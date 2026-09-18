@@ -1,9 +1,11 @@
 /**
  * How much text one classification may carry.
  *
- * The classifier holds a state cap — the judged text — inside a larger total
- * cap that also has to fit the questions and the answers. So the text budget is
- * arithmetic on what is left:
+ * The classifier's state cap covers the text **and** the questions together,
+ * which is measured rather than read off the name: 33,000 estimated tokens of
+ * text alone is accepted, while 31,000 of text beside a five-thousand-token
+ * question payload is refused with `max_tokens_exceeded`. So the text budget is
+ * arithmetic on what the questions leave:
  *
  * ```
  * text budget = state cap − questions − reserve

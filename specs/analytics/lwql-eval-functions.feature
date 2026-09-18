@@ -212,6 +212,13 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     And the other four rows hold their answers
 
   @unit
+  Scenario: A statement that judges nothing resolves no gate and builds no classifier
+    Given a statement that calls no eval function
+    When it is executed
+    Then the project's Instant Evals gate is never resolved
+    And no classifier is built for the query
+
+  @unit
   Scenario: A text the classifier failed on is skipped, not reported as a missing key
     Given a classifier that drops one text of two and answers the other
     When the statement is hydrated

@@ -30,11 +30,18 @@ export const INSTANT_EVALS_FLAG = "release_instant_evals";
 export async function instantEvalsEnabled({
   prisma,
   projectId,
+  isClassifierConfigured = isInstantEvalClassifierConfigured,
 }: {
   prisma: PrismaClient;
   projectId: string;
+  /**
+   * Reads the deployment's configuration, injectable so a test can state the
+   * operational condition instead of inheriting whatever the ambient
+   * environment happens to say about it.
+   */
+  isClassifierConfigured?: () => boolean;
 }): Promise<boolean> {
-  if (!isInstantEvalClassifierConfigured()) return false;
+  if (!isClassifierConfigured()) return false;
 
   const project = await prisma.project.findUnique({
     where: { id: projectId },

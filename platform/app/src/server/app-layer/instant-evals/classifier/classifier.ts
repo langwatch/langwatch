@@ -122,9 +122,27 @@ export interface InstantEvalJudgement {
 
 /** What one request may carry. Published by the implementation, never assumed. */
 export interface InstantEvalClassifierLimits {
-  /** Tokens of judged text one request may carry. */
+  /**
+   * Tokens one request may carry for the text **and** its questions together.
+   *
+   * Measured, because the name suggests otherwise and the wrong reading costs
+   * a failed request per row: 33,000 estimated tokens of text alone is
+   * accepted (29,606 real input tokens), while 31,000 of text plus a
+   * five-thousand-token question payload is refused with
+   * `max_tokens_exceeded`. So the questions are charged against this ceiling
+   * and the text budget is this less the questions less the reserve. Budgeting
+   * the text against the total ceiling instead would over-fill every request
+   * carrying a large category question.
+   */
   readonly stateTokens: number;
-  /** Tokens of text, questions and answer space together. */
+  /**
+   * Tokens the whole exchange may carry, the answers included.
+   *
+   * Not the text ceiling, and not what the text budget is derived from: it is
+   * far above {@link InstantEvalClassifierLimits.stateTokens} and no request
+   * this API builds can reach it, so it is published for completeness rather
+   * than enforced.
+   */
   readonly totalTokens: number;
   /** Options one category question may offer. */
   readonly maxCategoryOptions: number;

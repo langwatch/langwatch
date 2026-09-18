@@ -291,7 +291,15 @@ export function createEnvConfig() {
       // functions are published as unavailable and every judgement is skipped,
       // which is what a self-hosted install with nothing configured gets.
       JEV_API_KEY: z.string().optional(),
-      JEV_BASE_URL: z.string().url().optional(),
+      // HTTPS only: the classifier key travels in an Authorization header, so
+      // a plaintext origin would put it on the wire in the clear.
+      JEV_BASE_URL: z
+        .string()
+        .url()
+        .refine((value) => value.startsWith("https://"), {
+          message: "JEV_BASE_URL must use https",
+        })
+        .optional(),
       JEV_MODEL: z.string().optional(),
       INSTANT_EVAL_CLASSIFIER: z.enum(["jev", "null"]).optional(),
       INSTANT_EVAL_GLOBAL_RPS: z.coerce.number().int().positive().optional(),

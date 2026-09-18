@@ -1,10 +1,10 @@
 /**
- * The judged half of hydration, against a classifier that records what it was
- * asked.
+ * What a judged statement costs, and which questions travel together.
  *
- * The claims worth making here are about *grouping and cost*, not about the
- * judge: how many requests one statement costs, which questions travel
- * together, and what a cell holds when nothing answered. The judge's own
+ * The claims here are about *grouping and cost*, not about the judge: how many
+ * requests one statement costs, which questions share a request, and which
+ * reading each eval function takes off one verdict. What a cell holds when the
+ * judge did not answer is `./evaluateSkips.unit.test.ts`; the judge's own
  * behaviour is the classifier suite's.
  *
  * @see ../hydration/evaluate.ts
@@ -12,68 +12,15 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type {
-  InstantEvalClassifier,
-  InstantEvalClassifyRequest,
-  InstantEvalJudgement,
-  InstantEvalVerdict,
-} from "~/server/app-layer/instant-evals/classifier/classifier";
-import { INSTANT_EVAL_PRICING } from "~/server/app-layer/instant-evals/classifier/pricing";
-import { INSTANT_EVAL_CLASSIFIER_LIMITS } from "~/server/app-layer/instant-evals/classifier/token-budget";
-import type { InstantEvalHydrationSupport } from "../hydration/contract";
-import type { LangWatchQLAppFunctionCall } from "../plan";
-import { hydrate, sourceOf, trace } from "./hydrateFixtures";
-
-const THREAD = "conversation-1";
-
-/** A classifier that records its requests and answers from a fixed table. */
-function classifierAnswering(
-  answer: (request: InstantEvalClassifyRequest) => InstantEvalJudgement,
-): InstantEvalClassifier & { requests: InstantEvalClassifyRequest[] } {
-  const requests: InstantEvalClassifyRequest[] = [];
-  return {
-    requests,
-    limits: INSTANT_EVAL_CLASSIFIER_LIMITS,
-    pricing: INSTANT_EVAL_PRICING,
-    async classify(request) {
-      requests.push(request);
-      return answer(request);
-    },
-  };
-}
-
-function judged(verdicts: InstantEvalVerdict[]): InstantEvalJudgement {
-  return { verdicts, inputTokens: 100, isTextTruncated: false };
-}
-
-function support(
-  classifier: InstantEvalClassifier,
-): InstantEvalHydrationSupport {
-  return { classifier, maxConcurrency: 4, queryTokenBudget: 4_000_000 };
-}
-
-const evalOverConversation = (
-  column: string,
-  options: LangWatchQLAppFunctionCall["options"],
-  fn = "eval",
-): LangWatchQLAppFunctionCall => ({
-  column,
-  function: fn,
-  options,
-  source: { function: "conversation", options: [] },
-});
-
-const threadSource = () =>
-  sourceOf({
-    threadTraces: [
-      trace({
-        traceId: "trace-1",
-        threadKey: THREAD,
-        input: "my order never arrived",
-        output: "I am sorry about that",
-      }),
-    ],
-  });
+import {
+  classifierAnswering,
+  evalOverConversation,
+  judged,
+  support,
+  THREAD,
+  threadSource,
+} from "./evaluateFixtures";
+import { hydrate, sourceOf } from "./hydrateFixtures";
 
 describe("given one eval over an extracted conversation", () => {
   describe("when the statement is hydrated", () => {
@@ -276,153 +223,6 @@ describe("given one verdict read four different ways", () => {
         label: "refund",
         distribution: JSON.stringify({ refund: 0.7, bug: 0.3 }),
       });
-    });
-  });
-});
-
-describe("given a classifier that skips one text and answers the rest", () => {
-  describe("when the statement is hydrated", () => {
-    /** @scenario "A row the classifier could not judge is skipped rather than guessed" */
-    it("leaves that cell null and says how many texts went unjudged", async () => {
-      const classifier = classifierAnswering((request) =>
-        request.text.includes("second")
-          ? {
-              verdicts: [],
-              skippedReason: "classifier_rate_limited",
-              inputTokens: 0,
-              isTextTruncated: false,
-            }
-          : judged([{ questionId: "annoyed", probability: 0.4 }]),
-      );
-
-      const result = await hydrate({
-        calls: [{ column: "annoyed", function: "eval", options: ["Annoyed"] }],
-        columns: [{ name: "annoyed", type: "Nullable(String)" }],
-        rows: [{ annoyed: "the first one" }, { annoyed: "the second one" }],
-        traceSource: sourceOf(),
-        instantEvals: support(classifier),
-      });
-
-      expect(result.rows).toEqual([{ annoyed: 0.4 }, { annoyed: null }]);
-      expect(result.evalUsage?.skipped).toEqual({ classifier_rate_limited: 1 });
-      expect(result.evalUsage?.requests).toBe(2);
-    });
-  });
-});
-
-describe("given a key that resolves to no text at all", () => {
-  describe("when the statement is hydrated", () => {
-    it("leaves the cell null and reports the key as unresolved", async () => {
-      const classifier = classifierAnswering(() => judged([]));
-
-      const result = await hydrate({
-        calls: [evalOverConversation("annoyed", ["Annoyed"])],
-        columns: [{ name: "annoyed", type: "Nullable(String)" }],
-        rows: [{ annoyed: "conversation-that-does-not-exist" }],
-        traceSource: sourceOf(),
-        instantEvals: support(classifier),
-      });
-
-      expect(result.rows).toEqual([{ annoyed: null }]);
-      expect(result.unresolvedKeys).toEqual([
-        { column: "annoyed", function: "eval", keys: 1 },
-      ]);
-      expect(classifier.requests).toHaveLength(0);
-    });
-  });
-});
-
-describe("given a caller that cancels mid-query", () => {
-  describe("when the statement is being judged", () => {
-    /** @scenario "A cancelled query stops judging instead of paying out the rest" */
-    it("stops sending and propagates the cancellation", async () => {
-      const controller = new AbortController();
-      let asked = 0;
-      const classifier = classifierAnswering(() => {
-        asked += 1;
-        controller.abort();
-        return judged([{ questionId: "annoyed", probability: 0.5 }]);
-      });
-
-      const run = hydrate({
-        calls: [{ column: "annoyed", function: "eval", options: ["Annoyed"] }],
-        columns: [{ name: "annoyed", type: "Nullable(String)" }],
-        rows: [
-          { annoyed: "one" },
-          { annoyed: "two" },
-          { annoyed: "three" },
-          { annoyed: "four" },
-        ],
-        traceSource: sourceOf(),
-        instantEvals: {
-          classifier,
-          maxConcurrency: 1,
-          queryTokenBudget: 4_000_000,
-        },
-        signal: controller.signal,
-      });
-
-      await expect(run).rejects.toThrow();
-      // The first unit was in flight when the cancellation landed; the three
-      // behind it were never sent.
-      expect(asked).toBe(1);
-    });
-
-    it("hands the classifier the signal, so a request in flight is dropped too", async () => {
-      const controller = new AbortController();
-      const seen: (AbortSignal | undefined)[] = [];
-      const classifier: InstantEvalClassifier = {
-        limits: INSTANT_EVAL_CLASSIFIER_LIMITS,
-        pricing: INSTANT_EVAL_PRICING,
-        async classify(_request, signal) {
-          seen.push(signal);
-          return judged([{ questionId: "annoyed", probability: 0.5 }]);
-        },
-      };
-
-      await hydrate({
-        calls: [{ column: "annoyed", function: "eval", options: ["Annoyed"] }],
-        columns: [{ name: "annoyed", type: "Nullable(String)" }],
-        rows: [{ annoyed: "one" }],
-        traceSource: sourceOf(),
-        instantEvals: {
-          classifier,
-          maxConcurrency: 1,
-          queryTokenBudget: 4_000_000,
-        },
-        signal: controller.signal,
-      });
-
-      expect(seen).toEqual([controller.signal]);
-    });
-  });
-});
-
-describe("given a classifier that fails on one text and answers the rest", () => {
-  describe("when the statement is hydrated", () => {
-    /** @scenario "A text the classifier failed on is skipped, not reported as a missing key" */
-    it("reports it as a skipped judgement rather than as an unresolved key", async () => {
-      const classifier = classifierAnswering((request) => {
-        if (request.text.includes("second")) {
-          throw new Error("the classifier dropped this one");
-        }
-        return judged([{ questionId: "annoyed", probability: 0.4 }]);
-      });
-
-      const result = await hydrate({
-        calls: [{ column: "annoyed", function: "eval", options: ["Annoyed"] }],
-        columns: [{ name: "annoyed", type: "Nullable(String)" }],
-        rows: [{ annoyed: "the first one" }, { annoyed: "the second one" }],
-        traceSource: sourceOf(),
-        instantEvals: support(classifier),
-      });
-
-      expect(result.rows).toEqual([{ annoyed: 0.4 }, { annoyed: null }]);
-      // The reason matters: the key resolved and the text was sent, so
-      // reporting it as a key that named nothing would send the caller to
-      // check their conversation ids.
-      expect(result.evalUsage?.skipped).toEqual({ classifier_failed: 1 });
-      expect(result.unresolvedKeys).toEqual([]);
     });
   });
 });

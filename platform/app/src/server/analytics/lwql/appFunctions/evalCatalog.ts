@@ -268,3 +268,43 @@ function categoryCall(name: string): string {
     `'question: wants information', 'other: anything else'])`
   );
 }
+
+/**
+ * A case-insensitive test for any eval function name applied as a call.
+ *
+ * Built from the catalog so a new eval function is covered by adding it there.
+ * `eval` being a prefix of the others is harmless: the pattern requires an open
+ * parenthesis after the name, so `eval_criteria(` never matches the `eval`
+ * branch.
+ */
+const EVAL_FUNCTION_MENTION = new RegExp(
+  `\\b(${LWQL_EVAL_FUNCTION_CATALOG.map((definition) => definition.name).join(
+    "|",
+  )})\\s*\\(`,
+  "i",
+);
+
+/**
+ * Whether a statement could possibly call an eval function.
+ *
+ * A text test rather than a parse, and deliberately one-sided: a false positive
+ * costs one flag lookup, a false negative would be a correctness bug, and a
+ * statement that does not name any of these functions cannot call one. It
+ * exists because resolving the gate means a project read and a flag evaluation,
+ * and the overwhelming majority of statements judge nothing. The parse stays
+ * single (ADR-083) — this reads the SQL as text and asks nothing of the parser.
+ */
+export function statementMightCallEvalFunction(sql: string): boolean {
+  return EVAL_FUNCTION_MENTION.test(sql);
+}
+
+/** Whether a validated statement actually judges anything. */
+export function callsEvalFunction(
+  calls: readonly { readonly function: string }[],
+): boolean {
+  return calls.some((call) =>
+    LWQL_EVAL_FUNCTION_CATALOG.some(
+      (definition) => definition.name === call.function,
+    ),
+  );
+}

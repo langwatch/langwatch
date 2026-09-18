@@ -90,7 +90,8 @@ export interface JevClassifierOptions {
   readonly limiter: InstantEvalRateLimiter;
   /** Injected by suites; a keep-alive pool to the classifier otherwise. */
   readonly dispatcher?: Dispatcher;
-  readonly sleep?: (ms: number) => Promise<void>;
+  /** Waits, and gives up waiting when the caller cancels. */
+  readonly sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
 }
 
 /** What one attempt came back as. */
@@ -99,7 +100,7 @@ type Attempt =
   | {
       readonly kind: "retry";
       readonly waitMs: number;
-      readonly rateLimited: boolean;
+      readonly isRateLimited: boolean;
     }
   | { readonly kind: "too_large" }
   | { readonly kind: "permanent"; readonly error: Error };
@@ -112,7 +113,7 @@ export class JevInstantEvalClassifier implements InstantEvalClassifier {
   private readonly model: string;
   private readonly dispatcher: Dispatcher;
   private readonly ownsDispatcher: boolean;
-  private readonly sleep: (ms: number) => Promise<void>;
+  private readonly sleep: (ms: number, signal?: AbortSignal) => Promise<void>;
 
   constructor(private readonly options: JevClassifierOptions) {
     const baseUrl = options.baseUrl?.trim() ?? JEV_DEFAULT_BASE_URL;
@@ -125,9 +126,7 @@ export class JevInstantEvalClassifier implements InstantEvalClassifier {
         connections: POOL_CONNECTIONS,
         keepAliveTimeout: 30_000,
       });
-    this.sleep =
-      options.sleep ??
-      ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+    this.sleep = options.sleep ?? abortableSleep;
   }
 
   async close(): Promise<void> {
@@ -171,8 +170,8 @@ export class JevInstantEvalClassifier implements InstantEvalClassifier {
   }): Promise<InstantEvalJudgement> {
     const state: AttemptState = {
       text,
-      truncated: isTextTruncated,
-      cutForSize: false,
+      isTruncated: isTextTruncated,
+      isCutForSize: false,
     };
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -180,7 +179,7 @@ export class JevInstantEvalClassifier implements InstantEvalClassifier {
       const outcome = await this.send({
         text: state.text,
         request,
-        truncated: state.truncated,
+        isTruncated: state.isTruncated,
         ...(signal ? { signal } : {}),
       });
 
@@ -190,7 +189,7 @@ export class JevInstantEvalClassifier implements InstantEvalClassifier {
         isLastAttempt: attempt === MAX_ATTEMPTS,
       });
       if (settled) return settled;
-      if (outcome.kind === "retry") await this.sleep(outcome.waitMs);
+      if (outcome.kind === "retry") await this.sleep(outcome.waitMs, signal);
     }
     return instantEvalSkipped("classifier_rate_limited");
   }
@@ -199,12 +198,12 @@ export class JevInstantEvalClassifier implements InstantEvalClassifier {
   private async send({
     text,
     request,
-    truncated,
+    isTruncated,
     signal,
   }: {
     text: string;
     request: InstantEvalClassifyRequest;
-    truncated: boolean;
+    isTruncated: boolean;
     signal?: AbortSignal;
   }): Promise<Attempt> {
     const body = JSON.stringify({
@@ -230,11 +229,11 @@ export class JevInstantEvalClassifier implements InstantEvalClassifier {
       // A transport failure is worth another try: the reference client retries
       // these on the same backoff as a 5xx, and one dropped socket in a
       // thousand-row query should not cost that row its answer.
-      return { kind: "retry", waitMs: backoffMs(1), rateLimited: false };
+      return { kind: "retry", waitMs: backoffMs(1), isRateLimited: false };
     }
 
     if (response.status === 200) {
-      return await this.readAnswer({ response, request, truncated });
+      return await this.readAnswer({ response, request, isTruncated });
     }
     return await classifyFailure({ response });
   }
@@ -242,11 +241,11 @@ export class JevInstantEvalClassifier implements InstantEvalClassifier {
   private async readAnswer({
     response,
     request,
-    truncated,
+    isTruncated,
   }: {
     response: Awaited<ReturnType<typeof undiciFetch>>;
     request: InstantEvalClassifyRequest;
-    truncated: boolean;
+    isTruncated: boolean;
   }): Promise<Attempt> {
     const parsed = classifierResponseSchema.safeParse(await response.json());
     if (!parsed.success) {
@@ -265,7 +264,7 @@ export class JevInstantEvalClassifier implements InstantEvalClassifier {
           response: parsed.data,
         }),
         inputTokens: parsed.data.usage?.input_tokens ?? 0,
-        isTextTruncated: truncated,
+        isTextTruncated: isTruncated,
       },
     };
   }
@@ -274,9 +273,9 @@ export class JevInstantEvalClassifier implements InstantEvalClassifier {
 /** What one text has become across the attempts so far. */
 interface AttemptState {
   text: string;
-  truncated: boolean;
+  isTruncated: boolean;
   /** Whether the too-large retry has already spent its one cut. */
-  cutForSize: boolean;
+  isCutForSize: boolean;
 }
 
 /**
@@ -300,10 +299,16 @@ function settle({
       reasons: [outcome.error],
     });
   }
-  if (outcome.kind === "too_large") return cutForRetry(state);
+  if (outcome.kind === "too_large") {
+    // On the last attempt there is no send left to cut for, and reporting it
+    // as rate limited would name the wrong cause entirely.
+    return isLastAttempt
+      ? instantEvalSkipped("classifier_input_too_large")
+      : cutForRetry(state);
+  }
   return isLastAttempt
     ? instantEvalSkipped(
-        outcome.rateLimited ? "classifier_rate_limited" : "classifier_failed",
+        outcome.isRateLimited ? "classifier_rate_limited" : "classifier_failed",
       )
     : null;
 }
@@ -315,9 +320,11 @@ function settle({
  * single miss is expected and a second is a text this request cannot carry.
  */
 function cutForRetry(state: AttemptState): InstantEvalJudgement | null {
-  if (state.cutForSize) return instantEvalSkipped("classifier_input_too_large");
-  state.cutForSize = true;
-  state.truncated = true;
+  if (state.isCutForSize) {
+    return instantEvalSkipped("classifier_input_too_large");
+  }
+  state.isCutForSize = true;
+  state.isTruncated = true;
   state.text = state.text.slice(
     0,
     Math.floor(state.text.length * TOO_LARGE_RETRY_FRACTION),
@@ -339,7 +346,7 @@ async function classifyFailure({
   }
   if (status === 429 || status === 529 || status >= 500) {
     const waitMs = retryAfterMs(response.headers.get("retry-after"));
-    const rateLimited = status === 429 || status === 529;
+    const isRateLimited = status === 429 || status === 529;
     if (waitMs !== null && waitMs > MAX_RETRY_AFTER_MS) {
       logger.warn(
         { status, waitMs },
@@ -349,7 +356,7 @@ async function classifyFailure({
     return {
       kind: "retry",
       waitMs: Math.min(waitMs ?? backoffMs(1), MAX_RETRY_AFTER_MS),
-      rateLimited,
+      isRateLimited,
     };
   }
   return {
@@ -368,6 +375,30 @@ function retryAfterMs(header: string | null): number | null {
 /** Flat 1s base, which the caller caps. Kept simple: the API names its own waits. */
 function backoffMs(attempt: number): number {
   return Math.min(1_000 * 2 ** (attempt - 1), MAX_RETRY_AFTER_MS);
+}
+
+/**
+ * Waits, and stops waiting when the caller cancels.
+ *
+ * A plain `setTimeout` would hold a cancelled query for the whole
+ * `Retry-After`, up to the thirty-second cap, after nobody was listening.
+ */
+function abortableSleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason);
+      return;
+    }
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(signal?.reason);
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
 }
 
 /** The caller's cancellation and our own timeout, together. */
