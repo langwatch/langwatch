@@ -120,3 +120,37 @@ describe("given a mount that resolves to no component", () => {
     expect(String(thrown[0])).toContain("SecretHostApi");
   });
 });
+
+describe("given a mount whose module will not load", () => {
+  /** @scenario "A mount with nothing to render is refused by name" */
+  it("names the module and host rather than only the chunk url", async () => {
+    const Hosts = createUiModuleHostStack([
+      {
+        module: "licensing",
+        host: "LicensingHostApi",
+        load: async () => {
+          throw new TypeError("Failed to fetch dynamically imported module: /@fs/x.tsx");
+        },
+      },
+    ]);
+    const thrown: unknown[] = [];
+
+    render(
+      <ErrorBoundary
+        FallbackComponent={({ error }) => {
+          thrown.push(error);
+          return <span>refused</span>;
+        }}
+      >
+        <Hosts>
+          <ProbeScreen />
+        </Hosts>
+      </ErrorBoundary>,
+    );
+
+    expect(await screen.findByText("refused")).toBeTruthy();
+    expect(String(thrown[0])).toContain("licensing");
+    expect(String(thrown[0])).toContain("LicensingHostApi");
+    expect((thrown[0] as Error).cause).toBeInstanceOf(TypeError);
+  });
+});

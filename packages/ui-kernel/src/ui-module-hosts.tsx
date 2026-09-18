@@ -11,16 +11,27 @@ import type { UiModuleHostMount } from "./ui-host-mounts.ts";
 /** What a mount's module resolves to: the provider, rendering its children. */
 type UiHostProvider = ComponentType<{ children?: ReactNode }>;
 
+/**
+ * A chunk that will not load throws `Failed to fetch dynamically imported
+ * module: <url>` and names no module, so every mount's failure reads the same
+ * and the stack is at the ROOT — the blank page is the whole application, not
+ * one screen. Saying which mount it was is the difference between a URL and an
+ * address in the tree.
+ */
 function loadHostProvider(mount: UiModuleHostMount): Promise<{ default: UiHostProvider }> {
-  return Promise.resolve(mount.load()).then((loaded) => {
-    const provider = (loaded as { default?: unknown }).default;
-    if (typeof provider !== "function") {
-      throw new Error(
-        `Module ${JSON.stringify(mount.module)} mounts ${mount.host} with no default-exported provider component.`,
-      );
-    }
-    return { default: provider as UiHostProvider };
-  });
+  const named = `Module ${JSON.stringify(mount.module)} mounts ${mount.host}`;
+  return Promise.resolve(mount.load()).then(
+    (loaded) => {
+      const provider = (loaded as { default?: unknown }).default;
+      if (typeof provider !== "function") {
+        throw new Error(`${named} with no default-exported provider component.`);
+      }
+      return { default: provider as UiHostProvider };
+    },
+    (cause: unknown) => {
+      throw new Error(`${named}, and its module did not load.`, { cause });
+    },
+  );
 }
 
 /**
