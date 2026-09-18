@@ -220,22 +220,7 @@
   "langwatchDeclarationGroup": {
     "members": [
       {
-        "directory": "../modules/agent/browser",
-        "source": "src",
-        "output": "dist"
-      },
-      {
         "directory": "../modules/scenario/browser",
-        "source": "src",
-        "output": "dist"
-      },
-      {
-        "directory": "../modules/coding-agent/browser",
-        "source": "src",
-        "output": "dist"
-      },
-      {
-        "directory": "../modules/annotation/browser",
         "source": "src",
         "output": "dist"
       },
@@ -251,11 +236,6 @@
       },
       {
         "directory": "../modules/project/browser",
-        "source": "src",
-        "output": "dist"
-      },
-      {
-        "directory": "../modules/onboarding/browser",
         "source": "src",
         "output": "dist"
       },
