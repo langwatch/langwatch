@@ -383,6 +383,18 @@ export interface LangyTurnServiceDeps {
    * open. Optional: absent means the warm assumes the cap is not reached.
    */
   checkPermit?: (args: { userId: string }) => Promise<{ allowed: boolean }>;
+  /**
+   * Whether the worker registers the pre-execution delete gate (#7608),
+   * resolved once per turn in the base-dependency phase. Contract: never throws
+   * (see `resolveLangyDeleteGate`). Optional: absent (tests, minimal
+   * compositions) leaves `credentials.deleteGate` unset, which the worker reads
+   * as ON — the fail-safe default.
+   */
+  resolveDeleteGate?: (args: {
+    userId: string;
+    projectId: string;
+    organizationId: string;
+  }) => Promise<boolean>;
   perDayPrCap: number;
   /** Mint the per-turn session key (prisma pre-bound at composition). */
   mintSessionKey: (args: {

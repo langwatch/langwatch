@@ -318,6 +318,15 @@ export const FEATURE_FLAGS = [
       "Lets a project API key start and continue Langy turns over the public REST surface (spec: specs/langy/langy-api-key-turns.feature). Strictly narrower than release_langy_enabled and ANDed with it: this flag opens a new way in for an actor who already has Langy, and never grants Langy itself. Off = the REST surface 404s and only the browser can start a turn, which is the rollback position — turning it off cannot break the in-product assistant. Internal flag store only, so the /ops/feature-flags toggle is the one lever.",
   },
   {
+    key: "release_langy_delete_gate",
+    scope: "SYSTEM",
+    defaultValue: true,
+    envOverridable: false,
+    family: "Langy",
+    description:
+      "Registers the pi worker's pre-execution delete gate, which holds every destructive LangWatch command until a genuine, freshly-given, correctly-bound user confirmation is on record (spec: specs/langy/langy-delete-gate.feature, issue #7608). Evaluated once per turn and written into the worker config; a flip takes effect on the next warm/probe-MISS re-warm, not on a live worker. Default ON = the gate ships everywhere; turning it off per project is the rollback lever (the worker registers no gate and destructive commands run unheld). Managed only from the internal flag store (/ops/feature-flags); PostHog and env vars are not consulted.",
+  },
+  {
     key: "release_langy_ui_actions",
     scope: "SYSTEM",
     defaultValue: true,
