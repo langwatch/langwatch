@@ -83,6 +83,27 @@ function sessionLines(...rowIds: string[]): string {
   );
 }
 
+/**
+ * The same session with every row dated at a moment the caller picks.
+ *
+ * A test about a file's modification time needs rows the row clock will accept,
+ * or the row clock is what excludes them and the file's age proves nothing. The
+ * default {@link ROW_TIME_ISO} is older than any `sinceMs` a test takes from the
+ * wall clock, which is exactly the trap: two such tests passed with the whole
+ * modification-time check deleted.
+ */
+function sessionLinesDated(timestampIso: string, ...rowIds: string[]): string {
+  return (
+    `${JSON.stringify({
+      type: "session",
+      id: SESSION_ID,
+      version: 3,
+      createdAt: timestampIso,
+    })}\n` +
+    rowIds.map((rowId) => messageLine(rowId, timestampIso)).join("")
+  );
+}
+
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), "pi-capture-"));
 });
@@ -913,28 +934,61 @@ describe("given pi was pointed at one session file by name", () => {
      * naming it must not change that — otherwise `--session` on an old session
      * would ship a conversation the user never launched through us.
      *
+     * The rows are dated AFTER the run began and the same file is harvested
+     * twice, once stale and once fresh. Both matter. Without the fresh rows the
+     * row clock does the excluding and the file's age is never consulted: the
+     * first version of this test passed with the modification-time check
+     * deleted outright, and passed again with the line that ages the file
+     * removed. Without the fresh pass, a reader that captured nothing at all
+     * would look correct here.
+     *
      * @scenario "A session pi was told to open by path is captured where it lies"
      */
     it("still leaves a file untouched since the run began alone", async () => {
       const startedMs = Date.now();
+      await writeFile(
+        named,
+        sessionLinesDated(new Date(startedMs + 1_000).toISOString(), "cccccccc"),
+        "utf8",
+      );
       const longBefore = new Date(startedMs - 60 * 60 * 1000);
       await utimes(named, longBefore, longBefore);
 
-      const fetchImpl = vi.fn(async () => {
+      const refusingFetch = vi.fn(async () => {
         throw new Error("nothing should be posted");
       }) as unknown as typeof fetch;
 
-      const capture = createPiCapture({
+      const stale = createPiCapture({
         sinceMs: startedMs,
         sessionsDir: dir,
         sessionFiles: [named],
         logsEndpoint: LOGS_ENDPOINT,
         token: "sk-lw-test",
-        fetchImpl,
+        fetchImpl: refusingFetch,
       });
 
-      expect(await capture.harvest()).toBe(0);
-      expect(fetchImpl).not.toHaveBeenCalled();
+      expect(await stale.harvest()).toBe(0);
+      expect(refusingFetch).not.toHaveBeenCalled();
+
+      // The control: the same rows, the same name, a file touched during the
+      // run. Anything that stops this one is stopping it for a reason other
+      // than the file's age.
+      const now = new Date();
+      await utimes(named, now, now);
+      const acceptingFetch = vi.fn(
+        async () => ({ ok: true, status: 200 }) as Response,
+      ) as unknown as typeof fetch;
+
+      const fresh = createPiCapture({
+        sinceMs: startedMs,
+        sessionsDir: dir,
+        sessionFiles: [named],
+        logsEndpoint: LOGS_ENDPOINT,
+        token: "sk-lw-test",
+        fetchImpl: acceptingFetch,
+      });
+
+      expect(await fresh.harvest()).toBe(1);
     });
   });
 
@@ -1111,24 +1165,51 @@ describe("given a resume that reopened another project's session", () => {
      */
     it("still leaves a sibling session untouched since the run began alone", async () => {
       const startedMs = Date.now();
+      const sibling = join(theirs, "resumed.jsonl");
+      // Dated after the run began, so only the file's age can exclude it. With
+      // the default row time this test passed with the whole window deleted.
+      await writeFile(
+        sibling,
+        sessionLinesDated(new Date(startedMs + 1_000).toISOString(), "cccccccc"),
+        "utf8",
+      );
       const longBefore = new Date(startedMs - 60 * 60 * 1000);
-      await utimes(join(theirs, "resumed.jsonl"), longBefore, longBefore);
+      await utimes(sibling, longBefore, longBefore);
 
-      const fetchImpl = vi.fn(async () => {
+      const refusingFetch = vi.fn(async () => {
         throw new Error("nothing should be posted");
       }) as unknown as typeof fetch;
 
-      const capture = createPiCapture({
+      const stale = createPiCapture({
         sinceMs: startedMs,
         sessionsDir: ours,
         crossProjectSessionsRoot: root,
         logsEndpoint: LOGS_ENDPOINT,
         token: "sk-lw-test",
-        fetchImpl,
+        fetchImpl: refusingFetch,
       });
 
-      expect(await capture.harvest()).toBe(0);
-      expect(fetchImpl).not.toHaveBeenCalled();
+      expect(await stale.harvest()).toBe(0);
+      expect(refusingFetch).not.toHaveBeenCalled();
+
+      // The control: same file, same rows, touched during the run. It proves
+      // the silence above belongs to the file's age and to nothing else.
+      const now = new Date();
+      await utimes(sibling, now, now);
+      const acceptingFetch = vi.fn(
+        async () => ({ ok: true, status: 200 }) as Response,
+      ) as unknown as typeof fetch;
+
+      const fresh = createPiCapture({
+        sinceMs: startedMs,
+        sessionsDir: ours,
+        crossProjectSessionsRoot: root,
+        logsEndpoint: LOGS_ENDPOINT,
+        token: "sk-lw-test",
+        fetchImpl: acceptingFetch,
+      });
+
+      expect(await fresh.harvest()).toBe(1);
     });
   });
 });
