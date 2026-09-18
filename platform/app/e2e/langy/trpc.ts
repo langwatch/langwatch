@@ -36,10 +36,11 @@ export function resetSessionCookie(): void {
 }
 
 /**
- * Create an account through the same endpoint the sign-up form posts to.
- * The response also signs the account in, but the session helper does its
- * own sign-in once `useAccount` points at the new credentials, so nothing
- * here keeps a cookie.
+ * Create an account a scenario can sign in with. Registration asks for the
+ * proof an emailed link hands out, which a scenario cannot read, so the
+ * account is seeded in the local stack's database (see seed-account.ts, which
+ * refuses anything that is not on this machine). The session helper does its
+ * own sign-in once `useAccount` points at the new credentials.
  */
 export async function signUpAccount({
   name,
@@ -50,17 +51,11 @@ export async function signUpAccount({
   email: string;
   password: string;
 }): Promise<void> {
-  const res = await fetch(`${APP_BASE}/api/auth/sign-up/email`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Origin: APP_BASE },
-    body: JSON.stringify({ name, email, password }),
-    signal: AbortSignal.timeout(60_000),
-  });
-  if (!res.ok) {
-    throw new Error(
-      `Langy test sign-up failed for ${email}: ${res.status} ${await res.text()}`,
-    );
-  }
+  const { openLocalAccountStore, seedCredentialAccount } = await import(
+    "./seed-account"
+  );
+  const store = await openLocalAccountStore({ appBase: APP_BASE });
+  await seedCredentialAccount({ name, email, password, store });
 }
 
 /**
