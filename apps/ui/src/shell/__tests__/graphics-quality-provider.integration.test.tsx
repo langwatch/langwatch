@@ -4,11 +4,12 @@
  */
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useGraphicsQuality } from "../../behavior/use-graphics-quality";
+
 import {
   resetGraphicsQualityOverrideForTests,
   setGraphicsQualityOverride,
 } from "../../behavior/graphics-quality-override-store";
+import { useGraphicsQuality } from "../../behavior/use-graphics-quality";
 import { GraphicsQualityProvider } from "../graphics-quality-provider";
 
 let pendingCallback: FrameRequestCallback | null = null;

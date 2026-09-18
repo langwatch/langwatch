@@ -7,6 +7,7 @@
 import { trpcQueryKey } from "@langwatch/api/web";
 import type { QueryClient } from "@tanstack/react-query";
 import { createContext, useContext } from "react";
+
 import type { UiFeatureApiTransport } from "./ui-feature-transport";
 
 /** What a live procedure hands its subscriber, one entry at a time. */

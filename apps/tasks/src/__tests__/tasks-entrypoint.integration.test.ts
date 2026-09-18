@@ -43,7 +43,8 @@ describe("apps/tasks entrypoint", () => {
       });
       await expect(failure).rejects.toMatchObject({
         code: 1,
-        stderr: expect.stringContaining("Invalid tasks configuration"),
+        // The one parse refuses naming owner, field and the variable behind it.
+        stderr: expect.stringContaining("tasks.nodeEnvironment ← NODE_ENV"),
         stdout: expect.not.stringContaining("skipping Prisma migrations"),
       });
     }, 60_000);

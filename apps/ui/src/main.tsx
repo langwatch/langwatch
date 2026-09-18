@@ -13,7 +13,9 @@ import {
   createUiFeatureApiClient,
   type UiFeatureApiTransport,
 } from "./behavior/ui-feature-transport";
+import { BrowserUiFeedback } from "./behavior/ui-feedback";
 import { installedModuleScreens, type UiModuleScreens } from "./behavior/ui-module-screens";
+import { useBrowserUiSession } from "./behavior/ui-session";
 import { UiShell } from "./behavior/ui-shell";
 import { UiRuntime } from "./behavior/ui.runtime";
 import type { PublicEnvironment } from "./model/public-environment";
@@ -65,7 +67,15 @@ class BrowserUiShell extends UiShell {
     return new BrowserUiShell(
       createUiApplication({
         drawers,
-        features: { loaders: screens.loaders, routes: screens.routes, transport },
+        features: {
+          loaders: screens.loaders,
+          routes: screens.routes,
+          transport,
+          // Without these the shell resolves the REFUSING defaults, so the first
+          // session read throws instead of answering. See ARCHITECTURE.md 10.1.
+          session: useBrowserUiSession,
+          capabilities: { feedback: BrowserUiFeedback.create() },
+        },
         providers: {
           attribution: UiPendingProvider,
           session: UiPendingProvider,

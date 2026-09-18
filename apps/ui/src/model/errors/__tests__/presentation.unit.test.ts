@@ -4,9 +4,6 @@
  * dump (ADR-045 + #5984).
  */
 import { goErrorCodes, nodeErrorCodes } from "@langwatch/handled-error";
-import { describe, expect, it } from "vitest";
-import { z } from "zod";
-
 import { APP_ERROR_CODES } from "@langwatch/handled-error/app-codes";
 import {
   explainHandledError,
@@ -14,6 +11,8 @@ import {
   UNKNOWN_ERROR_PRESENTATION,
 } from "@langwatch/handled-error/presentation";
 import type { HandledErrorShape } from "@langwatch/handled-error/read-handled-error";
+import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 /** Every code the registry must cover — app + generated Go + generated node. */
 const ALL_CODES = [
@@ -106,10 +105,7 @@ describe("explainHandledError", () => {
         shape({
           code: "lwql_reserved_parameter_supplied",
           meta: {
-            parameters: [
-              "dashboard_context_period_start",
-              "dashboard_context_period_end",
-            ],
+            parameters: ["dashboard_context_period_start", "dashboard_context_period_end"],
           },
         }),
       );

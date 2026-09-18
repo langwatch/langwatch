@@ -1,6 +1,7 @@
 import { setTimeout as sleep } from "node:timers/promises";
-import { execa } from "execa";
+
 import { nowInstant } from "@langwatch/time";
+import { execa } from "execa";
 
 export type HealthProbeOk = { ok: true; durationMs: number };
 export type HealthProbeFail = { ok: false; durationMs: number; reason: string };

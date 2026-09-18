@@ -1,12 +1,14 @@
-import { execa } from "execa";
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
+
+import { nowInstant } from "@langwatch/time";
+import { execa } from "execa";
+
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
 import { execCheck, pollUntilHealthy } from "./health.ts";
 import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
-import { nowInstant } from "@langwatch/time";
 
 const DB_USER = "langwatch";
 const DB_NAME = "langwatch_db";

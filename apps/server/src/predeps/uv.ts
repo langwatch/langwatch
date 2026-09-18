@@ -1,6 +1,8 @@
-import { execa } from "execa";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+
+import { execa } from "execa";
+
 import type { Predep, DetectionResult } from "./types.ts";
 
 async function resolveVersion(bin: string): Promise<string | null> {

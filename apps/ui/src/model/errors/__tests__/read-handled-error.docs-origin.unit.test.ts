@@ -1,10 +1,9 @@
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 // @vitest-environment node
 /**
  * The docs-origin allowlist, asserted from a NON-development runtime.
  */
 import { describe, expect, it } from "vitest";
-
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 
 const trpcError = (error: unknown) => ({ data: { error } });
 

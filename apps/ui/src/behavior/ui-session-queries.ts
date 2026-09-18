@@ -6,6 +6,7 @@
 
 import { trpcQueryKey } from "@langwatch/api/web";
 import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
+
 import type { UiScopeOrganization } from "../model/ui-scope";
 import type { UiFeatureApiTransport } from "./ui-feature-transport";
 

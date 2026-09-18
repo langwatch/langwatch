@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+
 import { pollForGlobal } from "./poll-for-global";
 
 declare global {

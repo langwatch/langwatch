@@ -5,10 +5,7 @@ export {
   type UiApplicationShellProps,
   type UiOuterProvider,
 } from "./shell/ui-application-shell";
-export {
-  UiDesignSystemShell,
-  type UiDesignSystemShellProps,
-} from "./shell/ui-design-system-shell";
+export { UiDesignSystemShell, type UiDesignSystemShellProps } from "./shell/ui-design-system-shell";
 export { UiPrefixRedirect } from "./shell/ui-prefix-redirect";
 export {
   forceReloadOnce,
@@ -146,10 +143,7 @@ export {
 } from "./model/ui-route-table";
 export type { UiApplication, UiApplicationInstall } from "./shell/ui-application";
 export { createUiFeatureShell, type UiFeatureShellInstall } from "./shell/ui-feature-shell";
-export {
-  createUiInnerProvider,
-  type UiInnerProviderInstall,
-} from "./shell/ui-inner-providers";
+export { createUiInnerProvider, type UiInnerProviderInstall } from "./shell/ui-inner-providers";
 export {
   createUiOuterProvider,
   type UiOuterProviderInstall,

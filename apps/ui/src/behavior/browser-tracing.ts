@@ -5,6 +5,7 @@
 
 import { RUM_DEFAULT_SAMPLE_RATIO, startBrowserTracing } from "@langwatch/react-rum";
 import { useEffect } from "react";
+
 import type { PublicEnvironment } from "../model/public-environment";
 
 export type BrowserTracingPublicConfig = {

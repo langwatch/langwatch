@@ -4,7 +4,7 @@
  * `createProject` drawer; the popup's own interaction is navigation-web's.
  */
 
-import { WithStubNavigationHost } from "@langwatch/navigation-web/testing";
+import { WithStubNavigationHost } from "@langwatch/navigation-browser/testing";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -14,17 +14,18 @@ const capturedProps: {
 } = {};
 
 vi.mock("@langwatch/browser-host/drawer", async () => {
-  const actual =
-    await vi.importActual<typeof import("@langwatch/browser-host/drawer")>("@langwatch/browser-host/drawer");
+  const actual = await vi.importActual<typeof import("@langwatch/browser-host/drawer")>(
+    "@langwatch/browser-host/drawer",
+  );
   return {
     ...actual,
     useDrawer: () => ({ openDrawer: openDrawerMock, closeDrawer: () => {} }),
   };
 });
 
-vi.mock("@langwatch/navigation-web/chrome", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/navigation-web/chrome")>(
-    "@langwatch/navigation-web/chrome",
+vi.mock("@langwatch/navigation-browser/chrome", async () => {
+  const actual = await vi.importActual<typeof import("@langwatch/navigation-browser/chrome")>(
+    "@langwatch/navigation-browser/chrome",
   );
   return {
     ...actual,

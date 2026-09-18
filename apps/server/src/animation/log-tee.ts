@@ -1,6 +1,8 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
+
 import chalk from "chalk";
+
 import { paths } from "../shared/paths.ts";
 import { exitCause, type RuntimeEvent } from "../shared/runtime-contract.ts";
 

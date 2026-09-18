@@ -2,20 +2,19 @@ import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
+  PrismaDriverAdapterService,
   PrismaShutdownService,
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import type { TasksConfig } from "./config.ts";
+import type { TasksConfig, TasksDatabase } from "./config.ts";
+import { holdMigrationLock } from "./migration-lock.ts";
 
-export async function withDatabase(
-  config: TasksConfig,
-  run: (database: PrismaClient) => Promise<void>,
-): Promise<void> {
-  const databaseUrl = config.databaseUrl?.trim();
-  if (!databaseUrl) throw new Error("This task needs DATABASE_URL");
-
+/**
+ * Connects at the one site the URL exists — inside the boot seam's
+ * `secrets.into(...)` closure. Only the open connection escapes.
+ */
+export function openTasksDatabase(databaseUrl: string, config: TasksConfig): TasksDatabase {
   const connection = PrismaConnectionService.create({
     guard: PrismaTenancyGuardService.create(),
     logger: createLogger("langwatch:tasks:database"),
@@ -25,9 +24,15 @@ export async function withDatabase(
       log: config.nodeEnvironment === "development" ? ["error", "warn"] : ["error"],
     }),
   );
-  try {
-    await run(connection.client);
-  } finally {
-    await PrismaShutdownService.create().shutdown(connection);
-  }
+  // Session-scoped advisory locks need their own connection for the sequence.
+  const { pool } = PrismaDriverAdapterService.create().create(databaseUrl);
+
+  return {
+    client: connection.client,
+    hold: (run) => holdMigrationLock(pool, run),
+    close: async () => {
+      await pool.end();
+      await PrismaShutdownService.create().shutdown(connection);
+    },
+  };
 }

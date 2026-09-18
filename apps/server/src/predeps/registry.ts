@@ -1,15 +1,15 @@
+import type { LocalOrchestratorDevelopmentConfig } from "../platform/config/local-orchestrator.config.ts";
+import { resolveEffectiveFeatures } from "../shared/features.ts";
+import { paths } from "../shared/paths.ts";
 import { makeAigatewayPredep } from "./aigateway.ts";
-import { makeOpencodePredep } from "./opencode.ts";
 import { clickhousePredep } from "./clickhouse.ts";
 import { goosePredep } from "./goose.ts";
+import { makeOpencodePredep } from "./opencode.ts";
 import { pnpmPredep } from "./pnpm.ts";
 import { makePostgresPredep } from "./postgres.ts";
 import { redisPredep } from "./redis.ts";
-import { uvPredep } from "./uv.ts";
-import { resolveEffectiveFeatures } from "../shared/features.ts";
-import { paths } from "../shared/paths.ts";
 import type { Predep } from "./types.ts";
-import type { LocalOrchestratorDevelopmentConfig } from "../platform/config/local-orchestrator.config.ts";
+import { uvPredep } from "./uv.ts";
 
 export function predepRegistry({
   version,

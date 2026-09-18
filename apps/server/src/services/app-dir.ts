@@ -8,11 +8,13 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { nowInstant } from "@langwatch/time";
 import { execa } from "execa";
+
 import { paths } from "../shared/paths.ts";
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
-import { nowInstant } from "@langwatch/time";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 

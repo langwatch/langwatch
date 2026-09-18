@@ -1,6 +1,7 @@
 import type { RouteObject } from "react-router";
-import type { UiFeatureApiBinding } from "./ui-feature-transport";
+
 import type { UiFeature } from "./ui-feature";
+import type { UiFeatureApiBinding } from "./ui-feature-transport";
 
 export type UiWebRouteParent = "project";
 

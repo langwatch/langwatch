@@ -1,5 +1,7 @@
-import { execa, type Options as ExecaOptions, type ResultPromise } from "execa";
 import type { Readable } from "node:stream";
+
+import { execa, type Options as ExecaOptions, type ResultPromise } from "execa";
+
 import type { EventBus } from "./event-bus.ts";
 
 // Capture child stdout/stderr line-by-line to EventBus for parallel install steps.

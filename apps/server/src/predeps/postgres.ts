@@ -1,11 +1,13 @@
-import { execa } from "execa";
 import { createHash } from "node:crypto";
 import { createReadStream, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { pipeline } from "node:stream/promises";
+
+import { execa } from "execa";
+
 import embedsVersions from "../../embeds.versions.json" with { type: "json" };
-import { downloadWithProgress } from "./_download.ts";
 import type { LocalOrchestratorDevelopmentConfig } from "../platform/config/local-orchestrator.config.ts";
+import { downloadWithProgress } from "./_download.ts";
 import type { Predep } from "./types.ts";
 
 // Embedded postgres tarballs are built nightly by .github/workflows/

@@ -5,15 +5,16 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { WithStubNavigationHost } from "@langwatch/navigation-web/testing";
+import { WithStubNavigationHost } from "@langwatch/navigation-browser/testing";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const openDrawerMock = vi.fn();
 
 vi.mock("@langwatch/browser-host/drawer", async () => {
-  const actual =
-    await vi.importActual<typeof import("@langwatch/browser-host/drawer")>("@langwatch/browser-host/drawer");
+  const actual = await vi.importActual<typeof import("@langwatch/browser-host/drawer")>(
+    "@langwatch/browser-host/drawer",
+  );
   return {
     ...actual,
     useDrawer: () => ({ openDrawer: openDrawerMock, closeDrawer: () => {} }),

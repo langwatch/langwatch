@@ -2,8 +2,8 @@
  * Whether a routed page opens at all.
  */
 
-import type { ComponentType } from "react";
 import { useUiCapabilities } from "@langwatch/browser-host/capabilities";
+import type { ComponentType } from "react";
 
 export type UiPageGuardFallbacks = {
   /** While the flags this page is behind have not answered. */

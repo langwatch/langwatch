@@ -3,6 +3,7 @@
  */
 
 import type { ComponentType, ReactNode } from "react";
+
 import { uiDesignSystem } from "../behavior/design-system";
 import { UiDesignSystemShell } from "./ui-design-system-shell";
 

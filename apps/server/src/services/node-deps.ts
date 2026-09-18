@@ -10,12 +10,14 @@ import {
   writeFileSync,
 } from "node:fs";
 import { basename, dirname, join, relative, sep } from "node:path";
+
+import { nowInstant } from "@langwatch/time";
 import { execa } from "execa";
+
 import type { LangwatchPaths } from "../shared/paths.ts";
 import { execAndPipe } from "./_pipe-to-bus.ts";
 import { appRoot } from "./app-dir.ts";
 import type { EventBus } from "./event-bus.ts";
-import { nowInstant } from "@langwatch/time";
 
 /**
  * Workspace names of the four deployables, used to filter the install.

@@ -4,8 +4,8 @@ import {
   environmentLegacyTruthySchema,
   environmentNotExactOneSchema,
   environmentPresenceSchema,
-  RuntimeConfig,
-  type ConfigValue,
+  parseProcessConfig,
+  type ConfigOf,
 } from "@langwatch/config";
 
 /**
@@ -13,22 +13,18 @@ import {
  * Provider credentials remain explicit child-process pass-through values;
  * they are not configuration for the launcher to inspect or retain.
  */
-export const localOrchestratorConfigDefinition = RuntimeConfig.define({
+export const localOrchestratorConfig = Config.define((c) => ({
   browser: {
-    openEnabled: Config.value(environmentNotExactOneSchema, { env: "LANGWATCH_NO_OPEN" }),
-    continuousIntegration: Config.value(environmentPresenceSchema, { env: "CI" }),
+    openEnabled: c.env("LANGWATCH_NO_OPEN", environmentNotExactOneSchema),
+    continuousIntegration: c.env("CI", environmentPresenceSchema),
   },
   development: {
-    aiGatewayDevBuild: Config.value(environmentExactOneSchema, {
-      env: "LANGWATCH_AIGATEWAY_DEV_BUILD",
-    }),
-    forceBundledPostgres: Config.value(environmentLegacyTruthySchema, {
-      env: "LANGWATCH_FORCE_BUNDLED_POSTGRES",
-    }),
+    aiGatewayDevBuild: c.env("LANGWATCH_AIGATEWAY_DEV_BUILD", environmentExactOneSchema),
+    forceBundledPostgres: c.env("LANGWATCH_FORCE_BUNDLED_POSTGRES", environmentLegacyTruthySchema),
   },
-});
+}));
 
-export type LocalOrchestratorConfig = ConfigValue<typeof localOrchestratorConfigDefinition>;
+export type LocalOrchestratorConfig = ConfigOf<typeof localOrchestratorConfig>;
 
 export type LocalOrchestratorDevelopmentConfig = LocalOrchestratorConfig["development"];
 
@@ -36,9 +32,12 @@ export type LocalOrchestratorDevelopmentConfig = LocalOrchestratorConfig["develo
 export function resolveLocalOrchestratorConfig(
   source: Readonly<Record<string, unknown>>,
 ): LocalOrchestratorConfig {
-  return RuntimeConfig.create({
-    name: "local orchestrator",
-    definition: localOrchestratorConfigDefinition,
-    source,
-  }).value;
+  const environment = Object.fromEntries(
+    Object.entries(source).map(([key, value]) => [key, typeof value === "string" ? value : void 0]),
+  );
+
+  return parseProcessConfig({
+    owners: [{ name: "orchestrator", config: localOrchestratorConfig }],
+    environment,
+  }).orchestrator;
 }

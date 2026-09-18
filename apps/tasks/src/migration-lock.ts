@@ -1,5 +1,4 @@
 import { createLogger } from "@langwatch/observability";
-import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 
 export function migrationLockKey(): string {
   let hash = 0xcbf29ce484222325n;
@@ -9,39 +8,38 @@ export function migrationLockKey(): string {
   return BigInt.asIntN(64, hash).toString();
 }
 
-export async function withMigrationLock(
-  databaseUrl: string | undefined,
+/** Runs `run` under the advisory lock, on a connection from the given pool. */
+export async function holdMigrationLock(
+  pool: { connect(): Promise<PoolClient> },
   run: () => Promise<void>,
 ): Promise<void> {
-  if (!databaseUrl) return run();
-
-  // Session-scoped advisory locks need a dedicated connection for the entire sequence.
-  const { pool } = PrismaDriverAdapterService.create().create(databaseUrl);
+  const client = await pool.connect();
+  let held = false;
   try {
-    const client = await pool.connect();
-    let held = false;
-    try {
-      const result = await client.query<{ locked: boolean }>(
-        "SELECT pg_try_advisory_lock($1::bigint) AS locked",
-        [migrationLockKey()],
-      );
-      held = result.rows[0]?.locked === true;
-      if (!held) {
-        createLogger("langwatch:tasks").info("waiting for migration lock held by another runner");
-        await client.query("SELECT pg_advisory_lock($1::bigint)", [migrationLockKey()]);
-        held = true;
-      }
-      await run();
-    } finally {
-      try {
-        if (held) {
-          await client.query("SELECT pg_advisory_unlock($1::bigint)", [migrationLockKey()]);
-        }
-      } finally {
-        client.release();
-      }
+    const result = await client.query<{ locked: boolean }>(
+      "SELECT pg_try_advisory_lock($1::bigint) AS locked",
+      [migrationLockKey()],
+    );
+    held = result.rows[0]?.locked === true;
+    if (!held) {
+      createLogger("langwatch:tasks").info("waiting for migration lock held by another runner");
+      await client.query("SELECT pg_advisory_lock($1::bigint)", [migrationLockKey()]);
+      held = true;
     }
+    await run();
   } finally {
-    await pool.end();
+    try {
+      if (held) {
+        await client.query("SELECT pg_advisory_unlock($1::bigint)", [migrationLockKey()]);
+      }
+    } finally {
+      client.release();
+    }
   }
 }
+
+/** Just the part of a pg pool client this lock uses. */
+type PoolClient = {
+  query<Row>(text: string, values?: readonly unknown[]): Promise<{ rows: Row[] }>;
+  release(): void;
+};

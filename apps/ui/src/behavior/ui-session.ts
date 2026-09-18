@@ -5,20 +5,21 @@
  */
 
 import { permissionSatisfiedBy } from "@langwatch/authz-contract";
+import type { UiActiveScope, UiActor, UiFeedback } from "@langwatch/browser-host/capabilities";
+import { UiSession } from "@langwatch/browser-host/capabilities";
+import type { UiSessionSnapshot } from "@langwatch/browser-host/session";
 import {
   createUiScopeHost,
   type UiScopeHost,
 } from "@langwatch/browser-host/use-organization-team-project";
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import type { UiActiveScope, UiActor, UiFeedback } from "@langwatch/browser-host/capabilities";
-import { UiSession } from "@langwatch/browser-host/capabilities";
-import type { UiSessionSnapshot } from "@langwatch/browser-host/session";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+
 import type { UiResolvedScope, UiScopeProject } from "../model/ui-scope";
+import { readPublicAppConfig } from "./public-config";
 import { useUiAddress } from "./ui-address";
 import { uiLeaveTo } from "./ui-departure";
 import type { UiFeatureApiTransport } from "./ui-feature-transport";
-import { readPublicAppConfig } from "./public-config";
 import { resolveUiScope, uiScopeSelectionWrites } from "./ui-scope-resolution";
 import { useUiRouteReading } from "./ui-scope-route";
 import { rememberUiScopeSelection, useUiScopeMemory } from "./ui-scope-storage";

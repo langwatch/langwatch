@@ -2,6 +2,7 @@
  * See specs/traces-v2/default-drawer-routing.feature.
  */
 import { describe, expect, it } from "vitest";
+
 import { routeTraceDrawerForV2 } from "../ui-trace-drawer-routing";
 
 describe("routeTraceDrawerForV2()", () => {

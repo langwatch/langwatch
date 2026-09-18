@@ -2,6 +2,7 @@
  * @see specs/components/adaptive-graphics-quality.feature
  */
 import { describe, expect, it } from "vitest";
+
 import { evaluateFpsSample } from "../evaluate-fps-sample";
 
 describe("evaluateFpsSample()", () => {

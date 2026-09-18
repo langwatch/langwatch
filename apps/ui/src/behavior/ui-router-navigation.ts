@@ -4,6 +4,11 @@
  * screen gets a `UiNavigation` instead, which a test can record.
  */
 
+import {
+  UiNavigation,
+  UiRoute,
+  type UiRouteReadingValues,
+} from "@langwatch/browser-host/capabilities";
 import { useMemo } from "react";
 import {
   useLocation,
@@ -12,11 +17,6 @@ import {
   useSearchParams,
   type NavigateFunction,
 } from "react-router";
-import {
-  UiNavigation,
-  UiRoute,
-  type UiRouteReadingValues,
-} from "@langwatch/browser-host/capabilities";
 
 class RouterUiNavigation extends UiNavigation {
   constructor(private readonly navigateTo: NavigateFunction) {

@@ -6,6 +6,7 @@
 
 import { useMemo } from "react";
 import { matchPath, useLocation, useParams, useSearchParams } from "react-router";
+
 import type { UiScopeRoute } from "../model/ui-scope";
 
 /**

@@ -1,5 +1,4 @@
 import { HandledError } from "@langwatch/handled-error";
-import { describe, expect, it } from "vitest";
 // Imported from the module rather than the `~/features/errors` barrel: the
 // barrel pulls in `showErrorToast`, and with it the toaster and Chakra.
 import {
@@ -11,7 +10,8 @@ import {
   AVATAR_MAX_SOURCE_BYTES,
   AvatarImageProcessingFailedError,
   processAvatarImage,
-} from "@langwatch/user-web";
+} from "@langwatch/user-browser";
+import { describe, expect, it } from "vitest";
 
 /**
  * The pre-flight cases here are the ones that decide before the canvas is

@@ -7,6 +7,7 @@ import { trpcQueryKey } from "@langwatch/api/web";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router";
+
 import type { UiScopeOrganization } from "../model/ui-scope";
 import { UI_ORGANIZATIONS_PROCEDURE } from "./ui-organization-facts";
 import { useUiRpc } from "./ui-rpc";

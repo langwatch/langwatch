@@ -1,4 +1,5 @@
 import type { PublicAppConfig } from "@langwatch/config/public-app-config";
+
 import type { PublicEnvironment } from "../model/public-environment";
 
 /** Projects the browser bootstrap contract into the temporary legacy hook shape. */

@@ -1,5 +1,11 @@
 import process from "node:process";
-import { Config, RuntimeConfig, type ConfigValue } from "@langwatch/config";
+
+import {
+  Config,
+  nodeEnvironmentSchema,
+  parseProcessConfig,
+  type ConfigOf,
+} from "@langwatch/config";
 import { configureLogger, type LoggerConfiguration } from "@langwatch/observability";
 import {
   createProcessObservability,
@@ -9,39 +15,37 @@ import { z } from "zod";
 
 const optionalString = z.string().optional();
 
-const taskExecutableConfigDefinition = RuntimeConfig.define({
-  nodeEnv: Config.value(z.enum(["development", "test", "production"]), { env: "NODE_ENV" }),
-  environment: Config.value(
+const taskExecutableConfig = Config.define((c) => ({
+  nodeEnv: c.env("NODE_ENV", nodeEnvironmentSchema),
+  environment: c.env(
+    "ENVIRONMENT",
     optionalString.transform((value) => value ?? "local"),
-    {
-      env: "ENVIRONMENT",
-    },
   ),
   logger: {
-    format: Config.value(
+    format: c.env(
+      "LOG_FORMAT",
       optionalString.transform((value) =>
         value === "pretty" || value === "json" ? value : undefined,
       ),
-      { env: "LOG_FORMAT" },
     ),
-    pinoLevel: Config.value(optionalString, { env: "PINO_LOG_LEVEL" }),
-    legacyLevel: Config.value(optionalString, { env: "_LOG_LEVEL" }),
-    consoleLevel: Config.value(optionalString, { env: "LOG_CONSOLE_LEVEL" }),
-    legacyConsoleLevel: Config.value(optionalString, { env: "PINO_CONSOLE_LEVEL" }),
-    otelLevel: Config.value(optionalString, { env: "LOG_OTEL_LEVEL" }),
-    legacyOtelLevel: Config.value(optionalString, { env: "PINO_OTEL_LEVEL" }),
-    otelExportEnabled: Config.value(
+    pinoLevel: c.env("PINO_LOG_LEVEL", optionalString),
+    legacyLevel: c.env("_LOG_LEVEL", optionalString),
+    consoleLevel: c.env("LOG_CONSOLE_LEVEL", optionalString),
+    legacyConsoleLevel: c.env("PINO_CONSOLE_LEVEL", optionalString),
+    otelLevel: c.env("LOG_OTEL_LEVEL", optionalString),
+    legacyOtelLevel: c.env("PINO_OTEL_LEVEL", optionalString),
+    otelExportEnabled: c.env(
+      "PINO_OTEL_ENABLED",
       optionalString.transform((value) => value === "true"),
-      { env: "PINO_OTEL_ENABLED" },
     ),
-    serviceName: Config.value(optionalString, { env: "OTEL_SERVICE_NAME" }),
-    serviceVersion: Config.value(optionalString, { env: "SERVICE_VERSION" }),
-    resourceAttributes: Config.value(optionalString, { env: "OTEL_RESOURCE_ATTRIBUTES" }),
-    transportServiceVersion: Config.value(optionalString, { env: "npm_package_version" }),
+    serviceName: c.env("OTEL_SERVICE_NAME", optionalString),
+    serviceVersion: c.env("SERVICE_VERSION", optionalString),
+    resourceAttributes: c.env("OTEL_RESOURCE_ATTRIBUTES", optionalString),
+    transportServiceVersion: c.env("npm_package_version", optionalString),
   },
-});
+}));
 
-type TaskExecutableValues = ConfigValue<typeof taskExecutableConfigDefinition>;
+type TaskExecutableValues = ConfigOf<typeof taskExecutableConfig>;
 
 export type LocalTaskExecutableConfig = Readonly<{
   serviceName: string;
@@ -126,11 +130,15 @@ export async function runLocalTaskEntrypoint(options: {
 export function resolveLocalTaskExecutableConfig(
   source: Readonly<Record<string, unknown>>,
 ): LocalTaskExecutableConfig {
-  const values = RuntimeConfig.create({
-    name: "local task executable",
-    definition: taskExecutableConfigDefinition,
-    source,
-  }).value;
+  const values = parseProcessConfig({
+    owners: [{ name: "task", config: taskExecutableConfig }],
+    environment: Object.fromEntries(
+      Object.entries(source).map(([key, value]) => [
+        key,
+        typeof value === "string" ? value : void 0,
+      ]),
+    ),
+  }).task;
   return {
     serviceName: values.logger.serviceName?.trim() || "langwatch:task",
     environment: values.environment,

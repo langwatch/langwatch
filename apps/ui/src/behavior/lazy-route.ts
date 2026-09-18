@@ -1,4 +1,5 @@
 import type { ComponentType } from "react";
+
 import { reloadOnChunkError } from "./chunk-reload";
 
 /**

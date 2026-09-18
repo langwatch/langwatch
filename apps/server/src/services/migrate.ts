@@ -1,8 +1,9 @@
+import { nowInstant } from "@langwatch/time";
+
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
+import { execAndPipe } from "./_pipe-to-bus.ts";
 import type { EventBus } from "./event-bus.ts";
 import { locateTasksDir, resolvePnpm } from "./node-deps.ts";
-import { execAndPipe } from "./_pipe-to-bus.ts";
-import { nowInstant } from "@langwatch/time";
 
 // Run Prisma and ClickHouse goose migrations through apps/tasks launcher.
 export async function runMigrations(

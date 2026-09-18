@@ -1,7 +1,8 @@
 import chalk from "chalk";
 import prompts from "prompts";
-import { detectConflicts, killPidGroups, type ConflictReport } from "./detect.ts";
+
 import { PORT_BASE_DEFAULT } from "../shared/ports.ts";
+import { detectConflicts, killPidGroups, type ConflictReport } from "./detect.ts";
 
 export type ResolvedMembers = {
   base: number;

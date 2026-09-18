@@ -1,6 +1,8 @@
-import { execa } from "execa";
 import { chmodSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
+
+import { execa } from "execa";
+
 import { downloadWithProgress } from "./_download.ts";
 import type { Predep } from "./types.ts";
 

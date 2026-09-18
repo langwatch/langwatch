@@ -1,6 +1,7 @@
 import type { PublicAppConfig } from "@langwatch/config/public-app-config";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
+
 import { parseUiFeatureConfig } from "../ui-feature-config";
 
 const served: PublicAppConfig = {

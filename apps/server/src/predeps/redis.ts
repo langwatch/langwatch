@@ -1,9 +1,11 @@
-import { execa } from "execa";
 import { createHash } from "node:crypto";
 import { chmodSync, createReadStream, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { pipeline } from "node:stream/promises";
+
+import { execa } from "execa";
 import * as tar from "tar";
+
 import embedsVersions from "../../embeds.versions.json" with { type: "json" };
 import { downloadWithProgress } from "./_download.ts";
 import type { Predep } from "./types.ts";

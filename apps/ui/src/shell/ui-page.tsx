@@ -5,6 +5,7 @@
  */
 
 import type { ComponentType, ReactNode } from "react";
+
 import type { UiPageLoader } from "../behavior/ui-page-loaders";
 import { UiPageForbidden, UiPageLoading, UiPageNotFound } from "./ui-page-fallbacks";
 import { withUiPageGuard, type UiPageGuardFallbacks } from "./ui-page-guard";

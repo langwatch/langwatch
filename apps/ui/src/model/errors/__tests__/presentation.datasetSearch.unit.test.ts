@@ -1,12 +1,11 @@
+import { explainHandledError } from "@langwatch/handled-error/presentation";
+import type { HandledErrorShape } from "@langwatch/handled-error/read-handled-error";
 /**
  * The search refusal has to read as being about SEARCH. The registry is keyed by
  * code, so a search that reused the export refusal's code would answer the user
  * with copy about exporting a dataset they were trying to search.
  */
 import { describe, expect, it } from "vitest";
-
-import { explainHandledError } from "@langwatch/handled-error/presentation";
-import type { HandledErrorShape } from "@langwatch/handled-error/read-handled-error";
 
 const SERVER_MESSAGE = "Dataset has 120000 rows, more than the 50000 a single search will read";
 

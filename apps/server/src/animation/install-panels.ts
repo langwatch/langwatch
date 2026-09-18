@@ -1,4 +1,5 @@
 import { Listr } from "listr2";
+
 import type { RuntimeEvent } from "../shared/runtime-contract.ts";
 
 const RING_SIZE = 5;

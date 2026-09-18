@@ -9,6 +9,7 @@ import {
 } from "node:fs";
 import { dirname } from "node:path";
 import { createInterface } from "node:readline";
+
 import { exitCause } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
 import type { ServiceName, ServicePaths } from "./paths.ts";

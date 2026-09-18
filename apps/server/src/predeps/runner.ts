@@ -1,12 +1,14 @@
+import { mkdirSync } from "node:fs";
+
 import chalk from "chalk";
 import { Listr } from "listr2";
-import { mkdirSync } from "node:fs";
 import prompts from "prompts";
+
+import type { LocalOrchestratorConfig } from "../platform/config/local-orchestrator.config.ts";
 import { paths } from "../shared/paths.ts";
 import { detectPlatform, type SupportedPlatform } from "../shared/platform.ts";
 import { predepRegistry } from "./registry.ts";
 import type { Predep } from "./types.ts";
-import type { LocalOrchestratorConfig } from "../platform/config/local-orchestrator.config.ts";
 
 export type PredepResult = Record<
   string,

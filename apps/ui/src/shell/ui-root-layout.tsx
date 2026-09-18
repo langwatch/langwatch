@@ -6,6 +6,7 @@ import NProgress from "nprogress";
 import { Suspense, useEffect, type ComponentType } from "react";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 import { Outlet, useLocation, useNavigation } from "react-router";
+
 import type { UiProviderShell } from "./ui-outer-providers";
 
 export type UiRootLayoutInstall = {

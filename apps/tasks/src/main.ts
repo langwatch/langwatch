@@ -2,12 +2,20 @@ import "@langwatch/time/polyfill";
 import process from "node:process";
 
 import { bootNodeExecutable, configureLogger, createLogger } from "@langwatch/observability";
-import { SecretEnvironmentService, secretLogRedactPaths } from "@langwatch/secrets";
+import { RedisConnectionService, RedisShutdownService } from "@langwatch/redis-client";
+import { secretLogRedactPaths, SecretsChain, SecretsResolver } from "@langwatch/secrets";
 
 import { clickhouseMigrate } from "./clickhouse-migrate.ts";
-import { resolveTasksConfig, resolveTasksEnvironment, type TaskInput } from "./config.ts";
+import {
+  resolveTasksConfig,
+  resolveTasksEnvironment,
+  tasksSecrets,
+  type TaskConnections,
+  type TaskInput,
+  type TasksConfig,
+} from "./config.ts";
+import { openTasksDatabase } from "./database.ts";
 import { lwqlProvision } from "./lwql-provision.ts";
-import { withMigrationLock } from "./migration-lock.ts";
 import { prismaMigrate } from "./prisma-migrate.ts";
 import { systemMigrationsPass } from "./system-migrations-pass.ts";
 
@@ -36,25 +44,59 @@ export async function runTasks(argv: readonly string[], input: TaskInput): Promi
     }
   };
 
-  if (argv.some((name) => name !== "system-migrations-pass")) {
-    await withMigrationLock(input.config.databaseUrl, run);
+  const database = input.connections.database;
+  if (database && argv.some((name) => name !== "system-migrations-pass")) {
+    await database.hold(run);
   } else {
     await run();
   }
 }
 
+/**
+ * The runner's one secrets seam: each connection string lives only inside the
+ * closure `into` hands it to, and what escapes is the connector built there.
+ */
+async function openConnections(config: TasksConfig): Promise<TaskConnections> {
+  const chain = SecretsChain.start({ environment: process.env }).withEnv().withFile();
+  const resolver = SecretsResolver.over(chain);
+  const declared = Object.values(tasksSecrets);
+  await resolver.preflight(declared);
+  const secrets = resolver.scopeTo("tasks", declared);
+
+  // Each URL is spent where it is read: the connection is what comes back.
+  const database = await secrets.into(tasksSecrets.databaseUrl, (url) =>
+    url === undefined ? null : openTasksDatabase(url, config),
+  );
+  const redis = await secrets.into(tasksSecrets.redisUrl, (url) =>
+    url === undefined ? null : new RedisConnectionService().connect({ url }),
+  );
+
+  resolver.seal();
+
+  return { database, redis };
+}
+
 async function main(): Promise<void> {
-  configureLogger({ redactPaths: secretLogRedactPaths() });
-  const secrets = await SecretEnvironmentService.create({ source: process.env }).resolve();
-  const config = resolveTasksConfig(secrets.environment);
-  const environment = resolveTasksEnvironment(secrets.environment);
+  configureLogger({ redactPaths: secretLogRedactPaths(Object.values(tasksSecrets)) });
+  const source = { ...process.env };
+  const environment = resolveTasksEnvironment(source);
+  const config = resolveTasksConfig(source);
+  const connections = await openConnections(config);
   const controller = new AbortController();
   const abort = () => controller.abort();
   process.once("SIGINT", abort);
   process.once("SIGTERM", abort);
   try {
-    await runTasks(process.argv.slice(2), { config, environment, signal: controller.signal });
+    await runTasks(process.argv.slice(2), {
+      config,
+      connections,
+      environment,
+      signal: controller.signal,
+    });
   } finally {
+    // Whoever opened a connection closes it; a task only uses one.
+    if (connections.redis) await RedisShutdownService.create().shutdown(connections.redis);
+    await connections.database?.close();
     process.off("SIGINT", abort);
     process.off("SIGTERM", abort);
   }

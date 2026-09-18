@@ -3,6 +3,7 @@
  */
 
 import { Toaster } from "@langwatch/design-system/toaster";
+
 import { readUiErrorActions, UiErrorActions } from "./ui-error-actions";
 
 export function UiErrorToaster() {

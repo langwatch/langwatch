@@ -4,9 +4,10 @@
  * `/get-session` — an impersonating admin must see the customer's screens.
  */
 
-import { createAuthClient } from "better-auth/react";
-import { HandledError } from "@langwatch/handled-error";
 import type { UiActor } from "@langwatch/browser-host/capabilities";
+import { HandledError } from "@langwatch/handled-error";
+import { createAuthClient } from "better-auth/react";
+
 import { isUiApiUnreachable } from "./ui-api-reachability";
 
 /** The session endpoint, relative to the auth client's own base URL. */

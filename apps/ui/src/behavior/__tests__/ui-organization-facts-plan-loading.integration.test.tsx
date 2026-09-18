@@ -1,3 +1,4 @@
+import { UiCapabilityContextProvider, UiSession } from "@langwatch/browser-host/capabilities";
 /**
  * Prevents a loading plan from being read as "not Enterprise", which would show the sales
  * pitch to paying customers (specs/rbac/custom-role-permission-editing.feature).
@@ -8,9 +9,8 @@ import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { UiCapabilityContextProvider, UiSession } from "@langwatch/browser-host/capabilities";
-import { UiRpcContextProvider, type UiRpc } from "../ui-rpc";
 import { useUiOrganizationFacts } from "../ui-organization-facts";
+import { UiRpcContextProvider, type UiRpc } from "../ui-rpc";
 
 class StubSession extends UiSession {
   currentUser() {

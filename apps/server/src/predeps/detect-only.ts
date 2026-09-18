@@ -1,7 +1,8 @@
 import chalk from "chalk";
+
+import type { LocalOrchestratorDevelopmentConfig } from "../platform/config/local-orchestrator.config.ts";
 import { paths } from "../shared/paths.ts";
 import { predepRegistry } from "./registry.ts";
-import type { LocalOrchestratorDevelopmentConfig } from "../platform/config/local-orchestrator.config.ts";
 
 export type DoctorRow = {
   id: string;

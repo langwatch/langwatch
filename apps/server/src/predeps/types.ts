@@ -1,5 +1,5 @@
-import type { SupportedPlatform } from "../shared/platform.ts";
 import type { LangwatchPaths } from "../shared/paths.ts";
+import type { SupportedPlatform } from "../shared/platform.ts";
 
 export type PredepId =
   | "pnpm"

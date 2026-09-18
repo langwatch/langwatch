@@ -32,6 +32,16 @@ const names = ["prisma-migrate", "clickhouse-migrate", "lwql-provision", "system
 function input() {
   return {
     config: resolveTasksConfig({ NODE_ENV: "test" }),
+    // The boot seam builds these from resolved handles; a test supplies the
+    // same shape, so the sequence is exercised without opening a connection.
+    connections: {
+      database: {
+        client: undefined as never,
+        hold: (run: () => Promise<void>) => calls.lock(void 0, run),
+        close: async () => void 0,
+      },
+      redis: null,
+    },
     environment: {},
     signal: new AbortController().signal,
   };

@@ -7,12 +7,12 @@
     "src"
   ],
   "type": "module",
-  "main": "./src/index.ts",
+  "main": "./src/main.ts",
   "types": "./src/index.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
+      "types": "./src/main.ts",
+      "default": "./src/main.ts"
     }
   },
   "scripts": {

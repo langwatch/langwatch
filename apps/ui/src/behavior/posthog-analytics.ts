@@ -1,5 +1,6 @@
 import posthog from "posthog-js";
 import { useEffect, useRef } from "react";
+
 import type { PublicEnvironment } from "../model/public-environment";
 
 declare global {

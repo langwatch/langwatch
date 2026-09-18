@@ -5,9 +5,9 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
 
 import { APP_ERROR_CODES } from "@langwatch/handled-error/app-codes";
+import { describe, expect, it } from "vitest";
 
 const PACKAGE_ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
 
@@ -265,7 +265,7 @@ const DEAD_COPY_BACKLOG = new Set<string>([
   // Not dead, waiting: `presentation.datasetSearch.unit.test.ts` pins this
   // one's copy, and the class that used to throw it
   // (`DatasetTooLargeToSearchError`) is imported by
-  // `modules/dataset/server`'s own search tests but declared nowhere. The copy
+  // `modules/dataset/process`'s own search tests but declared nowhere. The copy
   // outlives a raiser that has to come back, not one that was renamed.
   "dataset_too_large_to_search",
   "cache_rule_not_found",

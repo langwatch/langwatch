@@ -1,74 +1,60 @@
-// Temporal, before anything reads a clock. A runtime that ships it natively keeps its own.
 import "@langwatch/time/polyfill";
-import process from "node:process";
-
 import { auditLogNullServer } from "@langwatch/audit-log-null";
 import { createDataPrivacyDirectoryReader } from "@langwatch/data-privacy-process";
-import {
-  createDeploymentEntitlementSource,
-  createOrganizationLicenses,
-} from "@langwatch/enterprise-licensing-process";
-import { setTraceUrlProvider } from "@langwatch/handled-error";
-import { createServerApp } from "@langwatch/installed-modules/server";
-import { configureLogger, createLogger, loggerConfigurationFrom } from "@langwatch/observability";
-import { grafanaTraceUrlFromEnv } from "@langwatch/observability/grafana-links";
-import { prometheusMetrics, startOtlpMetricsExport } from "@langwatch/observability/node";
-import { Server } from "@langwatch/process-server";
-import { createProcessMembers, hostedMembers } from "@langwatch/process-stores";
-import { SecretEnvironmentService, secretLogRedactPaths } from "@langwatch/secrets";
-
-import { resolveWorkerConfig, workerModuleConfig, workerProcessConfig } from "./config.ts";
+import { serverModules as processModules } from "@langwatch/installed-modules/server";
+import { processMetrics, processTelemetry } from "@langwatch/observability/node";
+import { processConfig, Server, type ProcessServer } from "@langwatch/process-server";
 
 /**
- * The worker process, whole. The same shape the api boots with: telemetry
- * first so a config parse failure is observable, then the server that owns the
- * teardown, then the application the installed modules compose.
+ * The local launcher hosts both halves in one Node process: only the owner may
+ * take signals or exit, and only one half may set the telemetry SDK up.
  */
-export async function startWorker(): Promise<Server> {
-  const secrets = await SecretEnvironmentService.create({ source: process.env }).resolve();
-  const config = resolveWorkerConfig(secrets.environment);
+export type WorkerStartOptions = Readonly<{
+  ownsProcess?: boolean;
+  ownsTelemetry?: boolean;
+}>;
 
-  configureLogger({ ...loggerConfigurationFrom(config), redactPaths: secretLogRedactPaths() });
-  setTraceUrlProvider(grafanaTraceUrlFromEnv);
-  startOtlpMetricsExport(config.otlpMetrics);
-  const logger = createLogger(config.serviceName);
+/** Boots the worker and starts consuming. The server it answers with drains it. */
+export async function startWorker(options: WorkerStartOptions = {}): Promise<ProcessServer> {
+  const preamble = Server.create("langwatch-worker")
+    .withConfig(processConfig(processModules, "worker"))
+    .withSecrets((config, secrets) =>
+      secrets.withEnv().withFile().withOnePassword(config.process.onePasswordAccount),
+    )
+    .withProcessOwnership(options.ownsProcess ?? true);
+  const server = await (
+    (options.ownsTelemetry ?? true)
+      ? preamble
+          .withTelemetry(processTelemetry("langwatch-worker"))
+          .withMetrics(processMetrics("langwatch-worker"))
+      : preamble
+  ).start();
 
-  const server = Server.create({
-    name: config.serviceName,
-    logger,
-    shutdownDeadlineMs: config.shutdown.processDeadlineMs,
-    healthPort: config.liveness.metricsPort,
-  }).with(prometheusMetrics({ token: config.liveness.metricsToken }));
-
-  const members = createProcessMembers({
-    config: workerProcessConfig({ config, secrets: secrets.environment }),
-  });
-  server.with(hostedMembers(members));
-
-  const runtime = await createServerApp("worker")
-    // The audit sink is this deployment's choice: OSS records nothing, enterprise swaps in its own.
-    .withModules([auditLogNullServer] as const)
-    .withConfig(workerModuleConfig(config))
-    .withStores(members)
-    .withMember("dataPrivacy", {
+  const app = await server
+    .composeProcess("worker")
+    .withModules(processModules)
+    // Availability, not a module install: audit-log's implementation is
+    // enterprise, so core answers the subject with the null provider.
+    .withModules([auditLogNullServer])
+    .withMember("dataPrivacy", (members) => ({
       directory: createDataPrivacyDirectoryReader(members.read("prisma")),
       redaction: null,
-    })
-    .withMember("elevenLabsWebhook", void 0)
-    .withMember("gatewayInternalProtocol", {})
-    .withMember("monitor", void 0)
-    .provide({
-      licenseSource: createDeploymentEntitlementSource({
-        licenses: createOrganizationLicenses(members.read("prisma")),
-        licensePublicKey: config.deployment.licensePublicKey,
-        isSaas: config.deployment.saas,
-      }),
-    })
+    }))
+    .withMember("elevenLabsWebhook", () => void 0)
+    .withMember("gatewayInternalProtocol", () => ({}))
+    .withMember("monitor", () => void 0)
+    // The worker hosts no topic-clustering caller of its own, so the claim is
+    // answered by something that refuses loudly rather than by `undefined`.
+    .withMember("topicClustering", () => ({
+      requestClustering: () =>
+        Promise.reject(new Error("langwatch-worker composes no topic clustering worker")),
+    }))
+    .withPipelines((pipelines) => pipelines.consume())
     .boot();
 
-  // Jobs drain before anything they call into is released.
-  await server.run(runtime);
+  await server.run(app);
+
   return server;
 }
 
-void startWorker();
+if (import.meta.main) await startWorker();

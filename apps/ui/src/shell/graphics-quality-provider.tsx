@@ -3,9 +3,10 @@
  * the app into reduced-graphics mode. @see specs/components/adaptive-graphics-quality.feature
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { evaluateFpsSample } from "../model/evaluate-fps-sample";
-import { GraphicsQualityContext } from "../behavior/use-graphics-quality";
+
 import { useGraphicsQualityOverrideStore } from "../behavior/graphics-quality-override-store";
+import { GraphicsQualityContext } from "../behavior/use-graphics-quality";
+import { evaluateFpsSample } from "../model/evaluate-fps-sample";
 
 const RESAMPLE_INTERVAL_MS = 60_000;
 const SAMPLE_WINDOW_MS = 1500;

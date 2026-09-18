@@ -7,6 +7,7 @@ import posthog from "posthog-js";
 import { PostHogProvider } from "posthog-js/react";
 import type { ComponentType, ReactNode } from "react";
 import { AnalyticsProvider } from "react-contextual-analytics";
+
 import { createUiAnalyticsClient } from "../behavior/analytics-client";
 import { useBrowserTracing } from "../behavior/browser-tracing";
 import { useIsGtagReady } from "../behavior/gtag-readiness";

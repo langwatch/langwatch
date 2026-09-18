@@ -17,15 +17,6 @@ const dependencies = vi.hoisted(() => ({
   sender: { send: vi.fn() },
 }));
 
-vi.mock("../database.ts", () => ({
-  withDatabase: async (_config: unknown, run: (database: unknown) => Promise<void>) => {
-    try {
-      await run(dependencies.database);
-    } finally {
-      dependencies.closeOrder.push("database");
-    }
-  },
-}));
 vi.mock("@langwatch/redis-client", () => ({
   RedisConnectionService: class {
     connect = dependencies.redis;
@@ -92,12 +83,27 @@ beforeEach(() => {
   dependencies.createRunner.mockReturnValue({ runPass: dependencies.runPass });
 });
 
+/** What the boot seam builds from resolved handles, as a test supplies it. */
+function connections() {
+  return {
+    database: {
+      client: dependencies.database as never,
+      hold: (run: () => Promise<void>) => run(),
+      close: async () => {
+        dependencies.closeOrder.push("database");
+      },
+    },
+    redis: dependencies.redis() as never,
+  };
+}
+
 describe("given the system migration task", () => {
   describe("when Redis is configured", () => {
     it("registers both producer pipelines and both tenant axes, then closes producers before stores", async () => {
       const signal = new AbortController().signal;
       await systemMigrationsPass({
-        config: resolveTasksConfig({ IS_SAAS: "true" }),
+        config: resolveTasksConfig({ IS_SAAS: "true", NODE_ENV: "test" }),
+        connections: connections(),
         environment: {},
         signal,
       });
@@ -124,7 +130,8 @@ describe("given the system migration task", () => {
         identity.tryPipelineCommand({ pipeline: "identity", command: "attachIdentifier" }),
       ).resolves.toBe(dependencies.sender);
       expect(dependencies.runPass).toHaveBeenCalledWith({ signal });
-      expect(dependencies.closeOrder).toEqual(["eventing", "redis", "database"]);
+      // The task closes only what it made; the boot seam closes the stores.
+      expect(dependencies.closeOrder).toEqual(["eventing"]);
     });
   });
 
@@ -134,12 +141,14 @@ describe("given the system migration task", () => {
       dependencies.runPass.mockRejectedValueOnce(failure);
       await expect(
         systemMigrationsPass({
-          config: resolveTasksConfig({}),
+          config: resolveTasksConfig({ NODE_ENV: "test" }),
+          connections: connections(),
           environment: {},
           signal: new AbortController().signal,
         }),
       ).rejects.toBe(failure);
-      expect(dependencies.closeOrder).toEqual(["eventing", "redis", "database"]);
+      // The task closes only what it made; the boot seam closes the stores.
+      expect(dependencies.closeOrder).toEqual(["eventing"]);
     });
   });
 
@@ -147,7 +156,8 @@ describe("given the system migration task", () => {
     it("preserves the user migrations and leaves the organization registry empty", async () => {
       dependencies.redis.mockReturnValue(null);
       await systemMigrationsPass({
-        config: resolveTasksConfig({}),
+        config: resolveTasksConfig({ NODE_ENV: "test" }),
+        connections: connections(),
         environment: {},
         signal: new AbortController().signal,
       });
@@ -159,7 +169,7 @@ describe("given the system migration task", () => {
       await expect(
         identity.tryPipelineCommand({ pipeline: "identity", command: "attachIdentifier" }),
       ).resolves.toBeNull();
-      expect(dependencies.closeOrder).toEqual(["database"]);
+      expect(dependencies.closeOrder).toEqual([]);
     });
   });
 });

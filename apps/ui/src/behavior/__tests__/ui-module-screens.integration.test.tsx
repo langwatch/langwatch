@@ -6,14 +6,16 @@ import { render, screen } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
-import { createUiRouteObjects, UiRouteOutlet } from "../../shell/ui-route-objects";
 import type { UiRouteDescriptor } from "../../model/ui-route-table";
+import { createUiRouteObjects, UiRouteOutlet } from "../../shell/ui-route-objects";
 import { installedModuleScreens } from "../ui-module-screens";
 
 // The screen has its own suites; here it only has to report the view its
 // declared route bound to it, which is the whole subject of this file.
 vi.mock("../../../../../modules/annotation/browser/src/ui/sections/annotations-screen.tsx", () => ({
-  AnnotationsScreen: ({ view }: { view: string }) => <div data-testid="annotation-view">{view}</div>,
+  AnnotationsScreen: ({ view }: { view: string }) => (
+    <div data-testid="annotation-view">{view}</div>
+  ),
 }));
 
 const injectedConfig = {

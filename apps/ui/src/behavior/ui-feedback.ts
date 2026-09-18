@@ -4,6 +4,12 @@
  * via `@langwatch/handled-error/presentation` — never `error.message`.
  */
 
+import {
+  UiFeedback,
+  type UiFailureNotice,
+  type UiSuccessNotice,
+} from "@langwatch/browser-host/capabilities";
+import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/design-system/toaster";
 import {
   explainHandledError,
@@ -11,12 +17,6 @@ import {
   UNKNOWN_ERROR_PRESENTATION,
 } from "@langwatch/handled-error/presentation";
 import { readEnvelopeTraceId, readHandledError } from "@langwatch/handled-error/read-handled-error";
-import {
-  UiFeedback,
-  type UiFailureNotice,
-  type UiSuccessNotice,
-} from "@langwatch/browser-host/capabilities";
-import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
 
 import { isServerUnreachable } from "../model/errors/isServerUnreachable";
 import { isUiNavigatingAway } from "./ui-departure";

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { migrationLockKey, withMigrationLock } from "../migration-lock.ts";
+import { holdMigrationLock, migrationLockKey } from "../migration-lock.ts";
 
 const database = vi.hoisted(() => ({
   query: vi.fn<(sql: string, values: string[]) => Promise<{ rows: { locked: boolean }[] }>>(),
@@ -9,11 +9,8 @@ const database = vi.hoisted(() => ({
   end: vi.fn<() => Promise<void>>(),
 }));
 
-vi.mock("@langwatch/prisma-client", () => ({
-  PrismaDriverAdapterService: {
-    create: () => ({ create: () => ({ pool: { connect: database.connect, end: database.end } }) }),
-  },
-}));
+/** The pool the opened database hands in; closing it is the database's job. */
+const pool = { connect: database.connect };
 
 beforeEach(() => {
   database.query.mockReset().mockResolvedValue({ rows: [{ locked: true }] });
@@ -34,14 +31,13 @@ describe("given the deployment migration lock", () => {
         ]);
         expect(database.release).not.toHaveBeenCalled();
       });
-      await withMigrationLock("postgresql://localhost/test", run);
+      await holdMigrationLock(pool, run);
       expect(run).toHaveBeenCalledOnce();
       expect(database.query).toHaveBeenLastCalledWith("SELECT pg_advisory_unlock($1::bigint)", [
         migrationLockKey(),
       ]);
       expect(database.connect).toHaveBeenCalledOnce();
       expect(database.release).toHaveBeenCalledOnce();
-      expect(database.end).toHaveBeenCalledOnce();
     });
   });
 
@@ -49,7 +45,7 @@ describe("given the deployment migration lock", () => {
     it("unlocks and closes the session before propagating the failure", async () => {
       const failure = new Error("task failed");
       await expect(
-        withMigrationLock("postgresql://localhost/test", async () => {
+        holdMigrationLock(pool, async () => {
           throw failure;
         }),
       ).rejects.toBe(failure);
@@ -57,27 +53,16 @@ describe("given the deployment migration lock", () => {
         migrationLockKey(),
       ]);
       expect(database.release).toHaveBeenCalledOnce();
-      expect(database.end).toHaveBeenCalledOnce();
     });
   });
 
   describe("when the database connection fails", () => {
-    it("closes the pool and runs no migration", async () => {
+    it("runs no migration", async () => {
       const failure = new Error("connection failed");
       database.connect.mockRejectedValueOnce(failure);
       const run = vi.fn<() => Promise<void>>();
-      await expect(withMigrationLock("postgresql://localhost/test", run)).rejects.toBe(failure);
+      await expect(holdMigrationLock(pool, run)).rejects.toBe(failure);
       expect(run).not.toHaveBeenCalled();
-      expect(database.end).toHaveBeenCalledOnce();
-    });
-  });
-
-  describe("when no database is configured", () => {
-    it("runs without opening a lock connection", async () => {
-      const run = vi.fn<() => Promise<void>>().mockResolvedValue();
-      await withMigrationLock(void 0, run);
-      expect(run).toHaveBeenCalledOnce();
-      expect(database.connect).not.toHaveBeenCalled();
     });
   });
 });

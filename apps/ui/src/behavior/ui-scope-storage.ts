@@ -5,6 +5,7 @@
  */
 
 import { useCallback, useSyncExternalStore } from "react";
+
 import type { UiScopeSelection } from "../model/ui-scope";
 import type { UiScopeSelectionWrite } from "./ui-scope-resolution";
 

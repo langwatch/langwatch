@@ -78,11 +78,7 @@ describe("given no failure at all", () => {
  * message is whatever the JSON parser said.
  */
 describe("given an intermediary answering while the app is still coming up", () => {
-  it.each([
-    [502],
-    [503],
-    [504],
-  ])("treats a bodiless %i as nothing having answered", (status) => {
+  it.each([[502], [503], [504]])("treats a bodiless %i as nothing having answered", (status) => {
     expect(
       isServerUnreachable({
         message: "Unexpected end of JSON input",

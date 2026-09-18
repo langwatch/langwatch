@@ -1,9 +1,11 @@
-import { execa } from "execa";
 import { chmodSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { downloadWithProgress } from "./_download.ts";
+
+import { execa } from "execa";
+
 import type { LocalOrchestratorDevelopmentConfig } from "../platform/config/local-orchestrator.config.ts";
+import { downloadWithProgress } from "./_download.ts";
 import type { Predep } from "./types.ts";
 
 // The Go AI Gateway monobinary is built per-platform in CI and uploaded to a

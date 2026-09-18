@@ -1,13 +1,15 @@
-import { execa } from "execa";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+
+import { nowInstant } from "@langwatch/time";
+import { execa } from "execa";
+
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
 import { httpGetCheck, pollUntilHealthy } from "./health.ts";
 import { locateApiDir, resolvePnpm } from "./node-deps.ts";
 import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
-import { nowInstant } from "@langwatch/time";
 
 /**
  * The langwatch API process, launched via `pnpm run start` in apps/api —

@@ -1,11 +1,11 @@
+import { explainHandledError } from "@langwatch/handled-error/presentation";
+import type { HandledErrorShape } from "@langwatch/handled-error/read-handled-error";
+import { modelProviders, providerDeprecation } from "@langwatch/model-provider-contract";
 /**
  * The refusal a retired provider hands back is only actionable if the customer is told
  * what to add instead.
  */
 import { describe, expect, it } from "vitest";
-import { modelProviders, providerDeprecation } from "@langwatch/model-provider-contract";
-import { explainHandledError } from "@langwatch/handled-error/presentation";
-import type { HandledErrorShape } from "@langwatch/handled-error/read-handled-error";
 
 /**
  * The payload as the client reads it off the wire — every field the shape

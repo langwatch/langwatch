@@ -1,5 +1,6 @@
-import { execa } from "execa";
 import chalk from "chalk";
+import { execa } from "execa";
+
 import { isMac } from "../shared/platform.ts";
 
 export type BrowserOpenOptions = {

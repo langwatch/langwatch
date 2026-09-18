@@ -14,6 +14,7 @@ import {
   splitLink,
 } from "@trpc/client";
 import type { ComponentType, ReactNode } from "react";
+
 import { type SseEventSourceConstructor, sseSubscriptionLink } from "./ui-sse-subscription-link";
 
 /** Same-origin, so the browser sends the session cookie without configuration. */

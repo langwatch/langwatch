@@ -3,8 +3,8 @@
 // implementation in services/runtime.ts. Keep this file backward compatible:
 // adding fields is fine, removing or renaming is a coordinated change.
 
-import type { PredepResult } from "../predeps/runner.ts";
 import type { LocalOrchestratorConfig } from "../platform/config/local-orchestrator.config.ts";
+import type { PredepResult } from "../predeps/runner.ts";
 import type { LangwatchPaths } from "../shared/paths.ts";
 import type { PortAllocation } from "../shared/ports.ts";
 

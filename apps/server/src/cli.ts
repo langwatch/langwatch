@@ -1,7 +1,9 @@
 import { existsSync } from "node:fs";
+
 import chalk from "chalk";
 import { Command } from "commander";
 import prompts from "prompts";
+
 import { printBanner } from "./animation/banner.ts";
 import {
   isInstallEvent,
@@ -10,10 +12,10 @@ import {
 } from "./animation/install-panels.ts";
 import { streamEventsToTTY } from "./animation/log-tee.ts";
 import { openBrowser } from "./animation/open-browser.ts";
+import { resolveLocalOrchestratorConfig } from "./platform/config/local-orchestrator.config.ts";
 import { resolvePortConflicts } from "./port-conflict/resolve.ts";
 import { inspectPredeps, printDoctorTable } from "./predeps/detect-only.ts";
 import { runPredeps } from "./predeps/runner.ts";
-import { resolveLocalOrchestratorConfig } from "./platform/config/local-orchestrator.config.ts";
 import { captureUserEnv } from "./shared/env.ts";
 import { paths } from "./shared/paths.ts";
 import { detectPlatform } from "./shared/platform.ts";

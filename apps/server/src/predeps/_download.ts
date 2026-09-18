@@ -1,8 +1,10 @@
 import { createWriteStream } from "node:fs";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import type { PredepTask } from "./types.ts";
+
 import { nowInstant } from "@langwatch/time";
+
+import type { PredepTask } from "./types.ts";
 
 // Download URL to disk with progress reporting. Throttled for spinner updates.
 export async function downloadWithProgress(

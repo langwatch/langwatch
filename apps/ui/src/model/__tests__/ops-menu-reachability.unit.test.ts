@@ -1,15 +1,16 @@
+import {
+  backofficeGroup,
+  isSettingsMenuItemActive,
+  opsGroup,
+  type SettingsMenuGroup,
+} from "@langwatch/navigation-browser/chrome";
 /**
  * Every internal ops page the route table registers must be reachable from the settings
  * menu.
  * Spec: specs/navigation/ops-navigation-v2.feature
  */
 import { describe, expect, it } from "vitest";
-import {
-  backofficeGroup,
-  isSettingsMenuItemActive,
-  opsGroup,
-  type SettingsMenuGroup,
-} from "@langwatch/navigation-web/chrome";
+
 import { uiRouteDescriptors, uiRouteTable } from "../ui-route-table";
 
 /**

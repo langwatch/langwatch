@@ -1,12 +1,14 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+
+import { nowInstant } from "@langwatch/time";
+
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import { appRoot } from "./app-dir.ts";
 import type { EventBus } from "./event-bus.ts";
 import { httpGetCheck, pollUntilHealthy } from "./health.ts";
 import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
-import { nowInstant } from "@langwatch/time";
 
 export async function startLangevals(
   ctx: RuntimeContext,

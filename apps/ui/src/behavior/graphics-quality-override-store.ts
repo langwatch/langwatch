@@ -1,9 +1,9 @@
+import { readUiStorage, writeUiStorage } from "@langwatch/browser-host/storage";
 /**
  * Manual escape hatch on top of the automatic FPS probe (auto/on/off), a
  * per-device preference read/written through the shell's storage port.
  */
 import { useSyncExternalStore } from "react";
-import { readUiStorage, writeUiStorage } from "@langwatch/browser-host/storage";
 
 export type GraphicsQualityOverride = "auto" | "on" | "off";
 

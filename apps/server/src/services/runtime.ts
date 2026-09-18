@@ -11,12 +11,12 @@ import type {
 import { startAigateway } from "./aigateway.ts";
 import { ensureAppDir } from "./app-dir.ts";
 import { startClickhouse } from "./clickhouse.ts";
-import { scaffoldEnv } from "./env.ts";
 import { readEnvFile } from "./env-file.ts";
+import { scaffoldEnv } from "./env.ts";
 import { EventBus } from "./event-bus.ts";
 import { startLangevals } from "./langevals.ts";
-import { startLangwatch } from "./langwatch.ts";
 import { startLangwatchWorkers } from "./langwatch-workers.ts";
+import { startLangwatch } from "./langwatch.ts";
 import { ensureLangyCli } from "./langy-cli.ts";
 import { monobinarySupportsLangyagent, startLangyagent } from "./langyagent.ts";
 import { runMigrations } from "./migrate.ts";

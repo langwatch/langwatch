@@ -1,4 +1,5 @@
 import { join } from "node:path";
+
 import type { LangwatchPaths } from "../shared/paths.ts";
 
 export type ServiceName =
