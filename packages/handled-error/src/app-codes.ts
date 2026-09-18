@@ -475,6 +475,7 @@ export const APP_ERROR_CODES = [
   "saved_workbench_chart_not_found",
   "saved_workbench_chart_specification_refused",
   "saved_workbench_charts_disabled_for_playground",
+  "scenario_event_archive_scope_invalid",
   "scenario_field_type_invalid",
   "scenario_field_unknown",
   "scenario_folder_slug_unavailable",

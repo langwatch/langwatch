@@ -1,4 +1,3 @@
-import type { AppRestBroadcast } from "@langwatch/api/rest";
 import * as observability from "@langwatch/observability";
 import { SimulationRunStatus } from "@langwatch/scenario-contract";
 import type {
@@ -6,7 +5,6 @@ import type {
   SimulationRunData,
   SimulationService,
 } from "@langwatch/scenario-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 const logInfo = vi.hoisted(() => vi.fn());
@@ -16,7 +14,8 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
   createLogger: () => ({ info: logInfo, warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }));
 
-import { createScenarioEventsRest } from "../scenario-event.rest.ts";
+import type { ScenarioBroadcast } from "../../app/scenario.app.ts";
+import { scenarioEventsRest } from "../scenario-event.rest.ts";
 import {
   createScenarioRestTestApp,
   createScenarioRestTestRuntime,
@@ -28,7 +27,7 @@ function buildEventFamily(
   options: {
     simulations?: Partial<SimulationService>;
     scenarioTabs?: Partial<ScenarioTabRegistry>;
-    broadcast?: Partial<AppRestBroadcast>;
+    broadcast?: Partial<ScenarioBroadcast>;
     extractInlineMedia?: (input: {
       event: unknown;
       projectId: string;
@@ -42,25 +41,20 @@ function buildEventFamily(
   const world = createScenarioRestTestApp({
     simulations: options.simulations,
     scenarioTabs: options.scenarioTabs,
+    broadcast: options.broadcast,
+    traces: {
+      extractInlineMediaFromEvent:
+        options.extractInlineMedia ??
+        (async ({ event }) => ({
+          rewrittenEvent: event,
+          refs: [],
+        })),
+    },
   });
   const { runtime, projectFacts } = createScenarioRestTestRuntime({
     authenticated: options.authenticated,
   });
-  const broadcast = createApiFixture<AppRestBroadcast>(options.broadcast, "REST broadcast");
-  const extractInlineMedia =
-    options.extractInlineMedia ??
-    (async ({ event }) => ({
-      rewrittenEvent: event,
-      refs: [],
-    }));
-  const declaration = createScenarioEventsRest({
-    simulations: () => world.simulations,
-    scenarioTabs: () => world.scenarioTabs,
-    broadcast: () => broadcast,
-    extractInlineMedia,
-    platformUrl: ({ projectSlug, path }) => `https://app.langwatch.test/${projectSlug}${path}`,
-  });
-  const mounted = runtime.mount(declaration.router(), {
+  const mounted = runtime.mount(scenarioEventsRest.router(), {
     app: () => world.app,
     onError: scenarioRestTestErrors,
     facts: [projectFacts],
@@ -97,6 +91,23 @@ describe("the scenario-events REST declaration", () => {
 
       expect((await deleteEvents(family)).status).toBe(422);
       expect(getRunIdsForSet).not.toHaveBeenCalled();
+    });
+
+    it("gives peer callers the named scope error for absent or ambiguous scope", async () => {
+      const world = createScenarioRestTestApp();
+
+      await expect(
+        world.app.archiveScenarioEvents({ projectId: PROJECT_ID }),
+      ).rejects.toMatchObject({
+        code: "scenario_event_archive_scope_invalid",
+      });
+      await expect(
+        world.app.archiveScenarioEvents({
+          projectId: PROJECT_ID,
+          scenarioSetId: "set-a",
+          scenarioRunId: "run-a",
+        }),
+      ).rejects.toMatchObject({ code: "scenario_event_archive_scope_invalid" });
     });
 
     /** @scenario "DELETE with both scenarioSetId and scenarioRunId is refused" */
@@ -295,8 +306,13 @@ describe("the scenario-events REST declaration", () => {
 
     /** @scenario "The handoff is delivered when a tab is listening" */
     it("parks and broadcasts this instance's run URL", async () => {
-      const setPendingNavigate = vi.fn(async () => {});
-      const broadcastToTenant = vi.fn(async () => {});
+      const calls: string[] = [];
+      const setPendingNavigate = vi.fn(async () => {
+        calls.push("park");
+      });
+      const broadcastToTenant = vi.fn(async () => {
+        calls.push("broadcast");
+      });
       const family = buildEventFamily({
         scenarioTabs: { hasLiveTab: async () => true, setPendingNavigate },
         broadcast: { broadcastToTenant },
@@ -314,6 +330,7 @@ describe("the scenario-events REST declaration", () => {
       });
       expect(setPendingNavigate).toHaveBeenCalledTimes(1);
       expect(broadcastToTenant).toHaveBeenCalledTimes(1);
+      expect(calls).toEqual(["park", "broadcast"]);
     });
 
     /** @scenario "A handoff never crosses projects" */

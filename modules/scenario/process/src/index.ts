@@ -140,12 +140,7 @@ export {
   type RunConfigurationScope,
 } from "./services/run-configurations.service.ts";
 export { ScenarioService, type ScenarioServiceOptions } from "./services/scenario.service.ts";
-export {
-  archiveScenarioRun,
-  archiveScenarioSetRuns,
-  createScenarioEventsRest,
-  type InlineMediaExtraction,
-} from "./transport/scenario-event.rest.ts";
+export { scenarioEventsRest } from "./transport/scenario-event.rest.ts";
 export {
   SCENARIO_GENERATE_DEFAULT_TIMEOUT_MS,
   SCENARIO_GENERATE_FEATURE_KEY,

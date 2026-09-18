@@ -20,6 +20,7 @@ import type {
 } from "@langwatch/scenario-contract";
 import { ScenarioSimulationsUnavailableError } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
@@ -61,6 +62,7 @@ function harness() {
       modelProviders: createApiFixture<ModelProviderApi>(),
       presence: createApiFixture<PresenceApi>(),
       auditLog: createApiFixture<AuditLogApi>(),
+      traces: createApiFixture<TraceApi>(),
     },
     config: undefined,
     resources: {} as ResourceOwnership,
@@ -92,6 +94,8 @@ function harness() {
         getTenantEmitter: () => {
           throw new Error("the queue path subscribes to nothing");
         },
+        broadcastToTenant: async () => {},
+        broadcastToTenantRateLimited: async () => {},
       },
     },
   });
@@ -365,6 +369,7 @@ describe("ScenarioApp.getRunDataForAllSuites", () => {
           modelProviders: createApiFixture<ModelProviderApi>(),
           presence: createApiFixture<PresenceApi>(),
           auditLog: createApiFixture<AuditLogApi>(),
+          traces: createApiFixture<TraceApi>(),
         },
         config: undefined,
         resources: {} as ResourceOwnership,
@@ -393,6 +398,8 @@ describe("ScenarioApp.getRunDataForAllSuites", () => {
             getTenantEmitter: () => {
               throw new Error("this read subscribes to nothing");
             },
+            broadcastToTenant: async () => {},
+            broadcastToTenantRateLimited: async () => {},
           },
         },
       });

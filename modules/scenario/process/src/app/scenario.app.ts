@@ -4,12 +4,13 @@ import { AgentApi } from "@langwatch/agent-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
-import type { Logger } from "@langwatch/observability";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { Logger } from "@langwatch/observability";
 import { PresenceApi } from "@langwatch/presence-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { AgentAdapter } from "@langwatch/scenario";
 import {
+  DEFAULT_SET_ID,
   type RunConfigurationEntryResponse,
   startScenarioTabPresence,
   ScenarioApi,
@@ -31,6 +32,12 @@ import {
   type ScenarioDuplicateInput,
   type ScenarioExecutionPrefetchInput,
   type ScenarioExecutionPrefetchResult,
+  type ScenarioEventArchiveInput,
+  type ScenarioEventArchiveResult,
+  type ScenarioEventBrowserTabOfferInput,
+  type ScenarioEventBrowserTabOfferResult,
+  type ScenarioEventReportInput,
+  type ScenarioEventReportResult,
   type ScenarioExecutionService,
   type ScenarioIdInput,
   type ScenarioMoveInput,
@@ -90,8 +97,10 @@ import {
  * The scenario feature's application: what all of its doors call.
  */
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
+import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi, type UserFullProfile, type UserProfilesInput } from "@langwatch/user-contract";
 
+import { ScenarioEventBroadcast } from "../channels/scenario-event-broadcast.channel.ts";
 import type { ScenarioRepositories } from "../repositories/scenario.repositories.ts";
 import { scenarioPlatformUrl } from "../rules/scenario-platform-url.rules.ts";
 import type { AgentTestService } from "../services/agent-test.service.ts";
@@ -102,6 +111,7 @@ import {
   SilentScenarioActivity,
   type ScenarioActivity,
 } from "../services/scenario-activity.service.ts";
+import { ScenarioEventService } from "../services/scenario-event.service.ts";
 import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
 import { ScenarioGenerateBoundsService } from "../services/scenario-generate-bounds.service.ts";
 import { ScenarioGenerationService } from "../services/scenario-generation.service.ts";
@@ -115,9 +125,10 @@ import { buildScenarioComposition } from "./scenario-composition.build.ts";
  * the events another pod published. Structural rather than the concrete broadcast service, because
  * the subscription needs nothing else from it.
  */
-export type ScenarioBroadcast = Readonly<{
-  getTenantEmitter(projectId: string): EventEmitter;
-}>;
+export type ScenarioBroadcast = ScenarioEventBroadcast &
+  Readonly<{
+    getTenantEmitter(projectId: string): EventEmitter;
+  }>;
 
 /** What the process composes this feature's application from. */
 export interface ScenarioAppDependencies {
@@ -138,6 +149,7 @@ export interface ScenarioAppDependencies {
   generateBounds: ScenarioGenerateBoundsService;
   generation: ScenarioGenerationService;
   runExportDownloads: ScenarioRunExportDownloadService;
+  events: ScenarioEventService;
   connectedTargets: ConnectedTargetService;
 }
 
@@ -185,6 +197,7 @@ export const scenarioAppDependencyTokens = {
   modelProviders: ModelProviderApi,
   presence: PresenceApi,
   auditLog: AuditLogApi,
+  traces: TraceApi,
 };
 
 /**
@@ -265,6 +278,12 @@ export class ScenarioApp implements ScenarioApi {
         exports,
         presence: setup.dependencies.presence,
       }),
+      events: ScenarioEventService.create({
+        simulations: setup.members.simulations,
+        scenarioTabs: setup.members.scenarioTabs,
+        broadcast: setup.members.broadcast,
+        traces: setup.dependencies.traces,
+      }),
       publicBaseUrl: setup.members.publicBaseUrl,
     });
   }
@@ -292,6 +311,37 @@ export class ScenarioApp implements ScenarioApi {
     input: ScenarioRunExportDownloadInput,
   ): Promise<ScenarioRunExportDownload> {
     return this.#dependencies.runExportDownloads.download(input);
+  }
+
+  async reportScenarioEvent(input: ScenarioEventReportInput): Promise<ScenarioEventReportResult> {
+    const reported = await this.#dependencies.events.report(input);
+    if (reported.scenarioSetId === null) return { success: true };
+
+    return {
+      success: true,
+      url: this.platformUrl({
+        projectSlug: input.projectSlug,
+        path: `/simulations/${reported.scenarioSetId}`,
+      }),
+    };
+  }
+
+  offerScenarioBrowserTab(
+    input: ScenarioEventBrowserTabOfferInput,
+  ): Promise<ScenarioEventBrowserTabOfferResult> {
+    return this.#dependencies.events.offerBrowserTab({
+      ...input,
+      url: this.platformUrl({
+        projectSlug: input.projectSlug,
+        path: `/simulations/${encodeURIComponent(
+          input.scenarioSetId || DEFAULT_SET_ID,
+        )}/${encodeURIComponent(input.batchRunId)}`,
+      }),
+    });
+  }
+
+  archiveScenarioEvents(input: ScenarioEventArchiveInput): Promise<ScenarioEventArchiveResult> {
+    return this.#dependencies.events.archive(input);
   }
 
   testAgentRun(input: TestAgentRunInput) {

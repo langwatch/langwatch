@@ -3203,6 +3203,10 @@ const presentations = {
     title: "This alert needs a severity",
     describe: () => "Say how urgent it is, so it reaches the right people.",
   },
+  scenario_event_archive_scope_invalid: {
+    title: "Choose what to archive",
+    describe: () => "Specify the scenario run or scenario set to archive.",
+  },
   report_schedule_missing: {
     title: "This report has no schedule",
     describe: () => "Edit it and pick when it should be sent, then resume it.",

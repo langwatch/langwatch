@@ -100,6 +100,23 @@ export class SimulationRunNotFoundError extends NotFoundError {
   }
 }
 
+/** A peer call omitted the archive scope the REST schema makes mandatory. */
+export class ScenarioEventArchiveScopeError extends HandledError {
+  declare readonly code: "scenario_event_archive_scope_invalid";
+
+  constructor() {
+    super(
+      "scenario_event_archive_scope_invalid",
+      "A scenario-event archive requires a run or set scope",
+      {
+        httpStatus: 400,
+        fault: "customer",
+      },
+    );
+    this.name = "ScenarioEventArchiveScopeError";
+  }
+}
+
 /** The batch a set of simulation runs was started as, which this project does not hold. */
 export class BatchRunNotFoundError extends NotFoundError {
   declare readonly code: "batch_run_not_found";

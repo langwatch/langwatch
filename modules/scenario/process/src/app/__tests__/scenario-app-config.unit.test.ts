@@ -19,6 +19,7 @@ import {
   type SimulationService,
 } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
@@ -40,7 +41,6 @@ import type {
   ScenarioTabStore,
 } from "../scenario.app.ts";
 
-
 function buildProductionApp(publicBaseUrl: string | undefined, emitter = new EventEmitter()) {
   return ScenarioApp.create({
     repositories: MemoryScenarioRepositories.create(),
@@ -52,6 +52,7 @@ function buildProductionApp(publicBaseUrl: string | undefined, emitter = new Eve
       modelProviders: createApiFixture<ModelProviderApi>(),
       presence: createApiFixture<PresenceApi>(),
       auditLog: createApiFixture<AuditLogApi>(),
+      traces: createApiFixture<TraceApi>(),
     },
     config: undefined,
     resources: createApiFixture<ResourceOwnership>(),
@@ -66,7 +67,11 @@ function buildProductionApp(publicBaseUrl: string | undefined, emitter = new Eve
       simulations: createApiFixture<SimulationService>(),
       scenarioExecution: createApiFixture<ScenarioExecutionService>(),
       scenarioTabs: createApiFixture<ScenarioTabRegistry>(),
-      broadcast: { getTenantEmitter: () => emitter },
+      broadcast: {
+        getTenantEmitter: () => emitter,
+        broadcastToTenant: async () => {},
+        broadcastToTenantRateLimited: async () => {},
+      },
       resultAtoms: createApiFixture<ResultAtomsService>(),
       runConfigurations: createApiFixture<RunConfigurationsService>(),
       agentAdapterFactory: createApiFixture<AgentAdapterFactory>(),

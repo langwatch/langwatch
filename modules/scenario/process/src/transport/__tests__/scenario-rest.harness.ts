@@ -1,13 +1,13 @@
 import { EventEmitter } from "node:events";
 
 import type { AgentApi } from "@langwatch/agent-contract";
-import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import {
   bindRestMiddleware,
   createRestRuntime,
   projectRestFacts,
   type RestErrorHandler,
 } from "@langwatch/api/rest";
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { ResourceOwnership } from "@langwatch/kernel";
@@ -21,6 +21,7 @@ import {
   type SimulationService,
 } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -35,6 +36,7 @@ import type {
   ScenarioExecutionRunner,
   ScenarioHttp,
   ScenarioProcessorServiceMetrics,
+  ScenarioBroadcast,
   ScenarioTabStore,
 } from "../../app/scenario.app.ts";
 import { ScenarioApp } from "../../app/scenario.app.ts";
@@ -50,6 +52,8 @@ export function createScenarioRestTestApp(
   options: {
     simulations?: Partial<SimulationService>;
     scenarioTabs?: Partial<ScenarioTabRegistry>;
+    broadcast?: Partial<ScenarioBroadcast>;
+    traces?: Partial<TraceApi>;
   } = {},
 ) {
   const simulations = createApiFixture<SimulationService>(
@@ -59,6 +63,13 @@ export function createScenarioRestTestApp(
   const scenarioTabs = createApiFixture<ScenarioTabRegistry>(
     options.scenarioTabs ?? {},
     "Scenario tab registry",
+  );
+  const broadcast = createApiFixture<ScenarioBroadcast>(
+    {
+      getTenantEmitter: () => new EventEmitter(),
+      ...options.broadcast,
+    },
+    "Scenario broadcast",
   );
 
   const app = ScenarioApp.create({
@@ -71,13 +82,14 @@ export function createScenarioRestTestApp(
       modelProviders: createApiFixture<ModelProviderApi>(),
       presence: createApiFixture<PresenceApi>(),
       auditLog: createApiFixture<AuditLogApi>(),
+      traces: createApiFixture<TraceApi>(options.traces, "Trace API"),
     },
     members: {
       agentTesting: createApiFixture<AgentTestService>(),
       simulations,
       scenarioExecution: createApiFixture<ScenarioExecutionService>(),
       scenarioTabs,
-      broadcast: { getTenantEmitter: () => new EventEmitter() },
+      broadcast,
       resultAtoms: createApiFixture<ResultAtomsService>(),
       runConfigurations: createApiFixture<RunConfigurationsService>(),
       agentAdapterFactory: createApiFixture<AgentAdapterFactory>(),
@@ -99,7 +111,7 @@ export function createScenarioRestTestApp(
     secrets: {} as never,
   });
 
-  return { app, simulations, scenarioTabs };
+  return { app, simulations, scenarioTabs, broadcast };
 }
 
 export function createScenarioRestTestRuntime(

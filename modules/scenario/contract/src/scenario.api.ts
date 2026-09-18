@@ -21,6 +21,15 @@ import type {
   ScenarioExecutionPrefetchInput,
   ScenarioExecutionPrefetchResult,
 } from "./scenario-execution.service.ts";
+import type {
+  ScenarioGenerateRequest,
+  ScenarioGenerateResponse,
+} from "./scenario-generate.schemas.ts";
+import type { ScenarioEvent } from "./scenario-run-data.ts";
+import type {
+  ScenarioRunExportDownload,
+  ScenarioRunExportDownloadInput,
+} from "./scenario-run-export.ts";
 import type { ScenarioTabPresence, ScenarioTabRegistration } from "./scenario-tab-presence.ts";
 import type { RunParameterValues } from "./scenario.parameters.ts";
 import type { RunConfigurationEntryResponse } from "./scenario.responses.ts";
@@ -49,11 +58,6 @@ import type {
   ScenarioVersionSummary,
 } from "./scenario.version.ts";
 import type { SimulationQueueRun } from "./simulation.commands.ts";
-import type { ScenarioGenerateRequest, ScenarioGenerateResponse } from "./scenario-generate.schemas.ts";
-import type {
-  ScenarioRunExportDownload,
-  ScenarioRunExportDownloadInput,
-} from "./scenario-run-export.ts";
 import type {
   SimulationAllSuitesInput,
   SimulationBatchHistoryInput,
@@ -119,6 +123,46 @@ export type ResolvedScenarioRunParametersForScenario = ResolvedScenarioRunParame
   scenarioId: string;
 };
 
+/** The project facts a scenario-events transport resolves before calling the app. */
+export type ScenarioEventProject = {
+  projectId: string;
+  projectSlug: string;
+};
+
+export type ScenarioEventReportInput = ScenarioEventProject & {
+  event: ScenarioEvent;
+};
+
+export type ScenarioEventReportResult = {
+  success: true;
+  url?: string;
+};
+
+export type ScenarioEventBrowserTabOfferInput = ScenarioEventProject & {
+  tabKey: string;
+  batchRunId: string;
+  scenarioSetId?: string;
+};
+
+export type ScenarioEventBrowserTabOfferResult = {
+  delivered: boolean;
+  url: string;
+};
+
+export type ScenarioEventArchiveInput = {
+  projectId: string;
+  scenarioSetId?: string;
+  scenarioRunId?: string;
+};
+
+export type ScenarioEventArchiveResult = {
+  archived: number;
+  failed: number;
+  scenarioSetId?: string;
+  hasMore?: boolean;
+  scenarioRunId?: string;
+};
+
 /** Who a write is attributed to, and the surface they wrote it through. */
 export interface ScenarioCaller {
   readonly id: string;
@@ -153,6 +197,11 @@ export interface QueueSimulationRunInput {
  * features such as Suite reach it by. */
 export interface ScenarioApi {
   generateScenario(input: ScenarioGenerateRequest): Promise<ScenarioGenerateResponse>;
+  reportScenarioEvent(input: ScenarioEventReportInput): Promise<ScenarioEventReportResult>;
+  offerScenarioBrowserTab(
+    input: ScenarioEventBrowserTabOfferInput,
+  ): Promise<ScenarioEventBrowserTabOfferResult>;
+  archiveScenarioEvents(input: ScenarioEventArchiveInput): Promise<ScenarioEventArchiveResult>;
   downloadScenarioRunExport(
     input: ScenarioRunExportDownloadInput,
   ): Promise<ScenarioRunExportDownload>;

@@ -1,506 +1,81 @@
 import {
-  type AppRestBroadcast,
   baseResponses,
   defineRestRouter,
-  BadRequestError,
   MANAGEMENT_API_VERSION,
   projectRestFacts,
   resolver,
-  type PlatformUrlBuilder,
-  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
-import { createLogger } from "@langwatch/observability";
 import {
-  SimulationRunNotFoundError,
-  DEFAULT_SET_ID,
-  encodeContent,
-  encodeEnd,
-  encodeStart,
   responseSchemas,
-  SCENARIO_TAB_NAVIGATE_EVENT,
-  scenarioEventSchema,
-  scenarioEventBrowserTabBodySchema,
   scenarioEventArchiveOutputSchema,
   scenarioEventArchiveQuerySchema,
+  scenarioEventBrowserTabBodySchema,
+  scenarioEventSchema,
   ScenarioApi,
-  ScenarioEventType,
-  type ScenarioEvent,
-  type ScenarioTabNavigatePayload,
-  type ScenarioTabRegistry,
-  type SimulationService,
 } from "@langwatch/scenario-contract";
-import { nowInstant } from "@langwatch/time";
-/**
- * `/api/scenario-events` - the events an SDK reports while a scenario runs.
- * Everything from the process arrives as a port: services, tenant broadcast,
- * media externalisation. Trace-usage and body-cap middleware are the mount's own concern.
- */
-import type { z } from "zod";
 
-const logger = createLogger("langwatch:api:scenario-events");
-
-/**
- * Externalises the inline media a reported event carries, rewriting the
- * event to reference the stored bytes by URL. The walk is the
- * stored-objects vertical's, arriving already bound to its store.
- */
-export type InlineMediaExtraction = (input: {
-  event: unknown;
-  projectId: string;
-  ownerKind: string;
-  ownerId: string;
-  purpose: string;
-}) => Promise<{ rewrittenEvent: unknown; refs: readonly { id: string }[] }>;
-
-/**
- * REST for the events an SDK reports while a scenario runs.
- */
-export function createScenarioEventsRest(options: {
-  simulations: () => SimulationService;
-  scenarioTabs: () => ScenarioTabRegistry;
-  broadcast: () => AppRestBroadcast;
-  extractInlineMedia: InlineMediaExtraction;
-  /** Absolute links back into this instance. Injected rather than read from the
-   *  environment here: a feature receives typed configuration, and the
-   *  composition root is the one place that parses it. */
-  platformUrl: PlatformUrlBuilder;
-}): Readonly<{
-  protocol: "rest";
-  namespace: string;
-  router: () => RestTransportDeclaration<ScenarioApi>;
-}> {
-  const { simulations, scenarioTabs, broadcast, extractInlineMedia, platformUrl } = options;
-
-  return (
-    defineRestRouter(ScenarioApi)
-      .withNamespace("scenario-events")
-      .withVersion(MANAGEMENT_API_VERSION)
-
-      // Reporting an event creates run data, not a scenario definition, so it
-      // asks for `scenarios:create`, not `:manage`. `:manage` still implies
-      // `:create`, so every prior key/role still works; a viewer is declined as
-      // before.
-      .post("/", "reportScenarioEvent")
-      .withInput(scenarioEventSchema)
-      .withPermission("scenarios:create")
-      .withOutput(responseSchemas.success)
-      .withStatus(201)
-      .withDocs({
-        description: "Create a new scenario event",
-        responses: {
-          ...baseResponses,
-          400: {
-            description: "Invalid event data",
-            content: { "application/json": { schema: resolver(responseSchemas.error) } },
-          },
-        },
-      })
-      .withMiddleware(projectRestFacts)
-      .handle(async ({ input: validatedEvent, scope }, project) => {
-        logger.info(
-          {
-            projectId: scope.id,
-            eventType: validatedEvent.type,
-            scenarioId: validatedEvent.scenarioId,
-            scenarioRunId: validatedEvent.scenarioRunId,
-            scenarioSetId: validatedEvent.scenarioSetId,
-          },
-          "Received scenario event",
-        );
-
-        // Extract inline media bytes, externalize to stored objects, and rewrite
-        // the event payload to reference them by URL before dispatch.
-        const { rewrittenEvent: rawRewritten, refs } = await extractInlineMedia({
-          event: validatedEvent,
-          projectId: scope.id,
-          ownerKind: "scenario_run",
-          ownerId: validatedEvent.scenarioRunId,
-          purpose: "scenario_event",
-        });
-
-        // Cast back to the typed ScenarioEvent - the rewrite only touches content
-        // arrays inside message objects; all discriminant fields are preserved.
-        const event = rawRewritten as ScenarioEvent;
-
-        if (refs.length > 0) {
-          logger.info(
-            {
-              stored_object_ids: refs.map((r) => r.id),
-              projectId: scope.id,
-              scenarioRunId: validatedEvent.scenarioRunId,
-              count: refs.length,
-            },
-            `scenario event extracted ${refs.length} stored object(s)`,
-          );
-        }
-
-        await dispatchSimulationEvent(simulations(), scope.id, event);
-
-        // Streaming events: broadcast only, no persistence
-        if (isStreamingEvent(event.type)) {
-          await broadcastStreamingEvent(broadcast(), scope.id, event);
-          return { success: true };
-        }
-
-        // Broadcast START/END directly so the frontend gets them immediately
-        // (the subscriber's debounced broadcast is too slow and causes CONTENT
-        // deltas to be dropped). Works regardless of event-sourcing flag.
-        if (
-          event.type === ScenarioEventType.TEXT_MESSAGE_START ||
-          event.type === ScenarioEventType.TEXT_MESSAGE_END
-        ) {
-          await broadcastStreamingEvent(broadcast(), scope.id, event);
-        }
-
-        const url = platformUrl({
-          projectSlug: project.projectSlug,
-          path: `/simulations/${event.scenarioSetId || DEFAULT_SET_ID}`,
-        });
-
-        return { success: true, url };
-      })
-
-      // Offer a batch run to a tab already open on the caller's machine. If the
-      // SDK's stamped tab key still has a live SSE subscription, the run
-      // broadcasts there and the SDK skips opening a browser; otherwise it
-      // falls back to opening one.
-      .post("/browser-tab", "offerScenarioBrowserTab")
-      .withInput(scenarioEventBrowserTabBodySchema)
-      .withPermission("scenarios:create")
-      .withOutput(responseSchemas.browserTabHandoff)
-      .withDocs({
-        description:
-          "Offer a batch run to an already-open simulations tab on the caller's machine. Returns whether a live tab took it.",
-        responses: baseResponses,
-      })
-      .withMiddleware(projectRestFacts)
-      .handle(async ({ input, scope }, project) => {
-        const { tabKey, batchRunId, scenarioSetId } = input;
-
-        // Built server-side from ids rather than accepted as a URL: a handoff can
-        // only ever point a browser at this instance's own simulations page. The
-        // ids are caller-supplied and only length-bounded, so they are encoded - a
-        // `#` or `?` in one would otherwise truncate the rest of the path.
-        const url = platformUrl({
-          projectSlug: project.projectSlug,
-          path: `/simulations/${encodeURIComponent(
-            scenarioSetId || DEFAULT_SET_ID,
-          )}/${encodeURIComponent(batchRunId)}`,
-        });
-
-        const hasLiveTab = await scenarioTabs().hasLiveTab({ projectId: scope.id, tabKey });
-
-        if (!hasLiveTab) {
-          return { delivered: false, url };
-        }
-
-        const payload: ScenarioTabNavigatePayload = {
-          event: SCENARIO_TAB_NAVIGATE_EVENT,
-          tabKey,
-          url,
-        };
-
-        // Parked before the broadcast so a tab reconnecting right now cannot slip
-        // between the two and miss a run we already reported as delivered.
-        await scenarioTabs().setPendingNavigate({ projectId: scope.id, tabKey, url });
-
-        await broadcast().broadcastToTenant(
-          scope.id,
-          JSON.stringify(payload),
-          "simulation_updated",
-        );
-
-        logger.info(
-          { projectId: scope.id, batchRunId },
-          "Handed scenario batch to an open simulations tab",
-        );
-
-        return { delivered: true, url };
-      })
-
-      // Archive simulation runs. Exactly ONE scope is MANDATORY: a
-      // scenarioSetId (archive every run in the set) or a scenarioRunId
-      // (archive one run). An unqualified request is rejected so a single call
-      // can never archive every run in the project. Stays at `:manage`: it is
-      // destruction, and only the administration grain should carry it.
-      .delete("/", "archiveScenarioEvents")
-      .withQuery(scenarioEventArchiveQuerySchema)
-      .withPermission("scenarios:manage")
-      .withOutput(scenarioEventArchiveOutputSchema)
-      .withDocs({
-        description:
-          "Archive simulation runs. Pass exactly one of `scenarioSetId` (archives every run in the set; `scenarioSetId=default` targets the implicit default set) or `scenarioRunId` (archives that one run).",
-        responses: {
-          ...baseResponses,
-          400: {
-            description: "Missing or invalid scope parameter",
-            content: { "application/json": { schema: resolver(responseSchemas.error) } },
-          },
-          404: {
-            description: "Scenario run not found in this project",
-            content: { "application/json": { schema: resolver(responseSchemas.error) } },
-          },
-        },
-      })
-      .handle(async ({ input, scope }) => {
-        return archiveScenarioEventScope({
-          simulations: simulations(),
-          projectId: scope.id,
-          ...input,
-        });
-      })
-
-      .build()
-  );
-}
-
-async function archiveScenarioEventScope({
-  simulations,
-  projectId,
-  scenarioSetId,
-  scenarioRunId,
-}: {
-  simulations: SimulationService;
-  projectId: string;
-  scenarioSetId?: string;
-  scenarioRunId?: string;
-}): Promise<z.infer<typeof scenarioEventArchiveOutputSchema>> {
-  if (scenarioRunId !== void 0) {
-    const archivedRun = await archiveScenarioRun({ simulations, projectId, scenarioRunId });
-    if (archivedRun === null) throw new SimulationRunNotFoundError(scenarioRunId);
-    return archivedRun;
-  }
-
-  if (scenarioSetId === void 0) {
-    throw new BadRequestError("A scenario-event archive requires a run or set scope");
-  }
-
-  return archiveScenarioSetRuns({ simulations, projectId, scenarioSetId });
-}
-
-async function dispatchSimulationEvent(
-  simulations: SimulationService,
-  projectId: string,
-  event: ScenarioEvent,
-): Promise<void> {
-  const basePayload = {
-    tenantId: projectId,
-    scenarioRunId: event.scenarioRunId,
-    occurredAt: event.timestamp ?? nowInstant().epochMilliseconds,
-  };
-
-  if (event.type === ScenarioEventType.RUN_STARTED) {
-    await simulations.startRun({
-      ...basePayload,
-      scenarioId: event.scenarioId,
-      batchRunId: event.batchRunId,
-      scenarioSetId: event.scenarioSetId || DEFAULT_SET_ID,
-      name: event.metadata?.name,
-      description: event.metadata?.description,
-      metadata: event.metadata,
-    });
-  } else if (event.type === ScenarioEventType.MESSAGE_SNAPSHOT) {
-    const messages = event.messages ?? [];
-    await simulations.messageSnapshot({
-      ...basePayload,
-      messages: messages as {
-        trace_id?: string;
-        [key: string]: unknown;
-      }[],
-      traceIds: messages
-        .map((m: { trace_id?: string }) => m.trace_id)
-        .filter((id): id is string => typeof id === "string"),
-    });
-  } else if (event.type === ScenarioEventType.TEXT_MESSAGE_START) {
-    await simulations.textMessageStart({
-      ...basePayload,
-      messageId: event.messageId,
-      role: event.role,
-      messageIndex: event.messageIndex,
-    });
-  } else if (event.type === ScenarioEventType.TEXT_MESSAGE_END) {
-    await simulations.textMessageEnd({
-      ...basePayload,
-      messageId: event.messageId,
-      role: event.role,
-      content: event.content ?? "",
-      message: event.message,
-      traceId: event.traceId,
-      messageIndex: event.messageIndex,
-    });
-  } else if (event.type === ScenarioEventType.RUN_FINISHED) {
-    await simulations.finishRun({
-      ...basePayload,
-      results: event.results
-        ? {
-            verdict: event.results.verdict,
-            reasoning: event.results.reasoning,
-            metCriteria: event.results.metCriteria,
-            unmetCriteria: event.results.unmetCriteria,
-            error: event.results.error,
-          }
-        : undefined,
-      status: event.status,
-    });
-  }
-}
-
-/** Streaming events are broadcast-only, not persisted via event-sourcing */
-function isStreamingEvent(type: string): boolean {
-  return (
-    type === ScenarioEventType.TEXT_MESSAGE_CONTENT ||
-    type === ScenarioEventType.TOOL_CALL_START ||
-    type === ScenarioEventType.TOOL_CALL_ARGS ||
-    type === ScenarioEventType.TOOL_CALL_END
-  );
-}
-
-/**
- * Archives ONE simulation run after checking it belongs to the project.
- * Answers null when the project holds no such run, so a caller can never
- * archive another tenant's run by guessing its id. Exported as a test seam.
- */
-export async function archiveScenarioRun({
-  simulations,
-  projectId,
-  scenarioRunId,
-}: {
-  simulations: Pick<SimulationService, "findScenarioRunData" | "deleteRun">;
-  projectId: string;
-  scenarioRunId: string;
-}): Promise<{ archived: number; failed: number; scenarioRunId: string } | null> {
-  const run = await simulations.findScenarioRunData({ projectId, scenarioRunId });
-  if (!run) return null;
-
-  await simulations.deleteRun({
-    tenantId: projectId,
-    scenarioRunId,
-    occurredAt: nowInstant().epochMilliseconds,
-  });
-
-  return { archived: 1, failed: 0, scenarioRunId };
-}
-
-/**
- * Archives every active run in a set via one deleteRun command per run id
- * (test seam). Bounded-concurrency and failure-collecting: one rejection
- * never short-circuits the rest. `hasMore` reflects whether the lookup hit its cap.
- */
-export async function archiveScenarioSetRuns({
-  simulations,
-  projectId,
-  scenarioSetId,
-}: {
-  simulations: Pick<SimulationService, "getRunIdsForSet" | "deleteRun">;
-  projectId: string;
-  scenarioSetId: string;
-}): Promise<{
-  archived: number;
-  failed: number;
-  scenarioSetId: string;
-  hasMore: boolean;
-}> {
-  const { runIds, reachedCap } = await simulations.getRunIdsForSet({
-    projectId,
-    scenarioSetId,
-  });
-
-  const now = nowInstant().epochMilliseconds;
-  let archived = 0;
-  let failed = 0;
-
-  await pMapLimited({
-    items: runIds,
-    concurrency: 8,
-    fn: async (id) => {
-      try {
-        await simulations.deleteRun({
-          tenantId: projectId,
-          scenarioRunId: id,
-          occurredAt: now,
-        });
-        archived++;
-      } catch (err) {
-        failed++;
-        logger.warn({ projectId, scenarioRunId: id, err }, "Failed to dispatch deleteRun");
-      }
+/** Scenario-run event reporting, live-tab handoff, and scoped archival. */
+export const scenarioEventsRest = defineRestRouter(ScenarioApi)
+  .withNamespace("scenario-events")
+  .withVersion(MANAGEMENT_API_VERSION)
+  .post("/", "reportScenarioEvent")
+  .withInput(scenarioEventSchema)
+  .withPermission("scenarios:create")
+  .withOutput(responseSchemas.success)
+  .withStatus(201)
+  .withDocs({
+    description: "Create a new scenario event",
+    responses: {
+      ...baseResponses,
+      400: {
+        description: "Invalid event data",
+        content: { "application/json": { schema: resolver(responseSchemas.error) } },
+      },
     },
-  });
-
-  return { archived, failed, scenarioSetId, hasMore: reachedCap };
-}
-
-/**
- * Maps `fn` over `items` with at most `concurrency` invocations in flight at
- * once, awaiting the next free slot before starting the following item.
- */
-async function pMapLimited<T>({
-  items,
-  fn,
-  concurrency,
-}: {
-  items: T[];
-  fn: (item: T) => Promise<void>;
-  concurrency: number;
-}): Promise<void> {
-  const executing = new Set<Promise<void>>();
-  for (const item of items) {
-    const p = fn(item).finally(() => {
-      executing.delete(p);
-    });
-    executing.add(p);
-    if (executing.size >= concurrency) await Promise.race(executing);
-  }
-  await Promise.all(executing);
-}
-
-async function broadcastStreamingEvent(
-  broadcast: AppRestBroadcast,
-  projectId: string,
-  event: ScenarioEvent,
-): Promise<void> {
-  try {
-    let payload: string;
-
-    if (event.type === ScenarioEventType.TEXT_MESSAGE_START) {
-      payload = encodeStart({
-        scenarioRunId: event.scenarioRunId,
-        batchRunId: event.batchRunId,
-        messageId: event.messageId,
-        role: event.role,
-        messageIndex: event.messageIndex,
-      });
-    } else if (event.type === ScenarioEventType.TEXT_MESSAGE_CONTENT) {
-      payload = encodeContent({
-        scenarioRunId: event.scenarioRunId,
-        batchRunId: event.batchRunId,
-        messageId: event.messageId,
-        delta: event.delta,
-      });
-    } else if (event.type === ScenarioEventType.TEXT_MESSAGE_END) {
-      payload = encodeEnd({
-        scenarioRunId: event.scenarioRunId,
-        batchRunId: event.batchRunId,
-        messageId: event.messageId,
-        content: event.content,
-      });
-    } else {
-      // Tool call events - full payload for now
-      payload = JSON.stringify({
-        e: event.type,
-        r: event.scenarioRunId,
-        b: event.batchRunId,
-      });
-    }
-
-    const tier =
-      event.type === ScenarioEventType.TEXT_MESSAGE_CONTENT ||
-      event.type === ScenarioEventType.TOOL_CALL_ARGS
-        ? ("delta" as const)
-        : ("structural" as const);
-
-    await broadcast.broadcastToTenantRateLimited(projectId, payload, "simulation_updated", tier);
-  } catch (err) {
-    logger.warn({ err, projectId }, "Failed to broadcast streaming event");
-  }
-}
+  })
+  .withMiddleware(projectRestFacts)
+  .handle(({ app, input, scope }, project) =>
+    app.reportScenarioEvent({
+      event: input,
+      projectId: scope.id,
+      projectSlug: project.projectSlug,
+    }),
+  )
+  .post("/browser-tab", "offerScenarioBrowserTab")
+  .withInput(scenarioEventBrowserTabBodySchema)
+  .withPermission("scenarios:create")
+  .withOutput(responseSchemas.browserTabHandoff)
+  .withDocs({
+    description:
+      "Offer a batch run to an already-open simulations tab on the caller's machine. Returns whether a live tab took it.",
+    responses: baseResponses,
+  })
+  .withMiddleware(projectRestFacts)
+  .handle(({ app, input, scope }, project) =>
+    app.offerScenarioBrowserTab({
+      ...input,
+      projectId: scope.id,
+      projectSlug: project.projectSlug,
+    }),
+  )
+  .delete("/", "archiveScenarioEvents")
+  .withQuery(scenarioEventArchiveQuerySchema)
+  .withPermission("scenarios:manage")
+  .withOutput(scenarioEventArchiveOutputSchema)
+  .withDocs({
+    description:
+      "Archive simulation runs. Pass exactly one of scenarioSetId (archives every run in the set; scenarioSetId=default targets the implicit default set) or scenarioRunId (archives that one run).",
+    responses: {
+      ...baseResponses,
+      400: {
+        description: "Missing or invalid scope parameter",
+        content: { "application/json": { schema: resolver(responseSchemas.error) } },
+      },
+      404: {
+        description: "Scenario run not found in this project",
+        content: { "application/json": { schema: resolver(responseSchemas.error) } },
+      },
+    },
+  })
+  .handle(({ app, input, scope }) => app.archiveScenarioEvents({ ...input, projectId: scope.id }))
+  .build();
