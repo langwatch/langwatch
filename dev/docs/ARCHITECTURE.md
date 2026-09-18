@@ -229,9 +229,12 @@ exported at `./declaration`; the generated `browserModules` list installs it.
 
 ```
 apps/api/src/
-├── main.ts       # everything below, ~40 lines
-└── config.ts     # module schemas + global config, composed (§6)
+└── main.ts       # everything below, ~40 lines — the WHOLE app
 ```
+
+There is no app config file (ruled 2026-09-18): config comes from the
+installed server modules' own declared schemas, composed by the generated
+parse (§6). A hand-maintained per-app config module is a defect.
 
 ```ts
 // apps/api/src/main.ts — the whole process (ruled 2026-09-18; the landed
@@ -272,7 +275,11 @@ await server.run(app);
 
 **Surface slots are compiler-driven and role-shaped.** `expose` exists only
 on the api builder, `consume` only on the worker's — a worker exposing REST
-is unwritable, not merely unwise. Inside `expose`, the members are typed
+is unwritable, not merely unwise. **Nothing extra rides the expose chain**
+(ruled 2026-09-18): no members, logger or stores threaded through the
+surface, and auth machinery — internal bearers, the admin instance bearer,
+credential binding — is the api package's own business behind a service,
+never something the main or the surface carries along. Inside `expose`, the members are typed
 from the installed tuple: install the first namespace-declaring module and
 `.trpc()` becomes required (boot() refuses to compile, naming
 `surface.trpc`); uninstall the last one and the `.trpc()` line goes red in
@@ -365,11 +372,15 @@ dependency; `main.ts` never touches lifecycle:
 | `createApp`/`boot` | what modules declared, and how to register it on the server |
 | `Server` | signals, phases, deadline, `/healthz`, `/metrics`, serve |
 
-**The Server chain is fluent and speaks in named factories** (ruled
-2026-09-18). Health is **built in and on by default**: `Server.create({...,
-healthPort })` opens the one HTTP door, `/healthz` answering during boot.
-Everything else arrives through ONE generic word — `.with(component)` — and
-Server never learns a domain word: the packages own the vocabulary.
+**The Server chain is fluent and speaks in named factories** (settled
+2026-09-18, superseding the same day's generic-`.with(component)` phrasing).
+Health is **built in and on by default**: `Server.create({..., healthPort })`
+opens the one HTTP door, `/healthz` answering during boot. The preamble names
+its concerns — `withSecrets`, `withConfig`, `withTelemetry`, `withMetrics`,
+then `start()` — while every ARGUMENT is a named factory from the owning
+package, which is where the vocabulary lives. After `boot()`, `serve(app)`
+composes the hosting dispatch and policy middlewares (§4 above: proxy remap,
+base security headers) and sends `/api/**` through to the api package.
 `prometheusMetrics({ token })` comes from `@langwatch/observability` (so an
 OTel export variant can sit beside it without any main changing shape).
 **Telemetry initializes immediately after the config parse** (ruled
@@ -514,33 +525,41 @@ the primitives; report the gap, never widen the root.
 
 ## 6. Config
 
-**Modules declare; apps compose; the parse refuses by name.**
+**Every value is declared at its owner; the parse is generated; apps hold no
+config file** (settled 2026-09-18 — this section replaces every earlier
+iteration).
 
 ```ts
-// modules/github/contract/src/github.config.ts — the module names its needs
-export const githubConfig = Config.define({
-  appId:      Config.value(z.string().optional(),  { env: "GITHUB_APP_ID" }),
-  privateKey: Config.secret(z.string().optional(), { env: "GITHUB_APP_PRIVATE_KEY" }),
-});
+// modules/github/process/src/github.server.ts — the module declares, on itself
+static configSchema = z.object({
+  appId: z.string().optional(),               // GITHUB_APP_ID
+}).readonly();
 
-// apps/api/src/config.ts — the whole file
-export const apiConfig = defineProcessConfig({
-  process: {                                  // global config, beside the modules
-    port:               Config.value(z.coerce.number().default(6560), { env: ["API_PORT", "PORT"] }),
-    serviceName:        Config.value(z.string().default("langwatch-api")),
-    shutdownDeadlineMs: Config.value(z.coerce.number().default(25_000)),
-  },
-  stores:  storesConfig(processModules),      // derived: demands exactly what's installed
-  modules: moduleConfigs(processModules),     // derived: { github: githubConfig, trace: …, … }
-});
+// apps/api/src/main.ts — the app's entire involvement
+const server = await Server.create("langwatch-api")
+  .withSecrets(secretsChain())
+  .withConfig(apiConfig())                    // generated from the installed list
+  ...
 ```
 
-Both maps are **derived from the installed list** — installing a module
-automatically brings its config slice and its store demands. Parse happens
-once in `main.ts`; a missing required value refuses **naming module and key**
-(`github.privateKey ← GITHUB_APP_PRIVATE_KEY`). `.withConfig` hands each
-module exactly its validated slice; a module with a schema and no slice fails
-to compile.
+**You write the schema yourself and attach it where you define the module**
+(ruled 2026-09-18). Both halves work the same way: defining the process
+module or the browser module takes a hand-written Zod schema, and the
+schema itself carries the validation, the environment reading and the
+parsing — nothing else defines anything. In the app you read the modules
+you installed and pull the schemas back out. That is the whole mechanism:
+no generated config map, no registry, no defineProcessConfig ceremony;
+inference flows from the module array itself, so a field added on a schema
+appears everywhere with no other edit. Framework-owned values follow the
+same rule at their owning package (the server's port and shutdown deadline
+on the process package, store connections on the stores config,
+observability on its own). There is no per-app config file — a `config.ts`
+in an app is a defect. Every key is a **root object** — `process` for the framework
+globals, or the module's name for its slice — and Zod reads the environment
+at the one boot seam. A missing required value refuses **naming module and
+key** (`github.appId ← GITHUB_APP_ID`); a module with a schema and no slice
+fails to compile. `.readonly()` on the schema is the immutability story —
+no `Object.freeze`, no mirror types, no re-plumbing.
 
 **Defaults are production-shaped; development earns convenience explicitly.**
 `developmentDefault` values (localhost store URLs) apply only under
@@ -549,30 +568,6 @@ and are inert in production, where every required value must be explicit or
 the parse refuses. Production infrastructure always sets
 `NODE_ENV=production` (the image sets it; a pod cannot forget it), so no
 development default can ever reach a server.
-
-Secrets resolve before the parse through `@langwatch/secrets` (ADR-132):
-classified keys, ordered chain (env/.env → 1Password opt-in → refusal by
-name), redaction everywhere. Nothing outside the secrets package, config
-composition and boot files reads a secret env var.
-
-**One generated Zod parse per process** (ruled 2026-09-18). The process's
-schema is generated from its installed module list **plus the app's own
-process schema** — `apiConfig()` infers every module slice from
-`installedModules`, and the app authors only its `process` object, so
-installing a module brings its config demand and uninstalling removes it
-without touching the app. No value is declared twice. Every key is a
-**root object** — `process` for the global values, or the module's name
-for its slice — and Zod reads the environment directly at the one boot
-seam. **The definition point is the module itself** — the `configSchema`
-static on its app class (the browser half's schema on its declaration) —
-and the generated map is pure re-exports of those declarations, so
-inference flows unbroken: `apiConfig()`'s type is computed from the module
-classes, `create()`'s config parameter from the same schema, and a field
-added on the static appears everywhere with no other edit.
-`.readonly()` on the schema is the immutability story; there is no
-`Object.freeze`, no hand-built projection type mirroring the schema, and no
-re-plumbing from an env read into a second structure. What the parse returns
-is what the process holds.
 
 **Config and secrets are separate** (ruled 2026-09-18). A secret is never a
 field on the parsed config object and never travels inside it. Secrets
