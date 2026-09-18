@@ -1,5 +1,6 @@
 // Temporal, before anything reads a clock. A runtime that ships it natively keeps its own.
 import "@langwatch/time/polyfill";
+import { UI_SESSION_QUERY_KEY } from "@langwatch/auth-browser/session";
 import {
   useBrowserUiSession,
   useUiSessionReading,
@@ -26,22 +27,24 @@ import {
   useUiScopeReading,
 } from "@langwatch/organization-browser/surfaces/scope-capability";
 import { createUi } from "@langwatch/ui-kernel";
+import { createUiApplication, type UiApplication } from "@langwatch/ui-kernel/application";
+import { UiApplicationShell } from "@langwatch/ui-kernel/application-shell";
+import { UiErrorToaster } from "@langwatch/ui-kernel/error-toaster";
+import { GraphicsQualityProvider } from "@langwatch/ui-kernel/graphics-quality-provider";
+import { installedModuleDrawers } from "@langwatch/ui-kernel/module-drawers";
+import { installedModuleScreens, type UiModuleScreens } from "@langwatch/ui-kernel/module-screens";
+import { UiPageFailure } from "@langwatch/ui-kernel/page-fallbacks";
 import posthog from "posthog-js";
 import type { ReactNode } from "react";
 import type { FallbackProps } from "react-error-boundary";
 import { useLocation } from "react-router";
 
+import { uiDesignSystem } from "./behavior/design-system";
 import { readPublicAppConfig } from "./behavior/public-config";
 import { BrowserUiFeedback, resolveUiFailureCopy } from "./behavior/ui-feedback";
 import { UiShell } from "./behavior/ui-shell";
 import { UiRuntime } from "./behavior/ui.runtime";
-import { GraphicsQualityProvider } from "./shell/graphics-quality-provider";
-import { createUiApplication, type UiApplication } from "./shell/ui-application";
-import { UiApplicationShell } from "./shell/ui-application-shell";
-import { UiErrorToaster } from "./shell/ui-error-toaster";
-import { installedModuleDrawers } from "./shell/ui-module-drawers";
-import { installedModuleScreens, type UiModuleScreens } from "./shell/ui-module-screens";
-import { UiPageFailure } from "./shell/ui-page-fallbacks";
+import { uiRouteTable } from "./shell/ui-route-table";
 import { uiUnservedPageLoaders } from "./shell/ui-unserved-pages";
 
 import "nprogress/nprogress.css";
@@ -119,6 +122,7 @@ class BrowserUiShell extends UiShell {
   ): BrowserUiShell {
     return new BrowserUiShell(
       createUiApplication({
+        sessionQueryKey: UI_SESSION_QUERY_KEY,
         drawers,
         features: {
           loaders: screens.loaders,
@@ -146,6 +150,7 @@ class BrowserUiShell extends UiShell {
           session: UiPendingProvider,
           transport: UiPendingProvider,
           graphicsQuality: GraphicsQualityProvider,
+          designSystem: uiDesignSystem,
           commandBar: UiPendingProvider,
           toaster: UiErrorToaster,
           footer: UiNoFooter,
@@ -155,6 +160,8 @@ class BrowserUiShell extends UiShell {
         },
         pages: {
           loaders: uiUnservedPageLoaders,
+          table: uiRouteTable,
+          shellLayouts: { chrome: () => import("./shell/ui-app-chrome") },
           errorFallback: UiPageError,
           rootErrorBoundary: UiBootPageError,
         },

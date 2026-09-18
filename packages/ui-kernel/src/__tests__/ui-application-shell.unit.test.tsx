@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { createMemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { UiApplicationShell } from "../ui-application-shell";
+import { UiApplicationShell } from "../ui-application-shell.tsx";
 
 let root: Root | undefined;
 

@@ -2,25 +2,21 @@
  * Turns the route table into React Router route objects.
  */
 
+import { lazyRoute } from "@langwatch/browser-host/navigation";
 import { Outlet, useMatches, type RouteObject } from "react-router";
 
-import { lazyRoute } from "@langwatch/browser-host/navigation";
 import {
   resolveUiPageLoader,
   type UiPageLoader,
   type UiPageLoaderRegistry,
-} from "../behavior/ui-page-loaders";
-import { UiPrefixRedirect } from "./ui-prefix-redirect";
-import { uiRouteDescriptors, type UiRouteDescriptor, type UiShellLayout } from "./ui-route-table";
-import type { UiWebRouteParent } from "./ui-web-installation";
-
-/**
- * The layouts the shell draws itself, lazily so the chrome and everything it
- * frames stay out of the entry chunk. Named here, never in a loader registry.
- */
-const UI_SHELL_LAYOUTS = {
-  chrome: () => import("./ui-app-chrome"),
-} as const satisfies Record<UiShellLayout, UiPageLoader>;
+} from "./ui-feature-install.ts";
+import { UiPrefixRedirect } from "./ui-prefix-redirect.tsx";
+import {
+  uiRouteDescriptors,
+  type UiRouteDescriptor,
+  type UiShellLayout,
+} from "./ui-route-descriptor.ts";
+import type { UiWebRouteParent } from "./ui-web-installation.ts";
 
 /** What a materialised page route carries on its match. */
 export type UiRouteHandle = { page: string };
@@ -51,12 +47,22 @@ export type UiRouteObjectsOptions = {
   table: readonly UiRouteDescriptor[];
   loaders: UiPageLoaderRegistry;
   installedRoutes?: Readonly<Record<UiWebRouteParent, readonly RouteObject[]>>;
+  /**
+   * The layouts the shell draws itself — composition's to supply, since a
+   * second browser app frames a different set of installed modules.
+   */
+  shellLayouts?: Readonly<Record<UiShellLayout, UiPageLoader>>;
 };
 
-export function createUiRouteObjects(options: UiRouteObjectsOptions): RouteObject[] {
-  const hasProjectContributions = (options.installedRoutes?.project.length ?? 0) > 0;
+export function createUiRouteObjects({
+  table,
+  loaders,
+  installedRoutes,
+  shellLayouts = {},
+}: UiRouteObjectsOptions): RouteObject[] {
+  const hasProjectContributions = (installedRoutes?.project.length ?? 0) > 0;
   if (hasProjectContributions) {
-    const anchors = uiRouteDescriptors(options.table).filter(
+    const anchors = uiRouteDescriptors(table).filter(
       (descriptor) => "webRouteParent" in descriptor && descriptor.webRouteParent === "project",
     );
     if (anchors.length !== 1) {
@@ -64,14 +70,37 @@ export function createUiRouteObjects(options: UiRouteObjectsOptions): RouteObjec
     }
   }
 
-  return materializeRoutes(options);
+  return materializeRoutes({ table, loaders, installedRoutes, shellLayouts });
 }
+
+/**
+ * A missing layout is a composition fault — throws where the router is
+ * built, exactly as `resolveUiPageLoader` does for a missing page key.
+ */
+function resolveUiShellLayoutLoader({
+  shellLayouts,
+  layout,
+}: {
+  shellLayouts: Readonly<Record<UiShellLayout, UiPageLoader>>;
+  layout: UiShellLayout;
+}): UiPageLoader {
+  const loader = shellLayouts[layout];
+  if (!loader) {
+    throw new Error(`No shell layout is registered for ${JSON.stringify(layout)}.`);
+  }
+  return loader;
+}
+
+type MaterializeRoutesOptions = Omit<UiRouteObjectsOptions, "shellLayouts"> & {
+  shellLayouts: Readonly<Record<UiShellLayout, UiPageLoader>>;
+};
 
 function materializeRoutes({
   table,
   loaders,
   installedRoutes,
-}: UiRouteObjectsOptions): RouteObject[] {
+  shellLayouts,
+}: MaterializeRoutesOptions): RouteObject[] {
   const routes = table.map((descriptor) => {
     if ("redirect" in descriptor) {
       const { from, to, pinParams, mapSegment } = descriptor.redirect;
@@ -85,7 +114,7 @@ function materializeRoutes({
 
     const route: RouteObject =
       "layout" in descriptor
-        ? { ...lazyRoute(UI_SHELL_LAYOUTS[descriptor.layout]) }
+        ? { ...lazyRoute(resolveUiShellLayoutLoader({ shellLayouts, layout: descriptor.layout })) }
         : {
             ...lazyRoute(resolveUiPageLoader({ registry: loaders, key: descriptor.page })),
             // The key travels onto the match, so a LAYOUT route above the page can ask
@@ -98,6 +127,7 @@ function materializeRoutes({
           table: descriptor.children,
           loaders,
           installedRoutes,
+          shellLayouts,
         })
       : [];
     if ("webRouteParent" in descriptor && descriptor.webRouteParent === "project") {

@@ -12,8 +12,11 @@ import {
   UNAVAILABLE_UI_SESSION,
   type UiCapabilityInstall,
   type UiRpc,
+  type UiSessionCapabilities,
+  type UiSessionSource,
 } from "@langwatch/browser-host/capabilities";
 import { CurrentDrawer, type UiDrawerRegistry } from "@langwatch/browser-host/drawer";
+import { useRouterUiNavigation, useRouterUiRoute } from "@langwatch/browser-host/navigation";
 import { createUiQueryClient } from "@langwatch/browser-host/query-client";
 import { UiSlot } from "@langwatch/browser-host/slots";
 import { BrowserUiStorage, setUiStorage } from "@langwatch/browser-host/storage";
@@ -27,11 +30,9 @@ import { UiScopeHostProvider } from "@langwatch/browser-host/use-organization-te
 import { QueryClientContext, QueryClientProvider } from "@tanstack/react-query";
 import { useContext, useMemo, useState, type ReactNode } from "react";
 
-import type { UiFailureHost, UiFailureInterceptor } from "../behavior/ui-feature";
-import { useRouterUiNavigation, useRouterUiRoute } from "@langwatch/browser-host/navigation";
-import type { UiSessionCapabilities, UiSessionSource } from "@langwatch/browser-host/capabilities";
-import { UiApiWaitingGate } from "./ui-api-waiting-gate";
-import type { UiProviderShell } from "./ui-outer-providers";
+import { UiApiWaitingGate } from "./ui-api-waiting-gate.tsx";
+import type { UiFailureHost, UiFailureInterceptor } from "./ui-feature-install.ts";
+import type { UiProviderShell } from "./ui-outer-providers.tsx";
 
 /** The device store the shell publishes to every feature. */
 const SHELL_UI_STORAGE = new BrowserUiStorage();
@@ -58,6 +59,12 @@ export type UiFeatureShellInstall = {
   session?: UiSessionSource;
   /** Whether this browser composition is a development build. */
   isDevelopment?: boolean;
+  /**
+   * The query key the composing application's session read is cached
+   * under — auth's to name, supplied as data so this package names no
+   * module. See `UiApiWaitingGate`.
+   */
+  sessionQueryKey: readonly unknown[];
 };
 
 /** The session and scope of a composition that declared neither. Refuse by name. */
@@ -74,6 +81,7 @@ export function createUiFeatureShell({
   failures = [],
   session,
   isDevelopment = false,
+  sessionQueryKey,
 }: UiFeatureShellInstall): UiProviderShell {
   // Chosen once per shell, never per render, so the hook it calls is the same
   // hook on every pass.
@@ -125,7 +133,9 @@ export function createUiFeatureShell({
         <UiScopeHostProvider value={resolved.scope?.scopeHost()}>
           {/* Nothing is answering on the API's address, so the reader waits
               here rather than being signed out of a stack that is booting. */}
-          <UiApiWaitingGate isDevelopment={isDevelopment}>{children}</UiApiWaitingGate>
+          <UiApiWaitingGate isDevelopment={isDevelopment} sessionQueryKey={sessionQueryKey}>
+            {children}
+          </UiApiWaitingGate>
           {/* Always mounted, one gate for every routed page — a surface
               without this reach opened a limit dialog nobody ever saw. */}
           <UiSlot name="globalUpgradeModal" props={{}} />

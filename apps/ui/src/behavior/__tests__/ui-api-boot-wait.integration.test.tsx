@@ -23,7 +23,7 @@ vi.mock("@langwatch/browser-host/navigation", async (importOriginal) => ({
   },
 }));
 
-import type { UiAuthClient } from "@langwatch/auth-browser/session";
+import { UI_SESSION_QUERY_KEY, type UiAuthClient } from "@langwatch/auth-browser/session";
 import {
   useBrowserUiSession,
   useUiSessionReading,
@@ -42,9 +42,8 @@ import {
   useUiScopeReading,
 } from "@langwatch/organization-browser/surfaces/scope-capability";
 import type { UiScopeOrganization, UiScopeTeam } from "@langwatch/organization-contract";
-
-import { UiApiWaitingScreen, UI_API_DEV_COMMAND } from "../../shell/ui-api-waiting-screen";
-import { createUiFeatureShell } from "../../shell/ui-feature-shell";
+import { UiApiWaitingScreen, UI_API_DEV_COMMAND } from "@langwatch/ui-kernel/api-waiting-screen";
+import { createUiFeatureShell } from "@langwatch/ui-kernel/feature-shell";
 
 /** The graph `organization.getAll` returns, only as far as this gate reads it. */
 const JANE = "user-jane";
@@ -161,6 +160,7 @@ function renderShell({
   page: ReactNode;
 }) {
   const Shell = createUiFeatureShell({
+    sessionQueryKey: UI_SESSION_QUERY_KEY,
     apis: [],
     capabilities: { feedback },
     transport: answeringTransport,

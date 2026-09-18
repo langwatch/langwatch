@@ -2,12 +2,12 @@
 
 import { webModules } from "@langwatch/installed-modules/web";
 import { createUi } from "@langwatch/ui-kernel";
+import { installedModuleScreens } from "@langwatch/ui-kernel/module-screens";
+import { createUiRouteObjects, UiRouteOutlet } from "@langwatch/ui-kernel/route-objects";
 import { render, screen } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
-import { installedModuleScreens } from "../ui-module-screens";
-import { createUiRouteObjects, UiRouteOutlet } from "../ui-route-objects";
 import type { UiRouteDescriptor } from "../ui-route-table";
 
 // The screen has its own suites; here it only has to report the view its

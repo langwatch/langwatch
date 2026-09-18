@@ -3,11 +3,11 @@
  * @see packages/design-system/specs/design-system-boundary.feature
  */
 import { useChakraContext } from "@chakra-ui/react";
+import { UiDesignSystemShell } from "@langwatch/ui-kernel/design-system-shell";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { uiDesignSystem } from "../../behavior/design-system";
-import { UiDesignSystemShell } from "../ui-design-system-shell";
 
 // jsdom ships no matchMedia, and the colour-mode provider reads it on mount.
 beforeAll(() => {

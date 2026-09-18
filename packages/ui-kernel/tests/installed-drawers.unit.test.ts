@@ -22,7 +22,11 @@ describe("installed drawers", () => {
   it("carries every declared drawer under the name the address bar uses", async () => {
     const loaders = installedDrawerLoaders([trace, evaluator]);
 
-    expect(Object.keys(loaders).toSorted()).toEqual(["evaluatorEditor", "spanDetails", "traceDetails"]);
+    expect(Object.keys(loaders).toSorted()).toEqual([
+      "evaluatorEditor",
+      "spanDetails",
+      "traceDetails",
+    ]);
     await expect(loaders.traceDetails?.()).resolves.toBe(traceDrawer);
   });
 

@@ -4,12 +4,12 @@
  * route table still names the paths it owns; a module owns its own.
  */
 
-import type { SupplyModule, WebScreen } from "@langwatch/ui-kernel";
+import { lazyRoute, type LazyRouteModule } from "@langwatch/browser-host/navigation";
 import type { RouteObject } from "react-router";
 
-import { lazyRoute, type LazyRouteModule } from "@langwatch/browser-host/navigation";
-import type { UiPageLoader, UiPageLoaderRegistry } from "../behavior/ui-page-loaders";
-import type { UiWebRouteParent } from "./ui-web-installation";
+import type { UiPageLoader, UiPageLoaderRegistry } from "./ui-feature-install.ts";
+import type { UiWebRouteParent } from "./ui-web-installation.ts";
+import type { SupplyModule, WebScreen } from "./web-module.ts";
 
 export type UiModuleScreens = {
   loaders: UiPageLoaderRegistry;

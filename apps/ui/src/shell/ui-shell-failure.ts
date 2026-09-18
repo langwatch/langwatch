@@ -3,14 +3,14 @@
  * Spec: specs/auth/session-failure.feature
  */
 
+import { UI_SIGN_IN_PATH } from "@langwatch/auth-browser/session-capability";
 import { useUiAddress } from "@langwatch/browser-host/address";
+import { isUiNavigatingAway, uiLeaveTo } from "@langwatch/browser-host/navigation";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { useUiRouteReading } from "@langwatch/organization-browser/surfaces/scope-capability";
 import { useEffect } from "react";
 
-import { isUiNavigatingAway, uiLeaveTo } from "@langwatch/browser-host/navigation";
 import { resolveUiFailureCopy, type ResolvedUiFailureCopy } from "../behavior/ui-feedback";
-import { UI_SIGN_IN_PATH } from "@langwatch/auth-browser/session-capability";
 
 /**
  * Whether this refusal means "we do not know who you are".

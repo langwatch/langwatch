@@ -1,8 +1,8 @@
+import { createUiRouteObjects } from "@langwatch/ui-kernel/route-objects";
 import { render, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, it } from "vitest";
 
-import { createUiRouteObjects } from "../ui-route-objects";
 import type { UiRouteDescriptor } from "../ui-route-table";
 
 const loaders = {

@@ -2,7 +2,7 @@
   "name": "@langwatch/ui-kernel",
   "version": "0.1.0",
   "private": true,
-  "description": "Compiler-checked browser module supply and boot-time configuration validation.",
+  "description": "The React shell machinery every browser application composes: the application shell, providers, routing, page guards and drawer address.",
   "license": "MIT",
   "files": [
     "src"
@@ -18,6 +18,98 @@
     "./supply": {
       "types": "./dist/ui-supply.d.ts",
       "default": "./src/ui-supply.ts"
+    },
+    "./application": {
+      "types": "./dist/ui-application.d.ts",
+      "default": "./src/ui-application.tsx"
+    },
+    "./application-shell": {
+      "types": "./dist/ui-application-shell.d.ts",
+      "default": "./src/ui-application-shell.tsx"
+    },
+    "./root-layout": {
+      "types": "./dist/ui-root-layout.d.ts",
+      "default": "./src/ui-root-layout.tsx"
+    },
+    "./outer-providers": {
+      "types": "./dist/ui-outer-providers.d.ts",
+      "default": "./src/ui-outer-providers.tsx"
+    },
+    "./inner-providers": {
+      "types": "./dist/ui-inner-providers.d.ts",
+      "default": "./src/ui-inner-providers.tsx"
+    },
+    "./feature-shell": {
+      "types": "./dist/ui-feature-shell.d.ts",
+      "default": "./src/ui-feature-shell.tsx"
+    },
+    "./route-objects": {
+      "types": "./dist/ui-route-objects.d.ts",
+      "default": "./src/ui-route-objects.tsx"
+    },
+    "./page": {
+      "types": "./dist/ui-page.d.ts",
+      "default": "./src/ui-page.tsx"
+    },
+    "./page-guard": {
+      "types": "./dist/ui-page-guard.d.ts",
+      "default": "./src/ui-page-guard.tsx"
+    },
+    "./page-fallbacks": {
+      "types": "./dist/ui-page-fallbacks.d.ts",
+      "default": "./src/ui-page-fallbacks.tsx"
+    },
+    "./prefix-redirect": {
+      "types": "./dist/ui-prefix-redirect.d.ts",
+      "default": "./src/ui-prefix-redirect.tsx"
+    },
+    "./drawer-address": {
+      "types": "./dist/ui-drawer-address.d.ts",
+      "default": "./src/ui-drawer-address.tsx"
+    },
+    "./error-toaster": {
+      "types": "./dist/ui-error-toaster.d.ts",
+      "default": "./src/ui-error-toaster.tsx"
+    },
+    "./error-actions": {
+      "types": "./dist/ui-error-actions.d.ts",
+      "default": "./src/ui-error-actions.tsx"
+    },
+    "./design-system-shell": {
+      "types": "./dist/ui-design-system-shell.d.ts",
+      "default": "./src/ui-design-system-shell.tsx"
+    },
+    "./web-installation": {
+      "types": "./dist/ui-web-installation.d.ts",
+      "default": "./src/ui-web-installation.ts"
+    },
+    "./module-screens": {
+      "types": "./dist/ui-module-screens.d.ts",
+      "default": "./src/ui-module-screens.ts"
+    },
+    "./module-drawers": {
+      "types": "./dist/ui-module-drawers.d.ts",
+      "default": "./src/ui-module-drawers.ts"
+    },
+    "./graphics-quality-provider": {
+      "types": "./dist/graphics-quality-provider.d.ts",
+      "default": "./src/graphics-quality-provider.tsx"
+    },
+    "./api-waiting-gate": {
+      "types": "./dist/ui-api-waiting-gate.d.ts",
+      "default": "./src/ui-api-waiting-gate.tsx"
+    },
+    "./api-waiting-screen": {
+      "types": "./dist/ui-api-waiting-screen.d.ts",
+      "default": "./src/ui-api-waiting-screen.tsx"
+    },
+    "./feature-install": {
+      "types": "./dist/ui-feature-install.d.ts",
+      "default": "./src/ui-feature-install.ts"
+    },
+    "./route-descriptor": {
+      "types": "./dist/ui-route-descriptor.d.ts",
+      "default": "./src/ui-route-descriptor.ts"
     }
   },
   "scripts": {
@@ -25,12 +117,39 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@langwatch/browser-host": "workspace:*",
     "@langwatch/config": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@tanstack/react-query": "catalog:",
+    "lucide-react": "catalog:",
+    "nprogress": "^0.2.0",
+    "posthog-js": "catalog:",
+    "react-error-boundary": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@emotion/react": "catalog:",
+    "@langwatch/auth-browser": "workspace:*",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
     "@types/node": "catalog:",
+    "@types/nprogress": "^0.2.3",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-router": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-router": "^8.0.1"
   }
 }

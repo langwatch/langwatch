@@ -5,8 +5,10 @@
  */
 
 import type { UiDrawerComponent, UiDrawerRegistry } from "@langwatch/browser-host/drawer";
-import { installedDrawerLoaders, type SupplyModule } from "@langwatch/ui-kernel";
 import { lazy } from "react";
+
+import { installedDrawerLoaders } from "./installed-drawers.ts";
+import type { SupplyModule } from "./web-module.ts";
 
 /** The composed registry `CurrentDrawer` resolves an open address against. */
 export function installedModuleDrawers(modules: readonly SupplyModule[]): UiDrawerRegistry {

@@ -5,13 +5,13 @@
  */
 import { clearDrawerStack, CurrentDrawer, useDrawer } from "@langwatch/browser-host/drawer";
 import { defineWebModule } from "@langwatch/ui-kernel";
+import { UiDesignSystemShell } from "@langwatch/ui-kernel/design-system-shell";
+import { installedModuleDrawers } from "@langwatch/ui-kernel/module-drawers";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { BrowserRouter, Route, Routes } from "react-router";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { uiDesignSystem } from "../../behavior/design-system";
-import { UiDesignSystemShell } from "../ui-design-system-shell";
-import { installedModuleDrawers } from "../ui-module-drawers";
 
 // jsdom ships no matchMedia, and the colour-mode provider reads it on mount.
 beforeAll(() => {

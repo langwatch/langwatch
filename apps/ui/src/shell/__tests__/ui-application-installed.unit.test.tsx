@@ -4,12 +4,12 @@
 
 import type { PublicAppConfig } from "@langwatch/config/public-app-config";
 import { webModules } from "@langwatch/installed-modules/web";
+import { createUiApplication } from "@langwatch/ui-kernel/application";
+import { installedModuleScreens } from "@langwatch/ui-kernel/module-screens";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
 import { uiRoutePageKeys, type UiPageLoaderRegistry } from "../../behavior/ui-page-loaders";
-import { createUiApplication } from "../ui-application";
-import { installedModuleScreens } from "../ui-module-screens";
 import { uiRouteTable } from "../ui-route-table";
 
 const publicAppConfig: PublicAppConfig = {
@@ -56,11 +56,14 @@ function applicationFromPackageEntry() {
       isDevelopment: false,
     },
     pages: {
+      table: uiRouteTable,
+      shellLayouts: { chrome: async () => ({ default: () => null }) },
       loaders: hostRegistryWithoutGovernance(),
       errorFallback: () => null,
       rootErrorBoundary: () => null,
     },
     features: { loaders: installedModuleScreens(webModules).loaders },
+    sessionQueryKey: ["test", "session"],
   });
 }
 

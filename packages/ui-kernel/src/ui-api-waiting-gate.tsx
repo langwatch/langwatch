@@ -4,12 +4,12 @@
  * Spec: specs/ui/api-boot-wait.feature
  */
 
+import type { UiSessionReading } from "@langwatch/auth-browser/session";
+import { useUiApiWait, UI_API_HEALTH_PATH } from "@langwatch/browser-host/navigation";
 import { hashKey, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useSyncExternalStore, type ReactNode } from "react";
 
-import { useUiApiWait, UI_API_HEALTH_PATH } from "@langwatch/browser-host/navigation";
-import { UI_SESSION_QUERY_KEY, type UiSessionReading } from "@langwatch/auth-browser/session";
-import { UiApiWaitingScreen } from "./ui-api-waiting-screen";
+import { UiApiWaitingScreen } from "./ui-api-waiting-screen.tsx";
 
 /** The address the wait is on, said in full so a developer can paste it. */
 function healthEndpoint(): string {
@@ -23,10 +23,17 @@ function healthEndpoint(): string {
 export function UiApiWaitingGate({
   children,
   isDevelopment,
+  sessionQueryKey,
 }: {
   children: ReactNode;
   /** Stated so a test can render both faces of the same screen. */
   isDevelopment: boolean;
+  /**
+   * The query key the composing application's session read is cached
+   * under — auth's to name (`UI_SESSION_QUERY_KEY`), supplied here as data
+   * so this file names no module. See `UiFeatureShellInstall`.
+   */
+  sessionQueryKey: readonly unknown[];
 }) {
   const queryClient = useQueryClient();
 
@@ -36,16 +43,16 @@ export function UiApiWaitingGate({
   // own entry, or every cache read would re-render the routed page.
   const subscribe = useCallback(
     (listener: () => void) => {
-      const hash = hashKey(UI_SESSION_QUERY_KEY);
+      const hash = hashKey(sessionQueryKey);
       return queryClient.getQueryCache().subscribe((event) => {
         if (event.query.queryHash === hash) listener();
       });
     },
-    [queryClient],
+    [queryClient, sessionQueryKey],
   );
   const readReading = useCallback(
-    () => queryClient.getQueryData<UiSessionReading>(UI_SESSION_QUERY_KEY),
-    [queryClient],
+    () => queryClient.getQueryData<UiSessionReading>(sessionQueryKey),
+    [queryClient, sessionQueryKey],
   );
   const reading = useSyncExternalStore(subscribe, readReading, readReading);
 
@@ -56,8 +63,8 @@ export function UiApiWaitingGate({
   // continues to wherever they were going, and the document never reloads.
   useEffect(() => {
     if (answers === 0) return;
-    void queryClient.invalidateQueries({ queryKey: UI_SESSION_QUERY_KEY });
-  }, [answers, queryClient]);
+    void queryClient.invalidateQueries({ queryKey: sessionQueryKey });
+  }, [answers, queryClient, sessionQueryKey]);
 
   if (!waiting) return <>{children}</>;
   return (

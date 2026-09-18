@@ -5,7 +5,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { UiDesignSystemShell } from "../ui-design-system-shell";
+import { UiDesignSystemShell } from "../ui-design-system-shell.tsx";
 
 let root: Root | undefined;
 

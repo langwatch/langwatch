@@ -10,9 +10,9 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import { NavigationShell, useNavigationTracking } from "@langwatch/navigation-browser/chrome";
 import { useUiOrgQueryParamSelection } from "@langwatch/organization-browser/surfaces/scope-capability";
+import { UiRouteOutlet } from "@langwatch/ui-kernel/route-objects";
 
 import { UiNavigationHost } from "./navigation-host-provider";
-import { UiRouteOutlet } from "./ui-route-objects";
 
 export default function UiAppChrome() {
   const capabilities = useOptionalUiCapabilities();

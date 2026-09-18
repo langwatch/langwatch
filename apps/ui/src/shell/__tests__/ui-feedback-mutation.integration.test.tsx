@@ -10,12 +10,12 @@ import {
   type UiCapabilities,
 } from "@langwatch/browser-host/capabilities";
 import { toaster } from "@langwatch/design-system/toaster";
+import { UiErrorToaster } from "@langwatch/ui-kernel/error-toaster";
 import { QueryClient, QueryClientProvider, useMutation } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { BrowserUiFeedback } from "../../behavior/ui-feedback";
-import { UiErrorToaster } from "../ui-error-toaster";
 
 // The Design System's toaster is a module singleton, so a toast raised by one
 // case is still in its store when the next renders and every query would match

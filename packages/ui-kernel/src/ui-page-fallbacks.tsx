@@ -5,8 +5,19 @@
 import { Box, Center, Heading, HStack, Spinner, Stack, Text } from "@chakra-ui/react";
 import { Lock } from "lucide-react";
 
-import type { ResolvedUiFailureCopy } from "../behavior/ui-feedback";
-import { UiErrorActions } from "./ui-error-actions";
+import { UiErrorActions } from "./ui-error-actions.tsx";
+
+/**
+ * Everything a surface needs to render one failure — structurally identical
+ * to `apps/ui/src/behavior/ui-feedback.ts`'s `ResolvedUiFailureCopy`, which
+ * still resolves it from the code-keyed presentation registry.
+ */
+export type ResolvedUiFailureCopy = {
+  title: string;
+  description: string;
+  docsUrl: string | undefined;
+  traceId: string | undefined;
+};
 
 /** While the flags a page is behind have not answered. */
 export function UiPageLoading() {

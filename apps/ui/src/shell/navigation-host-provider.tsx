@@ -9,6 +9,7 @@ import { signOutUi } from "@langwatch/auth-browser/session";
 import { useUiAddress } from "@langwatch/browser-host/address";
 import { useUiCapabilities, useUiRpc, useUiScope } from "@langwatch/browser-host/capabilities";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { routePatternOf } from "@langwatch/browser-host/navigation-tracing";
 import { LangyMark, LangyMarkGradientDefs } from "@langwatch/langy-browser/surfaces/langy-mark";
 import { useLangyStore } from "@langwatch/langy-browser/surfaces/langy-store";
 import {
@@ -36,10 +37,10 @@ import {
 } from "@langwatch/organization-browser/surfaces/scope-capability";
 import { useLegacySimulationsPreference } from "@langwatch/scenario-browser/surfaces/simulations-preference";
 import { PresenceMenuItem } from "@langwatch/trace-browser/surfaces/presence-menu-item";
+import { UiPageFailure, UiPageLoading, UiPageNotFound } from "@langwatch/ui-kernel/page-fallbacks";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, type ReactNode } from "react";
 
-import { routePatternOf } from "@langwatch/browser-host/navigation-tracing";
 import { BrowserNavigationHost } from "./navigation-host";
 import { readNavigationDeployment } from "./navigation-host-deployment";
 import { offersLangyAsk, offersPresenceMenuItem, opsAccessOf } from "./navigation-host-gates";
@@ -50,7 +51,6 @@ import {
   toNavigationOrganizations,
   type NavigationGraphRead,
 } from "./navigation-host-graph";
-import { UiPageFailure, UiPageLoading, UiPageNotFound } from "./ui-page-fallbacks";
 import { useUiShellFailure } from "./ui-shell-failure";
 
 /** The gradient the palette's own Langy mark paints with. */

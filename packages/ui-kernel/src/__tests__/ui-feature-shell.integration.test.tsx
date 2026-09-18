@@ -15,8 +15,11 @@ import type { ReactNode } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { createUiFeatureShell } from "../ui-feature-shell";
-import type { UiProviderShell } from "../ui-outer-providers";
+import { createUiFeatureShell } from "../ui-feature-shell.tsx";
+import type { UiProviderShell } from "../ui-outer-providers.tsx";
+
+/** Namespaced as auth's own query key would be; nothing here reads a real one. */
+const TEST_SESSION_QUERY_KEY = ["test", "session"];
 
 class StubSession extends UiSession {
   currentUser() {
@@ -105,6 +108,7 @@ describe("given the shell apps/ui mounts around every routed page", () => {
   describe("when a screen asks for a capability", () => {
     it("answers with the port the composition installed", () => {
       const shell = createUiFeatureShell({
+        sessionQueryKey: TEST_SESSION_QUERY_KEY,
         apis: [],
         capabilities: { session: new StubSession(), scope: new StubScope() },
         transport: {} as UiFeatureApiTransport,
@@ -126,6 +130,7 @@ describe("given the shell apps/ui mounts around every routed page", () => {
       const host = new QueryClient();
       const transport = {} as UiFeatureApiTransport;
       const shell = createUiFeatureShell({
+        sessionQueryKey: TEST_SESSION_QUERY_KEY,
         apis: [recordingBinding("prompt", mounts)],
         capabilities: {},
         transport,
@@ -144,6 +149,7 @@ describe("given the shell apps/ui mounts around every routed page", () => {
       let seen: QueryClient | undefined;
       const mounts: Mount[] = [];
       const shell = createUiFeatureShell({
+        sessionQueryKey: TEST_SESSION_QUERY_KEY,
         apis: [recordingBinding("prompt", mounts)],
         capabilities: {},
         transport: {} as UiFeatureApiTransport,
@@ -165,6 +171,7 @@ describe("given the shell apps/ui mounts around every routed page", () => {
     it("runs its interceptor on every failed mutation, with the host it can act through", async () => {
       const seen: { message: string; navigated: string[] }[] = [];
       const shell = createUiFeatureShell({
+        sessionQueryKey: TEST_SESSION_QUERY_KEY,
         apis: [],
         capabilities: {},
         transport: {} as UiFeatureApiTransport,
@@ -205,6 +212,7 @@ describe("given the shell apps/ui mounts around every routed page", () => {
     it("mounts them in declaration order, first one outermost", () => {
       const mounts: Mount[] = [];
       const shell = createUiFeatureShell({
+        sessionQueryKey: TEST_SESSION_QUERY_KEY,
         apis: [recordingBinding("prompt", mounts), recordingBinding("trace", mounts)],
         capabilities: {},
         transport: {} as UiFeatureApiTransport,
@@ -221,6 +229,7 @@ describe("given the shell apps/ui mounts around every routed page", () => {
     /** @scenario "The application session publishes the scope every feature reads" */
     it("sees the project, the organization and the grants the session resolved", () => {
       const shell = createUiFeatureShell({
+        sessionQueryKey: TEST_SESSION_QUERY_KEY,
         apis: [],
         capabilities: { session: new StubSession(), scope: new ResolvedScope() },
         transport: {} as UiFeatureApiTransport,
@@ -245,6 +254,7 @@ describe("given the shell apps/ui mounts around every routed page", () => {
     /** @scenario "A session with no resolved scope leaves the shared hook unresolved rather than throwing" */
     it("reads unresolved with no project and no grants when the session publishes no scope", () => {
       const shell = createUiFeatureShell({
+        sessionQueryKey: TEST_SESSION_QUERY_KEY,
         apis: [],
         capabilities: { session: new StubSession(), scope: new StubScope() },
         transport: {} as UiFeatureApiTransport,

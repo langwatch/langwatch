@@ -3,12 +3,12 @@
  * @vitest-environment jsdom
  */
 
+import { createUiRouteObjects } from "@langwatch/ui-kernel/route-objects";
 import { act, render, waitFor } from "@testing-library/react";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { uiRoutePageKeys, type UiPageLoaderRegistry } from "../../behavior/ui-page-loaders";
-import { createUiRouteObjects } from "../ui-route-objects";
 import { uiRouteTable } from "../ui-route-table";
 
 /**
@@ -30,7 +30,14 @@ const stubbedPages: UiPageLoaderRegistry = Object.fromEntries(
   ]),
 );
 
-const realRoutes = createUiRouteObjects({ table: uiRouteTable, loaders: stubbedPages });
+/** The chrome layout, stubbed the same way — it carries no page key of its own. */
+const stubbedShellLayouts = { chrome: async () => ({ default: () => <Outlet /> }) };
+
+const realRoutes = createUiRouteObjects({
+  table: uiRouteTable,
+  loaders: stubbedPages,
+  shellLayouts: stubbedShellLayouts,
+});
 
 /** Somewhere to come back to, so a replaced history entry is observable. */
 const ORIGIN = "/ops/dejaview";

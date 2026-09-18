@@ -4,7 +4,7 @@
     "types": ["node", "vitest/globals"],
     "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo"
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts"],
   "exclude": [],
 
   "references": [
@@ -12,7 +12,13 @@
       "path": "tsconfig.build.json"
     },
     {
+      "path": "../browser-host/tsconfig.build.json"
+    },
+    {
       "path": "../config/tsconfig.build.json"
+    },
+    {
+      "path": "../design-system/tsconfig.build.json"
     }
   ]
 }

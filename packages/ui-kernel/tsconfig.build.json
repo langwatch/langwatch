@@ -14,12 +14,18 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["**/__tests__/**", "**/__mocks__/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"],
 
   "references": [
     {
+      "path": "../browser-host/tsconfig.build.json"
+    },
+    {
       "path": "../config/tsconfig.build.json"
+    },
+    {
+      "path": "../design-system/tsconfig.build.json"
     }
   ]
 }

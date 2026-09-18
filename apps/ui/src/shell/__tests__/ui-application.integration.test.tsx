@@ -1,14 +1,15 @@
 import { UiSession, useUiCapabilities } from "@langwatch/browser-host/capabilities";
 import type { UiFeatureApiTransport } from "@langwatch/browser-host/transport";
 import type { PublicAppConfig } from "@langwatch/config/public-app-config";
+import { createUiApplication, type UiApplicationInstall } from "@langwatch/ui-kernel/application";
+import type { UiFeatureInstall } from "@langwatch/ui-kernel/feature-install";
 import { render } from "@testing-library/react";
 import type { ComponentType, ReactNode } from "react";
+import { Outlet } from "react-router";
 import { RouterProvider } from "react-router/dom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import type { UiFeatureInstall } from "../../behavior/ui-feature";
 import { uiRoutePageKeys, type UiPageLoaderRegistry } from "../../behavior/ui-page-loaders";
-import { createUiApplication, type UiApplicationInstall } from "../ui-application";
 import { uiRouteTable } from "../ui-route-table";
 
 const publicAppConfig: PublicAppConfig = {
@@ -80,11 +81,14 @@ function applicationOf({
   return createUiApplication({
     providers,
     pages: {
+      table: uiRouteTable,
+      shellLayouts: { chrome: async () => ({ default: () => <Outlet /> }) },
       loaders,
       errorFallback: () => <div data-testid="page-error" />,
       rootErrorBoundary: () => <div data-testid="root-error" />,
     },
     ...(features ? { features } : {}),
+    sessionQueryKey: ["test", "session"],
   });
 }
 

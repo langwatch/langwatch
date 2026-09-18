@@ -19,6 +19,7 @@ import {
   UiScope,
 } from "@langwatch/browser-host/capabilities";
 import { useOptionalNavigationHost } from "@langwatch/navigation-browser/navigation";
+import { UiDesignSystemShell } from "@langwatch/ui-kernel/design-system-shell";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -26,7 +27,6 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import UiAppChrome from "../ui-app-chrome";
-import { UiDesignSystemShell } from "../ui-design-system-shell";
 
 vi.mock("@langwatch/navigation-browser/chrome", () => ({
   NavigationShell: ({ children }: { children: ReactNode }) => (

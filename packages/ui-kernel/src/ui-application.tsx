@@ -3,29 +3,36 @@
  */
 
 import type { UiDrawerRegistry } from "@langwatch/browser-host/drawer";
+import { createUiRouter, type UiRouter } from "@langwatch/browser-host/navigation";
 import type { ComponentType } from "react";
 import type { FallbackProps } from "react-error-boundary";
 
-import type { UiFeatureInstall } from "../behavior/ui-feature";
-import { mergeUiPageLoaders, uiFeatureLoaders } from "../behavior/ui-feature-loaders";
-import type { UiPageLoaderRegistry } from "../behavior/ui-page-loaders";
-import { createUiRouter, type UiRouter } from "@langwatch/browser-host/navigation";
-import { createUiFeatureShell } from "./ui-feature-shell";
-import { createUiInnerProvider, type UiInnerProviderInstall } from "./ui-inner-providers";
+import {
+  mergeUiPageLoaders,
+  type UiFeatureInstall,
+  type UiPageLoader,
+  type UiPageLoaderRegistry,
+} from "./ui-feature-install.ts";
+import { createUiFeatureShell } from "./ui-feature-shell.tsx";
+import { createUiInnerProvider, type UiInnerProviderInstall } from "./ui-inner-providers.tsx";
 import {
   createUiOuterProvider,
   type UiOuterProviderInstall,
   type UiProviderShell,
-} from "./ui-outer-providers";
-import { createUiRootLayout } from "./ui-root-layout";
-import { createUiRouteObjects } from "./ui-route-objects";
-import { uiRouteTable } from "./ui-route-table";
+} from "./ui-outer-providers.tsx";
+import { createUiRootLayout } from "./ui-root-layout.tsx";
+import type { UiRouteDescriptor, UiShellLayout } from "./ui-route-descriptor.ts";
+import { createUiRouteObjects } from "./ui-route-objects.tsx";
 
 export type UiApplicationInstall = {
   providers: UiOuterProviderInstall & UiInnerProviderInstall;
   pages: {
+    /** The application's URL surface, as data — composition's own route table. */
+    table: readonly UiRouteDescriptor[];
     /** A loader for every page key the route table names. */
     loaders: UiPageLoaderRegistry;
+    /** The layouts the shell draws itself. See `UiRouteObjectsOptions`. */
+    shellLayouts?: Readonly<Record<UiShellLayout, UiPageLoader>>;
     /** Rendered when a page throws below the root layout. */
     errorFallback: ComponentType<FallbackProps>;
     /** Catches render and loader throws anywhere below the root route. */
@@ -35,6 +42,11 @@ export type UiApplicationInstall = {
   features?: UiFeatureInstall;
   /** Composed by installedModuleDrawers(installed.modules). */
   drawers?: UiDrawerRegistry;
+  /**
+   * The query key the composing application's session read is cached
+   * under. See `UiFeatureShellInstall.sessionQueryKey`.
+   */
+  sessionQueryKey: readonly unknown[];
 };
 
 export type UiApplication = {
@@ -47,9 +59,10 @@ export function createUiApplication({
   pages,
   drawers = {},
   features = {},
+  sessionQueryKey,
 }: UiApplicationInstall): UiApplication {
   const loaders = mergeUiPageLoaders({
-    own: features.loaders ?? uiFeatureLoaders,
+    own: features.loaders ?? {},
     host: pages.loaders,
   });
 
@@ -57,9 +70,10 @@ export function createUiApplication({
     outerProvider: createUiOuterProvider(providers),
     router: createUiRouter({
       routes: createUiRouteObjects({
-        table: uiRouteTable,
+        table: pages.table,
         loaders,
         installedRoutes: features.routes,
+        shellLayouts: pages.shellLayouts,
       }),
       rootComponent: createUiRootLayout({
         innerProvider: createUiInnerProvider(providers),
@@ -69,6 +83,7 @@ export function createUiApplication({
           drawers,
           failures: features.failures ?? [],
           isDevelopment: providers.isDevelopment,
+          sessionQueryKey,
           ...(features.transport ? { transport: features.transport } : {}),
           ...(features.session ? { session: features.session } : {}),
         }),

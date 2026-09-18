@@ -1,14 +1,13 @@
-/**
- * Samples frame rate via requestAnimationFrame; a struggling device flips
- * the app into reduced-graphics mode. @see specs/components/adaptive-graphics-quality.feature
- */
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-
 import {
   evaluateFpsSample,
   GraphicsQualityContext,
   useGraphicsQualityOverrideStore,
 } from "@langwatch/browser-host/facilities";
+/**
+ * Samples frame rate via requestAnimationFrame; a struggling device flips
+ * the app into reduced-graphics mode. @see specs/components/adaptive-graphics-quality.feature
+ */
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 const RESAMPLE_INTERVAL_MS = 60_000;
 const SAMPLE_WINDOW_MS = 1500;

@@ -10,7 +10,7 @@ import {
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GraphicsQualityProvider } from "../graphics-quality-provider";
+import { GraphicsQualityProvider } from "../graphics-quality-provider.tsx";
 
 let pendingCallback: FrameRequestCallback | null = null;
 let rafCallCount = 0;

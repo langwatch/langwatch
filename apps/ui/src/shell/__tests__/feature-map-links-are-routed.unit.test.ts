@@ -7,10 +7,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { webModules } from "@langwatch/installed-modules/web";
+import { installedModuleScreens } from "@langwatch/ui-kernel/module-screens";
 import { matchRoutes } from "react-router";
 import { describe, expect, it } from "vitest";
 
-import { installedModuleScreens } from "../ui-module-screens";
 import { uiRouteDescriptors, uiRouteTable } from "../ui-route-table";
 
 const CATCH_ALL = "*";

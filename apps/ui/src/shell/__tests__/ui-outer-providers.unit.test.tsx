@@ -1,11 +1,11 @@
 import { useChakraContext } from "@chakra-ui/react";
+import { createUiOuterProvider } from "@langwatch/ui-kernel/outer-providers";
 import type { ReactNode } from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { uiDesignSystem } from "../../behavior/design-system";
-import { createUiOuterProvider } from "../ui-outer-providers";
 
 let installedSystem: unknown;
 
@@ -54,6 +54,7 @@ describe("given the providers that wrap the router", () => {
         session: marker("session"),
         transport: marker("transport"),
         graphicsQuality: marker("graphics-quality"),
+        designSystem: uiDesignSystem,
       });
       container = document.createElement("div");
       document.body.append(container);

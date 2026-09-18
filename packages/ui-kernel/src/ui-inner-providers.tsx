@@ -3,14 +3,14 @@
  * browser instrumentation that runs beside them.
  */
 
+import { useBrowserTracing } from "@langwatch/browser-host/browser-tracing";
+import { useNavigationTracing } from "@langwatch/browser-host/navigation-tracing";
+import { usePostHog } from "@langwatch/browser-host/posthog";
 import type { PublicAppConfig } from "@langwatch/config/public-app-config";
 import posthog from "posthog-js";
 import { PostHogProvider } from "posthog-js/react";
 import type { ComponentType, ReactNode } from "react";
 
-import { useBrowserTracing } from "@langwatch/browser-host/browser-tracing";
-import { useNavigationTracing } from "@langwatch/browser-host/navigation-tracing";
-import { usePostHog } from "@langwatch/browser-host/posthog";
 import type { UiProviderShell } from "./ui-outer-providers";
 
 export type UiInnerProviderInstall = {

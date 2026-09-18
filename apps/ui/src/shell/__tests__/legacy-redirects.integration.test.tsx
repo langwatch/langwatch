@@ -4,12 +4,12 @@
  * Spec: specs/navigation/gateway-url-move.feature
  */
 
+import { UiPrefixRedirect } from "@langwatch/ui-kernel/prefix-redirect";
+import { createUiRouteObjects } from "@langwatch/ui-kernel/route-objects";
 import { act, render, waitFor } from "@testing-library/react";
 import { createMemoryRouter, type RouteObject, RouterProvider } from "react-router";
 import { describe, expect, it } from "vitest";
 
-import { UiPrefixRedirect } from "../ui-prefix-redirect";
-import { createUiRouteObjects } from "../ui-route-objects";
 import { uiLegacyRedirectRoutes, uiRouteDescriptors, uiRouteTable } from "../ui-route-table";
 
 /** The redirect descriptors the application mounts, materialised the same way. */

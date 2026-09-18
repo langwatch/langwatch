@@ -19,7 +19,7 @@ import {
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { resolveUiPageAccess, withUiPageGuard } from "../ui-page-guard";
+import { resolveUiPageAccess, withUiPageGuard } from "../ui-page-guard.tsx";
 
 class SilentNavigation extends UiNavigation {
   navigate(): void {}

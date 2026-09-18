@@ -7,7 +7,7 @@
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
-import { uiPage, withHost } from "../ui-page";
+import { uiPage, withHost } from "../ui-page.tsx";
 
 function Screen() {
   return <div>the screen</div>;
