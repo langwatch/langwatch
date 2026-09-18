@@ -234,21 +234,53 @@ apps/api/src/
 ```
 
 ```ts
-// apps/api/src/main.ts — the whole process (target shape; the landed
+// apps/api/src/main.ts — the whole process (ruled 2026-09-18; the landed
 // interim uses createServerApp + withStores, see git log)
 import "@langwatch/time/polyfill";
 
-const config = apiConfig();                   // §6: one generated Zod parse
-const server = Server.create({ name: "langwatch-api", logger, healthPort: config.process.port });
+const server = await Server.create("langwatch-api")
+  .withSecrets(secretsChain())          // ADR-132 chain: env → 1Password → refusal by name
+  .withConfig(apiConfig)                // §6 generated parse, UNDER telemetry: refusals are logged, named
+  .withTelemetry(grafanaTelemetry())    // logger + trace links + OTLP export, from config
+  .withMetrics(prometheusMetrics())     // scrape endpoint, token from config
+  .start();                             // fatal handlers → secrets → parse → /healthz live
 
-const app = await createProcessApp("api", config) // resolves process AND module
-  .withModules(processModules)                    //   dependencies from config
-  .withModuleDependencies({ licenseSource })      // code overrides beat config; two
-                                                  //   kinds: process and module (§5)
+const app = await server.composeProcess("api")
+  .withModules(processModules)          // dependencies resolve from config — no store lines (§5)
+  .expose((transports) => transports    // REQUIRED on the api; not on the worker's builder at all
+    .trpc()                             //   required iff any module declares namespaces
+    .rest()                             //   required iff any module declares families
+    .browserBundle())                   //   ALWAYS required on the api; .browserBundle(none) opts out loudly
+  .produce((pipelines) => pipelines
+    .commands())                        // the api emits commands onto the queue; never claims it
   .boot();
 
-await server.serve(app, { ui: config.process.ui }); // worker: server.run(app)
+await server.serve(app);
 ```
+
+```ts
+// apps/worker/src/main.ts — the whole difference
+const app = await server.composeProcess("worker")
+  .withModules(processModules)          // SAME module graph: apps install fully, jobs call them in-process
+  .consume((pipelines) => pipelines
+    .commands())                        // claims the queue: consumers, jobs, process managers
+  .boot();
+
+await server.run(app);
+```
+
+**Surface slots are compiler-driven and role-shaped.** `expose` exists only
+on the api builder, `consume` only on the worker's — a worker exposing REST
+is unwritable, not merely unwise. Inside `expose`, the members are typed
+from the installed tuple: install the first namespace-declaring module and
+`.trpc()` becomes required (boot() refuses to compile, naming
+`surface.trpc`); uninstall the last one and the `.trpc()` line goes red in
+place. A bare member means config and declarations decide everything;
+**each member's callback is where that surface's policy lives** — header
+overlays, auth overrides (`rest((r) => r.withBearerTokens({ cron: "test"
+}))` for tests), routing tweaks — scoped to the surface it concerns. There
+is no process-wide transport-auth object: an override beats config exactly
+where it applies and nowhere else.
 
 **`Server.create` ordering is the point:** fatal handlers first (raw stderr
 until a logger exists) → secrets resolve → config parses **under** telemetry,
@@ -307,10 +339,11 @@ with what it declared (registry-resolved, §3), never with a hand-assembled
 composition bag. There is no "door": `boot()` registers every installed
 module's declared transports onto the router, and the main never sees a
 namespace, a mount, or any transport internals. Transport auth follows the
-same rule as every dependency: it resolves from config, and a
-`withTransportAuth` override on the chain takes precedence over the config
-when stated — tests and special deployments override in code; an ordinary
-deployment states nothing.
+same rule as every dependency: it resolves from config, verifiers built
+with their secrets at construction, and an override stated inside the
+surface's own `expose` member block (§4) takes precedence over config —
+tests and special deployments override in code, scoped to the surface it
+guards; an ordinary deployment states nothing.
 
 **Deployment-choice modules are one line in the main.** The audit sink is
 the worked example: OSS composes `auditLogNullServer` (records nothing),
