@@ -11,6 +11,6 @@ export default defineModuleVitestConfig({
     // scenario suites that drive a real deployment through an LLM judge, each
     // with its own runner and config. Vitest's default include would collect
     // both and fail on the first `@playwright/test` import.
-    exclude: ["**/node_modules/**", "**/dist/**", "e2e/**"],
+    exclude: ["**/node_modules/**", "**/dist/**", "e2e/**", "tests/**"],
   },
 });

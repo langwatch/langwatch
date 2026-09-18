@@ -18,7 +18,7 @@
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
-  "exclude": ["**/__tests__/**", "**/__mocks__/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"],
+  "exclude": ["**/__mocks__/**"],
   "references": [
     {
       "path": "../../modules/agent/contract/tsconfig.build.json"
