@@ -75,14 +75,16 @@ export const ASSISTANT_PRESETS: Record<
     iconUrl: "/images/external-icons/github-copilot.svg",
     darkModeInvert: true,
   },
-  // No icon asset: we hold no pi mark we are licensed to redistribute, and
-  // inventing one would ship a fake logo. `iconUrl: null` is the supported
-  // no-asset state — TileIcon and the drawer preview both fall through to the
-  // neutral coding-assistant glyph. Swap in a real asset (with its licence
-  // recorded here) if one is ever obtained. ADR-132.
+  // The real mark, which this entry previously lacked. It is the logo pi's own
+  // README renders, fetched from the address that README points at
+  // (https://pi.dev/logo-auto.svg) and checked byte-for-byte against what we
+  // ship. pi is MIT, published as @earendil-works/pi-coding-agent from
+  // github.com/earendil-works/pi, so redistributing it is on the same footing
+  // as every other vendor mark in this folder. Brand-coloured, so it stays
+  // legible on both themes and does not want the dark-mode invert. ADR-132.
   pi: {
     label: "pi",
-    iconUrl: null,
+    iconUrl: "/images/external-icons/pi.svg",
     darkModeInvert: false,
   },
 };

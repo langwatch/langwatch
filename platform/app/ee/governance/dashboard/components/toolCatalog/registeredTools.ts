@@ -64,6 +64,10 @@ const ASSISTANT_BILLING: Record<string, ToolBilling> = {
   opencode: "consumption",
   cursor: "seat",
   github_copilot: "seat",
+  // Same shape as opencode: open source, run on a key the person supplies, so
+  // what it costs is what it consumed. There is no pi plan and no pi seat to
+  // count.
+  pi: "consumption",
 };
 
 /**
@@ -81,6 +85,10 @@ const ASSISTANT_VENDOR: Record<string, string> = {
   opencode: "Open source",
   cursor: "Anysphere",
   github_copilot: "GitHub",
+  // Named for the company rather than "Open source", which is what opencode
+  // carries: pi has a maker a customer can put on a renewal, and the licence is
+  // a separate fact from who publishes it.
+  pi: "Earendil Works",
 };
 
 const PROVIDER_VENDOR: Record<string, string> = {

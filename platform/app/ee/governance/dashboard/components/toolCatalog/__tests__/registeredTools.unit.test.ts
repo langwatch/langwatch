@@ -12,6 +12,8 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { ASSISTANT_OPTIONS } from "~/components/me/tiles/assistantIcons";
+
 import {
   applicableRowsForTool,
   badgesForTool,
@@ -93,13 +95,37 @@ describe("given a registered tool", () => {
   describe("when it is billed on what it consumed", () => {
     /** @scenario "A consumption-billed tool carries the token count it is billed on" */
     it("has the token row and no payment row", () => {
-      for (const tool of [provider, assistant("opencode")]) {
+      for (const tool of [provider, assistant("opencode"), assistant("pi")]) {
         expect(billingForTool(tool)).toBe("consumption");
         const rows = applicableRowsForTool(tool);
         expect(rows).toContain("tokens30Days");
         expect(rows).not.toContain("seats");
         expect(rows).not.toContain("subscriptions");
       }
+    });
+  });
+
+  /**
+   * Both maps fall back rather than throw when a kind is missing from them, so
+   * a kind added to the picker without them drifts silently: the tile renders,
+   * and it reads "Vendor not recorded" with no payment rows on a tool whose
+   * maker and billing model are both perfectly well known. Reading the picker's
+   * own list is what makes adding an option and forgetting the maps fail here
+   * instead of in the catalog.
+   */
+  describe("when every kind the tile picker offers is looked up", () => {
+    const offeredKinds = ASSISTANT_OPTIONS.map((option) => option.value).filter(
+      (kind) => kind !== "custom",
+    );
+
+    /** @scenario "The catalog says who makes pi and how it is paid for" */
+    it.each(offeredKinds)("names who makes %s", (kind) => {
+      expect(vendorForTool(assistant(kind))).not.toBe("Vendor not recorded");
+    });
+
+    /** @scenario "The catalog says who makes pi and how it is paid for" */
+    it.each(offeredKinds)("knows how %s is paid for", (kind) => {
+      expect(billingForTool(assistant(kind))).not.toBe("unknown");
     });
   });
 

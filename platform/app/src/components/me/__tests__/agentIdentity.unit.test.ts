@@ -34,11 +34,13 @@ describe("assistantKindOfAgent", () => {
     });
 
     /** @scenario "An agent slug resolves to its product name" */
-    it("names pi through the preset, which carries no icon asset", () => {
+    it("names pi through the preset, which carries pi's own mark", () => {
       const kind = assistantKindOfAgent("pi");
       expect(kind).not.toBeNull();
       expect(kind && ASSISTANT_PRESETS[kind].label).toBe("pi");
-      expect(kind && ASSISTANT_PRESETS[kind].iconUrl).toBeNull();
+      expect(kind && ASSISTANT_PRESETS[kind].iconUrl).toBe(
+        "/images/external-icons/pi.svg",
+      );
     });
   });
 

@@ -8,9 +8,8 @@ import type { AssistantKind } from "./tiles/assistantIcons";
  * keyed on assistant kinds, the vocabulary the coding-assistant tiles use. The
  * two agree on most names and differ on two: the registry says `gemini_cli`
  * where the tile says `gemini`, and `copilot` where the tile says
- * `github_copilot`. `pi` spells the same on both sides; its tile carries no
- * icon asset, which `ASSISTANT_PRESETS` handles with `iconUrl: null` rather
- * than being a gap here.
+ * `github_copilot`. `pi` spells the same on both sides, so it needs no
+ * translation here.
  */
 const ASSISTANT_KIND_BY_AGENT = {
   claude_code: "claude_code",
