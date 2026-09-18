@@ -1150,6 +1150,21 @@ invented:
   `apps/ui/src/behavior/*` from inside the application, which is the shape
   `01d92f9c74` existed to delete. The mount is new-shape or it does not happen.
 
+  **A port with no honest answer is widened, never filled** (ruled 2026-09-18,
+  from mounting all 36). A host method typed `string` whose real answer is
+  "nobody told me" has exactly two legal outcomes: widen the capability so
+  somebody does, or widen the port to `string | undefined` so absence is
+  sayable. What a mount may never do is satisfy the type with a value — not
+  `""`, not `"unknown"`, not a plausible default — because downstream that is
+  indistinguishable from a real answer at every call site.
+
+  The case that forced it: two enterprise hosts answered `""` for the
+  deployment's base URL, which renders links and copy-to-clipboard values that
+  look real and are not. Licensing, whose port allowed `undefined`, was honest
+  about the same gap on the same day. The capability grew `appBaseUrl` and both
+  stopped lying; `licensePaymentUrl` followed. An array port is different — `[]`
+  is the honest smallest instance, not a placeholder.
+
   **A mount carries a loader, and the shell composes them at the router root**
   (ruled 2026-09-18, evening). `mounts` stops being a bare string and becomes
   what `withScreens` and `withDrawers` already are:
