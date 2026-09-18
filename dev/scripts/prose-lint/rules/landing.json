@@ -1,0 +1,105 @@
+{
+  "set": "landing",
+  "source": "landing-page-writing (the words on a product landing page: titles, subtitles, cards, buttons, chart captions, FAQ answers). Every writing-rules rule binds too: --rules landing loads both.",
+  "rules": [
+    {
+      "id": "value-before-mechanism",
+      "name": "Rule 1: a title says what the reader gets, the mechanism goes under it",
+      "kind": "judge",
+      "locate": "heading",
+      "instruction": "Does the heading of `text` describe how the product works or how a result was produced (a method, a component list, a step) instead of what the reader gets or can now do? \"The same 300 support conversations and one question, put to four judges\" is a method note and fails; \"Eval accuracy above frontier models, at a fraction of the time and cost\" states what the reader gets and passes. A heading that is a plain feature name the founder supplied is not a mechanism.",
+      "yes": "the heading names a method, a setup, a component or a step of how the product works",
+      "no": "the heading names what the reader gets, can now do, or saves"
+    },
+    {
+      "id": "understandable-from-context",
+      "name": "Rule 2: every block is understandable from the page above it",
+      "kind": "judge",
+      "context": true,
+      "instruction": "`above` is everything a first-time visitor has read on the page before `text`; they have never used the product and do not know its vocabulary. Reading `text` with only `above` as context, is there a word, name or label whose meaning and relevance they cannot work out? Internal names such as shorthand, target, run, statement, hydration, judgment, window or a flag like --target fail when nothing above explains them. Ordinary developer words (SQL, JSON, trace, LLM, CLI, token) pass.",
+      "yes": "the block relies on a name, term or label that neither the block nor the text above it explains, so the visitor cannot tell what it means or why it matters",
+      "no": "a first-time visitor can tell what the block means and why they should care from the block and the text above it"
+    },
+    {
+      "id": "button-names-an-action",
+      "name": "Rule 3: a button is a verb the reader wants to do",
+      "kind": "judge",
+      "instruction": "Does `text` contain a button or link label (a markdown link, or a short line marked as a button) that is a noun naming a page, a feature or an internal concept (\"Target shorthand\", \"CLI reference\", \"Pricing\") instead of an action with its value (\"Start querying\", \"Read the docs\", \"Meet Langy\", \"Export from the CLI\")?",
+      "yes": "a button or link label is a noun phrase naming a page, a feature or a concept, with no verb the reader performs",
+      "no": "every button or link label starts with a verb the reader wants to do, or there is no button in the text"
+    },
+    {
+      "id": "assumes-product-use",
+      "name": "Rule 4: never assume the reader already uses the product",
+      "kind": "judge",
+      "instruction": "Does `text` speak to the reader as someone who already uses this product or its parts? \"The answers land where you already work: in a Langy chat\" assumes they work in Langy and fails. Referring to places everyone already is (Slack, the terminal, the browser, the SQL you already know) passes.",
+      "yes": "the text presumes the reader already uses the product, its app, its assistant or its query language",
+      "no": "the text is written for a first visit, or refers only to tools everyone already has"
+    },
+    {
+      "id": "subtitle-pulls-with-title",
+      "name": "Rule 5: a subtitle is one sentence pulling the same direction as its title",
+      "kind": "judge",
+      "instruction": "In `text`, take the sentence or line that sits directly under the heading as the subtitle. Is it a method note, a caveat, a list of the components involved, a set of instructions, or a definition of a term from the heading, rather than the heading's claim restated at another length or its consequence for the reader? A subtitle of two or more sentences fails too.",
+      "yes": "the subtitle explains method, lists components, gives instructions, hedges, defines a term, or runs past one sentence",
+      "no": "the subtitle is one sentence that says what the heading says or adds what it means for the reader"
+    },
+    {
+      "id": "asset-before-effect",
+      "name": "Rule 6: name the reader's asset before what it becomes",
+      "kind": "judge",
+      "instruction": "Does `text` ask the reader to hold an effect or a result (\"what you find\", \"a better product\", \"the matches\") before it has named the thing they own that produces it (their production data, every conversation their agent had, their traces)? \"Turn what you find into a better product\" fails; \"Your production data is gold, and now you can mine all of it\" names the asset first and passes.",
+      "yes": "an outcome or a derived thing is named before the reader's own data or asset is",
+      "no": "the reader's own data or asset is named first, or the text has no such pairing"
+    },
+    {
+      "id": "number-carries-consequence",
+      "name": "Rule 7: a number travels with its consequence for the reader",
+      "kind": "judge",
+      "instruction": "Does `text` state a number (a count, a price, a duration, a percentage) without saying, in the same block, what it means for the reader in their own terms? \"10,000 conversations for $0.32\" alone fails; \"10,000 conversations for $0.32, so you ask a question the way you grep\" passes. A chart footnote that only states method is exempt; a title or subtitle is not.",
+      "yes": "a number stands without its consequence for the reader",
+      "no": "every number in the text is tied to what it means for the reader, or the text is a method footnote"
+    },
+    {
+      "id": "card-says-move-and-return",
+      "name": "Rule 8: card text says what the reader does and what comes back, three sentences at most",
+      "kind": "judge",
+      "instruction": "Is `text` a card (a short title, a line, an action) whose line narrates the product's internal steps (\"prices the run, judges a sample, sharpens the wording\") or runs past three sentences, instead of describing the reader's move (\"ask it in chat\") and what comes back (\"the count, the conversations, what to change\")?",
+      "yes": "the card narrates the product's own steps, or its text runs past three sentences",
+      "no": "the card says what the reader does and what they get back in three sentences or fewer, or the text is not a card"
+    },
+    {
+      "id": "product-name-defined",
+      "name": "Rule 9: a product name carries its definition on first mention",
+      "kind": "judge",
+      "context": true,
+      "instruction": "`above` is everything on the page before `text`. Does `text` use a product or feature name (Langy, LangWatchQL, Instant Evals, or another capitalised name of ours) that neither `text` nor `above` has defined with a short appositive (\"Langy, the AI engineer inside LangWatch\")? A name defined anywhere in `above` passes on later mentions.",
+      "yes": "a product or feature name appears with no definition in the block or above it",
+      "no": "every product or feature name in the block was defined on this page at or before its first mention"
+    },
+    {
+      "id": "price-as-verb",
+      "name": "Rule 10: banned word, price as a verb",
+      "kind": "regex",
+      "pattern": "\\bpriced\\b|\\bpricing (?:the|a|an|each|every|it|them|your|context|runs?)\\b|\\bprices? (?:the|a|an|each|every|it|them|your|context|runs?)\\b|\\bto price\\b",
+      "flags": "gi",
+      "note": "Write shows the cost, estimates the cost, the cost is shown before the run."
+    },
+    {
+      "id": "list-dressed-as-paragraphs",
+      "name": "Rule 11: lists are lists, one line per item",
+      "kind": "judge",
+      "instruction": "Does `text` teach three or more steps, benefits or kinds as headed paragraphs or as prose, where a numbered list with a short bold name and one line per item would carry the same content? Three headed paragraphs of several lines each fail; a numbered list with one line per item passes.",
+      "yes": "three or more parallel items are written as paragraphs or prose instead of a list with one line each",
+      "no": "the items are a list with one line each, or the text has no such set"
+    },
+    {
+      "id": "faq-answers-first",
+      "name": "Rule 12: the FAQ answers the objection in the first sentence, then stops",
+      "kind": "judge",
+      "instruction": "Is `text` a question followed by an answer whose first sentence does not answer the question directly (\"Do I need my own keys? No.\"), or whose answer continues past the reason into a pitch for the product?",
+      "yes": "the answer's first sentence dodges the question, or the answer turns into a pitch after the reason",
+      "no": "the first sentence answers the question, the reason follows, and it stops; or the text is not a question and answer"
+    }
+  ]
+}
