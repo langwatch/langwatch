@@ -3,6 +3,7 @@ import "@langwatch/time/polyfill";
 import process from "node:process";
 
 import { auditLogNullServer } from "@langwatch/audit-log-null";
+import { createAbsentLicenseSource } from "@langwatch/entitlement-contract";
 import { setTraceUrlProvider } from "@langwatch/handled-error";
 import { createServerApp } from "@langwatch/installed-modules/server";
 import { configureLogger, createLogger } from "@langwatch/observability";
@@ -36,6 +37,8 @@ export async function startApi(): Promise<Server> {
   const runtime = await createServerApp("api")
     // The audit sink is this deployment's choice: OSS records nothing, enterprise swaps in its own.
     .withModules([auditLogNullServer] as const)
+    // Until stores open before the chain, the licence leg resolves null: plan defaults, no stored licences.
+    .provide({ licenseSource: createAbsentLicenseSource() })
     .boot();
 
   server.with(hostedRuntime({ name: "api runtime", runtime }));
