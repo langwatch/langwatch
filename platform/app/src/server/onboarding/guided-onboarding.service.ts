@@ -18,7 +18,9 @@ import {
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import {
   type GuidedOnboardingState,
+  type OnboardingVariant,
   parseGuidedOnboardingState,
+  parseOnboardingVariant,
 } from "~/server/schemas/sign-up-data.schema";
 import { GuidedOnboardingPathUnknownError } from "./guided-onboarding.errors";
 import {
@@ -83,6 +85,33 @@ export class GuidedOnboardingService {
   }: {
     organizationId: string;
   }): Promise<GuidedOnboardingState> {
+    return parseGuidedOnboardingState(
+      await this.signupDataOf({ organizationId }),
+    );
+  }
+
+  /**
+   * The state with the variant the organization was assigned at sign-up,
+   * null for one that predates the experiment. The Home offer shows only
+   * in the guided variant.
+   */
+  async getStateWithVariant({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<GuidedOnboardingState & { variant: OnboardingVariant | null }> {
+    const signupData = await this.signupDataOf({ organizationId });
+    return {
+      ...parseGuidedOnboardingState(signupData),
+      variant: parseOnboardingVariant(signupData),
+    };
+  }
+
+  private async signupDataOf({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<unknown> {
     const organization = await this.prisma.organization.findUnique({
       where: { id: organizationId },
       select: { signupData: true },
@@ -94,7 +123,7 @@ export class GuidedOnboardingService {
         organizationId,
       );
     }
-    return parseGuidedOnboardingState(organization.signupData);
+    return organization.signupData;
   }
 
   /** The picks from the value screen, in order. The first one starts now. */

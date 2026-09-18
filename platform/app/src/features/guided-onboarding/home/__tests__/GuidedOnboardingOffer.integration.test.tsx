@@ -35,10 +35,13 @@ let flagEnabled = true;
 vi.mock("~/hooks/useFeatureFlag", () => ({
   useFeatureFlag: () => ({ enabled: flagEnabled, isLoading: false }),
 }));
+let canReadSources = true;
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     organization: { id: "org_1", name: "ACME" },
     project: { id: "proj_1", slug: "acme-checkout" },
+    hasAnyPermission: (permission: string) =>
+      permission === "ingestionSources:view" ? canReadSources : true,
   }),
 }));
 vi.mock("~/hooks/useRequiredSession", () => ({
@@ -56,7 +59,22 @@ vi.mock("~/components/home/useProjectReach", () => ({
   useProjectReach: () => ({ isNewProject, guidedOnboarding: guidedState }),
 }));
 
-let orgGuidedState: GuidedOnboardingState = { paths: [], donePaths: [] };
+let orgGuidedState: GuidedOnboardingState & {
+  variant: "guided" | "classic" | null;
+} = { variant: "guided", paths: [], donePaths: [] };
+/** What each space's own read answers; undefined is a read still loading. */
+let virtualKeys: { status: string }[] | undefined = [];
+let ingestionSources: { id: string }[] | undefined = [];
+let personalKeys: { id: string }[] | undefined = [];
+let personalRequests: number | undefined = 0;
+function queryOf(data: () => unknown) {
+  return {
+    useQuery: (_input: unknown, opts: { enabled: boolean }) => ({
+      data: opts.enabled ? data() : undefined,
+      isLoading: false,
+    }),
+  };
+}
 const beginPathMutateAsync = vi.fn();
 const recordTourMutate = vi.fn();
 const invalidate = vi.fn();
@@ -75,6 +93,16 @@ vi.mock("~/utils/api", () => ({
       },
       beginPath: { useMutation: () => ({ mutateAsync: beginPathMutateAsync }) },
       recordTour: { useMutation: () => ({ mutate: recordTourMutate }) },
+    },
+    virtualKeys: { list: queryOf(() => virtualKeys) },
+    ingestionSources: { list: queryOf(() => ingestionSources) },
+    personalVirtualKeys: { list: queryOf(() => personalKeys) },
+    user: {
+      personalUsage: queryOf(() =>
+        personalRequests === undefined
+          ? undefined
+          : { summary: { requests: personalRequests } },
+      ),
     },
   },
 }));
@@ -108,7 +136,12 @@ const pill = () => screen.queryByTestId("guided-onboarding-offer");
 describe("GuidedOnboardingOffer", () => {
   beforeEach(() => {
     flagEnabled = true;
-    orgGuidedState = { paths: [], donePaths: [] };
+    canReadSources = true;
+    orgGuidedState = { variant: "guided", paths: [], donePaths: [] };
+    virtualKeys = [];
+    ingestionSources = [];
+    personalKeys = [];
+    personalRequests = 0;
     isNewProject = true;
     guidedState = { variant: "guided", paths: [], donePaths: [] };
     beginPathMutateAsync.mockReset();
@@ -159,7 +192,11 @@ describe("GuidedOnboardingOffer", () => {
 
     /** @scenario the offer is hidden once the space is done */
     it("hides once the space's path is done", () => {
-      orgGuidedState = { paths: ["gateway"], donePaths: ["gateway"] };
+      orgGuidedState = {
+        variant: "guided",
+        paths: ["gateway"],
+        donePaths: ["gateway"],
+      };
       renderOffer("gateway");
       expect(pill()).toBeNull();
     });
@@ -174,6 +211,7 @@ describe("GuidedOnboardingOffer", () => {
     /** @scenario a path picked on the value screen but not started yet is offered in its space */
     it("offers a picked path that has not started", () => {
       orgGuidedState = {
+        variant: "guided",
         paths: ["llmops", "gateway"],
         currentPath: "llmops",
         donePaths: [],
@@ -185,6 +223,7 @@ describe("GuidedOnboardingOffer", () => {
     /** @scenario a space the user never picked is offered too */
     it("offers a space that was never picked", () => {
       orgGuidedState = {
+        variant: "guided",
         paths: ["llmops"],
         currentPath: "llmops",
         donePaths: [],
@@ -200,6 +239,7 @@ describe("GuidedOnboardingOffer", () => {
       isNewProject = false;
       guidedState = null as unknown as GuidedOnboardingCheck;
       orgGuidedState = {
+        variant: "guided",
         paths: ["llmops"],
         currentPath: "llmops",
         donePaths: [],
@@ -207,9 +247,74 @@ describe("GuidedOnboardingOffer", () => {
       renderOffer("governance");
       expect(pill()).toBeInTheDocument();
       cleanup();
-      orgGuidedState = { paths: ["governance"], donePaths: ["governance"] };
+      orgGuidedState = {
+        variant: "guided",
+        paths: ["governance"],
+        donePaths: ["governance"],
+      };
       renderOffer("governance");
       expect(pill()).toBeNull();
+    });
+  });
+
+  describe("given a space that is already in use", () => {
+    /** @scenario a gateway with virtual keys is not offered the guided onboarding */
+    it("shows no pill on a gateway with a virtual key, active or revoked", () => {
+      virtualKeys = [{ status: "revoked" }];
+      renderOffer("gateway");
+      expect(pill()).toBeNull();
+      cleanup();
+      virtualKeys = [{ status: "active" }];
+      renderOffer("gateway");
+      expect(pill()).toBeNull();
+    });
+
+    /** @scenario a governance home with an ingestion source is not offered the guided onboarding */
+    it("shows no pill on governance once a source is connected", () => {
+      ingestionSources = [{ id: "src_1" }];
+      renderOffer("governance");
+      expect(pill()).toBeNull();
+    });
+
+    /** @scenario a personal home with a personal key or usage is not offered the guided onboarding */
+    it("shows no pill on the personal home with a personal key or usage", () => {
+      personalKeys = [{ id: "pvk_1" }];
+      renderOffer("me");
+      expect(pill()).toBeNull();
+      cleanup();
+      personalKeys = [];
+      personalRequests = 3;
+      renderOffer("me");
+      expect(pill()).toBeNull();
+    });
+
+    /** @scenario the offer waits until it knows whether the space is in use */
+    it("shows no pill while the space's own read is loading or not allowed", () => {
+      virtualKeys = undefined;
+      renderOffer("gateway");
+      expect(pill()).toBeNull();
+      cleanup();
+      canReadSources = false;
+      renderOffer("governance");
+      expect(pill()).toBeNull();
+      cleanup();
+      personalRequests = undefined;
+      renderOffer("me");
+      expect(pill()).toBeNull();
+    });
+  });
+
+  describe("given an organization outside the guided variant", () => {
+    /** @scenario an organization outside the guided variant is never offered it on the gateway, governance or personal pages */
+    it("shows no pill on the gateway, governance or personal homes", () => {
+      for (const variant of ["classic", null] as const) {
+        orgGuidedState = { variant, paths: [], donePaths: [] };
+        for (const space of ["gateway", "governance", "me"] as const) {
+          renderOffer(space);
+          expect(pill()).toBeNull();
+          cleanup();
+        }
+      }
     });
   });
 
@@ -224,13 +329,17 @@ describe("GuidedOnboardingOffer", () => {
 
   describe("given the classic variant", () => {
     /** @scenario the classic variant never shows the offer */
-    it("shows no pill with the flag off, nor for a classic organization", () => {
+    it("shows no pill with the flag off, nor outside the guided variant", () => {
       flagEnabled = false;
       renderOffer("project");
       expect(pill()).toBeNull();
       cleanup();
       flagEnabled = true;
       guidedState = { variant: "classic", paths: [], donePaths: [] };
+      renderOffer("project");
+      expect(pill()).toBeNull();
+      cleanup();
+      guidedState = { variant: null, paths: [], donePaths: [] };
       renderOffer("project");
       expect(pill()).toBeNull();
     });

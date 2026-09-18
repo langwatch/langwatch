@@ -10,6 +10,7 @@
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { GuidedOnboardingStateView } from "~/server/onboarding/guided-onboarding.instance";
+import type { OnboardingVariant } from "~/server/schemas/sign-up-data.schema";
 import { api } from "~/utils/api";
 
 export const GUIDED_ONBOARDING_FLAG = "experiment_onboarding_langy_guided";
@@ -39,6 +40,8 @@ export interface GuidedOnboardingView {
   /** The organization is in the guided variant and its state has loaded. */
   guided: boolean;
   state: GuidedOnboardingStateView | null;
+  /** The variant assigned at sign-up, null for an organization that predates it. */
+  variant: OnboardingVariant | null;
   organizationId: string | null;
   isLoading: boolean;
 }
@@ -56,6 +59,7 @@ export function useGuidedOnboarding(
   return {
     guided: flag.enabled && !!stateQuery.data,
     state: stateQuery.data ?? null,
+    variant: stateQuery.data?.variant ?? null,
     organizationId,
     isLoading: flag.isLoading || (flag.enabled && stateQuery.isLoading),
   };

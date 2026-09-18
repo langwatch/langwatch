@@ -1,14 +1,17 @@
 /**
  * The orange pill under the search bar of a day-zero home in the guided
  * variant: "Start guided onboarding". Each space (project, gateway,
- * governance, /me) offers its own path. Hidden while Langy is guiding that
- * same space, once that space is done, and while any tour is on screen.
+ * governance, /me) offers its own path. Only an organization assigned the
+ * guided variant at sign-up sees it. Hidden while Langy is guiding that
+ * same space, once that space is done or already in use, and while any
+ * tour is on screen.
  *
  * On the project home its state comes with the onboarding checks the home
  * already loads, and a project with traces is past the offer. The gateway,
  * governance and personal homes are about the organization, not whichever
  * project happens to be ambient, so there it reads the organization's
- * guided state the tour host already holds.
+ * guided state the tour host already holds, and `useSpaceInUse` says
+ * whether the space already has keys, sources or usage.
  *
  * Clicking it begins the path on the organization, opens the panel docked,
  * runs the path's tour when it has one, and queues the kickoff that
@@ -36,10 +39,11 @@ import {
   useGuidedOnboarding,
   useGuidedOnboardingFlag,
 } from "../useGuidedOnboarding";
+import { useSpaceInUse } from "./useSpaceInUse";
 
 /**
  * The path this space offers, or none when the space is guided or done, or
- * when the organization went through the classic onboarding.
+ * when the organization is not in the guided variant.
  */
 export function offeredPath({
   space,
@@ -48,7 +52,7 @@ export function offeredPath({
   space: GuidedSpace;
   state: GuidedOnboardingCheck;
 }): GuidedPath | null {
-  if (state.variant === "classic") return null;
+  if (state.variant !== "guided") return null;
   const path = guidedPathForSpace(space);
   if (state.currentPath === path) return null;
   if (state.donePaths.includes(path)) return null;
@@ -72,6 +76,10 @@ function GuidedOnboardingOfferInner({ space }: { space: GuidedSpace }) {
   const inProject = space === "project";
   const { isNewProject, guidedOnboarding } = useProjectReach();
   const orgView = useGuidedOnboarding({ enabled: !inProject });
+  const spaceInUse = useSpaceInUse({
+    space,
+    enabled: enabled && !inProject && orgView.variant === "guided",
+  });
   const touring = useGuidedTourStore((s) => s.running);
   const session = useRequiredSession();
   const { emit } = useAnalytics();
@@ -83,7 +91,7 @@ function GuidedOnboardingOfferInner({ space }: { space: GuidedSpace }) {
   const check: GuidedOnboardingCheck | null = inProject
     ? guidedOnboarding
     : orgView.state && {
-        variant: null,
+        variant: orgView.variant,
         paths: orgView.state.paths,
         currentPath: orgView.state.currentPath,
         donePaths: orgView.state.donePaths,
@@ -92,7 +100,7 @@ function GuidedOnboardingOfferInner({ space }: { space: GuidedSpace }) {
     !enabled ||
     !check ||
     !organizationId ||
-    (inProject && !isNewProject) ||
+    (inProject ? !isNewProject : spaceInUse !== false) ||
     touring
   ) {
     return null;
