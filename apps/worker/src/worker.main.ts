@@ -1,87 +1,44 @@
 import process from "node:process";
-import type { Logger } from "@langwatch/observability";
-import { WorkerSignalHandlers, type WorkerSignalSource } from "./platform/lifecycle/worker.signals.ts";
-import { bootWorker, type WorkerBootOptions } from "./worker.process.ts";
 
-export type WorkerMainSignals =
-  | false
-  | {
-      source?: WorkerSignalSource;
-      exit?: (code: number) => void;
-    };
+import { setTraceUrlProvider } from "@langwatch/handled-error";
+import { configureLogger, createLogger, loggerConfigurationFrom } from "@langwatch/observability";
+import { grafanaTraceUrlFromEnv } from "@langwatch/observability/grafana-links";
+import { startOtlpMetricsExport } from "@langwatch/observability/node";
+import { Server } from "@langwatch/process-server";
+import { SecretEnvironmentService, secretLogRedactPaths } from "@langwatch/secrets";
+import { createServerApp } from "@langwatch/installed-modules/server";
 
-export type WorkerMainOptions = WorkerBootOptions & {
-  signals?: WorkerMainSignals;
-};
-
-/** The executable needs only the worker's lifecycle and structured logger. */
-export type WorkerMainProcess = {
-  readonly logger: Pick<Logger, "error" | "info">;
-  start(): Promise<void>;
-  close(options?: { terminating?: boolean }): Promise<void>;
-};
-
-type WorkerMainCreateOptions = {
-  worker: WorkerMainProcess;
-  signals?: WorkerMainSignals;
-};
+import { resolveWorkerConfig } from "./platform/config/worker.config.ts";
 
 /**
- * Injectable worker executable boundary. It owns process signal policy while
- * `WorkerProcess` retains the resource ordering needed by every host. The live
- * production executable switches here only with the complete Worker registry.
+ * The worker process, whole. The same shape the api boots with: telemetry
+ * first so a config parse failure is observable, then the server that owns the
+ * teardown, then the application the installed modules compose.
  */
-export class WorkerMain {
-  static async boot(options: WorkerMainOptions): Promise<WorkerMain> {
-    const worker = await bootWorker(options);
-    return WorkerMain.create({ worker, signals: options.signals });
-  }
+export async function startWorker(): Promise<Server> {
+  const secrets = await SecretEnvironmentService.create({ source: process.env }).resolve();
+  const config = resolveWorkerConfig(secrets.environment);
 
-  static create(options: WorkerMainCreateOptions): WorkerMain {
-    const main = new WorkerMain(options.worker);
+  configureLogger({ ...loggerConfigurationFrom(config), redactPaths: secretLogRedactPaths() });
+  setTraceUrlProvider(grafanaTraceUrlFromEnv);
+  startOtlpMetricsExport(config.otlpMetrics);
+  const logger = createLogger(config.serviceName);
 
-    if (options.signals !== false) {
-      const source = options.signals?.source ?? process;
-      const exit = options.signals?.exit ?? process.exit.bind(process);
-      main.signals = WorkerSignalHandlers.install({
-        source,
-        close: () => main.close({ terminating: true }),
-        logger: options.worker.logger,
-        onComplete: async () => {
-          exit(0);
-        },
-        onFailure: async () => {
-          exit(1);
-        },
-      });
-    }
+  const server = Server.create({
+    name: config.serviceName,
+    logger,
+    shutdownDeadlineMs: config.shutdown.processDeadlineMs,
+  });
 
-    return main;
-  }
+  const runtime = await createServerApp("worker").boot();
 
-  private closing: Promise<void> | undefined;
-  private signals: WorkerSignalHandlers | undefined;
-
-  private constructor(readonly worker: WorkerMainProcess) {}
-
-  start(): Promise<void> {
-    return this.worker.start();
-  }
-
-  close(options?: { terminating?: boolean }): Promise<void> {
-    this.closing ??= this.closeMain(options);
-    return this.closing;
-  }
-
-  private async closeMain(options?: { terminating?: boolean }): Promise<void> {
-    try {
-      await this.worker.close(options);
-    } finally {
-      this.signals?.dispose();
-    }
-  }
-}
-
-export async function bootWorkerMain(options: WorkerMainOptions): Promise<WorkerMain> {
-  return WorkerMain.boot(options);
+  // Jobs drain before anything they call into is released.
+  server.host({
+    name: "worker runtime",
+    start: () => runtime.start(),
+    stop: () => runtime.stop(),
+    drain: true,
+  });
+  await server.listen();
+  return server;
 }

@@ -1,42 +1,20 @@
 // Voice agent type and transports. Transport is discriminated union inside config.
 // Contract-legal: schemas and pure functions only, no persistence/credential/transport.
 
-import { z } from "zod";
 import type { VoiceTransport } from "./voice-transport.ts";
-
-export const elevenLabsConvaiTransportSchema = z.object({
-  transport: z.literal("elevenlabs_convai"),
-  agentId: z.string().trim().min(1, "Agent id is required").max(128),
-});
-
-/**
- * E.164: a leading `+`, a non-zero country code digit, then up to 14 more
- * digits. The number is the whole identity of a phone target, so it is
- * validated at the schema boundary rather than trusted from the form.
- */
-export const E164_PHONE_PATTERN = /^\+[1-9]\d{1,14}$/;
-
-export const phoneTransportSchema = z.object({
-  transport: z.literal("phone"),
-  phoneNumber: z
-    .string()
-    .trim()
-    .regex(
-      E164_PHONE_PATTERN,
-      "Enter the number in E.164 form, like +14155550123",
-    ),
-  /**
-   * The agent under test greets on connect; the run waits for its opening turn
-   * before the simulator speaks.
-   */
-  isAgentSpeaksFirst: z.boolean().default(false),
-});
-
-export const voiceAgentConfigSchema = z.discriminatedUnion("transport", [
+export {
+  E164_PHONE_PATTERN,
   elevenLabsConvaiTransportSchema,
+  parseVoiceAgentConfig,
   phoneTransportSchema,
-]);
-export type VoiceAgentConfig = z.infer<typeof voiceAgentConfigSchema>;
+  voiceAgentConfigSchema,
+  type VoiceAgentConfig,
+} from "@langwatch/agent-contract";
+import {
+  voiceAgentExternalId as agentVoiceExternalId,
+  voiceAgentIdentityKey as agentVoiceIdentityKey,
+  type VoiceAgentConfig,
+} from "@langwatch/agent-contract";
 
 /** The transport's label in the "Reached via" select. */
 export const VOICE_TRANSPORT_LABELS: Record<VoiceTransport, string> = {
@@ -45,40 +23,25 @@ export const VOICE_TRANSPORT_LABELS: Record<VoiceTransport, string> = {
 };
 
 /** Model provider whose key signs sessions for this transport. */
-export const VOICE_TRANSPORT_PROVIDER: Record<
-  VoiceTransport,
-  "elevenlabs" | "twilio"
-> = {
+export const VOICE_TRANSPORT_PROVIDER: Record<VoiceTransport, "elevenlabs" | "twilio"> = {
   elevenlabs_convai: "elevenlabs",
   phone: "twilio",
 };
-
-export const parseVoiceAgentConfig = (config: unknown): VoiceAgentConfig =>
-  voiceAgentConfigSchema.parse(config);
 
 /**
  * The transport's own external identifier for a voice agent: the ElevenLabs
  * agent id, or the phone number for a phone target, the value forming the
  * identity key. An exhaustive switch makes a new transport a compile error here.
  */
-export const voiceAgentExternalId = (config: VoiceAgentConfig): string => {
-  switch (config.transport) {
-    case "elevenlabs_convai":
-      return config.agentId;
-    case "phone":
-      return config.phoneNumber;
-  }
-};
+export const voiceAgentExternalId = (config: VoiceAgentConfig): string =>
+  agentVoiceExternalId(config);
 
 /**
  * The natural key that folds every "Talk to it" against the same vendor
  * agent onto one row, so a retry or two racing tabs cannot create a second
  * row. Shares the `(projectId, identityKey)` constraint connected agents use.
  */
-export const voiceAgentIdentityKey = ({
-  transport,
-  agentExternalId,
-}: {
+export const voiceAgentIdentityKey = (input: {
   transport: VoiceTransport;
   agentExternalId: string;
-}): string => `voice:${transport}:${agentExternalId}`;
+}): string => agentVoiceIdentityKey(input);
