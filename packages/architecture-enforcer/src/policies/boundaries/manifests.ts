@@ -1,5 +1,8 @@
-import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import type { ArchitectureViolation, ClassifiedPackage, PackageManifest } from "../../types.ts";
+import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 
 function exportKeys(exportsValue: unknown): string[] {
   if (!exportsValue || typeof exportsValue !== "object" || Array.isArray(exportsValue)) {
@@ -7,6 +10,122 @@ function exportKeys(exportsValue: unknown): string[] {
   }
 
   return Object.keys(exportsValue as Record<string, unknown>);
+}
+
+type WorkspaceCatalogs = {
+  readonly catalog: Readonly<Record<string, string>>;
+  readonly catalogs: Readonly<Record<string, Readonly<Record<string, string>>>>;
+};
+
+const EMPTY_CATALOGS: WorkspaceCatalogs = { catalog: {}, catalogs: {} };
+
+type CatalogSection = "catalog" | "catalogs" | "other";
+
+/** Which block a top-level (unindented) line opens. */
+function topLevelSection(line: string): CatalogSection {
+  if (/^catalog:\s*$/.test(line)) return "catalog";
+
+  if (/^catalogs:\s*$/.test(line)) return "catalogs";
+
+  return "other";
+}
+
+/** A `catalog:` entry line: two-space indent, `name: range`. */
+function applyCatalogLine(line: string, catalog: Record<string, string>): void {
+  const entry = /^ {2}(['"]?)([^'":\s]+)\1:\s*(\S.*)$/.exec(line);
+  if (entry) catalog[entry[2]!] = entry[3]!.trim();
+}
+
+/**
+ * A `catalogs:` line: either a two-space-indent named-catalog header, or a
+ * four-space-indent `name: range` entry under the most recent header.
+ */
+function applyCatalogsLine(
+  line: string,
+  catalogs: Record<string, Record<string, string>>,
+  namedCatalog: string | undefined,
+): string | undefined {
+  const header = /^ {2}(['"]?)([^'":\s]+)\1:\s*$/.exec(line);
+
+  if (header) {
+    const name = header[2]!;
+    catalogs[name] ??= {};
+
+    return name;
+  }
+
+  const entry = /^ {4}(['"]?)([^'":\s]+)\1:\s*(\S.*)$/.exec(line);
+  if (entry && namedCatalog) catalogs[namedCatalog]![entry[2]!] = entry[3]!.trim();
+
+  return namedCatalog;
+}
+
+/**
+ * Hand-parsed, matching `workspaceGlobs` in `workspace/tsconfig-references.ts`:
+ * the `catalog:`/`catalogs:` blocks are a flat two/four-space-indented map, so
+ * reading them by hand keeps this policy free of a YAML dependency.
+ */
+function parseWorkspaceCatalogs(text: string): WorkspaceCatalogs {
+  const catalog: Record<string, string> = {};
+  const catalogs: Record<string, Record<string, string>> = {};
+
+  let section: CatalogSection = "other";
+  let namedCatalog: string | undefined;
+
+  for (const line of text.split("\n")) {
+    if (/^\s*#/.test(line) || line.trim() === "") continue;
+
+    if (/^\S/.test(line)) {
+      section = topLevelSection(line);
+      namedCatalog = void 0;
+      continue;
+    }
+
+    if (section === "catalog") applyCatalogLine(line, catalog);
+
+    if (section === "catalogs") namedCatalog = applyCatalogsLine(line, catalogs, namedCatalog);
+  }
+
+  return { catalog, catalogs };
+}
+
+const workspaceCatalogsByRoot = new Map<string, WorkspaceCatalogs>();
+
+function readWorkspaceCatalogs(root: string): WorkspaceCatalogs {
+  const cached = workspaceCatalogsByRoot.get(root);
+  if (cached) return cached;
+
+  const file = join(root, "pnpm-workspace.yaml");
+
+  const parsed = existsSync(file)
+    ? parseWorkspaceCatalogs(readFileSync(file, "utf8"))
+    : EMPTY_CATALOGS;
+
+  workspaceCatalogsByRoot.set(root, parsed);
+
+  return parsed;
+}
+
+/**
+ * Resolves pnpm's `catalog:`/`catalog:<name>` protocol to the range it names
+ * in `pnpm-workspace.yaml`; any other declared value (an explicit range, or
+ * `undefined`) passes through untouched.
+ */
+function resolveCatalogRange({
+  root,
+  dependency,
+  value,
+}: {
+  root: string;
+  dependency: string;
+  value: string | undefined;
+}): string | undefined {
+  if (value === void 0 || !value.startsWith("catalog:")) return value;
+
+  const { catalog, catalogs } = readWorkspaceCatalogs(root);
+  const name = value.slice("catalog:".length);
+
+  return name === "" ? catalog[dependency] : catalogs[name]?.[dependency];
 }
 
 function isZod4Range(value: string | undefined): boolean {
@@ -31,7 +150,7 @@ function isEnterpriseRuntimeDependency(name: string): boolean {
 function compatibleEnterpriseCompositionTarget(target: ClassifiedPackage): boolean {
   if (target.kind === "contract") return true;
 
-  return Boolean(target.enterprise && target.feature && target.kind === "server");
+  return Boolean(target.enterprise && target.feature && target.kind === "process");
 }
 
 function matchingEnterpriseComposition(pkg: ClassifiedPackage, target: ClassifiedPackage): boolean {
@@ -91,13 +210,17 @@ function exportViolations(pkg: ClassifiedPackage): ArchitectureViolation[] {
 }
 
 /** The retired-Zod-runtime violation for a feature package, or `undefined` when it is fine. */
-function zodRuntimeViolation(pkg: ClassifiedPackage): ArchitectureViolation | undefined {
+function zodRuntimeViolation(
+  pkg: ClassifiedPackage,
+  root: string,
+): ArchitectureViolation | undefined {
   if (!pkg.feature) return undefined;
 
   const zodVersion = manifestDependencies(pkg.manifest).zod;
   const requiresZod = pkg.kind === "contract";
   const mustDeclareZod4 = requiresZod || zodVersion !== void 0;
-  if (!mustDeclareZod4 || isZod4Range(zodVersion)) return undefined;
+  const resolvedZodRange = resolveCatalogRange({ root, dependency: "zod", value: zodVersion });
+  if (!mustDeclareZod4 || isZod4Range(resolvedZodRange)) return undefined;
 
   return {
     policy: "retired-package-runtime",
@@ -255,24 +378,24 @@ const contractImplementationCheck: DependencyCheck = (pkg, target, dependency) =
 };
 
 const webServerCheck: DependencyCheck = (pkg, target, dependency) => {
-  if (pkg.kind !== "web" || target.kind !== "server") return undefined;
+  if (pkg.kind !== "browser" || target.kind !== "process") return undefined;
 
   return {
     policy: "package-role",
     file: pkg.manifestPath,
     specifier: dependency,
-    message: "A web package cannot depend on a feature server package.",
+    message: "A browser package cannot depend on a feature process package.",
   };
 };
 
 const serverWebCheck: DependencyCheck = (pkg, target, dependency) => {
-  if (pkg.kind !== "server" || target.kind !== "web") return undefined;
+  if (pkg.kind !== "process" || target.kind !== "browser") return undefined;
 
   return {
     policy: "package-role",
     file: pkg.manifestPath,
     specifier: dependency,
-    message: "A server package cannot depend on a feature web package.",
+    message: "A process package cannot depend on a feature browser package.",
   };
 };
 
@@ -309,9 +432,9 @@ function dependencyViolations(
 
     if (check !== crossFeatureCheck) return runCheck();
 
-    if (pkg.kind !== "web") return runCheck();
+    if (pkg.kind !== "browser") return runCheck();
 
-    if (target.kind !== "web") return runCheck();
+    if (target.kind !== "browser") return runCheck();
 
     if (!allowedWebDependencies.has(`${pkg.name}->${target.name}`)) return runCheck();
 
@@ -326,8 +449,9 @@ function violationsForManifest(
   pkg: ClassifiedPackage,
   byName: Map<string, ClassifiedPackage>,
   allowedWebDependencies: ReadonlySet<string>,
+  root: string,
 ): ArchitectureViolation[] {
-  const zodViolation = zodRuntimeViolation(pkg);
+  const zodViolation = zodRuntimeViolation(pkg, root);
   const dependencies = Object.keys(manifestDependencies(pkg.manifest));
 
   return [
@@ -347,7 +471,9 @@ export function lintManifests(
 
   const byName = new Map(packages.map((pkg) => [pkg.name, pkg]));
 
-  return packages.flatMap((pkg) => violationsForManifest(pkg, byName, allowedWebDependencies));
+  return packages.flatMap((pkg) =>
+    violationsForManifest(pkg, byName, allowedWebDependencies, snapshot.root),
+  );
 }
 
 export function exportedSubpaths(pkg: ClassifiedPackage): Set<string> {

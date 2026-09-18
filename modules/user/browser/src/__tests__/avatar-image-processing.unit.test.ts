@@ -4,7 +4,7 @@ import { HandledError } from "@langwatch/handled-error";
 import {
   explainHandledError,
   UNKNOWN_ERROR_PRESENTATION,
-} from "@langwatch/handled-error/presentation";
+} from "@langwatch/error-presentation/presentation";
 import { UserAvatarRateLimitedError, UserAvatarTooLargeError } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 

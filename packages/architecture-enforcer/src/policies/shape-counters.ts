@@ -1,4 +1,5 @@
 import { join, relative, sep } from "node:path";
+
 import {
   type BaselineEntry,
   type BaselinePolicy,
@@ -9,9 +10,9 @@ import {
   readBaseline,
   staleRows,
 } from "../baseline.ts";
+import type { ArchitectureViolation } from "../types.ts";
 import { listFiles } from "../workspace/layout.ts";
 import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
-import type { ArchitectureViolation } from "../types.ts";
 
 /**
  * One counter the strict-layout drive tracks by hand
@@ -31,7 +32,7 @@ function workspacePath(root: string, path: string): string {
 // --- ports-and-adapters-folders ---------------------------------------------
 
 const PORTS_ADAPTERS_BASELINE_FILE = "ports-and-adapters-folders-baseline.json";
-const PORTS_ADAPTERS_PATH = /^(?:enterprise\/)?modules\/[^/]+\/server\/src\/(?:ports|adapters)\//;
+const PORTS_ADAPTERS_PATH = /^(?:enterprise\/)?modules\/[^/]+\/process\/src\/(?:ports|adapters)\//;
 
 function isPortsOrAdaptersFile(path: string): boolean {
   return /\.tsx?$/.test(path) && !/\.(?:test|spec)\.tsx?$/.test(path);
@@ -99,7 +100,12 @@ export function lintPortsAndAdaptersFolders(snapshot: WorkspaceSnapshot): Archit
   }
 
   violations.push(
-    ...staleRows({ entries: baseline.entries, found, policy: PORTS_AND_ADAPTERS_FOLDERS_BASELINE, file }),
+    ...staleRows({
+      entries: baseline.entries,
+      found,
+      policy: PORTS_AND_ADAPTERS_FOLDERS_BASELINE,
+      file,
+    }),
   );
 
   return violations;

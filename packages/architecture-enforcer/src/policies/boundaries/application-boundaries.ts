@@ -1,12 +1,14 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+
 import ts from "typescript";
 import { z } from "zod";
+
+import type { ArchitectureViolation, ClassifiedPackage } from "../../types.ts";
 import { listFiles } from "../../workspace/layout.ts";
-import { exportedSubpaths } from "./manifests.ts";
 import { sourceText } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
-import type { ArchitectureViolation, ClassifiedPackage } from "../../types.ts";
+import { exportedSubpaths } from "./manifests.ts";
 
 const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
 const LEGACY_BASELINE_PATH = join(
@@ -241,7 +243,7 @@ function targetPackage(
 function compatibleEnterpriseTarget(target: ClassifiedPackage): boolean {
   if (target.kind === "contract") return true;
 
-  return Boolean(target.enterprise && target.feature && target.kind === "server");
+  return Boolean(target.enterprise && target.feature && target.kind === "process");
 }
 
 function matchingEnterpriseComposition(

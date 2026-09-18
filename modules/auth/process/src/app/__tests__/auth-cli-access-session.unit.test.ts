@@ -6,7 +6,7 @@ import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RateLimiter, SecretResolver } from "@langwatch/process-stores/members";
 import { ScopedSecrets } from "@langwatch/secrets";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
@@ -16,7 +16,7 @@ import { AuthApp } from "../auth.app.ts";
 const ACCESS_TOKEN = "lw_at_active";
 const AUTHORIZATION = `Bearer ${ACCESS_TOKEN}`;
 
-function appForCliSessions(repositories: MemoryAuthRepositories): AuthApp {
+async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<AuthApp> {
   const secrets: SecretResolver = {
     find: () => void 0,
     read: (key) => {
@@ -74,7 +74,7 @@ describe("the Auth CLI access-session peer", () => {
       }),
       ttlSeconds: 60,
     });
-    const app = appForCliSessions(repositories);
+    const app = await appForCliSessions(repositories);
 
     await expect(app.findCliAccessSession({ authorization: AUTHORIZATION })).resolves.toEqual({
       userId: "user-1",
@@ -100,7 +100,7 @@ describe("the Auth CLI access-session peer", () => {
       memberKeys: [cliAccessTokenKey(ACCESS_TOKEN)],
       ttlMs: 60_000,
     });
-    const app = appForCliSessions(repositories);
+    const app = await appForCliSessions(repositories);
 
     await app.revokeCliAccessToken({ authorization: AUTHORIZATION, userId: "user-1" });
 

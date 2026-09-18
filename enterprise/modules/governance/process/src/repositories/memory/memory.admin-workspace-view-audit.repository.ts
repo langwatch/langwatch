@@ -11,8 +11,8 @@ import {
 let sequence = 0;
 
 /**
- * The admin-workspace-view-audit twin: targets are seeded by the test, rows
- * accumulate in an array, "recent" reads by the same fields the query filters.
+ * The admin-workspace-view-audit twin: rows accumulate in an array, "recent"
+ * reads by the same fields the query filters.
  */
 export class MemoryAdminWorkspaceViewAuditRepository extends AdminWorkspaceViewAuditRepository {
   private readonly targets = new Map<string, AdminWorkspaceTarget>();
@@ -26,10 +26,6 @@ export class MemoryAdminWorkspaceViewAuditRepository extends AdminWorkspaceViewA
 
   static create(): MemoryAdminWorkspaceViewAuditRepository {
     return new MemoryAdminWorkspaceViewAuditRepository();
-  }
-
-  seedTarget(teamId: string, target: AdminWorkspaceTarget): void {
-    this.targets.set(teamId, target);
   }
 
   async findTarget(input: {

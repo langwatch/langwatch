@@ -5,7 +5,7 @@
  */
 import { Badge, Box, HStack, Spinner, Text } from "@chakra-ui/react";
 import type { ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { formatRunStatusLabel } from "@langwatch/suite-browser/run-formatters";
+import { formatRunStatusLabel } from "@langwatch/suite-browser-kit";
 
 import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";
 import {

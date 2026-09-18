@@ -1,12 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { readFeatureCatalogue } from "./feature-catalogue.ts";
-import { forgetFileListings, listFiles } from "./layout.ts";
-import {
-  forgetWorkspaceModuleResolvers,
-  workspaceModuleResolver,
-  type WorkspaceModuleResolver,
-} from "./module-graph.ts";
+
 import type {
   ApplicationPackageRole,
   ArchitectureViolation,
@@ -16,8 +10,20 @@ import type {
   FeaturePackageRole,
   PackageManifest,
 } from "../types.ts";
+import { readFeatureCatalogue } from "./feature-catalogue.ts";
+import { forgetFileListings, listFiles } from "./layout.ts";
+import {
+  forgetWorkspaceModuleResolvers,
+  workspaceModuleResolver,
+  type WorkspaceModuleResolver,
+} from "./module-graph.ts";
 
-const FEATURE_ROLES = new Set<FeaturePackageRole>(["contract", "server", "web"]);
+const FEATURE_ROLES = new Set<FeaturePackageRole>([
+  "contract",
+  "process",
+  "browser",
+  "browser-kit",
+]);
 
 const APPLICATION_PACKAGES: readonly {
   role: ApplicationPackageRole;
@@ -89,7 +95,7 @@ export function discoverClassifiedPackages(root: string): {
           policy: "feature-layout",
           file: featureManifest,
           message: "A feature ownership directory cannot itself be a package.",
-          allowed: "Put package.json inside contract, server, or web.",
+          allowed: "Put package.json inside contract, process, browser, or browser-kit.",
         });
       }
 
@@ -102,7 +108,8 @@ export function discoverClassifiedPackages(root: string): {
             policy: "feature-layout",
             file: manifestPath,
             message: `Unknown feature package role "${roleName}".`,
-            allowed: "Use contract, server, or web; documentation belongs at the feature root.",
+            allowed:
+              "Use contract, process, browser, or browser-kit; documentation belongs at the feature root.",
           });
 
           continue;

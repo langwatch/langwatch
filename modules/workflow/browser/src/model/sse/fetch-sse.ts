@@ -1,5 +1,5 @@
 import { toError } from "@langwatch/browser-host/errors";
-import { explainSerializedError } from "@langwatch/handled-error/presentation";
+import { explainSerializedError } from "@langwatch/error-presentation/presentation";
 import { createLogger } from "@langwatch/observability/browser";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
 

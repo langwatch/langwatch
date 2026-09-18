@@ -1,6 +1,5 @@
 // Voice worker boot env: VOICE_WORKER_ONLY, VOICE_WS_PORT (default 3300), VOICE_PUBLIC_BASE_URL.
 // Twilio credentials are per-project platform data, not env.
-// Read from process.env before app graph evaluates (see voice-limits).
 
 import { z } from "zod";
 
@@ -34,7 +33,7 @@ const publicBaseUrlSchema = z
  * on but VOICE_PUBLIC_BASE_URL is missing or malformed, so the worker fails
  * loud at boot rather than coming up with a listener Twilio can never reach.
  */
-export function readVoiceWorkerEnv(env: NodeJS.ProcessEnv = process.env): VoiceWorkerEnv {
+export function readVoiceWorkerEnv(env: NodeJS.ProcessEnv): VoiceWorkerEnv {
   const voiceWorkerOnly = (env.VOICE_WORKER_ONLY ?? "").trim().toLowerCase() === "true";
   const voiceWsPort = portSchema.parse(env.VOICE_WS_PORT);
   const rawPublicBaseUrl =

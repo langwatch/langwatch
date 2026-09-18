@@ -171,7 +171,7 @@ export function buildOpsInfrastructure(input: {
   return {
     createCapability: (dependencies: OpsAppDependencies): OpsCapability => {
       const operations = OpsOperations.create({
-        adminEmails: config.adminEmails ?? "",
+        adminEmails: members.adminEmails,
         // Once the connection projection decides sign-in, editing the legacy
         // `ssoDomain`/`ssoProvider` strings changes nothing a person
         // experiences, so the backoffice refuses rather than accepting a
@@ -250,34 +250,5 @@ export function buildOpsInfrastructure(input: {
     explainClients,
     findOpsApiKey: () => config.apiKey ?? null,
     isProduction: members.nodeEnvironment === "production",
-    // -- unused by the api role's `OpsApp.create`, kept only because a worker
-    // composition builds the same `OpsAppInfrastructure` shape with its own
-    // real implementations for these. --------------------------------------
-    anomalyHardTierAlert: { notify: () => Promise.resolve() },
-    opsReplayRuntime: {
-      create: () => {
-        throw new OpsCapabilityUnavailableError("the projection replay runtime");
-      },
-    },
-    opsSnapshotRedis: new MemberOpsSnapshotRedis(members.redis),
-    opsWorker: {
-      tryStartAnomalyWorker: () => undefined,
-      tryStartUsageStatsWorker: () => undefined,
-      tryStartQueueMetricsWriter: () => undefined,
-    },
-    // "It decides nothing now" (see `OrganizationDataplane`'s own doc): every
-    // organization answers `shared` until a caller reports otherwise.
-    organizationDataplane: { dataplaneFor: () => ({ kind: "shared" }) },
-    queuePayloadDecoder: { tryDecode: () => Promise.resolve(null) },
-    schedulerWake: NoopSchedulerWakeService.create(),
-    storageStatsMetrics: {
-      beginTick: () => {},
-      recordTable: () => {},
-      recordDisk: () => {},
-      recordBackupStatus: () => {},
-      recordLastBackup: () => {},
-    },
-    usageStatsErrorReporter: { capture: () => Promise.resolve() },
-    usageStatsTelemetryClient: { send: () => Promise.resolve() },
   };
 }

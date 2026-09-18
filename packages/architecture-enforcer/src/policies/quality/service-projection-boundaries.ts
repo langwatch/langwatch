@@ -1,8 +1,10 @@
 import { join } from "node:path";
+
 import ts from "typescript";
+
+import type { ArchitectureViolation } from "../../types.ts";
 import { sourceFile } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
-import type { ArchitectureViolation } from "../../types.ts";
 
 const PROJECTION_WRITE_TYPES = new Set(["FoldProjectionStore", "ProjectionStore"]);
 const PROJECTION_WRITE_METHODS = new Set(["storeProjection", "storeProjectionBatch"]);
@@ -16,7 +18,7 @@ type PackageTypes = {
 };
 
 function isDomainServiceFile(path: string): boolean {
-  return /\/server\/src\/services\/.+\.service\.ts$/.test(path);
+  return /\/process\/src\/services\/.+\.service\.ts$/.test(path);
 }
 
 function declarationName(node: ts.DeclarationName | undefined): string | null {
@@ -291,7 +293,7 @@ export function lintServiceProjectionBoundaries(
   const violations: ArchitectureViolation[] = [];
 
   for (const pkg of packages) {
-    if (pkg.kind !== "server") continue;
+    if (pkg.kind !== "process") continue;
 
     const sourceFiles = snapshot.files({
       directory: join(pkg.root, "src"),

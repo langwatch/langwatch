@@ -20,6 +20,7 @@ import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
+import { trainTestSplit } from "@langwatch/workflow-browser-kit";
 import type { Entry } from "@langwatch/workflow-contract";
 import { checkIsEvaluator } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
@@ -38,7 +39,6 @@ import { useModelProviderKeys } from "../../../behavior/optimization_studio/use-
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { OPTIMIZERS } from "../../../model/optimizers.ts";
-import { trainTestSplit } from "../../../model/studio-dataset.utils.ts";
 import { AddModelProviderKey } from "../../elements/optimization_studio/add-model-provider-key.tsx";
 import { useVersionState } from "./history.tsx";
 import { OptimizationStudioLLMConfigField } from "./properties/llm-configs/optimization-studio-llm-config-field.tsx";

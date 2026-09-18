@@ -8,7 +8,7 @@ without leaking how the work is done, and to never read the resource before it
 is ready.
 
 This is the pattern. The dataset upload is the reference implementation
-(`modules/dataset/browser/src/screens/datasets/dataset-editor.screen.tsx`);
+(`modules/dataset/browser/src/ui/sections/dataset-editor.screen.tsx`);
 reuse it for the next
 processing-then-ready resource instead of reinventing the poll/banner/gate.
 
@@ -30,7 +30,7 @@ const datasetQuery = api.dataset.getById.useQuery(
 );
 ```
 
-Reference: `modules/dataset/browser/src/screens/datasets/dataset-editor.screen.tsx`
+Reference: `modules/dataset/browser/src/ui/sections/dataset-editor.screen.tsx`
 (the `getById` poll). The
 functional-`refetchInterval` idiom mirrors
 `src/features/traces-v2/hooks/useTraceFacets.ts`, where the same form drives a
@@ -123,7 +123,7 @@ User-facing copy describes what the customer gets, never how the work is done
 ## Reference implementation
 
 - Poll + banner + retry + read-gate:
-  `modules/dataset/browser/src/screens/datasets/dataset-editor.screen.tsx`
+  `modules/dataset/browser/src/ui/sections/dataset-editor.screen.tsx`
 - Functional `refetchInterval` idiom: `src/features/traces-v2/hooks/useTraceFacets.ts`
 - `Alert` banner primitive: `src/components/experiments/DSPyExperiment.tsx`
 - Gated dependent read: `src/components/datasets/editor/DatasetEditorTable.tsx`, and its

@@ -1,9 +1,9 @@
+import { useLangyStore } from "@langwatch/langy-browser-kit";
 import type { LangyEventCursor, LangyMessageDto } from "@langwatch/langy-contract";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 import { api } from "../../../../behavior/langy-api.ts";
-import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 
 export interface LangyMessagesResult {

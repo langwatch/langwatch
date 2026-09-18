@@ -2,10 +2,8 @@ import { createHash } from "node:crypto";
 
 import type { GithubRepository } from "@langwatch/github-contract";
 
-import {
-  HttpGithubApiAdapter,
-  GithubInstallationNotFoundError,
-} from "../channels/http/http.github-api.channel.ts";
+import { githubApiChannels } from "../channels/github-api-channels.registry.ts";
+import { GithubInstallationNotFoundError } from "../channels/http/http.github-api.channel.ts";
 import type { GithubTokenCacheRepository } from "../repositories/github-token-cache.repository.ts";
 import type { GithubRedis } from "../repositories/redis/github-redis.connection.ts";
 import { GithubTokenCacheRedisRepository } from "../repositories/redis/redis.github-token-cache.repository.ts";
@@ -34,7 +32,7 @@ export class RedisGithubAppTokenCache implements GithubAppTokenCache {
     redis: GithubRedis | null,
     host: GithubHost = GithubHostService.create(),
   ): RedisGithubAppTokenCache {
-    const api = HttpGithubApiAdapter.create(appId, privateKey, host);
+    const api = githubApiChannels.live.create(appId, privateKey, host);
     const cache = GithubTokenCacheRedisRepository.create({ redis, host });
     return new RedisGithubAppTokenCache(api, cache);
   }

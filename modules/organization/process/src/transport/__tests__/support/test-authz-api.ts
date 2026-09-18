@@ -19,6 +19,12 @@ const unsupported = <Method>(name: string): Method =>
   (() =>
     Promise.reject(new Error(`AuthzApi.${name} is not reached by the teams family`))) as Method;
 
+/** The synchronous refusal: a rejected promise would go unobserved here. */
+const unreachable = <Method>(name: string): Method =>
+  (() => {
+    throw new Error(`AuthzApi.${name} is not reached by the teams family`);
+  }) as Method;
+
 /** One person as the authorization boundary reports them beside a binding. */
 export type TestAuthzPerson = Readonly<{
   id: string;
@@ -171,6 +177,8 @@ export class TestAuthzApi implements AuthzApi {
     };
   }
 
+  isDemoProject = unreachable<AuthzApi["isDemoProject"]>("isDemoProject");
+  demoProject = unreachable<AuthzApi["demoProject"]>("demoProject");
   effectivePermissionsFor =
     unsupported<AuthzApi["effectivePermissionsFor"]>("effectivePermissionsFor");
   check = unsupported<AuthzApi["check"]>("check");

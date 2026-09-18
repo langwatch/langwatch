@@ -3,7 +3,7 @@
  */
 
 import { Box, Button, Center, EmptyState, HStack, Separator, Text, VStack } from "@chakra-ui/react";
-import type { Period } from "@langwatch/analytics-browser-kit/period-selector";
+import type { Period } from "@langwatch/analytics-browser-kit";
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
 import { getSuiteSetId, parseSuiteTargets } from "@langwatch/suite-contract";
 import { SetupWithAgentButton } from "@langwatch/trace-browser/surfaces/setup-with-agent-button";

@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { VariablesSection } from "@langwatch/prompt-browser-kit/variables";
+import { VariablesSection } from "@langwatch/prompt-browser-kit";
 import type { Entry } from "@langwatch/workflow-contract";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

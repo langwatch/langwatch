@@ -4,14 +4,17 @@
  * @see specs/features/suites/grid-view-and-borderless-tables.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { GroupRow, RunRow } from "@langwatch/suite-browser/run-cards";
 import {
-  RunHistoryFilters,
+  GroupRow,
+  makeBatchRun,
+  makeScenarioRunData,
+  makeSummary,
   type RunGroup,
   type RunGroupSummary,
+  RunHistoryFilters,
   type RunHistoryFilterValues,
-} from "@langwatch/suite-browser/run-formatters";
-import { makeBatchRun, makeScenarioRunData, makeSummary } from "@langwatch/suite-browser/testing";
+  RunRow,
+} from "@langwatch/suite-browser-kit";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";

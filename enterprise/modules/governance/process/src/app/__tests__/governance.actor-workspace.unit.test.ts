@@ -9,7 +9,7 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi, PersonalWorkspace } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import type { GovernanceMemberDatabase } from "../../governance.server.ts";

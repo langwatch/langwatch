@@ -20,6 +20,7 @@ import {
   licensingConfig,
 } from "@langwatch/enterprise-licensing-contract";
 import type { ResolvePlanInput } from "@langwatch/entitlement-contract";
+import { PrismaUsageMembershipRepository } from "@langwatch/entitlement-process";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { getPlanTemplate, quotedPlanLimitsOf } from "@langwatch/plans";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
@@ -36,6 +37,17 @@ import type {
   LicenseStorage,
   LicenseUsage,
 } from "./licensing.members.ts";
+
+/** Seat counts entitlement already keeps: a peer's own read, not a licence mutation. */
+function seatCountsOverPrisma(
+  database: Parameters<typeof PrismaUsageMembershipRepository.create>[0],
+): Pick<LicensingInfrastructure["repository"], "getMemberCount" | "getMembersLiteCount"> {
+  const memberships = PrismaUsageMembershipRepository.create(database);
+  return {
+    getMemberCount: (organizationId) => memberships.getMemberCount(organizationId),
+    getMembersLiteCount: (organizationId) => memberships.getMembersLiteCount(organizationId),
+  };
+}
 
 /** What the process composes this feature's application from. */
 export type LicensingInfrastructure = Readonly<{
@@ -120,15 +132,17 @@ export class LicensingApp implements LicensingApiContract {
 
   static create({ members, config }: LicensingSetup): LicensingApp {
     const cryptography = NodeLicenseCryptographyAdapter.create({ publicKey: config.publicKey });
-    // Derived from the closed prisma member: the licence read is live, the
-    // mutation and enforcement ports refuse by name until a process composes
-    // them, and the auth questions answer "not configured" the same way.
+    // Derived from the closed prisma member: the licence read is live, the seat
+    // counts are entitlement's own membership classification (peer, not owned
+    // here), and the mutation/enforcement ports refuse by name until a process
+    // composes them.
     const infrastructure =
       members.infrastructure !== undefined
         ? members.infrastructure
         : createUnavailableLicensingInfrastructure({
             database: members.prisma,
             processName: "this process",
+            ...seatCountsOverPrisma(members.prisma),
           });
     const { repository, usage, retention, logger, ...runtime } = infrastructure;
     const service = LicenseService.create({

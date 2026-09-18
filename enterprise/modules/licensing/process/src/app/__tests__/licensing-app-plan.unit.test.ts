@@ -1,6 +1,6 @@
 import { ResourceScope } from "@langwatch/kernel";
 import { ScopedSecrets } from "@langwatch/secrets";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { ENTERPRISE_LICENSE_KEY, TAMPERED_LICENSE_KEY, TEST_PUBLIC_KEY } from "../../testing.ts";

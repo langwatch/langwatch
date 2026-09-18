@@ -6,7 +6,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
-import { SCENARIO_RUN_STATUS_CONFIG } from "@langwatch/suite-browser/run-formatters";
+import { SCENARIO_RUN_STATUS_CONFIG } from "@langwatch/suite-browser-kit";
 import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";

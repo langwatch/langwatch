@@ -16,5 +16,9 @@
   },
   "include": ["src/**/*.ts"],
   "exclude": ["src/**/__tests__/**"],
-  "references": []
+  "references": [
+    {
+      "path": "../handled-error/tsconfig.build.json"
+    }
+  ]
 }

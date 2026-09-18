@@ -83,9 +83,6 @@
       "path": "../../onboarding/browser/tsconfig.build.json"
     },
     {
-      "path": "../../ops/browser/tsconfig.build.json"
-    },
-    {
       "path": "../../presence/browser/tsconfig.build.json"
     },
     {
@@ -125,7 +122,7 @@
       "path": "../../workflow/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/test-harness/tsconfig.build.json"
+      "path": "../../../packages/vitest-config/tsconfig.build.json"
     }
   ]
 }

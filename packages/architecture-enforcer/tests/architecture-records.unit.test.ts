@@ -1,7 +1,9 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { afterEach, describe, expect, it } from "vitest";
+
 import { lintArchitectureRecords } from "../src/policies/boundaries/architecture-records.ts";
 import type { ClassifiedPackage } from "../src/types.ts";
 import { snapshotOf } from "./workspace.ts";
@@ -27,14 +29,14 @@ function write(path: string, contents: string): void {
   writeFileSync(file, contents);
 }
 
-/** The feature server package whose sibling `adrs`/`specs` the policy scans. */
+/** The feature process package whose sibling `adrs`/`specs` the policy scans. */
 function serverPackage(): ClassifiedPackage {
   return {
-    name: "example-server",
+    name: "example-process",
     root: join(root, "modules/example/process"),
     manifestPath: join(root, "modules/example/process/package.json"),
     manifest: {},
-    kind: "server",
+    kind: "process",
     feature: "example",
     enterprise: false,
   };

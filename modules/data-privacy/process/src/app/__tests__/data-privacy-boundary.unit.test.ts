@@ -9,7 +9,7 @@ import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { dataPrivacyServer } from "../../data-privacy.server.ts";

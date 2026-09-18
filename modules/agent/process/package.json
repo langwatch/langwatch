@@ -49,7 +49,7 @@
   },
   "devDependencies": {
     "@langwatch/actor": "workspace:*",
-    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/api-fixture": "workspace:*",
     "@trpc/server": "catalog:",
     "@types/ws": "catalog:",
     "hono": "catalog:",

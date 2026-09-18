@@ -34,6 +34,7 @@
     "papaparse": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",
     "@types/papaparse": "catalog:",
     "typescript": "catalog:",

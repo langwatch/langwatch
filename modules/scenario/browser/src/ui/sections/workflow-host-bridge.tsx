@@ -12,7 +12,7 @@ import {
   type WorkflowRouteReading,
   type WorkflowScope,
   type WorkflowSuccessNotice,
-} from "@langwatch/workflow-browser/surfaces/workflow-host";
+} from "@langwatch/workflow-browser-kit";
 import { useMemo, type ReactNode } from "react";
 
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";

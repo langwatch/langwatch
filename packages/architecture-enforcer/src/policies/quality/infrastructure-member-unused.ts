@@ -1,6 +1,8 @@
 import { existsSync } from "node:fs";
 import { basename, join, relative, sep } from "node:path";
+
 import ts from "typescript";
+
 import {
   type BaselineEntry,
   type BaselinePolicy,
@@ -11,10 +13,10 @@ import {
   readBaseline,
   staleRows,
 } from "../../baseline.ts";
+import type { ArchitectureViolation } from "../../types.ts";
 import { listFiles } from "../../workspace/layout.ts";
 import { sourceFile } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
-import type { ArchitectureViolation } from "../../types.ts";
 
 /**
  * A member of the `<Feature>Infrastructure` interface beside a module's App
@@ -71,15 +73,18 @@ function isTestModule(path: string): boolean {
   return path.split(sep).some((segment) => SKIPPED_DIRECTORIES.has(segment));
 }
 
-/** Every module server package's source directory, core and enterprise. */
+/** Every module process package's source directory, core and enterprise. */
 export function moduleServerRoots(root: string): string[] {
   const manifests = MODULE_GROUPS.flatMap((group) =>
-    listFiles({ directory: join(root, group), accept: (path) => basename(path) === "package.json" }),
+    listFiles({
+      directory: join(root, group),
+      accept: (path) => basename(path) === "package.json",
+    }),
   );
 
   const roots = manifests.filter((file) => {
     const parts = relative(root, file).split(sep);
-    const server = parts.indexOf("server");
+    const server = parts.indexOf("process");
 
     return server > 0 && parts.length === server + 2;
   });

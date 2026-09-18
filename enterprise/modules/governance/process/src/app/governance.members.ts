@@ -45,44 +45,6 @@ import type {
   TraceProcessingEvent,
 } from "@langwatch/trace-contract";
 import type { z } from "zod";
-export interface GovernanceInfrastructure {
-  activityMonitorRepository: ActivityMonitorRepository;
-  adminWorkspaceViewOcsf: AdminWorkspaceViewOcsfChannel;
-  anomalyAlertHttp: AnomalyAlertHttpClient;
-  anomalySpendReader: AnomalySpendReader;
-  cliAdminContact: CliAdminContactReader;
-  cliBudgetOverview: CliBudgetOverviewReader;
-  cliTokenStore: CliTokenStore;
-  gatewayDebit: GatewayBudgetLedger;
-  governanceClickHouseClient: GovernanceClickHouseClient;
-  governanceClickHouseResolver: GovernanceClickHouseResolver;
-  governanceEncryption: GovernanceEncryptor;
-  governanceEventing: GovernanceEventingChannel;
-  governanceHttp: GovernanceHttpClient;
-  governanceKpiContribution: GovernanceKpiContributionWriter;
-  governanceObjectStorage: GovernanceObjectStore;
-  governanceOcsfEvent: GovernanceOcsfEventWriter;
-  governanceOcsfEventsReader: GovernanceOcsfEventsReader;
-  governanceProject: GovernanceProjectDirectory;
-  governanceSetupActivity: GovernanceSetupActivityReader;
-  governanceSignal: GovernanceSignalChannel;
-  governanceSubscriberDiagnostics: GovernanceSubscriberDiagnosticsSink;
-  governanceWebhook: GovernanceWebhookChannel;
-  ingestionKeyCapability: IngestionKeyCapability;
-  ingestionKeyIssuer: IngestionKeyIssuer;
-  ingestionKeyRepository: IngestionKeyRepository;
-  personalUsageReader: PersonalUsageReader;
-  personalVirtualKeyIssuer: PersonalVirtualKeyIssuer;
-  pulledUsageLedger: PulledUsageLedgerRepository;
-  pulledUsageRate: PulledUsageRateReader;
-  quarantineTenant: QuarantineTenantResolver;
-  quarantineTraceActivity: QuarantineTraceActivityReader;
-  traceAlertMetrics: TraceAlertMetricsSink;
-  traceAlertOriginGuard: TraceAlertOriginGuard;
-  traceAlertTrigger: TraceAlertTriggerReader;
-  traceAlertTriggerMatch: TraceAlertTriggerMatchChannel;
-}
-
 export type AnomalyAlertHttpResponse = {
   status: number;
   ok: boolean;

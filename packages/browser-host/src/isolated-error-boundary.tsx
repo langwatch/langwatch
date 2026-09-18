@@ -1,5 +1,5 @@
 import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { explainAnyError } from "@langwatch/handled-error/presentation";
+import { explainAnyError } from "@langwatch/error-presentation/presentation";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import type * as React from "react";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";

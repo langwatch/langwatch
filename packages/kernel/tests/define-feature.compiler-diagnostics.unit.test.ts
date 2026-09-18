@@ -1,8 +1,9 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -11,6 +12,8 @@ const application = resolve(root, "src/application.ts");
 const contract = resolve(root, "src/module-api-token.ts");
 const repositoryRegistry = resolve(root, "src/repository-registry.ts");
 const memberSource = resolve(root, "tests/member-source.ts");
+const configPackage = resolve(root, "../config/src/config.ts");
+const zodPackage = resolve(root, "node_modules/zod");
 const tsc = resolve(root, "node_modules/.bin/tsc");
 type Diagnostic = { line: number; code: string; text: string };
 
@@ -25,7 +28,9 @@ function diagnosticsFor(source: string): Diagnostic[] {
       .replaceAll("__APPLICATION__", application)
       .replaceAll("__CONTRACT__", contract)
       .replaceAll("__REPOSITORY_REGISTRY__", repositoryRegistry)
-      .replaceAll("__MEMBERS__", memberSource),
+      .replaceAll("__MEMBERS__", memberSource)
+      .replaceAll("__CONFIG__", configPackage)
+      .replaceAll("__ZOD__", zodPackage),
   );
   writeFileSync(
     config,
@@ -184,12 +189,14 @@ describe("defineServerModule compiler diagnostics", () => {
     `,
     ],
     [
-      "rejects a schema that disagrees with the factory config",
+      "rejects a declared slice that disagrees with the factory config",
       "TS2769",
       `
       import { defineServerModule, type FeatureSetup } from "__INSTALLER__";
+      import { Config } from "__CONFIG__";
+      import { z } from "__ZOD__";
       abstract class Contract { abstract readonly value: string; }
-      class App extends Contract { static readonly contract = Contract; static readonly dependencies = {}; static readonly configSchema = { parse: (value: unknown): { other: number } => ({ other: 1 }) }; readonly value = "ok"; static create(setup: FeatureSetup<{}, undefined, { required: string }>): App { return new App(); } }
+      class App extends Contract { static readonly contract = Contract; static readonly dependencies = {}; static readonly config = Config.define((c) => ({ other: c.env("OTHER", z.coerce.number()) })); readonly value = "ok"; static create(setup: FeatureSetup<{}, undefined, { required: string }>): App { return new App(); } }
       defineServerModule("annotation").withApp(App).build(); // EXPECT
     `,
     ],
@@ -266,11 +273,13 @@ describe("defineServerModule compiler diagnostics", () => {
   });
 
   const configuredModule = `
+      import { Config } from "__CONFIG__";
+      import { z } from "__ZOD__";
       abstract class Contract { abstract readonly value: string; }
       class App extends Contract {
         static readonly contract = Contract;
         static readonly dependencies = {};
-        static readonly configSchema = { parse: (value: unknown): { suffix: string } => value as { suffix: string } };
+        static readonly config = Config.define((c) => ({ suffix: c.env("SUFFIX", z.string()) }));
         readonly value = "ok";
         static create(setup: FeatureSetup<{}, {}, { suffix: string }>): App { return new App(); }
       }

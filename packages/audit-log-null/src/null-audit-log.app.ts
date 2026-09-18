@@ -8,7 +8,6 @@ import {
 export class NullAuditLog implements AuditLogApiContract {
   static readonly contract = AuditLogApi;
   static readonly dependencies = {};
-  static readonly configSchema = void 0;
 
   private constructor() {}
 

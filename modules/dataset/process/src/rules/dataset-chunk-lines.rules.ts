@@ -124,7 +124,7 @@ export const isChunkLine = (line: unknown): line is ChunkLine =>
 /** Read the persisted `chunkOffsets` JSON back as a typed array (defensive
  * against a null/legacy value — defaults to empty). */
 export const readOffsets = (dataset: Pick<DatasetMutationRecord, "chunkOffsets">): ChunkOffset[] =>
-  Array.isArray(dataset.chunkOffsets) ? (dataset.chunkOffsets as unknown as ChunkOffset[]) : [];
+  Array.isArray(dataset.chunkOffsets) ? dataset.chunkOffsets : [];
 
 /** Gate a mutation on `status='ready'` (Decision 6). Throws otherwise so a
  * still-preparing or failed dataset is never mutated under the lock. */

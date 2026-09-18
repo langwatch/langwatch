@@ -15,6 +15,7 @@
     "pngjs": "^7.0.0"
   },
   "devDependencies": {
+    "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",
     "@types/pngjs": "^6.0.5",
     "tsx": "catalog:",

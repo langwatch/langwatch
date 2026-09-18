@@ -1,5 +1,5 @@
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @see specs/langy/langy-api-key-turns.feature
  */

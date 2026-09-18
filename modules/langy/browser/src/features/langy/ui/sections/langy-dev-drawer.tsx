@@ -1,17 +1,17 @@
 import { Box, chakra, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { IsolatedErrorBoundary } from "@langwatch/browser-host/isolated-error-boundary";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import {
+  useLangyStore,
+  useReducedMotion,
+  INSPECTOR_TUCK,
+  INSPECTOR_WIDTH,
+  resolveInspectorFrame,
+} from "@langwatch/langy-browser-kit";
 import { Eraser, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { useLangyStore } from "../../../../behavior/langy.store.ts";
-import { useReducedMotion } from "../../../../behavior/use-reduced-motion.ts";
-import {
-  INSPECTOR_TUCK,
-  INSPECTOR_WIDTH,
-  resolveInspectorFrame,
-} from "../../../../model/langy-panel-layout.ts";
 /**
  * Developer mode's inspector — a drawer that slides out of the LEFT edge of the Langy
  * panel.

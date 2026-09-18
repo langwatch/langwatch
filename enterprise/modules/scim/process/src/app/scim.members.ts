@@ -1,7 +1,3 @@
-export interface SCIMInfrastructure {
-  scimSyncLifecycle: ScimSyncLifecycle;
-}
-
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 export type ScimUserPushOperation = "create" | "update" | "deactivate";

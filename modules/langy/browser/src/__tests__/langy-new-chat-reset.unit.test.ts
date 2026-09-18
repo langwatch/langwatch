@@ -1,6 +1,5 @@
+import { useLangyStore } from "@langwatch/langy-browser-kit";
 import { beforeEach, describe, expect, it } from "vitest";
-
-import { useLangyStore } from "../behavior/langy.store.ts";
 
 /**
  * "New chat" must actually START a new chat.

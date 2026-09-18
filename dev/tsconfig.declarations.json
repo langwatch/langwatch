@@ -26,12 +26,6 @@
       "path": "../packages/egress/tsconfig.build.json"
     },
     {
-      "path": "../enterprise/packages/composition/api/tsconfig.build.json"
-    },
-    {
-      "path": "../enterprise/packages/composition/worker/tsconfig.build.json"
-    },
-    {
       "path": "../packages/audit-log-null/tsconfig.build.json"
     },
     {
@@ -102,9 +96,6 @@
     },
     {
       "path": "../modules/webhook/process/tsconfig.build.json"
-    },
-    {
-      "path": "../enterprise/tsconfig.build.json"
     },
     {
       "path": "../packages/eventing/tsconfig.build.json"

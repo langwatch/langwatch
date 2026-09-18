@@ -3,41 +3,34 @@
  */
 
 import { Box, Button, EmptyState, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
-import type { Period } from "@langwatch/analytics-browser-kit/period-selector";
+import type { Period } from "@langwatch/analytics-browser-kit";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { toaster } from "@langwatch/design-system/toaster";
-import {
-  LangyContextTarget,
-  scenarioContextChip,
-} from "@langwatch/langy-browser/surfaces/langy-context";
+import { LangyContextTarget, scenarioContextChip } from "@langwatch/langy-browser-kit";
 import { isOnPlatformSet, ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import {
-  GroupRow,
-  RunHistorySkeleton,
-  RunRow,
-  RunSummaryCounts,
-  type ScenarioRunContextRenderer,
-} from "@langwatch/suite-browser/run-cards";
-import { ScenarioRunExportDialog } from "@langwatch/suite-browser/run-dialogs";
-import {
-  RunHistoryFilters,
-  type RunHistoryFilterValues,
   computeBatchRunSummary,
   computeGroupSummary,
   computeRunHistoryTotals,
+  GroupRow,
   groupRunsByBatchId,
   groupRunsByScenarioId,
   groupRunsByTarget,
   resolveOriginLabel,
-} from "@langwatch/suite-browser/run-formatters";
-import {
+  RunHistoryFilters,
+  type RunHistoryFilterValues,
+  RunHistorySkeleton,
+  RunRow,
+  RunSummaryCounts,
+  ScenarioRunExportDialog,
+  type ScenarioRunContextRenderer,
   useAutoExpansion,
   useRunHistoryStore,
   useScrollToBatch,
-} from "@langwatch/suite-browser/run-history-store";
+} from "@langwatch/suite-browser-kit";
 import { isSuiteSetId } from "@langwatch/suite-contract";
 import { SetupWithAgentButton } from "@langwatch/trace-browser/surfaces/setup-with-agent-button";
 import { FlaskConical, RefreshCw } from "lucide-react";

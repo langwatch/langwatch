@@ -1,7 +1,7 @@
 import { HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { WorkflowIcon } from "@langwatch/workflow-browser-kit/workflow-icons";
+import { WorkflowIcon } from "@langwatch/workflow-browser-kit";
 import { ArrowUp, Copy, MoreVertical, RefreshCw, Trash2 } from "react-feather";
 
 type WorkflowCardBaseProps = React.ComponentProps<typeof VStack>;

@@ -4,11 +4,11 @@
  * @see specs/features/agent-testing/cases-table.feature
  */
 
-import type { Period } from "@langwatch/analytics-browser-kit/period-selector";
+import type { Period } from "@langwatch/analytics-browser-kit";
 import {
   computeBatchRunSummary,
   groupRunsByBatchId,
-} from "@langwatch/suite-browser/run-formatters";
+} from "@langwatch/suite-browser-kit";
 import { useMemo } from "react";
 
 import { api } from "../../../../behavior/scenario-api.ts";

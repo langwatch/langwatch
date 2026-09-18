@@ -4,7 +4,7 @@
  * Spec: specs/langy/langy-inline-model-setup.feature
  */
 import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
-import { modelProviderIcons } from "@langwatch/model-provider-browser-kit/provider-icons";
+import { modelProviderIcons } from "@langwatch/model-provider-browser-kit";
 import { EditModelProviderForm } from "@langwatch/model-provider-browser/edit-model-provider-form";
 import { useCallback, useRef, useState } from "react";
 

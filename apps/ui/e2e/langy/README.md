@@ -86,14 +86,14 @@ npx vitest run langy-dogfood.scenario.test.ts --reporter=verbose
 production behaviour rather than from named user flows. Each scenario maps 1:1
 to a filed defect and is expected to FAIL until that defect is fixed:
 
-| Scenario | Defect it guards | Issue |
-|---|---|---|
-| never ends a turn with nothing rendered | 27 of 260 completed turns render no text at all | `langwatch-saas#1097` |
-| answers from the project, not from memory | 40% of completed turns make zero tool calls; 58% answer under 120 chars | `langwatch-saas#1098` |
-| owns the tools it actually has | `AGENTS.md:149` calls the working `langwatch.*` tools hallucinations | `langwatch-saas#1099` |
-| stays a platform assistant | a stock coding-agent persona bleeding through (`read` 144, `edit` 68 calls) | `langwatch-saas#1100` |
-| creates the monitor, not just the evaluator | `langwatch.monitor.create` errors on 48% of calls | `langwatch-saas#1101` |
-| answers a single lookup inside the budget | p90 380s, p99 1,868s | `langwatch-saas#1102` |
+| Scenario                                    | Defect it guards                                                            | Issue                 |
+| ------------------------------------------- | --------------------------------------------------------------------------- | --------------------- |
+| never ends a turn with nothing rendered     | 27 of 260 completed turns render no text at all                             | `langwatch-saas#1097` |
+| answers from the project, not from memory   | 40% of completed turns make zero tool calls; 58% answer under 120 chars     | `langwatch-saas#1098` |
+| owns the tools it actually has              | `AGENTS.md:149` calls the working `langwatch.*` tools hallucinations        | `langwatch-saas#1099` |
+| stays a platform assistant                  | a stock coding-agent persona bleeding through (`read` 144, `edit` 68 calls) | `langwatch-saas#1100` |
+| creates the monitor, not just the evaluator | `langwatch.monitor.create` errors on 48% of calls                           | `langwatch-saas#1101` |
+| answers a single lookup inside the budget   | p90 380s, p99 1,868s                                                        | `langwatch-saas#1102` |
 
 Every one of the six asserts structurally as well as through the judge
 (empty-string length, a digit in a "how much" answer, a `hallucinat` / "no
@@ -156,14 +156,14 @@ the REAL command line, `langwatch langy --share-control`, in a tmux session
 against a demo application copied into a temporary git repository, and answer
 the permission and question cards through tRPC as the user would.
 
-| File | What it covers |
-|---|---|
-| `langy-code-access.scenario.test.ts` | the ask, the card, the folder shared, the branch and commit that follow |
-| `langy-code-access-github.scenario.test.ts` | GitHub with remember, no card in the next conversation, and the choice cleared |
-| `langy-code-access-platform-only.scenario.test.ts` | platform work never asks: no `code_access` call and no control request |
-| `langy-local-connected-agent.scenario.test.ts` | a run parameter added to a connected agent, restarted through the folder |
-| `langy-local-permissions.scenario.test.ts` | the folder boundary, a denial that is not retried, a pattern granted once |
-| `langy-local-disconnect.scenario.test.ts` | Ctrl-C mid-task, and the next code ask that asks again |
+| File                                               | What it covers                                                                 |
+| -------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `langy-code-access.scenario.test.ts`               | the ask, the card, the folder shared, the branch and commit that follow        |
+| `langy-code-access-github.scenario.test.ts`        | GitHub with remember, no card in the next conversation, and the choice cleared |
+| `langy-code-access-platform-only.scenario.test.ts` | platform work never asks: no `code_access` call and no control request         |
+| `langy-local-connected-agent.scenario.test.ts`     | a run parameter added to a connected agent, restarted through the folder       |
+| `langy-local-permissions.scenario.test.ts`         | the folder boundary, a denial that is not retried, a pattern granted once      |
+| `langy-local-disconnect.scenario.test.ts`          | Ctrl-C mid-task, and the next code ask that asks again                         |
 
 `local-control-fixture.ts` is what they share:
 

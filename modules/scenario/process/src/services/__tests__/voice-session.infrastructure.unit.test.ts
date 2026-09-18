@@ -1,9 +1,13 @@
+import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 /**
  * Infrastructure composition for "Talk to it" route over in-memory fakes.
  * Verifies infrastructure translates service results to promised shapes.
  * @see specs/features/agents/voice-agents-v1.feature
  */
-import { ScenarioRunStatus } from "@langwatch/scenario-contract";
+import type {
+  VoiceTransport,
+  VoiceTransportRunner,
+} from "@langwatch/scenario-contract/voice-runtime";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -48,6 +52,7 @@ function createVoiceSessionInfrastructureFromServices(
     recordCallTraces: vi.fn(async () => ({ turnTraceIds: [] })),
     writeCallRun: vi.fn(async () => {}),
     signSessionToken: vi.fn(() => "signed-token"),
+    registry: fakeRegistry(),
     ...over,
   });
 }
@@ -73,6 +78,26 @@ function fakeScenarioService(over: {
 }) {
   return {
     getById: over.getById ?? vi.fn(async () => null),
+  };
+}
+
+function fakeRegistry(): Record<VoiceTransport, VoiceTransportRunner> {
+  return {
+    elevenlabs_convai: {
+      missingKeyMessage: "No ElevenLabs key in this project",
+      createAgentAdapter: vi.fn(),
+      mintSession: vi.fn(),
+      fetchCallRecord: vi.fn(),
+      endCall: vi.fn(),
+    },
+    phone: {
+      missingKeyMessage: "No Twilio credentials in this project",
+      createAgentAdapter: vi.fn(),
+      mintSession: vi.fn(),
+      fetchCallRecord: vi.fn(),
+      endCall: vi.fn(),
+      assertAvailable: vi.fn(),
+    },
   };
 }
 

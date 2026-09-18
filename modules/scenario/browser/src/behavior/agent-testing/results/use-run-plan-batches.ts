@@ -4,13 +4,13 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import type { Period } from "@langwatch/analytics-browser-kit/period-selector";
+import type { Period } from "@langwatch/analytics-browser-kit";
 import {
   type BatchRun,
   computeBatchRunSummary,
   computeIterationMap,
   groupRunsByBatchId,
-} from "@langwatch/suite-browser/run-formatters";
+} from "@langwatch/suite-browser-kit";
 import { useMemo } from "react";
 
 import { api } from "../../scenario-api.ts";

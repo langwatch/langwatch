@@ -14,7 +14,7 @@ import {
   ProviderScopeChips,
   ScopeChipPicker,
   type ScopeTriadEntry,
-} from "@langwatch/authz-browser-kit/scope-picker";
+} from "@langwatch/authz-browser-kit";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";

@@ -1,9 +1,11 @@
 import { existsSync } from "node:fs";
 import { basename, join, relative, sep } from "node:path";
+
 import ts from "typescript";
+
+import type { ArchitectureViolation, ClassifiedPackage, FeatureCatalogueEntry } from "../types.ts";
 import { sourceFile, sourceText, type WorkspaceModuleResolver } from "../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
-import type { ArchitectureViolation, ClassifiedPackage, FeatureCatalogueEntry } from "../types.ts";
 
 /**
  * Three files folded into one concept: the contract vocabulary a feature API
@@ -1236,8 +1238,7 @@ function collectInstallerImport(
 ): void {
   const moduleName = statement.moduleSpecifier;
 
-  if (!ts.isStringLiteral(moduleName) || moduleName.text !== "@langwatch/kernel")
-    return;
+  if (!ts.isStringLiteral(moduleName) || moduleName.text !== "@langwatch/kernel") return;
 
   const bindings = statement.importClause?.namedBindings;
   if (!bindings) return;
@@ -1591,7 +1592,7 @@ function lintFeatureOwner(
     (pkg) => pkg.feature === owner.id && pkg.enterprise === isEnterprise,
   );
 
-  const server = surfaces.find((pkg) => pkg.kind === "server");
+  const server = surfaces.find((pkg) => pkg.kind === "process");
   if (!server) return [];
 
   const contract = surfaces.find((pkg) => pkg.kind === "contract");
@@ -1610,7 +1611,7 @@ function lintFeatureOwner(
   violations.push(...contractViolations(snapshot, contractRoot, owner.id, resolver));
 
   for (const surface of surfaces) {
-    if (surface.kind === "server" || surface.kind === "web")
+    if (surface.kind === "process" || surface.kind === "browser")
       violations.push(
         ...concreteAppViolations(
           snapshot,
@@ -2359,7 +2360,7 @@ export function lintFeatureSetupInfrastructure(
   const { packages, resolver } = snapshot;
 
   return packages
-    .filter((pkg) => pkg.kind === "server")
+    .filter((pkg) => pkg.kind === "process")
     .flatMap((pkg) => {
       const appRoot = join(pkg.root, "src", "app");
       if (!existsSync(appRoot)) return [];

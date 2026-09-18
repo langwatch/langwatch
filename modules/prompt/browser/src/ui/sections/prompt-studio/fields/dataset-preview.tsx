@@ -1,5 +1,5 @@
 import { Box, Center, HStack, Text } from "@chakra-ui/react";
-import { DatasetPreviewTable } from "@langwatch/dataset-browser/dataset-preview-table";
+import { DatasetPreviewTable } from "@langwatch/dataset-browser-kit";
 import type { DatasetColumns, DatasetRecordInput } from "@langwatch/dataset-contract";
 import { Pencil } from "lucide-react";
 import type { ComponentProps } from "react";

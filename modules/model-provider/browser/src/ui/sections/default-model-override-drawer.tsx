@@ -5,10 +5,11 @@ import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
  * keeps the outgoing model stale until remounted.
  */
 import type { WireOf } from "@langwatch/api/web";
-import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/authz-browser-kit/scope-picker";
+import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/authz-browser-kit";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { INHERIT_SENTINEL, ProviderModelSelector } from "@langwatch/model-provider-browser-kit";
 import {
   buildCustomModelDisplayNames,
   isModelAllowedAsRoleDefault,
@@ -23,7 +24,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
 import { useModelProviderHost } from "../../model/model-provider-host.ts";
 import { modelSelectorOptions } from "../elements/model-selector.tsx";
-import { INHERIT_SENTINEL, ProviderModelSelector } from "../elements/provider-model-selector.tsx";
 
 /** The snapshot as the browser holds one: its instants are ISO strings. */
 type Payload = WireOf<ModelDefaultSnapshot>;

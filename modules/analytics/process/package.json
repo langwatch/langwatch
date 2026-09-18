@@ -64,6 +64,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/api-fixture": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@testcontainers/clickhouse": "catalog:",
     "@testcontainers/postgresql": "^12.1.0",

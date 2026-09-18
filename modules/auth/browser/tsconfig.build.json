@@ -58,9 +58,6 @@
     },
     {
       "path": "../../../packages/ui-kernel/tsconfig.build.json"
-    },
-    {
-      "path": "../../user/browser/tsconfig.build.json"
     }
   ]
 }

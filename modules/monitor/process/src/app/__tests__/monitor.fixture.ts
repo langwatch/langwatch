@@ -10,7 +10,7 @@ import type {
   OnlineEvaluationPerformance,
 } from "@langwatch/evaluation-contract";
 import { EvaluatorNotFoundError, type EvaluatorApi } from "@langwatch/evaluator-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 
 import { MemoryMonitorRepository } from "../../repositories/memory/memory.monitor.repository.ts";
 import type { MonitorRepositories } from "../../repositories/monitor.repositories.ts";

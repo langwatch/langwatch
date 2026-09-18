@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { cleanupTestRows } from "@langwatch/test-harness";
+import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 /**
  * Real-Postgres coverage for multi-instance provider rows: a second row at a different scope
  * instead of a silent overwrite, the atomic multi-scope write gate, cross-tenant read refusal,

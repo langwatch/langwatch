@@ -18,6 +18,7 @@ import { Select } from "@langwatch/design-system/select";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
+import { TechStackSelector } from "@langwatch/onboarding-browser/surfaces/tech-stack";
 import {
   DepartmentPicker,
   useDepartmentColumn,
@@ -40,7 +41,7 @@ import {
   type ProjectHostOrganization,
   type ProjectHostProject,
 } from "../../../model/project-host.ts";
-import { ProjectTechStackIcon, TechStackSelector } from "../../../ui/blocks/tech-stack.tsx";
+import { ProjectTechStackIcon } from "../../../ui/blocks/tech-stack.tsx";
 import { HorizontalFormControl } from "../../../ui/elements/horizontal-form-control.tsx";
 
 type OrganizationFormData = {

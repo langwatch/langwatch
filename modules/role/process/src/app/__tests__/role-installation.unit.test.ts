@@ -3,7 +3,7 @@ import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { RoleApi } from "@langwatch/role-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 

@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { ScopeTriadEntry } from "@langwatch/authz-browser-kit/scope-picker";
+import type { ScopeTriadEntry } from "@langwatch/authz-browser-kit";
 import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 

@@ -15,7 +15,7 @@ import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { createTestLogger } from "@langwatch/test-harness";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 

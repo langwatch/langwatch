@@ -4,9 +4,6 @@
     "types": ["node"],
     "rootDir": "src",
     "noEmit": true,
-    // `./views` is the one entry here that renders: the presentation
-    // registry's own views, for the browser that shows a handled error.
-    "jsx": "react-jsx",
     // `dom` for the `URL` parser the docs-origin allowlist in
     // `read-handled-error` is built on, and `es2022` for `Object.hasOwn`, which
     // is how the presentation registry looks a code up without inheriting from
@@ -28,9 +25,6 @@
   "references": [
     {
       "path": "tsconfig.build.json"
-    },
-    {
-      "path": "../config/tsconfig.build.json"
     }
   ]
 }

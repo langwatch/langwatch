@@ -311,19 +311,21 @@ jobs:
 
       - uses: ./.github/actions/prepare-generated-files
 
-      # Each package writes its own .tsbuildinfo to
-      # node_modules/.cache/tsbuildinfo/<pkg>.tsbuildinfo, per the repo rule
-      # that every package tsconfig sets `incremental` and a per-package path.
-      # Without the per-package path they would clobber each other's cache and
-      # this job would be cold every time.
+      # Each package writes its own .tsbuildinfo beside its output, to
+      # dist/tsconfig.<stem>.tsbuildinfo, per the repo rule that every package
+      # tsconfig sets `incremental` and its own tsBuildInfoFile -- never under
+      # node_modules. The whole dist/ is the cached unit, not the stamp alone:
+      # tsc -b rebuilds a project whose declaration outputs are absent, so
+      # caching the stamp without them still runs cold. Same unit nx.json
+      # declares as typecheck's outputs.
       - name: Cache TypeScript incremental build info
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
-            packages/**/node_modules/.cache/tsbuildinfo
-            modules/**/node_modules/.cache/tsbuildinfo
-            enterprise/**/node_modules/.cache/tsbuildinfo
-            apps/*/node_modules/.cache/tsbuildinfo
+            packages/**/dist
+            modules/**/dist
+            enterprise/**/dist
+            apps/*/dist
           key: ${{ runner.os }}-pkg-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-pkg-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml') }}-

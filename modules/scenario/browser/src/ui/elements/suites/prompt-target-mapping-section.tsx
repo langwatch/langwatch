@@ -3,7 +3,7 @@
  */
 
 import { Box, Text, VStack } from "@chakra-ui/react";
-import type { FieldMapping, Variable } from "@langwatch/prompt-browser-kit/variables";
+import type { FieldMapping, Variable } from "@langwatch/prompt-browser-kit";
 import type { SuiteTarget } from "@langwatch/suite-contract";
 
 import { ScenarioInputMappingSection } from "./scenario-input-mapping-section.tsx";

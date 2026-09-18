@@ -59,8 +59,11 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/api-fixture": "workspace:*",
+    "@langwatch/error-presentation": "workspace:*",
     "@langwatch/feature-flag-process": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

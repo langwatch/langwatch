@@ -25,7 +25,7 @@ import {
   type ProjectNamesByIdsInput,
   type ProjectWithTeam,
 } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 
 import {
   ModelProviderCatalog,

@@ -1,4 +1,4 @@
-import { defineModuleVitestConfig } from "@langwatch/test-harness/vitest-config";
+import { defineModuleVitestConfig } from "@langwatch/vitest-config";
 
 /**
  * No `environment` here on purpose: 12 of this package's test files ask for
@@ -8,6 +8,11 @@ import { defineModuleVitestConfig } from "@langwatch/test-harness/vitest-config"
 
 export default defineModuleVitestConfig({
   kind: "jsdom",
+  // Dozens of files now mock the shared `@langwatch/langy-browser-kit`
+  // specifier with different partial shapes (it folds what used to be many
+  // independently-mocked store files) — isolate:false's default shared
+  // registry lets one file's mock leak into the next.
+  isolate: true,
   test: {
     setupFiles: ["./src/__tests__/setup.ts"],
   },

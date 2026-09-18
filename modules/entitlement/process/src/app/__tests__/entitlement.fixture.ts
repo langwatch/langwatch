@@ -6,7 +6,7 @@ import type {
   UsageLimitWarning,
   UsageUnit,
 } from "@langwatch/entitlement-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 
 import type { EntitlementRepositories } from "../../repositories/entitlement.repositories.ts";

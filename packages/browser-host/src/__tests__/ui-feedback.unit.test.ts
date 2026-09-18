@@ -2,9 +2,9 @@
  * How a failure reaches a reader, and which words it arrives in.
  */
 
-import { goErrorCodes, nodeErrorCodes } from "@langwatch/handled-error";
-import { APP_ERROR_CODES } from "@langwatch/handled-error/app-codes";
-import { UNKNOWN_ERROR_PRESENTATION } from "@langwatch/handled-error/presentation";
+import { goErrorCodes, nodeErrorCodes } from "@langwatch/error-presentation";
+import { APP_ERROR_CODES } from "@langwatch/error-presentation/app-codes";
+import { UNKNOWN_ERROR_PRESENTATION } from "@langwatch/error-presentation/presentation";
 import { describe, expect, it } from "vitest";
 
 import { BrowserUiFeedback, resolveUiFailureCopy, type UiToaster } from "../ui-feedback";

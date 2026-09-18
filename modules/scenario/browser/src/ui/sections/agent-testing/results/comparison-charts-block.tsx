@@ -5,8 +5,12 @@
  */
 
 import { Grid } from "@chakra-ui/react";
-import { formatCost, formatLatency } from "@langwatch/suite-browser/run-formatters";
-import type { BatchRun, RunGroupSummary } from "@langwatch/suite-browser/run-formatters";
+import {
+  type BatchRun,
+  formatCost,
+  formatLatency,
+  type RunGroupSummary,
+} from "@langwatch/suite-browser-kit";
 
 import { runTitle } from "../../../../behavior/agent-testing/results/run-titles.ts";
 import {

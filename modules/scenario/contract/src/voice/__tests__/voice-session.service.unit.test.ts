@@ -6,7 +6,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ScenarioRunStatus } from "../../scenario-run.ts";
 import type { CallRecord } from "../call-record";
-import { phoneTransport, VoicePhoneTransportUnavailableError } from "../transports/phone.transport";
+import {
+  createPhoneTransport,
+  VoicePhoneTransportUnavailableError,
+} from "../transports/phone.transport";
 import type { VoiceSessionTokenPayload } from "../voice-session-token.payload.ts";
 import {
   authorizeRecordingPlayback,
@@ -70,7 +73,7 @@ function fakePorts({
     signSessionToken: (payload) => JSON.stringify(payload),
     now: () => 1000,
     newSessionId: () => "sess_generated",
-    registry: { elevenlabs_convai: runner, phone: phoneTransport },
+    registry: { elevenlabs_convai: runner, phone: createPhoneTransport({ processEnv: {} }) },
     ...over,
   };
 }
@@ -242,7 +245,10 @@ describe("mintVoiceSession", () => {
           runner,
           over: {
             resolveCredential,
-            registry: { elevenlabs_convai: runner, phone: phoneTransport },
+            registry: {
+              elevenlabs_convai: runner,
+              phone: createPhoneTransport({ processEnv: {} }),
+            },
           },
         });
 

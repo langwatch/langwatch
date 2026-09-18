@@ -170,7 +170,7 @@
   "devDependencies": {
     "@ai-sdk/openai": "catalog:",
     "@langwatch/scenario": "catalog:",
-    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
     "esbuild": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

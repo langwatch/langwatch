@@ -1,6 +1,6 @@
 import { Box, Grid, HStack, Progress, Text, VStack } from "@chakra-ui/react";
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { useEffect } from "react";
-import { useAnalytics } from "react-contextual-analytics";
 import type { IconType } from "react-icons";
 import {
   LuCheck,
@@ -211,7 +211,7 @@ function StepItem({ step, onClick }: StepItemProps) {
 export function OnboardingProgress() {
   const navigate = useProjectHomeHost().navigate.bind(useProjectHomeHost());
   const project = useProjectHomeHost().project();
-  const { emit } = useAnalytics();
+  const analytics = useUiAnalytics();
 
   const { data: checkStatus, isLoading } = homeApi.integrationsChecks.getCheckStatus.useQuery(
     { projectId: project?.id ?? "" },
@@ -227,34 +227,38 @@ export function OnboardingProgress() {
     const completedSteps = steps.filter((s) => s.complete);
     const completionPercentage = calculateCompletionPercentage(steps);
 
-    emit("viewed", "onboarding_progress", {
-      // Use project_id as the grouping dimension
-      project_id: project.id,
+    analytics.track({
+      action: "viewed",
+      name: "onboarding_progress",
+      attributes: {
+        // Use project_id as the grouping dimension
+        project_id: project.id,
 
-      // Overall metrics
-      completion_percentage: completionPercentage,
-      completed_tasks_count: completedSteps.length,
-      total_tasks_count: steps.length,
-      all_complete: completionPercentage === 100,
+        // Overall metrics
+        completion_percentage: completionPercentage,
+        completed_tasks_count: completedSteps.length,
+        total_tasks_count: steps.length,
+        all_complete: completionPercentage === 100,
 
-      // Individual task completion (booleans for filtering)
-      has_first_message: checkStatus.firstMessage,
-      has_team_members: (checkStatus.teamMembers ?? 0) > 1,
-      has_model_providers: (checkStatus.modelProviders ?? 0) > 0,
-      has_prompts: (checkStatus.prompts ?? 0) > 0,
-      has_simulations: (checkStatus.simulations ?? 0) > 0,
-      has_online_evaluations: (checkStatus.onlineEvaluations ?? 0) > 0,
-      has_workflows: (checkStatus.workflows ?? 0) > 0,
-      has_datasets: (checkStatus.datasets ?? 0) > 0,
+        // Individual task completion (booleans for filtering)
+        has_first_message: checkStatus.firstMessage,
+        has_team_members: (checkStatus.teamMembers ?? 0) > 1,
+        has_model_providers: (checkStatus.modelProviders ?? 0) > 0,
+        has_prompts: (checkStatus.prompts ?? 0) > 0,
+        has_simulations: (checkStatus.simulations ?? 0) > 0,
+        has_online_evaluations: (checkStatus.onlineEvaluations ?? 0) > 0,
+        has_workflows: (checkStatus.workflows ?? 0) > 0,
+        has_datasets: (checkStatus.datasets ?? 0) > 0,
 
-      // Raw counts (for seeing actual usage depth)
-      count_team_members: checkStatus.teamMembers ?? 0,
-      count_model_providers: checkStatus.modelProviders ?? 0,
-      count_prompts: checkStatus.prompts ?? 0,
-      count_simulations: checkStatus.simulations ?? 0,
-      count_online_evaluations: checkStatus.onlineEvaluations ?? 0,
-      count_workflows: checkStatus.workflows ?? 0,
-      count_datasets: checkStatus.datasets ?? 0,
+        // Raw counts (for seeing actual usage depth)
+        count_team_members: checkStatus.teamMembers ?? 0,
+        count_model_providers: checkStatus.modelProviders ?? 0,
+        count_prompts: checkStatus.prompts ?? 0,
+        count_simulations: checkStatus.simulations ?? 0,
+        count_online_evaluations: checkStatus.onlineEvaluations ?? 0,
+        count_workflows: checkStatus.workflows ?? 0,
+        count_datasets: checkStatus.datasets ?? 0,
+      },
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading]);
@@ -272,11 +276,15 @@ export function OnboardingProgress() {
   }
 
   const handleStepClick = (step: OnboardingStep) => {
-    emit("clicked", "onboarding_step", {
-      project_id: project.id,
-      step_key: step.key,
-      step_title: step.title,
-      step_complete: step.complete,
+    analytics.track({
+      action: "clicked",
+      name: "onboarding_step",
+      attributes: {
+        project_id: project.id,
+        step_key: step.key,
+        step_title: step.title,
+        step_complete: step.complete,
+      },
     });
     navigate(step.href);
   };

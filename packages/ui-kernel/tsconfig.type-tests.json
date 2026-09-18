@@ -22,6 +22,9 @@
     },
     {
       "path": "../../modules/auth/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../vitest-config/tsconfig.build.json"
     }
   ]
 }

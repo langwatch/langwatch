@@ -85,10 +85,10 @@ footer.
 
 ## Canonical examples
 
-- `@langwatch/enterprise-governance-browser`'s `screens/governance/governance-people.screen.tsx`
-  (departments row)
+- `@langwatch/enterprise-governance-browser`'s
+  `ui/sections/governance/governance-people.screen.tsx` (departments row)
 - `@langwatch/model-provider-browser`'s
-  `screens/model-provider/model-providers.screen.tsx` (provider row, with a
+  `ui/sections/model-providers-screen.tsx` (provider row, with a
   permission tooltip on the trigger)
 - `@langwatch/enterprise-governance-browser`'s
   `features/ai-tools/ui/sections/tool-catalog-editor.tsx` (AI tool catalog

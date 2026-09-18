@@ -107,7 +107,6 @@
     "@langwatch/model-provider-browser-kit": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
-    "@langwatch/project-browser": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
     "libphonenumber-js": "catalog:",
@@ -124,7 +123,7 @@
   "devDependencies": {
     "@chakra-ui/react": "catalog:",
     "@emotion/react": "catalog:",
-    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
     "@testing-library/jest-dom": "catalog:",
     "@testing-library/react": "catalog:",
     "@testing-library/user-event": "catalog:",

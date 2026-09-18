@@ -1,6 +1,6 @@
 import { Box, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { useLangyStore } from "@langwatch/langy-browser-kit";
 import { LangyPanelSurface } from "@langwatch/langy-browser/surfaces/asaplangy";
-import { useLangyStore } from "@langwatch/langy-browser/surfaces/langy-store";
 
 import { useProjectHomeHost } from "../../../../../model/project-home-host.ts";
 import { useLangyBriefing } from "../hooks/use-langy-briefing.ts";

@@ -8,7 +8,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { cleanupTestRows } from "@langwatch/test-harness";
+import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { fromDate } from "@langwatch/time";
 /**
  * @vitest-environment node

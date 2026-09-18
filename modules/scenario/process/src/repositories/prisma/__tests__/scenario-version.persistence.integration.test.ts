@@ -15,7 +15,7 @@ import {
   type Scenario,
   SimulationService,
 } from "@langwatch/scenario-contract";
-import { cleanupTestRows } from "@langwatch/test-harness";
+import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 

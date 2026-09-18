@@ -6,7 +6,7 @@
 
 import { useDrawerParams } from "@langwatch/browser-host/drawer";
 import { isTerminalStatus, ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { buildDisplayTitle } from "@langwatch/suite-browser/run-formatters";
+import { buildDisplayTitle } from "@langwatch/suite-browser-kit";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api } from "../../../../behavior/scenario-api.ts";

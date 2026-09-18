@@ -19,7 +19,7 @@ import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { TopicApi } from "@langwatch/topic-contract";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";

@@ -8,30 +8,33 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let capturedOnData: ((data: { event: string }) => void) | undefined;
 
-vi.mock("@langwatch/trace-browser-kit/sse-subscription", () => ({
-  useSSESubscription: (
-    _subscription: unknown,
-    _input: Record<string, unknown>,
-    options: { onData?: (data: { event: string }) => void },
-  ) => {
-    capturedOnData = options.onData;
-    return {
-      connectionState: "connected",
-      isConnected: true,
-      isConnecting: false,
-      hasError: false,
-      isDisconnected: false,
-      retryCount: 0,
-      lastData: undefined,
-      lastError: undefined,
-    };
-  },
-}));
-
 let mockIsVisible = true;
-vi.mock("@langwatch/trace-browser/surfaces/page-visibility", () => ({
-  usePageVisibility: () => mockIsVisible,
-}));
+vi.mock("@langwatch/trace-browser-kit", async () => {
+  const actual = await vi.importActual<typeof import("@langwatch/trace-browser-kit")>(
+    "@langwatch/trace-browser-kit",
+  );
+  return {
+    ...actual,
+    usePageVisibility: () => mockIsVisible,
+    useSSESubscription: (
+      _subscription: unknown,
+      _input: Record<string, unknown>,
+      options: { onData?: (data: { event: string }) => void },
+    ) => {
+      capturedOnData = options.onData;
+      return {
+        connectionState: "connected",
+        isConnected: true,
+        isConnecting: false,
+        hasError: false,
+        isDisconnected: false,
+        retryCount: 0,
+        lastData: undefined,
+        lastError: undefined,
+      };
+    },
+  };
+});
 
 const mockInvalidateRunState = vi.fn().mockResolvedValue(undefined);
 

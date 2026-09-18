@@ -1,6 +1,7 @@
 import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { isInternalHref, Markdown } from "@langwatch/browser-host/markdown";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { useLangyStore, LANGY_ACTION_SHADOW, LangyMeshLayer } from "@langwatch/langy-browser-kit";
 import type {
   LangyChoiceSelection,
   LangyChoicesLockState,
@@ -17,7 +18,6 @@ import { ArrowRight, Check, Sparkles } from "lucide-react";
 import type React from "react";
 import { memo, useMemo } from "react";
 
-import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import {
   hasLangyBlockParts,
@@ -53,7 +53,6 @@ import { LangyGitHubProgressCard } from "../../../../ui/elements/github/langy-gi
 import { LangyCardBoundary } from "../../../../ui/elements/langy-card-boundary.tsx";
 import { LangyCodeAccessCard } from "../../../../ui/sections/derived-cards/langy-code-access-card.tsx";
 import { LangyDerivedCardView } from "../../../../ui/sections/derived-cards/langy-derived-card-view.tsx";
-import { LANGY_ACTION_SHADOW, LangyMeshLayer } from "../../../../ui/sections/langy-mark.tsx";
 import { useSpaLinkClick } from "../../behavior/logic/spa-link.ts";
 import { LangyGitHubPrCard } from "../elements/github/langy-git-hub-pr-card.tsx";
 import { StreamingAnswerWithCards } from "./derived-cards/streaming-answer-with-cards.tsx";

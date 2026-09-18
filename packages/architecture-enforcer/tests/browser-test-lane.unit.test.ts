@@ -71,14 +71,18 @@ function workspaceMembers(): Member[] {
 }
 
 /**
- * The packages that render React: a module's web third — `web`, or a `web-`
- * prefixed sibling like `web-kit` — the browser application, and the shared UI
- * packages. Everything else is a contract, a server or a tool.
+ * The packages that render React: a module's browser package — `browser`, or
+ * a `browser-` prefixed sibling like `browser-kit` — the browser application,
+ * and the shared UI packages. Everything else is a contract, a process
+ * package or a tool.
  */
 function isWebPackage(dir: string): boolean {
   const leaf = dir.slice(dir.lastIndexOf("/") + 1);
   return (
-    leaf === "web" || leaf.startsWith("web-") || dir === "apps/ui" || dir.startsWith("packages/")
+    leaf === "browser" ||
+    leaf.startsWith("browser-") ||
+    dir === "apps/ui" ||
+    dir.startsWith("packages/")
   );
 }
 

@@ -85,12 +85,14 @@ export class AuthzApp implements AuthzApi {
   #dispatcher: EventingAuthzCommandDispatcherAdapter | undefined;
   #pipeline: AuthzPipeline | undefined;
   #demoProjectId: string | undefined;
+  #demoProjectUserId: string | undefined;
 
   private constructor(
     permissions: AuthzService,
     grants: AuthzGrantsService,
     options: Readonly<{
       demoProjectId?: string | undefined;
+      demoProjectUserId?: string | undefined;
       eventing?: Readonly<{
         pipeline: AuthzPipeline;
         dispatcher: EventingAuthzCommandDispatcherAdapter;
@@ -102,6 +104,7 @@ export class AuthzApp implements AuthzApi {
     this.#pipeline = options.eventing?.pipeline;
     this.#dispatcher = options.eventing?.dispatcher;
     this.#demoProjectId = options.demoProjectId;
+    this.#demoProjectUserId = options.demoProjectUserId;
   }
 
   /**
@@ -138,6 +141,7 @@ export class AuthzApp implements AuthzApi {
     }).build();
     return new AuthzApp(built.authz, built.grants, {
       demoProjectId: config.demoProjectId(),
+      demoProjectUserId: config.demoProjectUserId,
       eventing: { pipeline: built.pipeline, dispatcher },
     });
   }
@@ -162,9 +166,15 @@ export class AuthzApp implements AuthzApi {
   }): AuthzApp {
     return new AuthzApp(input.permissions, input.grants, {
       demoProjectId: input.config?.demoProjectId,
+      demoProjectUserId: input.config?.demoProjectUserId,
     });
   }
   isDemoProject: AuthzApi["isDemoProject"] = ({ projectId }) => this.#demoProjectId === projectId;
+  /** Blank rather than absent: the shape the composition this replaced answered. */
+  demoProject(): Readonly<{ projectId: string; userId: string }> {
+    return { projectId: this.#demoProjectId ?? "", userId: this.#demoProjectUserId ?? "" };
+  }
+
   async effectivePermissionsFor(
     input: Readonly<{ projectId?: string; organizationId?: string }>,
     by: AuthzCaller,

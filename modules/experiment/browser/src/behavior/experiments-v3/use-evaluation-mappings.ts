@@ -5,8 +5,8 @@
 import {
   type AvailableSource,
   type FieldMapping as UIFieldMapping,
-} from "@langwatch/prompt-browser-kit/variables";
-import { datasetColumnTypeToFieldType } from "@langwatch/workflow-browser/studio-dataset-columns";
+} from "@langwatch/prompt-browser-kit";
+import { datasetColumnTypeToFieldType } from "@langwatch/workflow-browser-kit";
 import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 

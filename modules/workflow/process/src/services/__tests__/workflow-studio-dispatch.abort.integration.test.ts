@@ -4,7 +4,7 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
  * abort flag, and cancelling the reader disconnects the engine.
  * @see specs/experiments-v3/execution-backend.feature
  */
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { StudioClientEvent, StudioServerEvent } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 

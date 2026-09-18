@@ -42,8 +42,8 @@ export interface EnsureCloudflaredOnPathDeps {
   resolveModule?: () => CloudflaredModule;
   /** Whether the binary already exists on disk. Defaults to `fs.existsSync`. */
   binaryExists?: (binPath: string) => boolean;
-  /** The env whose `PATH` is prepended. Defaults to `process.env`. */
-  env?: NodeJS.ProcessEnv;
+  /** The env whose `PATH` is prepended. */
+  env: NodeJS.ProcessEnv;
   /** How long the fallback download may run before it is abandoned. */
   installTimeoutMs?: number;
 }
@@ -216,11 +216,9 @@ async function ensureBinaryPresent({
  * no-op if already on PATH, else resolves the package, downloads a fallback
  * binary if missing, and prepends its directory. Throws {@link VoiceTunnelBinaryError}.
  */
-export async function ensureCloudflaredOnPath(
-  deps: EnsureCloudflaredOnPathDeps = {},
-): Promise<void> {
+export async function ensureCloudflaredOnPath(deps: EnsureCloudflaredOnPathDeps): Promise<void> {
   const isOnPath = deps.isOnPath ?? defaultIsOnPath;
-  const env = deps.env ?? process.env;
+  const env = deps.env;
 
   // A system cloudflared already on PATH (some dev boxes, some images) needs
   // nothing further — and this short-circuit costs one cheap subprocess.

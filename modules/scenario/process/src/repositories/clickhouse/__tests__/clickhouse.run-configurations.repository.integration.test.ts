@@ -12,7 +12,7 @@ import {
   SuiteExecutionService,
   type QueueSimulationRunCommandData,
 } from "@langwatch/suite-process";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

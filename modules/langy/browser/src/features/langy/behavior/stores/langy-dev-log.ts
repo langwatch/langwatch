@@ -1,3 +1,4 @@
+import { useLangyStore } from "@langwatch/langy-browser-kit";
 import {
   applyLangyTurnEvents,
   initialLangyTurnProjection,
@@ -9,8 +10,6 @@ import {
 } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
 import { create } from "zustand";
-
-import { useLangyStore } from "../../../../behavior/langy.store.ts";
 
 /**
  * The developer drawer's record of what actually crossed the wire — in BOTH directions,

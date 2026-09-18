@@ -3,10 +3,10 @@
  */
 import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
+import { useReducedMotion } from "@langwatch/langy-browser-kit";
 import { Check, ChevronRight, Square, SquareCheck } from "lucide-react";
 import { useState } from "react";
 
-import { useReducedMotion } from "../../../../behavior/use-reduced-motion.ts";
 import type {
   LangyPlan,
   LangyPlanItem,

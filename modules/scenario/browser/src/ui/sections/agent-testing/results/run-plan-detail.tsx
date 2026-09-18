@@ -5,11 +5,7 @@ import { HStack } from "@chakra-ui/react";
  * @see specs/features/agent-testing/results-tabs.feature
  * @see specs/suites/run-notes.feature
  */
-import type {
-  Period,
-  PeriodMode,
-  RelativePresetKey,
-} from "@langwatch/analytics-browser-kit/period-selector";
+import type { Period, PeriodMode, RelativePresetKey } from "@langwatch/analytics-browser-kit";
 import type { Instant } from "@langwatch/time";
 
 import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";

@@ -601,9 +601,13 @@ a reason for a container.
 
 The `processModules` list is generated from `modules/catalogue.json`
 (`pnpm generate:modules` → `@langwatch/installed-modules`). **Installing a
-module edits the catalogue, never a root.** The generated `createServerApp`
-owns the chunked chain TypeScript's instantiation depth forces; no
-hand-written file names a chunk. Uninstalling a module that another module
+module edits the catalogue, never a root.** A process composes the whole
+list in one call — `server.composeProcess(role).withModules(serverModules)` —
+and that is also the cheap shape: one call over all 49 modules costs ~88k type
+instantiations, where the ten-step chunked chain it replaced cost 11.3M.
+Instantiation cost grows with the length of the chain, not the size of the
+list, because each `withModules` re-instantiates the accumulated type. Do not
+split the list to appease TS2589. Uninstalling a module that another module
 peer-depends on fails to compile, naming the dependent.
 
 **The root never grows.** A change that needs it to grow has found a gap in
@@ -1448,12 +1452,25 @@ chain. New code uses the left column only.
 | `@langwatch/module` (light core)              | `@langwatch/kernel`'s token half                                   |
 | `@langwatch/process`                          | `@langwatch/process-server` + kernel's boot AND declaration halves |
 | `@langwatch/browser`                          | `@langwatch/ui-kernel` (boot half)                                 |
-| `createProcessApp(role)`                      | `createServerApp(role)` (generated)                                |
+| `createProcessApp(role)`                      | none — apps compose directly (see note below)                      |
 | `openStores(config)`                          | `createProcessMembers({ config })`                                 |
 | `defineProcessModule` / `defineBrowserModule` | `defineServerModule` / `defineWebModule`                           |
 | `traceProcessModule` / `processModules`       | `traceServer` / `serverModules`                                    |
 | `TraceModule` + `.withApi(...)`               | `TraceApp` + `.withApp(...)`                                       |
 | `<f>.module.ts` / `<f>.web.ts` file stems     | `<f>.server.ts` / `<f>.web.ts`                                     |
+
+`createProcessApp` stays the target shape. Its previous implementation, the
+generated `createServerApp` and its `serverModuleChunk0..9`,
+`coreServerModules` and `enterpriseServerModules` lists, was **removed
+2026-09-18 as dead code** — nothing outside the generator imported it, yet it
+cost 11.3M type instantiations in every program that compiled it: because
+`modules/` emits no `.d.ts`, `apps/{api,worker,ui}` and `dev-runtime` each
+compiled it from source. Removing it took those five programs from 70.5M
+instantiations (107.2s of checking) to 13.9M (2.3s). Build it again once
+`modules/` can emit a `.d.ts`; today it cannot
+(`TS7056` — the composed type exceeds what the compiler will serialize, and
+~50 `TS2883`s name module repositories the composed type should not expose).
+Until then a process composes `serverModules` directly.
 
 Also open, each a worklist: the config-defined dependency state migration
 (§6 — deletes the remaining bespoke member tail); eventing member composition for both roles; `browserModules` is
@@ -1474,3 +1491,38 @@ this document; all earlier composition ADRs are historical. When someone
 finds this document teaching something the tree refuses, the fix is a change
 to this file in the same commit as the code — an out-of-date architecture
 document is worse than none, because it reads authoritative.
+
+## 18. Running work
+
+Nx is the workspace task runner (ADR-150). It reads the workspace that
+already exists: projects come from `pnpm-workspace.yaml`, targets from each
+package's `scripts` block. No package carries a `project.json`, no script is
+an Nx executor, and Nx generates nothing — a module is still installed by
+editing `modules/catalogue.json` and running `pnpm generate:modules`. The
+whole configuration is `nx.json` at the root.
+
+What Nx decides is *when* a script runs and whether it may be skipped, never
+what a package is. That distinction is load-bearing: the file grammar, the
+architecture-enforcer and the catalogue already say what a package is, and a
+second system describing the same packages would be a second authority
+disagreeing with the linter.
+
+Cache inputs are declared for a workspace that resolves source, not build
+output. Packages point their `exports` at `./src/*.ts`, so a dependency's
+source is an input to its dependents' tests with no build in between —
+`typecheck` and `test` therefore both take `["default", "^default"]`. A cache
+keyed on a package's own files alone would replay a stale pass after a
+dependency changed underneath it. `test:integration` is left uncached on
+purpose: those suites read Postgres, ClickHouse and Redis, and their result is
+a function of datastore state that no input declaration describes.
+
+The root scripts are unchanged. `test`, `typecheck`, `lint` and `build` keep
+the filter sets CI, haven and this documentation already invoke; Nx is
+available beside them as `test:all`, `test:affected`, `typecheck:all`,
+`typecheck:affected`, `build:affected`, `lint:affected` and `graph`. Repointing
+the root scripts at Nx is a separate decision — the current root `test` covers
+`packages/`, `modules/` and the enterprise packages and deliberately excludes
+the applications, the SDK and the e2e suites, so the two are not the same set.
+
+The cache is local. No Nx Cloud account is configured and `nxCloudId` is
+absent, so no source or task metadata leaves the machine.

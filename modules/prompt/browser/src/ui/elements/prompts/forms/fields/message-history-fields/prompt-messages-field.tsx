@@ -9,9 +9,9 @@ import {
   type AvailableSource,
   type PromptTextAreaOnAddMention,
   PromptTextAreaWithVariables,
+  useLayoutMode,
   type Variable,
-} from "@langwatch/prompt-browser-kit/variables";
-import { useLayoutMode } from "@langwatch/prompt-browser-kit/variables";
+} from "@langwatch/prompt-browser-kit";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {

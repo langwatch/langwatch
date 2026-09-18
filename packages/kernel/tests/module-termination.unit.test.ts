@@ -1,4 +1,6 @@
+import { Config } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import {
   defineServerModule,
@@ -33,9 +35,9 @@ class CatalogueApp extends CatalogueApi {
   static readonly contract = CatalogueApi;
   static readonly dependencies = {};
   static readonly reads = ["prefix"] as const;
-  static readonly configSchema = {
-    parse: (value: unknown): Config => ({ suffix: String((value as Config).suffix) }),
-  };
+  static readonly config = Config.define((c) => ({
+    suffix: c.env("CATALOGUE_SUFFIX", z.string()),
+  }));
 
   private constructor(private readonly label: string) {
     super();
@@ -88,7 +90,9 @@ describe("given a module that states its doors", () => {
 
   describe("when the vestigial terminator is looked for", () => {
     it("is not there to find", () => {
-      type _noBuild = Expect<Equal<"build" extends keyof typeof withoutBuild ? true : false, false>>;
+      type _noBuild = Expect<
+        Equal<"build" extends keyof typeof withoutBuild ? true : false, false>
+      >;
 
       expect("build" in withoutBuild).toBe(false);
     });
@@ -122,7 +126,7 @@ describe("given a module that owns repositories", () => {
     static readonly contract = CatalogueApi;
     static readonly dependencies = {};
     static readonly reads = ["prefix"] as const;
-    static readonly configSchema = CatalogueApp.configSchema;
+    static readonly config = CatalogueApp.config;
 
     private constructor(private readonly rows: number) {
       super();
@@ -151,9 +155,7 @@ describe("given a module that owns repositories", () => {
     .withTransports(catalogueRest);
 
   it("terminates the same way on the repository path", () => {
-    type _config = Expect<
-      Equal<ModuleConfigFor<[typeof stored]>, { readonly annotation: Config }>
-    >;
+    type _config = Expect<Equal<ModuleConfigFor<[typeof stored]>, { readonly annotation: Config }>>;
     const installable: InstallableServerFeature<Members, "annotation", Config> = stored;
 
     expect(installable.name).toBe("annotation");

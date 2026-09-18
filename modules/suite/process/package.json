@@ -42,6 +42,7 @@
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
     "@langwatch/suite-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@trpc/server": "catalog:",
@@ -50,7 +51,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/api-fixture": "workspace:*",
     "hono": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

@@ -7,7 +7,7 @@ import {
   type RunPlanConfigInput,
   type Suite,
 } from "@langwatch/suite-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * @see specs/agents/connected-agents.feature

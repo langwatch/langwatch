@@ -1,7 +1,9 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import { lintWorkspace } from "../src/index.ts";
 
 let root = "";
@@ -39,7 +41,7 @@ function featurePackage({
   capability = "service",
 }: {
   feature: string;
-  role: "contract" | "server" | "web";
+  role: "contract" | "process" | "browser";
   name?: string;
   dependencies?: Record<string, string>;
   exports?: Record<string, unknown>;
@@ -166,7 +168,7 @@ The ${feature} implementation becomes singular at the cost of explicit compositi
       `import { moduleApi } from "@langwatch/kernel"; export interface ${className(feature)}Api { get(): string; } export const ${className(feature)}Api = moduleApi<${className(feature)}Api>()("${feature}");`,
     );
   }
-  if (role === "server") {
+  if (role === "process") {
     write(
       `${prefix}/src/services/${feature}.service.ts`,
       `export class ${serviceName} { static create(): ${serviceName} { return new ${serviceName}(); } }`,
@@ -228,22 +230,28 @@ describe("feature package boundary lint", () => {
     });
     featurePackage({
       feature: "agent",
-      role: "server",
+      role: "process",
       dependencies: { "@langwatch/agent-contract": "workspace:*" },
       source:
         'import type { Agent } from "@langwatch/agent-contract"; export const create = (agent: Agent) => agent;',
     });
     featurePackage({
       feature: "agent",
-      role: "web",
+      role: "browser",
       dependencies: { "@langwatch/agent-contract": "workspace:*" },
       source:
         'import type { Agent } from "@langwatch/agent-contract"; export type AgentView = Agent;',
     });
 
+    const minimalFixturePolicies = new Set([
+      "feature-app-contract",
+      "feature-shape",
+      "browser-package-exports",
+      "unused-module-export",
+    ]);
     const violations = lintWorkspace({ root, declarations: false });
-    expect(violations.filter((item) => item.policy !== "feature-app-contract")).toEqual([]);
-    expect(violations.filter((item) => item.policy === "feature-app-contract")).toHaveLength(2);
+    expect(violations.filter((item) => !minimalFixturePolicies.has(item.policy))).toEqual([]);
+    expect(violations.filter((item) => item.policy === "feature-app-contract")).toHaveLength(3);
   });
 
   /** @scenario Physical package names match their feature roles */
@@ -270,8 +278,34 @@ describe("feature package boundary lint", () => {
   it("rejects the retired Zod runtime in any governed feature surface", () => {
     featurePackage({
       feature: "agent",
-      role: "server",
+      role: "process",
       dependencies: { zod: "^3.25.76" },
+    });
+
+    expect(policies()).toContain("retired-package-runtime");
+  });
+
+  /**
+   * @scenario "pnpm's catalog protocol resolves against the workspace
+   * catalogue before the retired-runtime check reads it"
+   */
+  it("accepts the repository Zod 4 range declared through pnpm's catalog protocol", () => {
+    write("pnpm-workspace.yaml", "catalog:\n  zod: ^4.4.3\n");
+    featurePackage({
+      feature: "agent",
+      role: "process",
+      dependencies: { zod: "catalog:" },
+    });
+
+    expect(policies()).not.toContain("retired-package-runtime");
+  });
+
+  it("still rejects a catalog range that itself pins the retired Zod runtime", () => {
+    write("pnpm-workspace.yaml", "catalog:\n  zod: ^3.25.76\n");
+    featurePackage({
+      feature: "agent",
+      role: "process",
+      dependencies: { zod: "catalog:" },
     });
 
     expect(policies()).toContain("retired-package-runtime");
@@ -299,10 +333,10 @@ describe("feature package boundary lint", () => {
 
   /** @scenario Web production code cannot acquire backend dependencies */
   it("rejects backend dependencies from web source", () => {
-    featurePackage({ feature: "agent", role: "server" });
+    featurePackage({ feature: "agent", role: "process" });
     featurePackage({
       feature: "agent",
-      role: "web",
+      role: "browser",
       dependencies: { "@langwatch/agent-process": "workspace:*" },
       source:
         'import type { value } from "@langwatch/agent-process"; export type View = typeof value;',
@@ -312,7 +346,7 @@ describe("feature package boundary lint", () => {
 
   it("accepts canonical dotted artifact roles with kebab-case subjects", () => {
     featurePackage({ feature: "agent", role: "contract" });
-    featurePackage({ feature: "agent", role: "server" });
+    featurePackage({ feature: "agent", role: "process" });
     write(
       "modules/agent/contract/src/this-this.service.ts",
       "export abstract class ThisThisService {}",
@@ -339,10 +373,10 @@ describe("feature package boundary lint", () => {
 
   /** @scenario Cross-feature collaboration uses only contracts */
   it("rejects another feature server even through a type-only import", () => {
-    featurePackage({ feature: "workflow", role: "server" });
+    featurePackage({ feature: "workflow", role: "process" });
     featurePackage({
       feature: "agent",
-      role: "server",
+      role: "process",
       dependencies: { "@langwatch/workflow-process": "workspace:*" },
       source:
         'import type { value } from "@langwatch/workflow-process"; export type Value = typeof value;',
@@ -360,7 +394,7 @@ describe("feature package boundary lint", () => {
     });
     featurePackage({
       feature: "entitlement",
-      role: "server",
+      role: "process",
       dependencies: { "@langwatch/enterprise-billing-contract": "workspace:*" },
       source:
         'import type { value } from "@langwatch/enterprise-billing-contract"; export type Value = typeof value;',
@@ -372,7 +406,7 @@ describe("feature package boundary lint", () => {
   it("rejects wildcard exports", () => {
     featurePackage({
       feature: "agent",
-      role: "server",
+      role: "process",
       exports: { ".": "./src/index.ts", "./*": "./src/*.ts" },
     });
     expect(policies()).toContain("public-exports");
@@ -382,7 +416,7 @@ describe("feature package boundary lint", () => {
   it("rejects private persistence exported through a server root barrel", () => {
     featurePackage({
       feature: "agent",
-      role: "server",
+      role: "process",
       source: 'export { AgentRepository } from "./repositories/agent.repository";',
     });
 
@@ -393,7 +427,7 @@ describe("feature package boundary lint", () => {
   it("rejects a repository reached through a star-exported adapter chain", () => {
     featurePackage({
       feature: "agent",
-      role: "server",
+      role: "process",
       source: 'export * from "./adapters/agent.adapter";',
     });
     write(
@@ -412,7 +446,7 @@ describe("feature package boundary lint", () => {
   it("rejects a repository reached through a named re-export chain", () => {
     featurePackage({
       feature: "agent",
-      role: "server",
+      role: "process",
       source: 'export { AgentRepository } from "./adapters/agent.adapter";',
     });
     write(
@@ -431,7 +465,7 @@ describe("feature package boundary lint", () => {
   it("rejects a repository reached through a #app/ import alias", () => {
     featurePackage({
       feature: "agent",
-      role: "server",
+      role: "process",
       source: 'export { AgentRepository } from "#app/repositories/agent.repository";',
     });
     write(
@@ -456,7 +490,7 @@ describe("feature package boundary lint", () => {
   it("rejects a repository reached through a secondary package entrypoint", () => {
     featurePackage({
       feature: "agent",
-      role: "server",
+      role: "process",
       exports: {
         ".": "./src/index.ts",
         "./testing": "./src/testing.ts",
@@ -478,7 +512,7 @@ describe("feature package boundary lint", () => {
   it("allows testing.ts to export a repository under repositories/memory", () => {
     featurePackage({
       feature: "agent",
-      role: "server",
+      role: "process",
       exports: {
         ".": "./src/index.ts",
         "./testing": "./src/testing.ts",
@@ -500,7 +534,7 @@ describe("feature package boundary lint", () => {
   it("allows testing.ts to export a fake-named repository double", () => {
     featurePackage({
       feature: "agent",
-      role: "server",
+      role: "process",
       exports: {
         ".": "./src/index.ts",
         "./testing": "./src/testing.ts",
@@ -522,7 +556,7 @@ describe("feature package boundary lint", () => {
   it("allows testing.ts to export from a *.test-fakes.ts module", () => {
     featurePackage({
       feature: "agent",
-      role: "server",
+      role: "process",
       exports: {
         ".": "./src/index.ts",
         "./testing": "./src/testing.ts",
@@ -532,7 +566,10 @@ describe("feature package boundary lint", () => {
       "modules/agent/process/src/testing.ts",
       'export { agentFixture } from "./stores/agent.test-fakes";',
     );
-    write("modules/agent/process/src/stores/agent.test-fakes.ts", "export const agentFixture = {};");
+    write(
+      "modules/agent/process/src/stores/agent.test-fakes.ts",
+      "export const agentFixture = {};",
+    );
 
     expect(policies()).not.toContain("private-runtime-export");
   });
@@ -541,7 +578,7 @@ describe("feature package boundary lint", () => {
   it("still rejects testing.ts exporting a real repository", () => {
     featurePackage({
       feature: "agent",
-      role: "server",
+      role: "process",
       exports: {
         ".": "./src/index.ts",
         "./testing": "./src/testing.ts",
@@ -563,7 +600,7 @@ describe("feature package boundary lint", () => {
   it("still rejects index.ts exporting a memory repository double", () => {
     featurePackage({
       feature: "agent",
-      role: "server",
+      role: "process",
       source:
         'export { MemoryAgentRepository } from "./repositories/memory/memory.agent.repository";',
     });
@@ -579,7 +616,7 @@ describe("feature package boundary lint", () => {
   it("allows a type-only export of a repository's database type", () => {
     featurePackage({
       feature: "agent",
-      role: "server",
+      role: "process",
       source: 'export type { AgentDatabase } from "./repositories/agent.repository";',
     });
     write(
@@ -594,7 +631,7 @@ describe("feature package boundary lint", () => {
   it("allows an adapter export that only uses a repository internally", () => {
     featurePackage({
       feature: "agent",
-      role: "server",
+      role: "process",
       source: 'export { AgentAdapter } from "./adapters/agent.adapter";',
     });
     write(
@@ -613,7 +650,7 @@ describe("feature package boundary lint", () => {
   it("rejects Prisma in emitted declarations", () => {
     featurePackage({
       feature: "agent",
-      role: "server",
+      role: "process",
       source: 'export type Leaked = import("@prisma/client").PrismaClient;',
     });
     buildsDeclarations({
@@ -644,7 +681,7 @@ describe("strict feature source layout", () => {
   it("accepts canonical version-0 contract and server source", () => {
     featurePackage({ feature: "agent", role: "contract" });
     write("modules/agent/contract/src/agent.service.ts", "export abstract class AgentService {}");
-    featurePackage({ feature: "agent", role: "server" });
+    featurePackage({ feature: "agent", role: "process" });
     write(
       "modules/agent/process/src/services/agent.service.ts",
       "export class AgentService { static create() { return new AgentService(); } }",
@@ -729,7 +766,7 @@ describe("strict feature source layout", () => {
    * nothing useful to say about it.
    */
   it("accepts tests and their helpers anywhere under a __tests__ directory", () => {
-    featurePackage({ feature: "agent", role: "server" });
+    featurePackage({ feature: "agent", role: "process" });
     write("modules/agent/process/src/services/agent.service.ts", "export class AgentService {}");
     write(
       "modules/agent/process/src/services/__tests__/agent.service.unit.test.ts",
@@ -762,7 +799,7 @@ describe("strict feature source layout", () => {
 
   it("treats the last qualifier as the subject of a technology adapter", () => {
     featurePackage({ feature: "licensing", role: "contract" });
-    featurePackage({ feature: "sso", role: "server" });
+    featurePackage({ feature: "sso", role: "process" });
     write(
       "modules/sso/process/src/adapters/licensing.sso.adapter.ts",
       "export class LicensingSsoAdapter {}",
@@ -788,7 +825,7 @@ describe("strict feature source layout", () => {
   /** @scenario "A rules/ module is a pure package of functions" */
   it("accepts a rules module exporting pure functions and constants", () => {
     featurePackage({ feature: "agent", role: "contract" });
-    featurePackage({ feature: "agent", role: "server" });
+    featurePackage({ feature: "agent", role: "process" });
     write(
       "modules/agent/process/src/rules/agent-support.rules.ts",
       "export function isSiblingRule(value: number): boolean {\n  return value % 2 === 0;\n}\n",
@@ -814,7 +851,7 @@ describe("strict feature source layout", () => {
 
   it("accepts a rules module constructing a pure value", () => {
     featurePackage({ feature: "agent", role: "contract" });
-    featurePackage({ feature: "agent", role: "server" });
+    featurePackage({ feature: "agent", role: "process" });
     write(
       "modules/agent/process/src/rules/agent-eligibility.rules.ts",
       'export function names(): Set<string> {\n  return new Set(["a"]);\n}\n',
@@ -824,7 +861,7 @@ describe("strict feature source layout", () => {
   });
 
   it("rejects a rules module importing a service", () => {
-    featurePackage({ feature: "agent", role: "server" });
+    featurePackage({ feature: "agent", role: "process" });
     write(
       "modules/agent/process/src/rules/agent-eligibility.rules.ts",
       [
@@ -851,7 +888,7 @@ describe("strict feature source layout", () => {
   });
 
   it("rejects a rules module importing Prisma", () => {
-    featurePackage({ feature: "agent", role: "server" });
+    featurePackage({ feature: "agent", role: "process" });
     write(
       "modules/agent/process/src/rules/agent-eligibility.rules.ts",
       [
@@ -881,7 +918,7 @@ describe("strict feature source layout", () => {
 describe("Prisma client containment", () => {
   /** @scenario Prisma imports stay in concrete adapters */
   it("allows generated Prisma only in strict feature Prisma adapters", () => {
-    featurePackage({ feature: "agent", role: "server" });
+    featurePackage({ feature: "agent", role: "process" });
     write(
       "modules/agent/process/src/repositories/prisma/prisma.agents.repository.ts",
       'import type { Prisma } from "@langwatch/prisma-client/generated"; export class PrismaAgentsRepository { static create(_query: Prisma.AgentWhereInput) { return new PrismaAgentsRepository(); } }',
@@ -897,10 +934,10 @@ describe("Prisma client containment", () => {
       role: "contract",
       dependencies: { zod: "^3.25.76" },
     });
-    featurePackage({ feature: "agent", role: "server" });
+    featurePackage({ feature: "agent", role: "process" });
     featurePackage({
       feature: "agent",
-      role: "web",
+      role: "browser",
       dependencies: { "@langwatch/agent-process": "workspace:*" },
       subjects: ["agent", "shared", "shared"],
       source:
@@ -945,7 +982,7 @@ describe("Prisma client containment", () => {
   it("rejects generated Prisma reached through a public server re-export", () => {
     featurePackage({
       feature: "agent",
-      role: "server",
+      role: "process",
       source:
         'export type { PrismaBacked } from "./repositories/prisma/prisma.agents.repository.ts";',
     });
@@ -976,7 +1013,7 @@ describe("Prisma client containment", () => {
   it("refuses a package whose declarations the build has not written", () => {
     featurePackage({
       feature: "agent",
-      role: "server",
+      role: "process",
       source: 'export type Leaked = import("@prisma/client").PrismaClient;',
     });
     buildsDeclarations({

@@ -28,7 +28,10 @@ const LEVEL_NUMBERS: Record<string, number> = {
  */
 export function createTestLogger(): { logger: PinoLogger; lines: TestLogLines } {
   const backing: TestLogLine[] = [];
-  const findByLevelAndMessage = (levelName: string, msgIncludes: string): TestLogLine | undefined => {
+  const findByLevelAndMessage = (
+    levelName: string,
+    msgIncludes: string,
+  ): TestLogLine | undefined => {
     const wanted = LEVEL_NUMBERS[levelName];
     return Array.prototype.find.call(backing, (line: TestLogLine) => {
       if (wanted !== undefined && line.level !== wanted) return false;

@@ -22,7 +22,9 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
+    "@langwatch/config": "workspace:*",
     "@langwatch/kernel": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

@@ -1,6 +1,12 @@
 import { Box, chakra, HStack, Spinner, Text, Textarea } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import {
+  useLangyContextTargetStore,
+  type LangyContextChip,
+  useLangyStore,
+  useReducedMotion,
+} from "@langwatch/langy-browser-kit";
 import type { LangyTurnPhase } from "@langwatch/langy-contract";
 import {
   Bot,
@@ -29,9 +35,6 @@ import type React from "react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 
 import { describeChipContext } from "../../../../behavior/langy-chip-context.ts";
-import { useLangyContextTargetStore } from "../../../../behavior/langy-context-target.store.ts";
-import { type LangyContextChip, useLangyStore } from "../../../../behavior/langy.store.ts";
-import { useReducedMotion } from "../../../../behavior/use-reduced-motion.ts";
 import { LANGY_ANSWER_HERE_OR_TERMINAL } from "../../../../model/langy-local-waits.ts";
 import type { LangySkill } from "../../../../model/shared/langy/langy-skills.ts";
 import { LangyComposerPalette, type PaletteMode } from "../elements/langy-composer-palette.tsx";

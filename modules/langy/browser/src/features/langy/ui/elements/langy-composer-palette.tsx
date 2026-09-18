@@ -7,15 +7,15 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import {
+  absorbContextTarget,
+  type LangyContextChip,
+  type LangyContextTargetDescriptor,
+  useLangyContextTargetStore,
+} from "@langwatch/langy-browser-kit";
 import { Cpu, Plus, Sparkles, Waypoints } from "lucide-react";
 import { useEffect, useMemo } from "react";
 
-import {
-  absorbContextTarget,
-  type LangyContextTarget as LangyContextTargetDescriptor,
-  useLangyContextTargetStore,
-} from "../../../../behavior/langy-context-target.store.ts";
-import { type LangyContextChip } from "../../../../behavior/langy.store.ts";
 import { LANGY_SKILLS, type LangySkill } from "../../../../model/shared/langy/langy-skills.ts";
 
 /**

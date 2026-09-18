@@ -32,6 +32,7 @@
     "@langwatch/workflow-contract": "workspace:*"
   },
   "devDependencies": {
+    "@langwatch/vitest-config": "workspace:*",
     "@types/react": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

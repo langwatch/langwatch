@@ -9,7 +9,7 @@ import { toComparisonConfig } from "@langwatch/experiment-contract";
 import {
   type AvailableSource,
   type FieldMapping as UIFieldMapping,
-} from "@langwatch/prompt-browser-kit/variables";
+} from "@langwatch/prompt-browser-kit";
 import { useCallback } from "react";
 import { useShallow } from "zustand/react/shallow";
 

@@ -6,6 +6,7 @@
 import {
   LangWatchQLNotEnabledError,
   createSavedWorkbenchChartSchema,
+  langWatchQLCallerProtections,
   placeSavedWorkbenchChartSchema,
   savedWorkbenchChartListSchema,
   savedWorkbenchChartParamsSchema,
@@ -13,7 +14,6 @@ import {
   savedWorkbenchChartSchema,
   updateSavedWorkbenchChartSchema,
 } from "@langwatch/analytics-contract";
-import { langWatchQLCallerProtections } from "@langwatch/analytics-process";
 import {
   apiErrorSchema,
   canonicalBaseResponses,

@@ -162,8 +162,8 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
 
 import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { useLangyStore } from "@langwatch/langy-browser-kit";
 
-import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import {
   LangyHostApi,
   LangyHostProvider,

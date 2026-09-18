@@ -1,7 +1,9 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import {
   collectPortsAndAdaptersFoldersBaseline,
   collectPortsAndAdaptersFoldersFindings,
@@ -28,7 +30,8 @@ function write(path: string, content: string): void {
   writeFileSync(absolute, content, "utf8");
 }
 
-const PORTS_BASELINE = "packages/architecture-enforcer/src/ports-and-adapters-folders-baseline.json";
+const PORTS_BASELINE =
+  "packages/architecture-enforcer/src/ports-and-adapters-folders-baseline.json";
 
 function baselineText(policy: BaselinePolicy, keys: readonly string[]): string {
   return formatBaseline({
@@ -41,26 +44,32 @@ describe("ports and adapters folders", () => {
   describe("given a file under a module's ports or adapters folder", () => {
     /** @scenario A ports/adapters file is refused with the instruction to fold it into repositories or services */
     it("reports the file by its path", () => {
-      write("modules/widget/server/src/ports/widget-clock.port.ts", "export type WidgetClock = unknown;\n");
       write(
-        "enterprise/modules/billing/server/src/adapters/postgres.billing.adapter.ts",
+        "modules/widget/process/src/ports/widget-clock.port.ts",
+        "export type WidgetClock = unknown;\n",
+      );
+      write(
+        "enterprise/modules/billing/process/src/adapters/postgres.billing.adapter.ts",
         "export const adapter = 1;\n",
       );
-      write("modules/widget/server/src/services/widget.service.ts", "export const service = 1;\n");
+      write("modules/widget/process/src/services/widget.service.ts", "export const service = 1;\n");
 
       const findings = collectPortsAndAdaptersFoldersFindings(root);
 
       expect(findings).toEqual([
-        "enterprise/modules/billing/server/src/adapters/postgres.billing.adapter.ts",
-        "modules/widget/server/src/ports/widget-clock.port.ts",
+        "enterprise/modules/billing/process/src/adapters/postgres.billing.adapter.ts",
+        "modules/widget/process/src/ports/widget-clock.port.ts",
       ]);
     });
   });
 
   describe("given no module carries a ports or adapters folder", () => {
     it("reports nothing", () => {
-      write("modules/widget/server/src/services/widget.service.ts", "export const service = 1;\n");
-      write("modules/widget/server/src/repositories/widget.repository.ts", "export const repo = 1;\n");
+      write("modules/widget/process/src/services/widget.service.ts", "export const service = 1;\n");
+      write(
+        "modules/widget/process/src/repositories/widget.repository.ts",
+        "export const repo = 1;\n",
+      );
 
       expect(collectPortsAndAdaptersFoldersFindings(root)).toEqual([]);
     });
@@ -68,12 +77,15 @@ describe("ports and adapters folders", () => {
 
   describe("given a baseline", () => {
     it("silences a listed path and refuses a stale entry", () => {
-      write("modules/widget/server/src/ports/widget-clock.port.ts", "export type WidgetClock = unknown;\n");
+      write(
+        "modules/widget/process/src/ports/widget-clock.port.ts",
+        "export type WidgetClock = unknown;\n",
+      );
       write(
         PORTS_BASELINE,
         baselineText(PORTS_AND_ADAPTERS_FOLDERS_BASELINE, [
-          "modules/widget/server/src/ports/widget-clock.port.ts",
-          "modules/widget/server/src/ports/gone.port.ts",
+          "modules/widget/process/src/ports/widget-clock.port.ts",
+          "modules/widget/process/src/ports/gone.port.ts",
         ]),
       );
 
@@ -87,14 +99,14 @@ describe("ports and adapters folders", () => {
   });
 
   it("collects the baseline sorted by path", () => {
-    write("modules/widget/server/src/ports/b.port.ts", "export type B = unknown;\n");
-    write("modules/widget/server/src/adapters/a.adapter.ts", "export const a = 1;\n");
+    write("modules/widget/process/src/ports/b.port.ts", "export type B = unknown;\n");
+    write("modules/widget/process/src/adapters/a.adapter.ts", "export const a = 1;\n");
 
     const entries = collectPortsAndAdaptersFoldersBaseline({ root });
 
     expect(entries.map((entry) => entry.key)).toEqual([
-      "modules/widget/server/src/adapters/a.adapter.ts",
-      "modules/widget/server/src/ports/b.port.ts",
+      "modules/widget/process/src/adapters/a.adapter.ts",
+      "modules/widget/process/src/ports/b.port.ts",
     ]);
   });
 });

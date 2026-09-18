@@ -1,9 +1,11 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { builtinModules } from "node:module";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+
 import ts from "typescript";
 import { z } from "zod";
-import { browserOnlyPackage } from "./browser-packages.ts";
+
+import type { ArchitectureViolation, ClassifiedPackage } from "../../types.ts";
 import { listFiles } from "../../workspace/layout.ts";
 import {
   workspaceModuleResolver,
@@ -17,7 +19,7 @@ import {
   sourceText,
 } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
-import type { ArchitectureViolation, ClassifiedPackage } from "../../types.ts";
+import { browserOnlyPackage } from "./browser-packages.ts";
 
 const UI_FEATURE_CATALOGUE_PATH = join("apps", "ui", "src", "features", "catalogue.json");
 const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
@@ -63,7 +65,7 @@ const featureUseSchema = z
 const uiFeatureCatalogueSchema = z
   .object({
     version: z.literal(0),
-    governedWebPackages: z.array(z.string().regex(/^@langwatch\/[a-z0-9-]+-web$/)),
+    governedWebPackages: z.array(z.string().regex(/^@langwatch\/[a-z0-9-]+-browser$/)),
     features: z.array(
       z
         .object({
@@ -96,7 +98,7 @@ type Capability = {
   id: string;
 };
 
-type WebPackage = ClassifiedPackage & { kind: "web"; feature: string };
+type WebPackage = ClassifiedPackage & { kind: "browser"; feature: string };
 
 /**
  * Screens are allowed the typed client and React Query: the browser derives
@@ -425,7 +427,7 @@ function isForbiddenUiSpecifier(specifier: string): string | undefined {
     return "a Node.js builtin";
   }
 
-  if (/^@langwatch\/(?:[^/]+-server|platform-api|server|worker)(?:\/|$)/.test(specifier)) {
+  if (/^@langwatch\/(?:[^/]+-process|platform-api|server|worker)(?:\/|$)/.test(specifier)) {
     return "server, API, worker, or Prisma implementation";
   }
 
@@ -675,7 +677,7 @@ function collaboratingSurfaceImport({
   catalogue: UiFeatureCatalogue;
 }): boolean {
   const nestedSurface = specifier.match(
-    /^(@langwatch\/[a-z0-9-]+-web)\/surfaces\/([a-z][a-z0-9]*(?:-[a-z0-9]+)*)$/,
+    /^(@langwatch\/[a-z0-9-]+-browser)\/surfaces\/([a-z][a-z0-9]*(?:-[a-z0-9]+)*)$/,
   );
 
   if (nestedSurface) {
@@ -722,7 +724,7 @@ function forbiddenWebPresentationImport({
     return "an application or package source alias";
   }
 
-  if (/^@langwatch\/[^/]+-web(?:\/|$)/.test(specifier)) {
+  if (/^@langwatch\/[^/]+-browser(?:\/|$)/.test(specifier)) {
     if (collaboratingSurface?.(specifier)) return void 0;
 
     return "a feature-web public entry";
@@ -747,7 +749,7 @@ function forbiddenFrontendFeatureImport({
   const forbiddenCapability = forbiddenBrowserCapabilityImport(specifier);
   if (forbiddenCapability) return forbiddenCapability;
 
-  const declaredWebCapability = /^@langwatch\/[^/]+-web(?:\/|$)/.test(specifier);
+  const declaredWebCapability = /^@langwatch\/[^/]+-browser(?:\/|$)/.test(specifier);
 
   if (specifier.startsWith("@langwatch/")) {
     if (!declaredWebCapability) {
@@ -2379,7 +2381,7 @@ export function lintFrontendUiBoundaries(snapshot: WorkspaceSnapshot): Architect
   if (!catalogue) return violations;
 
   const webPackages = packages.filter(
-    (pkg): pkg is WebPackage => pkg.kind === "web" && pkg.feature !== void 0,
+    (pkg): pkg is WebPackage => pkg.kind === "browser" && pkg.feature !== void 0,
   );
 
   const selectedPackageNames = new Set(catalogue.governedWebPackages);
@@ -2412,7 +2414,7 @@ export function declaredWebDependencyPairs(snapshot: WorkspaceSnapshot): Readonl
   if (!catalogue) return new Set();
 
   const webPackages = packages.filter(
-    (pkg): pkg is WebPackage => pkg.kind === "web" && pkg.feature !== void 0,
+    (pkg): pkg is WebPackage => pkg.kind === "browser" && pkg.feature !== void 0,
   );
 
   const governed = new Set(catalogue.governedWebPackages);

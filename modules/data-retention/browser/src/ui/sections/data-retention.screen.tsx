@@ -26,7 +26,7 @@ import {
   scopeFilterFromAddress,
   scopeHierarchyOf,
   type ScopeFilterValue,
-} from "@langwatch/authz-browser-kit/scope-picker";
+} from "@langwatch/authz-browser-kit";
 import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
   retentionCategories,

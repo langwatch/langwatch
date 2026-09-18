@@ -1,13 +1,13 @@
 import type { WorkflowApiRouter, RouterOutputs } from "@langwatch/browser-trpc/workflow-api";
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
+import { datasetDatabaseRecordsToInMemoryDataset } from "@langwatch/workflow-browser-kit";
 import type { Entry } from "@langwatch/workflow-contract";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import { useMemo } from "react";
 
-import { datasetDatabaseRecordsToInMemoryDataset } from "../../model/studio-dataset.utils.ts";
 import { useOrganizationTeamProject } from "../studio-host/use-organization-team-project.ts";
 
 export const useGetDatasetData = ({

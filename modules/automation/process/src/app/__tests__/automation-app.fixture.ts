@@ -6,7 +6,7 @@ import { ResourceScope } from "@langwatch/kernel";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import { PrismaClient, type Trigger as PrismaTrigger } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { vi } from "vitest";
 

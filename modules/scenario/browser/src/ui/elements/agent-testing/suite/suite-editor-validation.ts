@@ -7,7 +7,7 @@
  */
 
 import { describeError } from "@langwatch/browser-host/errors";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
 import {
   SUITE_FIELD_IDENTIFIER_DUPLICATE_MESSAGE,
   type SuiteFieldDefinition,

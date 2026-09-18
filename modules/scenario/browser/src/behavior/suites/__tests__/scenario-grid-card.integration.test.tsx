@@ -4,8 +4,7 @@
  *   Scenario: Grid card shows scenario name, target, and iteration
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { ScenarioGridCard } from "@langwatch/suite-browser/run-cards";
-import { makeScenarioRunData } from "@langwatch/suite-browser/testing";
+import { makeScenarioRunData, ScenarioGridCard } from "@langwatch/suite-browser-kit";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";

@@ -121,7 +121,6 @@ type RouteInput<Params extends RouteSource, Query extends RouteSource, Body exte
  */
 type OutputSchema =
   | z.ZodObject
-  | z.ZodUnion
   | z.ZodArray
   | z.ZodVoid
   | z.ZodUndefined

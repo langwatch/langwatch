@@ -11,9 +11,8 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useColorModeValue } from "@langwatch/design-system/color-mode";
+import { LangyMark, useLangyStore } from "@langwatch/langy-browser-kit";
 import { SERIF } from "@langwatch/langy-browser/surfaces/asaplangy";
-import { LangyMark } from "@langwatch/langy-browser/surfaces/langy-mark";
-import { useLangyStore } from "@langwatch/langy-browser/surfaces/langy-store";
 import { getIsMac } from "@langwatch/navigation-browser/surfaces/command-bar";
 import { MeshGradient } from "@paper-design/shaders-react";
 import {

@@ -12,7 +12,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { docsUrl } from "@langwatch/handled-error/docs-url";
+import { docsUrl } from "@langwatch/error-presentation/docs-url";
 import { Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 

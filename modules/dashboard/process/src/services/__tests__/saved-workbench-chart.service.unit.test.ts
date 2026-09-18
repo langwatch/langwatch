@@ -18,7 +18,7 @@ import {
   WORKBENCH_CHART_DEFINITION_VERSION,
   type SavedWorkbenchChartDefinition,
 } from "@langwatch/dashboard-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type {

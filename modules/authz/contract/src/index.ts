@@ -3,6 +3,7 @@
  * This is the package's only public entry point.
  */
 export * from "./authz.ts";
+export { newAuthzBindingId } from "./authz-binding-id.ts";
 export * from "./authz.binding-management.ts";
 export * from "./authz.commands.ts";
 export * from "./authz.errors.ts";

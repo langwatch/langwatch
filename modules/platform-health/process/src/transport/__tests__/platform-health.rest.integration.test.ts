@@ -7,7 +7,7 @@ import {
   type PlatformHealthApi as PlatformHealthCapability,
   PlatformHealthUnauthorizedError,
 } from "@langwatch/platform-health-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { ErrorHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";

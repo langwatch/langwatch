@@ -14,7 +14,7 @@ import { api } from "@langwatch/browser-trpc/workflow-api";
 import { api as workflowApi } from "@langwatch/browser-trpc/workflow-api";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { HistoryIcon } from "@langwatch/model-provider-browser/history-icon";
+import { HistoryIcon } from "@langwatch/model-provider-browser-kit";
 import {
   hasDSLChanged,
   parseStudioWorkflow,

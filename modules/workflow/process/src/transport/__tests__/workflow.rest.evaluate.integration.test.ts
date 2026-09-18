@@ -10,7 +10,7 @@ import {
   type RestErrorHandler,
 } from "@langwatch/api/rest";
 import { HandledError, NotFoundError, ValidationError } from "@langwatch/handled-error";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { WorkflowApi, WorkflowEvaluationStarted } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 

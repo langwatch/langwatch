@@ -1,5 +1,5 @@
 import { AgentNotFoundError, AgentOwnerOnlyError } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 

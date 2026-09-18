@@ -12,8 +12,9 @@
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import {
+  ssoConfig,
+  ssoSecrets,
   SsoApi,
-  ssoConfigurationSchema,
   type SsoApi as SsoApiContract,
   type ActivateSsoConnectionInput,
   type BackofficeSsoConnection,
@@ -21,6 +22,7 @@ import {
   type ListSsoConnectionsInput,
   type RegisterSsoConnectionInput,
   type RejectSsoDomainClaimInput,
+  type SsoConfig,
   type SsoConfiguration,
   type SsoConnectionByIdInput,
   type SsoConnectionReasonInput,
@@ -31,7 +33,6 @@ import {
 import { IdentityApi } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
-import { reads } from "@langwatch/process-stores/members";
 import { UserApi } from "@langwatch/user-contract";
 
 import {
@@ -59,13 +60,83 @@ class BetterAuthSsoProviderMount extends SsoProviderMountInspector {
   }
 }
 
-/** What the process composes this feature's application over. */
+/**
+ * Shapes restated rather than imported from `@langwatch/process-stores`: a
+ * module depends on contracts. `publicBaseUrl` is the process's own fact,
+ * drilled in — absent where the deployment named no `BASE_HOST`.
+ * `isSaas` is the process's own fact too: `IS_SAAS` has one owner, the process
+ * slice, and every module that needs it reads it here.
+ */
 export type SsoInfrastructure = Readonly<{
   /** Where the gate's decisions are written. */
   logger: SsoGateLogger;
+  publicBaseUrl: string | undefined;
+  isSaas: boolean;
 }>;
 
-type SsoSetup = FeatureSetup<typeof SsoApp.dependencies, SsoInfrastructure, SsoConfiguration>;
+type SsoSetup = FeatureSetup<typeof SsoApp.dependencies, SsoInfrastructure, SsoConfig>;
+
+/** Every credential this module resolves, alongside the deployment facts. */
+async function resolveConfiguration(
+  config: SsoConfig,
+  members: SsoInfrastructure,
+  secrets: SsoSetup["secrets"],
+): Promise<SsoConfiguration> {
+  const [
+    instanceLicenseKey,
+    googleClientSecret,
+    githubClientSecret,
+    gitlabClientSecret,
+    azureAdClientSecret,
+    auth0ClientSecret,
+    oktaClientSecret,
+    cognitoClientSecret,
+    oneLoginClientSecret,
+    oidcClientSecret,
+  ] = await Promise.all([
+    secrets.into(ssoSecrets.instanceLicenseKey, (value) => value),
+    secrets.into(ssoSecrets.googleClientSecret, (value) => value),
+    secrets.into(ssoSecrets.githubClientSecret, (value) => value),
+    secrets.into(ssoSecrets.gitlabClientSecret, (value) => value),
+    secrets.into(ssoSecrets.azureAdClientSecret, (value) => value),
+    secrets.into(ssoSecrets.auth0ClientSecret, (value) => value),
+    secrets.into(ssoSecrets.oktaClientSecret, (value) => value),
+    secrets.into(ssoSecrets.cognitoClientSecret, (value) => value),
+    secrets.into(ssoSecrets.oneLoginClientSecret, (value) => value),
+    secrets.into(ssoSecrets.oidcClientSecret, (value) => value),
+  ]);
+
+  return {
+    isSaas: members.isSaas,
+    provider: config.provider,
+    baseUrl: members.publicBaseUrl ?? "http://localhost",
+    instanceLicenseKey,
+    googleClientId: config.googleClientId,
+    googleClientSecret,
+    githubClientId: config.githubClientId,
+    githubClientSecret,
+    gitlabClientId: config.gitlabClientId,
+    gitlabClientSecret,
+    azureAdClientId: config.azureAdClientId,
+    azureAdClientSecret,
+    azureAdTenantId: config.azureAdTenantId,
+    auth0ClientId: config.auth0ClientId,
+    auth0ClientSecret,
+    auth0Issuer: config.auth0Issuer,
+    oktaClientId: config.oktaClientId,
+    oktaClientSecret,
+    oktaIssuer: config.oktaIssuer,
+    cognitoClientId: config.cognitoClientId,
+    cognitoClientSecret,
+    cognitoIssuer: config.cognitoIssuer,
+    oneLoginClientId: config.oneLoginClientId,
+    oneLoginClientSecret,
+    oneLoginIssuer: config.oneLoginIssuer,
+    oidcClientId: config.oidcClientId,
+    oidcClientSecret,
+    oidcIssuer: config.oidcIssuer,
+  };
+}
 
 /**
  * How long a removal stays reversible before the process manager completes it.
@@ -87,8 +158,10 @@ export class SsoApp implements SsoApiContract {
     auditLog: AuditLogApi,
     identity: IdentityApi,
   };
-  static readonly configSchema = ssoConfigurationSchema;
-  static readonly reads = reads("logger");
+  static readonly config = ssoConfig;
+  static readonly secrets = ssoSecrets;
+  /** `publicBaseUrl` is not one of the closed `reads()` members. */
+  static readonly reads = ["logger", "publicBaseUrl", "isSaas"] as const;
 
   readonly #gate: SsoGateService;
   readonly #connections: SsoConnectionLedger;
@@ -108,7 +181,7 @@ export class SsoApp implements SsoApiContract {
     this.#auditLog = dependencies.auditLog;
   }
 
-  static create({ dependencies, members, config }: SsoSetup): SsoApp {
+  static async create({ dependencies, members, config, secrets }: SsoSetup): Promise<SsoApp> {
     // A peer may not be invoked while the process constructs, so the ledger
     // forwards to identity per call rather than being fetched here.
     const backoffice = () => dependencies.identity.ssoBackoffice();
@@ -125,9 +198,10 @@ export class SsoApp implements SsoApiContract {
       resumeConnection: (input) => backoffice().resumeConnection(input),
       requestTeardown: (input) => backoffice().requestTeardown(input),
     };
+    const configuration = await resolveConfiguration(config, members, secrets);
     return new SsoApp(
       SsoGateService.create({
-        configuration: config,
+        configuration,
         licensing: dependencies.licensing,
         logger: members.logger,
         providerMountInspector: BetterAuthSsoProviderMount.create(),

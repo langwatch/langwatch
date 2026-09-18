@@ -249,10 +249,9 @@ function ssoConnectionLedger(options: {
     stagedSender: (name) => {
       if (!eventing.isEnabled) return null;
       try {
-        const pipeline = eventing.getPipeline(SSO_CONNECTION_PIPELINE_NAME) as unknown as {
-          commands: Record<string, SsoConnectionStagedSender>;
-        };
-        return pipeline.commands[name] ?? null;
+        const pipeline = eventing.getPipeline(SSO_CONNECTION_PIPELINE_NAME);
+        const command: SsoConnectionStagedSender | undefined = pipeline.commands[name];
+        return command ?? null;
       } catch {
         return null;
       }

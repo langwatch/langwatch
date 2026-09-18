@@ -12,7 +12,7 @@ vi.mock("@langwatch/navigation-browser/surfaces/command-bar", () => ({
 }));
 
 const askLangy = vi.fn();
-vi.mock("@langwatch/langy-browser/surfaces/langy-store", () => ({
+vi.mock("@langwatch/langy-browser-kit", () => ({
   useLangyStore: (selector: (s: { askLangy: () => void }) => unknown) => selector({ askLangy }),
   selectLangySuggestions: ({ reach }: { reach: { hasTraces: boolean } }) =>
     reach.hasTraces

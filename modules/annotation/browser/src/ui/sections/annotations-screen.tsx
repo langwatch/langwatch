@@ -4,7 +4,7 @@ import { Box, Flex, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 import { downloadCsv } from "@langwatch/csv/download";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
 import { Inbox } from "lucide-react";
 import { useMemo } from "react";
 

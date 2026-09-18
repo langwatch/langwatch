@@ -5,15 +5,21 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+
 import type { SourceFile } from "typescript/unstable/ast";
 import { beforeAll, describe, expect, it } from "vitest";
+
 import {
   mightContainMockCall,
   resolveMockSpecifier,
   scanSourceForMockSpecifiers,
 } from "../mock-specifier-scan.ts";
 import { parseSourceText, parseSourceTexts } from "../ts-ast.ts";
-import { aliasesForFile, type ModuleAlias, parseVitestConfigAliases } from "../vitest-alias-table.ts";
+import {
+  aliasesForFile,
+  type ModuleAlias,
+  parseVitestConfigAliases,
+} from "../vitest-alias-table.ts";
 
 /** packages/test-harness/, from src/__tests__/. */
 const PACKAGE_ROOT = resolve(__dirname, "../..");

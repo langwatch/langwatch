@@ -1,6 +1,5 @@
 import { Box, Skeleton, VStack } from "@chakra-ui/react";
-
-import { useReducedMotion } from "../../../../behavior/use-reduced-motion.ts";
+import { useReducedMotion } from "@langwatch/langy-browser-kit";
 
 /**
  * How many placeholder turns are worth drawing. The column only shows a few

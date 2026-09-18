@@ -25,6 +25,33 @@ export const processOwner = {
      */
     isSaas: c.env("IS_SAAS", environmentOneOrTrueSchema),
     /**
+     * The platform-operator list, parsed once. Blank means none rather than
+     * refusing boot; several modules read it, so it has one owner here.
+     */
+    adminEmails: c.env(
+      "ADMIN_EMAILS",
+      z
+        .string()
+        .optional()
+        .transform((raw) =>
+          (raw ?? "")
+            .split(",")
+            .map((email) => email.trim())
+            .filter((email) => email.length > 0),
+        ),
+    ),
+    /**
+     * The NLP engine's address. A deployment fact of the process, read by the
+     * http surface and by every module that calls the engine.
+     */
+    nlpServiceUrl: c.env(
+      "LANGWATCH_NLP_SERVICE",
+      z
+        .string()
+        .optional()
+        .transform((value) => value?.trim() || void 0),
+    ),
+    /**
      * This deployment's public origin: a process fact drilled to the modules
      * that link back, never a config key each of them declares. Absent and
      * blank both mean "named none", as the composition this replaced answered.

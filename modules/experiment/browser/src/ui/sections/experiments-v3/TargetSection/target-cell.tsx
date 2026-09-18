@@ -3,6 +3,7 @@ import { useDrawer } from "@langwatch/browser-host/drawer";
 import { formatLatency } from "@langwatch/design-system/metric-value-formatters";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useEscapeKey } from "@langwatch/design-system/use-escape-key";
+import { describeCellFailure } from "@langwatch/experiment-browser-kit";
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import { TraceIdPeek } from "@langwatch/trace-browser/surfaces/trace-id-peek";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -20,7 +21,6 @@ import { useEvaluationsV3Store } from "../../../../behavior/experiments-v3/use-e
 import { useCodeEvaluatorIds } from "../../../../behavior/experiments-v3/use-evaluator-name.ts";
 import { useOpenEvaluatorEditor } from "../../../../behavior/experiments-v3/use-open-evaluator-editor.ts";
 import { useTargetName } from "../../../../behavior/experiments-v3/use-target-name.ts";
-import { describeCellFailure } from "../../../../model/experiments-v3/cell-failure.ts";
 import { evaluatorHasMissingMappings } from "../../../../model/experiments-v3/mapping-validation.ts";
 import type { EvaluatorConfig, TargetConfig } from "../../../../model/experiments-v3/types.ts";
 import { isComparisonEvaluator } from "../../../../model/experiments-v3/types.ts";

@@ -8,10 +8,10 @@
   ],
   "type": "module",
   "exports": {
-    "./provider-icons": {
-      "langwatch-declaration-source": "./src/provider-icons.ts",
-      "types": "./dist/provider-icons.d.ts",
-      "default": "./src/provider-icons.ts"
+    ".": {
+      "langwatch-declaration-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
     }
   },
   "scripts": {
@@ -19,15 +19,23 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
-    "@langwatch/model-provider-contract": "workspace:*"
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
+    "lucide-react": "catalog:"
   },
   "devDependencies": {
     "@chakra-ui/react": "catalog:",
     "@emotion/react": "catalog:",
-    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
+    "@tanstack/react-query": "catalog:",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "typescript": "catalog:",

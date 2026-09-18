@@ -1,8 +1,3 @@
-import type {
-  Period,
-  RelativePresetKey,
-  PeriodMode,
-} from "@langwatch/analytics-browser-kit/period-selector";
 /**
  * The window the Results tab reads, in the two forms the surface uses.
  * @see specs/features/agent-testing/results-tabs.feature
@@ -10,8 +5,11 @@ import type {
 import {
   describePeriod,
   matchPeriodPreset,
+  type Period,
+  type PeriodMode,
   PeriodSelector,
-} from "@langwatch/analytics-browser-kit/period-selector";
+  type RelativePresetKey,
+} from "@langwatch/analytics-browser-kit";
 import type { Instant } from "@langwatch/time";
 import { differenceInCalendarDays, fromDate } from "@langwatch/time";
 

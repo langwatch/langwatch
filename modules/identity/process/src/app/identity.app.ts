@@ -3,12 +3,7 @@
  * newborn sweep, join-request/SSO-connection/directory-sync guards — every
  * capability crossing a package boundary today (ADR-101, 115, 116, 117).
  */
-import {
-  identityConfig,
-  IdentityApi,
-  IdentityCapabilityUnavailableError,
-  type IdentityConfig,
-} from "@langwatch/identity-contract";
+import { IdentityApi, IdentityCapabilityUnavailableError } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { Temporal, nowInstant } from "@langwatch/time";
@@ -50,9 +45,9 @@ const RESERVATIONS_REAP_LIMIT_PER_PASS = 200;
  * see the handoff. Default preserves the deleted schema's producer-role default.
  */
 type IdentityMembers = MembersRead<readonly ["prisma", "eventing"]> &
-  Readonly<{ producesPipelines: boolean }>;
+  Readonly<{ producesPipelines: boolean; adminEmails: readonly string[] }>;
 
-type IdentitySetup = FeatureSetup<Record<string, never>, IdentityMembers, IdentityConfig> &
+type IdentitySetup = FeatureSetup<Record<string, never>, IdentityMembers, undefined> &
   Readonly<{ repositories: IdentityRepositories }>;
 
 type IdentityAppParts = {
@@ -76,16 +71,19 @@ type IdentityAppParts = {
 export class IdentityApp implements IdentityApi {
   static readonly contract = IdentityApi;
   static readonly dependencies = {};
-  static readonly config = identityConfig;
   /** `registersPipelines` is named raw so the process can answer it through
    * `withMember`/`withMembers` (see {@link IdentityMembers}). */
-  static readonly reads = [...reads("prisma", "eventing"), "producesPipelines"] as const;
+  static readonly reads = [
+    ...reads("prisma", "eventing"),
+    "producesPipelines",
+    "adminEmails",
+  ] as const;
 
   static create(setup: IdentitySetup): IdentityApp {
     const infrastructure = buildIdentityInfrastructure({
       prisma: setup.members.prisma,
       eventing: setup.members.eventing,
-      adminEmails: setup.config.adminEmails,
+      adminEmails: setup.members.adminEmails,
       registersPipelines: setup.members.producesPipelines,
     });
     const reservations = setup.repositories.reservations;

@@ -31,7 +31,10 @@
       "path": "../../organization/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/test-harness/tsconfig.build.json"
+      "path": "../../../packages/error-presentation/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/vitest-config/tsconfig.build.json"
     }
   ]
 }

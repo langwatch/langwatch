@@ -1,0 +1,38 @@
+{
+  "name": "@langwatch/error-views",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The browser views for a handled error: the alert, the remediation action and the retry affordance the presentation registry describes.",
+  "license": "MIT",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/views.tsx",
+  "types": "./dist/views.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/views.d.ts",
+      "default": "./src/views.tsx"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@langwatch/error-presentation": "workspace:*",
+    "react": "catalog:"
+  },
+  "devDependencies": {
+    "@emotion/react": "catalog:",
+    "@types/react": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "react": "^19.2.7"
+  }
+}

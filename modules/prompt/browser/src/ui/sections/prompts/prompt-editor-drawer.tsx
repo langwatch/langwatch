@@ -13,14 +13,16 @@ import { api } from "@langwatch/browser-trpc/workflow-api";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useEvaluationMappings } from "@langwatch/experiment-browser/evaluation-mappings";
-import { getFieldsUsedByPromptTemplate } from "@langwatch/experiment-browser/mapping-validation";
 import type { LocalPromptConfig } from "@langwatch/experiment-contract";
+import { getFieldsUsedByPromptTemplate } from "@langwatch/experiment-contract/mapping-validation";
 import { useModelProvidersSettings } from "@langwatch/model-provider-browser/surfaces/model-provider-settings";
 import {
   type AvailableSource,
   type FieldMapping,
   FormVariablesSection,
-} from "@langwatch/prompt-browser-kit/variables";
+  getMaxTokenLimit,
+  VersionBadge,
+} from "@langwatch/prompt-browser-kit";
 import { hasNonEmptySystemMessage, type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import type { LlmConfigInputType } from "@langwatch/workflow-browser/component-types";
 import { useRegisterDrawerFooter } from "@langwatch/workflow-browser/studio-drawer-footer";
@@ -32,7 +34,6 @@ import { LuArrowLeft, LuPencil } from "react-icons/lu";
 import { formValuesToTriggerSaveVersionParams } from "../../../behavior/prompts/llm-prompt-config-utils.ts";
 import { useLatestPromptVersion } from "../../../behavior/prompts/use-latest-prompt-version.ts";
 import { usePromptConfigForm } from "../../../behavior/prompts/use-prompt-config-form.ts";
-import { getMaxTokenLimit } from "../../../model/max-token-limit.ts";
 import { localConfigToFormValues } from "../../../model/prompts/local-config-to-form-values.ts";
 import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt.ts";
 import {
@@ -42,7 +43,6 @@ import {
   getSaveBlockerMessage,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "../../../prompt-form.ts";
-import { VersionBadge } from "../../../prompt-version.ts";
 import { FormOutputsSection } from "../../elements/outputs/form-outputs-section.tsx";
 import { PromptMessagesField } from "../../elements/prompts/forms/fields/message-history-fields/prompt-messages-field.tsx";
 import {

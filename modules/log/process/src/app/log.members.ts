@@ -1,11 +1,5 @@
 import type { LogPiiRedactionLevel, LogPreparation } from "@langwatch/log-contract";
 import type { LogRecordReceivedEventData } from "@langwatch/trace-contract";
-export interface LogInfrastructure {
-  logPreparation: LogPreparer;
-  logRedaction: LogRedaction;
-  logTraceIo: LogTraceIoExtractor;
-}
-
 export type LogPreparationInput = {
   tenantId: string;
   organizationId: string;

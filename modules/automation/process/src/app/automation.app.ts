@@ -79,6 +79,7 @@ import { AutomationPersistCapService } from "../services/persist-cap.service.ts"
 import type { AutomationPersistCapRedis } from "../services/persist-cap.service.ts";
 import { ReportScheduleService } from "../services/report-schedule.service.ts";
 import { AutomationGraphService } from "../services/trigger-graph.service.ts";
+import { HmacUnsubscribeTokenAdapter } from "../services/unsubscribe-token.service.ts";
 import type { UnsubscribeTokenVerifier } from "../services/unsubscribe-token.service.ts";
 import {
   buildAutomationInfrastructure,
@@ -244,13 +245,15 @@ export class AutomationApp implements AutomationApi {
     auditLog: AuditLogApi,
   };
   static readonly config = automationServerConfig;
+  /** `secrets` carries the cipher key `stores` owns: one owner declares
+   * `CREDENTIALS_SECRET`, and this module reads the value through the member. */
   static readonly reads = [
     "prisma",
     "redis",
     "logger",
     "encryption",
+    "secrets",
     "publicBaseUrl",
-    "unsubscribeSecret",
   ] as const;
 
   /**
@@ -259,9 +262,13 @@ export class AutomationApp implements AutomationApi {
    * {@link AutomationApp.fromInfrastructure} does.
    */
   static create(setup: AutomationSetup): AutomationApp {
+    const verifier = HmacUnsubscribeTokenAdapter.create({
+      secret: setup.members.secrets.find("CREDENTIALS_SECRET"),
+    });
     const infrastructure = buildAutomationInfrastructure({
       members: setup.members,
       auditLog: setup.dependencies.auditLog,
+      verifier,
     });
 
     return AutomationApp.fromInfrastructure({

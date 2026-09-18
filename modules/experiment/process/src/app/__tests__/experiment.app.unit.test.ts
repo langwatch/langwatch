@@ -11,7 +11,7 @@ import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { Experiment, ExperimentPublishedMonitor } from "@langwatch/experiment-contract";
 import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 import type { WorkflowService } from "@langwatch/workflow-process";
 import { describe, expect, it, vi } from "vitest";

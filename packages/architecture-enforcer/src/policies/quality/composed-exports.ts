@@ -1,6 +1,8 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { basename, join, relative, resolve, sep } from "node:path";
+
 import ts from "typescript";
+
 import {
   type BaselineEntry,
   type BaselinePolicy,
@@ -11,6 +13,7 @@ import {
   shrinkCheck,
   staleRows,
 } from "../../baseline.ts";
+import type { ArchitectureViolation } from "../../types.ts";
 import {
   workspaceModuleResolver,
   sourceFile,
@@ -19,7 +22,6 @@ import {
   type WorkspaceModuleResolver,
 } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
-import type { ArchitectureViolation } from "../../types.ts";
 
 /** Guard that exported capabilities are actually composed (reachability, not just existence);
  * see composed-exports-baseline.json for exclusions and full rules */
@@ -93,7 +95,7 @@ function subdirectories(path: string): string[] {
 }
 
 /**
- * The server package indexes this rule reads: every feature's `server` role
+ * The server package indexes this rule reads: every feature's `process` role
  * and the server-side infrastructure packages under `packages/`. Derived, not
  * listed — a hand-written list only guards what somebody remembered to add.
  */
@@ -106,7 +108,7 @@ export function serverPackageIndexes({ root }: { root: string }): string[] {
 
   for (const group of [join(root, "modules"), join(root, "enterprise", "modules")]) {
     for (const feature of subdirectories(group)) {
-      push(join(group, feature, "server", "src", "index.ts"));
+      push(join(group, feature, "process", "src", "index.ts"));
     }
   }
 
@@ -271,11 +273,11 @@ export function collectComposedExportSubjects({
 }
 
 /**
- * Trees the walk stops on: a contract package publishes wire shapes, a web
+ * Trees the walk stops on: a contract publishes wire shapes, a browser
  * package is browser code, `dist` is build output — none composes anything,
- * so descending into them buys nothing and costs a quarter of the parse budget.
+ * so descending buys nothing and costs a quarter of the parse budget.
  */
-const TERMINAL = /(?:\/dist\/|\/contract\/|-contract\/|\/web\/|-web\/)/;
+const TERMINAL = /(?:\/dist\/|\/contract\/|-contract\/|\/browser\/|-browser\/)/;
 
 /** Every file the entrypoints reach through value imports. */
 export function reachableFiles({
@@ -464,7 +466,11 @@ export function lintComposedExports(
 
     violations.push({
       policy: "composed-exports",
-      file: subject.indexFile,
+      // Absolute, matching every other policy's convention: `lintPolicies`
+      // relativizes to `root` once. `subject.indexFile` is already
+      // root-relative, so passing it through here double-joined it against
+      // `process.cwd()` instead, producing an unnavigable reported path.
+      file: join(root, subject.indexFile),
       message: `\`${subject.name}\` is exported from \`${subject.packagePath}\` and composed by no application. Compose it in the owning \`*.composition.ts\`, or delete it and its tests.`,
       allowed: `Construct it on a path reachable from ${ENTRYPOINTS.join(", ")}.`,
     });

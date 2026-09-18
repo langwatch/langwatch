@@ -4,7 +4,7 @@
  */
 import type { AuthzApi, AuthzCanBatchByIdsInput } from "@langwatch/authz-contract";
 import type { DataPrivacyProjectLineage } from "@langwatch/data-privacy-process";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type { DataPrivacyDirectoryReader } from "../../app/data-privacy.app.ts";

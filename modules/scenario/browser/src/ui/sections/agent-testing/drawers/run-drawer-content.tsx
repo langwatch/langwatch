@@ -6,7 +6,7 @@
 
 import { Accordion, Box, Grid, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { isTerminalStatus, ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { ConversationExpandContext } from "@langwatch/trace-browser/surfaces/conversation-expand-context";
+import { ConversationExpandContext } from "@langwatch/trace-browser-kit";
 
 import { RunVerdictPanel } from "../../../elements/agent-testing/drawers/run-verdict-panel.tsx";
 import { nextSpeakerOf } from "../../../elements/next-speaker.ts";

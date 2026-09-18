@@ -1,4 +1,4 @@
-import { explainHandledError } from "@langwatch/handled-error/presentation";
+import { explainHandledError } from "@langwatch/error-presentation/presentation";
 /**
  * Reading a failed tool frame into card copy.
  * @see specs/langy/langy-cli-tool-envelope.feature

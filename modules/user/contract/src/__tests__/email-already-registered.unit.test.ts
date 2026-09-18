@@ -3,7 +3,7 @@
  * words a customer reads for it.
  * @see specs/auth/signup-does-not-strand-an-account.feature
  */
-import { APP_ERROR_CODES } from "@langwatch/handled-error/app-codes";
+import { APP_ERROR_CODES } from "@langwatch/error-presentation/app-codes";
 import { describe, expect, it } from "vitest";
 
 import { EmailAlreadyRegisteredError } from "../user.errors.ts";

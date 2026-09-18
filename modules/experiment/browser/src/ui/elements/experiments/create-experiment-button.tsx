@@ -1,57 +1,19 @@
 import { Box, HStack, Link, Spinner, Text } from "@chakra-ui/react";
-import { showErrorToast } from "@langwatch/browser-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { useRouter } from "@langwatch/browser-host/use-router";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { generateHumanReadableId } from "@langwatch/experiment-contract";
 import { ChevronDown, ExternalLink, Plus } from "lucide-react";
-import { useState } from "react";
 
-import { createInitialState } from "../../../model/experiments-v3/types.ts";
-import { extractPersistedState } from "../../../model/experiments-v3/types/persistence.ts";
-
-export const CreateExperimentButton = () => {
+export const CreateExperimentButton = ({
+  isCreating,
+  onCreate,
+}: {
+  isCreating: boolean;
+  onCreate: () => void;
+}) => {
   const { project, hasPermission } = useOrganizationTeamProject();
-  const router = useRouter();
-  const [isCreating, setIsCreating] = useState(false);
-  const utils = api.useUtils();
-  const createExperiment = api.experiments.saveEvaluationsV3.useMutation({
-    onSuccess: (data) => {
-      void utils.experiments.getAllForEvaluationsList.invalidate();
-      void router.push(`/${project?.slug}/experiments/workbench/${data.slug}`);
-      setIsCreating(false);
-    },
-    onError: (error) => {
-      setIsCreating(false);
-      showErrorToast({
-        error,
-        fallbackTitle: "Couldn't create the experiment",
-      });
-    },
-  });
 
   if (!project || !hasPermission("experiments:update")) return null;
-
-  const handleCreate = () => {
-    if (isCreating) return;
-
-    setIsCreating(true);
-    const name = generateHumanReadableId();
-    const initialState = createInitialState();
-    initialState.name = name;
-    const persistedState = extractPersistedState(initialState);
-
-    createExperiment.mutate({
-      projectId: project.id,
-      experimentId: undefined,
-      state: {
-        ...persistedState,
-        experimentSlug: name,
-      },
-    });
-  };
 
   return (
     <Menu.Root>
@@ -63,7 +25,7 @@ export const CreateExperimentButton = () => {
         </PageLayout.HeaderButton>
       </Menu.Trigger>
       <Menu.Content minWidth="320px">
-        <Menu.Item value="experiment-ui" onClick={handleCreate} disabled={isCreating}>
+        <Menu.Item value="experiment-ui" onClick={onCreate} disabled={isCreating}>
           <Box width="100%">
             <Text fontWeight="medium">
               {isCreating && <Spinner size="xs" marginRight={2} />}

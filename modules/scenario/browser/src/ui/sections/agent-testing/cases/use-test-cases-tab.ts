@@ -1,8 +1,4 @@
-import type {
-  Period,
-  PeriodMode,
-  RelativePresetKey,
-} from "@langwatch/analytics-browser-kit/period-selector";
+import type { Period, PeriodMode, RelativePresetKey } from "@langwatch/analytics-browser-kit";
 /**
  * Everything the Scenarios tab reads and writes, in one model.
  * @see specs/features/agent-testing/suites-rail.feature

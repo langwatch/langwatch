@@ -6,7 +6,7 @@
  */
 
 import { chakra, VStack } from "@chakra-ui/react";
-import { getRoutePath } from "@langwatch/workflow-browser/surfaces/workflow-routes";
+import { getRoutePath } from "@langwatch/workflow-contract";
 
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";

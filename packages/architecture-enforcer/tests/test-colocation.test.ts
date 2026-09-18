@@ -1,5 +1,6 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -22,7 +23,7 @@ function write(path: string, contents: string): void {
 }
 
 /** A strict feature package the workspace scanner will discover. */
-function featurePackage(feature: string, role: "contract" | "server" | "web"): void {
+function featurePackage(feature: string, role: "contract" | "process" | "browser"): void {
   write("pnpm-workspace.yaml", 'packages:\n  - "modules/*/*"\n');
   write(
     "modules/catalogue.json",
@@ -231,11 +232,8 @@ describe("planTestColocation", () => {
   describe("given a package whose tests mirror its source tree", () => {
     it("puts each test in a __tests__ beside the module it imports", () => {
       root = mkdtempSync(join("/tmp", "langwatch-test-colocation-"));
-      featurePackage("agent", "server");
-      write(
-        "modules/agent/process/src/services/agent.service.ts",
-        "export class AgentService {}",
-      );
+      featurePackage("agent", "process");
+      write("modules/agent/process/src/services/agent.service.ts", "export class AgentService {}");
       write(
         "modules/agent/process/src/repositories/agent.repository.ts",
         "export abstract class AgentRepository {}",
@@ -263,11 +261,8 @@ describe("planTestColocation", () => {
 
     it("rewrites the moved test's own imports to reach its new neighbours", () => {
       root = mkdtempSync(join("/tmp", "langwatch-test-colocation-"));
-      featurePackage("agent", "server");
-      write(
-        "modules/agent/process/src/services/agent.service.ts",
-        "export class AgentService {}",
-      );
+      featurePackage("agent", "process");
+      write("modules/agent/process/src/services/agent.service.ts", "export class AgentService {}");
       write(
         "modules/agent/process/tests/agent.service.unit.test.ts",
         'import { AgentService } from "../src/services/agent.service";\n',
@@ -288,11 +283,8 @@ describe("planTestColocation", () => {
      */
     it("resolves the subpath against src", () => {
       root = mkdtempSync(join("/tmp", "langwatch-test-colocation-"));
-      featurePackage("agent", "server");
-      write(
-        "modules/agent/process/src/eventing/agent.events.ts",
-        "export const AGENT_EVENTS = 1;",
-      );
+      featurePackage("agent", "process");
+      write("modules/agent/process/src/eventing/agent.events.ts", "export const AGENT_EVENTS = 1;");
       write(
         "modules/agent/process/tests/agent.events.unit.test.ts",
         'import { AGENT_EVENTS } from "@langwatch/agent-process/eventing/agent.events";\n',
@@ -308,7 +300,7 @@ describe("planTestColocation", () => {
 
     it("resolves the bare package name to its index", () => {
       root = mkdtempSync(join("/tmp", "langwatch-test-colocation-"));
-      featurePackage("agent", "server");
+      featurePackage("agent", "process");
       write("modules/agent/process/src/index.ts", "export const x = 1;");
       write(
         "modules/agent/process/tests/barrel.unit.test.ts",
@@ -325,7 +317,7 @@ describe("planTestColocation", () => {
 
     it("leaves another package's name alone", () => {
       root = mkdtempSync(join("/tmp", "langwatch-test-colocation-"));
-      featurePackage("agent", "server");
+      featurePackage("agent", "process");
       write("modules/agent/process/src/index.ts", "export const x = 1;");
       write(
         "modules/agent/process/tests/foreign.unit.test.ts",
@@ -346,7 +338,7 @@ describe("planTestColocation", () => {
      */
     it("keeps each one's directory rather than flattening them together", () => {
       root = mkdtempSync(join("/tmp", "langwatch-test-colocation-"));
-      featurePackage("agent", "web");
+      featurePackage("agent", "browser");
       write("modules/agent/browser/src/charts/chart.ts", "export const chart = 1;");
       write(
         "modules/agent/browser/tests/fixtures/valid/index.ts",
@@ -376,11 +368,8 @@ describe("planTestColocation", () => {
   describe("given a helper shared by the tests", () => {
     it("moves it into the __tests__ of the first test that imports it, keeping its path", () => {
       root = mkdtempSync(join("/tmp", "langwatch-test-colocation-"));
-      featurePackage("agent", "server");
-      write(
-        "modules/agent/process/src/services/agent.service.ts",
-        "export class AgentService {}",
-      );
+      featurePackage("agent", "process");
+      write("modules/agent/process/src/services/agent.service.ts", "export class AgentService {}");
       write("modules/agent/process/tests/support/stub.ts", "export const stub = 1;");
       write(
         "modules/agent/process/tests/agent.service.unit.test.ts",
@@ -408,11 +397,8 @@ describe("planTestColocation", () => {
      */
     it("reports it unresolved and leaves it where it is", () => {
       root = mkdtempSync(join("/tmp", "langwatch-test-colocation-"));
-      featurePackage("agent", "server");
-      write(
-        "modules/agent/process/src/services/agent.service.ts",
-        "export class AgentService {}",
-      );
+      featurePackage("agent", "process");
+      write("modules/agent/process/src/services/agent.service.ts", "export class AgentService {}");
       write(
         "modules/agent/process/tests/docs-shape.unit.test.ts",
         'import { readFileSync } from "node:fs";\nreadFileSync("README.md");\n',
@@ -430,11 +416,8 @@ describe("planTestColocation", () => {
   describe("given two tests of one module with the same filename", () => {
     it("reports the collision rather than letting one overwrite the other", () => {
       root = mkdtempSync(join("/tmp", "langwatch-test-colocation-"));
-      featurePackage("agent", "server");
-      write(
-        "modules/agent/process/src/services/agent.service.ts",
-        "export class AgentService {}",
-      );
+      featurePackage("agent", "process");
+      write("modules/agent/process/src/services/agent.service.ts", "export class AgentService {}");
       write(
         "modules/agent/process/tests/a/agent.service.unit.test.ts",
         'import { AgentService } from "../../src/services/agent.service";\n',
@@ -454,11 +437,8 @@ describe("planTestColocation", () => {
   describe("given a package with no tests directory", () => {
     it("plans nothing for it", () => {
       root = mkdtempSync(join("/tmp", "langwatch-test-colocation-"));
-      featurePackage("agent", "server");
-      write(
-        "modules/agent/process/src/services/agent.service.ts",
-        "export class AgentService {}",
-      );
+      featurePackage("agent", "process");
+      write("modules/agent/process/src/services/agent.service.ts", "export class AgentService {}");
 
       expect(planTestColocation(root).moves).toEqual([]);
     });

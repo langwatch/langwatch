@@ -3,11 +3,11 @@ import {
   ASSISTANT_PRESETS,
   type AssistantKind,
 } from "@langwatch/coding-agent-browser/surfaces/agent-identity";
+import { modelProviderIcons } from "@langwatch/model-provider-browser-kit";
 import { Bot, Boxes, Wrench } from "lucide-react";
 import type { ReactNode } from "react";
 
 import type { AiToolType } from "../../model/ai-tool-catalog.ts";
-import { modelProviderIcons } from "./model-provider-marks.tsx";
 import { resolveToolPreset, TOOL_PRESETS } from "./tool-presets.tsx";
 
 const FALLBACK_ICONS: Record<AiToolType, ReactNode> = {

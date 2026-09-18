@@ -70,7 +70,7 @@ describe("given the checked-in module lists", () => {
       // A tier gate coming back drops these three, and that is the failure
       // this test exists to catch.
       for (const module of ["governance", "scim", "licensing"]) {
-        expect(source).toContain(`@langwatch/enterprise-${module}-server`);
+        expect(source).toContain(`@langwatch/enterprise-${module}-process`);
       }
     });
 

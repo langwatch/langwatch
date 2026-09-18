@@ -40,10 +40,10 @@
       "path": "../../agent/contract/tsconfig.build.json"
     },
     {
-      "path": "../../audit-log/contract/tsconfig.build.json"
+      "path": "../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/api/tsconfig.build.json"
+      "path": "../../audit-log/contract/tsconfig.build.json"
     },
     {
       "path": "../../authz/contract/tsconfig.build.json"
@@ -76,13 +76,13 @@
       "path": "../../model-provider/contract/tsconfig.build.json"
     },
     {
-      "path": "../../presence/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/observability/tsconfig.build.json"
     },
     {
       "path": "../../../packages/plans/tsconfig.build.json"
+    },
+    {
+      "path": "../../presence/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/prisma-client/tsconfig.build.json"
@@ -101,6 +101,9 @@
     },
     {
       "path": "../../secret/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/secrets/tsconfig.build.json"
     },
     {
       "path": "../../suite/contract/tsconfig.build.json"

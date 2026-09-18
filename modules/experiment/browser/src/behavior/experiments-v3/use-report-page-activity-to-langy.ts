@@ -1,5 +1,5 @@
 import { narrateWorkbenchRun } from "@langwatch/experiment-contract";
-import { useLangyStore } from "@langwatch/langy-browser/surfaces/langy-store";
+import { useLangyStore } from "@langwatch/langy-browser-kit";
 import { useEffect } from "react";
 
 /**

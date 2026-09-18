@@ -8,7 +8,7 @@ import { randomUUID } from "node:crypto";
 
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
-import { cleanupTestRows } from "@langwatch/test-harness";
+import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { AuthzDatabase } from "../repositories/authz-read.repository.ts";

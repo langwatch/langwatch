@@ -1,7 +1,7 @@
+import { useLangyStore } from "@langwatch/langy-browser-kit";
 import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import {
   replayTurnProjection,
   tapeForConversation,

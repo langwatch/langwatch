@@ -11,7 +11,7 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "files": ["./src/workflow-icons.ts"],
+  "files": ["./src/index.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": [
     "**/__tests__/**",
@@ -24,6 +24,9 @@
     "**/__bench__/**"
   ],
   "references": [
+    {
+      "path": "../../dataset/contract/tsconfig.build.json"
+    },
     {
       "path": "../../../packages/design-system/tsconfig.build.json"
     },

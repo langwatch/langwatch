@@ -4,7 +4,7 @@
  */
 import { createTrpcRuntime } from "@langwatch/api/trpc";
 import type { SuiteApi, SuiteRunResult } from "@langwatch/suite-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 

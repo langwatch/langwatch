@@ -19,7 +19,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { cleanupTestRows } from "@langwatch/test-harness";
+import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { initTRPC } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it, vi } from "vitest";

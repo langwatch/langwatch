@@ -1,4 +1,4 @@
-import { langWatchQLCallerProtections } from "@langwatch/analytics-process";
+import { langWatchQLCallerProtections } from "@langwatch/analytics-contract";
 import {
   bindRestMiddleware,
   credentialPrincipalOfToken,
@@ -8,8 +8,8 @@ import { defineServerModule } from "@langwatch/kernel";
 
 import { DashboardApp } from "./app/dashboard.app.ts";
 import { dashboardRepositories } from "./repositories/dashboard-repositories.registry.ts";
-import { dashboardRest } from "./transport/dashboard.rest.ts";
 import { dashboardWidgetRest, dashboardWidgetUrl } from "./transport/dashboard-widget.rest.ts";
+import { dashboardRest } from "./transport/dashboard.rest.ts";
 import { dashboardTrpcTransport } from "./transport/dashboard.trpc.ts";
 import { graphRest } from "./transport/graph.rest.ts";
 import { graphTrpcTransport } from "./transport/graph.trpc.ts";

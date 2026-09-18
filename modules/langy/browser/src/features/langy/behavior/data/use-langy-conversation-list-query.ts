@@ -1,8 +1,8 @@
+import { useLangyStore } from "@langwatch/langy-browser-kit";
 import type { LangyConversationListItemDto } from "@langwatch/langy-contract";
 import { keepPreviousData } from "@tanstack/react-query";
 
 import { api } from "../../../../behavior/langy-api.ts";
-import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 
 /** Bounded page size for the recents combobox's incremental rendering. */

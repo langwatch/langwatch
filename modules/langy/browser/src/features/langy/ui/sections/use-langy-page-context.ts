@@ -1,18 +1,16 @@
-import { useEffect, useMemo } from "react";
-import { useInRouterContext, useLocation } from "react-router";
-
 import {
   datasetContextChip,
   mergeContextChips,
   traceContextChip,
-} from "../../../../behavior/langy-context-chips.ts";
-import { useLangyContextTargetStore } from "../../../../behavior/langy-context-target.store.ts";
-import {
+  useLangyContextTargetStore,
   type LangyContextChip,
   selectAddableChips,
   selectVisibleChips,
   useLangyStore,
-} from "../../../../behavior/langy.store.ts";
+} from "@langwatch/langy-browser-kit";
+import { useEffect, useMemo } from "react";
+import { useInRouterContext, useLocation } from "react-router";
+
 import { useLangyDrawerContext } from "../../../../behavior/use-langy-drawer-context.ts";
 import { useLangy } from "../../../../ui/sections/langy-page-context.tsx";
 import { useLangySelectionContext } from "../../behavior/use-langy-selection-context.ts";

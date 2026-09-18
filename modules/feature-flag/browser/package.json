@@ -36,7 +36,7 @@
     "react": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
     "@testing-library/react": "catalog:",
     "@testing-library/user-event": "catalog:",
     "@types/react": "catalog:",

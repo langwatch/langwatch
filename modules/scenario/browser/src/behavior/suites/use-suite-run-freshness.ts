@@ -3,7 +3,7 @@
  */
 
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { getAdaptivePollingInterval } from "@langwatch/suite-browser/run-formatters";
+import { getAdaptivePollingInterval } from "@langwatch/suite-browser-kit";
 import { useEffect, useRef } from "react";
 
 import { api } from "../scenario-api.ts";

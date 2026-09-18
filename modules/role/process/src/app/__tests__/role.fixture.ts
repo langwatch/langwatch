@@ -3,7 +3,7 @@ import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 
 import { MemoryRoleRepository } from "../../repositories/memory/memory.role.repository.ts";

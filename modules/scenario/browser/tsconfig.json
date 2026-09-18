@@ -41,6 +41,9 @@
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/error-presentation/tsconfig.build.json"
+    },
+    {
       "path": "../../evaluator/contract/tsconfig.build.json"
     },
     {
@@ -56,6 +59,12 @@
       "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
+      "path": "../../langy/browser-kit/tsconfig.build.json"
+    },
+    {
+      "path": "../../model-provider/browser-kit/tsconfig.build.json"
+    },
+    {
       "path": "../../model-provider/contract/tsconfig.build.json"
     },
     {
@@ -68,7 +77,7 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
-      "path": "../../suite/browser/tsconfig.build.json"
+      "path": "../../suite/browser-kit/tsconfig.build.json"
     },
     {
       "path": "../../suite/contract/tsconfig.build.json"
@@ -80,10 +89,16 @@
       "path": "../../trace/browser-kit/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/ui-kernel/tsconfig.build.json"
+    },
+    {
+      "path": "../../workflow/browser-kit/tsconfig.build.json"
+    },
+    {
       "path": "../../workflow/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/test-harness/tsconfig.build.json"
+      "path": "../../../packages/vitest-config/tsconfig.build.json"
     }
   ]
 }

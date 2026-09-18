@@ -5,7 +5,7 @@
  */
 
 import { Box, type ButtonProps, HStack, Icon, Text } from "@chakra-ui/react";
-import type { Period } from "@langwatch/analytics-browser-kit/period-selector";
+import type { Period } from "@langwatch/analytics-browser-kit";
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";

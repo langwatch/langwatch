@@ -4,7 +4,12 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { collectSSE, hasGo, type NlpgoSubprocess, startNlpgoSubprocess } from "../nlpgo-subprocess.ts";
+import {
+  collectSSE,
+  hasGo,
+  type NlpgoSubprocess,
+  startNlpgoSubprocess,
+} from "../nlpgo-subprocess.ts";
 
 // Unique port alongside the other nlpgo subprocess integration tests
 // (55610 / 55611 / 55612 / 55620 — see CLAUDE.md). 55613 is this test's.

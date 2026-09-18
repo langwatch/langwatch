@@ -22,7 +22,13 @@
       "path": "../../../../packages/api/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/config/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/kernel/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/secrets/tsconfig.build.json"
     }
   ]
 }

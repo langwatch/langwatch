@@ -54,6 +54,9 @@
       "path": "../../../../modules/ops/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/secrets/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/user/contract/tsconfig.build.json"
     }
   ]

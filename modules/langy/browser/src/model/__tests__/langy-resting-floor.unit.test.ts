@@ -1,11 +1,10 @@
-import { describe, expect, it } from "vitest";
-
 import {
   LANGY_FLOATING_FLOOR_EMPTY_PX,
   LANGY_FLOATING_FLOOR_THREAD_PX,
   LANGY_FLOATING_FLOOR_TURN_PX,
   langyRestingFloorPx,
-} from "../langy-panel-layout.ts";
+} from "@langwatch/langy-browser-kit";
+import { describe, expect, it } from "vitest";
 
 /**
  * The floating card's resting floor. The interesting case is the one the panel used to

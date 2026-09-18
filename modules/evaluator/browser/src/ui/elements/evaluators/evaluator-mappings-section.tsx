@@ -2,13 +2,13 @@ import { Box, Text } from "@chakra-ui/react";
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { getThreadAvailableSources, getTraceAvailableSources } from "@langwatch/dataset-contract";
-import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-browser/mapping-validation";
+import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-contract/mapping-validation";
 import { createLogger } from "@langwatch/observability/browser";
 import {
   type AvailableSource,
   type FieldMapping as UIFieldMapping,
   VariablesSection,
-} from "@langwatch/prompt-browser-kit/variables";
+} from "@langwatch/prompt-browser-kit";
 import { useProjectSpanNames } from "@langwatch/trace-browser/surfaces/project-span-names";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 

@@ -1,9 +1,9 @@
 import { Box, Circle, HStack, type StackProps, Text } from "@chakra-ui/react";
+import { VersionBadge } from "@langwatch/prompt-browser-kit";
 import { useState, type MouseEvent } from "react";
 import { LuX } from "react-icons/lu";
 
 import { getDisplayHandle } from "../../../prompt-reference.ts";
-import { VersionBadge } from "../../../prompt-version.ts";
 
 export interface PromptBrowserTabProps extends StackProps {
   title: string;

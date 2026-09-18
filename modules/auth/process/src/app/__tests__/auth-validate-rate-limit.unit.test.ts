@@ -7,6 +7,7 @@ import { AuthValidateRateLimitedError } from "@langwatch/auth-contract";
  */
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
+import { ScopedSecrets } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 
 import { MemoryAuthRepositories } from "../../repositories/memory/memory.auth.repositories.ts";
@@ -34,7 +35,9 @@ function countingLimiter() {
   return { rateLimiter, windows };
 }
 
-function appFor(limiter: ReturnType<typeof countingLimiter>["rateLimiter"]): AuthApp {
+async function appFor(
+  limiter: ReturnType<typeof countingLimiter>["rateLimiter"],
+): Promise<AuthApp> {
   return AuthApp.create({
     config: {
       sessionUrl: undefined,
@@ -73,7 +76,7 @@ function appFor(limiter: ReturnType<typeof countingLimiter>["rateLimiter"]): Aut
       processName: "langwatch-api",
     },
     resources: { own: () => undefined } as never,
-    secrets: {} as never,
+    secrets: new ScopedSecrets(async (_handle, build) => build(void 0)),
   });
 }
 
@@ -81,7 +84,7 @@ describe("given the token check behind the registry's per-IP ceiling", () => {
   describe("when one caller probes past the ceiling", () => {
     it("answers the ceiling's worth of probes, then refuses with the handled 429", async () => {
       const { rateLimiter, windows } = countingLimiter();
-      const app = appFor(rateLimiter);
+      const app = await appFor(rateLimiter);
 
       for (let probe = 0; probe < CEILING; probe += 1) {
         await expect(
@@ -103,7 +106,7 @@ describe("given the token check behind the registry's per-IP ceiling", () => {
 
     it("counts each caller apart, so one caller's refusal leaves another untouched", async () => {
       const { rateLimiter } = countingLimiter();
-      const app = appFor(rateLimiter);
+      const app = await appFor(rateLimiter);
 
       for (let probe = 0; probe <= CEILING; probe += 1) {
         await app
@@ -120,7 +123,7 @@ describe("given the token check behind the registry's per-IP ceiling", () => {
   describe("when a call names no caller", () => {
     it("answers without counting, there being nobody to count", async () => {
       const { rateLimiter, windows } = countingLimiter();
-      const app = appFor(rateLimiter);
+      const app = await appFor(rateLimiter);
 
       await expect(app.findProjectSlugByToken({ token: "tok" })).resolves.toBe("acme");
 

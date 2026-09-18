@@ -1,7 +1,7 @@
+import { useLangyStore } from "@langwatch/langy-browser-kit";
 import { useEffect } from "react";
 
 import { useRequiredSession } from "../../../behavior/auth-session.ts";
-import { useLangyStore } from "../../../behavior/langy.store.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 
 /**

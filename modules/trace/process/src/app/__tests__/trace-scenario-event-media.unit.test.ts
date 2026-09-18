@@ -1,5 +1,5 @@
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { TraceApp, type TraceAppDependencies } from "../trace.app.ts";

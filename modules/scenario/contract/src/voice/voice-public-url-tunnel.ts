@@ -123,6 +123,7 @@ export async function waitUntilTunnelResolvable(params: {
  */
 export async function openVoicePublicUrlTunnel(params: {
   port: number;
+  env: NodeJS.ProcessEnv;
   timeoutMs?: number;
   pollIntervalMs?: number;
   openTunnel?: (opts: { port: number; provider: "cloudflared" }) => Promise<OpenedTunnel>;
@@ -136,7 +137,8 @@ export async function openVoicePublicUrlTunnel(params: {
   // The SDK's cloudflared provider opens the tunnel with a bare
   // `spawn("cloudflared", ...)`, a PATH lookup, so the binary's directory
   // must be on PATH before openTunnel runs (see voice-cloudflared-binary.ts).
-  const ensureBinaryOnPath = params.ensureBinaryOnPath ?? (() => ensureCloudflaredOnPath());
+  const ensureBinaryOnPath =
+    params.ensureBinaryOnPath ?? (() => ensureCloudflaredOnPath({ env: params.env }));
   await ensureBinaryOnPath();
   const tunnel = await openTunnel({
     port: params.port,

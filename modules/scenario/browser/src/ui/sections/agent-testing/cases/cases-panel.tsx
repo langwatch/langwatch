@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/page-structure.feature
  */
 
-import type { Period } from "@langwatch/analytics-browser-kit/period-selector";
+import type { Period } from "@langwatch/analytics-browser-kit";
 
 import type { AgentTestingSelection } from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
 import type { TestCase, TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";

@@ -1,7 +1,9 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { afterEach, describe, expect, it } from "vitest";
+
 import { lintStrictPortModules, type ClassifiedPackage } from "../src/index.ts";
 import { snapshotOf } from "./workspace.ts";
 
@@ -9,13 +11,13 @@ let root = "";
 
 function packageForFixture(): ClassifiedPackage {
   const featureRoot = join(root, "modules/example");
-  const serverRoot = join(featureRoot, "server");
+  const serverRoot = join(featureRoot, "process");
   return {
-    name: "@langwatch/example-server",
+    name: "@langwatch/example-process",
     root: serverRoot,
     manifestPath: join(serverRoot, "package.json"),
     manifest: {},
-    kind: "server",
+    kind: "process",
     feature: "example",
     featureRoot,
     subjects: [],

@@ -4,6 +4,7 @@
  * listed here, so a new manifest action is answered too.
  */
 
+import { useEvaluationsV3Store } from "@langwatch/experiment-browser/workbench-store";
 import {
   type ExecutionScope,
   readLiveWorkbench,
@@ -11,7 +12,6 @@ import {
   WORKBENCH_ACTION_KINDS,
   WORKBENCH_ACTIONS,
 } from "@langwatch/experiment-contract";
-import { useEvaluationsV3Store } from "@langwatch/experiment-browser/workbench-store";
 import type { LangyUiActionHandlers } from "@langwatch/langy-browser/langy-ui-actions";
 
 export function buildFakeTabHandlers({

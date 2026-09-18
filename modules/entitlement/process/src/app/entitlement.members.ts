@@ -5,13 +5,6 @@ import type {
   UsageUnit,
 } from "@langwatch/entitlement-contract";
 
-export interface EntitlementInfrastructure {
-  usageCounter: UsageCounter;
-  usageOrganization: UsageOrganization;
-  usageVolumeCounter: UsageVolumeCounter;
-  usageWarning: UsageWarning;
-}
-
 /**
  * Sentinel when a counter cannot count, to distinguish from zero usage.
  * An outage must not silently disable metering.

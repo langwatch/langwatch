@@ -1,7 +1,4 @@
 import { Button, createListCollection, Field, Text, VStack } from "@chakra-ui/react";
-import { showErrorToast } from "@langwatch/browser-host/errors";
-import { toaster } from "@langwatch/browser-host/toaster";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Select } from "@langwatch/design-system/select";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
@@ -11,17 +8,19 @@ import { useState } from "react";
 export const CopyExperimentDialog = ({
   open,
   onClose,
-  experimentId,
-  experimentName,
+  isCopying,
+  onCopy,
 }: {
   open: boolean;
   onClose: () => void;
-  experimentId: string;
-  experimentName: string;
+  isCopying: boolean;
+  onCopy: (params: {
+    targetProjectId: string;
+    targetProjectName: string;
+    copyDatasets: boolean;
+  }) => void;
 }) => {
   const { copyTargets, project } = useOrganizationTeamProject();
-  const utils = api.useUtils();
-  const copyExperiment = api.experiments.copy.useMutation();
   const [selectedProjectId, setSelectedProjectId] = useState<string[]>([]);
   const [copyDatasets, setCopyDatasets] = useState(false);
 
@@ -38,37 +37,16 @@ export const CopyExperimentDialog = ({
     items: projects,
   });
 
-  const handleCopy = async () => {
-    const projectId = selectedProjectId[0];
-    if (!projectId || !project) return;
+  const handleCopy = () => {
+    const targetProjectId = selectedProjectId[0];
+    if (!targetProjectId || !project) return;
 
-    const selectedProject = projects.find((p) => p.value === projectId);
-    const targetProjectPath = selectedProject?.label ?? "selected project";
-
-    try {
-      await copyExperiment.mutateAsync({
-        experimentId,
-        projectId: projectId,
-        sourceProjectId: project.id,
-        copyDatasets,
-      });
-
-      // Invalidate queries to refresh the experiment list
-      await utils.experiments.getAllForEvaluationsList.invalidate();
-
-      toaster.create({
-        title: "Experiment replicated",
-        description: `Experiment "${experimentName}" replicated successfully to ${targetProjectPath}.`,
-        type: "success",
-      });
-
-      onClose();
-    } catch (error) {
-      showErrorToast({
-        error,
-        fallbackTitle: "Couldn't replicate the experiment",
-      });
-    }
+    const selectedProject = projects.find((p) => p.value === targetProjectId);
+    onCopy({
+      targetProjectId,
+      targetProjectName: selectedProject?.label ?? "selected project",
+      copyDatasets,
+    });
   };
 
   return (
@@ -128,10 +106,8 @@ export const CopyExperimentDialog = ({
           </Button>
           <Button
             colorPalette="blue"
-            onClick={() => {
-              void handleCopy();
-            }}
-            loading={copyExperiment.isPending}
+            onClick={handleCopy}
+            loading={isCopying}
             disabled={
               !selectedProjectId.length ||
               !projects.find((p) => p.value === selectedProjectId[0])?.hasManagePermission

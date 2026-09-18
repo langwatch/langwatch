@@ -1,5 +1,5 @@
 import { chakra, HStack, Text } from "@chakra-ui/react";
-import { useLangyStore } from "@langwatch/langy-browser/surfaces/langy-store";
+import { useLangyStore } from "@langwatch/langy-browser-kit";
 import { Sparkles } from "lucide-react";
 import { motion } from "motion/react";
 import { type MouseEvent, useEffect, useState } from "react";

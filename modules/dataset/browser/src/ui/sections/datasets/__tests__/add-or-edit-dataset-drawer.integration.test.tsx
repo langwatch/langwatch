@@ -30,7 +30,7 @@ vi.mock("@langwatch/browser-host/errors", () => ({
   showErrorToast: () => void 0,
 }));
 
-vi.mock("@langwatch/workflow-browser", () => ({
+vi.mock("@langwatch/workflow-browser-kit", () => ({
   tryToMapPreviousColumnsToNewColumns: (records: unknown) => records,
 }));
 

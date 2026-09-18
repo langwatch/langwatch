@@ -4,12 +4,8 @@ import { Box, VStack } from "@chakra-ui/react";
  * @see specs/features/agent-testing/suites-rail.feature
  * @see specs/suites/test-suites.feature
  */
-import type {
-  Period,
-  PeriodMode,
-  RelativePresetKey,
-} from "@langwatch/analytics-browser-kit/period-selector";
-import { SuiteArchiveDialog } from "@langwatch/suite-browser/run-dialogs";
+import type { Period, PeriodMode, RelativePresetKey } from "@langwatch/analytics-browser-kit";
+import { SuiteArchiveDialog } from "@langwatch/suite-browser-kit";
 import type { Instant } from "@langwatch/time";
 import { useCallback, useState } from "react";
 

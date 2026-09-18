@@ -1,8 +1,7 @@
 import { chakra } from "@chakra-ui/react";
+import { useReducedMotion } from "@langwatch/langy-browser-kit";
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo } from "react";
-
-import { useReducedMotion } from "../../../../behavior/use-reduced-motion.ts";
 
 const MotionSpan = motion.create(chakra.span);
 

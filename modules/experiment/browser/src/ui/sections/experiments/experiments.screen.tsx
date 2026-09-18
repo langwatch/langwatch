@@ -22,10 +22,7 @@ import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import type { LEGACY_EXPERIMENT_TASK_TYPES } from "@langwatch/experiment-contract";
-import {
-  LangyContextTarget,
-  experimentContextChip,
-} from "@langwatch/langy-browser/surfaces/langy-context";
+import { LangyContextTarget, experimentContextChip } from "@langwatch/langy-browser-kit";
 import { nowInstant } from "@langwatch/time";
 import type { TimeInput } from "@langwatch/time";
 import { keepPreviousData } from "@tanstack/react-query";
@@ -40,6 +37,8 @@ import {
   LuTrash,
 } from "react-icons/lu";
 
+import { useCopyExperiment } from "../../../behavior/experiments/use-copy-experiment.ts";
+import { useCreateExperiment } from "../../../behavior/experiments/use-create-experiment.ts";
 import { readableDate } from "../../../model/display-formatters.ts";
 import type { ExperimentType } from "../../../model/prisma-types.ts";
 import { formatEvaluationSummary } from "../../../ui/elements/experiments/BatchEvaluationV2/batch-evaluation-summary.tsx";
@@ -95,6 +94,11 @@ export function ExperimentsPage() {
   } | null>(null);
 
   const navigationFooter = useNavigationFooter();
+  const { createNewExperiment, isCreating } = useCreateExperiment({
+    projectId: project?.id,
+    projectSlug: project?.slug,
+  });
+  const { copyExperimentTo, isCopying } = useCopyExperiment();
 
   /** One page of the project's experiments; every field is one the table renders. */
   const experiments = api.experiments.getAllForEvaluationsList.useQuery(
@@ -158,7 +162,7 @@ export function ExperimentsPage() {
         <PageLayout.Heading>Experiments</PageLayout.Heading>
         <Spacer />
         <HStack gap={2}>
-          <CreateExperimentButton />
+          <CreateExperimentButton isCreating={isCreating} onCreate={createNewExperiment} />
         </HStack>
       </PageLayout.Header>
       {experiments.isLoading ? (
@@ -193,7 +197,7 @@ export function ExperimentsPage() {
               }
             >
               <HStack marginTop={4} gap={2}>
-                <CreateExperimentButton />
+                <CreateExperimentButton isCreating={isCreating} onCreate={createNewExperiment} />
               </HStack>
             </NoDataInfoBlock>
           </PageLayout.Content>
@@ -466,8 +470,18 @@ export function ExperimentsPage() {
         <CopyExperimentDialog
           open={copyDialogState.open}
           onClose={() => setCopyDialogState(null)}
-          experimentId={copyDialogState.experimentId}
-          experimentName={copyDialogState.experimentName}
+          isCopying={isCopying}
+          onCopy={({ targetProjectId, targetProjectName, copyDatasets }) => {
+            void copyExperimentTo({
+              experimentId: copyDialogState.experimentId,
+              experimentName: copyDialogState.experimentName,
+              sourceProjectId: project?.id ?? "",
+              targetProjectId,
+              targetProjectName,
+              copyDatasets,
+              onSuccess: () => setCopyDialogState(null),
+            });
+          }}
         />
       )}
       <ConfirmDialog

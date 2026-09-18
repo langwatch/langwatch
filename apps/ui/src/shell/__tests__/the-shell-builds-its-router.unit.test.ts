@@ -20,7 +20,10 @@ const loaders = mergeUiPageLoaders({
 });
 
 /** Composed exactly as `main.tsx` composes it. */
-const shellLayouts = { chrome: () => import("../ui-app-chrome") };
+const shellLayouts = {
+  auth: () => import("../ui-auth-host"),
+  chrome: () => import("../ui-app-chrome"),
+};
 
 describe("given the route table and the modules this build installs", () => {
   describe("when the shell builds its router from them", () => {

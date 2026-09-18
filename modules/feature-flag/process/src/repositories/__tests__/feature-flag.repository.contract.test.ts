@@ -14,7 +14,8 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { cleanupTestRows, createTestLogger } from "@langwatch/test-harness";
+import { createTestLogger } from "@langwatch/test-harness";
+import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { FeatureFlagRepository } from "../feature-flag.repository.ts";

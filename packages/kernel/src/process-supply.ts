@@ -21,8 +21,9 @@ import type { FeatureTransportHosts } from "./transport-mounting.ts";
 import type { TransportPeers } from "./transport-peers.ts";
 
 type SupplyRecord = Readonly<Record<string, unknown>>;
-type MemberValueFrom<RequiredMemberSet, Name extends string> =
-  Name extends keyof RequiredMemberSet ? RequiredMemberSet[Name] : unknown;
+type MemberValueFrom<RequiredMemberSet, Name extends string> = Name extends keyof RequiredMemberSet
+  ? RequiredMemberSet[Name]
+  : unknown;
 type MissingFrom<
   RequiredMemberSet,
   RequiredConfigSet,
@@ -140,7 +141,7 @@ type CheckedModules<Modules extends readonly SupplyModule[]> = number extends Mo
   ? never
   : string extends Modules[number]["name"]
     ? never
-    : SupplyModule["configSchema"] extends Modules[number]["configSchema"]
+    : SupplyModule["configType"] extends Modules[number]["configType"]
       ? never
       : CheckedModuleUnion<Modules>;
 
@@ -262,9 +263,7 @@ export class ProcessSupply<
     >({ ...this.#state, config });
   }
 
-  provide<const Next extends SupplyRecord>(
-    peers: Next & ValidateSupply<Next, RequiredPeerSet>,
-  ) {
+  provide<const Next extends SupplyRecord>(peers: Next & ValidateSupply<Next, RequiredPeerSet>) {
     return new ProcessSupply<
       Modules,
       Members,
@@ -301,15 +300,21 @@ export class ProcessSupply<
     return this.#withMembers({ secrets });
   }
 
-  withEncryption<Value extends MemberValueFrom<RequiredMemberSet, "encryption">>(encryption: Value) {
+  withEncryption<Value extends MemberValueFrom<RequiredMemberSet, "encryption">>(
+    encryption: Value,
+  ) {
     return this.#withMembers({ encryption });
   }
 
-  withRelational<Value extends MemberValueFrom<RequiredMemberSet, "relational">>(relational: Value) {
+  withRelational<Value extends MemberValueFrom<RequiredMemberSet, "relational">>(
+    relational: Value,
+  ) {
     return this.#withMembers({ relational });
   }
 
-  withAnalytical<Value extends MemberValueFrom<RequiredMemberSet, "analytical">>(analytical: Value) {
+  withAnalytical<Value extends MemberValueFrom<RequiredMemberSet, "analytical">>(
+    analytical: Value,
+  ) {
     return this.#withMembers({ analytical });
   }
 

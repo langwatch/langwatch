@@ -1,5 +1,5 @@
 import { HStack } from "@chakra-ui/react";
-import { ColorfulBlockIcon } from "@langwatch/workflow-browser-kit/workflow-icons";
+import { ColorfulBlockIcon } from "@langwatch/workflow-browser-kit";
 import type { ReactNode } from "react";
 
 type SuperHeaderProps = {

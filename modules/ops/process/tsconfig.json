@@ -91,10 +91,19 @@
       "path": "../../user/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/api-fixture/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/error-presentation/tsconfig.build.json"
+    },
+    {
       "path": "../../feature-flag/process/tsconfig.build.json"
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/vitest-config/tsconfig.build.json"
     }
   ]
 }

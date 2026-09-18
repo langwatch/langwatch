@@ -4,6 +4,7 @@
 import { Box, chakra, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { useLangyStore, useReducedMotion } from "@langwatch/langy-browser-kit";
 import {
   cliToolResultPayload,
   cliToolResultSchema,
@@ -14,9 +15,7 @@ import type { UIMessage } from "ai";
 import { AlertCircle, Braces, Check, ChevronRight, Layers3 } from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 
-import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useLangyDevMode } from "../../../../behavior/use-langy-dev-mode.ts";
-import { useReducedMotion } from "../../../../behavior/use-reduced-motion.ts";
 import {
   type CapabilityCommand,
   commandOfToolCall,

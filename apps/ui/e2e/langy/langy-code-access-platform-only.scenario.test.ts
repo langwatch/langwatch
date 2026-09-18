@@ -7,6 +7,7 @@
 import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
 import { beforeAll, describe, expect, it } from "vitest";
+
 import { listScenarios } from "./langwatch-api";
 import { makeLangyAdapter } from "./langy-agent";
 import { LANGY_CORE_RULE_CRITERIA } from "./langy-rules";
@@ -59,9 +60,7 @@ describe("Langy asks for the code only when the code has to change", () => {
               }),
             ],
             script: [
-              scenario.user(
-                "create a scenario for refunds against my support agent",
-              ),
+              scenario.user("create a scenario for refunds against my support agent"),
               scenario.agent(),
               scenario.judge(),
             ],
@@ -75,14 +74,9 @@ describe("Langy asks for the code only when the code has to change", () => {
         console.log("[layer2] tools:", langy.state.toolNames.join(", "));
         console.log(
           "[layer2] questions:",
-          watcher.questions
-            .map((ask) => ask.questions[0]?.question)
-            .join(" | "),
+          watcher.questions.map((ask) => ask.questions[0]?.question).join(" | "),
         );
-        console.log(
-          "[layer2] pendingRequest:",
-          JSON.stringify(status.pendingRequest),
-        );
+        console.log("[layer2] pendingRequest:", JSON.stringify(status.pendingRequest));
 
         expect(langy.state.toolNames).not.toContain("code_access");
         expect(status.pendingRequest).toBeNull();

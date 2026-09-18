@@ -64,7 +64,7 @@ const missingSession = createUi({ document: documentRoot, mount: "root" }).withM
   sessionModule,
 ]);
 expectTypeOf<MissingNames<typeof missingSession>>().toEqualTypeOf<"session">();
-// @ts-expect-error declared flags require the session source
+// @ts-expect-error a declared session requirement needs the session source
 void missingSession.render();
 
 const partialFacilities = createUi({ document: documentRoot, mount: "root" })

@@ -1,0 +1,25 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "noEmit": true,
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "lib": ["es2023"],
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+    "types": [],
+
+    "rewriteRelativeImportExtensions": false
+  },
+  "include": ["src/**/*.ts"],
+
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../vitest-config/tsconfig.build.json"
+    }
+  ]
+}

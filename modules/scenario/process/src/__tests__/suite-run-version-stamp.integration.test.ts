@@ -30,8 +30,8 @@ import {
   SuiteRunCommands,
   type QueueSimulationRunCommandData,
 } from "@langwatch/suite-process";
-import { cleanupTestRows } from "@langwatch/test-harness";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { cleanupTestRows } from "@langwatch/test-harness/prisma";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 

@@ -8,5 +8,10 @@
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "references": [
+    {
+      "path": "../../../packages/vitest-config/tsconfig.build.json"
+    }
+  ]
 }

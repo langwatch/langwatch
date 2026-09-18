@@ -2,8 +2,8 @@
  * What a browser feature does with a failure, in one place.
  */
 
-import { explainAnyError } from "@langwatch/handled-error/presentation";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { explainAnyError } from "@langwatch/error-presentation/presentation";
+import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
 
 import type { UiFailureAction } from "./capabilities.ts";
 import { currentUiFeedbackHost } from "./toaster.ts";

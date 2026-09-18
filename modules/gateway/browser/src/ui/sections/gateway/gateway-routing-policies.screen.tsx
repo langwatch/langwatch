@@ -1,7 +1,7 @@
 import { Box, Button, Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import type { ScopeTriadEntry } from "@langwatch/authz-browser-kit/scope-picker";
-import { docsUrl } from "@langwatch/config/docs-url";
+import type { ScopeTriadEntry } from "@langwatch/authz-browser-kit";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { docsUrl } from "@langwatch/error-presentation/docs-url";
 import { Lightbulb, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 

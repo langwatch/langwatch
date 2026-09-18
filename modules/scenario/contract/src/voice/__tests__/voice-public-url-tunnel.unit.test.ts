@@ -104,6 +104,7 @@ describe("openVoicePublicUrlTunnel", () => {
 
     const tunnel = await openVoicePublicUrlTunnel({
       port: 3300,
+      env: {},
       openTunnel,
       resolveHost,
       ensureBinaryOnPath: async () => {},
@@ -136,6 +137,7 @@ describe("openVoicePublicUrlTunnel", () => {
 
     await openVoicePublicUrlTunnel({
       port: 3300,
+      env: {},
       openTunnel,
       resolveHost,
       ensureBinaryOnPath,
@@ -156,6 +158,7 @@ describe("openVoicePublicUrlTunnel", () => {
     await expect(
       openVoicePublicUrlTunnel({
         port: 3300,
+        env: {},
         openTunnel,
         resolveHost: vi.fn().mockResolvedValue(true),
         ensureBinaryOnPath,
@@ -178,6 +181,7 @@ describe("openVoicePublicUrlTunnel", () => {
     await expect(
       openVoicePublicUrlTunnel({
         port: 3300,
+        env: {},
         openTunnel,
         resolveHost,
         ensureBinaryOnPath: async () => {},
@@ -199,6 +203,7 @@ describe("openVoicePublicUrlTunnel", () => {
 
     const tunnel = await openVoicePublicUrlTunnel({
       port: 3300,
+      env: {},
       openTunnel,
       resolveHost,
       ensureBinaryOnPath: async () => {},

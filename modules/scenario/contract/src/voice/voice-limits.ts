@@ -1,5 +1,5 @@
 // Operator limits from environment: VOICE_CALL_MAX_SECONDS (default 300) and
-// VOICE_RUNS_MAX_CONCURRENT (default 2 per process/project). Read from process.env directly.
+// VOICE_RUNS_MAX_CONCURRENT (default 2 per process/project).
 
 export const VOICE_CALL_MAX_SECONDS_DEFAULT = 300;
 export const VOICE_RUNS_MAX_CONCURRENT_DEFAULT = 2;
@@ -29,7 +29,7 @@ export function parsePositiveIntEnv({
   return parsed;
 }
 
-export function voiceCallMaxSeconds(env: NodeJS.ProcessEnv = process.env): number {
+export function voiceCallMaxSeconds(env: NodeJS.ProcessEnv): number {
   const parsed = parsePositiveIntEnv({
     raw: env.VOICE_CALL_MAX_SECONDS,
     fallback: VOICE_CALL_MAX_SECONDS_DEFAULT,
@@ -37,7 +37,7 @@ export function voiceCallMaxSeconds(env: NodeJS.ProcessEnv = process.env): numbe
   return Math.min(parsed, VOICE_CALL_MAX_SECONDS_CEILING);
 }
 
-export function voiceRunsMaxConcurrent(env: NodeJS.ProcessEnv = process.env): number {
+export function voiceRunsMaxConcurrent(env: NodeJS.ProcessEnv): number {
   return parsePositiveIntEnv({
     raw: env.VOICE_RUNS_MAX_CONCURRENT,
     fallback: VOICE_RUNS_MAX_CONCURRENT_DEFAULT,

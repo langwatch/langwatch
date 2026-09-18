@@ -2,10 +2,7 @@ import { Box, Button, Circle, HStack, Icon, Spinner, Text, VStack } from "@chakr
 import { keyframes } from "@emotion/react";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import {
-  EVALUATION_STATUS_COLORS,
-  getStatusLabel,
-} from "@langwatch/evaluator-browser/evaluation-results";
+import { EVALUATION_STATUS_COLORS, getStatusLabel } from "@langwatch/evaluator-browser-kit";
 import { parseEvaluationResult } from "@langwatch/evaluator-contract";
 import { useState } from "react";
 import {

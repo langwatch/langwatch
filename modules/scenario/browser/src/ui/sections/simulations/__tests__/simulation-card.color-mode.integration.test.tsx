@@ -5,7 +5,7 @@
  */
 import { ChakraProvider, defaultSystem, Text } from "@chakra-ui/react";
 import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { SimulationCard } from "@langwatch/suite-browser/run-cards";
+import { SimulationCard } from "@langwatch/suite-browser-kit";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 

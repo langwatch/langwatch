@@ -4,8 +4,8 @@
  * Spec: specs/auth/session-failure.feature
  */
 
-import { UNKNOWN_ERROR_PRESENTATION, explainAnyError } from "@langwatch/handled-error/presentation";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { UNKNOWN_ERROR_PRESENTATION, explainAnyError } from "@langwatch/error-presentation/presentation";
+import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider, useLocation } from "react-router";

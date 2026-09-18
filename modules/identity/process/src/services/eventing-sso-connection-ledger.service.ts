@@ -115,7 +115,7 @@ export class SsoConnectionLedgerWriterAdapter implements SsoConnectionLedger {
 
     await this.stage({ command });
     await this.awaitFold({ connectionId, tenantId, events });
-    return events as unknown as SsoConnectionFact[];
+    return events;
   }
 
   private async stage({ command }: { command: SsoConnectionCommand }): Promise<void> {

@@ -5,7 +5,7 @@
  */
 
 import { Button } from "@chakra-ui/react";
-import type { Period } from "@langwatch/analytics-browser-kit/period-selector";
+import type { Period } from "@langwatch/analytics-browser-kit";
 import { Menu } from "@langwatch/design-system/menu";
 import { MoreVertical } from "lucide-react";
 

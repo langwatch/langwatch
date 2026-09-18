@@ -138,47 +138,14 @@ function moduleConfigsFor({ root, catalogue }) {
 
 /** The generated source for one list, imports first and the array last. */
 function sourceFor({ declarations, constant, half }) {
-  const imports = [
-    ...(half === "server"
-      ? ['import { createApp, type ServerRole } from "@langwatch/kernel";']
-      : []),
-    ...declarations.map(
-      (declaration) => `import { ${declaration.symbol} } from "${declaration.specifier}";`,
-    ),
-  ];
+  const imports = declarations.map(
+    (declaration) => `import { ${declaration.symbol} } from "${declaration.specifier}";`,
+  );
   const entries = declarations.map((declaration) =>
     half === "web"
       ? `  ${declaration.symbol} satisfies { readonly name: "${declaration.id}" },`
       : `  ${declaration.symbol},`,
   );
-  const isEnterprise = (declaration) => declaration.specifier.startsWith("@langwatch/enterprise-");
-  const tierList = (constantName, kept) =>
-    `export const ${constantName} = [${kept.map((declaration) => declaration.symbol).join(", ")}] as const;`;
-  const CHUNK = 5;
-  const chunks = Array.from({ length: Math.ceil(declarations.length / CHUNK) }, (_, index) =>
-    declarations.slice(index * CHUNK, index * CHUNK + CHUNK),
-  );
-  const tiers =
-    half === "server"
-      ? [
-          "",
-          "/** The same graph by tier, so a build states which tiers it installs. */",
-          tierList("coreServerModules", declarations.filter((one) => !isEnterprise(one))),
-          tierList("enterpriseServerModules", declarations.filter(isEnterprise)),
-          "",
-          "/**",
-          " * The graph in chunks, and the chain that installs it. TypeScript cannot",
-          " * instantiate 49 modules in one `withModules` call (TS2589), so the chain",
-          " * is generated here and a process installs everything with one call.",
-          " */",
-          ...chunks.map((chunk, index) => tierList(`serverModuleChunk${index}`, chunk)),
-          "",
-          "export const createServerApp = (role: ServerRole) =>",
-          "  createApp({ role })" +
-            chunks.map((_, index) => `\n    .withModules(serverModuleChunk${index})`).join("") +
-            ";",
-        ]
-      : [];
   const empty = `/** No module declares a ${half} half yet. */\nexport const ${constant} = [] as const;\n`;
   const filled = [
     ...imports,
@@ -187,7 +154,6 @@ function sourceFor({ declarations, constant, half }) {
     `export const ${constant} = [`,
     ...entries,
     "] as const;",
-    ...tiers,
     "",
   ].join("\n");
 
@@ -207,8 +173,10 @@ function packageSourceFor({ root, catalogue, configs }) {
     ...configs.map((config) => ({ package: config.specifier })),
   ];
 
-  // The generated chain imports createApp from the kernel, so the manifest
-  // declares it — resolution by hoisting luck broke the first real boot.
+  // No generated file imports the kernel since `createServerApp` was removed,
+  // but `modules/tsconfig.json` still references its build project and
+  // `createProcessApp` (ARCHITECTURE.md §16) will import it again. Dropping it
+  // means regenerating references, so it stays declared.
   manifest.dependencies = Object.fromEntries(
     [...new Set(["@langwatch/kernel", ...installed.map((declaration) => declaration.package)])]
       .toSorted()

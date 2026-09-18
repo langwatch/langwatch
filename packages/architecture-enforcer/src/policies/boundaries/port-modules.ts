@@ -1,10 +1,11 @@
 import ts from "typescript";
+
+import type { ArchitectureViolation } from "../../types.ts";
 import { sourceFile } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
-import type { ArchitectureViolation } from "../../types.ts";
 
 function isStrictPort(path: string): boolean {
-  return /\/server\/src\/ports\/.+\.port\.ts$/.test(path);
+  return /\/process\/src\/ports\/.+\.port\.ts$/.test(path);
 }
 
 function hasOnlyExportedAbstractPortClasses(path: string): boolean {
@@ -59,7 +60,7 @@ export function lintStrictPortModules(snapshot: WorkspaceSnapshot): Architecture
   const violations: ArchitectureViolation[] = [];
 
   for (const pkg of packages) {
-    if (pkg.kind !== "server") continue;
+    if (pkg.kind !== "process") continue;
 
     for (const file of snapshot.files({ directory: pkg.root, accept: isStrictPort })) {
       if (hasOnlyExportedAbstractPortClasses(file)) continue;

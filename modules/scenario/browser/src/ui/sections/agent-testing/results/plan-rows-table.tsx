@@ -8,7 +8,7 @@ import { Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
 import { Menu } from "@langwatch/design-system/menu";
 import type { ResultGroup } from "@langwatch/scenario-contract";
-import { SuiteArchiveDialog } from "@langwatch/suite-browser/run-dialogs";
+import { SuiteArchiveDialog } from "@langwatch/suite-browser-kit";
 import { Archive, Crosshair, Folder, FolderCode, Layers, MoreVertical, Tag } from "lucide-react";
 import { useState } from "react";
 

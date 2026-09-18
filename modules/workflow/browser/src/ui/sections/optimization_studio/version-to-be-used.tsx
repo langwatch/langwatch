@@ -2,7 +2,7 @@ import { Field, HStack, IconButton, Input, Text, VStack } from "@chakra-ui/react
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { SmallLabel } from "@langwatch/design-system/small-label";
-import { AISparklesLoader } from "@langwatch/model-provider-browser/ai-sparkles-loader";
+import { AISparklesLoader } from "@langwatch/model-provider-browser-kit";
 import {
   allModelOptions,
   useModelSelectionOptions,

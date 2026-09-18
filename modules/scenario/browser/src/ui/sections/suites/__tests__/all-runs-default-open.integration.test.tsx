@@ -18,18 +18,22 @@ vi.mock("@langwatch/trace-browser/surfaces/setup-with-agent-button", () => ({
   SetupWithAgentButton: () => null,
 }));
 
-vi.mock("@langwatch/trace-browser-kit/sse-subscription", () => ({
-  useSSESubscription: () => ({
-    connectionState: "connected",
-    isConnected: true,
-    isConnecting: false,
-    hasError: false,
-    isDisconnected: false,
-    retryCount: 0,
-    lastData: undefined,
-    lastError: undefined,
-  }),
-}));
+vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@langwatch/trace-browser-kit")>();
+  return {
+    ...actual,
+    useSSESubscription: () => ({
+      connectionState: "connected",
+      isConnected: true,
+      isConnecting: false,
+      hasError: false,
+      isDisconnected: false,
+      retryCount: 0,
+      lastData: undefined,
+      lastError: undefined,
+    }),
+  };
+});
 
 // Capture the archive mutation's onSuccess so tests can trigger it manually
 let capturedArchiveOnSuccess: (() => void) | undefined;

@@ -30,6 +30,7 @@
   "dependencies": {
     "@langwatch/api": "workspace:*",
     "@langwatch/config": "workspace:*",
+    "@langwatch/error-presentation": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/time": "workspace:*",

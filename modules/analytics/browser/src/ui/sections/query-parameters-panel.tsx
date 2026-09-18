@@ -11,7 +11,7 @@
  */
 
 import { Badge, Box, Button, chakra, HStack, Input, Stack, Text, VStack } from "@chakra-ui/react";
-import { FieldTypeSelect, VariableTypeIcon } from "@langwatch/prompt-browser-kit/variables";
+import { FieldTypeSelect, VariableTypeIcon } from "@langwatch/prompt-browser-kit";
 import { Plus, Trash2 } from "lucide-react";
 
 import {

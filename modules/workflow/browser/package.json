@@ -143,11 +143,6 @@
       "types": "./dist/workflow-templates.d.ts",
       "default": "./src/workflow-templates.ts"
     },
-    "./studio-dataset-columns": {
-      "langwatch-declaration-source": "./src/studio-dataset-columns.ts",
-      "types": "./dist/studio-dataset-columns.d.ts",
-      "default": "./src/studio-dataset-columns.ts"
-    },
     "./studio-drawer-footer": {
       "langwatch-declaration-source": "./src/studio-drawer-footer.ts",
       "types": "./dist/studio-drawer-footer.d.ts",
@@ -228,6 +223,7 @@
     "zustand": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/vitest-config": "workspace:*",
     "@testing-library/jest-dom": "catalog:",
     "@testing-library/react": "catalog:",
     "@testing-library/user-event": "catalog:",

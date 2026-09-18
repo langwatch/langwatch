@@ -7,7 +7,7 @@ import {
   type DataPrivacyApi,
 } from "@langwatch/data-privacy-contract";
 import type { Project, ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import {

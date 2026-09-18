@@ -183,14 +183,12 @@ export interface ServerOrganizationAppDependencies {
   apiKeys: ApiKeyApi;
 }
 
-/** `processName`/`demoProject`/`publicBaseUrl` are facts this module could
- * not turn into its own env config; `demoProject` collides with `authz`'s
- * landed leaves if redeclared here. See the handoff. */
+/** `publicBaseUrl`/`processName` are the process's own facts. The demo project
+ * is `authz`'s: its env leaves have one owner, so this module asks that peer. */
 type OrganizationMembers = MembersRead<readonly ["prisma", "encryption", "logger", "redis"]> &
   Readonly<{
     publicBaseUrl: string | undefined;
     processName: string;
-    demoProject: Readonly<{ userId: string; projectId: string }>;
   }>;
 
 type OrganizationSetup = FeatureSetup<
@@ -289,13 +287,11 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     /** Where custom-role assignability is defined, for the invitation door. */
     roles: RoleApi,
   };
-  /** `publicBaseUrl`/`processName`/`demoProject` are named raw so the process
-   * can answer them through `withMember`/`withMembers` (see {@link OrganizationMembers}). */
+  /** Named raw: the process answers these two, no store carries them. */
   static readonly reads = [
     ...reads("prisma", "encryption", "logger", "redis"),
     "publicBaseUrl",
     "processName",
-    "demoProject",
   ] as const;
   #dependencies: ServerOrganizationAppDependencies;
 
@@ -307,7 +303,16 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       redis: setup.members.redis,
       publicBaseUrl: setup.members.publicBaseUrl,
       processName: setup.members.processName,
-      demoProject: setup.members.demoProject,
+      // The peer reference is stored now and called on first read, which is
+      // after boot: a peer API refuses while the process is still constructing.
+      demoProject: {
+        get userId() {
+          return setup.dependencies.permissions.demoProject().userId;
+        },
+        get projectId() {
+          return setup.dependencies.permissions.demoProject().projectId;
+        },
+      },
       dependencies: {
         projects: setup.dependencies.projects,
         identity: setup.dependencies.identity,

@@ -254,8 +254,6 @@ export interface WorkflowInfrastructure {
   execution: WorkflowExecution;
   /** Where a studio graph and a code evaluator both execute. */
   nlpRuntime: WorkflowNlpRuntime;
-  /** The engine's streaming studio route, as bytes. */
-  studioStream: WorkflowStudioStream;
   /** Mints workflow and version ids. */
   ids: WorkflowId;
   /** Upgrades a persisted graph before it becomes the workflow's current version. */
@@ -272,19 +270,12 @@ export interface WorkflowInfrastructure {
   codeCompletions: WorkflowCodeCompletions;
   studioRuns: WorkflowStudioRuns;
   signals: WorkflowSignals;
-  nlpLambdaArnResolver: NlpLambdaArnResolver;
   /**
    * The account the studio's engines are deployed into, for the cron sweep.
    * Absent where the deployment fronts the engine with no Lambdas at all,
    * and the sweep then refuses by name rather than reporting a clean run.
    */
   nlpLambdaFleet?: NlpLambdaFleet;
-  nlpLambdaFunction: NlpLambdaFunctionReader;
-  nlpLambdaInvoke: NlpLambdaInvoke;
-  nlpLambdaStreamInvoke: NlpLambdaStreamInvoke;
-  nlpPayloadStaging: NlpPayloadStaging;
-  workflowAiCall: WorkflowAiCall;
-  workflowCommitMessageModel: WorkflowCommitMessageModel;
   /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
   publicBaseUrl?: string;
 }

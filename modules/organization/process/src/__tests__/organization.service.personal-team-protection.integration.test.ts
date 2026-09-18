@@ -13,8 +13,8 @@ import {
   type PrismaConnection,
 } from "@langwatch/prisma-client";
 import { OrganizationUserRole, type PrismaClient } from "@langwatch/prisma-client/generated";
-import { cleanupTestRows } from "@langwatch/test-harness";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { cleanupTestRows } from "@langwatch/test-harness/prisma";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

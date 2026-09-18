@@ -10,7 +10,7 @@ import {
   type ResolvedScopeFilter,
   type ScopeFilterValue,
   type ScopeHierarchy,
-} from "@langwatch/authz-browser-kit/scope-picker";
+} from "@langwatch/authz-browser-kit";
 
 /**
  * Re-exported so the rest of this package imports the authz surface from one place instead of

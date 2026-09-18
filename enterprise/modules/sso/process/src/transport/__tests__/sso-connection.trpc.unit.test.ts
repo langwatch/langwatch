@@ -64,10 +64,10 @@ function runtimePorts(): TrpcRuntimeMembers<TestContext> {
   };
 }
 
-function harness() {
+async function harness() {
   const connections = RecordingSsoConnectionLedger.create();
   const record = vi.fn<AuditLogApi["record"]>(async () => {});
-  const app = createSsoTestApp({
+  const app = await createSsoTestApp({
     connections,
     dependencies: {
       users: createSsoTestUsers({
@@ -93,10 +93,10 @@ function harness() {
 const TARGET = { organizationId: "org_acme", connectionId: "ssoc_1" };
 
 describe("the back-office single sign-on surface", () => {
-  let context: ReturnType<typeof harness>;
+  let context: Awaited<ReturnType<typeof harness>>;
 
-  beforeEach(() => {
-    context = harness();
+  beforeEach(async () => {
+    context = await harness();
   });
 
   describe("given somebody outside the staff list", () => {

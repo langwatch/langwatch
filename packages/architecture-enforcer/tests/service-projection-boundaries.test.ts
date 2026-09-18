@@ -1,7 +1,9 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import { lintServiceProjectionBoundaries, type ClassifiedPackage } from "../src/index.ts";
 import { snapshotOf } from "./workspace.ts";
 
@@ -23,13 +25,13 @@ function write(path: string, source: string): void {
 
 function strictServer(): ClassifiedPackage {
   const featureRoot = join(root, "modules/example");
-  const packageRoot = join(featureRoot, "server");
+  const packageRoot = join(featureRoot, "process");
   return {
-    name: "@langwatch/example-server",
+    name: "@langwatch/example-process",
     root: packageRoot,
     manifestPath: join(packageRoot, "package.json"),
-    manifest: { name: "@langwatch/example-server" },
-    kind: "server",
+    manifest: { name: "@langwatch/example-process" },
+    kind: "process",
     feature: "example",
     featureRoot,
     subjects: ["example"],

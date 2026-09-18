@@ -5,7 +5,7 @@ import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi, OrganizationTeam } from "@langwatch/organization-contract";
 import type { ProjectApi, ProjectWithTeam, Team } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";
 

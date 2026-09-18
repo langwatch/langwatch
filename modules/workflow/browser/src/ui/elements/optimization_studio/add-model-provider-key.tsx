@@ -1,7 +1,7 @@
 import { Alert, Box, Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Link } from "@langwatch/browser-host/link";
 import { titleCase } from "@langwatch/design-system/string-casing";
-import { modelProviderIcons } from "@langwatch/model-provider-browser-kit/provider-icons";
+import { modelProviderIcons } from "@langwatch/model-provider-browser-kit";
 
 export const AddModelProviderKey = ({
   runWhat,

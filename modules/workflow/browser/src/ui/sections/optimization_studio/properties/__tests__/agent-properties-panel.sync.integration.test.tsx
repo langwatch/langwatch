@@ -83,7 +83,7 @@ vi.mock("../../../../../behavior/agents/http/index.ts", () => ({
   useHttpTest: () => ({ handleTest: vi.fn() }),
 }));
 
-vi.mock("@langwatch/prompt-browser-kit/variables", () => ({
+vi.mock("@langwatch/prompt-browser-kit", () => ({
   VariablesSection: () => null,
 }));
 

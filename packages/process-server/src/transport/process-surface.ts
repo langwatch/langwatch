@@ -10,6 +10,7 @@ import { apiOwner, type ApiHostConfig } from "./config-owner.ts";
 export async function processSurface(
   config: ApiHostConfig,
   production: boolean,
+  executionProxyBaseUrl: string | undefined,
   members: ProcessMemberSource,
   secrets: ScopedSecrets,
   selection: TransportSelection,
@@ -35,7 +36,7 @@ export async function processSurface(
     internalBearers: new Map([["cron", cron]]),
     instanceAdmin,
     trustedProxies: config.trustedProxies,
-    executionProxyBaseUrl: config.executionProxyBaseUrl,
+    executionProxyBaseUrl,
     production,
     selection,
   });

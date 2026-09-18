@@ -1,7 +1,9 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import { lintFeatureSetupInfrastructure } from "../src/policies/feature-app.ts";
 import type { ClassifiedPackage, FeatureCatalogueEntry } from "../src/types.ts";
 import { snapshotOf } from "./workspace.ts";
@@ -16,7 +18,7 @@ function write(file: string, text: string): void {
   writeFileSync(target, text);
 }
 
-function server(feature: string, kind: "server" | "contract"): ClassifiedPackage {
+function server(feature: string, kind: "process" | "contract"): ClassifiedPackage {
   const directory = `modules/${feature}/${kind}`;
   const manifest = { name: `@langwatch/${feature}-${kind}` };
   write(`${directory}/package.json`, JSON.stringify(manifest));
@@ -43,7 +45,7 @@ ${body}`,
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "feature-setup-infrastructure-"));
-  packages = [server("widget", "server"), server("foreign", "contract")];
+  packages = [server("widget", "process"), server("foreign", "contract")];
   write(
     "modules/foreign/contract/src/foreign.api.ts",
     "export interface ForeignApi { read(): void }",

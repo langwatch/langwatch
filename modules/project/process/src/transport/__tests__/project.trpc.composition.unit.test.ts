@@ -10,7 +10,7 @@ import { LocalFeatureApis, ResourceScope } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi, type Project, type ProjectWithTeam } from "@langwatch/project-contract";
 import { ShareApi } from "@langwatch/share-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { TopicApi, type TopicClusteringStatus } from "@langwatch/topic-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";

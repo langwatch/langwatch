@@ -5,7 +5,7 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
 import { type EvaluatorAttachment, parseEvaluatorAttachments } from "@langwatch/scenario-contract";
 import { useCallback, useMemo } from "react";
 

@@ -33,7 +33,6 @@
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
-    "@langwatch/evaluator-process": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
@@ -47,9 +46,11 @@
   },
   "devDependencies": {
     "@clickhouse/client": "catalog:",
+    "@langwatch/api-fixture": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
     "@trpc/server": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

@@ -8,7 +8,7 @@ import { buildSeriesName, type AnalyticsSeries } from "@langwatch/analytics-cont
 import { createAnalyticsService } from "@langwatch/analytics-process";
 import { DEFAULT_CLICKHOUSE_SETTINGS } from "@langwatch/clickhouse-client";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
-import { startTestClickHouseEndpoints } from "@langwatch/test-harness";
+import { startTestClickHouseEndpoints } from "@langwatch/test-harness/clickhouse";
 import { nanoid } from "nanoid";
 
 const DAY_MS = 24 * 60 * 60 * 1000;

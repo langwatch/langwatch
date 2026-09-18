@@ -5,7 +5,7 @@
  */
 
 import { Box, Text } from "@chakra-ui/react";
-import { usePeriodSelector } from "@langwatch/analytics-browser-kit/period-selector";
+import { usePeriodSelector } from "@langwatch/analytics-browser-kit";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { useMemo } from "react";
 

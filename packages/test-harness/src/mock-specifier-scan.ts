@@ -1,5 +1,6 @@
 import { statSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
+
 import type { CallExpression, Expression, Node, SourceFile } from "typescript/unstable/ast";
 import {
   isCallExpression,
@@ -9,6 +10,7 @@ import {
   isStringLiteral,
   SyntaxKind,
 } from "typescript/unstable/ast";
+
 import type { ModuleAlias } from "./vitest-alias-table.ts";
 
 /**

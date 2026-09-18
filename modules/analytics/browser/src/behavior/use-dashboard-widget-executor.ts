@@ -5,7 +5,7 @@
  */
 
 import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
-import { explainAnyError } from "@langwatch/handled-error/presentation";
+import { explainAnyError } from "@langwatch/error-presentation/presentation";
 import { nowInstant } from "@langwatch/time";
 import { useCallback, useMemo, useState } from "react";
 

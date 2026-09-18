@@ -60,10 +60,16 @@
       "path": "../../scenario/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/secrets/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/api-fixture/tsconfig.build.json"
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"

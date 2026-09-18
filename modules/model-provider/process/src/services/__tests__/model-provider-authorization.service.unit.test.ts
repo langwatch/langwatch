@@ -4,7 +4,7 @@
 
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ModelDefaultScope } from "@langwatch/model-provider-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { ModelProviderAuthorizationService } from "../model-provider-authorization.service.ts";

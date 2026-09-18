@@ -8,22 +8,6 @@ import type {
 import type { Instant } from "@langwatch/time";
 
 import type { PersonalWorkspaceResourceIds } from "../repositories/organization.repository.ts";
-export interface OrganizationInfrastructure {
-  groupIdentity: GroupIdentity;
-  organizationGrantCache: OrganizationGrantCache;
-  organizationPromptSeed: OrganizationPromptSeed;
-  organizationSeatLicense: OrganizationSeatLicense;
-  organizationSessionRevocation: OrganizationSessionRevocation;
-  organizationSettingsSecret: OrganizationSettingsSecret;
-  personalWorkspaceDiagnostics: PersonalWorkspaceDiagnostics;
-  personalWorkspaceIdentity: PersonalWorkspaceIdentity;
-  teamIdentity: TeamIdentity;
-  organizationInviteSeatCensus?: OrganizationInviteSeatCensus;
-  organizationInviteMail?: OrganizationInviteMail;
-  organizationInviteWorkspaceCensus?: OrganizationInviteWorkspaceCensus;
-  organizationInviteRateLimit?: OrganizationInviteRateLimit;
-}
-
 /**
  * What an organization's seats currently cost it, and what a lite seat is - two counts and one
  * predicate for the single question "is there room for these invitations." A process with none

@@ -104,7 +104,7 @@ The grouped row's `id` is a stable hash of its non-scope keys (e.g. `${role}::${
 
 ## UI shape: ScopeChipPicker
 
-One shared primitive — `modules/authz/browser/src/surfaces/scope-picker/scope-chip-picker.tsx` — renders the multi-select of scopes the caller can write at. Every settings page that touches scoped resources uses it. Don't roll a new picker.
+One shared primitive — `modules/authz/browser-kit/src/scope-picker/scope-chip-picker.tsx` — renders the multi-select of scopes the caller can write at. Every settings page that touches scoped resources uses it. Don't roll a new picker.
 
 The drawer/form that authors a new rule:
 
@@ -199,6 +199,6 @@ Migrations are immutable once deployed (see `feedback_never_modify_deployed_migr
 - **Storage + read grouping:** `modules/model-provider/process/src/transport/api-trpc/model-provider.api.ts` → `getDefaultModelsForProject`
 - **Write per-scope:** `modules/model-provider/process/src/services/model-provider-defaults-write.service.ts`
 - **Multi-scope authz:** `modules/gateway/process/src/app/gateway.app.ts` → `assertCanManageAllScopes`
-- **UI primitive:** `modules/authz/browser/src/surfaces/scope-picker/scope-chip-picker.tsx`
+- **UI primitive:** `modules/authz/browser-kit/src/scope-picker/scope-chip-picker.tsx`
 - **Cascade-FK variant:** `GatewayBudget` model in `prisma/schema.prisma`
 - **Spec:** `specs/model-providers/role-based-default-models.feature`

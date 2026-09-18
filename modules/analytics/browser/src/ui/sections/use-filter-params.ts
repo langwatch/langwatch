@@ -1,4 +1,4 @@
-import { usePeriodSelector } from "@langwatch/analytics-browser-kit/period-selector";
+import { usePeriodSelector } from "@langwatch/analytics-browser-kit";
 import { readUiStorage } from "@langwatch/browser-host/storage";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";

@@ -8,7 +8,7 @@ import { ResourceScope } from "@langwatch/kernel";
  */
 import type { PresenceUser } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { vi } from "vitest";
 

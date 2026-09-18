@@ -1,7 +1,7 @@
 import { Box, HStack, type StackProps, Text, VStack } from "@chakra-ui/react";
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { modelProviderIcons } from "@langwatch/model-provider-browser-kit/provider-icons";
+import { modelProviderIcons } from "@langwatch/model-provider-browser-kit";
 import {
   allModelOptions,
   useModelSelectionOptions,

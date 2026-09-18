@@ -4,6 +4,7 @@
  */
 import { writeFileSync } from "node:fs";
 import path from "node:path";
+
 import type { Reporter, TestModule } from "vitest/node";
 
 import type { DurationManifest } from "./shard-weights.ts";

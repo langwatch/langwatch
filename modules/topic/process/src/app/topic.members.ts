@@ -6,13 +6,6 @@ import type {
   TopicModelRecordMode,
   TopicModelRecordSource,
 } from "@langwatch/topic-contract";
-export interface TopicInfrastructure {
-  langevalsPayloadStaging: LangevalsPayloadStaging;
-  topicClusteringClickHouse: TopicClusteringClickHouse;
-  topicClusteringCommands: TopicClusteringCommands;
-  topicClusteringLangevals: TopicClusteringLangevals;
-}
-
 /** One parked payload, as the caller needs it back to fetch and to discard it. */
 export interface StagedLangevalsPayload {
   /** The presigned GET URL the receiver fetches the body from. */

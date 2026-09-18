@@ -1,6 +1,5 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { absorbContextTarget } from "@langwatch/langy-browser/surfaces/langy-context";
-import { useLangyStore } from "@langwatch/langy-browser/surfaces/langy-store";
+import { absorbContextTarget, useLangyStore } from "@langwatch/langy-browser-kit";
 import { useFeatureFlag } from "@langwatch/workflow-browser/feature-flag";
 import { useCallback } from "react";
 

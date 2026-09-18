@@ -1,9 +1,6 @@
 import { Text, VStack } from "@chakra-ui/react";
+import { INHERIT_SENTINEL, ProviderModelSelector } from "@langwatch/model-provider-browser-kit";
 import { modelSelectorOptions } from "@langwatch/model-provider-browser/surfaces/model-selector";
-import {
-  INHERIT_SENTINEL,
-  ProviderModelSelector,
-} from "@langwatch/model-provider-browser/surfaces/provider-model-selector";
 import {
   buildCustomModelDisplayNames,
   LATEST_ALIAS_PROVIDERS,

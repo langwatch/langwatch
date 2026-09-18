@@ -15,7 +15,6 @@
   },
   "include": ["src/**/*.ts"],
   "references": [
-    { "path": "../../../../packages/process-stores/tsconfig.build.json" },
     {
       "path": "tsconfig.build.json"
     },
@@ -27,6 +26,9 @@
     },
     {
       "path": "../../../../modules/entitlement/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/entitlement/process/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/handled-error/tsconfig.build.json"
@@ -41,13 +43,19 @@
       "path": "../../../../packages/prisma-client/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/time/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/test-harness/tsconfig.build.json"
+      "path": "../../../../packages/process-stores/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/secrets/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/api-fixture/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/vitest-config/tsconfig.build.json"
     }
   ]
 }

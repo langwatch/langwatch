@@ -31,6 +31,9 @@
       "path": "../../../packages/browser-trpc/tsconfig.build.json"
     },
     {
+      "path": "../../dataset/browser-kit/tsconfig.build.json"
+    },
+    {
       "path": "../../dataset/contract/tsconfig.build.json"
     },
     {
@@ -50,6 +53,9 @@
     },
     {
       "path": "../../../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../onboarding/browser/tsconfig.build.json"
     },
     {
       "path": "../browser-kit/tsconfig.build.json"
@@ -79,7 +85,7 @@
       "path": "../../workflow/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/test-harness/tsconfig.build.json"
+      "path": "../../../packages/vitest-config/tsconfig.build.json"
     }
   ]
 }

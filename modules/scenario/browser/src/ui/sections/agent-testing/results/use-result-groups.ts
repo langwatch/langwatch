@@ -3,7 +3,7 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import type { Period, PeriodMode } from "@langwatch/analytics-browser-kit/period-selector";
+import type { Period, PeriodMode } from "@langwatch/analytics-browser-kit";
 import type {
   CodeScenario,
   ResultAtom,

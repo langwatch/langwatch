@@ -48,7 +48,7 @@ vi.mock("../../../../ui/sections/gateway-layout.tsx", () => ({
 // One surface, one mock: the picker and the read-only chips travel together
 // because the picker renders the chips, and two `vi.mock` calls for the same
 // specifier would leave whichever ran last as the whole module.
-vi.mock("@langwatch/authz-browser-kit/scope-picker", () => ({
+vi.mock("@langwatch/authz-browser-kit", () => ({
   ScopeChipPicker: () => <div data-testid="scope-chip-picker" />,
   ProviderScopeChips: () => <div data-testid="provider-scope-chips" />,
 }));

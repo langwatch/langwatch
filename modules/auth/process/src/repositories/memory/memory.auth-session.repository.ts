@@ -9,11 +9,6 @@ export class MemoryAuthSessionRepository implements AuthSessionRepository {
     return new MemoryAuthSessionRepository(memory);
   }
 
-  /** Test seam: the rows a case starts from, written the way Better Auth would. */
-  put(session: StoredBrowserSession): void {
-    this.memory.sessions.set(session.id, session);
-  }
-
   async findById({ id }: { id: string }): Promise<StoredBrowserSession | null> {
     return this.memory.sessions.get(id) ?? null;
   }

@@ -1,4 +1,4 @@
-import { FLOATING_PANEL_INSET, resolveFloatingPanelWidth } from "./langy-panel-layout.ts";
+import { FLOATING_PANEL_INSET, resolveFloatingPanelWidth } from "@langwatch/langy-browser-kit";
 
 /**
  * Keeps the mounted panel itself visible as a small rest or near sliver. Unmounting

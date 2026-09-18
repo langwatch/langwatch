@@ -2,17 +2,6 @@
  * Test harness: lane assignment, shard weighting, compiler, datastore wiring.
  * See {@link laneForSource} for COMPONENT vs DATASTORE lane split.
  */
-export { cleanupTestRows, requireAssigned, type CleanupEntry } from "./cleanup-test-rows.ts";
-export {
-  migrateTestClickHouseOnce,
-  nativeClickHouseBaseUrl,
-  privateRouteOrgId,
-  startTestClickHouseEndpoints,
-  TEST_CLICKHOUSE_IMAGE,
-  TEST_CLICKHOUSE_TUNING,
-  TEST_CLICKHOUSE_TUNING_LABEL,
-  type TestClickHouseEndpoint,
-} from "./clickhouse-test-endpoints.ts";
 export {
   default as DurationManifestReporter,
   mergeDurations,
@@ -86,8 +75,10 @@ export {
 } from "./member-doubles.ts";
 export { createTestAuditSink, type TestAuditRow, type TestAuditSink } from "./test-audit-sink.ts";
 export { createTestLogger, type TestLogLine, type TestLogLines } from "./test-logger.ts";
-export { allowConsole } from "./console-guard.ts";
+export { allowConsole } from "@langwatch/vitest-config/console-guard";
 export { closeTsAstSession, parseSourceText, parseSourceTexts } from "./ts-ast.ts";
-export { aliasesForFile, parseVitestConfigAliases, type ModuleAlias } from "./vitest-alias-table.ts";
-export * from "./nlpgo-binary-stamp.ts";
-export * from "./nlpgo-subprocess.ts";
+export {
+  aliasesForFile,
+  parseVitestConfigAliases,
+  type ModuleAlias,
+} from "./vitest-alias-table.ts";

@@ -3,7 +3,7 @@ import {
   langyConversationUpdateSignalSchema,
 } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
-import { useSSESubscription } from "@langwatch/trace-browser-kit/sse-subscription";
+import { useSSESubscription } from "@langwatch/trace-browser-kit";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api } from "../../../behavior/langy-api.ts";

@@ -5,7 +5,7 @@
  */
 
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
-import { type BatchRun, computeBatchRunSummary } from "@langwatch/suite-browser/run-formatters";
+import { type BatchRun, computeBatchRunSummary } from "@langwatch/suite-browser-kit";
 
 import { batchNote } from "../../../../behavior/agent-testing/results/run-plans.ts";
 import { runTitle } from "../../../../behavior/agent-testing/results/run-titles.ts";

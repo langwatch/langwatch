@@ -371,16 +371,6 @@ export interface OpsAppInfrastructure {
    * package reads none.
    */
   isProduction: boolean;
-  anomalyHardTierAlert: AnomalyHardTierAlert;
-  opsReplayRuntime: OpsReplayRuntimeFactory;
-  opsSnapshotRedis: OpsSnapshotRedis;
-  opsWorker: OpsWorker;
-  organizationDataplane: OrganizationDataplaneResolver;
-  queuePayloadDecoder: QueuePayloadDecoder;
-  schedulerWake: SchedulerWake;
-  storageStatsMetrics: StorageStatsMetrics;
-  usageStatsErrorReporter: UsageStatsErrorReporter;
-  usageStatsTelemetryClient: UsageStatsTelemetryClient;
 }
 type OpsRuntimeDependencies = Readonly<{
   ops: OpsCapability;
@@ -535,6 +525,7 @@ export class OpsApp implements OpsApi {
     "eventing",
     "logger",
     "nodeEnvironment",
+    "adminEmails",
   ] as const;
 
   /**

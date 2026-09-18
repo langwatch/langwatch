@@ -8,12 +8,12 @@ import {
   type FieldMapping,
   type Variable,
   VariablesSection,
-} from "@langwatch/prompt-browser-kit/variables";
+} from "@langwatch/prompt-browser-kit";
 import {
   fromOutputFieldState,
   resolveOutputField,
   toOutputFieldState,
-} from "@langwatch/suite-browser/run-formatters";
+} from "@langwatch/suite-browser-kit";
 import { useMemo } from "react";
 
 /** The scenario fields shown as input mapping rows. */

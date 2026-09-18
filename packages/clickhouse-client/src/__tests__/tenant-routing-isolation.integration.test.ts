@@ -6,7 +6,7 @@
  * NOT on the other. Spec: specs/private-dataplane/clickhouse-routing.feature
  */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
-import { privateRouteOrgId, startTestClickHouseEndpoints } from "@langwatch/test-harness";
+import { privateRouteOrgId, startTestClickHouseEndpoints } from "@langwatch/test-harness/clickhouse";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   ClickHouseClientFactory,

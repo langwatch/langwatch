@@ -1,9 +1,15 @@
-import { defineModuleVitestConfig } from "../../../../packages/test-harness/src/vitest-config.ts";
+import { defineConfig } from "vitest/config";
 
-export default defineModuleVitestConfig({
-  kind: "node",
-  isolate: false,
+// Standalone on purpose: this sample installs from npm the way a customer's
+// project does, so it declares no workspace package. It reached into
+// packages/test-harness/src by relative path before, which resolved only
+// because the checkout happened to sit above it.
+export default defineConfig({
   test: {
+    environment: "node",
+    isolate: false,
+    pool: "forks",
+    watch: false,
     include: ["tests/**/*.test.ts"],
     testTimeout: 180_000,
     hookTimeout: 60_000,

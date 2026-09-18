@@ -17,7 +17,7 @@ vi.mock("@langwatch/trace-browser/surfaces/setup-with-agent-button", () => ({
 import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 import { useRouter } from "@langwatch/browser-host/use-router";
-import { createRunHistoryStore } from "@langwatch/suite-browser/run-history-store";
+import { createRunHistoryStore } from "@langwatch/suite-browser-kit";
 import { MemoryRouter, Route, Routes, useLocation, useNavigate, useParams } from "react-router";
 
 import { ScenarioHostApi, ScenarioHostProvider } from "../../../model/scenario-host.ts";

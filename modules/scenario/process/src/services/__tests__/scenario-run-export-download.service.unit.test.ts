@@ -12,7 +12,7 @@ import {
   type SimulationService,
   Verdict,
 } from "@langwatch/scenario-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { ScenarioRunExportDownloadService } from "../scenario-run-export-download.service.ts";

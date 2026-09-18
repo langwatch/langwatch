@@ -1,4 +1,4 @@
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 
 import { agentFixture } from "../app/__tests__/agent.fixture.ts";
 import type { AgentService } from "../services/agent.service.ts";

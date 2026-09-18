@@ -10,8 +10,8 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
+import { LangyMark, LangyMarkGradientDefs } from "@langwatch/langy-browser-kit";
 import { CARD } from "@langwatch/langy-browser/surfaces/asaplangy";
-import { LangyMark, LangyMarkGradientDefs } from "@langwatch/langy-browser/surfaces/langy-mark";
 import { AlertCircle, ArrowRight, PencilLine, Sparkles } from "lucide-react";
 
 import "@langwatch/langy-browser/surfaces/langy-theme.css";

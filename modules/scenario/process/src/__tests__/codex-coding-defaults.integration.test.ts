@@ -32,7 +32,7 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { TargetConfig } from "@langwatch/scenario-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {

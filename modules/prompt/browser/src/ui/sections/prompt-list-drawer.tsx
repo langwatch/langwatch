@@ -17,7 +17,7 @@ import {
 } from "@chakra-ui/react";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { modelProviderIcons } from "@langwatch/model-provider-browser-kit/provider-icons";
+import { modelProviderIcons } from "@langwatch/model-provider-browser-kit";
 import groupBy from "lodash-es/groupBy";
 import { ChevronRight, FileText, FolderOpen, Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";

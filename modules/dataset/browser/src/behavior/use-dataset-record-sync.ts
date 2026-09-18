@@ -1,9 +1,9 @@
 /** Debounced sync of edited records: full replace + delete-marked deletions.
  * Save status via onStatus callback for autosave indicator.
  */
+import type { AutosaveState } from "@langwatch/dataset-browser-kit";
 import { useCallback, useEffect, useRef } from "react";
 
-import type { AutosaveState } from "../model/dataset-table-context.tsx";
 import type { PendingSavedChanges } from "../model/pending-saved-changes.ts";
 import { datasetApi } from "./dataset-api.ts";
 

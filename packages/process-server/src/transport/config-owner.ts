@@ -27,7 +27,6 @@ export const apiOwner = {
         .default(fileURLToPath(new URL("../../../../apps/ui/dist/client", import.meta.url))),
     ),
     assetBase: c.env("LANGWATCH_ASSET_BASE", z.string().optional()),
-    executionProxyBaseUrl: c.env("LANGWATCH_NLP_SERVICE", z.string().optional()),
   })),
   secrets: {
     cron: Secret.load("CRON_API_KEY", { optional: true }),

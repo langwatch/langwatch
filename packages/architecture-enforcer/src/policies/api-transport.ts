@@ -27,11 +27,13 @@
 
 import { existsSync } from "node:fs";
 import { join, sep } from "node:path";
+
 import ts from "typescript";
+
+import type { ArchitectureViolation, ClassifiedPackage } from "../types.ts";
 import { listFiles } from "../workspace/layout.ts";
 import { sourceFile } from "../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
-import type { ArchitectureViolation, ClassifiedPackage } from "../types.ts";
 
 const POLICY = "api-transport-through-framework";
 
@@ -222,7 +224,7 @@ function transportFiles(
   const found: { file: string; surface: Surface }[] = [];
 
   for (const pkg of packages) {
-    if (pkg.kind !== "server") continue;
+    if (pkg.kind !== "process") continue;
 
     for (const surface of ["rest", "trpc"] as const) {
       const root = join(pkg.root, "src", "transport", `api-${surface}`);
@@ -245,7 +247,7 @@ function transportFiles(
 
 function featureServerFiles(packages: readonly ClassifiedPackage[]): string[] {
   return packages.flatMap((pkg) => {
-    if (pkg.kind !== "server") return [];
+    if (pkg.kind !== "process") return [];
 
     return listFiles({
       directory: join(pkg.root, "src"),
@@ -836,7 +838,7 @@ function transportSources(packages: readonly ClassifiedPackage[]): TransportSour
   const sources = new Map<string, TransportSource>();
 
   for (const pkg of packages) {
-    const strictFeatureApi = pkg.kind === "server";
+    const strictFeatureApi = pkg.kind === "process";
     const apiApplication = pkg.kind === "application" && pkg.applicationRole === "api";
     if (!strictFeatureApi && !apiApplication) continue;
 

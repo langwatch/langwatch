@@ -130,10 +130,10 @@ interface UserAppDependencies {
   projects: ProjectApi;
 }
 
-/** `passkeysEnabled` collides with `auth`'s landed leaf if redeclared, and
- * `baseUrl` is the process's own fact; both stay members. See the handoff. */
+/** `PASSKEYS_ENABLED` has one owner, `auth`, so this module asks that peer
+ * rather than redeclaring it; `publicBaseUrl` is the process's own fact. */
 type UserMembers = MembersRead<readonly ["prisma", "redis"]> &
-  Readonly<{ passkeysEnabled: boolean; publicBaseUrl: string | undefined }>;
+  Readonly<{ publicBaseUrl: string | undefined }>;
 
 /** The two flagged facts above, resolved once and threaded where `config` used to travel. */
 export type UserFacts = Readonly<{ passkeysEnabled: boolean; baseUrl: string | null }>;
@@ -147,13 +147,8 @@ type UserSetup = FeatureSetup<
 
 export class UserApp implements UserApi {
   static readonly contract = UserApi;
-  /** `passkeysEnabled`/`publicBaseUrl` are named raw so the process can
-   * answer them through `withMember`/`withMembers` (see {@link UserMembers}). */
-  static readonly reads = [
-    ...reads("prisma", "redis"),
-    "passkeysEnabled",
-    "publicBaseUrl",
-  ] as const;
+  /** `publicBaseUrl` is named raw: the process answers it, no store does. */
+  static readonly reads = [...reads("prisma", "redis"), "publicBaseUrl"] as const;
   static readonly dependencies: {
     auth: typeof AuthApi;
     identity: typeof IdentityApi;
@@ -180,7 +175,10 @@ export class UserApp implements UserApi {
       dependencies: setup.dependencies,
       repositories: setup.repositories,
       facts: {
-        passkeysEnabled: setup.members.passkeysEnabled,
+        // Stored now, asked on first read: a peer API refuses during construction.
+        get passkeysEnabled() {
+          return setup.dependencies.auth.offersPasskeys();
+        },
         baseUrl: setup.members.publicBaseUrl ?? null,
       },
     });

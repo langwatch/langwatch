@@ -24,8 +24,8 @@ import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organiza
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import { createEvaluatorEditorCallbacks } from "@langwatch/experiment-browser/evaluator-editor-callbacks";
-import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-browser/mapping-validation";
-import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit/variables";
+import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-contract/mapping-validation";
+import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit";
 import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
 import { AlertTriangle, ArrowLeft, HelpCircle, Spool, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";

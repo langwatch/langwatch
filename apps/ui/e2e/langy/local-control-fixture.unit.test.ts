@@ -4,6 +4,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import {
   answerOfTurn,
   demoReposToPrune,
@@ -121,16 +122,12 @@ describe("questionAnswerNote", () => {
     it("carries the question and the option that was picked", () => {
       const note = questionAnswerNote({
         waitId: "wait_2",
-        questions: [
-          { question: "Which branch?", options: [{ label: "main" }] },
-        ],
+        questions: [{ question: "Which branch?", options: [{ label: "main" }] }],
         answered: [{ question: "Which branch?", selected: ["main"] }],
         turnId: "langyturn_1",
       });
 
-      expect(note).toBe(
-        '[developer answered in the panel: "Which branch?" -> main]',
-      );
+      expect(note).toBe('[developer answered in the panel: "Which branch?" -> main]');
     });
   });
 });
@@ -158,9 +155,7 @@ describe("demoReposToPrune", () => {
 
   describe("when the folders fit inside what a run keeps", () => {
     it("names none", () => {
-      expect(
-        demoReposToPrune({ existing: [`code-access-${stamp(0)}`], keep: 4 }),
-      ).toEqual([]);
+      expect(demoReposToPrune({ existing: [`code-access-${stamp(0)}`], keep: 4 })).toEqual([]);
     });
   });
 
@@ -168,9 +163,7 @@ describe("demoReposToPrune", () => {
     it("treats it as the oldest, so it is pruned first", () => {
       const folders = ["leftover", `code-access-${stamp(0)}`];
 
-      expect(demoReposToPrune({ existing: folders, keep: 1 })).toEqual([
-        "leftover",
-      ]);
+      expect(demoReposToPrune({ existing: folders, keep: 1 })).toEqual(["leftover"]);
     });
   });
 });

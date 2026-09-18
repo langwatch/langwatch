@@ -81,6 +81,7 @@ Reusable framework decisions live with their packages:
 | [141](./141-platform-invariants.md)                                    | The invariants a single file can be checked against                                                                       | Proposed                  |
 | [142](./142-test-quality-rules.md)                                     | A test that cannot fail is worse than no test                                                                             | Proposed                  |
 | [143](./143-formatting.md)                                             | oxfmt is the only formatter, and it reads one configuration                                                               | Proposed                  |
+| [150](./150-nx-task-runner.md)                                         | Nx is the workspace task runner, over inferred pnpm targets                                                               | Accepted                  |
 
 Package-local decisions are indexed beside their owners. The framework
 records are the [Eventing ADR index](../../../packages/eventing/adrs/README.md)

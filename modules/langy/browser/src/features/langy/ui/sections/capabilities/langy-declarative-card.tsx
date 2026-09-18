@@ -3,6 +3,7 @@
  * describes, from the body widget its descriptor names.
  */
 import { Box, Grid, Text, VStack } from "@chakra-ui/react";
+import { type LangyTurnMetric } from "@langwatch/langy-browser-kit";
 import {
   type CliResultDigest,
   parseCardResult,
@@ -10,7 +11,6 @@ import {
 } from "@langwatch/langy-contract";
 
 import { collectionOf, totalOf } from "../../../../../model/langy-cli-result-document.ts";
-import { type LangyTurnMetric } from "../../../../../model/values/langy-turn.ts";
 import { StreamingStatCard } from "../../../../../ui/sections/streaming-stat-card.tsx";
 import { type CapabilityData, useCapabilityData } from "../../../behavior/use-capability-data.ts";
 import {

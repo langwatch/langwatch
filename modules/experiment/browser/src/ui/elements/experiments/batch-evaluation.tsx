@@ -12,7 +12,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { downloadCsv } from "@langwatch/csv/download";
 import { formatMoney } from "@langwatch/design-system/format-money";
 import { Tooltip } from "@langwatch/design-system/tooltip";
@@ -25,19 +24,13 @@ import { readableDate } from "../../../model/display-formatters.ts";
 import type { BatchEvaluation } from "../../../model/prisma-types.ts";
 
 export default function BatchEvaluation({
-  project,
   experiment,
+  evaluations,
 }: {
   project: Project;
   experiment: Experiment;
+  evaluations: { data?: BatchEvaluation[]; isLoading: boolean };
 }) {
-  /** The run's rows, named by the shape this file already renders. */
-  const evaluationsQuery = api.batchRecord.getAllByexperimentSlug.useQuery({
-    projectId: project.id ?? "",
-    experimentSlug: experiment.slug ?? "",
-  });
-  const evaluations = evaluationsQuery as { data?: BatchEvaluation[]; isLoading: boolean };
-
   const downloadCSV = () => {
     const fields = [
       "Dataset",

@@ -30,8 +30,11 @@ const stubbedPages: UiPageLoaderRegistry = Object.fromEntries(
   ]),
 );
 
-/** The chrome layout, stubbed the same way — it carries no page key of its own. */
-const stubbedShellLayouts = { chrome: async () => ({ default: () => <Outlet /> }) };
+/** The shell layouts, stubbed the same way — they carry no page key of their own. */
+const stubbedShellLayouts = {
+  auth: async () => ({ default: () => <Outlet /> }),
+  chrome: async () => ({ default: () => <Outlet /> }),
+};
 
 const realRoutes = createUiRouteObjects({
   table: uiRouteTable,

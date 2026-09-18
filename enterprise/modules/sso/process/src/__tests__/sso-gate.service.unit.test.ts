@@ -3,7 +3,7 @@ import {
   type PlatformLicenseAccess,
 } from "@langwatch/enterprise-licensing-contract";
 import type { SsoConfiguration } from "@langwatch/enterprise-sso-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SsoGateLogger } from "../app/sso.members.ts";

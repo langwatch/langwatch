@@ -8,15 +8,10 @@
   ],
   "type": "module",
   "exports": {
-    "./llm-model-display": {
-      "langwatch-declaration-source": "./src/llm-model-display.ts",
-      "types": "./dist/llm-model-display.d.ts",
-      "default": "./src/llm-model-display.ts"
-    },
-    "./variables": {
-      "langwatch-declaration-source": "./src/variables.ts",
-      "types": "./dist/variables.d.ts",
-      "default": "./src/variables.ts"
+    ".": {
+      "langwatch-declaration-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
     }
   },
   "scripts": {
@@ -27,6 +22,7 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/model-provider-browser": "workspace:*",
     "@langwatch/model-provider-browser-kit": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/workflow-browser-kit": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
@@ -39,7 +35,7 @@
     "@chakra-ui/react": "catalog:",
     "@emotion/react": "catalog:",
     "@langwatch/browser-trpc": "workspace:*",
-    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
     "@testing-library/jest-dom": "catalog:",
     "@testing-library/react": "catalog:",
     "@testing-library/user-event": "catalog:",

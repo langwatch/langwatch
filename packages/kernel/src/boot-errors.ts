@@ -54,17 +54,6 @@ export class RoleContributionError extends Error {
   }
 }
 
-/** The config handed to boot does not match what a feature declared. */
-export class FeatureConfigError extends Error {
-  constructor(
-    readonly feature: string,
-    readonly reason: string,
-  ) {
-    super(`Feature "${feature}" rejected its configuration: ${reason}`);
-    this.name = "FeatureConfigError";
-  }
-}
-
 /** A module resolved a secret in a process that composed no secrets chain. */
 export class FeatureSecretsUnavailableError extends Error {
   constructor(

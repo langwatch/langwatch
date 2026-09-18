@@ -15,6 +15,13 @@ import { lintFeatureLayouts } from "./feature-layout.ts";
 import { lintFeatureShape } from "./feature-shape.ts";
 import { lintBrowserNodeLeaks } from "./frontend/browser-node-leak.ts";
 import {
+  lintBrowserKitDependencies,
+  lintBrowserKitExports,
+  lintBrowserPackageClosure,
+  lintBrowserPackageExports,
+  lintBrowserPackageManifestClosure,
+} from "./frontend/browser-packages.ts";
+import {
   declaredWebDependencyPairs,
   lintFrontendUiBoundaries,
 } from "./frontend/frontend-ui-boundaries.ts";
@@ -167,6 +174,31 @@ export const POLICIES: readonly PolicyDefinition[] = [
     spec: "specs/tooling/lint-browser-node-leak.feature",
     baseline: "browser-node-leak-baseline.json",
     run: lintBrowserNodeLeaks,
+  }),
+  definePolicy({
+    id: "browser-package-closure",
+    spec: "specs/frontend-feature-boundaries.feature",
+    run: lintBrowserPackageClosure,
+  }),
+  definePolicy({
+    id: "browser-package-manifest-closure",
+    spec: "specs/frontend-feature-boundaries.feature",
+    run: lintBrowserPackageManifestClosure,
+  }),
+  definePolicy({
+    id: "browser-package-exports",
+    spec: "specs/frontend-feature-boundaries.feature",
+    run: lintBrowserPackageExports,
+  }),
+  definePolicy({
+    id: "browser-kit-exports",
+    spec: "specs/frontend-feature-boundaries.feature",
+    run: lintBrowserKitExports,
+  }),
+  definePolicy({
+    id: "browser-kit-dependencies",
+    spec: "specs/frontend-feature-boundaries.feature",
+    run: lintBrowserKitDependencies,
   }),
   definePolicy({
     id: "global-app-access",

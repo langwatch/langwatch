@@ -1,6 +1,6 @@
 import { toaster } from "@langwatch/browser-host/toaster";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
-import { ComponentIcon } from "@langwatch/workflow-browser-kit/workflow-icons";
+import { ComponentIcon } from "@langwatch/workflow-browser-kit";
 import type { ComponentProps } from "react";
 
 import { HoverableBigText } from "../../hoverable-big-text.tsx";

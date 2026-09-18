@@ -21,10 +21,16 @@
       "path": "../clickhouse-client/tsconfig.build.json"
     },
     {
+      "path": "../config/tsconfig.build.json"
+    },
+    {
       "path": "../eventing/tsconfig.build.json"
     },
     {
       "path": "../group-queue/tsconfig.build.json"
+    },
+    {
+      "path": "../kernel/tsconfig.build.json"
     },
     {
       "path": "../mail/tsconfig.declarations.json"
@@ -37,12 +43,6 @@
     },
     {
       "path": "../redis-client/tsconfig.build.json"
-    },
-    {
-      "path": "../kernel/tsconfig.build.json"
-    },
-    {
-      "path": "../config/tsconfig.build.json"
     },
     {
       "path": "../secrets/tsconfig.build.json"

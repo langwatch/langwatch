@@ -25,10 +25,6 @@ export class MemoryGovernanceSetupStateRepository extends GovernanceSetupStateRe
     return new MemoryGovernanceSetupStateRepository();
   }
 
-  record(organizationId: string, counts: GovernanceSetupCounts): void {
-    this.byOrganization.set(organizationId, counts);
-  }
-
   async counts(organizationId: string): Promise<GovernanceSetupCounts> {
     return this.byOrganization.get(organizationId) ?? NOTHING_SET_UP;
   }

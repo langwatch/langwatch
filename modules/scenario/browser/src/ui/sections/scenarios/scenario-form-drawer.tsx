@@ -21,7 +21,7 @@ import { applyHandledErrorToForm, showErrorToast } from "@langwatch/browser-host
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { toaster } from "@langwatch/design-system/toaster";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
 import { generate } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "@langwatch/ksuid";
 import { PromptEditorDrawer } from "@langwatch/prompt-browser/surfaces/prompt-editor-drawer";

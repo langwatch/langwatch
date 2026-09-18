@@ -1,7 +1,4 @@
 import type { PlatformHealthCheckName } from "@langwatch/platform-health-contract";
-export interface PlatformHealthInfrastructure {
-  subsystemProbe: SubsystemProbe;
-}
 
 /**
  * What one subsystem answered. `not_configured` is the deployment's own gap —

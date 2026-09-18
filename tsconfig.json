@@ -18,6 +18,7 @@
   // workspace manifests, and the declaration-project-references rule fails a
   // build where it has drifted. Do not hand-edit the array.
   "files": [],
+  "exclude": [".claude/"],
   // The mail preview studio is a project of its own inside a package, so no
   // workspace manifest names it; the rest of the array is derived.
   "langwatchExtraReferences": [{ "path": "packages/mail/preview/tsconfig.json" }],
@@ -63,6 +64,9 @@
     },
     {
       "path": "packages/api/tsconfig.type-tests.json"
+    },
+    {
+      "path": "packages/api-fixture/tsconfig.json"
     },
     {
       "path": "modules/api-key/browser/tsconfig.json"
@@ -170,6 +174,9 @@
       "path": "modules/dataset/browser/tsconfig.json"
     },
     {
+      "path": "modules/dataset/browser-kit/tsconfig.json"
+    },
+    {
       "path": "modules/dataset/contract/tsconfig.json"
     },
     {
@@ -254,6 +261,12 @@
       "path": "modules/entitlement/process/tsconfig.json"
     },
     {
+      "path": "packages/error-presentation/tsconfig.json"
+    },
+    {
+      "path": "packages/error-views/tsconfig.json"
+    },
+    {
       "path": "modules/evaluation/contract/tsconfig.json"
     },
     {
@@ -261,6 +274,9 @@
     },
     {
       "path": "modules/evaluator/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/evaluator/browser-kit/tsconfig.json"
     },
     {
       "path": "modules/evaluator/contract/tsconfig.json"
@@ -276,6 +292,9 @@
     },
     {
       "path": "modules/experiment/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/experiment/browser-kit/tsconfig.json"
     },
     {
       "path": "modules/experiment/contract/tsconfig.json"
@@ -345,6 +364,9 @@
     },
     {
       "path": "modules/langy/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/langy/browser-kit/tsconfig.json"
     },
     {
       "path": "modules/langy/contract/tsconfig.json"
@@ -548,6 +570,9 @@
       "path": "modules/suite/browser/tsconfig.json"
     },
     {
+      "path": "modules/suite/browser-kit/tsconfig.json"
+    },
+    {
       "path": "modules/suite/contract/tsconfig.json"
     },
     {
@@ -609,6 +634,9 @@
     },
     {
       "path": "tools/visualdiff/runner/tsconfig.json"
+    },
+    {
+      "path": "packages/vitest-config/tsconfig.json"
     },
     {
       "path": "modules/webhook/contract/tsconfig.json"

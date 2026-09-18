@@ -3,7 +3,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi, ScenarioTestSuite } from "@langwatch/scenario-contract";
 import { SuiteScopeNotAllowedError } from "@langwatch/suite-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  */

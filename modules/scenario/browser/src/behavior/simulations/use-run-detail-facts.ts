@@ -6,7 +6,7 @@
 
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { runParameterValuesSchema } from "@langwatch/scenario-contract";
-import { buildDisplayTitle } from "@langwatch/suite-browser/run-formatters";
+import { buildDisplayTitle } from "@langwatch/suite-browser-kit";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 

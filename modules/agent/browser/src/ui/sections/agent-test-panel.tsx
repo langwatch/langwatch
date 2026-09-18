@@ -3,8 +3,8 @@
 import { Alert, Box, Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { explainAnyError } from "@langwatch/handled-error/presentation";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { explainAnyError } from "@langwatch/error-presentation/presentation";
+import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
 import { FieldLabel } from "@langwatch/scenario-browser/surfaces/dialog-fields";
 import { toLineRunParameters } from "@langwatch/scenario-browser/surfaces/parameter-line";
 import { ParameterLineField } from "@langwatch/scenario-browser/surfaces/parameter-line-field";

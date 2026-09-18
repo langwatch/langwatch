@@ -1,4 +1,4 @@
-import type { ProjectReach } from "@langwatch/langy-browser/surfaces/langy-store";
+import type { ProjectReach } from "@langwatch/langy-browser-kit";
 
 import { homeApi } from "../../../../behavior/home-api.ts";
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";

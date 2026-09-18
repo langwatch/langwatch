@@ -13,10 +13,10 @@ import {
 } from "@langwatch/design-system/color-mode";
 import { titleCase } from "@langwatch/design-system/string-casing";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { EvaluationProgressBar } from "@langwatch/experiment-browser/evaluation-progress-bar";
+import { EvaluationProgressBar } from "@langwatch/experiment-browser-kit";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
-import { LLMModelDisplay } from "@langwatch/prompt-browser-kit/llm-model-display";
-import { ComponentIcon } from "@langwatch/workflow-browser-kit/workflow-icons";
+import { LLMModelDisplay } from "@langwatch/prompt-browser-kit";
+import { ComponentIcon } from "@langwatch/workflow-browser-kit";
 import {
   fieldSchema,
   getInputsOutputs,

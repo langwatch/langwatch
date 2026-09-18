@@ -1,8 +1,8 @@
 // Where a target's input variables can read their values from: the active
 // dataset and other targets' outputs.
 
-import type { AvailableSource, FieldType } from "@langwatch/prompt-browser-kit/variables";
-import { datasetColumnTypeToFieldType } from "@langwatch/workflow-browser/studio-dataset-columns";
+import type { AvailableSource, FieldType } from "@langwatch/prompt-browser-kit";
+import { datasetColumnTypeToFieldType } from "@langwatch/workflow-browser-kit";
 
 import type { DatasetReference, TargetConfig } from "../../model/experiments-v3/types.ts";
 

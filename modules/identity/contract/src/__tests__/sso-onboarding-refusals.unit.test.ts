@@ -2,8 +2,8 @@ import {
   explainAnyError,
   explainHandledError,
   UNKNOWN_ERROR_PRESENTATION,
-} from "@langwatch/handled-error/presentation";
-import type { HandledErrorShape } from "@langwatch/handled-error/read-handled-error";
+} from "@langwatch/error-presentation/presentation";
+import type { HandledErrorShape } from "@langwatch/error-presentation/read-handled-error";
 /**
  * Every refusal the single sign-on onboarding surfaces can produce, and what a customer
  * actually reads when one arrives. Corresponds to specs/identity/sso-onboarding-tiers.feature.

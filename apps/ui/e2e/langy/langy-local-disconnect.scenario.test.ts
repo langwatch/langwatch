@@ -7,6 +7,7 @@
 import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { makeLangyAdapter } from "./langy-agent";
 import { LANGY_CORE_RULE_CRITERIA } from "./langy-rules";
 import {
@@ -85,9 +86,7 @@ describe("Langy notices when the shared folder goes away", () => {
               }),
             ],
             script: [
-              scenario.user(
-                "add type hints to the account store in this project",
-              ),
+              scenario.user("add type hints to the account store in this project"),
               scenario.agent(),
               async (_state, executor) => {
                 const conversationId = langy.state.conversationId ?? "";
@@ -145,15 +144,10 @@ describe("Langy notices when the shared folder goes away", () => {
         // The command line said it was leaving, and the platform saw it go.
         expect(capture).toMatch(/Leaving|disconnected/i);
         expect(afterDisconnect.connected).toBe(false);
-        expect(watcher.workspaceEvents.map((event) => event.state)).toContain(
-          "disconnected",
-        );
+        expect(watcher.workspaceEvents.map((event) => event.state)).toContain("disconnected");
         // Either the model read the offline pushback, or it had already
         // stopped calling the folder; the reply is what carries the news.
-        console.log(
-          "[layer2] offline pushback seen:",
-          /not connected/.test(outputs),
-        );
+        console.log("[layer2] offline pushback seen:", /not connected/.test(outputs));
 
         if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
         expect(result.success).toBe(true);

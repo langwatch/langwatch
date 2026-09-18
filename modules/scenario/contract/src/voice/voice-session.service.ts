@@ -16,7 +16,6 @@ import {
   type ElevenLabsCredential,
   type VoiceTransportCredential,
   type VoiceTransportRunner,
-  voiceTransportRegistry,
 } from "./voice-transport.registry.ts";
 import type { VoiceTransport } from "./voice-transport.ts";
 
@@ -242,14 +241,14 @@ export interface VoiceSessionInfrastructure {
   signSessionToken(payload: VoiceSessionTokenPayload): string;
   now(): number;
   newSessionId(): string;
-  registry?: Record<VoiceTransport, VoiceTransportRunner>;
+  registry: Record<VoiceTransport, VoiceTransportRunner>;
 }
 
 function runnerFor(
   ports: VoiceSessionInfrastructure,
   transport: VoiceTransport,
 ): VoiceTransportRunner {
-  return (ports.registry ?? voiceTransportRegistry)[transport];
+  return ports.registry[transport];
 }
 
 /** Extra grace beyond the call budget before a session token expires: a call

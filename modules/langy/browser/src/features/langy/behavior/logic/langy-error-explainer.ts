@@ -1,11 +1,11 @@
 import {
   explainHandledError,
   UNKNOWN_ERROR_PRESENTATION,
-} from "@langwatch/handled-error/presentation";
+} from "@langwatch/error-presentation/presentation";
 import {
   type HandledErrorShape,
   readHandledError,
-} from "@langwatch/handled-error/read-handled-error";
+} from "@langwatch/error-presentation/read-handled-error";
 
 /**
  * Langy error explainer (ADR-045).

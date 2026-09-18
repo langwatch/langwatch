@@ -5,7 +5,7 @@ import {
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { cleanupTestRows } from "@langwatch/test-harness";
+import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 /**
  * `AccountCredential.userId` cascades under `relationMode = "prisma"` (packages/prisma-
  * client/prisma/schema.prisma),

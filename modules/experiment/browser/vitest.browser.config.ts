@@ -3,6 +3,6 @@
  * and a pointer hover over it.
  */
 
-import { defineBrowserVitestConfig } from "@langwatch/test-harness/vitest-browser-config";
+import { defineBrowserVitestConfig } from "@langwatch/vitest-config/browser";
 
 export default defineBrowserVitestConfig();

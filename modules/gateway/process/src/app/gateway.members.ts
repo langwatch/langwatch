@@ -14,24 +14,6 @@ import {
 import { nowInstant, type Instant } from "@langwatch/time";
 
 import type { ConfirmSpendCommandData } from "../eventing/gateway-spend-commands.process.ts";
-export interface GatewayInfrastructure {
-  gatewayAudit: GatewayAudit;
-  gatewayBudgetSpend: GatewayBudgetSpend;
-  gatewayChangeEvents: GatewayChangeEvents;
-  gatewayClickHouse: GatewayClickHouse;
-  gatewayConfigAssembly: GatewayConfigAssembly;
-  gatewayGovernanceSignals: GatewayGovernanceSignals;
-  gatewayModelProviderCredentials: GatewayModelProviderCredentials;
-  gatewayScopePermissions: GatewayScopePermissions;
-  gatewaySettlementPolicy: GatewaySettlementPolicy;
-  gatewaySpanIngestion: GatewaySpanIngestion;
-  gatewaySpendConfirmation: GatewaySpendConfirmation;
-  gatewaySpendRating: GatewaySpendRating;
-  gatewayTransaction: GatewayTransaction;
-  gatewayVirtualKeyCrypto: GatewayVirtualKeyCrypto;
-  gatewayVirtualKeySpend: GatewayVirtualKeySpend;
-}
-
 export type GatewayAuditAction =
   | "gateway.budget.created"
   | "gateway.budget.deleted"

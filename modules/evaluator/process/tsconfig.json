@@ -54,6 +54,9 @@
       "path": "../../../packages/redaction/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/secrets/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
@@ -63,7 +66,13 @@
       "path": "../../workflow/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/api-fixture/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/test-harness/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/vitest-config/tsconfig.build.json"
     }
   ]
 }

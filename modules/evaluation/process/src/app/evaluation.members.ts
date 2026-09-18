@@ -21,23 +21,6 @@ import type {
   EvaluationTraceSpan,
   EvaluationTraceEvent,
 } from "@langwatch/trace-contract";
-export interface EvaluationInfrastructure {
-  evaluationCustomEvaluators: EvaluationCustomEvaluators;
-  evaluationExecutionTelemetry: EvaluationExecutionTelemetry;
-  evaluationInstallEnvironment: EvaluationInstallEnvironment;
-  evaluationLangevals: EvaluationLangevals;
-  evaluationModelEnv: EvaluationModelEnv;
-  evaluationMonitorLookup: EvaluationMonitorLookup;
-  evaluationReport: EvaluationReport;
-  evaluationRescore: EvaluationRescore;
-  evaluationRunAnalytics: EvaluationRunAnalytics;
-  evaluationSpanDigest: EvaluationSpanDigest;
-  evaluationTraceEvidence: EvaluationTraceEvidence;
-  evaluationTraceRead: EvaluationTraceRead;
-  evaluationWarmup: EvaluationWarmupProbe;
-  evaluationWorkflowExecutor: EvaluationWorkflowExecutor;
-}
-
 /**
  * Trace view protections for an evaluation read. Declared in Evaluation vocab
  * rather than imported from trace-server (feature packages may not import).

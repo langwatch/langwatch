@@ -3,7 +3,7 @@ import type { IdentityApi } from "@langwatch/identity-contract";
 import type { OpsApi } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { vi } from "vitest";
 
 import { MemoryUserRepositories } from "../../repositories/memory/memory.user.repositories.ts";

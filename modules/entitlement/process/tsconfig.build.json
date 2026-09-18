@@ -29,12 +29,14 @@
     "**/testing.tsx"
   ],
   "references": [
-    { "path": "../../../enterprise/modules/licensing/contract/tsconfig.build.json" },
     {
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
       "path": "../../authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../enterprise/modules/licensing/contract/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"

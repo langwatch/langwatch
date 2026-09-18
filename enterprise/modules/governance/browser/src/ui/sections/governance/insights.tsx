@@ -1,8 +1,7 @@
 import { Badge, Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { LangyMark, useLangyStore } from "@langwatch/langy-browser-kit";
 import { LangyPanelSurface, SERIF } from "@langwatch/langy-browser/surfaces/asaplangy";
-import { LangyMark } from "@langwatch/langy-browser/surfaces/langy-mark";
-import { useLangyStore } from "@langwatch/langy-browser/surfaces/langy-store";
 import { useState } from "react";
 
 import {

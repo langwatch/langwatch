@@ -167,7 +167,7 @@
     "zod-validation-error": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
     "@opentelemetry/otlp-transformer": "catalog:",
     "@opentelemetry/sdk-trace-base": "catalog:",
     "@opentelemetry/sdk-trace-web": "catalog:",

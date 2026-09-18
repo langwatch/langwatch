@@ -98,7 +98,7 @@ export class JoinRequestLedgerWriterAdapter implements JoinRequestLedger {
 
     await this.stage({ command });
     await this.awaitFold({ joinRequestId, tenantId, events });
-    return events as unknown as JoinRequestFact[];
+    return events;
   }
 
   /**

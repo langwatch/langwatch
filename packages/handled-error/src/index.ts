@@ -31,5 +31,3 @@ export type {
   SerializedHandledError,
   SerializedReason,
 } from "./serialized-handled-error.ts";
-export { goErrorCodes, nodeErrorCodes } from "./codes.generated.ts";
-export type { GoErrorCode, NodeErrorCode } from "./codes.generated.ts";

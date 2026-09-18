@@ -30,7 +30,7 @@ import {
   type SuiteScope,
   type SuiteTarget,
 } from "@langwatch/suite-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 

@@ -36,8 +36,7 @@ vi.mock("@langwatch/workflow-browser/feature-flag", () => ({
   useFeatureFlag: () => ({ enabled: flagEnabled.value }),
 }));
 
-import { useLangyContextTargetStore } from "@langwatch/langy-browser/surfaces/langy-context";
-import { useLangyStore } from "@langwatch/langy-browser/surfaces/langy-store";
+import { useLangyContextTargetStore, useLangyStore } from "@langwatch/langy-browser-kit";
 
 import type { TargetConfig } from "../../../model/experiments-v3/types.ts";
 import { TargetHeader } from "../../../ui/sections/experiments-v3/TargetSection/target-header.tsx";

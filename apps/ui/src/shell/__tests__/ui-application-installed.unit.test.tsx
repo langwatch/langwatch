@@ -57,7 +57,10 @@ function applicationFromPackageEntry() {
     },
     pages: {
       table: uiRouteTable,
-      shellLayouts: { chrome: async () => ({ default: () => null }) },
+      shellLayouts: {
+        auth: async () => ({ default: () => null }),
+        chrome: async () => ({ default: () => null }),
+      },
       loaders: hostRegistryWithoutGovernance(),
       errorFallback: () => null,
       rootErrorBoundary: () => null,

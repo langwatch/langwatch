@@ -1,9 +1,6 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { AskChip } from "@langwatch/design-system/ask-chip";
-import {
-  selectLangySuggestions,
-  useLangyStore,
-} from "@langwatch/langy-browser/surfaces/langy-store";
+import { selectLangySuggestions, useLangyStore } from "@langwatch/langy-browser-kit";
 
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 import { useHomeDevState } from "./dev/home-dev-state.ts";

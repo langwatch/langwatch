@@ -113,7 +113,7 @@ export class PrismaIdentityNewbornRepository implements IdentityNewbornRepositor
           report: { kind: IDENTITY_BORN_REPORT_KIND },
         },
       });
-      return row as unknown as Record<string, unknown>;
+      return row;
     });
   }
 

@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { cleanupTestRows } from "@langwatch/test-harness";
+import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 /**
  * Real-Postgres coverage for the provider write path on an organization with no project at
  * all — `tryResolveAnchor` short-circuits on `organizationId` before `projectId`. The unit

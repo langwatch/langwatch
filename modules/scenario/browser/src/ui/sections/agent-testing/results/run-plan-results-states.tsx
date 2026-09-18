@@ -6,7 +6,7 @@
  */
 
 import { Box, EmptyState, Skeleton, Spinner, Text, VStack } from "@chakra-ui/react";
-import type { Period, RelativePresetKey } from "@langwatch/analytics-browser-kit/period-selector";
+import type { Period, RelativePresetKey } from "@langwatch/analytics-browser-kit";
 import { RefreshCw } from "lucide-react";
 
 import { HandledErrorAlert } from "../../../../behavior/errors.tsx";

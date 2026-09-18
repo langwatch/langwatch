@@ -2,7 +2,7 @@
   "name": "@langwatch/handled-error",
   "version": "0.1.0",
   "private": true,
-  "description": "The shared handled-error contract: HandledError base class, serialized wire shapes, the Go herr envelope adapter, the enumerated app codes and the code-keyed client presentation registry. Used by the LangWatch app, MCP server, CLI, and SDKs.",
+  "description": "The handled-error machinery: the HandledError base class, its subclasses, the serialized wire shapes and the Go herr envelope adapter. The codes and the customer copy live in @langwatch/error-presentation.",
   "license": "MIT",
   "files": [
     "src"
@@ -15,29 +15,9 @@
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
-    "./app-codes": {
-      "types": "./dist/app-codes.d.ts",
-      "default": "./src/app-codes.ts"
-    },
-    "./docs-url": {
-      "types": "./dist/docs-url.d.ts",
-      "default": "./src/docs-url.ts"
-    },
     "./is-server-unreachable": {
       "types": "./dist/is-server-unreachable.d.ts",
       "default": "./src/is-server-unreachable.ts"
-    },
-    "./presentation": {
-      "types": "./dist/presentation.d.ts",
-      "default": "./src/presentation.ts"
-    },
-    "./read-handled-error": {
-      "types": "./dist/read-handled-error.d.ts",
-      "default": "./src/read-handled-error.ts"
-    },
-    "./views": {
-      "types": "./dist/views.d.ts",
-      "default": "./src/views.tsx"
     }
   },
   "scripts": {
@@ -49,11 +29,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@chakra-ui/react": "catalog:",
-    "@emotion/react": "catalog:",
     "@types/node": "catalog:",
-    "@types/react": "catalog:",
-    "react": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

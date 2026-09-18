@@ -131,10 +131,9 @@ export class PostgresSsoConnectionPipelineAdapter {
         stagedSender: (name) => {
           if (!eventSourcing.isEnabled) return null;
           try {
-            const pipeline = eventSourcing.getPipeline(
-              SSO_CONNECTION_PIPELINE_NAME as never,
-            ) as unknown as { commands: Record<string, SsoConnectionStagedSender> };
-            return pipeline.commands[name] ?? null;
+            const pipeline = eventSourcing.getPipeline(SSO_CONNECTION_PIPELINE_NAME);
+            const command: SsoConnectionStagedSender | undefined = pipeline.commands[name];
+            return command ?? null;
           } catch {
             return null;
           }

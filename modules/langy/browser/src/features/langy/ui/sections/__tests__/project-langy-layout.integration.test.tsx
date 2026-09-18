@@ -47,7 +47,8 @@ vi.mock("../../../../../behavior/use-langy-conversation-deep-link.ts", () => ({
   useLangyConversationDeepLink: () => undefined,
 }));
 
-import { useLangyStore } from "../../../../../behavior/langy.store.ts";
+import { useLangyStore } from "@langwatch/langy-browser-kit";
+
 import {
   LangyHostApi,
   LangyHostProvider,

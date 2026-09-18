@@ -154,7 +154,7 @@ vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   },
 }));
 
-import { useLangyStore } from "@langwatch/langy-browser/surfaces/langy-store";
+import { useLangyStore } from "@langwatch/langy-browser-kit";
 
 import WorkbenchPage from "../workbench.screen.tsx";
 

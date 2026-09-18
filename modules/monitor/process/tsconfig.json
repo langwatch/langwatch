@@ -33,9 +33,6 @@
       "path": "../../evaluator/contract/tsconfig.build.json"
     },
     {
-      "path": "../../evaluator/process/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
@@ -60,6 +57,9 @@
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/api-fixture/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/clickhouse-client/tsconfig.build.json"
     },
     {
@@ -67,6 +67,9 @@
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/vitest-config/tsconfig.build.json"
     }
   ]
 }

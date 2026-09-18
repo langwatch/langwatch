@@ -1,9 +1,9 @@
+import { useLangyStore } from "@langwatch/langy-browser-kit";
 import { LANGY_CONVERSATION_PARAM } from "@langwatch/langy-contract";
 import { useEffect } from "react";
 import { useSearchParams } from "react-router";
 
 import { api } from "./langy-api.ts";
-import { useLangyStore } from "./langy.store.ts";
 import { useOrganizationTeamProject } from "./use-organization-team-project.ts";
 
 /**

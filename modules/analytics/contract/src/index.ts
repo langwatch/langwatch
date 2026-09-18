@@ -1,5 +1,9 @@
 export { filterFieldsEnum, type FilterField } from "./analytics.filter-field.ts";
 export {
+  analyticsComparisonWindow,
+  type AnalyticsComparisonWindow,
+} from "./analytics-comparison-window.ts";
+export {
   normalizePreconditionTraceData,
   PRECONDITION_FIELD_MATCHERS,
   type PreconditionField,

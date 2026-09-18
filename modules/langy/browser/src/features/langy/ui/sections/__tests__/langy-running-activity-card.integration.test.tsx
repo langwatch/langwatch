@@ -3,11 +3,11 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { useLangyStore } from "@langwatch/langy-browser-kit";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import { LangyToolActivity } from "../langy-tool-activity.tsx";
 
 function turnFromParts(parts: unknown[]): UIMessage {

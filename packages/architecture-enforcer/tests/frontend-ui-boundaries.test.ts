@@ -1,7 +1,9 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import {
   declaredWebDependencyPairs,
   lintFrontendUiBoundaries,
@@ -65,24 +67,24 @@ function webPackage(
   { enterprise = false }: { enterprise?: boolean } = {},
 ): ClassifiedPackage {
   const featureRoot = enterprise ? `enterprise/modules/${feature}` : `modules/${feature}`;
-  const packageRoot = `${featureRoot}/web`;
+  const packageRoot = `${featureRoot}/browser`;
   write(
     `${packageRoot}/package.json`,
     JSON.stringify({
-      name: `@langwatch/${feature}-web`,
+      name: `@langwatch/${feature}-browser`,
       type: "module",
       exports,
     }),
   );
   return {
-    name: `@langwatch/${feature}-web`,
+    name: `@langwatch/${feature}-browser`,
     root: join(root, packageRoot),
     manifestPath: join(root, packageRoot, "package.json"),
     manifest: {
-      name: `@langwatch/${feature}-web`,
+      name: `@langwatch/${feature}-browser`,
       exports,
     },
-    kind: "web",
+    kind: "browser",
     feature,
     featureRoot: join(root, featureRoot),
     enterprise,
@@ -246,10 +248,7 @@ describe("frontend UI architecture boundaries", () => {
       ],
       ["@langwatch/prompt-browser", "@langwatch/trace-browser"],
     );
-    write(
-      "modules/prompt/browser/src/prompt-reference.ts",
-      "export const PromptReference = true;",
-    );
+    write("modules/prompt/browser/src/prompt-reference.ts", "export const PromptReference = true;");
     write("modules/trace/browser/src/trace-card.ts", "export const TraceCard = true;");
     promptWeb.manifest.dependencies = { "@langwatch/trace-browser": "workspace:*" };
 
@@ -260,9 +259,9 @@ describe("frontend UI architecture boundaries", () => {
     writeCatalogue([
       { id: "prompt-studio", root: "prompt", screens: ["@langwatch/trace-browser/trace-card"] },
     ]);
-    expect(declaredWebDependencyPairs(snapshotOf({ root, packages: [promptWeb, traceWeb] }))).toEqual(
-      new Set(),
-    );
+    expect(
+      declaredWebDependencyPairs(snapshotOf({ root, packages: [promptWeb, traceWeb] })),
+    ).toEqual(new Set());
     expect(lintManifests(snapshotOf({ root, packages: [promptWeb, traceWeb] }))).toEqual(
       expect.arrayContaining([expect.objectContaining({ policy: "cross-feature" })]),
     );
@@ -659,10 +658,7 @@ describe("frontend UI architecture boundaries", () => {
     );
     write("modules/model-provider/browser/src/index.ts", "export {};");
     write("modules/model-provider/browser/src/surfaces/model-selector.tsx", "export {};");
-    write(
-      "modules/model-provider/browser/src/screens/model-providers/index.ts",
-      "export {};",
-    );
+    write("modules/model-provider/browser/src/screens/model-providers/index.ts", "export {};");
 
     expect(
       lint([promptWeb, modelProviderWeb])
@@ -797,7 +793,7 @@ describe("frontend UI architecture boundaries", () => {
     write("platform/app/src/prompts.ts", "export {};");
 
     expect(policies([promptWeb]).filter((policy) => policy === "ui-surface-closure")).toHaveLength(
-      10,
+      9,
     );
     expect(policies([promptWeb])).not.toContain("ui-web-public-entry");
   });
@@ -827,13 +823,13 @@ describe("frontend UI architecture boundaries", () => {
     write(
       "modules/prompt/browser/src/screens/prompt-studio/index.ts",
       [
-        'import { titleFor } from "@langwatch/handled-error/presentation";',
+        'import { titleFor } from "@langwatch/error-presentation/presentation";',
         "export const PromptStudio = titleFor;",
       ].join("\n"),
     );
     write(
       "apps/ui/src/features/prompt-studio/route.ts",
-      'import { titleFor } from "@langwatch/handled-error/presentation";\nexport const title = titleFor;',
+      'import { titleFor } from "@langwatch/error-presentation/presentation";\nexport const title = titleFor;',
     );
 
     expect(policies([promptWeb]).filter((policy) => policy === "ui-screen-closure")).toEqual([]);
@@ -869,25 +865,25 @@ describe("frontend UI architecture boundaries", () => {
     write(
       "modules/prompt/browser/src/screens/prompt-studio/index.ts",
       [
-        'import { titleFor } from "@langwatch/handled-error/presentation";',
+        'import { titleFor } from "@langwatch/error-presentation/presentation";',
         "export const PromptStudio = titleFor;",
       ].join("\n"),
     );
     write(
       "apps/ui/src/features/prompt-studio/route.ts",
-      'import { titleFor } from "@langwatch/handled-error/presentation";\nexport const title = titleFor;',
+      'import { titleFor } from "@langwatch/error-presentation/presentation";\nexport const title = titleFor;',
     );
 
     expect(
       lint([promptWeb])
         .filter((violation) => violation.policy === "ui-screen-closure")
         .map((violation) => violation.specifier),
-    ).toEqual(["@langwatch/handled-error/presentation"]);
+    ).toEqual(["@langwatch/error-presentation/presentation"]);
     expect(
       lint([promptWeb])
         .filter((violation) => violation.policy === "ui-browser-capability")
         .map((violation) => violation.specifier),
-    ).toEqual(["@langwatch/handled-error/presentation"]);
+    ).toEqual(["@langwatch/error-presentation/presentation"]);
   });
 
   /** @scenario A docblock stays a comment after a template literal */
@@ -1085,10 +1081,7 @@ describe("frontend UI architecture boundaries", () => {
         "export const AgentManagement = [AgentLabel, agentBehavior, PackageElement, TunnelBadge, AgentCard];",
       ].join("\n"),
     );
-    write(
-      "modules/agent/browser/src/model/agent-label.ts",
-      'export const AgentLabel = "Agent";',
-    );
+    write("modules/agent/browser/src/model/agent-label.ts", 'export const AgentLabel = "Agent";');
     write(
       "modules/agent/browser/src/behavior/agent-behavior.ts",
       'import { AgentLabel } from "../model/agent-label"; export const agentBehavior = AgentLabel;',
@@ -1218,10 +1211,7 @@ describe("frontend UI architecture boundaries", () => {
       "modules/agent/browser/src/features/management/ui/sections/agent-management.tsx",
       'import "../../../../screens/other-screen"; export const AgentManagement = true;',
     );
-    write(
-      "modules/agent/browser/src/screens/other-screen/index.ts",
-      "export const Other = true;",
-    );
+    write("modules/agent/browser/src/screens/other-screen/index.ts", "export const Other = true;");
 
     expect(policies([agentWeb])).toEqual(
       expect.arrayContaining([

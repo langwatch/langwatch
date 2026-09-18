@@ -25,9 +25,5 @@
     "**/*.bench.*",
     "**/__bench__/**"
   ],
-  "references": [
-    {
-      "path": "../config/tsconfig.build.json"
-    }
-  ]
+  "references": []
 }

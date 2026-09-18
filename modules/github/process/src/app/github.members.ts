@@ -1,15 +1,5 @@
 import type { GithubInstallStatePayload, GithubPullRequestEvent } from "@langwatch/github-contract";
 import type { Instant } from "@langwatch/time";
-export interface GithubInfrastructure {
-  githubBranchDemand: GithubBranchDemand;
-  githubBranchMaintenance: GithubBranchMaintenance;
-  githubHost: GithubHost;
-  githubInstallResponse: GithubInstallResponse;
-  githubInstallState: GithubInstallState;
-  githubProjectActivity: GithubProjectActivity;
-  githubPullRequestEvent: GithubPullRequestEventParser;
-}
-
 /**
  * Two methods consumers need to avoid the full GithubService composition:
  * checking hosts and mapping branches.

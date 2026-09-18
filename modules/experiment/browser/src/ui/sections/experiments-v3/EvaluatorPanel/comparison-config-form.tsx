@@ -2,12 +2,13 @@ import { Box, Button, Field, HStack, SimpleGrid, Text, VStack } from "@chakra-ui
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { Menu } from "@langwatch/design-system/menu";
 import { Switch } from "@langwatch/design-system/switch";
+import { ALL_DEFAULT_JUDGE_PROMPTS, pickDefaultJudgePrompt } from "@langwatch/evaluator-contract";
 import { disambiguateNames } from "@langwatch/experiment-contract";
 import {
   type AvailableSource,
   type FieldMapping,
   VariableMappingInput,
-} from "@langwatch/prompt-browser-kit/variables";
+} from "@langwatch/prompt-browser-kit";
 import { Plus, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
@@ -28,46 +29,6 @@ type VariantOutputOption = {
   label: string;
   path: string[];
 };
-
-/**
- * The four default judge prompts, one per (golden × input) presence combo.
- */
-export const JUDGE_PROMPT_GOLDEN_INPUT =
-  'Pick the best of N candidate replies to the task.\n\nTask:       {input}\nReference:  {golden}\n\nCandidates:\n{candidates}\n\nLook across the candidates and decide which one is the best reply.\nBriefly explain WHY it\'s better than the others, then pick the winning\nslot label. Use "tie" only when no candidate is clearly better.\n';
-
-export const JUDGE_PROMPT_GOLDEN_NO_INPUT =
-  'Pick the best of N candidate replies.\n\nReference:  {golden}\n\nCandidates:\n{candidates}\n\nCompare each candidate against the reference answer and decide which one\nis closest. Briefly explain WHY it\'s better than the others, then pick the\nwinning slot label. Use "tie" only when no candidate is clearly better.\n';
-
-export const JUDGE_PROMPT_NO_GOLDEN_INPUT =
-  'Pick the best of N candidate replies to the task; there is no reference\nanswer, so compare them on their own merits.\n\nTask:  {input}\n\nCandidates:\n{candidates}\n\nLook across the candidates and decide which one is the best reply.\nBriefly explain WHY it\'s better than the others, then pick the winning\nslot label. Use "tie" only when no candidate is clearly better.\n';
-
-export const JUDGE_PROMPT_NO_GOLDEN_NO_INPUT =
-  'Pick the best of N candidate replies; there is no task description or\nreference answer, so compare them on their own merits.\n\nCandidates:\n{candidates}\n\nLook across the candidates and decide which one is the best reply.\nBriefly explain WHY it\'s better than the others, then pick the winning\nslot label. Use "tie" only when no candidate is clearly better.\n';
-
-/** Every shipped default, so an untouched prompt can be detected regardless
- * of which combo it was last defaulted to (hand-tuned prompts never match). */
-export const ALL_DEFAULT_JUDGE_PROMPTS = [
-  JUDGE_PROMPT_GOLDEN_INPUT,
-  JUDGE_PROMPT_GOLDEN_NO_INPUT,
-  JUDGE_PROMPT_NO_GOLDEN_INPUT,
-  JUDGE_PROMPT_NO_GOLDEN_NO_INPUT,
-] as const;
-
-/** The default prompt for a given presence combo — the judge prompt adapts
- * to what the row actually gives it (a reference answer, task context, both,
- * or neither). */
-export function pickDefaultJudgePrompt({
-  hasGolden,
-  hasInput,
-}: {
-  hasGolden: boolean;
-  hasInput: boolean;
-}): string {
-  if (hasGolden) {
-    return hasInput ? JUDGE_PROMPT_GOLDEN_INPUT : JUDGE_PROMPT_GOLDEN_NO_INPUT;
-  }
-  return hasInput ? JUDGE_PROMPT_NO_GOLDEN_INPUT : JUDGE_PROMPT_NO_GOLDEN_NO_INPUT;
-}
 
 /**
  * Configuration form for the langevals/select_best_compare evaluator — the one

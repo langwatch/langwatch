@@ -9,7 +9,7 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock useLatestPromptVersion to avoid needing SessionProvider
-vi.mock("@langwatch/prompt-browser/latest-prompt-version", () => ({
+vi.mock("../../../../../behavior/experiments-v3/use-latest-prompt-version.ts", () => ({
   useLatestPromptVersion: () => ({
     currentVersion: undefined,
     latestVersion: undefined,

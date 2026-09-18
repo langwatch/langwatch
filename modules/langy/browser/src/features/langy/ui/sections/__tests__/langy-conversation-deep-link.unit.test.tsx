@@ -37,7 +37,7 @@ vi.mock("../../../../../behavior/langy-api.ts", () => ({
   },
 }));
 
-vi.mock("../../../../../behavior/langy.store.ts", () => ({
+vi.mock("@langwatch/langy-browser-kit", () => ({
   useLangyStore: { getState: () => ({ openPanel, selectConversation }) },
 }));
 

@@ -1,6 +1,6 @@
+import { FLOATING_PANEL_INSET } from "@langwatch/langy-browser-kit";
 import { describe, expect, it } from "vitest";
 
-import { FLOATING_PANEL_INSET } from "../langy-panel-layout.ts";
 import {
   FLOATING_PEEK_REST_PX,
   PEEK_PROXIMITY_ENTER_PX,

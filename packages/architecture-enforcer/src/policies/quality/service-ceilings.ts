@@ -1,8 +1,10 @@
 import { resolve } from "node:path";
+
 import ts from "typescript";
+
+import type { ArchitectureViolation } from "../../types.ts";
 import { sourceFile, sourceText } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
-import type { ArchitectureViolation } from "../../types.ts";
 
 const MAX_MODULE_LINES = 500;
 const MAX_METHOD_LINES = 80;
@@ -44,7 +46,7 @@ const COMPLEXITY_SHORT_CIRCUIT = new Set([
 ]);
 
 function isStrictService(path: string): boolean {
-  return /\/server\/src\/services\/.+\.service\.ts$/.test(path);
+  return /\/process\/src\/services\/.+\.service\.ts$/.test(path);
 }
 
 const FUNCTION_LIKE_KINDS = new Set([
@@ -158,7 +160,7 @@ export function lintServiceCeilings(snapshot: WorkspaceSnapshot): ArchitectureVi
   const packages = snapshot.packages;
 
   return packages
-    .filter((pkg) => pkg.kind === "server" && pkg.featureRoot)
+    .filter((pkg) => pkg.kind === "process" && pkg.featureRoot)
     .flatMap((pkg) => snapshot.files({ directory: pkg.root, accept: isStrictService }))
     .map(ceilingViolation)
     .filter((violation): violation is ArchitectureViolation => violation !== void 0);

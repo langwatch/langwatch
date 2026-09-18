@@ -9,7 +9,6 @@ import type {
   CallRecord,
   SimulationService,
   VoiceSessionInfrastructure,
-  VoiceTransport,
 } from "@langwatch/scenario-contract";
 import {
   getOnPlatformSetId,
@@ -17,6 +16,10 @@ import {
   VOICE_TRANSPORT_PROVIDER,
   voiceAgentExternalId,
 } from "@langwatch/scenario-contract";
+import type {
+  VoiceTransport,
+  VoiceTransportRunner,
+} from "@langwatch/scenario-contract/voice-runtime";
 import { getSuiteSetId } from "@langwatch/suite-contract";
 import { nowInstant } from "@langwatch/time";
 
@@ -71,6 +74,8 @@ export interface VoiceSessionServices {
   /** Signs the claims a browser carries from mint to finish. The deployment's
    *  secret is resolved once, at composition, and travels as a value. */
   signSessionToken: VoiceSessionInfrastructure["signSessionToken"];
+  /** The voice transports by vendor, built with environment drilled in. */
+  registry: Record<VoiceTransport, VoiceTransportRunner>;
 }
 
 /** The terminal-retry fields a finished run persisted, narrowed from the loose
@@ -117,6 +122,7 @@ export function createVoiceSessionInfrastructureFromServices({
   recordCallTraces,
   writeCallRun,
   signSessionToken,
+  registry,
 }: VoiceSessionServices): VoiceSessionInfrastructure {
   return {
     /** Resolve the provider credential for a transport. Only ElevenLabs
@@ -207,5 +213,6 @@ export function createVoiceSessionInfrastructureFromServices({
     signSessionToken,
     now: () => nowInstant().epochMilliseconds,
     newSessionId: () => generate("scenario").toString(),
+    registry,
   };
 }

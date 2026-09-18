@@ -22,7 +22,6 @@ export {
   DependencyCycleError,
   DuplicateFeatureError,
   DuplicateProviderError,
-  FeatureConfigError,
   FeatureApiUnavailableError,
   FeatureSecretsUnavailableError,
   MissingProviderError,
@@ -60,7 +59,6 @@ export { moduleApi, ModuleApiToken, type OperationsOnly } from "./module-api-tok
 export { supplyToken, SupplyToken } from "./supply-token.ts";
 export { LocalFeatureApis } from "./local-feature-api.ts";
 export {
-  type FeatureConfigSchema,
   type AppDefinition,
   type AppDefinitionWithoutConfig,
   defineServerModule,

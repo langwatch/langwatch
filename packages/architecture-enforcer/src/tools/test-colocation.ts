@@ -1,6 +1,8 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, relative, resolve, sep } from "node:path";
+
 import ts from "typescript";
+
 import { walkFiles } from "../workspace/layout.ts";
 import { discoverClassifiedPackages } from "../workspace/snapshot.ts";
 
@@ -371,7 +373,7 @@ function packagesWithMirroredTests(root: string): MirroredPackage[] {
   const { packages } = discoverClassifiedPackages(root);
 
   return packages
-    .filter((pkg) => ["contract", "server", "web"].includes(pkg.kind))
+    .filter((pkg) => ["contract", "process", "browser", "browser-kit"].includes(pkg.kind))
     .filter((pkg) => existsSync(`${pkg.root}/tests`))
     .map((pkg) => ({
       root: pkg.root,

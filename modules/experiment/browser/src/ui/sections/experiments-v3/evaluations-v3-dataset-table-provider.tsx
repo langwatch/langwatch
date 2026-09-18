@@ -1,8 +1,8 @@
 import {
   type DatasetTableContextValue,
   DatasetTableProvider,
-} from "@langwatch/dataset-browser/dataset-table";
-import { renderDatasetImage } from "@langwatch/dataset-browser/render-dataset-image";
+  renderDatasetImage,
+} from "@langwatch/dataset-browser-kit";
 /**
  * Adapter that backs the shared dataset table cells with the evaluations workbench
  * store. The cells (EditableCell, TableCell) only know the narrow DatasetTableContext

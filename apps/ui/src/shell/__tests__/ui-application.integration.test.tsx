@@ -7,6 +7,7 @@ import { uiRoutePageKeys, type UiPageLoaderRegistry } from "@langwatch/ui-kernel
 import { render } from "@testing-library/react";
 import type { ComponentType, ReactNode } from "react";
 import { Outlet } from "react-router";
+import type { RouteObject } from "react-router";
 import { RouterProvider } from "react-router/dom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -82,7 +83,10 @@ function applicationOf({
     providers,
     pages: {
       table: uiRouteTable,
-      shellLayouts: { chrome: async () => ({ default: () => <Outlet /> }) },
+      shellLayouts: {
+        auth: async () => ({ default: () => <Outlet /> }),
+        chrome: async () => ({ default: () => <Outlet /> }),
+      },
       loaders,
       errorFallback: () => <div data-testid="page-error" />,
       rootErrorBoundary: () => <div data-testid="root-error" />,
@@ -103,6 +107,16 @@ afterEach(() => {
   dispose = void 0;
   document.body.replaceChildren();
 });
+
+/** The route at a path, wherever the table nests it — auth sits under its own layout. */
+function routeAt(routes: readonly RouteObject[], path: string): RouteObject | undefined {
+  for (const route of routes) {
+    if (route.path === path) return route;
+    const found = route.children ? routeAt(route.children, path) : void 0;
+    if (found) return found;
+  }
+  return void 0;
+}
 
 describe("given an application composed of pages apps/ui serves and pages the host still serves", () => {
   describe("when both halves register the same page key", () => {
@@ -144,9 +158,7 @@ describe("given an application composed of pages apps/ui serves and pages the ho
       });
       dispose = () => application.router.dispose();
 
-      const signup = application.router.routes[0]?.children?.find(
-        (route) => route.path === "/auth/signup",
-      );
+      const signup = routeAt(application.router.routes, "/auth/signup");
       const load = signup?.lazy;
       if (typeof load !== "function") throw new Error("the route carries no lazy loader");
 

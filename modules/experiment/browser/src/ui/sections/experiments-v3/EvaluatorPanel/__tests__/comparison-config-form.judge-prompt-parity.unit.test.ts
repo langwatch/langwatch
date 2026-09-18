@@ -1,12 +1,9 @@
 /**
- * The four default Comparison judge prompts are written down twice: in the langevals evaluator,
- * which is the source of truth and the thing that actually calls the model, and again in this
- * config form. Both files say they are kept byte-identical. Until this test, nothing checked.
+ * The four default Comparison judge prompts live twice: in the langevals evaluator (source of
+ * truth) and in evaluator-contract's select-best-compare-prompts.ts. This guards them matching.
  */
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-
-import { describe, expect, it } from "vitest";
 
 import {
   ALL_DEFAULT_JUDGE_PROMPTS,
@@ -14,7 +11,8 @@ import {
   JUDGE_PROMPT_GOLDEN_NO_INPUT,
   JUDGE_PROMPT_NO_GOLDEN_INPUT,
   JUDGE_PROMPT_NO_GOLDEN_NO_INPUT,
-} from "../comparison-config-form.tsx";
+} from "@langwatch/evaluator-contract";
+import { describe, expect, it } from "vitest";
 
 /** Walk up from this package until the workspace root (the one holding the
  * evaluator source) is found, so the test resolves the same from any worktree. */
@@ -34,8 +32,7 @@ const REPO_ROOT = findRepoRoot();
 
 const EVALUATOR_SOURCE =
   "services/langevals/evaluators/langevals/langevals_langevals/select_best_compare.py";
-const CONFIG_FORM_SOURCE =
-  "modules/experiment/browser/src/ui/sections/experiments-v3/EvaluatorPanel/comparison-config-form.tsx";
+const CONFIG_FORM_SOURCE = "modules/evaluator/contract/src/select-best-compare-prompts.ts";
 
 /** `DEFAULT_SELECT_BEST_PROMPT... = """..."""`, at the start of a line so a
  * docstring or a mention in prose can never be mistaken for a declaration. */

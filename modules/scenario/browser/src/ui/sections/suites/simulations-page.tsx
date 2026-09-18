@@ -3,11 +3,7 @@
  */
 
 import { Box, EmptyState, HStack, VStack } from "@chakra-ui/react";
-import {
-  type Period,
-  PeriodSelector,
-  usePeriodSelector,
-} from "@langwatch/analytics-browser-kit/period-selector";
+import { type Period, PeriodSelector, usePeriodSelector } from "@langwatch/analytics-browser-kit";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { useRouter } from "@langwatch/browser-host/use-router";
@@ -19,7 +15,7 @@ import {
   SuiteContextMenu,
   SuiteRunConfirmationDialog,
   NowProvider,
-} from "@langwatch/suite-browser/run-dialogs";
+} from "@langwatch/suite-browser-kit";
 import { nowInstant, subDays, toDate } from "@langwatch/time";
 import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";

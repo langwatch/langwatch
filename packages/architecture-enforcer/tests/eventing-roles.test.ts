@@ -1,7 +1,9 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import { lintEventingRoles } from "../src/policies/eventing-roles.ts";
 import type { ClassifiedPackage } from "../src/types.ts";
 import { snapshotOf } from "./workspace.ts";
@@ -23,13 +25,13 @@ function write(path: string, source: string): void {
 }
 
 function strictServer(feature = "agent"): ClassifiedPackage {
-  const packageRoot = join(root, "modules", feature, "server");
+  const packageRoot = join(root, "modules", feature, "process");
   return {
-    name: `@langwatch/${feature}-server`,
+    name: `@langwatch/${feature}-process`,
     root: packageRoot,
     manifestPath: join(packageRoot, "package.json"),
-    manifest: { name: `@langwatch/${feature}-server` },
-    kind: "server",
+    manifest: { name: `@langwatch/${feature}-process` },
+    kind: "process",
     feature,
     featureRoot: join(root, "modules", feature),
     subjects: [feature],
@@ -38,13 +40,13 @@ function strictServer(feature = "agent"): ClassifiedPackage {
 }
 
 function enterpriseServer(feature: string): ClassifiedPackage {
-  const packageRoot = join(root, "enterprise", "modules", feature, "server");
+  const packageRoot = join(root, "enterprise", "modules", feature, "process");
   return {
-    name: `@langwatch/enterprise-${feature}-server`,
+    name: `@langwatch/enterprise-${feature}-process`,
     root: packageRoot,
     manifestPath: join(packageRoot, "package.json"),
-    manifest: { name: `@langwatch/enterprise-${feature}-server` },
-    kind: "server",
+    manifest: { name: `@langwatch/enterprise-${feature}-process` },
+    kind: "process",
     feature,
     featureRoot: join(root, "enterprise", "modules", feature),
     subjects: [feature],
@@ -150,10 +152,7 @@ describe("Eventing role lint", () => {
     // Right name, wrong directory: the pairing has to be visible from the
     // subscriber's own folder, or the next person to move one takes its test
     // out of range without noticing.
-    write(
-      "modules/agent/process/src/__tests__/agent.subscriber.redelivery.test.ts",
-      "export {};",
-    );
+    write("modules/agent/process/src/__tests__/agent.subscriber.redelivery.test.ts", "export {};");
 
     expect(policies([pkg])).toContain("eventing-subscriber-idempotency");
   });

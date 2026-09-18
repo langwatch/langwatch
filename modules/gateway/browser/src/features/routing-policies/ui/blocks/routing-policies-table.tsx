@@ -1,6 +1,6 @@
 import { Badge, Box, Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
-import { ProviderScopeChips } from "@langwatch/authz-browser-kit/scope-picker";
-import type { ScopeTriadEntry } from "@langwatch/authz-browser-kit/scope-picker";
+import { ProviderScopeChips } from "@langwatch/authz-browser-kit";
+import type { ScopeTriadEntry } from "@langwatch/authz-browser-kit";
 import { Plus } from "lucide-react";
 
 import { isModelTier } from "../../model/model-tier-presets.ts";

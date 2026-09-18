@@ -20,6 +20,15 @@ import { showErrorToast } from "@langwatch/browser-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import { downloadCsv } from "@langwatch/csv/download";
+import {
+  type AutosaveState,
+  type DatasetTableContextValue,
+  DatasetTableProvider,
+  type DatasetTableRowData,
+  datasetTableCss,
+  useTableKeyboardNavigation,
+  VirtualizedTableBody,
+} from "@langwatch/dataset-browser-kit";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
 import { ExternalImage, getImageUrl } from "@langwatch/design-system/external-image";
@@ -47,21 +56,12 @@ import {
   type EditorRecord,
   rekeyEditorRecords,
 } from "../../../../behavior/use-dataset-editor-store.ts";
-import { useTableKeyboardNavigation } from "../../../../behavior/use-table-keyboard-navigation.ts";
 import {
   formatSearchRecordCount,
   noSearchMatchesMessage,
   plainRecordCount,
   searchFailedMessage,
 } from "../../../../model/dataset-editor-copy.ts";
-import {
-  type AutosaveState,
-  type DatasetTableContextValue,
-  DatasetTableProvider,
-  type DatasetTableRowData,
-} from "../../../../model/dataset-table-context.tsx";
-import { datasetTableCss } from "../../../../model/dataset-table-styles.ts";
-import { VirtualizedTableBody } from "../../../blocks/virtualized-table-body.tsx";
 import { AddOrEditDatasetDrawer } from "../add-or-edit-dataset-drawer.tsx";
 import { AddRowsFromCSVModal } from "../add-rows-from-csv-modal.tsx";
 

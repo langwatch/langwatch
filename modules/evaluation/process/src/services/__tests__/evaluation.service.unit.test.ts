@@ -1,6 +1,6 @@
 import { EvaluationNotFoundError } from "@langwatch/evaluation-contract";
 import type { EvaluationRunData, TraceEvaluationData } from "@langwatch/evaluation-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";

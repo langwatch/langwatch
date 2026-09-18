@@ -52,7 +52,16 @@
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/error-presentation/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../model-provider/browser-kit/tsconfig.build.json"
     },
     {
       "path": "../../model-provider/contract/tsconfig.build.json"
@@ -61,19 +70,19 @@
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
+      "path": "../../trace/browser-kit/tsconfig.build.json"
+    },
+    {
       "path": "../../trace/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/ui-kernel/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/test-harness/tsconfig.build.json"
-    },
-    {
-      "path": "../../../dev/tsconfig.web-declarations.json"
-    },
-    {
       "path": "../../trace/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/vitest-config/tsconfig.build.json"
     }
   ]
 }

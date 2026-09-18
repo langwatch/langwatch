@@ -1,5 +1,6 @@
 import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
+
 import type { Expression, Node, SourceFile } from "typescript/unstable/ast";
 import {
   isConditionalExpression,
@@ -19,8 +20,7 @@ import { parseSourceTexts } from "./ts-ast.ts";
  */
 
 /** The brand accent, in the spellings a `colorPalette` is written in. */
-export const BRAND_ORANGE =
-  /^(?:orange|var\(--chakra-colors-orange-solid\)|#ed8926)$/i;
+export const BRAND_ORANGE = /^(?:orange|var\(--chakra-colors-orange-solid\)|#ed8926)$/i;
 
 /** Every Chakra button variant that does not fill the button. */
 const UNFILLED = new Set(["ghost", "subtle", "outline", "plain", "surface"]);
@@ -82,9 +82,7 @@ function initializerOf({
 }): Expression | undefined {
   if (!isJsxAttribute(attribute) || !attribute.name) return undefined;
 
-  const name = source
-    .getText()
-    .slice(attribute.name.getStart(source), attribute.name.getEnd());
+  const name = source.getText().slice(attribute.name.getStart(source), attribute.name.getEnd());
   if (name !== wanted) return undefined;
 
   const initializer = attribute.initializer;
@@ -119,13 +117,7 @@ function attributeValue({
 }
 
 /** Whether this opening tag draws a button with a fill behind its label. */
-function isFilled({
-  element,
-  source,
-}: {
-  element: Node;
-  source: SourceFile;
-}): boolean {
+function isFilled({ element, source }: { element: Node; source: SourceFile }): boolean {
   const variant = attributeValue({ element, wanted: "variant", source });
 
   // No variant at all is the plainest way to get a filled button, and it is how
@@ -142,9 +134,7 @@ function isFilled({
  * Filled button spans on lines: skips drawer footer via flag (nodes lack
  * parent links).
  */
-function filledButtonSpans(
-  source: SourceFile,
-): { tag: string; from: number; to: number }[] {
+function filledButtonSpans(source: SourceFile): { tag: string; from: number; to: number }[] {
   const spans: { tag: string; from: number; to: number }[] = [];
   const text = source.getText();
 
@@ -170,8 +160,7 @@ function filledButtonSpans(
 
     spans.push({
       tag,
-      from:
-        source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1,
+      from: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1,
       to: source.getLineAndCharacterOfPosition(node.getEnd()).line + 1,
     });
   };
@@ -179,11 +168,9 @@ function filledButtonSpans(
   const visit = (node: Node, inFooter: boolean): void => {
     const tag = isTag(node) ? tagOf(node) : null;
 
-    if (tag !== null && !inFooter)
-      record(node as Node & { tagName: Node }, tag);
+    if (tag !== null && !inFooter) record(node as Node & { tagName: Node }, tag);
 
-    const footerHere =
-      inFooter || (tag !== null && FOOTER_TAG.test(tag)) || wrapsFooter(node);
+    const footerHere = inFooter || (tag !== null && FOOTER_TAG.test(tag)) || wrapsFooter(node);
 
     node.forEachChild((child) => {
       visit(child, footerHere);
@@ -207,9 +194,7 @@ export function solidOrangeButtonSites(source: SourceFile): ButtonWeightSite[] {
     if (site.role !== "colorPalette") return [];
     if (!BRAND_ORANGE.test(site.value)) return [];
 
-    const owner = spans.find(
-      (span) => site.line >= span.from && site.line <= span.to,
-    );
+    const owner = spans.find((span) => site.line >= span.from && site.line <= span.to);
 
     return owner ? [{ tag: owner.tag, line: site.line }] : [];
   });

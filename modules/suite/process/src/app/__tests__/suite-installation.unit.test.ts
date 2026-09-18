@@ -9,7 +9,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi as ScenarioApiContract } from "@langwatch/scenario-contract";
 import { SuiteApi, SuiteNameTakenError } from "@langwatch/suite-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { suiteServer } from "../../suite.server.ts";

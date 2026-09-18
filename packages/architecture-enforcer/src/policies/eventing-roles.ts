@@ -1,9 +1,11 @@
 import { existsSync } from "node:fs";
 import { basename, dirname, join, relative, sep } from "node:path";
+
 import ts from "typescript";
+
+import type { ArchitectureViolation, ClassifiedPackage } from "../types.ts";
 import { sourceFile as parsedSourceFile } from "../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
-import type { ArchitectureViolation, ClassifiedPackage } from "../types.ts";
 
 const PROJECTION_FILE = /\.(?:projection|foldProjection|mapProjection)\.ts$/;
 const SUBSCRIBER_FILE = /\.subscriber\.ts$/;
@@ -263,7 +265,7 @@ function eventingScanRoots(root: string, packages: readonly ClassifiedPackage[])
   const scanRoots = [
     join(root, "apps/api/src"),
     join(root, "apps/worker/src"),
-    ...packages.filter((pkg) => pkg.kind === "server").map((pkg) => join(pkg.root, "src")),
+    ...packages.filter((pkg) => pkg.kind === "process").map((pkg) => join(pkg.root, "src")),
   ];
 
   return [...new Set(scanRoots)];
@@ -291,7 +293,7 @@ export function lintEventingRoles(snapshot: WorkspaceSnapshot): ArchitectureViol
   const { root, packages } = snapshot;
 
   const packageByFile = packages
-    .filter((pkg) => pkg.kind === "server")
+    .filter((pkg) => pkg.kind === "process")
     .toSorted((left, right) => right.root.length - left.root.length);
 
   return eventingScanRoots(root, packages).flatMap((scanRoot) =>

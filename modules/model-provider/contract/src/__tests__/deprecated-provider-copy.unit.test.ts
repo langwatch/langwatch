@@ -1,5 +1,5 @@
-import { explainHandledError } from "@langwatch/handled-error/presentation";
-import type { HandledErrorShape } from "@langwatch/handled-error/read-handled-error";
+import { explainHandledError } from "@langwatch/error-presentation/presentation";
+import type { HandledErrorShape } from "@langwatch/error-presentation/read-handled-error";
 import { modelProviders, providerDeprecation } from "@langwatch/model-provider-contract";
 /**
  * The refusal a retired provider hands back is only actionable if the customer is told

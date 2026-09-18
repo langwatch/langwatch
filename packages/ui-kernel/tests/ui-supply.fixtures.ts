@@ -33,7 +33,7 @@ export const transportModule = defineWebModule("screen").withScreens({
   },
 });
 
-export const sessionModule = defineWebModule("flags").withFlags(["release_example"] as const);
+export const sessionModule = defineWebModule("session-only").requires(["session"] as const);
 
 export const configModule = defineWebModule("configuration").withConfig(
   z.strictObject({ mode: z.enum(["development", "test", "production"]) }),

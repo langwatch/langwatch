@@ -5,7 +5,10 @@
 
 import type { AgentAdapter } from "@langwatch/scenario";
 import type { VoiceAgentData } from "@langwatch/scenario-contract";
-import { voiceTransportRegistry } from "@langwatch/scenario-contract/voice-runtime";
+import type {
+  VoiceTransport,
+  VoiceTransportRunner,
+} from "@langwatch/scenario-contract/voice-runtime";
 
 /**
  * Shown on a voice run whose project has no OpenAI key: the SDK builds its
@@ -17,12 +20,11 @@ export const NO_OPENAI_KEY_MESSAGE =
 
 export function createSerializedVoiceAgentAdapter({
   data,
-  registry = voiceTransportRegistry,
+  registry,
 }: {
   data: VoiceAgentData;
-  /** Injected in tests so the failure messages can be asserted without a
-   *  live socket. */
-  registry?: typeof voiceTransportRegistry;
+  /** The voice transports by vendor, built with environment drilled in. */
+  registry: Record<VoiceTransport, VoiceTransportRunner>;
 }): AgentAdapter {
   const runner = registry[data.voiceTarget.transport];
   if (!data.voiceTarget.credential) {

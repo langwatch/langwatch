@@ -4,10 +4,11 @@
  * ONE TAB PER PROCESS — the store is a singleton, so a second tab is refused.
  */
 
-import { readLiveWorkbench } from "@langwatch/experiment-contract";
 import { startAndIdentifyRun } from "@langwatch/experiment-browser/workbench-run-identification";
 import { useEvaluationsV3Store } from "@langwatch/experiment-browser/workbench-store";
+import { readLiveWorkbench } from "@langwatch/experiment-contract";
 import type { ExecutionScope } from "@langwatch/experiment-contract";
+
 import { createFakeTabDocument } from "./fake-tab-document";
 import { buildFakeTabHandlers } from "./fake-tab-handlers";
 import { createFakeTabRunner, type FakeTabRun } from "./fake-tab-run";

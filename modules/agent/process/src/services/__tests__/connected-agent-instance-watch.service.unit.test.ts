@@ -1,6 +1,6 @@
 import { AgentSessionUnknownError } from "@langwatch/agent-contract";
 import { SessionStateStoreFactory } from "@langwatch/redis-client";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { instanceChannel } from "../../rules/connected-agent-keys.rules.ts";

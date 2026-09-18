@@ -1,5 +1,5 @@
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
-import { VariablesSection } from "@langwatch/prompt-browser-kit/variables";
+import { VariablesSection } from "@langwatch/prompt-browser-kit";
 import { OutputsSection } from "@langwatch/prompt-browser/outputs-section";
 import type {
   AgentComponent,

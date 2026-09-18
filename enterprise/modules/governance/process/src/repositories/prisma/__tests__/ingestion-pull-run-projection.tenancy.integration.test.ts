@@ -24,7 +24,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { Organization, PrismaClient, Team } from "@langwatch/prisma-client/generated";
 import { PROJECT_KIND } from "@langwatch/project-contract";
-import { cleanupTestRows } from "@langwatch/test-harness";
+import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

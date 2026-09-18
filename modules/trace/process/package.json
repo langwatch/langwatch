@@ -124,6 +124,7 @@
   },
   "devDependencies": {
     "@clickhouse/client": "catalog:",
+    "@langwatch/api-fixture": "workspace:*",
     "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/data-privacy-process": "workspace:*",
     "@langwatch/test-harness": "workspace:*",

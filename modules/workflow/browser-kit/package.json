@@ -8,14 +8,10 @@
   ],
   "type": "module",
   "exports": {
-    "./workflow-host": {
-      "types": "./dist/model/workflow-host.d.ts",
-      "default": "./src/model/workflow-host.ts"
-    },
-    "./workflow-icons": {
-      "langwatch-declaration-source": "./src/workflow-icons.ts",
-      "types": "./dist/workflow-icons.d.ts",
-      "default": "./src/workflow-icons.ts"
+    ".": {
+      "langwatch-declaration-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
     }
   },
   "scripts": {
@@ -23,15 +19,17 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "lucide-react": "catalog:",
-    "react-feather": "catalog:"
+    "react-feather": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@chakra-ui/react": "catalog:",
     "@emotion/react": "catalog:",
-    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "react": "catalog:",

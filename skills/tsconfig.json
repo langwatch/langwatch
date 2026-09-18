@@ -8,5 +8,10 @@
     "noUncheckedIndexedAccess": true
   },
   "include": ["**/*.ts"],
-  "exclude": ["node_modules", "_tests/fixtures"]
+  "exclude": ["node_modules", "_tests/fixtures"],
+  "references": [
+    {
+      "path": "../packages/vitest-config/tsconfig.build.json"
+    }
+  ]
 }

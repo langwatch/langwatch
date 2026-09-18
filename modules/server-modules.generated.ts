@@ -1,7 +1,6 @@
 /** Generated from modules/catalogue.json. Do not edit by hand. */
 /** Run `pnpm generate:modules` to rewrite it. */
 
-import { createApp, type ServerRole } from "@langwatch/kernel";
 import { agentServer } from "@langwatch/agent-process";
 import { analyticsServer } from "@langwatch/analytics-process";
 import { annotationServer } from "@langwatch/annotation-process";
@@ -104,36 +103,3 @@ export const serverModules = [
   webhookServer,
   workflowServer,
 ] as const;
-
-/** The same graph by tier, so a build states which tiers it installs. */
-export const coreServerModules = [agentServer, analyticsServer, annotationServer, apiKeyServer, authServer, authzServer, automationServer, codingAgentServer, dashboardServer, dataPrivacyServer, dataRetentionServer, datasetServer, entitlementServer, evaluationServer, evaluatorServer, experimentServer, featureFlagServer, gatewayServer, githubServer, hostedMcpServer, identityServer, langyServer, logServer, metricServer, modelProviderServer, monitorServer, notificationServer, opsServer, organizationServer, platformHealthServer, presenceServer, projectServer, promptServer, roleServer, scenarioServer, secretServer, shareServer, storedObjectServer, suiteServer, topicServer, traceServer, userServer, webhookServer, workflowServer] as const;
-export const enterpriseServerModules = [governanceServer, licensingServer, managedProviderServer, scimServer, ssoServer] as const;
-
-/**
- * The graph in chunks, and the chain that installs it. TypeScript cannot
- * instantiate 49 modules in one `withModules` call (TS2589), so the chain
- * is generated here and a process installs everything with one call.
- */
-export const serverModuleChunk0 = [agentServer, analyticsServer, annotationServer, apiKeyServer, authServer] as const;
-export const serverModuleChunk1 = [authzServer, automationServer, codingAgentServer, dashboardServer, dataPrivacyServer] as const;
-export const serverModuleChunk2 = [dataRetentionServer, datasetServer, entitlementServer, evaluationServer, evaluatorServer] as const;
-export const serverModuleChunk3 = [experimentServer, featureFlagServer, gatewayServer, githubServer, governanceServer] as const;
-export const serverModuleChunk4 = [hostedMcpServer, identityServer, langyServer, licensingServer, logServer] as const;
-export const serverModuleChunk5 = [managedProviderServer, metricServer, modelProviderServer, monitorServer, notificationServer] as const;
-export const serverModuleChunk6 = [opsServer, organizationServer, platformHealthServer, presenceServer, projectServer] as const;
-export const serverModuleChunk7 = [promptServer, roleServer, scenarioServer, scimServer, secretServer] as const;
-export const serverModuleChunk8 = [shareServer, ssoServer, storedObjectServer, suiteServer, topicServer] as const;
-export const serverModuleChunk9 = [traceServer, userServer, webhookServer, workflowServer] as const;
-
-export const createServerApp = (role: ServerRole) =>
-  createApp({ role })
-    .withModules(serverModuleChunk0)
-    .withModules(serverModuleChunk1)
-    .withModules(serverModuleChunk2)
-    .withModules(serverModuleChunk3)
-    .withModules(serverModuleChunk4)
-    .withModules(serverModuleChunk5)
-    .withModules(serverModuleChunk6)
-    .withModules(serverModuleChunk7)
-    .withModules(serverModuleChunk8)
-    .withModules(serverModuleChunk9);

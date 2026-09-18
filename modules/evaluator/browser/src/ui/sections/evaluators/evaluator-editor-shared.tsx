@@ -29,7 +29,7 @@ import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import type {
   AvailableSource,
   FieldMapping as UIFieldMapping,
-} from "@langwatch/prompt-browser-kit/variables";
+} from "@langwatch/prompt-browser-kit";
 import { toEpochMs } from "@langwatch/time";
 import { FormServerError } from "@langwatch/workflow-browser/handled-error-views";
 import { DEFAULT_EMBEDDINGS_MODEL } from "@langwatch/workflow-browser/platform-defaults";

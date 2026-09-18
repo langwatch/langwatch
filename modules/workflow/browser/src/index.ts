@@ -40,14 +40,13 @@ export * from "./model/unsaved-changes.ts";
 export * from "./model/code-signature.ts";
 export * from "./model/evaluate-api-snippet.ts";
 export * from "./model/agent-node-data.ts";
-export * from "./model/studio-dataset.utils.ts";
 export { PromptSelectionButton } from "./ui/elements/prompt-selection-button.tsx";
 export { WorkflowConfigPopover } from "./ui/elements/workflow-config-popover.tsx";
 export {
   buildCodeConfig,
   DEFAULT_CODE,
   getCodeFromConfig,
-} from "@langwatch/agent-browser/agent-editors";
+} from "@langwatch/agent-contract/code-config";
 export * from "./model/llm-signature-node-factory.ts";
 export * from "./model/code/python-providers.ts";
 export {

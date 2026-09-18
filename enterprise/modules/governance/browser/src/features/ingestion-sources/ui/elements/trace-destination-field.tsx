@@ -33,7 +33,7 @@
  */
 
 import { Badge, HStack, Text, VStack } from "@chakra-ui/react";
-import { ScopeChipPicker } from "@langwatch/authz-browser-kit/scope-picker";
+import { ScopeChipPicker } from "@langwatch/authz-browser-kit";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 

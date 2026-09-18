@@ -14,7 +14,7 @@ import {
 } from "@langwatch/model-provider-contract";
 import { OrganizationService, type OrganizationApi } from "@langwatch/organization-contract";
 import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { nowInstant, toDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 

@@ -1,11 +1,6 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
-import { useEffect, useMemo, useRef, useState } from "react";
-
-import { useModelProvidersSettings } from "../../../../behavior/use-model-providers-settings.ts";
-import { usePromptProject } from "../../../../behavior/use-prompt-project.ts";
-import { clampMaxTokens } from "../../../../model/clamp-max-tokens.ts";
-import { getMaxTokenLimit } from "../../../../model/max-token-limit.ts";
+import { getMaxTokenLimit } from "@langwatch/prompt-browser-kit";
 import {
   buildModelChangeValues,
   DEFAULT_SUPPORTED_PARAMETERS,
@@ -16,7 +11,12 @@ import {
   normalizeMaxTokens,
   ParameterRow,
   toFormKey,
-} from "../../llm-parameters/index.ts";
+} from "@langwatch/prompt-browser-kit";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import { useModelProvidersSettings } from "../../../../behavior/use-model-providers-settings.ts";
+import { usePromptProject } from "../../../../behavior/use-prompt-project.ts";
+import { clampMaxTokens } from "../../../../model/clamp-max-tokens.ts";
 import { allModelOptions, ModelSelector } from "./model-selector.tsx";
 import { type Output, OutputsSection, type OutputType } from "./outputs-section.tsx";
 

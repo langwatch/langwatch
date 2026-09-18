@@ -1,5 +1,5 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { computeRelativeWindow } from "@langwatch/analytics-browser-kit/period-selector";
+import { computeRelativeWindow } from "@langwatch/analytics-browser-kit";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 /**

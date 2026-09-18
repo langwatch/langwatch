@@ -1,6 +1,6 @@
 import { SLOT_STALE_AFTER_MS } from "@langwatch/ops-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ScheduledJobRecord } from "../../index.ts";

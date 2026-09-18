@@ -1,6 +1,5 @@
+import { useReducedMotion } from "@langwatch/langy-browser-kit";
 import { useEffect, useState } from "react";
-
-import { useReducedMotion } from "./use-reduced-motion.ts";
 
 export function useCyclingVerb(
   active: boolean,

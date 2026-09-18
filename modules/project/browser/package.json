@@ -33,8 +33,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@langwatch/onboarding-browser": "workspace:*",
-    "@langwatch/trace-browser-kit": "workspace:*",
     "@langwatch/analytics-browser": "workspace:*",
     "@langwatch/analytics-browser-kit": "workspace:*",
     "@langwatch/analytics-contract": "workspace:*",
@@ -43,11 +41,14 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/langy-browser": "workspace:*",
+    "@langwatch/langy-browser-kit": "workspace:*",
     "@langwatch/navigation-browser": "workspace:*",
+    "@langwatch/onboarding-browser": "workspace:*",
     "@langwatch/organization-browser": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-browser": "workspace:*",
+    "@langwatch/trace-browser-kit": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
     "@paper-design/shaders-react": "catalog:",
     "@tanstack/react-query": "catalog:",
@@ -63,7 +64,7 @@
   "devDependencies": {
     "@chakra-ui/react": "catalog:",
     "@emotion/react": "catalog:",
-    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
     "@testing-library/jest-dom": "catalog:",
     "@testing-library/react": "catalog:",
     "@testing-library/user-event": "catalog:",

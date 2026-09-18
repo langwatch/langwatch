@@ -1,7 +1,12 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+
 import { afterEach, describe, expect, it } from "vitest";
-import { collectFilenameMigrationMappings, planFilenameMigration } from "../src/tools/filename-migration.ts";
+
+import {
+  collectFilenameMigrationMappings,
+  planFilenameMigration,
+} from "../src/tools/filename-migration.ts";
 
 let root = "";
 
@@ -16,7 +21,7 @@ function write(path: string, content: string): void {
 }
 
 function packageFixture(): void {
-  for (const role of ["contract", "server", "web"]) {
+  for (const role of ["contract", "process", "browser"]) {
     write(
       `modules/agent/${role}/package.json`,
       JSON.stringify({ name: `@langwatch/agent-${role}` }),
@@ -66,13 +71,10 @@ describe("strict filename migration", () => {
       // `prisma.agent.repository.ts` is NOT in this list: the dotted
       // technology qualifier is the canonical spelling, so the planner leaves
       // it alone rather than flattening it to a dash.
+      ["modules/agent/browser/src/agentCard.tsx", "modules/agent/browser/src/agent-card.tsx"],
       [
         "modules/agent/process/src/services/agentService.service.ts",
         "modules/agent/process/src/services/agent-service.service.ts",
-      ],
-      [
-        "modules/agent/browser/src/agentCard.tsx",
-        "modules/agent/browser/src/agent-card.tsx",
       ],
     ]);
     expect(plan.edits.get(join(root, "modules/agent/process/src/index.ts"))).toContain(
@@ -166,8 +168,8 @@ describe("strict filename migration", () => {
 
     const plan = planFilenameMigration(root);
     expect(plan.edits.has(join(root, "modules/agent/process/src/notes.ts"))).toBe(false);
-    expect(
-      readFileSync(join(root, "modules/agent/process/src/notes.ts"), "utf8"),
-    ).toContain("agentService.service");
+    expect(readFileSync(join(root, "modules/agent/process/src/notes.ts"), "utf8")).toContain(
+      "agentService.service",
+    );
   });
 });

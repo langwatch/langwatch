@@ -169,17 +169,25 @@ The non-negotiables, all lint-enforced:
   travels.
 - **Browser half:** flat public entries → `model/` (pure) → `behavior/`
   (hooks, api bindings, stores) → `ui/elements|blocks|sections`; elements and
-  blocks cannot fetch. The tRPC client is derived from the contract's
-  declarations, never hand-written. Screens read session/navigation through a
+  blocks cannot fetch. A package that outgrows that flat layout nests:
+  `features/<name>/` repeats `model/behavior/ui` inside itself, and a feature
+  that is one component is a section, not a feature. The tRPC client is
+  derived from the contract's declarations, never hand-written. The package's
+  `exports` map lists `./declaration` only — `surfaces/` and `screens/` are
+  deleted browser folders (§15) — and a module capability the composition
+  root needs travels through the declaration's `withCapabilities` slot,
+  never a side-door export. Screens read session/navigation through a
   declared `*HostApi` the shell implements from `@langwatch/browser-host`
-  capabilities — never the router or host directly. Drawers are URL-routed
-  singletons with a navigation stack: a sub-flow **navigates**
-  (`openDrawer("target", { onSuccess, onClose: goBack })`), never mounts a
-  drawer component from inside another drawer.
+  capabilities — never the router or host directly; an unmounted `*HostApi`
+  is refused by `createUi` at install, by name, before any component
+  renders. Drawers are URL-routed singletons with a navigation stack: a
+  sub-flow **navigates** (`openDrawer("target", { onSuccess, onClose: goBack
+  })`), never mounts a drawer component from inside another drawer.
 - **The kit law:** a module's browser package is closed — sharing means moving
   the thing to `*-browser-kit`. A kit is a leaf (contracts, design-system,
   browser-host only), fetches nothing, is a real package not a subpath, and
-  exists only at three or more consumers.
+  by default exists only at three or more consumers — two mint one only
+  where the alternative is duplicating a large shared surface.
 - **Verbs (new code):** `find*` returns an array (empty, never null);
   `get*`/`getBy*` returns one or throws; `T | null` is not a shape we write
   any more, and `try*`/`require*` prefixes are banned. The linter names the
@@ -259,6 +267,24 @@ pnpm start:prepare:files            # regenerate Prisma client + generated types
 pnpm generate:modules               # after editing modules/catalogue.json
 pnpm sync:references                # after adding/removing a workspace package
 ```
+
+Nx is the task runner over these same scripts (ADR-150): it infers one project
+per pnpm workspace member and one target per package.json script, caches the
+results, and derives what a change reached from the `workspace:*` graph.
+
+```bash
+pnpm test:affected                  # only the packages this change reached
+pnpm typecheck:affected             # same, for tsc -b
+pnpm test:all                       # every package's test target, cached
+pnpm graph                          # the dependency graph, in a browser
+```
+
+A cached target replays in milliseconds, and the cache is correct across
+package boundaries: packages resolve each other's TypeScript source, so a
+dependency's files are declared inputs to its dependents. `test:integration` is
+deliberately uncached — it reads datastores no input declaration describes. The
+root `test`, `typecheck`, `lint` and `build` are unchanged and still mean
+exactly what they meant; Nx sits beside them, not in front of them.
 
 **Whole-repo checks take a machine-wide slot.** A full typecheck holds
 2.3–3.5 GiB and every core, and this machine runs many agents at once, so the

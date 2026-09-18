@@ -1,8 +1,8 @@
 import type { AgentAdapter } from "@langwatch/scenario";
 import type { VoiceAgentData } from "@langwatch/scenario-contract";
-import {
-  phoneTransport,
-  type voiceTransportRegistry,
+import type {
+  VoiceTransport,
+  VoiceTransportRunner,
 } from "@langwatch/scenario-contract/voice-runtime";
 import { describe, expect, it, vi } from "vitest";
 
@@ -12,7 +12,7 @@ const fakeAdapter = { call: async () => "" } as unknown as AgentAdapter;
 
 function fakeRegistry(
   createAgentAdapter = vi.fn(() => fakeAdapter),
-): typeof voiceTransportRegistry {
+): Record<VoiceTransport, VoiceTransportRunner> {
   return {
     elevenlabs_convai: {
       missingKeyMessage: "No ElevenLabs key in this project",
@@ -21,7 +21,16 @@ function fakeRegistry(
       fetchCallRecord: vi.fn(),
       endCall: vi.fn(),
     },
-    phone: phoneTransport,
+    phone: {
+      missingKeyMessage: "No Twilio credentials in this project",
+      createAgentAdapter: vi.fn(),
+      mintSession: vi.fn(),
+      fetchCallRecord: vi.fn(),
+      endCall: vi.fn(),
+      assertAvailable: vi.fn(() => {
+        throw new Error("Phone targets have no browser call");
+      }),
+    },
   };
 }
 

@@ -9,8 +9,7 @@ import {
   isCompactStreamingEvent,
 } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
-import { useSSESubscription } from "@langwatch/trace-browser-kit/sse-subscription";
-import { usePageVisibility } from "@langwatch/trace-browser/surfaces/page-visibility";
+import { usePageVisibility, useSSESubscription } from "@langwatch/trace-browser-kit";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { z } from "zod";
 

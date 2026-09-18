@@ -4,7 +4,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { AvailableSource } from "@langwatch/prompt-browser-kit/variables";
+import type { AvailableSource } from "@langwatch/prompt-browser-kit";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -46,7 +46,7 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   setFlowCallbacks: vi.fn(),
 }));
 
-vi.mock("@langwatch/prompt-browser/latest-prompt-version", () => ({
+vi.mock("../../../../behavior/experiments-v3/use-latest-prompt-version.ts", () => ({
   useLatestPromptVersion: () => ({
     currentVersion: undefined,
     latestVersion: undefined,

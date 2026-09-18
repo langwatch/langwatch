@@ -9,7 +9,7 @@ import { Button, Heading, HStack, VStack, Icon } from "@chakra-ui/react";
 import { formatCost, formatLatency } from "@langwatch/design-system/metric-value-formatters";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import type { SimulationRunStatus } from "@langwatch/scenario-contract";
-import { Chip } from "@langwatch/trace-browser/surfaces/trace-drawer-chip";
+import { Chip } from "@langwatch/trace-browser-kit";
 import { Square, Edit2 } from "lucide-react";
 
 import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";

@@ -41,6 +41,7 @@
     "@opentelemetry/semantic-conventions": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",
     "jsdom": "catalog:",
     "typescript": "catalog:",

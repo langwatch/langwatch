@@ -10,7 +10,7 @@ import {
   groupRunsByTargetKey,
   type RunGroupSummary,
   targetKeyOfRun,
-} from "@langwatch/suite-browser/run-formatters";
+} from "@langwatch/suite-browser-kit";
 import {
   differingParameterNames,
   targetLabels,

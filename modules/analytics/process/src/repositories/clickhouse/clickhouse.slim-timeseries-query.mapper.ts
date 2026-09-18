@@ -381,17 +381,21 @@ export function buildSlimTimeseriesQuery(
   const havingClause =
     groupByColumn && !slimGroupByHandlesUnknown(input.groupBy) ? `HAVING group_key != ''` : "";
 
+  // Outer WHERE is wrapped in one enclosing paren: `dedupedSlim`'s own
+  // tenant predicate sits one bracket deep already, so this OR (and any
+  // filter clause) must nest deeper still to stay outside the tenant guard's
+  // reach — see the matching note on `baseWhere` in aggregation-builder.mapper.ts.
   const sql = `
     SELECT
       ${selectExprs.join(",\n      ")}
     FROM ${dedupedSlim(ta, SLIM_DATE_FILTER_BOTH_PERIODS)}
-    WHERE ${ta}.TenantId = {tenantId:String}
+    WHERE (${ta}.TenantId = {tenantId:String}
       AND (
         (${ta}.OccurredAt >= {currentStart:DateTime64(3)} AND ${ta}.OccurredAt < {currentEnd:DateTime64(3)})
         OR
         (${ta}.OccurredAt >= {previousStart:DateTime64(3)} AND ${ta}.OccurredAt < {previousEnd:DateTime64(3)})
       )
-      ${filterWhere}
+      ${filterWhere})
     GROUP BY ${groupByExprs.join(", ")}
     ${havingClause}
     ORDER BY period${typeof input.timeScale === "number" ? ", date" : ""}

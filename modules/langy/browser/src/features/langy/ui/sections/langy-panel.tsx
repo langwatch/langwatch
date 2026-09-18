@@ -10,7 +10,30 @@ import { toaster } from "@langwatch/design-system/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
+import {
+  mergeContextChips,
+  removeContextChip,
+  attachedContextToChip,
+  type LangyPanelEffect,
+  type LangyPanelMode,
+  useLangyStore,
+  useReducedMotion,
+  APP_HEADER_HEIGHT,
+  FLOATING_PANEL_CSS_WIDTH,
+  FLOATING_PANEL_INSET,
+  LANGY_DODGE_STAGGER_MS,
+  LANGY_TRANSITION,
+  langyRestingFloorPx,
+  PANEL_LAYOUT_TRANSITION,
+  resolveFloatingPanelWidth,
+  SIDEBAR_PANEL_WIDTH,
+  EmptyState,
+  PANEL_SUGGESTION_COUNT,
+  selectLangySuggestions,
+  LangyMark,
+  LangyMarkGradientDefs,
+} from "@langwatch/langy-browser-kit";
 import {
   isLangyHiddenLocalNotice,
   isSendUnanswered,
@@ -62,15 +85,7 @@ import { useProjectReach } from "../../../../behavior/home/use-project-reach.ts"
 // spreads `langyTurnContextSchema.shape` into its body schema, and this types the
 // payload against the same source.
 import { api, trpcClient } from "../../../../behavior/langy-api.ts";
-import { mergeContextChips } from "../../../../behavior/langy-context-chips.ts";
-import { removeContextChip } from "../../../../behavior/langy-context-target.store.ts";
 import { useLangyLocalControlStore } from "../../../../behavior/langy-local-control.store.ts";
-import {
-  attachedContextToChip,
-  type LangyPanelEffect,
-  type LangyPanelMode,
-  useLangyStore,
-} from "../../../../behavior/langy.store.ts";
 import { useFeatureFlag } from "../../../../behavior/use-feature-flag.ts";
 import { useGlobalLangyShortcut } from "../../../../behavior/use-global-langy-shortcut.ts";
 import { useLangyContextDropZone } from "../../../../behavior/use-langy-context-drop-zone.ts";
@@ -80,7 +95,6 @@ import { useLangyPeekProximity } from "../../../../behavior/use-langy-peek-proxi
 import { useLangyTurnSignals } from "../../../../behavior/use-langy-turn-signals.ts";
 import { useLingeringDodge } from "../../../../behavior/use-lingering-dodge.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { useReducedMotion } from "../../../../behavior/use-reduced-motion.ts";
 import { useScrolledFromTop } from "../../../../behavior/use-scrolled-from-top.ts";
 import { PANEL_ROOT_ATTR } from "../../../../model/composer-morph-geometry.ts";
 import { shouldRehydrateEngineFromDurable } from "../../../../model/foreign-turn-rehydration.ts";
@@ -96,17 +110,6 @@ import {
   routeLangyChoiceAnswer,
 } from "../../../../model/langy-local-waits.ts";
 import { navigateDedupKey, reserveNavigate } from "../../../../model/langy-navigate-dedup.ts";
-import {
-  APP_HEADER_HEIGHT,
-  FLOATING_PANEL_CSS_WIDTH,
-  FLOATING_PANEL_INSET,
-  LANGY_DODGE_STAGGER_MS,
-  LANGY_TRANSITION,
-  langyRestingFloorPx,
-  PANEL_LAYOUT_TRANSITION,
-  resolveFloatingPanelWidth,
-  SIDEBAR_PANEL_WIDTH,
-} from "../../../../model/langy-panel-layout.ts";
 import {
   FLOATING_PEEK_NEAR_PX,
   type LangyPeekPhase,
@@ -136,12 +139,6 @@ import { LangyWave } from "../../../../ui/elements/langy-wave.tsx";
 import { LANGY_CODE_ACCESS_ASK_AGAIN } from "../../../../ui/sections/derived-cards/langy-code-access-card.tsx";
 import { LangyDerivedCardView } from "../../../../ui/sections/derived-cards/langy-derived-card-view.tsx";
 import { LangyContextTargetLayer } from "../../../../ui/sections/langy-context-target-layer.tsx";
-import { EmptyState } from "../../../../ui/sections/langy-empty-state.tsx";
-import {
-  PANEL_SUGGESTION_COUNT,
-  selectLangySuggestions,
-} from "../../../../ui/sections/langy-home-suggestions.ts";
-import { LangyMark, LangyMarkGradientDefs } from "../../../../ui/sections/langy-mark.tsx";
 import { LangyThinkingLine } from "../../../../ui/sections/langy-thinking-line.tsx";
 import { LangyModelProviderSetup } from "../../../../ui/sections/model-provider-setup.tsx";
 import { StreamingStatusLine } from "../../../../ui/sections/streaming-status-line.tsx";

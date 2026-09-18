@@ -1,3 +1,4 @@
+import type { LangyContextChip } from "@langwatch/langy-browser-kit";
 import {
   createContext,
   type ReactNode,
@@ -10,7 +11,6 @@ import {
   useState,
 } from "react";
 
-import type { LangyContextChip } from "../../behavior/langy.store.ts";
 import type { ProposalHandlers } from "../../model/langy-proposal-handlers.ts";
 import type { LangyUiActionHandlers } from "../../model/ui-actions/langy-ui-action-types.ts";
 

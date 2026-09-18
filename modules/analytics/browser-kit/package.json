@@ -8,10 +8,10 @@
   ],
   "type": "module",
   "exports": {
-    "./period-selector": {
-      "langwatch-declaration-source": "./src/period-selector.ts",
-      "types": "./dist/period-selector.d.ts",
-      "default": "./src/period-selector.ts"
+    ".": {
+      "langwatch-declaration-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
     }
   },
   "scripts": {
@@ -28,7 +28,7 @@
   "devDependencies": {
     "@chakra-ui/react": "catalog:",
     "@emotion/react": "catalog:",
-    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
     "@testing-library/jest-dom": "catalog:",
     "@testing-library/react": "catalog:",
     "@types/react": "catalog:",

@@ -13,8 +13,8 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { docsUrl } from "@langwatch/config/docs-url";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { docsUrl } from "@langwatch/error-presentation/docs-url";
 import { Info, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -800,7 +800,7 @@ function RuleComposer({
                 <Text fontSize="xs" color="fg.muted">
                   Only <code>spend_spike</code> is evaluated by the anomaly subscriber today. Other
                   rule types (<code>rate_limit</code>,<code>after_hours</code>, …) are{" "}
-                  <Link href="/ai-gateway/governance/anomaly-rules" color="blue.600">
+                  <Link href={docsUrl("/ai-governance/anomaly-rules")} color="blue.600">
                     preview
                   </Link>{" "}
                   , persisted as active but not yet detected.
@@ -934,7 +934,7 @@ function RuleComposer({
                 </Link>{" "}
                 today. Slack, PagerDuty, webhook, and email destinations ship in a follow-up
                 release; the composer will gain structured destination fields then. (See{" "}
-                <Link href="/ai-gateway/governance/anomaly-rules" color="blue.600">
+                <Link href={docsUrl("/ai-governance/anomaly-rules")} color="blue.600">
                   anomaly rules docs
                 </Link>{" "}
                 for the dispatch coverage table.)

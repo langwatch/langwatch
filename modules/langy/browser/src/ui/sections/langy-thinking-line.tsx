@@ -1,10 +1,10 @@
 import { Box, HStack } from "@chakra-ui/react";
+import { useReducedMotion } from "@langwatch/langy-browser-kit";
 import { nowInstant } from "@langwatch/time";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 
 import { useCyclingVerb } from "../../behavior/use-cycling-verb.ts";
-import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
 import type {
   LangyThinkingTone,
   LangyToolNarrator,

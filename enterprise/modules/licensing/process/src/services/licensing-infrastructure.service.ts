@@ -12,10 +12,16 @@ export function createOrganizationLicenses(
   return PrismaOrganizationLicenseRepository.create(database);
 }
 
-/** The live license read plus explicit refusals for write/enforcement ports not composed here. */
+/**
+ * The live license read, plus explicit refusals for write/enforcement ports not composed here.
+ * Seat counts are a peer module's own repository, so this service never reaches for them itself -
+ * the caller (the app's own composition) may supply real ones; unsupplied, they refuse too.
+ */
 export function createUnavailableLicensingInfrastructure(options: {
   database: OrganizationLicenseDatabase;
   processName: string;
+  getMemberCount?: (organizationId: string) => Promise<number>;
+  getMembersLiteCount?: (organizationId: string) => Promise<number>;
 }): LicensingInfrastructure {
   const licenses = createOrganizationLicenses(options.database);
   const unavailable = () => new Error(`${options.processName} does not compose license mutation`);
@@ -25,8 +31,8 @@ export function createUnavailableLicensingInfrastructure(options: {
     organizationExists: () => Promise.reject(unavailable()),
     storeLicense: () => Promise.reject(unavailable()),
     removeLicense: () => Promise.reject(unavailable()),
-    getMemberCount: () => Promise.reject(unavailable()),
-    getMembersLiteCount: () => Promise.reject(unavailable()),
+    getMemberCount: options.getMemberCount ?? (() => Promise.reject(unavailable())),
+    getMembersLiteCount: options.getMembersLiteCount ?? (() => Promise.reject(unavailable())),
   };
   return {
     repository,

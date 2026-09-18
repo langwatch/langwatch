@@ -3,9 +3,9 @@
  */
 
 import { Alert, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
-import { explainAnyError } from "@langwatch/handled-error/presentation";
+import { explainAnyError } from "@langwatch/error-presentation/presentation";
 import type { ReactNode } from "react";
-export { readHandledError } from "@langwatch/handled-error/read-handled-error";
+export { readHandledError } from "@langwatch/error-presentation/read-handled-error";
 
 /**
  * The whole explanation as one string, for the slots that can only take text — a toast title a

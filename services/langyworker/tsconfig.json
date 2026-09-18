@@ -16,5 +16,10 @@
     // tsc; typechecked via `bun build` at the point of use (same convention as
     // sdks/typescript/scripts/build-cli-binary.ts).
     "scripts/build-binary.ts"
+  ],
+  "references": [
+    {
+      "path": "../../packages/vitest-config/tsconfig.build.json"
+    }
   ]
 }

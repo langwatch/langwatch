@@ -104,6 +104,7 @@
   },
   "devDependencies": {
     "@langwatch/actor": "workspace:*",
+    "@langwatch/api-fixture": "workspace:*",
     "@langwatch/model-provider-process": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/redis-client": "workspace:*",

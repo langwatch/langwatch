@@ -13,6 +13,10 @@ import { DatasetPickerList } from "@langwatch/dataset-browser/dataset-picker-lis
 import { UploadCSVDrawer } from "@langwatch/dataset-browser/upload-csv-drawer";
 import type { DatasetColumns } from "@langwatch/dataset-contract";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
+import {
+  datasetColumnsToFields,
+  inMemoryDatasetToNodeDataset,
+} from "@langwatch/workflow-browser-kit";
 import type { Component, Entry } from "@langwatch/workflow-contract";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import type { Node, NodeProps } from "@xyflow/react";
@@ -22,10 +26,6 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Database, Plus, Upload } from "react-feather";
 
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
-import {
-  datasetColumnsToFields,
-  inMemoryDatasetToNodeDataset,
-} from "../../../model/studio-dataset.utils.ts";
 
 const DRAFT_DATASET_COLUMNS: DatasetColumns = [
   { name: "input", type: "string" },

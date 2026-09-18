@@ -1,7 +1,7 @@
 import type { ConfigOf, ConfigSlice } from "@langwatch/config";
 import { ScopedSecrets, type SecretHandle } from "@langwatch/secrets";
 
-import { FeatureConfigError, FeatureSecretsUnavailableError } from "./boot-errors.ts";
+import { FeatureSecretsUnavailableError } from "./boot-errors.ts";
 /** One feature installer. A feature declares its config, the contract services */
 import type {
   DependencyIdentity,
@@ -38,11 +38,6 @@ export type ModuleSecretsScope = (
   declared: readonly SecretHandle<unknown>[],
 ) => ScopedSecrets;
 
-/** As much of Zod as a feature's config needs, so this package depends on none. */
-export interface FeatureConfigSchema<Config> {
-  parse(value: unknown): Config;
-}
-
 /** The complete context supplied to a server app's static factory. */
 export type FeatureSetup<
   Dependencies extends TokenMap,
@@ -72,7 +67,6 @@ export type AppDefinition<Dependencies extends TokenMap, Members, Config, App> =
   App
 > &
   Readonly<{
-    readonly configSchema?: FeatureConfigSchema<Config>;
     /** Present when the App declared its own slice instead (§6). */
     readonly config?: ConfigSlice;
     readonly repositories?: FeatureRepositories;
@@ -253,11 +247,15 @@ export interface FeatureInstallArguments<Members> {
  */
 export interface InstallableServerFeature<Members, Name extends string = string, Config = unknown> {
   readonly name: Name;
+  /**
+   * Phantom: the slice type the one process parse (§6) produces for this
+   * feature. Type-only, never read, and the anchor `ModuleConfigGuard` infers
+   * a module's config from — without it the guard silently checks nothing.
+   */
+  readonly configType?: Config;
   readonly config?: ConfigSlice;
   readonly secrets?: Readonly<Record<string, SecretHandle<unknown>>>;
   readonly publicConfig?: (config: unknown) => unknown;
-  /** Config schema for compile-time validation (ADR-144). */
-  readonly configSchema?: FeatureConfigSchema<Config>;
   /** Every door this feature declared, for the process root to mount at boot. */
   readonly transports?: readonly FeatureTransportDescriptor[];
   readonly repositories?: FeatureRepositories;
@@ -390,13 +388,11 @@ export interface ServerFeatureDeclaration<
 
 /** What the declaration stage accumulates before a setup exists. */
 interface FeatureShape<
-  Config,
   Dependencies extends TokenMap,
   TransportDependencies extends TokenMap,
   Name extends string = string,
 > {
   readonly name: Name;
-  readonly configSchema: FeatureConfigSchema<Config> | undefined;
   readonly dependencies: Dependencies;
   readonly transportDependencies: TransportDependencies;
   /** What this feature reads off the process's members, for a feature with no App. */
@@ -415,16 +411,20 @@ export class ServerFeatureBuilder<
   TransportDependencies extends TokenMap,
   Name extends string = string,
 > {
-  constructor(
-    private readonly shape: FeatureShape<Config, Dependencies, TransportDependencies, Name>,
-  ) {}
+  constructor(private readonly shape: FeatureShape<Dependencies, TransportDependencies, Name>) {}
 
-  /** The typed config slice `boot({ config })` must carry for this feature. */
-  /** Absent where the App declared its own slice: the one process parse ran already (§6). */
-  withConfig<NextConfig>(
-    schema: FeatureConfigSchema<NextConfig> | undefined,
-  ): ServerFeatureBuilder<NextConfig, Members, Dependencies, TransportDependencies, Name> {
-    return new ServerFeatureBuilder({ ...this.shape, configSchema: schema });
+  /**
+   * States the slice type the one process parse (§6) produces for this
+   * feature. Type-only: there is no second schema and nothing runs here.
+   */
+  withConfigType<NextConfig>(): ServerFeatureBuilder<
+    NextConfig,
+    Members,
+    Dependencies,
+    TransportDependencies,
+    Name
+  > {
+    return new ServerFeatureBuilder(this.shape);
   }
 
   /** The contract services this feature needs in EVERY role it is installed in. */
@@ -491,7 +491,7 @@ interface FeatureAssemblyState<
   Trpc,
   Worker,
   Name extends string = string,
-> extends FeatureShape<Config, Dependencies, TransportDependencies, Name> {
+> extends FeatureShape<Dependencies, TransportDependencies, Name> {
   readonly setup: (
     args: FeatureSetupArguments<Config, Members, ResolvedTokens<Dependencies>>,
   ) => Provided | Promise<Provided>;
@@ -793,7 +793,6 @@ export class ServerFeatureAssembly<
     const state = this.state;
     const declaration = {
       name: state.name,
-      configSchema: state.configSchema,
       dependencies: state.dependencies,
       transportDependencies: state.transportDependencies,
       providers: state.providers as readonly FeatureProvider<never>[],
@@ -802,7 +801,7 @@ export class ServerFeatureAssembly<
       types: undefined as never,
 
       install: async (args: FeatureInstallArguments<Members>): Promise<InstalledFeatureState> => {
-        const config = parseFeatureConfig(state.name, state.configSchema, args.config);
+        const config = declaredConfig<Config>(args.config);
         const dependencies = resolveTokens(
           state.dependencies,
           args.resolve,
@@ -889,7 +888,6 @@ export function serverFeature<Members>(
   if (!trimmed) throw new Error("A feature installer needs a name.");
   return new ServerFeatureBuilder({
     name: trimmed,
-    configSchema: undefined,
     dependencies: {},
     transportDependencies: {},
     members: [],
@@ -971,7 +969,7 @@ class DefinedFeatureBuilder<Name extends ModuleName> {
       | AppDefinition<TokenMap, unknown, unknown, unknown>
       | AppDefinitionWithoutConfig<TokenMap, unknown, unknown>,
   ): object {
-    if ("configSchema" in app || "config" in app) {
+    if ("config" in app) {
       return new ConfiguredAppBuilder(this.name, app);
     }
     return new UnconfiguredAppBuilder(this.name, app);
@@ -986,7 +984,6 @@ type RepositoryAppDefinition<
   App,
 > = AppContract<Dependencies, App> &
   Readonly<{
-    readonly configSchema?: FeatureConfigSchema<Config>;
     /** Present when the App declared its own slice instead (§6). */
     readonly config?: ConfigSlice;
     readonly reads?: readonly string[];
@@ -1136,7 +1133,7 @@ class RepositoryDefinedFeatureBuilder<
   ): object {
     // Mirrors the non-repository path: a declared slice is config too, and the
     // one process parse has already produced it (§6).
-    if ("configSchema" in app || "config" in app) {
+    if ("config" in app) {
       return new RepositoryAppBuilder(this.name, this.repositories, app);
     }
     return new RepositoryUnconfiguredAppBuilder(this.name, this.repositories, app);
@@ -1228,7 +1225,7 @@ class RepositoryAppBuilder<
     const registry = this.repositories;
     const name = this.name;
     const setup = serverFeature<Members>(name)
-      .withConfig(app.configSchema)
+      .withConfigType<Config>()
       .withDependencies(app.dependencies)
       .withSetup(({ dependencies, members, config, secrets, resources, repositories }) => {
         return app.create({
@@ -1313,8 +1310,8 @@ class RepositoryUnconfiguredAppBuilder<
     super(name, repositories, {
       contract: app.contract,
       dependencies: app.dependencies,
-      configSchema: { parse: () => void 0 },
       ...(app.reads === undefined ? {} : { reads: app.reads }),
+      ...("secrets" in app ? { secrets: app.secrets } : {}),
       create: (setup) => app.create(setup),
     } as RepositoryAppDefinition<
       Dependencies,
@@ -1399,7 +1396,7 @@ class ConfiguredAppBuilder<
   > & { readonly members: readonly Reads[number][] } {
     const app = this.app;
     const declaration = serverFeature<Members>(this.name)
-      .withConfig(app.configSchema)
+      .withConfigType<Config>()
       .withDependencies(app.dependencies)
       .withSetup(({ dependencies, members, config, secrets, resources }) =>
         app.create({
@@ -1495,7 +1492,7 @@ class UnconfiguredAppBuilder<
   > & { readonly members: readonly Reads[number][] } {
     const app = this.app;
     const declaration = serverFeature<Members>(this.name)
-      .withConfig({ parse: () => void 0 })
+      .withConfigType<undefined>()
       .withDependencies(app.dependencies)
       .withSetup(({ dependencies, members, config, secrets, resources }) =>
         app.create({
@@ -1623,19 +1620,13 @@ function undeclaredSecrets(feature: string): ScopedSecrets {
   });
 }
 
-function parseFeatureConfig<Config>(
-  feature: string,
-  schema: FeatureConfigSchema<Config> | undefined,
-  value: unknown,
-): Config {
-  // A module that declares `config` (§6) is already parsed by the one process
-  // parse; only a legacy `configSchema` re-parses here.
-  if (schema === undefined) return value as Config;
-  try {
-    return schema.parse(value);
-  } catch (error) {
-    throw new FeatureConfigError(feature, error instanceof Error ? error.message : String(error));
-  }
+/**
+ * The one process parse (§6) already produced this feature's slice, so the
+ * declaration only gives it a type. This is the single boundary where the
+ * parsed value stops being `unknown`; there is no second schema.
+ */
+function declaredConfig<Config>(value: unknown): Config {
+  return value as Config;
 }
 
 function resolveTokens(

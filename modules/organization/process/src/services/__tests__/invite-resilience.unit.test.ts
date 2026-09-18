@@ -1,6 +1,6 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { InviteNotFoundError } from "@langwatch/organization-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository.ts";

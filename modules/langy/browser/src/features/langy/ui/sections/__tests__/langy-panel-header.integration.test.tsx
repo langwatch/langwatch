@@ -137,7 +137,8 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
   return { api: withFallback(explicitApi), trpcClient: {} };
 });
 
-import { useLangyStore } from "../../../../../behavior/langy.store.ts";
+import { useLangyStore } from "@langwatch/langy-browser-kit";
+
 import {
   LangyHostApi,
   LangyHostProvider,

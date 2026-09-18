@@ -16,6 +16,16 @@ import {
 } from "@chakra-ui/react";
 import type { WireOf } from "@langwatch/api/web";
 import { downloadCsv } from "@langwatch/csv/download";
+import {
+  type AutosaveState,
+  type DatasetTableContextValue,
+  DatasetTableProvider,
+  type DatasetTableRowData,
+  datasetTableCss,
+  SaveStatusChip,
+  useTableKeyboardNavigation,
+  VirtualizedTableBody,
+} from "@langwatch/dataset-browser-kit";
 import type { DatasetColumns, DatasetPage } from "@langwatch/dataset-contract";
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
 import { Pagination } from "@langwatch/design-system/pagination";
@@ -37,20 +47,10 @@ import {
   type EditorRecord,
 } from "../../behavior/use-dataset-editor-store.ts";
 import { useDatasetRecordSync } from "../../behavior/use-dataset-record-sync.ts";
-import { useTableKeyboardNavigation } from "../../behavior/use-table-keyboard-navigation.ts";
 import { formatRecordCount } from "../../model/dataset-editor-copy.ts";
 import { useDatasetHost } from "../../model/dataset-host.ts";
 import { datasetImageUrl } from "../../model/dataset-image-url.ts";
-import {
-  type AutosaveState,
-  type DatasetTableContextValue,
-  DatasetTableProvider,
-  type DatasetTableRowData,
-} from "../../model/dataset-table-context.tsx";
-import { datasetTableCss } from "../../model/dataset-table-styles.ts";
-import { VirtualizedTableBody } from "../blocks/virtualized-table-body.tsx";
 import { DatasetCellImage } from "../elements/dataset-cell-image.tsx";
-import { SaveStatusChip } from "../elements/save-status-chip.tsx";
 import { SelectionActionBar } from "../elements/selection-action-bar.tsx";
 import { AddOrEditDatasetDrawer } from "./add-or-edit-dataset-drawer.tsx";
 import { AddRowsFromCSVModal } from "./add-rows-from-csv-modal.tsx";

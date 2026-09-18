@@ -21,10 +21,16 @@
   "exclude": ["**/__mocks__/**"],
   "references": [
     {
-      "path": "../../dev/tsconfig.web-declarations.json"
+      "path": "../../modules/agent/browser/tsconfig.build.json"
     },
     {
       "path": "../../modules/agent/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../dev/tsconfig.web-declarations.json"
+    },
+    {
+      "path": "../../modules/annotation/browser/tsconfig.build.json"
     },
     {
       "path": "../../packages/api/tsconfig.build.json"
@@ -87,6 +93,9 @@
       "path": "../../enterprise/modules/scim/browser/tsconfig.build.json"
     },
     {
+      "path": "../../packages/error-presentation/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/evaluation/contract/tsconfig.build.json"
     },
     {
@@ -105,6 +114,9 @@
       "path": "../../packages/handled-error/tsconfig.build.json"
     },
     {
+      "path": "../../modules/langy/browser-kit/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/model-provider/contract/tsconfig.build.json"
     },
     {
@@ -120,6 +132,9 @@
       "path": "../../modules/notification/contract/tsconfig.build.json"
     },
     {
+      "path": "../../modules/onboarding/browser/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/ops/browser/tsconfig.build.json"
     },
     {
@@ -127,6 +142,9 @@
     },
     {
       "path": "../../modules/organization/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/organization/contract/tsconfig.build.json"
     },
     {
       "path": "../../modules/prompt/browser-kit/tsconfig.build.json"
@@ -172,6 +190,9 @@
     },
     {
       "path": "../../modules/scenario/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/vitest-config/tsconfig.build.json"
     }
   ]
 }

@@ -5,15 +5,6 @@ import type {
 } from "@langwatch/enterprise-licensing-contract";
 import type { Instant } from "@langwatch/time";
 
-export interface LicensingInfrastructure {
-  licenseCryptography: LicenseCryptography;
-  licenseLogger: LicenseLogger;
-  licenseRetention: LicenseRetention;
-  licenseUsage: LicenseUsage;
-  organizationLicense: OrganizationLicense;
-  licenseStorage: LicenseStorage;
-}
-
 export interface LicenseCryptography {
   parseLicenseKey(licenseKey: string): SignedLicense | null;
   verifySignature(signedLicense: SignedLicense, publicKey?: string): boolean;

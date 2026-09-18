@@ -16,7 +16,7 @@ import {
   type PrismaConnection,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createOpsTestApp } from "../../app/__tests__/ops.fixture.ts";

@@ -1,5 +1,5 @@
 import { Box, chakra, Grid, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
-import { usePeriodSelector } from "@langwatch/analytics-browser-kit/period-selector";
+import { usePeriodSelector } from "@langwatch/analytics-browser-kit";
 import { analyticsMetrics } from "@langwatch/analytics-browser/surfaces/analytics-registry";
 import {
   CustomGraph,

@@ -3,7 +3,7 @@
  */
 
 import { Alert, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
-import { explainAnyError } from "@langwatch/handled-error/presentation";
+import { explainAnyError } from "@langwatch/error-presentation/presentation";
 import type { ReactNode } from "react";
 
 /**

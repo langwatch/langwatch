@@ -35,13 +35,25 @@
       "path": "../../../packages/csv/tsconfig.build.json"
     },
     {
+      "path": "../../dataset/browser-kit/tsconfig.build.json"
+    },
+    {
       "path": "../../dataset/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/error-presentation/tsconfig.build.json"
+    },
+    {
+      "path": "../../evaluator/browser-kit/tsconfig.build.json"
+    },
+    {
       "path": "../../evaluator/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../browser-kit/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"
@@ -54,6 +66,9 @@
     },
     {
       "path": "../../../packages/ksuid/tsconfig.build.json"
+    },
+    {
+      "path": "../../langy/browser-kit/tsconfig.build.json"
     },
     {
       "path": "../../prompt/browser-kit/tsconfig.build.json"
@@ -74,7 +89,7 @@
       "path": "../../workflow/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/test-harness/tsconfig.build.json"
+      "path": "../../../packages/vitest-config/tsconfig.build.json"
     }
   ]
 }

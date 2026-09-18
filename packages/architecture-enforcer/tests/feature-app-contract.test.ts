@@ -52,7 +52,7 @@ beforeEach(() => {
       subjects: ["widget"],
     },
   ];
-  packages = (["contract", "server"] as const).map((kind) => {
+  packages = (["contract", "process"] as const).map((kind) => {
     const directory = kind === "contract" ? contract : server;
     const manifest = { name: `@langwatch/widget-${kind}`, exports: { ".": "./src/index.ts" } };
     write(`${directory}/package.json`, JSON.stringify(manifest));

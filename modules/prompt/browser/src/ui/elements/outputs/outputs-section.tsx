@@ -2,11 +2,7 @@ import { Box, Button, HStack, Input, Spacer, Text, useDisclosure, VStack } from 
 import { Menu } from "@langwatch/design-system/menu";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import {
-  FieldTypeSelect,
-  TYPE_LABELS,
-  VariableTypeIcon,
-} from "@langwatch/prompt-browser-kit/variables";
+import { FieldTypeSelect, TYPE_LABELS, VariableTypeIcon } from "@langwatch/prompt-browser-kit";
 import {
   outputsSchema,
   generateUniqueIdentifier,

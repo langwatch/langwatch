@@ -6,19 +6,6 @@ import type {
   OtlpResource,
   OtlpSpan,
 } from "@langwatch/trace-contract";
-export interface CodingAgentInfrastructure {
-  codingAgentBillingPolicy: CodingAgentBillingPolicy;
-  codingAgentCallerScopeDirectory: CodingAgentCallerScopeDirectory;
-  codingAgentClock: CodingAgentClock;
-  codingAgentCostEstimator: CodingAgentCostEstimator;
-  codingAgentCostMetrics: CodingAgentCostMetrics;
-  codingAgentProjectActivity: CodingAgentProjectActivity;
-  codingAgentPullRequestMapping: CodingAgentPullRequestMapping;
-  codingAgentReadMetrics: CodingAgentReadMetrics;
-  codingAgentScopePermissions: CodingAgentScopePermissions;
-  codingAgentTraceProcessing: CodingAgentTraceProcessor;
-}
-
 /**
  * The billing entitlement decision required to present coding-agent costs.
  * Composition selects the policy; callers do not supply a partial entitlement

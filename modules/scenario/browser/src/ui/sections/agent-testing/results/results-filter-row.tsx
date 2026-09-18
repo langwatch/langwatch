@@ -4,11 +4,7 @@ import { Box, Button, HStack, NativeSelect } from "@chakra-ui/react";
  * the window it all sits in.
  * @see specs/features/agent-testing/results-tabs.feature
  */
-import type {
-  Period,
-  PeriodMode,
-  RelativePresetKey,
-} from "@langwatch/analytics-browser-kit/period-selector";
+import type { Period, PeriodMode, RelativePresetKey } from "@langwatch/analytics-browser-kit";
 import type { Instant } from "@langwatch/time";
 import { ChartColumn } from "lucide-react";
 

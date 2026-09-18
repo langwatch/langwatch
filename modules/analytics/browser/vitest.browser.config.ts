@@ -4,6 +4,6 @@
  * jest-dom matcher set itself, which is all this lane's setup ever did.
  */
 
-import { defineBrowserVitestConfig } from "@langwatch/test-harness/vitest-browser-config";
+import { defineBrowserVitestConfig } from "@langwatch/vitest-config/browser";
 
 export default defineBrowserVitestConfig();

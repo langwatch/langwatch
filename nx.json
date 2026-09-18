@@ -1,0 +1,57 @@
+{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "defaultBase": "origin/main",
+  "namedInputs": {
+    "sharedGlobals": [
+      "{workspaceRoot}/tsconfig.base.json",
+      "{workspaceRoot}/pnpm-workspace.yaml",
+      "{workspaceRoot}/pnpm-lock.yaml"
+    ],
+    "default": ["{projectRoot}/**/*", "sharedGlobals"],
+    "sources": [
+      "default",
+      "!{projectRoot}/**/__tests__/**/*",
+      "!{projectRoot}/**/*.test.ts",
+      "!{projectRoot}/**/*.test.tsx",
+      "!{projectRoot}/**/*.test.mts",
+      "!{projectRoot}/vitest.config.*",
+      "!{projectRoot}/vitest.integration.config.*"
+    ],
+    "lintGlobals": [
+      "sharedGlobals",
+      "{workspaceRoot}/.oxlintrc.jsonc",
+      "{workspaceRoot}/packages/oxlint-rules/**/*"
+    ]
+  },
+  "targetDefaults": {
+    "typecheck": {
+      "cache": true,
+      "dependsOn": ["^typecheck"],
+      "inputs": ["default", "^default"],
+      "outputs": ["{projectRoot}/dist"]
+    },
+    "build": {
+      "cache": true,
+      "dependsOn": ["^build"],
+      "inputs": ["sources", "^sources"],
+      "outputs": ["{projectRoot}/dist"]
+    },
+    "test": {
+      "cache": true,
+      "inputs": ["default", "^default"],
+      "outputs": []
+    },
+    "test:unit": {
+      "cache": true,
+      "inputs": ["default", "^default"],
+      "outputs": []
+    },
+    "lint": {
+      "cache": true,
+      "inputs": ["default", "lintGlobals"],
+      "outputs": []
+    }
+  },
+  "parallel": 4,
+  "analytics": false
+}

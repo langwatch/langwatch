@@ -1,16 +1,17 @@
+import { foldEvaluationEvent } from "@langwatch/experiment-browser/workbench-results-fold";
+import { useEvaluationsV3Store } from "@langwatch/experiment-browser/workbench-store";
 /**
  * The fake workbench tab's run half: posts the page's execute request and
  * drains the stream into the store, standing in for the page's SSE client,
  * which needs an origin the browser supplies.
  */
 import { buildExecutionRequest } from "@langwatch/experiment-contract";
-import { foldEvaluationEvent } from "@langwatch/experiment-browser/workbench-results-fold";
-import { useEvaluationsV3Store } from "@langwatch/experiment-browser/workbench-store";
 import type {
   EvaluationV3Event,
   ExecutionRequest,
   ExecutionScope,
 } from "@langwatch/experiment-contract";
+
 import { APP_BASE, PROJECT_ID } from "./config";
 import type { SaveOutcome } from "./fake-tab-document";
 

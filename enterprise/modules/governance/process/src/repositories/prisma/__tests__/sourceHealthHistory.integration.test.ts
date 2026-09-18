@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
-import { migrateTestClickHouseOnce, startTestClickHouseEndpoints } from "@langwatch/test-harness";
+import { migrateTestClickHouseOnce, startTestClickHouseEndpoints } from "@langwatch/test-harness/clickhouse";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ActivityMonitorHealthClickHouseRepository } from "../activityMonitor.health.clickhouse.repository";

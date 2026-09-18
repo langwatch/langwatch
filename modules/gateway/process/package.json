@@ -91,7 +91,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
-    "@langwatch/analytics-process": "workspace:*",
+    "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
@@ -118,7 +118,6 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/webhook-contract": "workspace:*",
-    "@langwatch/webhook-process": "workspace:*",
     "@trpc/server": "catalog:",
     "hono": "catalog:",
     "hono-openapi": "catalog:",
@@ -129,8 +128,10 @@
   },
   "devDependencies": {
     "@clickhouse/client": "catalog:",
+    "@langwatch/api-fixture": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/clickhouse-migrations": "workspace:*",
+    "@langwatch/error-presentation": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@types/jsonwebtoken": "catalog:",
     "typescript": "catalog:",

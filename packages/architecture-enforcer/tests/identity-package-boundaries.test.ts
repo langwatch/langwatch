@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 /**
@@ -12,7 +13,7 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."
 // the one that composed identity when this guard was written, and it is gone.
 const APP_SRC = join(REPO_ROOT, "apps", "api", "src");
 const IDENTITY_SRC = join(REPO_ROOT, "modules", "identity", "contract", "src");
-const IDENTITY_SERVER_SRC = join(REPO_ROOT, "modules", "identity", "server", "src");
+const IDENTITY_SERVER_SRC = join(REPO_ROOT, "modules", "identity", "process", "src");
 
 function sourceFiles(root: string): string[] {
   const files: string[] = [];
@@ -102,7 +103,9 @@ describe("identity package boundaries", () => {
     it("construct IdentityService only in the identity composition", () => {
       const constructors: string[] = [];
       for (const file of sourceFiles(APP_SRC)) {
-        if (/(?:new IdentityService\(|IdentityService\.create\()/.test(readFileSync(file, "utf8"))) {
+        if (
+          /(?:new IdentityService\(|IdentityService\.create\()/.test(readFileSync(file, "utf8"))
+        ) {
           constructors.push(relative(APP_SRC, file));
         }
       }

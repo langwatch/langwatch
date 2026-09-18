@@ -1,7 +1,9 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import { lintApiTransportBoundaries } from "../src/index.ts";
 import type { ArchitectureViolation, ClassifiedPackage } from "../src/index.ts";
 import { snapshotOf } from "./workspace.ts";
@@ -25,11 +27,11 @@ function write(path: string, content: string): void {
 function featureServer(): ClassifiedPackage {
   const packageRoot = join(root, "modules/widget/process");
   return {
-    name: "@langwatch/widget-server",
+    name: "@langwatch/widget-process",
     root: packageRoot,
     manifestPath: join(packageRoot, "package.json"),
-    manifest: { name: "@langwatch/widget-server" },
-    kind: "server",
+    manifest: { name: "@langwatch/widget-process" },
+    kind: "process",
     feature: "widget",
     featureRoot: join(root, "modules/widget"),
     subjects: ["widget"],

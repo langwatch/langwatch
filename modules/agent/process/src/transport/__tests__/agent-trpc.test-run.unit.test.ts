@@ -3,7 +3,7 @@
  * @see specs/agents/agent-test-run.feature
  */
 import type { AgentApi, AgentTestRunResult } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { agentTrpcTransport } from "../agent.trpc.ts";

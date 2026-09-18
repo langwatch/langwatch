@@ -335,6 +335,10 @@ export class ApplicationBuilder<
       workers: declaration.workers ?? [],
       tasks: declaration.tasks ?? [],
       eventing: declaration.eventing,
+      // Copied member by member above, so an omission here silently disables a
+      // seam rather than failing to compile: without this the root scopes every
+      // module's resolver to nothing and every declared handle reads undeclared.
+      ...(declaration.secrets ? { secrets: declaration.secrets } : {}),
       install: (args) => declaration.install(args as FeatureInstallArguments<Members>),
     });
     return this;

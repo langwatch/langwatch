@@ -6,7 +6,7 @@
 
 import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { Checkbox } from "@langwatch/design-system/checkbox";
-import { PICKER_UNFILED_GROUP_NAME } from "@langwatch/suite-browser/suite-pickers";
+import { PICKER_UNFILED_GROUP_NAME } from "@langwatch/suite-browser-kit";
 import { Folder } from "lucide-react";
 
 import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";

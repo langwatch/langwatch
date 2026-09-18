@@ -1,5 +1,8 @@
-import { defineModuleVitestConfig } from "@langwatch/test-harness/vitest-config";
+import { defineModuleVitestConfig } from "@langwatch/vitest-config";
 
 export default defineModuleVitestConfig({
-  kind: "node",
+  kind: "jsdom",
+  test: {
+    setupFiles: ["./vitest.setup.ts"],
+  },
 });

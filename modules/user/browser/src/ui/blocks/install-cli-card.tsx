@@ -1,5 +1,5 @@
 import { Box, Button, Code, Heading, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
-import { docsUrl } from "@langwatch/config/docs-url";
+import { docsUrl } from "@langwatch/error-presentation/docs-url";
 import { Check, Copy, ExternalLink, Terminal } from "lucide-react";
 import { useState } from "react";
 

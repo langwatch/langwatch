@@ -1,0 +1,44 @@
+{
+  "name": "@langwatch/langy-browser-kit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Peer-importable browser helpers owned by the Langy module.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "langwatch-declaration-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@langwatch/langy-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "lucide-react": "catalog:",
+    "react-feather": "catalog:",
+    "zustand": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@types/react": "catalog:",
+    "jsdom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "react": "^19.2.7"
+  }
+}

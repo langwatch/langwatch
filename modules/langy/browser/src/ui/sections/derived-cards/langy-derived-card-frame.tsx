@@ -3,10 +3,10 @@
  */
 import { HStack, Text, VStack } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { useReducedMotion } from "@langwatch/langy-browser-kit";
 import { Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { useReducedMotion } from "../../../behavior/use-reduced-motion.ts";
 import { langyThinkingShimmerStyles } from "../../../model/values/langy-shimmer.ts";
 
 /** The provenance line, and the longer answer behind it. */

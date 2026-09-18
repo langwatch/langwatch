@@ -3,7 +3,7 @@
  */
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { SuiteTarget } from "@langwatch/suite-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { CollapsingRunCommands } from "../../__tests__/support/collapsing-run-commands.ts";

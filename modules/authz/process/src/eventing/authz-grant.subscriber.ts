@@ -121,7 +121,7 @@ class AuthzAuditRowMapper {
   }
 
   private static metadata(event: AuthzGrantsEvent): Record<string, unknown> {
-    const data = event.data as unknown as Record<string, unknown>;
+    const data = event.data as Record<string, unknown>;
     const metadata: Record<string, unknown> = {};
     for (const field of AUDIT_METADATA_FIELDS[event.type] ?? []) {
       if (data[field] !== undefined) metadata[field] = data[field];

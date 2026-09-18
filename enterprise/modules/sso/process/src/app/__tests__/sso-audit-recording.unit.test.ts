@@ -6,7 +6,7 @@
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AdminSurfaceHiddenError } from "@langwatch/ops-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -20,10 +20,10 @@ const STAFF_ID = "user_olive";
 const CUSTOMER_ID = "user_customer";
 const TARGET = { organizationId: "org_acme", connectionId: "ssoc_1", domain: "acme.com" };
 
-function harness() {
+async function harness() {
   const record = vi.fn<AuditLogApi["record"]>(async () => {});
   const connections = RecordingSsoConnectionLedger.create();
-  const app = createSsoTestApp({
+  const app = await createSsoTestApp({
     dependencies: {
       auditLog: createApiFixture<AuditLogApi>({ record }),
       users: createSsoTestUsers({ [STAFF_ID]: SSO_TEST_STAFF_EMAIL, [CUSTOMER_ID]: null }),
@@ -35,10 +35,10 @@ function harness() {
 }
 
 describe("the back office's audit trail", () => {
-  let context: ReturnType<typeof harness>;
+  let context: Awaited<ReturnType<typeof harness>>;
 
-  beforeEach(() => {
-    context = harness();
+  beforeEach(async () => {
+    context = await harness();
   });
 
   describe("given a ledger that refuses the command", () => {

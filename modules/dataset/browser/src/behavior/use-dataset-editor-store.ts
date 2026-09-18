@@ -1,3 +1,4 @@
+import type { AutosaveState, CellPosition, RowHeightMode } from "@langwatch/dataset-browser-kit";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
 import { nowInstant } from "@langwatch/time";
 /**
@@ -6,11 +7,6 @@ import { nowInstant } from "@langwatch/time";
  */
 import { createStore, type StoreApi } from "zustand";
 
-import type {
-  AutosaveState,
-  CellPosition,
-  RowHeightMode,
-} from "../model/dataset-table-context.tsx";
 import type { PendingSavedChanges } from "../model/pending-saved-changes.ts";
 
 export type EditorColumn = {

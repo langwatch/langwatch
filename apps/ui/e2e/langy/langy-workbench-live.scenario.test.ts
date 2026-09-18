@@ -5,12 +5,13 @@
  */
 
 import { openai } from "@ai-sdk/openai";
-import * as scenario from "@langwatch/scenario";
-import { describe, expect, it } from "vitest";
 import {
   addEvaluatorPayloadSchema,
   COMPARISON_COLUMN_REFUSAL,
 } from "@langwatch/experiment-contract";
+import * as scenario from "@langwatch/scenario";
+import { describe, expect, it } from "vitest";
+
 import { type FakeWorkbenchTab, openFakeWorkbenchTab } from "./fake-workbench-tab";
 import { makeLangyAdapter } from "./langy-agent";
 import { LANGY_LIVE_PAGE_CRITERIA, LANGY_OPTIMIZE_LOOP_CRITERIA } from "./langy-rules";

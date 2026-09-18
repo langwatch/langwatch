@@ -1,4 +1,5 @@
 import { dirname, join, resolve } from "node:path";
+
 import type {
   CallExpression,
   Expression,
@@ -19,6 +20,7 @@ import {
   isRegularExpressionLiteral,
   isStringLiteral,
 } from "typescript/unstable/ast";
+
 import { parseSourceText } from "./ts-ast.ts";
 
 // Read module-alias tables live from vitest configs to track changes.

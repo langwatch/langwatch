@@ -1,3 +1,4 @@
+import { useLangyStore } from "@langwatch/langy-browser-kit";
 /**
  * The durable catch-up shared by the freshness signal and the history poll: bring the local
  * turn fold to a target cursor by fetching and folding the event tail.
@@ -7,7 +8,6 @@
 import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import { catchUpConversationFold } from "../langy-durable-catch-up.ts";
 
 type Utils = Parameters<typeof catchUpConversationFold>[0]["utils"];

@@ -4,7 +4,7 @@
  * @see specs/scenarios/secret-run-parameters.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { SuiteRunConfirmationDialog } from "@langwatch/suite-browser/run-dialogs";
+import { SuiteRunConfirmationDialog } from "@langwatch/suite-browser-kit";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";

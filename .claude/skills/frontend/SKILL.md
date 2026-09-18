@@ -37,13 +37,22 @@ Layer order, one direction only: flat public entries (`src/<id>.ts`) →
 `model/` (pure values, the `*HostApi` contract) → `behavior/` (hooks, the api
 binding, stores) → `ui/elements` → `ui/blocks` → `ui/sections` (data meets
 layout). Elements and blocks never import `behavior/` and never fetch. A
-screen declares a `*HostApi` (`model/<name>-host.ts`) the **shell**
-implements from `@langwatch/browser-host` capabilities — a screen component
-never imports `browser-host` or a router itself. The whole half is declared
-once, exported at `./declaration`, with `defineBrowserModule` (screens,
-drawers, publications, mounts, flags); the generated `browserModules` list
-installs it, the same way `processModules` are generated for the backend — no
-hand-written file in `apps/ui` names either list.
+package that outgrows one `ui/sections/` folder does not invent a layer, it
+nests: `features/<name>/` repeats `model/behavior/ui` inside itself, and a
+feature that is one component is a section, not a feature — behaviour lives
+in the feature that owns it, not a package-wide `behavior/` bucket every
+feature reaches into. A screen declares a `*HostApi` (`model/<name>-host.ts`)
+the **shell** implements from `@langwatch/browser-host` capabilities — a
+screen component never imports `browser-host` or a router itself, and an
+unmounted `*HostApi` is refused by `createUi` at install, by name, before any
+component renders. The whole half is declared once, with `defineBrowserModule`
+(screens, drawers, publications, mounts, capabilities), and the package's
+`exports` map lists that declaration and nothing else — `surfaces/` and
+`screens/` are deleted browser folders (record §15). A module capability the
+composition root needs (not a screen) travels through the same declaration's
+capability slot, never a side-door export. The generated `browserModules`
+list installs the declaration, the same way `processModules` are generated
+for the backend — no hand-written file in `apps/ui` names either list.
 
 The tRPC client is derived from the contract's declarations via
 `browser-trpc` (`ContractApiMap<typeof <name>Trpc>`) — never hand-written,
@@ -71,6 +80,13 @@ kit. Read the `design-system` skill and the relevant
 screen, list, drawer or settings page — extend the existing pattern rather
 than inventing a new one.
 
+That is the shell-to-module direction. The reverse — a module's own
+capability implementation (fetching or not) that the **composition root**
+needs, e.g. `apps/ui/src/main.tsx` — is neither a kit (rule 3: a kit fetches
+nothing) nor a side-door export (§3.4 shuts that): it travels through the
+declaration's capability slot instead. The test is the consumer, not
+purity — many consumers means a kit; the composition root means the slot.
+
 ## The kit law (record §3.4) — when a different module needs a piece of yours
 
 A module's `*-browser` package is **closed**: nothing else ever imports it,
@@ -79,9 +95,12 @@ module owns, that thing **moves** (never copies) to a new package,
 `<name>-browser-kit` — sharing is declared by moving code, never observed by
 reaching in.
 
-1. **A kit exists only where sharing is real — three or more consumers.** One
-   consumer is bilateral coupling, not an API: inline or duplicate it
-   instead.
+1. **A kit exists only where sharing is real — three consumers by default.**
+   One consumer is bilateral coupling, not an API: inline or duplicate it
+   instead. Two consumers mint a kit where the alternative is duplicating a
+   large shared surface (the `suite` case: 56 import lines across two
+   consumers) — the floor stops premature kits, not sharing that is plainly
+   already real.
 2. **A kit is a leaf.** It may import contracts (any module's),
    `design-system`, `browser-host`. It may not import its own module's
    `*-browser`, any other `*-browser`, or another kit.
@@ -98,9 +117,10 @@ reaching in.
 To publish: create `modules/<owner>/browser-kit/` as a normal workspace
 package (`@langwatch/<owner>-browser-kit`), move the piece in (delete the
 original, repoint the owner's own importers to the kit too — exactly one
-copy), export a flat entry in `package.json` `exports`, and have the consumer
-add the workspace dependency and import it directly — no catalogue
-registration step, no "surfaces" declaration (that mechanism is superseded).
+copy), give it a single `"."` entry in `package.json` `exports` (no
+subpaths — a kit is closed the same way an owner is; `surfaces/` was the
+deleted mechanism), and have the consumer add the workspace dependency and
+import it directly — no catalogue registration step.
 `architecture-enforcer lint` is what checks the kit law itself (closed
 `*-browser`, leaf-only imports, no fetching) — a violation there is the
 finding, not a judgement call.
@@ -124,13 +144,15 @@ src/testing.tsx             Stub<Name>Host + render harness
 ```
 
 ```ts
-// declaration.ts — the one file the generated browserModules list installs
+// declaration.ts — the one file the generated browserModules list installs,
+// and the exports map's only entry (./declaration)
 export default defineBrowserModule("<name>")
   .withScreens({ <name>s: () => import("./ui/sections/<name>s-screen.tsx") })
   .withDrawers({ ... })         // if any
   .withPublications({ ... })    // if another module reads a slot from this one
-  .withMounts({ ... })          // shell mount points
-  .withFlags({ ... });          // feature-flag gates, if any
+  .withHosts({ requires: [...], mounts: [...] })  // *HostApi names read/provided —
+                                // an unmounted one is refused by createUi at install
+  .withCapabilities({ ... });   // if the composition root needs an impl this module owns
 ```
 
 `pnpm generate:modules` regenerates the app's `browserModules` list from the

@@ -73,6 +73,7 @@
     "pino-pretty": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/vitest-config": "workspace:*",
     "@opentelemetry/sdk-trace-node": "catalog:",
     "@pyroscope/nodejs": "0.6.2",
     "@types/node": "catalog:",

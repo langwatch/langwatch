@@ -65,6 +65,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/api-fixture": "workspace:*",
     "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/prompt-process": "workspace:*",
     "@langwatch/test-harness": "workspace:*",

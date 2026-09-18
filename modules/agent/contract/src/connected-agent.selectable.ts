@@ -1,4 +1,4 @@
-import { explainHandledError } from "@langwatch/handled-error/presentation";
+import { explainHandledError } from "@langwatch/error-presentation/presentation";
 
 /** Why a row is listed but cannot be chosen. */
 export const CONNECTED_AGENT_NOT_SELECTABLE_REASONS = ["owned_by_another_person"] as const;

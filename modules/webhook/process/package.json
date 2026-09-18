@@ -50,7 +50,9 @@
   },
   "devDependencies": {
     "@clickhouse/client": "catalog:",
+    "@langwatch/api-fixture": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

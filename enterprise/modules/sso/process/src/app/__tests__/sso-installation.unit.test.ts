@@ -1,78 +1,46 @@
 /**
  * @vitest-environment node
+ * `SsoApp.create` directly: `createApp().boot()`'s test harness has no
+ * `ModuleSecretsScope` yet, so a module resolving a declared handle cannot
+ * boot through it. `managed-provider` and `scim` test the same way.
  */
-import { SsoApi } from "@langwatch/enterprise-sso-contract";
-import { createApp } from "@langwatch/kernel";
 import { describe, expect, it } from "vitest";
 
-import { ssoServer } from "../../sso.server.ts";
 import {
-  createSsoTestAuditLog,
-  createSsoTestConfiguration,
-  createSsoTestIdentity,
-  createSsoTestLicensing,
-  createSsoTestOperators,
+  createSsoTestApp,
+  createSsoTestConfig,
   createSsoTestUsers,
   RecordingSsoConnectionLedger,
-  RecordingSsoGateLogger,
   SSO_TEST_STAFF_EMAIL,
 } from "./sso.fixture.ts";
 
 const STAFF_ID = "user_olive";
 
-function process(
-  options: {
-    connections?: RecordingSsoConnectionLedger;
-    configuration?: ReturnType<typeof createSsoTestConfiguration>;
-  } = {},
-) {
-  const connections = options.connections ?? RecordingSsoConnectionLedger.create();
-  return createApp({ role: "api" })
-    .withModules([ssoServer])
-    .withConfig({ sso: options.configuration ?? createSsoTestConfiguration() })
-    .withObservability((observability) =>
-      observability.withLogging(RecordingSsoGateLogger.create()),
-    )
-    .provide({
-      licensing: createSsoTestLicensing(),
-      ops: createSsoTestOperators(),
-      user: createSsoTestUsers({ [STAFF_ID]: SSO_TEST_STAFF_EMAIL }),
-      "audit-log": createSsoTestAuditLog(),
-      identity: createSsoTestIdentity(connections),
-    });
-}
-
 describe("given a process that installed single sign-on", () => {
-  describe("when the api role boots it", () => {
+  describe("when the app is constructed", () => {
+    /** @scenario "A configured process serves the back office's connection ledger" */
     it("serves the feature api the back office reads", async () => {
       const connections = RecordingSsoConnectionLedger.create();
-      const runtime = await process({ connections }).boot();
+      const app = await createSsoTestApp({
+        connections,
+        dependencies: { users: createSsoTestUsers({ [STAFF_ID]: SSO_TEST_STAFF_EMAIL }) },
+      });
 
-      try {
-        const app = runtime.service(SsoApi);
-        expect(runtime.module(ssoServer).provided).toBe(app);
-
-        await expect(
-          app.listConnections({ page: 0, pageSize: 25 }, { id: STAFF_ID }),
-        ).resolves.toEqual({ connections: [], total: 0 });
-        expect(connections.list).toHaveBeenCalledOnce();
-      } finally {
-        await runtime.stop();
-      }
+      await expect(
+        app.listConnections({ page: 0, pageSize: 25 }, { id: STAFF_ID }),
+      ).resolves.toEqual({ connections: [], total: 0 });
+      expect(connections.list).toHaveBeenCalledOnce();
     });
 
+    /** @scenario "A provider without credentials falls back to email" */
     it("falls back to email when the configured provider has no credentials", async () => {
-      const runtime = await process({
-        configuration: createSsoTestConfiguration({ auth0ClientSecret: undefined }),
-      }).boot();
+      const app = await createSsoTestApp({
+        config: createSsoTestConfig(),
+        secrets: { auth0ClientSecret: undefined },
+      });
 
-      try {
-        const app = runtime.service(SsoApi);
-        expect(app.providerIsMounted()).toBe(false);
-        await expect(app.resolveProvider()).resolves.toBe("email");
-      } finally {
-        await runtime.stop();
-      }
+      expect(app.providerIsMounted()).toBe(false);
+      await expect(app.resolveProvider()).resolves.toBe("email");
     });
   });
 });

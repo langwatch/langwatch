@@ -14,7 +14,6 @@
   },
   "include": ["src/**/*.ts"],
   "references": [
-    { "path": "../../../enterprise/modules/licensing/contract/tsconfig.build.json" },
     {
       "path": "tsconfig.build.json"
     },
@@ -23,6 +22,9 @@
     },
     {
       "path": "../../authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../enterprise/modules/licensing/contract/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"
@@ -52,7 +54,13 @@
       "path": "../../user/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/api-fixture/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/test-harness/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/vitest-config/tsconfig.build.json"
     }
   ]
 }

@@ -13,7 +13,7 @@ import {
   ScenarioInfraErrorCode,
 } from "@langwatch/scenario-contract";
 import { ScenarioFailureHandlerService } from "@langwatch/scenario-process";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockFinishRun = vi.fn().mockResolvedValue(undefined);

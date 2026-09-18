@@ -2,7 +2,7 @@ import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { ResolvedRetention } from "@langwatch/data-retention-contract";
 import { TeamNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import {

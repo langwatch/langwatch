@@ -1,7 +1,7 @@
 // The application's own refusal for "the store these figures live in is not
 // reachable": one taxonomy for an unreachable ClickHouse, shared with every
 // other read of it.
-import { ClickHouseUnavailableError } from "@langwatch/analytics-process";
+import { ClickHouseUnavailableError } from "@langwatch/analytics-contract";
 import type { RestIdentity } from "@langwatch/api/rest";
 import { type AuthzPermission, AuthzApi } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -42,11 +42,15 @@ import { type ProcessMembers } from "@langwatch/process-stores/members";
 import { type ProjectIdentity, ProjectApi } from "@langwatch/project-contract";
 import { Secret } from "@langwatch/secrets";
 import { toDate, type Instant } from "@langwatch/time";
-import { WebhookApi, eventMatches } from "@langwatch/webhook-contract";
 // The billing envelope and the subscription grammar are the webhook
 // platform's, and a reconciliation pull has to answer the same bytes a push
 // delivers, so both ARRIVE from that module rather than being restated here.
-import { createWebhookEnvelopes, type WebhookEnvelopes } from "@langwatch/webhook-process";
+import {
+  eventMatches,
+  webhookEnvelopeFromSpendRow,
+  WebhookApi,
+  type WebhookSpendEventRow,
+} from "@langwatch/webhook-contract";
 import type { z } from "zod";
 
 import { settlementGraceMs } from "../eventing/gateway-spend-settlement.intent.ts";
@@ -669,7 +673,6 @@ export class GatewayApp implements GatewayApi {
   #budgetOverview: BudgetOverviewService | undefined;
   #internalProtocol: GatewayInternalProtocolService;
   #internalDoor: RestIdentity;
-  readonly #envelopes: WebhookEnvelopes = createWebhookEnvelopes();
 
   private constructor(
     members: GatewayInfrastructure,
@@ -842,10 +845,8 @@ export class GatewayApp implements GatewayApi {
   }
 
   /** One spend row rendered as the canonical billing envelope. */
-  spendEventEnvelope(
-    row: Parameters<WebhookEnvelopes["fromSpendRow"]>[0],
-  ): ReturnType<WebhookEnvelopes["fromSpendRow"]> {
-    return this.#envelopes.fromSpendRow(row);
+  spendEventEnvelope(row: WebhookSpendEventRow): ReturnType<typeof webhookEnvelopeFromSpendRow> {
+    return webhookEnvelopeFromSpendRow(row);
   }
 
   /** Whether an endpoint's subscriptions cover one event type. */

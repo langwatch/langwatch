@@ -4,13 +4,13 @@
  */
 
 import { displayTypedValue } from "@langwatch/design-system/json-value-text";
-import { rankByMatch } from "@langwatch/trace-browser/surfaces/suggestion-items";
 import {
   getSuggestionState,
   PARAMETER_LINE_GRAMMAR,
+  rankByMatch,
+  type SuggestionRow,
   type SuggestionState,
-} from "@langwatch/trace-browser/surfaces/suggestion-state";
-import type { SuggestionRow } from "@langwatch/trace-browser/surfaces/suggestion-ui";
+} from "@langwatch/trace-browser-kit";
 
 import type {
   DeclaredParameter,

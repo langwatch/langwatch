@@ -3,35 +3,28 @@
  */
 
 import { Box, Button, EmptyState, HStack, Text, VStack } from "@chakra-ui/react";
-import type { Period } from "@langwatch/analytics-browser-kit/period-selector";
+import type { Period } from "@langwatch/analytics-browser-kit";
 import { useDrawer } from "@langwatch/browser-host/drawer";
-import {
-  LangyContextTarget,
-  scenarioContextChip,
-} from "@langwatch/langy-browser/surfaces/langy-context";
+import { LangyContextTarget, scenarioContextChip } from "@langwatch/langy-browser-kit";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import {
+  availableGroupByOptions,
+  computeBatchRunSummary,
+  computeGroupSummary,
   GroupRow,
+  groupRunsByBatchId,
+  groupRunsByScenarioId,
+  RunHistoryFilters,
+  type RunHistoryFilterValues,
   RunHistorySkeleton,
   RunRow,
   type ScenarioRunContextRenderer,
   ScenarioTabConnectedBadge,
-} from "@langwatch/suite-browser/run-cards";
-import {
-  RunHistoryFilters,
-  type RunHistoryFilterValues,
-  availableGroupByOptions,
-  computeBatchRunSummary,
-  computeGroupSummary,
-  groupRunsByBatchId,
-  groupRunsByScenarioId,
-} from "@langwatch/suite-browser/run-formatters";
-import {
   useAutoExpansion,
   useRunHistoryStore,
   useScrollToBatch,
-} from "@langwatch/suite-browser/run-history-store";
+} from "@langwatch/suite-browser-kit";
 import { FlaskConical, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 

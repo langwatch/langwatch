@@ -3,11 +3,7 @@
  * (job-supplied), or LANGWATCH_TEST_CLICKHOUSE_URL (always-on local, harness-managed). */
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
-import {
-  migrateTestClickHouseOnce,
-  nativeClickHouseBaseUrl,
-  startTestClickHouseEndpoints,
-} from "@langwatch/test-harness";
+import { migrateTestClickHouseOnce, nativeClickHouseBaseUrl, startTestClickHouseEndpoints } from "@langwatch/test-harness/clickhouse";
 
 /** The endpoint name this package's migrated-schema suites ask the harness for. */
 const MIGRATED_ENDPOINT_SUITE = "trace-migrated";

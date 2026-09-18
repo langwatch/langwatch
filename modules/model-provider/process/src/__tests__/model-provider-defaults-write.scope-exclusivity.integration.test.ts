@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { cleanupTestRows } from "@langwatch/test-harness";
+import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 /**
  * Real-Postgres coverage for the one-config-per-scope invariant on ModelDefaultConfig writes,
  * and the handled errors it raises instead of leaking plain 500s (customer report: duplicate

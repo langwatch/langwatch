@@ -3,7 +3,7 @@
  * @see specs/features/agents/connected-agents-ui.feature
  */
 
-import { explainHandledError } from "@langwatch/handled-error/presentation";
+import { explainHandledError } from "@langwatch/error-presentation/presentation";
 
 import type { TargetValue } from "../../../../model/scenario-target.ts";
 import type { RunDialogAgent } from "./run-target-picker.tsx";

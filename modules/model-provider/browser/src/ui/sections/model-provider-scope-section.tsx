@@ -1,5 +1,5 @@
 import { Text, VStack } from "@chakra-ui/react";
-import { ProviderScopeChips, ScopeChipPicker } from "@langwatch/authz-browser-kit/scope-picker";
+import { ProviderScopeChips, ScopeChipPicker } from "@langwatch/authz-browser-kit";
 import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 
 import type {

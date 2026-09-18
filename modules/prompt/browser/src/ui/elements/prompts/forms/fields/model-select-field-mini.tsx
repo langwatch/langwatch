@@ -1,12 +1,12 @@
 import { Box, Popover as ChakraPopover, HStack, Skeleton } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { NoModelsConfiguredCallout } from "@langwatch/model-provider-browser/no-models-configured-callout";
+import { NoModelsConfiguredCallout } from "@langwatch/model-provider-browser-kit";
 import {
   allModelOptions,
   useModelSelectionOptions,
 } from "@langwatch/model-provider-browser/surfaces/model-selector";
-import { LLMModelDisplay } from "@langwatch/prompt-browser-kit/llm-model-display";
+import { LLMModelDisplay } from "@langwatch/prompt-browser-kit";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import type { LlmConfigOutputType } from "@langwatch/workflow-browser/component-types";
 import React, { useCallback, useState } from "react";

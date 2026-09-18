@@ -1,4 +1,4 @@
-import { usePeriodSelector } from "@langwatch/analytics-browser-kit/period-selector";
+import { usePeriodSelector } from "@langwatch/analytics-browser-kit";
 import { useMemo, useState } from "react";
 
 import { analyticsApi as api } from "../../behavior/analytics-api.ts";

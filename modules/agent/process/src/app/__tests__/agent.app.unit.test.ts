@@ -1,6 +1,6 @@
 import { PROTOCOL_VERSION } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, onTestFinished } from "vitest";
 

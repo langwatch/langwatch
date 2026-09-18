@@ -6,13 +6,13 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
-import { ORIGIN_DISPLAY } from "@langwatch/trace-browser/surfaces/trace-origins";
+import { ORIGIN_DISPLAY } from "@langwatch/trace-browser-kit";
 import { describe, expect, it } from "vitest";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const promptPath = path.resolve(
   here,
-  "../../../../../../../../../../services/langyagent/internal/assets/AGENTS.md",
+  "../../../../../../../../../services/langyagent/internal/assets/AGENTS.md",
 );
 
 /**

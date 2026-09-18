@@ -5,18 +5,18 @@ import {
   type AuthzRevocationReason,
   AuthzRevocationTelemetry,
 } from "../../services/authz-revocation-telemetry.service.ts";
-import type { AuthzDatabase } from "../authz-read.repository.ts";
 
 const logger = createLogger("langwatch:authz:revocation");
 
-type RevocationDatabase = {
+/** The one write this repository performs, and no other. */
+export type RevocationDatabase = {
   grant: {
     updateMany(args: unknown): Promise<unknown>;
   };
 };
 
 export type PrismaAuthzRevocationRepositoryOptions = {
-  database: AuthzDatabase;
+  database: RevocationDatabase;
   telemetry: AuthzRevocationTelemetry;
 };
 
@@ -29,7 +29,7 @@ export class PrismaAuthzRevocationRepository {
   }
 
   private constructor(private readonly options: PrismaAuthzRevocationRepositoryOptions) {
-    this.database = options.database as unknown as RevocationDatabase;
+    this.database = options.database;
   }
 
   async enforceGrantRevocation({

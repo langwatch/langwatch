@@ -4,7 +4,7 @@
  */
 
 import { Box, Flex, HStack, Icon, Text } from "@chakra-ui/react";
-import { TRACE_QUERY_CONFIG } from "@langwatch/trace-browser/surfaces/conversation";
+import { TRACE_QUERY_CONFIG } from "@langwatch/trace-browser-kit";
 import { TracePreviewHoverCard } from "@langwatch/trace-browser/surfaces/trace-id-peek";
 import { LuListTree } from "react-icons/lu";
 

@@ -6,6 +6,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 function findRepoRoot(start: string): string {
@@ -112,8 +113,8 @@ describe("the retired library cannot come back", () => {
       const entrypoints = [
         "apps/api/src/main.ts",
         "apps/worker/src/main.ts",
-        "apps/tasks/src/tasks.entrypoint.ts",
-        "apps/ui/src/ui.entrypoint.tsx",
+        "apps/tasks/src/main.ts",
+        "apps/ui/src/main.tsx",
       ];
       const specifier = "@langwatch/time/polyfill";
 

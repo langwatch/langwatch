@@ -2,7 +2,7 @@ import { Box, Button, HStack } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { ComponentIcon } from "@langwatch/workflow-browser-kit/workflow-icons";
+import { ComponentIcon } from "@langwatch/workflow-browser-kit";
 import type { Component, ComponentType } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
 import { motion } from "motion/react";

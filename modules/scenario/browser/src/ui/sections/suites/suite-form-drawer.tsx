@@ -21,9 +21,13 @@ import {
 } from "@langwatch/browser-host/errors";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { toaster } from "@langwatch/design-system/toaster";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
-import { type SuiteFormData, useSuiteForm } from "@langwatch/suite-browser/suite-form";
-import { ScenarioPicker, TargetPicker } from "@langwatch/suite-browser/suite-pickers";
+import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
+import {
+  ScenarioPicker,
+  type SuiteFormData,
+  TargetPicker,
+  useSuiteForm,
+} from "@langwatch/suite-browser-kit";
 import { MAX_SUITE_REPEAT_COUNT } from "@langwatch/suite-contract";
 import { ChevronDown, ChevronRight, Play } from "lucide-react";
 import { useCallback, useRef, useState, type ReactNode } from "react";

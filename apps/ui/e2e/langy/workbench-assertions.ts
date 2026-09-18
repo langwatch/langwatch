@@ -12,8 +12,9 @@
  * assertion, and a helper the suites share has no business living in one of them.
  */
 
-import { expect } from "vitest";
 import type { EvaluationV3Event } from "@langwatch/experiment-contract";
+import { expect } from "vitest";
+
 import { PROJECT_ID } from "./config";
 import type { FakeTabRun } from "./fake-tab-run";
 import type { FakeWorkbenchTab } from "./fake-workbench-tab";

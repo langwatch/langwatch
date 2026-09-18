@@ -1,5 +1,5 @@
-import type { AppErrorCode } from "@langwatch/handled-error/app-codes";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import type { AppErrorCode } from "@langwatch/error-presentation/app-codes";
+import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
 
 export const MAX_QUERY_RETRIES = 4;
 

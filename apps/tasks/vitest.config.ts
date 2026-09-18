@@ -1,4 +1,4 @@
-import { defineModuleVitestConfig } from "../../packages/test-harness/src/vitest-config.ts";
+import { defineModuleVitestConfig } from "@langwatch/vitest-config";
 
 const config = defineModuleVitestConfig({
   kind: "node",

@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { cleanupTestRows } from "@langwatch/test-harness";
+import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 /**
  * Real-Postgres coverage for `ModelProviderCommandService.delete`'s scope-aware lookup: it must
  * resolve org/team/sibling-project credentials, not just the caller's project. Only real

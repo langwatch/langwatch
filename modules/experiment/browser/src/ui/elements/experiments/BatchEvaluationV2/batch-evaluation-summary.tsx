@@ -3,6 +3,7 @@ import type { WorkflowApiRouter, RouterOutputs } from "@langwatch/browser-trpc/w
 import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds";
 import { formatMoney } from "@langwatch/design-system/format-money";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { EvaluationProgressBar } from "@langwatch/experiment-browser-kit";
 import type { ExperimentRun } from "@langwatch/experiment-contract";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 import { FormatMoney } from "@langwatch/workflow-browser/format-money";
@@ -11,8 +12,6 @@ import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import numeral from "numeral";
 import React, { useEffect, useMemo, useState } from "react";
-
-import { EvaluationProgressBar } from "./evaluation-progress-bar.tsx";
 
 export function BatchEvaluationV2EvaluationSummary({
   run,

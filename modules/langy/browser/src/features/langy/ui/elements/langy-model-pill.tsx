@@ -8,10 +8,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import {
-  modelProviderIcons,
-  ProviderIconGlyph,
-} from "@langwatch/model-provider-browser-kit/provider-icons";
+import { modelProviderIcons, ProviderIconGlyph } from "@langwatch/model-provider-browser-kit";
 import { useModelSelectionOptions } from "@langwatch/model-provider-browser/surfaces/model-selector";
 import { LANGY_CHAT_FEATURE_KEY, getModelById } from "@langwatch/model-provider-contract";
 import {

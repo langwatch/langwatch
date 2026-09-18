@@ -1,7 +1,9 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import {
   collectLegacyFeatureFragments,
   formatLegacyFeatureFragmentBaseline,
@@ -70,7 +72,7 @@ function baseline(): void {
         root: join(root, "modules/dataset/process"),
         manifestPath: join(root, "modules/dataset/process/package.json"),
         manifest: {},
-        kind: "server" as const,
+        kind: "process" as const,
         feature: "dataset",
         enterprise: false,
       },
@@ -116,7 +118,7 @@ describe("shrinking legacy feature fragment inventory", () => {
             root: join(root, "modules/dataset/process"),
             manifestPath: join(root, "modules/dataset/process/package.json"),
             manifest: {},
-            kind: "server",
+            kind: "process",
             feature: "dataset",
             enterprise: false,
           },

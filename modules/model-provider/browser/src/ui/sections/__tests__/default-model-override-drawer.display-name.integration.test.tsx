@@ -29,9 +29,9 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
 }));
 
 // Orthogonal to display-name threading and pulls in its own data hooks.
-vi.mock("@langwatch/authz-browser-kit/scope-picker", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/authz-browser-kit/scope-picker")>(
-    "@langwatch/authz-browser-kit/scope-picker",
+vi.mock("@langwatch/authz-browser-kit", async () => {
+  const actual = await vi.importActual<typeof import("@langwatch/authz-browser-kit")>(
+    "@langwatch/authz-browser-kit",
   );
   return {
     ...actual,

@@ -1,4 +1,5 @@
-import type { ProjectReach } from "../../model/langy-project-reach.ts";
+import type { ProjectReach } from "@langwatch/langy-browser-kit";
+
 import { api } from "../langy-api.ts";
 import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
 

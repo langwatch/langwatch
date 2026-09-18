@@ -5,11 +5,12 @@
 import { type ChildProcess, execFileSync, execSync, spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
+import { fileURLToPath } from "node:url";
+
+import { nowInstant } from "@langwatch/time";
 
 import { cachedBinaryIsUsable, digestGoSources, writeStamp } from "./nlpgo-binary-stamp.ts";
-import { nowInstant } from "@langwatch/time";
 
 // nlpgo-subprocess.ts lives in packages/test-harness/src →
 // up 6 = repo root.

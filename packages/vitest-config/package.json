@@ -1,0 +1,56 @@
+{
+  "name": "@langwatch/vitest-config",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The one vitest shape every LangWatch package declares: the jsdom/node builder, the real-browser lane, and the console guard a unit suite sets up. A leaf on purpose — it depends on vitest and nothing else, so the packages vitest itself is tested with can declare it without a cycle.",
+  "keywords": [
+    "config",
+    "langwatch",
+    "vitest"
+  ],
+  "license": "MIT",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./browser": {
+      "types": "./dist/vitest-browser-config.d.ts",
+      "default": "./src/vitest-browser-config.ts"
+    },
+    "./console-guard": {
+      "types": "./dist/console-guard.d.ts",
+      "default": "./src/console-guard.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
+    "playwright": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@vitest/browser-playwright": "^5.0.0",
+    "playwright": "*",
+    "vitest": "^5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@vitest/browser-playwright": {
+      "optional": true
+    },
+    "playwright": {
+      "optional": true
+    }
+  }
+}

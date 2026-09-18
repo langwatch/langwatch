@@ -1,5 +1,5 @@
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { getOverlayConfig } from "@langwatch/suite-browser/run-cards";
+import { getOverlayConfig } from "@langwatch/suite-browser-kit";
 /**
  * Integration tests for stalled scenario run visual treatment.
  * @see specs/scenarios/stalled-scenario-runs.feature - UI Display integration scenarios

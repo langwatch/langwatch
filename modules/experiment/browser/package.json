@@ -66,8 +66,6 @@
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/langy-browser": "workspace:*",
     "@langwatch/langy-browser-kit": "workspace:*",
-    "@langwatch/model-provider-browser": "workspace:*",
-    "@langwatch/prompt-browser": "workspace:*",
     "@langwatch/prompt-browser-kit": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-browser": "workspace:*",
@@ -100,7 +98,7 @@
     "zustand": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "catalog:",
     "@testing-library/user-event": "catalog:",

@@ -1,6 +1,6 @@
 import { Box, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
-import { ColorfulBlockIcon, ComponentIcon } from "@langwatch/workflow-browser-kit/workflow-icons";
+import { ColorfulBlockIcon, ComponentIcon } from "@langwatch/workflow-browser-kit";
 import type { ComponentType } from "@langwatch/workflow-contract";
 import { Database, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";

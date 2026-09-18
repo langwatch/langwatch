@@ -1,7 +1,6 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import ts from "typescript";
-import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
+
 import {
   CONTRACT_ARTIFACT,
   isFeatureApiContract,
@@ -10,6 +9,9 @@ import {
   SERVICE_MODULE_PATTERN,
   TEST_DIRECTORY,
 } from "@langwatch/oxlint-rules/grammar/feature-layout-policy.mjs";
+import ts from "typescript";
+
+import type { ArchitectureViolation, ClassifiedPackage } from "../types.ts";
 import {
   resolveRelativeModule,
   sourceFile,
@@ -17,7 +19,7 @@ import {
   walkValueImportGraph,
   type WorkspaceModuleResolver,
 } from "../workspace/module-graph.ts";
-import type { ArchitectureViolation, ClassifiedPackage } from "../types.ts";
+import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
 
 const RULES_IMPLEMENTATION_PATH =
   /(?:^|\/)(?:services|ports|adapters|repositories|stores|projections|subscribers|processes|intents|transport)(?:\/|$)/;
@@ -275,7 +277,8 @@ function lintServer(snapshot: WorkspaceSnapshot, pkg: ClassifiedPackage): Archit
   return violations;
 }
 
-const PRIVATE_SERVER_EXPORT = /(?:^|\/)(?:app|projections|repositories|rules|services|stores)(?:\/|$)/;
+const PRIVATE_SERVER_EXPORT =
+  /(?:^|\/)(?:app|projections|repositories|rules|services|stores)(?:\/|$)/;
 /**
  * What `src/testing.ts` may still export past `PRIVATE_SERVER_EXPORT`: a
  * double, not a real repository, store, or projection (R6, burn-down §4).
@@ -540,8 +543,7 @@ function resolveBindingOrigin(
 
         const boundName = exportName(element);
 
-        if (resolveBindingOrigin(target, boundName, pkg, visited, allowTestingDoubles))
-          return true;
+        if (resolveBindingOrigin(target, boundName, pkg, visited, allowTestingDoubles)) return true;
       }
       // `export * from "./elsewhere"` may forward the name; best-effort probe.
     } else if (
@@ -747,7 +749,7 @@ export function lintFeatureLayouts(snapshot: WorkspaceSnapshot): ArchitectureVio
   for (const pkg of snapshot.packages) {
     if (pkg.kind === "contract") violations.push(...lintContract(snapshot, pkg));
 
-    if (pkg.kind === "server") {
+    if (pkg.kind === "process") {
       violations.push(...lintServer(snapshot, pkg));
       violations.push(...lintPrivateServerExports(pkg));
     }

@@ -40,7 +40,7 @@
     "pino": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
     "esbuild": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

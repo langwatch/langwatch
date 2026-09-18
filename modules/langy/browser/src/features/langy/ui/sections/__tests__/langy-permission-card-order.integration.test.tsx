@@ -99,7 +99,7 @@ vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-vi.mock("@langwatch/handled-error/read-handled-error", async (importOriginal) => ({
+vi.mock("@langwatch/error-presentation/read-handled-error", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   isHandledByGlobalHandler: () => false,
 }));
@@ -230,9 +230,9 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
   };
 });
 
+import { useLangyStore } from "@langwatch/langy-browser-kit";
 import { MemoryRouter } from "react-router";
 
-import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
 import { LangySidecar } from "../langy-panel.tsx";
 

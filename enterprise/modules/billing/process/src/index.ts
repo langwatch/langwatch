@@ -18,7 +18,6 @@ export {
   subscriptionTrpcTransport,
   type BillingSubscriber,
 } from "./transport/subscription.trpc.ts";
-export { ClickHouseBillingAdapter } from "./repositories/clickhouse/clickhouse.clickhouse.repository.ts";
 export type { PostgresBillingPersistence } from "./repositories/prisma/prisma.postgres.repository.ts";
 export type { BillingCheckpoint } from "./repositories/billing-checkpoint.repository.ts";
 export type { BillingOrganizationCache } from "./repositories/organization/billing-organization-cache.repository.ts";
@@ -29,16 +28,8 @@ export {
 export type { BillingReportOrganization } from "./repositories/organization/billing-report-organization.repository.ts";
 export type { BillingCheckpointDatabase } from "./repositories/prisma/prisma.billing-checkpoint.repository.ts";
 export type { BillingReportOrganizationDatabase } from "./repositories/prisma/prisma.billing-report-organization.repository.ts";
-export {
-  RedisBillingOrganizationCacheAdapter,
-  type BillingOrganizationCacheRedis,
-} from "./repositories/redis/redis.billing-organization-cache.repository.ts";
+export type { BillingOrganizationCacheRedis } from "./repositories/redis/redis.billing-organization-cache.repository.ts";
 export { BillingReportingPipeline } from "./eventing/billing-reporting.pipeline.ts";
-export {
-  BillingErrorReporter,
-  BillingErrorReporterService,
-  NullBillingErrorReporter,
-} from "./services/billing-error-reporter.service.ts";
 export { BillingSubscriptionNotifier } from "./channels/billing-subscription-notifier.channel.ts";
 export { MemoryBillingSubscriptionNotifierChannel } from "./channels/memory/memory.billing-subscription-notifier.channel.ts";
 export { billingSubscriptionNotifierChannels } from "./channels/billing-subscription-notifier-channels.registry.ts";
@@ -69,20 +60,14 @@ export {
   BILLING_METER_DISPATCH_SUPPRESS_MS,
   BillingMeterDispatchSubscriber,
 } from "./eventing/billing-meter-dispatch.subscriber.ts";
-export {
-  BillingTenantOrganizationService,
-  type BillingTenantOrganizationCache,
-} from "./services/tenant-organization.service.ts";
+export type { BillingTenantOrganizationCache } from "./services/tenant-organization.service.ts";
 export {
   BILLING_TENANT_ORGANIZATION_CACHE_PREFIX,
   BILLING_TENANT_ORGANIZATION_CACHE_TTL_MS,
-  RedisBillingTenantOrganizationCacheAdapter,
   type BillingTenantOrganizationCacheRedis,
 } from "./repositories/redis/redis.tenant-organization-cache.repository.ts";
 export type { BillingTenantOrganizationDatabase } from "./repositories/prisma/prisma.tenant-organization.repository.ts";
-export { PlanLimitsCatalogueService } from "./services/plan-limits-catalogue.service.ts";
 export type { BillingSubscription } from "./repositories/subscription.repository.ts";
-export { BillableEventsQueryService } from "./services/billable-events-query.service.ts";
 export type { CurrencyRequest } from "./services/currency.service.ts";
 export type { BillingCooldownCache } from "./services/billing-alert-cooldown.service.ts";
 export type {
@@ -98,18 +83,16 @@ export type {
 } from "./services/license-purchase.service.ts";
 export type { UsageLimitEmailData } from "./services/billing-usage-notice.service.ts";
 export type { NurturingServiceOptions } from "./services/nurturing.service.ts";
-export {
-  DeploymentPlanSourcesService,
-  type DeploymentPlanSources,
-  type DeploymentPlanSourcesOptions,
+export type {
+  DeploymentPlanSources,
+  DeploymentPlanSourcesOptions,
 } from "./services/deployment-plan-sources.service.ts";
 export type { CheckoutCurrencyResolution } from "./services/stripe-customer-currency.service.ts";
 export type { SubscriptionItemUpdate } from "./services/subscription-item-calculator.service.ts";
-export {
-  StripeUsageReportingBuilder,
-  type UsageReportingService,
-  type MeterEventResult,
-  type UsageSummary,
+export type {
+  UsageReportingService,
+  MeterEventResult,
+  UsageSummary,
 } from "./services/usage-reporting.service.ts";
 
 // The Stripe webhook and the Customer.io lifecycle signals, moved off
@@ -153,8 +136,4 @@ export type { SubscriptionReportRow } from "./repositories/duplicate-subscriptio
 // one tier and is handed every row; it constructs no repository itself.
 export type { BillingRepositories } from "./repositories/billing.repositories.ts";
 export type { BillingClickHouseRepositories } from "./repositories/billing.repositories.ts";
-export {
-  billingClickhouseRepositories,
-  billingRepositories,
-} from "./repositories/billing-repositories.registry.ts";
-export { PostgresBillingRepositories } from "./repositories/prisma/prisma.billing.repositories.ts";
+export type { PostgresBillingRepositories } from "./repositories/prisma/prisma.billing.repositories.ts";

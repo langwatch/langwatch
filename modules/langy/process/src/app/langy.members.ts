@@ -38,30 +38,6 @@ import {
 } from "../eventing/langy-conversation-process.schemas.ts";
 import type { LangyNavigateResourceKind } from "../rules/langy-navigate-resources.rules.ts";
 
-export interface LangyInfrastructure {
-  langyFrameAuth: LangyFrameAuth;
-  langyIds: LangyIds;
-  langyNavigateProject: LangyNavigateProject;
-  langyNavigateResource: LangyNavigateResourceLocator;
-  langyProcessEventView: LangyProcessEventViewer;
-  langySessionKeyMetrics: LangySessionKeyMetrics;
-  langyTitleGeneration: LangyTitleGeneration;
-  langyTitleModel: LangyTitleModelResolver;
-  langyUiActionBackend: LangyUiActionBackend;
-  langyUiActionCatalog: LangyUiActionCatalog;
-  langyWorkerDispatch: LangyWorkerDispatcher;
-  langyWorker: LangyWorker;
-  langyWorkerMetrics: LangyWorkerMetrics;
-  langyBlockMetrics: LangyBlockMetrics;
-  langyHarness: LangyHarness;
-  langyTurnMetrics: LangyTurnMetrics;
-  langyTurnContext: LangyTurnContextRenderer;
-  langyUiActionSurface: LangyUiActionSurface;
-  langySessionKey: LangySessionKey;
-  langyGithubPermit: LangyGithubPermit;
-  langyModel: LangyModel;
-}
-
 export type LangyProcessIntentType =
   (typeof LANGY_PROCESS_INTENT_TYPES)[keyof typeof LANGY_PROCESS_INTENT_TYPES];
 

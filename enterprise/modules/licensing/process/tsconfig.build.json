@@ -29,7 +29,6 @@
     "**/testing.tsx"
   ],
   "references": [
-    { "path": "../../../../packages/process-stores/tsconfig.build.json" },
     {
       "path": "../../../../packages/api/tsconfig.build.json"
     },
@@ -38,6 +37,9 @@
     },
     {
       "path": "../../../../modules/entitlement/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/entitlement/process/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/handled-error/tsconfig.build.json"
@@ -52,10 +54,13 @@
       "path": "../../../../packages/prisma-client/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/time/tsconfig.build.json"
+      "path": "../../../../packages/process-stores/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/secrets/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/time/tsconfig.build.json"
     }
   ]
 }

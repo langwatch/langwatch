@@ -1,5 +1,5 @@
 import { describeError, showErrorToast } from "@langwatch/browser-host/errors";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
 import type { EvaluatorAttachment } from "@langwatch/scenario-contract";
 import type { SuiteTarget } from "@langwatch/suite-contract";
 import { useCallback } from "react";

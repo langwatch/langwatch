@@ -1,11 +1,10 @@
+import { useLangyStore } from "@langwatch/langy-browser-kit";
 /**
  * @see specs/langy/langy-model-selection.feature
  *      "Reopening a conversation restores the model it last ran on"
  *      "A new conversation starts on the resolved default again"
  */
 import { beforeEach, describe, expect, it } from "vitest";
-
-import { useLangyStore } from "../behavior/langy.store.ts";
 
 const DEFAULT = "openai_codex/gpt-5.6-terra";
 

@@ -1,7 +1,7 @@
 import { Button, Field, HStack, Input, Text, Textarea, VStack } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { WorkflowIcon } from "@langwatch/workflow-browser-kit/workflow-icons";
+import { WorkflowIcon } from "@langwatch/workflow-browser-kit";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 

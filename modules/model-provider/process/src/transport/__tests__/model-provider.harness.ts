@@ -8,7 +8,7 @@ import type {
   ModelProviderApi,
   ModelProviderCredentialVerdict,
 } from "@langwatch/model-provider-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 
 import { createModelProviderTestApp } from "../../app/__tests__/model-provider.fixture.ts";
 import type { ModelProviderApp } from "../../app/model-provider.app.ts";

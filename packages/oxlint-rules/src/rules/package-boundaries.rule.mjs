@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
+
 import { classify } from "../classify.mjs";
 import { defineRule } from "../define-rule.mjs";
 
@@ -45,11 +46,34 @@ function loadWorkspace(cwd) {
   return workspace;
 }
 
+const packageRootCache = new Map();
+
+// The nearest package.json above the file, so every workspace member is held,
+// not just the module roles this used to name. It named contract|server|web,
+// which the process/browser rename left matching nothing, and packages/* was
+// never in scope at all -- 36 configs reached into another package's src/.
 function packageRootForFile(filename, cwd) {
-  const normalized = relative(cwd, filename).split(sep).join("/");
-  const match = normalized.match(/^((?:enterprise\/)?modules\/[^/]+\/(?:contract|server|web))\//);
-  if (!match) return undefined;
-  return resolve(cwd, match[1]);
+  let directory = dirname(resolve(cwd, filename));
+  const visited = [];
+  for (;;) {
+    const cached = packageRootCache.get(directory);
+    if (cached !== undefined) {
+      for (const seen of visited) packageRootCache.set(seen, cached);
+      return cached ?? undefined;
+    }
+    visited.push(directory);
+    if (existsSync(join(directory, "package.json"))) {
+      for (const seen of visited) packageRootCache.set(seen, directory);
+      return directory;
+    }
+    const parent = dirname(directory);
+    const reachedRoot = parent === directory || relative(cwd, parent).startsWith("..");
+    if (reachedRoot) {
+      for (const seen of visited) packageRootCache.set(seen, null);
+      return undefined;
+    }
+    directory = parent;
+  }
 }
 
 function packageSubpath(specifier, packageName) {
@@ -115,7 +139,7 @@ export const boundaryRule = defineRule({
     },
     packageEscape: {
       what: "`{{specifier}}` resolves outside `{{packageRoot}}`, so this package depends on a file it does not own.",
-      fix: "Replace `{{specifier}}` with the target's package name — `@langwatch/<feature>-<contract|server|web>` for a feature package, `@langwatch/<name>` for any other workspace package. Move the file into `{{packageRoot}}` instead only when nothing outside `{{packageRoot}}` imports it.",
+      fix: "Replace `{{specifier}}` with the target's package name — `@langwatch/<feature>-<contract|process|browser|browser-kit>` for a module package, `@langwatch/<name>` for any other workspace package. Move the file into `{{packageRoot}}` instead only when nothing outside `{{packageRoot}}` imports it.",
     },
     contractRuntime: {
       what: "A contract package is transport-neutral: `{{specifier}}` is a node, browser or server runtime.",
@@ -135,7 +159,7 @@ export const boundaryRule = defineRule({
     },
     deadAlias: {
       what: "`{{specifier}}` is a deleted alias (`~/`, `@app/`, `@ee/`); nothing resolves it any more.",
-      fix: "Import the module by its package name — `@langwatch/<feature>-<contract|server|web>` for a feature package, `@langwatch/<name>` for any other workspace package — or by a relative path when it already lives inside this package.",
+      fix: "Import the module by its package name — `@langwatch/<feature>-<contract|process|browser|browser-kit>` for a module package, `@langwatch/<name>` for any other workspace package — or by a relative path when it already lives inside this package.",
     },
     prismaContainment: {
       what: "`{{specifier}}` is Prisma, which only a server repository under `src/repositories/prisma/` may import.",
@@ -155,7 +179,7 @@ export const boundaryRule = defineRule({
     },
     sealedExports: {
       what: "`{{subpath}}` is not in `{{package}}`'s `exports`.",
-      fix: "Import from `{{package}}` itself when its entry already re-exports the symbol; otherwise add `\"{{subpath}}\"` to the `exports` map in `{{package}}`'s package.json and re-export the symbol from the file that entry points at.",
+      fix: 'Import from `{{package}}` itself when its entry already re-exports the symbol; otherwise add `"{{subpath}}"` to the `exports` map in `{{package}}`\'s package.json and re-export the symbol from the file that entry points at.',
     },
   },
   create(context) {
@@ -184,7 +208,14 @@ export const boundaryRule = defineRule({
         if (packageRoot) {
           const targetPath = resolve(dirname(filename), specifier);
           const escaped = relative(packageRoot, targetPath).startsWith("..");
-          if (escaped) {
+          // Only when the target belongs to another workspace member: that is
+          // the case the fix can name. A path into a directory no package owns
+          // (dev/scripts, services/langevals) has no package name to replace it
+          // with, and a rule whose fix cannot be followed reads as debt.
+          const targetRoot = packageRootForFile(targetPath, context.cwd);
+          const crossesIntoAMember =
+            targetRoot !== undefined && targetRoot !== packageRoot && targetRoot !== context.cwd;
+          if (escaped && crossesIntoAMember) {
             context.report({
               node,
               messageId: "packageEscape",

@@ -2,14 +2,18 @@
  * @vitest-environment node
  * @see specs/tooling/lint-composed-exports.feature
  */
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import {
   COMPOSED_EXPORTS_BASELINE,
   lintComposedExports,
   lintComposedExportsBaseline,
+  lintPolicies,
+  POLICIES,
   readBaseline,
 } from "../src/index.ts";
 import { snapshotOf } from "./workspace.ts";
@@ -246,6 +250,24 @@ describe("composed exports", () => {
     });
   });
 
+  describe("when the finding is reported through the registry (cwd differs from the workspace root)", () => {
+    /** @scenario "A composed-exports finding names a file that exists on disk" */
+    it("reports a path that resolves against the workspace root, not the enforcer's own package root", () => {
+      const composedExportsPolicy = POLICIES.find((policy) => policy.id === "composed-exports");
+      if (!composedExportsPolicy) throw new Error("composed-exports policy is not registered");
+
+      const findings = lintPolicies(snapshotOf({ root }), [composedExportsPolicy]).filter(
+        (violation) => violation.policy === "composed-exports",
+      );
+
+      expect(findings.length).toBeGreaterThan(0);
+
+      for (const finding of findings) {
+        expect(existsSync(join(root, finding.file))).toBe(true);
+      }
+    });
+  });
+
   describe("when the export is baselined", () => {
     /** @scenario "A baselined export is accepted while it stays baselined" */
     it("reports nothing for it", () => {
@@ -258,10 +280,7 @@ describe("composed exports", () => {
   describe("when the baseline is compared against the merge base", () => {
     /** @scenario "The baseline may only shrink" */
     it("reports an entry the merge base does not carry", () => {
-      baseline([
-        "modules/thing/process|OtherService",
-        "modules/thing/process|UncomposedService",
-      ]);
+      baseline(["modules/thing/process|OtherService", "modules/thing/process|UncomposedService"]);
       baseline(["modules/thing/process|UncomposedService"], "merge-base");
 
       const messages = lintComposedExportsBaseline(
@@ -278,10 +297,7 @@ describe("composed exports", () => {
     it("accepts a baseline with one fewer entry", () => {
       baseline(["modules/thing/process|UncomposedService"]);
       baseline(
-        [
-          "modules/thing/process|OtherService",
-          "modules/thing/process|UncomposedService",
-        ],
+        ["modules/thing/process|OtherService", "modules/thing/process|UncomposedService"],
         "merge-base",
       );
 

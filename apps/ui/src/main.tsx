@@ -21,7 +21,7 @@ import {
   type UiFeatureApiTransport,
 } from "@langwatch/browser-host/transport";
 import type { PublicAppConfig } from "@langwatch/config/public-app-config";
-import { configureDocsRuntime } from "@langwatch/handled-error/docs-url";
+import { configureDocsRuntime } from "@langwatch/error-presentation/docs-url";
 import { webModules } from "@langwatch/installed-modules/web";
 import {
   createBrowserUiScope,

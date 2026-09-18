@@ -18,7 +18,7 @@ import {
   type ScenarioTabRegistry,
   type SimulationService,
 } from "@langwatch/scenario-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
@@ -28,18 +28,6 @@ import type { AgentTestService } from "../../services/agent-test.service.ts";
 import type { ResultAtomsService } from "../../services/result-atoms.service.ts";
 import type { RunConfigurationsService } from "../../services/run-configurations.service.ts";
 import { ScenarioApp } from "../scenario.app.ts";
-import type {
-  AgentAdapterFactory,
-  CancellationPublisher,
-  CancellationSubscriber,
-  ScenarioChildBootstrap,
-  ScenarioChildExecutionSession,
-  ScenarioExecutionPool,
-  ScenarioExecutionRunner,
-  ScenarioHttp,
-  ScenarioProcessorServiceMetrics,
-  ScenarioTabStore,
-} from "../scenario.app.ts";
 
 function buildProductionApp(publicBaseUrl: string | undefined, emitter = new EventEmitter()) {
   return ScenarioApp.create({
@@ -74,16 +62,6 @@ function buildProductionApp(publicBaseUrl: string | undefined, emitter = new Eve
       },
       resultAtoms: createApiFixture<ResultAtomsService>(),
       runConfigurations: createApiFixture<RunConfigurationsService>(),
-      agentAdapterFactory: createApiFixture<AgentAdapterFactory>(),
-      cancellationPublisher: createApiFixture<CancellationPublisher>(),
-      cancellationSubscriber: createApiFixture<CancellationSubscriber>(),
-      scenarioChildBootstrap: createApiFixture<ScenarioChildBootstrap>(),
-      scenarioChildExecutionSession: createApiFixture<ScenarioChildExecutionSession>(),
-      scenarioExecutionPool: createApiFixture<ScenarioExecutionPool>(),
-      scenarioExecutionRunner: createApiFixture<ScenarioExecutionRunner>(),
-      scenarioHttp: createApiFixture<ScenarioHttp>(),
-      scenarioProcessorServiceMetrics: createApiFixture<ScenarioProcessorServiceMetrics>(),
-      scenarioTabStore: createApiFixture<ScenarioTabStore>(),
       rateLimiter: { check: async () => ({ allowed: true }) },
     },
   });

@@ -3,7 +3,7 @@ import {
   ProviderScopeChips,
   ScopeChipPicker,
   type ScopeTriadEntry,
-} from "@langwatch/authz-browser-kit/scope-picker";
+} from "@langwatch/authz-browser-kit";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Building2, Folder, UserLock, Users } from "lucide-react";

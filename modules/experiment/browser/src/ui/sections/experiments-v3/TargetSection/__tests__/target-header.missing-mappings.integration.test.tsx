@@ -19,7 +19,7 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
   }),
 }));
 
-vi.mock("@langwatch/prompt-browser/latest-prompt-version", () => ({
+vi.mock("../../../../../behavior/experiments-v3/use-latest-prompt-version.ts", () => ({
   useLatestPromptVersion: () => ({
     currentVersion: undefined,
     latestVersion: undefined,

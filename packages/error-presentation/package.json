@@ -1,0 +1,48 @@
+{
+  "name": "@langwatch/error-presentation",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The enumerated app error codes and the code-keyed customer presentation registry: the words a customer reads for a handled error, plus the reader that turns a wire payload into them.",
+  "license": "MIT",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./app-codes": {
+      "types": "./dist/app-codes.d.ts",
+      "default": "./src/app-codes.ts"
+    },
+    "./docs-url": {
+      "types": "./dist/docs-url.d.ts",
+      "default": "./src/docs-url.ts"
+    },
+    "./presentation": {
+      "types": "./dist/presentation.d.ts",
+      "default": "./src/presentation.ts"
+    },
+    "./read-handled-error": {
+      "types": "./dist/read-handled-error.d.ts",
+      "default": "./src/read-handled-error.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/handled-error": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -1,27 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../src/application.ts";
-import { memberSourceOf } from "./member-source.ts";
 import {
   DependencyCycleError,
   DuplicateProviderError,
-  FeatureConfigError,
   MissingProviderError,
   RoleContributionError,
 } from "../src/boot-errors.ts";
-import { type FeatureConfigSchema, serverFeature } from "../src/feature-installer.ts";
-
-/**
- * A schema as the container asks for it. Any Zod schema satisfies the same
- * `parse`, which is why this package depends on no validator of its own.
- */
-const limitsSchema: FeatureConfigSchema<{ maximum: number }> = {
-  parse(value: unknown) {
-    const maximum = (value as { maximum?: unknown } | undefined)?.maximum;
-    if (typeof maximum !== "number") throw new Error("maximum must be a number");
-    return { maximum };
-  },
-};
+import { serverFeature } from "../src/feature-installer.ts";
+import { memberSourceOf } from "./member-source.ts";
 
 abstract class GreetingService {
   abstract greet(): string;
@@ -79,8 +66,10 @@ describe("the server feature container", () => {
     it("constructs nothing until boot", async () => {
       const setup = vi.fn();
       const declaration = greetingFeature(setup);
-      const application = createApp({ role: "api", members: memberSourceOf({ prefix: "a" }) })
-        .withModules([declaration]);
+      const application = createApp({
+        role: "api",
+        members: memberSourceOf({ prefix: "a" }),
+      }).withModules([declaration]);
 
       expect(setup).not.toHaveBeenCalled();
 
@@ -104,26 +93,6 @@ describe("the server feature container", () => {
       // The process could build `unread`, and does not: nothing asked for it.
       expect(booted.members).toEqual({ prefix: "process" });
       expect(booted.module(declaration).provided.value).toBe("process");
-    });
-
-    it("parses the feature's own config slice and refuses one that does not match", async () => {
-      const declaration = serverFeature<TestMembers>("limits")
-        .withConfig(limitsSchema)
-        .withSetup(({ config }) => ({ maximum: config.maximum }))
-        .build();
-
-      const booted = await createApp({ role: "api", config: { limits: { maximum: 3 } }, members: memberSourceOf({ prefix: "a" }) })
-        .withModules([declaration])
-        .boot();
-      expect(booted.module(declaration).provided.maximum).toBe(3);
-
-      await expect(
-        Promise.resolve().then(() =>
-          createApp({ role: "api", config: { limits: { maximum: "three" } }, members: memberSourceOf({ prefix: "a" }) })
-            .withModules([declaration])
-            .boot(),
-        ),
-      ).rejects.toBeInstanceOf(FeatureConfigError);
     });
   });
 
@@ -203,7 +172,6 @@ describe("the server feature container", () => {
       expect((error as MissingProviderError).token).toBe("DirectoryApp");
       expect(setup).not.toHaveBeenCalled();
     });
-
   });
 
   describe("when features depend on each other", () => {

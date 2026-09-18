@@ -61,6 +61,7 @@
     "zod-validation-error": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/api-fixture": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/workflow-process": "workspace:*",
     "typescript": "catalog:",

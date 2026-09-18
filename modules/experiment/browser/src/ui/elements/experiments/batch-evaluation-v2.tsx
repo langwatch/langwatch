@@ -14,9 +14,7 @@ import {
 } from "@chakra-ui/react";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { Link } from "@langwatch/browser-host/link";
-import { useRouter } from "@langwatch/browser-host/use-router";
 import type { WorkflowApiRouter, RouterOutputs } from "@langwatch/browser-trpc/workflow-api";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
 import { Tooltip } from "@langwatch/design-system/tooltip";
@@ -27,20 +25,31 @@ import { VersionBox } from "@langwatch/workflow-browser/version-history";
 import type { Experiment, Project } from "@langwatch/workflow-contract";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React from "react";
 import { Download, ExternalLink } from "react-feather";
 
+import {
+  useBatchEvaluationDownloadCSV,
+  useBatchEvaluationResults,
+} from "../../../behavior/experiments/use-batch-evaluation-run-results.ts";
+import { useBatchEvaluationState } from "../../../behavior/experiments/use-batch-evaluation-runs.ts";
 import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name.ts";
 import {
   BatchEvaluationV2EvaluationSummary,
   formatEvaluationSummary,
   getFinishedAt,
 } from "./BatchEvaluationV2/batch-evaluation-summary.tsx";
-import {
-  BatchEvaluationV2EvaluationResults,
-  useBatchEvaluationDownloadCSV,
-} from "./BatchEvaluationV2/batch-evaluation-v2-evaluation-results.tsx";
+import { BatchEvaluationV2EvaluationResults } from "./BatchEvaluationV2/batch-evaluation-v2-evaluation-results.tsx";
 
+// Re-exported for `@langwatch/experiment-browser/batch-evaluation-state`:
+// `workflow/browser`'s results-panel still calls this hook directly.
+export { useBatchEvaluationState };
+
+/**
+ * The `BatchEvaluationV2` view itself is unused (kept for reference, see
+ * `experiment-detail.screen.tsx`) but has no owning section to move its
+ * fetch hooks into; this remains the wiring point until it is revived.
+ */
 export function BatchEvaluationV2({
   project,
   experiment,
@@ -58,6 +67,13 @@ export function BatchEvaluationV2({
     project,
     experiment,
     runId: selectedRunId,
+    isFinished,
+  });
+
+  const evaluationResults = useBatchEvaluationResults({
+    project,
+    experiment,
+    runId: selectedRun?.runId,
     isFinished,
   });
 
@@ -141,6 +157,9 @@ export function BatchEvaluationV2({
                     experiment={experiment}
                     runId={selectedRun?.runId}
                     isFinished={isFinished}
+                    downloadCSV={downloadCSV}
+                    isDownloadCSVEnabled={isDownloadCSVEnabled}
+                    {...evaluationResults}
                   />
                 </Card.Body>
               </Card.Root>
@@ -152,123 +171,6 @@ export function BatchEvaluationV2({
     </HStack>
   );
 }
-
-/**
- * Polls while a selected run is missing from the list, giving up after a
- * deadline armed once per wait (on a ref) so list churn can't push it out.
- */
-function useKeepFetchingWhileRunIsMissing({
-  isRunMissing,
-  setKeepFetching,
-}: {
-  isRunMissing: boolean;
-  setKeepFetching: (isKeepFetching: boolean) => void;
-}) {
-  const deadlineRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (!isRunMissing) {
-      setKeepFetching(false);
-      return;
-    }
-    setKeepFetching(true);
-    if (!deadlineRef.current) {
-      deadlineRef.current = setTimeout(() => {
-        deadlineRef.current = null;
-        setKeepFetching(false);
-      }, 5_000);
-    }
-  }, [isRunMissing, setKeepFetching]);
-
-  useEffect(
-    () => () => {
-      if (deadlineRef.current) {
-        clearTimeout(deadlineRef.current);
-      }
-    },
-    [],
-  );
-}
-
-export const useBatchEvaluationState = ({
-  project,
-  experiment,
-  selectedRunId,
-  setSelectedRunId,
-}: {
-  project?: Project;
-  experiment?: Experiment;
-  selectedRunId?: string;
-  setSelectedRunId?: (runId: string) => void;
-}) => {
-  const [isSomeRunning, setIsSomeRunning] = useState(false);
-  const [keepFetching, setKeepFetching] = useState(false);
-
-  const batchEvaluationRuns = api.experiments.getExperimentBatchEvaluationRuns.useQuery(
-    {
-      projectId: project?.id ?? "",
-      experimentId: experiment?.id ?? "",
-    },
-    {
-      refetchInterval: keepFetching ? 1 : isSomeRunning ? 3000 : 10_000,
-      enabled: !!project && !!experiment,
-    },
-  );
-
-  const router = useRouter();
-
-  const { selectedRunId_, selectedRun } = useMemo(() => {
-    const selectedRunId_ =
-      selectedRunId ??
-      (typeof router.query.runId === "string" ? router.query.runId : null) ??
-      batchEvaluationRuns.data?.runs[0]?.runId;
-    const selectedRun = batchEvaluationRuns.data?.runs.find((r: any) => r.runId === selectedRunId_);
-    return { selectedRunId_, selectedRun };
-  }, [selectedRunId, router.query.runId, batchEvaluationRuns.data?.runs]);
-
-  useKeepFetchingWhileRunIsMissing({
-    isRunMissing: !!selectedRunId && !selectedRun,
-    setKeepFetching,
-  });
-
-  const setSelectedRunId_ = useCallback(
-    (runId: string) => {
-      if (setSelectedRunId) {
-        setSelectedRunId(runId);
-      } else {
-        void router.push({ query: { ...router.query, runId } });
-      }
-    },
-    [router, setSelectedRunId],
-  );
-
-  const isFinished = useMemo(() => {
-    if (!selectedRun) {
-      return false;
-    }
-    return getFinishedAt(selectedRun.timestamps, nowInstant().epochMilliseconds) !== undefined;
-  }, [selectedRun]);
-
-  useEffect(() => {
-    if (
-      batchEvaluationRuns.data?.runs.some(
-        (r: any) => getFinishedAt(r.timestamps, nowInstant().epochMilliseconds) === undefined,
-      )
-    ) {
-      setIsSomeRunning(true);
-    } else {
-      setIsSomeRunning(false);
-    }
-  }, [batchEvaluationRuns.data?.runs]);
-
-  return {
-    batchEvaluationRuns,
-    selectedRun,
-    selectedRunId: selectedRunId_,
-    setSelectedRunId: setSelectedRunId_,
-    isFinished,
-  };
-};
 
 export function BatchEvaluationV2RunList({
   batchEvaluationRuns,

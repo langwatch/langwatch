@@ -105,6 +105,7 @@ export class ProcessServer implements ProcessBoot {
         surface = await processSurface(
           this.config.http as ApiHostConfig,
           this.production,
+          this.settings.nlpServiceUrl,
           members,
           this.resolver.scopeTo(apiOwner.name, Object.values(apiOwner.secrets)),
           transports,
@@ -137,6 +138,8 @@ export class ProcessServer implements ProcessBoot {
               publicBaseUrl: this.settings.baseHost,
               nodeEnvironment: this.settings.nodeEnvironment,
               isSaas: this.settings.isSaas ?? false,
+              nlpServiceUrl: this.settings.nlpServiceUrl,
+              adminEmails: this.settings.adminEmails ?? [],
               // Role facts: the composition's word, never a deployment's.
               processName: this.server.name,
               producesPipelines: pipelines.mode === "produce",
@@ -190,4 +193,6 @@ const processSettings = z.object({
   baseHost: z.string().optional(),
   nodeEnvironment: z.string().optional(),
   isSaas: z.boolean().optional(),
+  nlpServiceUrl: z.string().optional(),
+  adminEmails: z.array(z.string()).optional(),
 });

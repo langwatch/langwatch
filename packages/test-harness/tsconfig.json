@@ -24,7 +24,7 @@
       "path": "../time/tsconfig.build.json"
     },
     {
-      "path": "../../modules/workflow/process/tsconfig.build.json"
+      "path": "../vitest-config/tsconfig.build.json"
     }
   ]
 }

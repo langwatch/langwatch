@@ -36,7 +36,10 @@
       "path": "../time/tsconfig.build.json"
     },
     {
-      "path": "../test-harness/tsconfig.build.json"
+      "path": "../api-fixture/tsconfig.build.json"
+    },
+    {
+      "path": "../vitest-config/tsconfig.build.json"
     }
   ]
 }

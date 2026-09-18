@@ -3,9 +3,6 @@
   "references": [
     {
       "path": "../../../dev/tsconfig.web-declarations.json"
-    },
-    {
-      "path": "../../../packages/browser-host/tsconfig.build.json"
     }
   ]
 }

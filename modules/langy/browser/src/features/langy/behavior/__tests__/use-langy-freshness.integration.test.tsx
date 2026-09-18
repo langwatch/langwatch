@@ -62,7 +62,8 @@ vi.mock("../use-langy-conversation-update-listener.ts", () => ({
   },
 }));
 
-import { useLangyStore } from "../../../../behavior/langy.store.ts";
+import { useLangyStore } from "@langwatch/langy-browser-kit";
+
 import { useLangyFreshness } from "../use-langy-freshness.ts";
 
 const at = (acceptedAt: number, eventId: string): LangyEventCursor => ({

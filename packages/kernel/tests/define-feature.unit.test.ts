@@ -1,8 +1,10 @@
+import { Config } from "@langwatch/config";
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 import { createApp } from "../src/application.ts";
-import { memberSourceOf } from "./member-source.ts";
 import { defineServerModule, type FeatureSetup } from "../src/feature-installer.ts";
+import { memberSourceOf } from "./member-source.ts";
 
 abstract class DirectoryApp {
   abstract readonly name: string;
@@ -16,14 +18,10 @@ class ComposedDirectoryApp extends DirectoryApp {
   static readonly dependencies = {};
   /** The one member this app reads, and therefore the only one boot builds. */
   static readonly reads = ["prefix"] as const;
-  static readonly configSchema = {
-    parse(value: unknown): Config {
-      if (!value || typeof value !== "object" || !("suffix" in value)) {
-        throw new Error("suffix is required");
-      }
-      return { suffix: String(value.suffix) };
-    },
-  };
+  /** Declared once; the process parse (§6) produces it, this app just reads it. */
+  static readonly config = Config.define((c) => ({
+    suffix: c.env("ANNOTATION_SUFFIX", z.string()),
+  }));
 
   private constructor(readonly name: string) {
     super();
@@ -47,7 +45,11 @@ const directoryWithTransports = defineServerModule("annotation")
 
 describe("defineServerModule", () => {
   it("constructs the declared app once during boot and publishes its contract", async () => {
-    const runtime = await createApp({ role: "api", config: { annotation: { suffix: "directory" } }, members: memberSourceOf({ prefix: "tenant-" }) })
+    const runtime = await createApp({
+      role: "api",
+      config: { annotation: { suffix: "directory" } },
+      members: memberSourceOf({ prefix: "tenant-" }),
+    })
       .withModules([directoryServer])
       .boot();
 
@@ -80,27 +82,6 @@ describe("defineServerModule", () => {
 
     await runtime.stop();
     expect(own).toHaveBeenCalledOnce();
-  });
-
-  it("validates semantic config before invoking the app factory", async () => {
-    const create = vi.fn((...args: Parameters<typeof ComposedDirectoryApp.create>) =>
-      ComposedDirectoryApp.create(...args),
-    );
-    const app = { ...ComposedDirectoryApp, create };
-    const declaration = defineServerModule("annotation").withApp(app).build();
-
-    await expect(
-      createApp({ role: "api", config: { annotation: {} }, members: memberSourceOf({ prefix: "unused" }) })
-        // The config slice is deliberately incomplete, and ModuleConfigGuard is
-        // right to refuse it where it can see it. This test covers the refusal
-        // that still has to hold when it cannot: config reaching boot from JSON,
-        // the environment or a process config file was never type-checked, so
-        // the runtime parse stays the load-bearing one.
-        // @ts-expect-error - the compile-time refusal is asserted by this directive
-        .withModules([declaration])
-        .boot(),
-    ).rejects.toThrow("suffix is required");
-    expect(create).not.toHaveBeenCalled();
   });
 
   it("keeps transport descriptors inert and preserves their tuple", () => {

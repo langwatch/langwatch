@@ -57,7 +57,7 @@
   ],
   "references": [
     {
-      "path": "../../analytics/process/tsconfig.build.json"
+      "path": "../../analytics/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/api/tsconfig.build.json"
@@ -136,9 +136,6 @@
     },
     {
       "path": "../../webhook/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../webhook/process/tsconfig.build.json"
     }
   ]
 }

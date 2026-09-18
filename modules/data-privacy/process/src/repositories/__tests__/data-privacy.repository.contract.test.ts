@@ -14,7 +14,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { cleanupTestRows } from "@langwatch/test-harness";
+import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { DataPrivacyPolicyRepository } from "../data-privacy.repository.ts";

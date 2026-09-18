@@ -1,3 +1,4 @@
+import { useLangyStore } from "@langwatch/langy-browser-kit";
 /**
  * The panel-open pre-warm hook: fires `langy.warmWorker` on the panel-open rising edge and on
  * conversation change, at most once per (project, conversation) while open, holds the returned
@@ -9,7 +10,6 @@ import { cleanup, renderHook } from "@testing-library/react";
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useLangyWarmWorker } from "../use-langy-warm-worker.ts";
 
 type WarmInput = {

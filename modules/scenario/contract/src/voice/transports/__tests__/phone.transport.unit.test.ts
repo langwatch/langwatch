@@ -12,7 +12,6 @@ import {
   PHONE_CONNECT_REJECTED_PREFIX,
   PHONE_NO_BROWSER_CALL_MESSAGE,
   PHONE_RESPONSE_TAIL_SILENCE_SECONDS,
-  phoneTransport,
   resolveHttpPort,
   resolvePublicBaseUrl,
   TWILIO_MAX_CALL_DURATION_CAP_SECONDS,
@@ -253,15 +252,16 @@ describe("phoneTransport", () => {
             expect((error as Error).message).toBe(PHONE_NO_BROWSER_CALL_MESSAGE);
           }
         };
-        assertThrows(() => phoneTransport.assertAvailable?.());
+        const transport = createPhoneTransport({ processEnv: {} });
+        assertThrows(() => transport.assertAvailable?.());
         assertThrows(() =>
-          phoneTransport.mintSession({
+          transport.mintSession({
             agentId: TARGET,
             credential: TWILIO_CREDENTIAL,
           }),
         );
         assertThrows(() =>
-          phoneTransport.fetchCallRecord({
+          transport.fetchCallRecord({
             conversationId: "c",
             credential: TWILIO_CREDENTIAL,
             audioProxyUrl: "/audio",

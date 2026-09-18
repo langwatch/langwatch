@@ -24,12 +24,13 @@ import {
   scopeFilterFromAddress,
   scopeHierarchyOf,
   type ScopeFilterValue,
-} from "@langwatch/authz-browser-kit/scope-picker";
+} from "@langwatch/authz-browser-kit";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
+import { modelProviderIcons } from "@langwatch/model-provider-browser-kit";
 import { buildCustomModelDisplayNames } from "@langwatch/model-provider-contract";
 import { BrainCircuit, Edit, MoreVertical, PlugZap, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -51,7 +52,6 @@ import {
   sortProvidersForTable,
 } from "../../model/provider-catalogue.ts";
 import { filterRowsByScope } from "../../model/provider-scope-filter.ts";
-import { modelProviderIcons } from "../elements/model-provider-icons.tsx";
 import { CodexCodingDefaultsAskHost } from "./codex-coding-defaults-ask.tsx";
 import { DefaultModelsSection } from "./default-models-section.tsx";
 

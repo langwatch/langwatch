@@ -1,4 +1,4 @@
-import { defineModuleVitestConfig } from "../../packages/test-harness/src/vitest-config.ts";
+import { defineModuleVitestConfig } from "@langwatch/vitest-config";
 
 /** Two workers keep this node-only suite parallel without excess memory. */
 

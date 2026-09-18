@@ -2,12 +2,12 @@
  * Builds MonitorAppInfrastructure. The performance trend read calls EvaluationApi
  * instead of private ClickHouse access.
  */
-import { createAnalyticsComparisonWindow } from "@langwatch/analytics-process";
+import { analyticsComparisonWindow } from "@langwatch/analytics-contract";
 import type { EvaluationApi, MonitorPerformanceQuery } from "@langwatch/evaluation-contract";
-import type { EvaluatorApi } from "@langwatch/evaluator-contract";
-import { EvaluatorReplicationService } from "@langwatch/evaluator-process";
+import { newEvaluatorId, type EvaluatorApi } from "@langwatch/evaluator-contract";
 import { generate } from "@langwatch/ksuid";
 import { MonitorCapabilityUnavailableError } from "@langwatch/monitor-contract";
+import { Temporal } from "@langwatch/time";
 
 import type {
   MonitorAppInfrastructure,
@@ -30,40 +30,36 @@ class ProcessMonitorEvaluators implements MonitorEvaluator {
 }
 
 /**
- * Copying an evaluator's workflow, on a process that composed no replication
- * of the graph behind it. Both members refuse by name — a silent copy without
- * its workflow would be structurally broken. Ported from b383462d96^.
+ * Deleting a workflow a copy created, on a process that composed no
+ * replication of the graph behind it. Refuses by name — an orphaned workflow
+ * left behind by a failed monitor insert cannot be cleaned up here.
  */
-type MonitorWorkflowReplication = Readonly<{
-  replicateEvaluatorWorkflow(
-    input: Readonly<{
-      workflowId: string;
-      sourceProjectId: string;
-      targetProjectId: string;
-      actor: Readonly<{ id: string }>;
-    }>,
-  ): Promise<string>;
+type MonitorWorkflowCleanup = Readonly<{
   deleteReplicatedWorkflow(
     input: Readonly<{ workflowId: string; projectId: string }>,
   ): Promise<void>;
 }>;
 
-function unreplicatedEvaluatorWorkflows(): MonitorWorkflowReplication {
-  const refuse = (): Promise<never> =>
-    Promise.reject(
-      new MonitorCapabilityUnavailableError(
-        "evaluator workflow replication, so a monitor cannot be copied to another project",
+function unreplicatedEvaluatorWorkflows(): MonitorWorkflowCleanup {
+  return {
+    deleteReplicatedWorkflow: () =>
+      Promise.reject(
+        new MonitorCapabilityUnavailableError(
+          "evaluator workflow replication, so a monitor's copied workflow cannot be cleaned up",
+        ),
       ),
-    );
-
-  return { replicateEvaluatorWorkflow: refuse, deleteReplicatedWorkflow: refuse };
+  };
 }
 
-/** The evaluator copy, over the process's own (absent) replication of the graph behind it. */
+/**
+ * The evaluator copy, over `EvaluatorApi.copy` — the SAME replication
+ * `evaluators.copy` itself runs, so a monitor's copy and an evaluator's own
+ * copy replicate a workflow evaluator's graph identically.
+ */
 class ProcessMonitorReplication implements MonitorReplicationReader {
   constructor(
     private readonly evaluators: EvaluatorApi,
-    private readonly workflows: MonitorWorkflowReplication,
+    private readonly workflows: MonitorWorkflowCleanup,
   ) {}
 
   async copyEvaluatorToProject(input: {
@@ -72,19 +68,12 @@ class ProcessMonitorReplication implements MonitorReplicationReader {
     targetProjectId: string;
     actor: { id: string };
   }) {
-    const copied = await EvaluatorReplicationService.create({
-      replicateEvaluatorWorkflow: (replication) =>
-        this.workflows.replicateEvaluatorWorkflow({ ...replication, actor: input.actor }),
-      deleteReplicatedWorkflow: (replication) =>
-        this.workflows.deleteReplicatedWorkflow(replication),
-    }).copyToProject({
-      evaluators: {
-        findById: (lookup) => this.evaluators.findById(lookup),
-        create: (created) => this.evaluators.create(created),
-      },
+    const copied = await this.evaluators.copy({
       evaluatorId: input.evaluatorId,
+      projectId: input.targetProjectId,
       sourceProjectId: input.sourceProjectId,
-      targetProjectId: input.targetProjectId,
+      newEvaluatorId: newEvaluatorId(),
+      actorId: input.actor.id,
     });
 
     return { id: copied.id, workflowId: copied.workflowId };
@@ -103,11 +92,11 @@ class ProcessMonitorReplication implements MonitorReplicationReader {
 function composeMonitorPerformance(
   evaluation: Pick<EvaluationApi, "getMonitorPerformance">,
 ): MonitorPerformance {
-  const window = createAnalyticsComparisonWindow();
   const previousPeriodStartMs = ({ startMs, endMs }: { startMs: number; endMs: number }) =>
-    window
-      .currentVsPrevious({ startDate: startMs, endDate: endMs })
-      .previousPeriodStartDate.getTime();
+    analyticsComparisonWindow({
+      start: Temporal.Instant.fromEpochMilliseconds(startMs),
+      end: Temporal.Instant.fromEpochMilliseconds(endMs),
+    }).previousPeriodStart.epochMilliseconds;
 
   return new EvaluationApiMonitorPerformance(evaluation, previousPeriodStartMs);
 }

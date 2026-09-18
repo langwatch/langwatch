@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
-import type { SsoConfiguration } from "@langwatch/enterprise-sso-contract";
+import { ssoSecrets, type SsoConfig } from "@langwatch/enterprise-sso-contract";
 import type { IdentityApi, SsoConnectionBackofficeApi } from "@langwatch/identity-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OpsApi } from "@langwatch/ops-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { ScopedSecrets, type SecretHandle } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";
 
@@ -15,18 +16,44 @@ import type { SsoConnectionLedger, SsoGateLogger } from "../sso.members.ts";
 /** The one operator on the staff list, exactly as `ADMIN_EMAILS` decides it. */
 export const SSO_TEST_STAFF_EMAIL = "olive@langwatch.ai";
 
-export function createSsoTestConfiguration(
-  overrides: Partial<SsoConfiguration> = {},
-): SsoConfiguration {
+export function createSsoTestConfig(overrides: Partial<SsoConfig> = {}): SsoConfig {
   return {
-    isSaas: false,
     provider: "auth0",
-    baseUrl: "https://acme.test",
+    googleClientId: undefined,
+    githubClientId: undefined,
+    gitlabClientId: undefined,
+    azureAdClientId: undefined,
+    azureAdTenantId: undefined,
     auth0ClientId: "client",
-    auth0ClientSecret: "secret",
     auth0Issuer: "https://acme.auth0.com",
+    oktaClientId: undefined,
+    oktaIssuer: undefined,
+    cognitoClientId: undefined,
+    cognitoIssuer: undefined,
+    oneLoginClientId: undefined,
+    oneLoginIssuer: undefined,
+    oidcClientId: undefined,
+    oidcIssuer: undefined,
     ...overrides,
   };
+}
+
+type SsoSecretOverrides = Partial<{
+  [Key in keyof typeof ssoSecrets]: string | undefined;
+}>;
+
+/** A scoped secrets double: resolves configured overrides, `undefined` otherwise. */
+export function createSsoTestSecrets(overrides: SsoSecretOverrides = {}): ScopedSecrets {
+  const byId = new Map<string, string | undefined>(
+    (Object.keys(ssoSecrets) as (keyof typeof ssoSecrets)[]).map((key) => [
+      ssoSecrets[key].id,
+      overrides[key],
+    ]),
+  );
+  return new ScopedSecrets(
+    async (handle: SecretHandle<unknown>, build: (value: unknown) => unknown) =>
+      build(byId.get(handle.id)),
+  );
 }
 
 /** Nothing on the back office asks the licence gate; a call would be a surprise. */
@@ -113,7 +140,8 @@ export function createSsoTestIdentity(connections: SsoConnectionBackofficeApi): 
 
 export function createSsoTestApp(
   input: Readonly<{
-    config?: SsoConfiguration;
+    config?: SsoConfig;
+    secrets?: SsoSecretOverrides;
     members?: Partial<SsoInfrastructure>;
     connections?: RecordingSsoConnectionLedger;
     dependencies?: Partial<{
@@ -124,10 +152,10 @@ export function createSsoTestApp(
       identity: IdentityApi;
     }>;
   }> = {},
-): SsoApp {
+): Promise<SsoApp> {
   const connections = input.connections ?? RecordingSsoConnectionLedger.create();
   return SsoApp.create({
-    config: input.config ?? createSsoTestConfiguration(),
+    config: input.config ?? createSsoTestConfig(),
     dependencies: {
       licensing: input.dependencies?.licensing ?? createSsoTestLicensing(),
       operators: input.dependencies?.operators ?? createSsoTestOperators(),
@@ -137,8 +165,10 @@ export function createSsoTestApp(
     },
     members: {
       logger: input.members?.logger ?? RecordingSsoGateLogger.create(),
+      publicBaseUrl: input.members?.publicBaseUrl ?? "https://acme.test",
+      isSaas: input.members?.isSaas ?? false,
     },
     resources: new ResourceScope(),
-    secrets: {} as never,
+    secrets: createSsoTestSecrets({ auth0ClientSecret: "secret", ...input.secrets }),
   });
 }

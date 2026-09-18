@@ -33,6 +33,9 @@
     },
     {
       "path": "../design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../vitest-config/tsconfig.build.json"
     }
   ]
 }

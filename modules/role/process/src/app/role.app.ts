@@ -7,6 +7,7 @@ import { ledgerActorFor, type LedgerActor } from "@langwatch/actor";
 import {
   AuthzApi,
   bindingScopeCanGrantPermission,
+  newAuthzBindingId,
   PermissionDeniedError,
   type AuthzAccessBreakdownOutput,
   type AuthzApplyMemberBindingsInput,
@@ -18,7 +19,6 @@ import {
   type AuthzListManagedBindingsForUserOutput,
   type AuthzUpdateBindingInput,
 } from "@langwatch/authz-contract";
-import { KsuidAuthzBindingIdAdapter } from "@langwatch/authz-process";
 import {
   assertEnterprisePlanType,
   ENTERPRISE_FEATURE_ERRORS,
@@ -84,7 +84,6 @@ export class RoleApp implements RoleApi {
   #users: UserApi;
   #entitlement: EntitlementApi;
   #prisma: RoleSetup["members"]["prisma"];
-  #bindingIds: KsuidAuthzBindingIdAdapter;
 
   private constructor(
     repositories: RoleRepositories,
@@ -97,7 +96,6 @@ export class RoleApp implements RoleApi {
     this.#users = dependencies.users;
     this.#entitlement = dependencies.entitlement;
     this.#prisma = members.prisma;
-    this.#bindingIds = KsuidAuthzBindingIdAdapter.create();
   }
 
   static create({ repositories, dependencies, members }: RoleSetup): RoleApp {
@@ -541,7 +539,7 @@ export class RoleApp implements RoleApi {
       organizationId: input.organizationId,
       bindings: [
         {
-          bindingId: this.#bindingIds.newBindingId(),
+          bindingId: newAuthzBindingId(),
           principal: { userId: input.userId },
           role,
           customRoleId: input.customRoleId,

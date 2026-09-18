@@ -21,7 +21,7 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import { Prisma } from "@langwatch/prisma-client/generated";
 // @vitest-environment node
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { Temporal, type Instant } from "@langwatch/time";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";

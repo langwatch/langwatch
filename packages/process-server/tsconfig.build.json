@@ -33,52 +33,52 @@
   ],
   "references": [
     {
+      "path": "../actor/tsconfig.build.json"
+    },
+    {
       "path": "../api/tsconfig.build.json"
-    },
-    {
-      "path": "../config/tsconfig.build.json"
-    },
-    {
-      "path": "../kernel/tsconfig.build.json"
-    },
-    {
-      "path": "../secrets/tsconfig.build.json"
     },
     {
       "path": "../../modules/api-key/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/auth/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/audit-log/contract/tsconfig.build.json"
     },
     {
-      "path": "../../enterprise/modules/scim/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/model-provider/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/organization/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/langy/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../process-stores/tsconfig.build.json"
-    },
-    {
-      "path": "../actor/tsconfig.build.json"
+      "path": "../../modules/auth/contract/tsconfig.build.json"
     },
     {
       "path": "../../modules/authz/contract/tsconfig.build.json"
     },
     {
-      "path": "../observability/tsconfig.build.json"
+      "path": "../config/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/scim/contract/tsconfig.build.json"
     },
     {
       "path": "../handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../kernel/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/langy/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/model-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/organization/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../process-stores/tsconfig.build.json"
+    },
+    {
+      "path": "../secrets/tsconfig.build.json"
     }
   ]
 }

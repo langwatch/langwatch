@@ -111,11 +111,11 @@ export class InviteService {
     }[];
 
     if (teamAssignments && Array.isArray(teamAssignments)) {
-      const assignments = teamAssignments as unknown as {
+      const assignments: {
         teamId: string;
         role: TeamUserRole;
         customRoleId?: string;
-      }[];
+      }[] = teamAssignments;
       memberships = assignments.map((a) => ({
         teamId: a.teamId,
         role: a.role,

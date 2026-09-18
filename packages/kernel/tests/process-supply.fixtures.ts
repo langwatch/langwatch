@@ -1,3 +1,4 @@
+import { Config } from "@langwatch/config";
 import { z } from "zod";
 
 import {
@@ -61,7 +62,7 @@ const ConfigApi = moduleApi<ConfigApi>()("api-key");
 class ConfigApp implements ConfigApi {
   static readonly contract = ConfigApi;
   static readonly dependencies = {};
-  static readonly configSchema = z.object({ pepper: z.string() });
+  static readonly config = Config.define((c) => ({ pepper: c.env("API_KEY_PEPPER", z.string()) }));
   readonly #pepper: string;
   private constructor(pepper: string) {
     this.#pepper = pepper;

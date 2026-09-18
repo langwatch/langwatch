@@ -1,5 +1,8 @@
 import { join } from "node:path";
+
 import ts from "typescript";
+
+import type { ArchitectureViolation, FeatureCatalogueEntry } from "../../types.ts";
 import { listFiles } from "../../workspace/layout.ts";
 import {
   moduleImports,
@@ -8,7 +11,6 @@ import {
   workspaceModuleResolver,
   type WorkspaceModuleResolver,
 } from "../../workspace/module-graph.ts";
-import type { ArchitectureViolation, FeatureCatalogueEntry } from "../../types.ts";
 
 const OWNERSHIP = "@langwatch/prisma-client/ownership";
 const TEST = /(?:__tests__|__fixtures__|\.(?:test|spec)\.)/;
@@ -57,7 +59,9 @@ function isStaticCreateFactoryMethod(member: ts.ClassElement): boolean {
 
   if (!ts.isIdentifier(member.name) || member.name.text !== "create") return false;
 
-  return !!ts.getModifiers(member)?.some((modifier) => modifier.kind === ts.SyntaxKind.StaticKeyword);
+  return !!ts
+    .getModifiers(member)
+    ?.some((modifier) => modifier.kind === ts.SyntaxKind.StaticKeyword);
 }
 
 function isNewInstanceOfClass(expression: ts.Expression, className: string): boolean {
@@ -69,7 +73,7 @@ function isNewInstanceOfClass(expression: ts.Expression, className: string): boo
 }
 
 function migrationClasses(source: ts.SourceFile): Set<string> {
-  if (!/\/server\/src\/migrations\/[^/]+\.migration\.ts$/.test(source.fileName)) return new Set();
+  if (!/\/process\/src\/migrations\/[^/]+\.migration\.ts$/.test(source.fileName)) return new Set();
 
   const contracts = namedImports(source, "@langwatch/system-migrations", "SystemMigration");
 
@@ -140,7 +144,8 @@ function isMigrationFactoryCreateCall(params: {
   if (!ts.isIdentifier(ownerCall.expression.expression)) return false;
 
   return (
-    migrations.has(ownerCall.expression.expression.text) && ownerCall.expression.name.text === "create"
+    migrations.has(ownerCall.expression.expression.text) &&
+    ownerCall.expression.name.text === "create"
   );
 }
 
@@ -313,7 +318,7 @@ export function lintPrismaMigrationAccess(
       }
 
       const validLocation =
-        /\/server\/src\/repositories\/prisma\/prisma\.[^/]+-migration\.repository\.ts$/.test(
+        /\/process\/src\/repositories\/prisma\/prisma\.[^/]+-migration\.repository\.ts$/.test(
           source.fileName,
         );
 
@@ -340,7 +345,7 @@ export function lintPrismaMigrationAccess(
         !consumers.length ||
         consumers.some(
           (consumer) =>
-            !consumer.fileName.startsWith(join(root, feature.root, "server/src/migrations/")) ||
+            !consumer.fileName.startsWith(join(root, feature.root, "process/src/migrations/")) ||
             !constructsOnlyMigration(consumer, source.fileName, resolver),
         );
 

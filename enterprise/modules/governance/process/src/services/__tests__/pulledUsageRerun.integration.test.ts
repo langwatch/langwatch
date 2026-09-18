@@ -27,7 +27,7 @@ import {
   type FoldProjectionDefinition,
   type ProjectionStoreContext,
 } from "@langwatch/eventing";
-import { migrateTestClickHouseOnce, startTestClickHouseEndpoints } from "@langwatch/test-harness";
+import { migrateTestClickHouseOnce, startTestClickHouseEndpoints } from "@langwatch/test-harness/clickhouse";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 

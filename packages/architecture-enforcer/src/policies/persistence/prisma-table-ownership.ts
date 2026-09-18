@@ -1,10 +1,12 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+
 import ts from "typescript";
+
+import type { ArchitectureViolation, FeatureCatalogueEntry } from "../../types.ts";
 import { listFiles } from "../../workspace/layout.ts";
 import { sourceFile as parsedSourceFile, sourceText } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
-import type { ArchitectureViolation, FeatureCatalogueEntry } from "../../types.ts";
 
 const OWNERSHIP_MODULE = "@langwatch/prisma-client/ownership";
 const REPOSITORY_MODULE = "@langwatch/prisma-client";
@@ -71,7 +73,7 @@ function isClaimProperty(call: ts.CallExpression, file: string): boolean {
   return (
     modifiers.some((item) => item.kind === ts.SyntaxKind.StaticKeyword) &&
     modifiers.some((item) => item.kind === ts.SyntaxKind.ReadonlyKeyword) &&
-    /\/server\/src\/repositories\/prisma\/prisma\.[^/]+\.repository\.ts$/.test(file)
+    /\/process\/src\/repositories\/prisma\/prisma\.[^/]+\.repository\.ts$/.test(file)
   );
 }
 
@@ -145,12 +147,15 @@ function isNativeClaimHeritage(call: ts.CallExpression, file: string): boolean {
 
   if (!ts.isExpressionWithTypeArguments(heritage) || heritage.expression !== call) return false;
 
-  if (!ts.isHeritageClause(heritage.parent) || heritage.parent.token !== ts.SyntaxKind.ExtendsKeyword)
+  if (
+    !ts.isHeritageClause(heritage.parent) ||
+    heritage.parent.token !== ts.SyntaxKind.ExtendsKeyword
+  )
     return false;
 
   if (!ts.isClassDeclaration(heritage.parent.parent)) return false;
 
-  return /\/server\/src\/repositories\/prisma\/prisma\.[^/]+\.repository\.ts$/.test(file);
+  return /\/process\/src\/repositories\/prisma\/prisma\.[^/]+\.repository\.ts$/.test(file);
 }
 
 function isFactoryReference(node: ts.Node, bindings: Bindings): boolean {

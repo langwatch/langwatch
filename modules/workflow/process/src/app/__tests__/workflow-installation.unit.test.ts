@@ -4,7 +4,7 @@
  */
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { WorkflowApi, type Workflow } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 

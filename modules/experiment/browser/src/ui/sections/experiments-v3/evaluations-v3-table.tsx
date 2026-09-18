@@ -9,17 +9,17 @@ import {
 } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import type { RouterOutputs } from "@langwatch/browser-trpc/workflow-api";
-import { AddOrEditDatasetDrawer } from "@langwatch/dataset-browser/dataset-drawer";
 import {
   type DatasetTableColumnType as ColumnType,
   datasetTableCss,
   useTableKeyboardNavigation,
   VirtualizedTableBody,
-} from "@langwatch/dataset-browser/dataset-table";
+} from "@langwatch/dataset-browser-kit";
+import { AddOrEditDatasetDrawer } from "@langwatch/dataset-browser/dataset-drawer";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
 import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
-import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit/variables";
+import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit";
 import type { Field, HttpComponentConfig } from "@langwatch/workflow-contract";
 import {
   type ColumnDef,

@@ -44,6 +44,9 @@
     },
     {
       "path": "../../modules/workflow/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../vitest-config/tsconfig.build.json"
     }
   ]
 }

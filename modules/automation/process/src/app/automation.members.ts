@@ -16,24 +16,12 @@ import type { TraceQueryClassification, TraceSummaryData } from "@langwatch/trac
 import type { AutomationGraphNotifier } from "../channels/automation-graph-alert.channel.ts";
 import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
 import type { LimitEmailKind } from "../channels/automation-runaway-notice.channel.ts";
-import type { SchedulerWake } from "../channels/automation-scheduler-wake.channel.ts";
-import type { AutomationTestFire } from "../channels/automation-test-fire.channel.ts";
-import type { AutomationIntentRetention } from "../repositories/automation-intent-retention.repository.ts";
-import type { AutomationPersistActionWriter } from "../repositories/automation-persist-action.repository.ts";
-import type { AutomationTraceTriggerCatalogue } from "../repositories/automation-trace-trigger-catalogue.repository.ts";
-import type { AutomationDatasetMapper } from "../services/automation-dataset-mapper.service.ts";
 import type {
   AutomationDispatchError,
   AutomationHeartbeat,
   AutomationLogger,
 } from "../services/automation-graph-runtime.service.ts";
-import type { AutomationScheduledIntent } from "../services/automation-scheduled-intent.service.ts";
-import type {
-  AutomationSlackBotTokenDecryptor,
-  AutomationSlackProvider,
-} from "../services/automation-slack-secrets.service.ts";
-import type { AutomationWebhookProvider } from "../services/automation-webhook-secrets.service.ts";
-import type { UnsubscribeTokenVerifier } from "../services/unsubscribe-token.service.ts";
+import type { AutomationSlackBotTokenDecryptor } from "../services/automation-slack-secrets.service.ts";
 
 // Re-exported: several files in this module still import these names from
 // here rather than from where they are actually declared.
@@ -45,36 +33,6 @@ export type {
   AutomationNotificationDelivery,
   AutomationSlackBotTokenDecryptor,
 };
-export interface AutomationInfrastructure {
-  automationClock: AutomationClock;
-  automationDatasetMapper: AutomationDatasetMapper;
-  automationDispatchError: AutomationDispatchError;
-  automationEmailCapStore: AutomationEmailCapStore;
-  automationEvaluationQueryClassification: AutomationEvaluationQueryClassification;
-  automationEvaluationTraceSummary: AutomationEvaluationTraceSummary;
-  automationEvaluationTriggerFilter: AutomationEvaluationTriggerFilter;
-  automationGraphActivity: AutomationGraphActivity;
-  automationGraphDelivery: AutomationGraphDelivery;
-  automationGraphNotifier: AutomationGraphNotifier;
-  automationHeartbeat: AutomationHeartbeat;
-  automationIntentRetention: AutomationIntentRetention;
-  automationLogger: AutomationLogger;
-  automationNotificationDelivery: AutomationNotificationDelivery;
-  automationPersistActionWriter: AutomationPersistActionWriter;
-  automationProjectDirectory: AutomationProjectDirectory;
-  automationRunaway: AutomationRunawayPort;
-  automationScheduledIntent: AutomationScheduledIntent;
-  automationSlackBotTokenDecryptor: AutomationSlackBotTokenDecryptor;
-  automationSlackProvider: AutomationSlackProvider;
-  automationTestFire: AutomationTestFire;
-  automationTraceTriggerCatalogue: AutomationTraceTriggerCatalogue;
-  automationTriggerMatchRecorder: AutomationTriggerMatchRecorder;
-  automationWebhookProvider: AutomationWebhookProvider;
-  scheduledJobStore: ScheduledJobStorePort;
-  schedulerWake: SchedulerWake;
-  unsubscribeTokenVerifier: UnsubscribeTokenVerifier;
-}
-
 export interface AutomationClock {
   now(): Instant;
 }

@@ -7,6 +7,7 @@
 import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { makeLangyAdapter } from "./langy-agent";
 import { LANGY_CORE_RULE_CRITERIA } from "./langy-rules";
 import {
@@ -140,9 +141,7 @@ describe("Langy reaches the code through the shared folder", () => {
 
         // Layer 2: the folder, as git sees it.
         const branches = repo.branches();
-        const langyBranches = branches.filter((branch) =>
-          branch.startsWith("langy/"),
-        );
+        const langyBranches = branches.filter((branch) => branch.startsWith("langy/"));
         const capture = terminal.capture();
         console.log("[layer2] branches:", branches.join(", "));
         console.log("[layer2] commits:", repo.log().join(" | "));
@@ -165,10 +164,7 @@ describe("Langy reaches the code through the shared folder", () => {
         // The push reached the remote. `gh pr create` cannot run without a
         // GitHub account, so the branch on the remote is how far the pull
         // request path can go here, and it has to get that far.
-        console.log(
-          "[layer2] remote branches:",
-          repo.remoteBranches().join(", "),
-        );
+        console.log("[layer2] remote branches:", repo.remoteBranches().join(", "));
         expect(repo.remoteBranches()).toContain(branch);
         // The project's own checks ran on the machine before the commit.
         expect(capture).toMatch(/bash .*(pytest|uv run|python)/);
@@ -181,9 +177,7 @@ describe("Langy reaches the code through the shared folder", () => {
         expect(result.success).toBe(true);
 
         // The conversation holds the folder now, so nothing asks again.
-        const status = await getLocalWorkspace(
-          langy.state.conversationId ?? "",
-        );
+        const status = await getLocalWorkspace(langy.state.conversationId ?? "");
         expect(status.connected).toBe(true);
         expect(status.pendingRequest).toBeNull();
       },

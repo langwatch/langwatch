@@ -4,7 +4,7 @@
  * Spec: specs/security/resource-scope-permission-checks.feature
  */
 import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 

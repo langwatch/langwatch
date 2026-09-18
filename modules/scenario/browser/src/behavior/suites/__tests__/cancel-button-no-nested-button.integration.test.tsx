@@ -5,8 +5,13 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { RunRow, ScenarioGridCard } from "@langwatch/suite-browser/run-cards";
-import { makeBatchRun, makeScenarioRunData, makeSummary } from "@langwatch/suite-browser/testing";
+import {
+  makeBatchRun,
+  makeScenarioRunData,
+  makeSummary,
+  RunRow,
+  ScenarioGridCard,
+} from "@langwatch/suite-browser-kit";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";

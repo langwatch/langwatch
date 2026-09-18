@@ -80,9 +80,7 @@ function toArray<T>(payload: unknown): T[] {
   return [];
 }
 
-export async function listDatasets(): Promise<
-  { id: string; name: string; recordCount: number }[]
-> {
+export async function listDatasets(): Promise<{ id: string; name: string; recordCount: number }[]> {
   return toArray(await lwGet("/api/dataset"));
 }
 
@@ -176,9 +174,7 @@ export async function listScenarios(): Promise<{ id: string; name: string }[]> {
   return toArray(await lwGet("/api/scenarios"));
 }
 
-export async function listPrompts(): Promise<
-  { id: string; name?: string; handle?: string }[]
-> {
+export async function listPrompts(): Promise<{ id: string; name?: string; handle?: string }[]> {
   return toArray(await lwGet("/api/prompts"));
 }
 
@@ -265,9 +261,7 @@ export async function listAnnotations(): Promise<
   return toArray(await lwGet("/api/annotations"));
 }
 
-export async function listTriggers(): Promise<
-  { id: string; name?: string; active?: boolean }[]
-> {
+export async function listTriggers(): Promise<{ id: string; name?: string; active?: boolean }[]> {
   return toArray(await lwGet("/api/triggers"));
 }
 

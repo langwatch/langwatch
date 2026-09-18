@@ -1,6 +1,8 @@
 import { existsSync } from "node:fs";
 import { basename, join, relative, sep } from "node:path";
+
 import ts from "typescript";
+
 import {
   type BaselineEntry,
   type BaselinePolicy,
@@ -11,6 +13,7 @@ import {
   readBaseline,
   staleRows,
 } from "../../baseline.ts";
+import type { ArchitectureViolation } from "../../types.ts";
 import { SOURCE_ROOTS, listFiles } from "../../workspace/layout.ts";
 import {
   moduleImports,
@@ -19,7 +22,6 @@ import {
   type WorkspaceModuleResolver,
 } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
-import type { ArchitectureViolation } from "../../types.ts";
 
 /**
  * A name a module's server package exports that no file in the repository
@@ -89,10 +91,10 @@ function isConfigModule(path: string): boolean {
   return /\.config\.tsx?$/.test(basename(path));
 }
 
-/** Whether the path lies in a module's `server/src`, wherever the module lives. */
+/** Whether the path lies in a module's `process/src`, wherever the module lives. */
 function isModuleServerSource(root: string, path: string): boolean {
   const parts = relative(root, path).split(sep);
-  const server = parts.indexOf("server");
+  const server = parts.indexOf("process");
   if (server < 1) return false;
 
   return parts[server + 1] === "src";

@@ -2,6 +2,7 @@
  * Shared shell for every domain-capability card (task #12).
  */
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { useReducedMotion } from "@langwatch/langy-browser-kit";
 import {
   BarChart3,
   Bot,
@@ -33,7 +34,6 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
 import type {
   CapabilityIconName,
   CapabilitySurface,

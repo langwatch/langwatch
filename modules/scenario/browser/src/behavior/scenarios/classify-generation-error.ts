@@ -5,8 +5,8 @@ import {
   type ErrorExplanation,
   explainAnyError,
   explainSerializedError,
-} from "@langwatch/handled-error/presentation";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+} from "@langwatch/error-presentation/presentation";
+import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
 
 import { ScenarioGenerationError } from "../../model/scenario-generation.ts";
 

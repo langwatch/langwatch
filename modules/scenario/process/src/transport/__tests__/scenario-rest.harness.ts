@@ -20,25 +20,13 @@ import {
   type ScenarioTabRegistry,
   type SimulationService,
 } from "@langwatch/scenario-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import type {
-  AgentAdapterFactory,
-  CancellationPublisher,
-  CancellationSubscriber,
-  ScenarioChildBootstrap,
-  ScenarioChildExecutionSession,
-  ScenarioExecutionPool,
-  ScenarioExecutionRunner,
-  ScenarioHttp,
-  ScenarioProcessorServiceMetrics,
-  ScenarioBroadcast,
-  ScenarioTabStore,
-} from "../../app/scenario.app.ts";
+import type { ScenarioBroadcast } from "../../app/scenario.app.ts";
 import { ScenarioApp } from "../../app/scenario.app.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
 import type { AgentTestService } from "../../services/agent-test.service.ts";
@@ -92,16 +80,6 @@ export function createScenarioRestTestApp(
       broadcast,
       resultAtoms: createApiFixture<ResultAtomsService>(),
       runConfigurations: createApiFixture<RunConfigurationsService>(),
-      agentAdapterFactory: createApiFixture<AgentAdapterFactory>(),
-      cancellationPublisher: createApiFixture<CancellationPublisher>(),
-      cancellationSubscriber: createApiFixture<CancellationSubscriber>(),
-      scenarioChildBootstrap: createApiFixture<ScenarioChildBootstrap>(),
-      scenarioChildExecutionSession: createApiFixture<ScenarioChildExecutionSession>(),
-      scenarioExecutionPool: createApiFixture<ScenarioExecutionPool>(),
-      scenarioExecutionRunner: createApiFixture<ScenarioExecutionRunner>(),
-      scenarioHttp: createApiFixture<ScenarioHttp>(),
-      scenarioProcessorServiceMetrics: createApiFixture<ScenarioProcessorServiceMetrics>(),
-      scenarioTabStore: createApiFixture<ScenarioTabStore>(),
       encryption: createApiFixture<Encryption>(),
       rateLimiter: { check: async () => ({ allowed: true }) },
       publicBaseUrl: "https://app.langwatch.test",

@@ -1,5 +1,5 @@
 import { defineConfig } from "vitest/config";
-import { moduleVitestTestOptions } from "../../../../packages/test-harness/src/vitest-config.ts";
+import { moduleVitestTestOptions } from "@langwatch/vitest-config";
 
 export default defineConfig({
   resolve: {

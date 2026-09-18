@@ -20,22 +20,25 @@ vi.mock("@langwatch/trace-browser/surfaces/setup-with-agent-button", () => ({
   SetupWithAgentButton: () => null,
 }));
 
-vi.mock("@langwatch/trace-browser/surfaces/page-visibility", () => ({
-  usePageVisibility: () => true,
-}));
-
-vi.mock("@langwatch/trace-browser-kit/sse-subscription", () => ({
-  useSSESubscription: vi.fn(() => ({
-    connectionState: "disconnected",
-    isConnected: false,
-    isConnecting: false,
-    hasError: false,
-    isDisconnected: true,
-    retryCount: 0,
-    lastData: undefined,
-    lastError: undefined,
-  })),
-}));
+vi.mock("@langwatch/trace-browser-kit", async () => {
+  const actual = await vi.importActual<typeof import("@langwatch/trace-browser-kit")>(
+    "@langwatch/trace-browser-kit",
+  );
+  return {
+    ...actual,
+    usePageVisibility: () => true,
+    useSSESubscription: vi.fn(() => ({
+      connectionState: "disconnected",
+      isConnected: false,
+      isConnecting: false,
+      hasError: false,
+      isDisconnected: true,
+      retryCount: 0,
+      lastData: undefined,
+      lastError: undefined,
+    })),
+  };
+});
 
 vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({

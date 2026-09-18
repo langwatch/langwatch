@@ -49,9 +49,9 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
 // The picker itself is `@langwatch/authz-browser`'s and has its own suite; what
 // this file is about is what the SCREEN does with the value it hands back, so
 // the menu is replaced by two buttons that call `onChange` directly.
-vi.mock("@langwatch/authz-browser-kit/scope-picker", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/authz-browser-kit/scope-picker")>(
-    "@langwatch/authz-browser-kit/scope-picker",
+vi.mock("@langwatch/authz-browser-kit", async () => {
+  const actual = await vi.importActual<typeof import("@langwatch/authz-browser-kit")>(
+    "@langwatch/authz-browser-kit",
   );
   return {
     ...actual,

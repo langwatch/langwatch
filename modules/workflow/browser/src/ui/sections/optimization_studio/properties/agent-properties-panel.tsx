@@ -10,18 +10,14 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
 import {
   buildCodeConfig,
   DEFAULT_CODE,
   getCodeFromConfig,
-} from "@langwatch/agent-browser/agent-editors";
-import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
+} from "@langwatch/agent-contract/code-config";
 import { api } from "@langwatch/browser-trpc/workflow-api";
-import {
-  type FieldMapping,
-  type Variable,
-  VariablesSection,
-} from "@langwatch/prompt-browser-kit/variables";
+import { type FieldMapping, type Variable, VariablesSection } from "@langwatch/prompt-browser-kit";
 import {
   CODE_OUTPUT_TYPES,
   type Output,

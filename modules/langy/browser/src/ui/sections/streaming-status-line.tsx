@@ -1,10 +1,13 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import {
+  useReducedMotion,
+  type LangyProgressSample,
+  type LangyTurnMetric,
+} from "@langwatch/langy-browser-kit";
 import { nowInstant } from "@langwatch/time";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 
-import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
-import type { LangyProgressSample, LangyTurnMetric } from "../../model/values/langy-turn.ts";
 import { LangyObserverGlyph } from "./langy-observation-state.tsx";
 import { NumberTicker } from "./number-ticker.tsx";
 import { StreamingStatCard } from "./streaming-stat-card.tsx";

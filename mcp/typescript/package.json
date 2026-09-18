@@ -18,19 +18,18 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "require": "./dist/index.js"
+      "import": "./dist/index.js"
     },
     "./create-mcp-server": {
       "types": "./src/create-mcp-server.d.ts",
       "import": "./dist/create-mcp-server.js",
-      "require": "./dist/create-mcp-server.js",
+      "require": "./dist/create-mcp-server.cjs",
       "default": "./dist/create-mcp-server.js"
     },
     "./config": {
       "types": "./src/config.d.ts",
       "import": "./dist/config.js",
-      "require": "./dist/config.js",
+      "require": "./dist/config.cjs",
       "default": "./dist/config.js"
     }
   },

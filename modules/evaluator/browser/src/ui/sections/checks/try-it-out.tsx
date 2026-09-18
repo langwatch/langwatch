@@ -12,10 +12,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import {
-  PeriodSelector,
-  usePeriodSelector,
-} from "@langwatch/analytics-browser-kit/period-selector";
+import { PeriodSelector, usePeriodSelector } from "@langwatch/analytics-browser-kit";
 import { useFilterParams } from "@langwatch/analytics-browser/surfaces/filter-params";
 import { FilterSidebar } from "@langwatch/analytics-browser/surfaces/filter-sidebar";
 import { FilterToggle } from "@langwatch/analytics-browser/surfaces/filter-toggle";

@@ -5,6 +5,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 /** packages/test-harness/, from src/__tests__/. */
@@ -17,7 +18,11 @@ const REPO_ROOT = resolve(PACKAGE_ROOT, "../..");
  * Packages on TypeScript 6: sdks/typescript, mcp/typescript (tsup `dts`),
  * architecture-enforcer (programmatic API, sync CLI).
  */
-const HELD_ON_SIX = new Set(["sdks/typescript", "mcp/typescript", "packages/architecture-enforcer"]);
+const HELD_ON_SIX = new Set([
+  "sdks/typescript",
+  "mcp/typescript",
+  "packages/architecture-enforcer",
+]);
 
 /**
  * Manifest pattern: `packages/` at any depth (modules), `apps/` (replaced

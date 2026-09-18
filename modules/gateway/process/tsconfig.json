@@ -17,7 +17,7 @@
       "path": "tsconfig.build.json"
     },
     {
-      "path": "../../analytics/process/tsconfig.build.json"
+      "path": "../../analytics/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/api/tsconfig.build.json"
@@ -98,13 +98,16 @@
       "path": "../../webhook/contract/tsconfig.build.json"
     },
     {
-      "path": "../../webhook/process/tsconfig.build.json"
+      "path": "../../../packages/api-fixture/tsconfig.build.json"
     },
     {
       "path": "../../../packages/clickhouse-client/tsconfig.build.json"
     },
     {
       "path": "../../../packages/clickhouse-migrations/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/error-presentation/tsconfig.build.json"
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"

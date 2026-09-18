@@ -1,4 +1,4 @@
-import { docsUrl } from "@langwatch/config/docs-url";
+import { docsUrl } from "@langwatch/error-presentation/docs-url";
 
 import { api } from "../../behavior/personal-workspace-api.ts";
 import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";

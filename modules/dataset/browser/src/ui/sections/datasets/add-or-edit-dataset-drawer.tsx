@@ -23,8 +23,8 @@ import {
 } from "@langwatch/dataset-contract";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
-import { tryToMapPreviousColumnsToNewColumns } from "@langwatch/workflow-browser/studio-dataset-columns";
+import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
+import { tryToMapPreviousColumnsToNewColumns } from "@langwatch/workflow-browser-kit";
 import { useEffect } from "react";
 import { Eye, EyeOff, Trash2 } from "react-feather";
 import { type FieldErrors, useFieldArray, useForm } from "react-hook-form";

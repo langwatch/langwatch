@@ -4,13 +4,15 @@
  *   than pulsing in formation", "Things near my pointer light up quietly")
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import {
+  useLangyContextTargetStore,
+  useLangyStore,
+  LangyContextTarget,
+} from "@langwatch/langy-browser-kit";
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useLangyContextTargetStore } from "../../../behavior/langy-context-target.store.ts";
-import { useLangyStore } from "../../../behavior/langy.store.ts";
 import { LangyContextTargetLayer } from "../langy-context-target-layer.tsx";
-import { LangyContextTarget } from "../langy-context-target.tsx";
 
 function press(key: string, target: EventTarget = document.body) {
   act(() => {

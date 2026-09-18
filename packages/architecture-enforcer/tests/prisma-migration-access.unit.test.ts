@@ -22,7 +22,7 @@ function fixture() {
   const root = mkdtempSync(join(tmpdir(), "migration-access-"));
   roots.push(root);
   function write(file: string, content: string) {
-    const path = join(root, featureRoot, "server", file);
+    const path = join(root, featureRoot, "process", file);
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, content);
   }
@@ -112,7 +112,7 @@ describe("scoped migration Prisma access", () => {
     const world = fixture();
     world.write(
       "../../../../apps/api/src/app.ts",
-      `import { Repository } from "../../../${featureRoot}/server/src/${repository}";`,
+      `import { Repository } from "../../../${featureRoot}/process/src/${repository}";`,
     );
     expect(world.lint().some((issue) => issue.message.includes("must be private"))).toBe(true);
   });

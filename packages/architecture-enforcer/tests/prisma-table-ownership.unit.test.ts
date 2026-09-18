@@ -1,7 +1,9 @@
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+
 import { afterEach, describe, expect, it } from "vitest";
+
 import { lintPrismaTableOwnership } from "../src/policies/persistence/prisma-table-ownership.ts";
 import type { FeatureCatalogueEntry } from "../src/types.ts";
 import { snapshotOf } from "./workspace.ts";
@@ -46,7 +48,7 @@ model AuditLog {
       });
     }
     write(
-      `${featureRoot}/server/src/${options.path ?? `repositories/prisma/prisma.${feature}.repository.ts`}`,
+      `${featureRoot}/process/src/${options.path ?? `repositories/prisma/prisma.${feature}.repository.ts`}`,
       `${options.imports ?? 'import { prismaTables } from "@langwatch/prisma-client/ownership";'}
 ${options.declaration ?? `export class Repository { static readonly tables = ${expression}; }`}`,
     );

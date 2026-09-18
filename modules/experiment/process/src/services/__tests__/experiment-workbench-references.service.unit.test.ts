@@ -11,7 +11,7 @@ import {
   type PersistedEvaluationsV3State,
 } from "@langwatch/experiment-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 

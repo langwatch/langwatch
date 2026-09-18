@@ -1,10 +1,11 @@
 import { Box, Field, HStack, Spacer, VStack } from "@chakra-ui/react";
 import {
+  type AvailableSource,
   type PromptTextAreaOnAddMention,
   PromptTextAreaWithVariables,
-} from "@langwatch/prompt-browser-kit/variables";
-import type { AvailableSource, Variable } from "@langwatch/prompt-browser-kit/variables";
-import { useLayoutMode } from "@langwatch/prompt-browser-kit/variables";
+  useLayoutMode,
+  type Variable,
+} from "@langwatch/prompt-browser-kit";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {

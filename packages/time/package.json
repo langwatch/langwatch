@@ -33,6 +33,7 @@
     "temporal-polyfill": "^1.0.4"
   },
   "devDependencies": {
+    "@langwatch/vitest-config": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

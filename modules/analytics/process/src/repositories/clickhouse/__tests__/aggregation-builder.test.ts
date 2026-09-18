@@ -736,7 +736,7 @@ describe("aggregation-builder", () => {
         };
         const result = buildTimeseriesQuery(input);
 
-        expect(result.sql).toMatch(/AND NOT \(.*ts\.TopicId IN/s);
+        expect(result.sql).toMatch(/AND \(NOT \(.*ts\.TopicId IN/s);
       });
 
       it("does not negate the traceIds scope restriction", () => {
@@ -748,7 +748,7 @@ describe("aggregation-builder", () => {
         };
         const result = buildTimeseriesQuery(input);
 
-        expect(result.sql).toMatch(/AND NOT \(.*ts\.TopicId IN/s);
+        expect(result.sql).toMatch(/AND \(NOT \(.*ts\.TopicId IN/s);
         expect(result.sql).toContain("ts.TraceId IN ({traceIds:Array(String)})");
         expect(result.sql).not.toMatch(/NOT \([^)]*\{traceIds:Array\(String\)\}/);
       });

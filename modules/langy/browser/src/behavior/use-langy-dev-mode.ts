@@ -1,4 +1,4 @@
-import { useLangyStore } from "./langy.store.ts";
+import { useLangyStore } from "@langwatch/langy-browser-kit";
 
 /**
  * Persistent, per-browser "developer mode" for the Langy panel.

@@ -9,5 +9,10 @@
     "isolatedModules": true,
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo"
   },
-  "include": ["__tests__/**/*.ts", "vitest.config.ts"]
+  "include": ["__tests__/**/*.ts", "vitest.config.ts"],
+  "references": [
+    {
+      "path": "../../packages/vitest-config/tsconfig.build.json"
+    }
+  ]
 }

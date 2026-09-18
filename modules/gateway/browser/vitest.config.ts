@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 
-import { moduleVitestTestOptions } from "@langwatch/test-harness/vitest-config";
+import { moduleVitestTestOptions } from "@langwatch/vitest-config";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
@@ -12,8 +12,8 @@ export default defineConfig({
       "@langwatch/gateway-contract": fileURLToPath(
         new URL("../contract/src/index.ts", import.meta.url),
       ),
-      "@langwatch/authz-browser-kit/scope-picker": fileURLToPath(
-        new URL("../../authz/browser-kit/src/scope-picker/index.ts", import.meta.url),
+      "@langwatch/authz-browser-kit": fileURLToPath(
+        new URL("../../authz/browser-kit/src/index.ts", import.meta.url),
       ),
       "@langwatch/model-provider-contract": fileURLToPath(
         new URL("../../model-provider/contract/src/index.ts", import.meta.url),

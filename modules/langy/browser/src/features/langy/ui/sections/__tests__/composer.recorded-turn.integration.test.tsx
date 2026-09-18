@@ -6,12 +6,11 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { useLangyStore } from "@langwatch/langy-browser-kit";
 import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 
 // The auto-resizing textarea (Ark's field-textarea) reaches for
 // ResizeObserver on mount, which jsdom does not implement.

@@ -64,6 +64,17 @@ Feature: haven logs
     Then the api lane's lines appear under the lane's own name
     And the launcher's own lines, which belong to neither half, are among them
 
+  # The dashboard's list is what a person selects from, so anything it reports
+  # has to be in it. Reporting the shared machinery on a line of its own as
+  # well said everything twice and left half of it unreachable.
+  Scenario: One list, and everything in it can be selected
+    When the developer opens the session dashboard
+    Then the browser application, the api and the worker lead the list
+    And the machine-wide machinery is listed after this stack's own children
+    And a server this stack merely routes to appears once, not once per listing
+    And a row with no URL of its own still says where it is reached
+    And selecting machine-wide machinery reads it but never offers to bounce it
+
   # A stack serving pages with a dead worker looks healthy from every row but
   # the worker's, and the logs page is where a person already is when they are
   # asking why nothing happened.

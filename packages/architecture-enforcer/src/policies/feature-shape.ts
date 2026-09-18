@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
+
 import {
   type BaselineEntry,
   type BaselinePolicy,
@@ -10,10 +11,10 @@ import {
   readBaseline,
   staleRows,
 } from "../baseline.ts";
+import type { ArchitectureViolation, ClassifiedPackage, FeatureCatalogueEntry } from "../types.ts";
 import { listFiles } from "../workspace/layout.ts";
 import { sourceText } from "../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
-import type { ArchitectureViolation, ClassifiedPackage, FeatureCatalogueEntry } from "../types.ts";
 
 const BASELINE_FILE = "feature-shape-baseline.json";
 
@@ -88,7 +89,10 @@ const TARGET: Record<FeatureShapeLegacyKind, string> = {
 };
 
 const COMPOSITION_ROOTS = ["apps/api/src/features", "apps/worker/src/features"];
-const GENERATED_MODULE_LISTS = ["modules/server-modules.generated.ts", "modules/web-modules.generated.ts"];
+const GENERATED_MODULE_LISTS = [
+  "modules/server-modules.generated.ts",
+  "modules/web-modules.generated.ts",
+];
 const GENERATED_MODULE_LIST_BLOCK = /export const \w+Modules = \[([\s\S]*?)\] as const/;
 const GENERATED_MODULE_LIST_ENTRY = /([A-Za-z0-9_]+)/g;
 const REFUSING_EXPORT = /export function refusing/;
@@ -314,11 +318,11 @@ export function collectFeatureShapeFindings(
 
       if (pkg.kind === "contract") return [...composition, ...contractFindings(root, feature, pkg)];
 
-      if (pkg.kind === "server") {
+      if (pkg.kind === "process") {
         return [...composition, ...serverFindings(root, feature, pkg, booted)];
       }
 
-      if (pkg.kind === "web") return [...composition, ...webFindings(root, feature, pkg)];
+      if (pkg.kind === "browser") return [...composition, ...webFindings(root, feature, pkg)];
 
       return composition;
     })

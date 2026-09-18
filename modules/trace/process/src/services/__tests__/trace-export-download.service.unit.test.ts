@@ -4,7 +4,7 @@
  * @vitest-environment node
  */
 import type { PresenceApi } from "@langwatch/presence-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { TraceExportRateLimitedError, type Protections } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 

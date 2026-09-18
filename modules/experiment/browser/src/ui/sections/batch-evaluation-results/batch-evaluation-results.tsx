@@ -18,7 +18,8 @@ import { useRouter } from "@langwatch/browser-host/use-router";
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import { ExternalImage } from "@langwatch/design-system/external-image";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { EvaluatorResultChip } from "@langwatch/evaluator-browser/evaluator-result-chip";
+import { EvaluatorResultChip } from "@langwatch/evaluator-browser-kit";
+import { describeCellFailure } from "@langwatch/experiment-browser-kit";
 import type { Experiment } from "@langwatch/experiment-contract";
 import { nowInstant } from "@langwatch/time";
 import { TraceIdPeek } from "@langwatch/trace-browser/surfaces/trace-id-peek";
@@ -36,7 +37,6 @@ import { useComparisonMode } from "../../../behavior/use-comparison-mode.ts";
 import { useResultDisplayPreferences } from "../../../behavior/use-result-display-preferences.ts";
 import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name.ts";
 import { isRunFinished } from "../../../model/batch-evaluation-results.run-state.ts";
-import { describeCellFailure } from "../../../model/experiments-v3/cell-failure.ts";
 import { TableSkeleton } from "../../elements/batch-results/table-skeleton.tsx";
 import { downloadCsv } from "../batch-evaluation-results.csv.ts";
 import {

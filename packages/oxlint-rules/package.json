@@ -25,6 +25,7 @@
     "oxc-parser": "^0.127.0"
   },
   "devDependencies": {
+    "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",
     "oxlint": "catalog:",
     "typescript": "catalog:",

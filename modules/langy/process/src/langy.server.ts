@@ -27,8 +27,6 @@ import { langyInternalRest } from "./transport/langy-internal.rest.ts";
 import { langyTurnsMembers, langyTurnsRest } from "./transport/langy-turns.rest.ts";
 import { setupSkillsTrpcTransport } from "./transport/setup-skills.trpc.ts";
 
-export type { LangyInfrastructure } from "./app/langy.members.ts";
-
 // The seams below are process-graph factories: a composing worker calls one of these
 // instead of naming the feature's private repository/service classes directly (the
 // private-runtime-export drive, dev/docs/plans/private-runtime-export-drive.md §3d).

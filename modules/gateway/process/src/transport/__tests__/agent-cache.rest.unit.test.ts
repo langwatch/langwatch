@@ -2,7 +2,7 @@ import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
 /** Exercises the declaration on its in-memory runtime without external members. */
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { MemoryGatewayAgentCacheEntryRepository } from "../../repositories/redis/redis.gateway-agent-cache.repository.ts";

@@ -1,14 +1,20 @@
+import { Config } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
+
+import { createApp } from "../src/application.ts";
 import {
   defineServerModule,
   defineRepositories,
   withMemoryRepositories,
   type FeatureSetup,
 } from "../src/index.ts";
-import { createApp } from "../src/application.ts";
-import { instantiateRepositories, selectedRepositoryOwnership } from "../src/repository-registry.ts";
-import { RepositoryOwnershipConflictError } from "../src/repository-ownership.ts";
 import { MissingMemberError } from "../src/module-members.ts";
+import { RepositoryOwnershipConflictError } from "../src/repository-ownership.ts";
+import {
+  instantiateRepositories,
+  selectedRepositoryOwnership,
+} from "../src/repository-registry.ts";
 import { memberSourceOf } from "./member-source.ts";
 
 type Repositories = Readonly<{ value: { read(): string } }>;
@@ -36,7 +42,6 @@ const repositories = defineRepositories({ live: LiveRepositories, memory: Memory
 class App {
   static readonly contract = App;
   static readonly dependencies = {};
-  static readonly configSchema = { parse: () => undefined };
   static create({
     repositories,
   }: FeatureSetup<Record<never, never>, never, undefined, Repositories>): App {
@@ -49,14 +54,7 @@ class ConfiguredApp {
   static readonly contract = ConfiguredApp;
   static readonly dependencies = {};
   static readonly reads = ["suffix"] as const;
-  static readonly configSchema = {
-    parse(value: unknown): { prefix: string } {
-      if (value === null || typeof value !== "object") throw new Error("prefix is required");
-      if (!("prefix" in value) || typeof value.prefix !== "string")
-        throw new Error("prefix is required");
-      return { prefix: value.prefix };
-    },
-  };
+  static readonly config = Config.define((c) => ({ prefix: c.env("AGENT_PREFIX", z.string()) }));
   static create({
     repositories,
     members,
@@ -72,7 +70,10 @@ class ConfiguredApp {
   constructor(readonly value: string) {}
 }
 
-const feature = defineServerModule("annotation").withRepositories(repositories).withApp(App).build();
+const feature = defineServerModule("annotation")
+  .withRepositories(repositories)
+  .withApp(App)
+  .build();
 const configuredFeature = defineServerModule("agent")
   .withRepositories(repositories)
   .withApp(ConfiguredApp)

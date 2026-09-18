@@ -1,8 +1,7 @@
+import { useLangyContextTargetStore, useLangyStore } from "@langwatch/langy-browser-kit";
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { useLangyContextTargetStore } from "../../../../../behavior/langy-context-target.store.ts";
-import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import { useLangyDevLog } from "../langy-dev-log.ts";
 
 /**

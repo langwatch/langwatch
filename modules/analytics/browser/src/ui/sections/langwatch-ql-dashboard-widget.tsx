@@ -5,7 +5,7 @@
  */
 
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import { usePeriodSelector } from "@langwatch/analytics-browser-kit/period-selector";
+import { usePeriodSelector } from "@langwatch/analytics-browser-kit";
 import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 import type { LangWatchQLDatasetColumn } from "@langwatch/analytics-contract/visualization";
 import { useMemo } from "react";

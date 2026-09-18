@@ -12,7 +12,7 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { AnalyticsApp } from "../analytics.app.ts";

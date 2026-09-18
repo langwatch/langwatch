@@ -4,7 +4,7 @@
  */
 
 import { Box, VStack } from "@chakra-ui/react";
-import { NowProvider } from "@langwatch/suite-browser/run-dialogs";
+import { NowProvider } from "@langwatch/suite-browser-kit";
 
 import { toRunPlanSuites } from "../../../behavior/agent-testing/results/run-plans.ts";
 import { useAgentTestingLiveUpdates } from "../../../behavior/agent-testing/use-agent-testing-live-updates.ts";

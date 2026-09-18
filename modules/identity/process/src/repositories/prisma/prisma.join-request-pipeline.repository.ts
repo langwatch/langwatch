@@ -72,10 +72,9 @@ export class PostgresJoinRequestPipelineAdapter {
         tryResolveStagedSender: (name) => {
           if (!eventSourcing.isEnabled) return null;
           try {
-            const pipeline = eventSourcing.getPipeline(JOIN_REQUEST_PIPELINE_NAME) as unknown as {
-              commands: Record<string, JoinRequestStagedSender>;
-            };
-            return pipeline.commands[name] ?? null;
+            const pipeline = eventSourcing.getPipeline(JOIN_REQUEST_PIPELINE_NAME);
+            const command: JoinRequestStagedSender | undefined = pipeline.commands[name];
+            return command ?? null;
           } catch {
             return null;
           }

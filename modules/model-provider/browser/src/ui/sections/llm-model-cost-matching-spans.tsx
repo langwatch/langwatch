@@ -6,7 +6,7 @@
 
 import { Badge, Box, chakra, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
-import { ProviderIcon } from "@langwatch/model-provider-browser-kit/provider-icons";
+import { ProviderIcon } from "@langwatch/model-provider-browser-kit";
 import type {
   CostRuleMatchingSpansPreview,
   CostRulePreviewSampleSpan,

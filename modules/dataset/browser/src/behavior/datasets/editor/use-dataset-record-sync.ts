@@ -4,9 +4,9 @@ import { api } from "@langwatch/browser-trpc/workflow-api";
  * changes through datasetRecord.update with the FULL record. A failed
  * sync keeps the change for retry — never report silent success.
  */
+import type { AutosaveState } from "@langwatch/dataset-browser-kit";
 import { useCallback, useEffect, useRef } from "react";
 
-import type { AutosaveState } from "../../../model/dataset-table-context.tsx";
 import type { PendingSavedChanges } from "../../../model/pending-saved-changes.ts";
 
 export const DATASET_SYNC_DEBOUNCE_MS = 500;

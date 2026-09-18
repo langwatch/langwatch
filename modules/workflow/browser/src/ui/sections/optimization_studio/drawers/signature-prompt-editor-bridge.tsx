@@ -1,5 +1,5 @@
 import type { LocalPromptConfig } from "@langwatch/experiment-contract";
-import type { FieldMapping } from "@langwatch/prompt-browser-kit/variables";
+import type { FieldMapping } from "@langwatch/prompt-browser-kit";
 import { nodeDataToLocalPromptConfig } from "@langwatch/prompt-browser/llm-prompt-config-utils";
 import { PromptEditorDrawer } from "@langwatch/prompt-browser/surfaces/prompt-editor-drawer";
 import {

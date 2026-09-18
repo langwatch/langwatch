@@ -10,7 +10,7 @@ import type { Readable } from "node:stream";
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
-import { TEST_CLICKHOUSE_IMAGE } from "@langwatch/test-harness";
+import { TEST_CLICKHOUSE_IMAGE } from "@langwatch/test-harness/clickhouse";
 import { ClickHouseContainer, type StartedClickHouseContainer } from "@testcontainers/clickhouse";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { expect } from "vitest";

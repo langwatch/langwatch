@@ -1,5 +1,5 @@
 import { OrganizationService, type OrganizationApi } from "@langwatch/organization-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { TestProjectApi } from "./test-project-api.ts";
 import type { Instant } from "@langwatch/time";
 

@@ -1,6 +1,5 @@
+import { useLangyContextTargetStore } from "@langwatch/langy-browser-kit";
 import { useEffect } from "react";
-
-import { useLangyContextTargetStore } from "./langy-context-target.store.ts";
 
 /**
  * The gesture that puts the page into "point at something and give it to Langy" mode.

@@ -1,7 +1,7 @@
 /**
  * The feedback capability, over the Design System's toaster. A screen
  * hands over the raw error; the words are resolved HERE from its `code`
- * via `@langwatch/handled-error/presentation` — never `error.message`.
+ * via `@langwatch/error-presentation/presentation` — never `error.message`.
  */
 
 import { toaster } from "@langwatch/design-system/toaster";
@@ -10,8 +10,8 @@ import {
   explainHandledError,
   explainUnhandledError,
   UNKNOWN_ERROR_PRESENTATION,
-} from "@langwatch/handled-error/presentation";
-import { readEnvelopeTraceId, readHandledError } from "@langwatch/handled-error/read-handled-error";
+} from "@langwatch/error-presentation/presentation";
+import { readEnvelopeTraceId, readHandledError } from "@langwatch/error-presentation/read-handled-error";
 
 import { UiFeedback, type UiFailureNotice, type UiSuccessNotice } from "./capabilities.ts";
 import { isHandledByGlobalHandler } from "./errors.ts";

@@ -24,11 +24,8 @@ vi.mock("@langwatch/observability", () => ({
 
 import { Temporal } from "@langwatch/time";
 
-import {
-  BillingErrorReporter,
-  UsageLimitEmailChannel,
-  type UsageLimitEmailData,
-} from "../index.ts";
+import { UsageLimitEmailChannel, type UsageLimitEmailData } from "../index.ts";
+import { BillingErrorReporter } from "../services/billing-error-reporter.service.ts";
 import { NotificationService } from "../services/billing-usage-notice.service.ts";
 
 class FakeErrorReporter extends BillingErrorReporter {

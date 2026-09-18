@@ -5,7 +5,7 @@
  */
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { StudioWorkflow, Workflow } from "@langwatch/workflow-contract";
 
 import type { WorkflowAgentMapping, WorkflowStudioDsl } from "../../app/workflow.app.ts";
@@ -115,7 +115,6 @@ export function createWorkflowTestInfrastructure(
     workflowRows: new RecordingWorkflowRows(),
     execution: createApiFixture<WorkflowInfrastructure["execution"]>(),
     nlpRuntime: createApiFixture<WorkflowInfrastructure["nlpRuntime"]>(),
-    studioStream: createApiFixture<WorkflowInfrastructure["studioStream"]>(),
     ids: createApiFixture<WorkflowInfrastructure["ids"]>(),
     dslMigration: createApiFixture<WorkflowInfrastructure["dslMigration"]>(),
     projectEnvironment: createApiFixture<WorkflowInfrastructure["projectEnvironment"]>(),
@@ -128,14 +127,6 @@ export function createWorkflowTestInfrastructure(
     codeCompletions: noCodeCompletions,
     studioRuns: noStudioRuns,
     signals: silentSignals,
-    nlpLambdaArnResolver: createApiFixture<WorkflowInfrastructure["nlpLambdaArnResolver"]>(),
-    nlpLambdaFunction: createApiFixture<WorkflowInfrastructure["nlpLambdaFunction"]>(),
-    nlpLambdaInvoke: createApiFixture<WorkflowInfrastructure["nlpLambdaInvoke"]>(),
-    nlpLambdaStreamInvoke: createApiFixture<WorkflowInfrastructure["nlpLambdaStreamInvoke"]>(),
-    nlpPayloadStaging: createApiFixture<WorkflowInfrastructure["nlpPayloadStaging"]>(),
-    workflowAiCall: createApiFixture<WorkflowInfrastructure["workflowAiCall"]>(),
-    workflowCommitMessageModel:
-      createApiFixture<WorkflowInfrastructure["workflowCommitMessageModel"]>(),
     ...overrides,
   };
 }

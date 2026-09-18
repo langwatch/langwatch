@@ -5,7 +5,7 @@
  */
 
 import { describeError, showErrorToast } from "@langwatch/browser-host/errors";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
 import {
   DEFAULT_CALLER_VOICE,
   type CallerVoiceConfig,

@@ -19,7 +19,7 @@
 
   "references": [
     {
-      "path": "../../../dev/tsconfig.web-declarations.json"
+      "path": "tsconfig.build.json"
     },
     {
       "path": "../../../packages/api/tsconfig.build.json"
@@ -46,7 +46,7 @@
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/test-harness/tsconfig.build.json"
+      "path": "../../../packages/vitest-config/tsconfig.build.json"
     }
   ]
 }

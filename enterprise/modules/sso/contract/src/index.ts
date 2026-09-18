@@ -8,7 +8,6 @@ export {
   registerSsoConnectionInputSchema,
   rejectSsoDomainClaimInputSchema,
   SSO_FEATURE_ID,
-  ssoConfigurationSchema,
   ssoConnectionByIdSchema,
   ssoConnectionReasonInputSchema,
   ssoConnectionTargetSchema,
@@ -19,9 +18,9 @@ export {
   type ListSsoConnectionsInput,
   type RegisterSsoConnectionInput,
   type RejectSsoDomainClaimInput,
-  type SsoConfiguration,
   type SsoConnectionByIdInput,
   type SsoConnectionReasonInput,
   type SsoConnectionTarget,
   type SsoDomainTarget,
 } from "./sso.contract.ts";
+export { ssoConfig, ssoSecrets, type SsoConfig, type SsoConfiguration } from "./sso.config.ts";

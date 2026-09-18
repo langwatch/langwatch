@@ -14,7 +14,7 @@ const processSettings = (role: "api" | "worker") =>
     port:
       role === "worker"
         ? c.env("WORKER_METRICS_PORT", port.default(2999))
-        : c.env("PORT", port.default(5560)),
+        : c.env("API_PORT", port.default(6560)),
     shutdownDeadlineMs: c.env(
       "PROCESS_SHUTDOWN_DEADLINE_MS",
       z.coerce.number().int().positive().default(60000),

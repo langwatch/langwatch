@@ -5,7 +5,7 @@ import {
   VariablesSection,
   type FieldMapping as VariableFieldMapping,
   type Variable,
-} from "@langwatch/prompt-browser-kit/variables";
+} from "@langwatch/prompt-browser-kit";
 import type { Field } from "@langwatch/workflow-contract";
 import { useMemo } from "react";
 

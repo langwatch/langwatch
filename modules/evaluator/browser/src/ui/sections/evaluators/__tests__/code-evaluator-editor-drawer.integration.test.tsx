@@ -48,8 +48,8 @@ vi.mock("@langwatch/browser-host/errors", () => ({
 vi.mock("@langwatch/workflow-browser/surfaces/code-editor-transport", () => ({
   CodeEditor: ({ code }: { code: string }) => <div data-testid="code-editor">{code}</div>,
 }));
-vi.mock("@langwatch/prompt-browser-kit/variables", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@langwatch/prompt-browser-kit/variables")>()),
+vi.mock("@langwatch/prompt-browser-kit", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/prompt-browser-kit")>()),
   VariablesSection: () => <div data-testid="variables-section" />,
 }));
 

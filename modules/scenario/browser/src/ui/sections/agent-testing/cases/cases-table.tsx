@@ -6,7 +6,7 @@
  */
 
 import { Box, Button, Checkbox, chakra, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
-import type { Period } from "@langwatch/analytics-browser-kit/period-selector";
+import type { Period } from "@langwatch/analytics-browser-kit";
 import { Menu } from "@langwatch/design-system/menu";
 import type { ScenarioLastResultSummary } from "@langwatch/scenario-contract";
 import { format } from "@langwatch/time";

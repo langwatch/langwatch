@@ -1,4 +1,4 @@
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { WorkflowApi, WorkflowMappingFields } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 

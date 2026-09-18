@@ -5,7 +5,7 @@
  */
 
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { LLMModelDisplay } from "@langwatch/prompt-browser-kit/llm-model-display";
+import { LLMModelDisplay } from "@langwatch/prompt-browser-kit";
 import type { ReactNode } from "react";
 
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";

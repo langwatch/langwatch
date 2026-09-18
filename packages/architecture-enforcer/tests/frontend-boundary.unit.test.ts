@@ -6,7 +6,9 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
+
 import { browserOnlyPackage } from "../src/policies/frontend/browser-packages.ts";
 import { walkFiles } from "../src/workspace/layout.ts";
 import {
@@ -58,10 +60,7 @@ const WORKER_SRC = join(REPO_ROOT, "apps", "worker", "src");
  */
 const applicationRoots = (): string[] => {
   const roots: string[] = [];
-  for (const entrypoint of [
-    join(API_SRC, "main.ts"),
-    join(WORKER_SRC, "main.ts"),
-  ]) {
+  for (const entrypoint of [join(API_SRC, "main.ts"), join(WORKER_SRC, "main.ts")]) {
     if (existsSync(entrypoint)) roots.push(entrypoint);
   }
   for (const source of [API_SRC, WORKER_SRC]) {
@@ -80,7 +79,7 @@ const applicationRoots = (): string[] => {
 const serverPackageRoots = (): string[] => {
   const roots: string[] = [];
   for (const feature of subdirectories(join(REPO_ROOT, "modules"))) {
-    const source = join(REPO_ROOT, "modules", feature, "server", "src");
+    const source = join(REPO_ROOT, "modules", feature, "process", "src");
     if (existsSync(source)) roots.push(source);
   }
   for (const packageName of subdirectories(join(REPO_ROOT, "packages"))) {
@@ -258,10 +257,7 @@ describe("browser-only UI never reaches backend code", () => {
   // refuses to count it — that is what lets a backend file name a browser
   // component's props without being reported.
   describe("given a type-only import of a browser package", () => {
-    const module = join(
-      REPO_ROOT,
-      "modules/annotation/browser/src/model/annotation-form-types.ts",
-    );
+    const module = join(REPO_ROOT, "modules/annotation/browser/src/model/annotation-form-types.ts");
     const specifier = "react";
 
     it("still makes that import, so the case has a subject", () => {

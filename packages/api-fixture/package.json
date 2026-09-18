@@ -1,0 +1,33 @@
+{
+  "name": "@langwatch/api-fixture",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The double every LangWatch test composes an *Api with: a proxy that throws by name on any method the test did not configure. A leaf with no dependencies, so the 199 suites that need only this one never install a ClickHouse client or a Prisma schema to get it.",
+  "keywords": [
+    "fixture",
+    "langwatch",
+    "testing"
+  ],
+  "license": "MIT",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@langwatch/vitest-config": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

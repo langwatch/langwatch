@@ -14,7 +14,7 @@ import type { Command } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
 import type { MonitorIdInput, MonitorWithEvaluator } from "@langwatch/monitor-contract";
 import { monitorWithEvaluatorSchema } from "@langwatch/monitor-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type {
   EvaluationTraceEvent,
   EvaluationTraceSpan,

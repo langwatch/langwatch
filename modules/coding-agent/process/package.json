@@ -56,8 +56,8 @@
   "devDependencies": {
     "@langwatch/group-queue": "workspace:*",
     "@langwatch/metric-process": "workspace:*",
-    "@langwatch/test-harness": "workspace:*",
     "@langwatch/trace-process": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
     "@testcontainers/redis": "catalog:",
     "@types/node": "catalog:",
     "typescript": "catalog:",

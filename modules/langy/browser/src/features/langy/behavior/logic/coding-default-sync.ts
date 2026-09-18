@@ -1,7 +1,7 @@
+import { useLangyStore } from "@langwatch/langy-browser-kit";
 import { LANGY_CHAT_FEATURE_KEY } from "@langwatch/model-provider-contract";
 
 import type { api } from "../../../../behavior/langy-api.ts";
-import { useLangyStore } from "../../../../behavior/langy.store.ts";
 
 type ApiUtils = ReturnType<typeof api.useUtils>;
 

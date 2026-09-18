@@ -38,6 +38,9 @@
       "path": "../../enterprise/modules/licensing/contract/tsconfig.build.json"
     },
     {
+      "path": "../error-presentation/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/feature-flag/contract/tsconfig.build.json"
     },
     {
@@ -47,7 +50,13 @@
       "path": "../observability/tsconfig.build.json"
     },
     {
+      "path": "../react-rum/tsconfig.build.json"
+    },
+    {
       "path": "../time/tsconfig.build.json"
+    },
+    {
+      "path": "../vitest-config/tsconfig.build.json"
     }
   ]
 }

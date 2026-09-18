@@ -22,5 +22,8 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/worker": "workspace:*",
     "vite": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/vitest-config": "workspace:*"
   }
 }

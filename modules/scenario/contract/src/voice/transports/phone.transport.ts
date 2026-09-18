@@ -185,9 +185,7 @@ function normalizeToHttpUrl(value: string): string | undefined {
 /** App's public base URL for Twilio media stream: VOICE_PUBLIC_BASE_URL or
  * BASE_HOST; normalized via normalizeToHttpUrl, throws if unparseable.
  */
-export function resolvePublicBaseUrl(
-  processEnv: NodeJS.ProcessEnv = process.env,
-): string | undefined {
+export function resolvePublicBaseUrl(processEnv: NodeJS.ProcessEnv): string | undefined {
   const resolved = resolvePublicBaseUrlWithSource(processEnv);
   return resolved?.value;
 }
@@ -195,7 +193,7 @@ export function resolvePublicBaseUrl(
 /** Same resolution as {@link resolvePublicBaseUrl}, but also reports which env
  *  var the value came from, so a caller can log it alongside the value. */
 export function resolvePublicBaseUrlWithSource(
-  processEnv: NodeJS.ProcessEnv = process.env,
+  processEnv: NodeJS.ProcessEnv,
 ): { value: string; source: PublicBaseUrlSource } | undefined {
   const fromWorker = processEnv.VOICE_PUBLIC_BASE_URL?.trim();
   if (fromWorker) {
@@ -223,7 +221,7 @@ export function resolvePublicBaseUrlWithSource(
  * valid, else `0` (OS-assigned). Lets an operator route a public origin to
  * the child in a single-worker deployment; slice 3's handoff supersedes it.
  */
-export function resolveHttpPort(processEnv: NodeJS.ProcessEnv = process.env): number {
+export function resolveHttpPort(processEnv: NodeJS.ProcessEnv): number {
   const raw = processEnv.VOICE_WS_PORT?.trim();
   if (!raw) return 0;
   const port = Number(raw);
@@ -235,7 +233,7 @@ export function resolveHttpPort(processEnv: NodeJS.ProcessEnv = process.env): nu
  *  Twilio adapter and a controlled env stand in for the real SDK and host. */
 export interface PhoneTransportDeps {
   twilioAgentFactory?: TwilioAgentFactory;
-  processEnv?: NodeJS.ProcessEnv;
+  processEnv: NodeJS.ProcessEnv;
 }
 
 /** The Twilio branch of the credential union, or a thrown error. A credential
@@ -294,7 +292,7 @@ function withOutboundDial(
  * Build the phone transport runner from its dependencies. `phoneTransport` is
  * the production instance; tests build their own with a fake adapter factory.
  */
-export function createPhoneTransport(deps: PhoneTransportDeps = {}): VoiceTransportRunner {
+export function createPhoneTransport(deps: PhoneTransportDeps): VoiceTransportRunner {
   const twilioAgentFactory = deps.twilioAgentFactory ?? defaultTwilioAgentFactory;
 
   return {
@@ -336,9 +334,7 @@ export function createPhoneTransport(deps: PhoneTransportDeps = {}): VoiceTransp
         // (set at boot, forwarded by the child's environment), read from the
         // same env the base URL was resolved from so a test's injected env is
         // honored.
-        const reason = (deps.processEnv ?? process.env)[
-          VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV
-        ]?.trim();
+        const reason = deps.processEnv[VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV]?.trim();
         logger.error(
           { agentId, streamBaseUrlSource: source, reason },
           "no voice public base URL for outbound call; refusing to dial",
@@ -383,5 +379,3 @@ export function createPhoneTransport(deps: PhoneTransportDeps = {}): VoiceTransp
     },
   };
 }
-
-export const phoneTransport: VoiceTransportRunner = createPhoneTransport();

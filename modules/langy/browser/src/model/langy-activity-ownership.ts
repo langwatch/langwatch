@@ -1,4 +1,4 @@
-import type { LangyProgressSample } from "./values/langy-turn.ts";
+import type { LangyProgressSample } from "@langwatch/langy-browser-kit";
 
 /**
  * One piece of work gets one visible progress owner.

@@ -6,7 +6,7 @@
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { DEFAULT_CLICKHOUSE_SETTINGS } from "@langwatch/clickhouse-client";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
-import { migrateTestClickHouseOnce, startTestClickHouseEndpoints } from "@langwatch/test-harness";
+import { migrateTestClickHouseOnce, startTestClickHouseEndpoints } from "@langwatch/test-harness/clickhouse";
 
 /** The one endpoint name the gateway's migrated-schema suites ask for. */
 const MIGRATED_ENDPOINT_SUITE = "gateway-migrated";

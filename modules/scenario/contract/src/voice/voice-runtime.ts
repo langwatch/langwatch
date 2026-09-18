@@ -3,11 +3,12 @@
  * public index because they value-import the ElevenLabs SDK, which drags grpc,
  * ffmpeg-static and `open` behind it. Server-side callers import this path.
  */
-export { voiceTransportRegistry } from "./voice-transport.registry.ts";
+export { createVoiceTransportRegistry } from "./voice-transport.registry.ts";
 export type {
   ElevenLabsCredential,
   VoiceSessionConnect,
   VoiceTransportCredential,
   VoiceTransportRunner,
 } from "./voice-transport.registry.ts";
-export { PHONE_NO_CREDENTIAL_MESSAGE, phoneTransport } from "./transports/phone.transport.ts";
+export type { VoiceTransport } from "./voice-transport.ts";
+export { PHONE_NO_CREDENTIAL_MESSAGE } from "./transports/phone.transport.ts";

@@ -2,7 +2,7 @@
  * @vitest-environment node
  */
 import { ScenarioTestSuiteNotFoundError, type ScenarioApi } from "@langwatch/scenario-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { createSuiteTestApp } from "./suite.fixture.ts";

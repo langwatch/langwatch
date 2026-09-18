@@ -1,6 +1,6 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import type { AutosaveState } from "@langwatch/dataset-browser-kit";
 import { useDatasetRecordSync } from "@langwatch/dataset-browser/dataset-record-sync";
-import type { AutosaveState } from "@langwatch/dataset-browser/dataset-table";
 import { useCallback } from "react";
 
 import type { DatasetReference } from "../../model/experiments-v3/types.ts";

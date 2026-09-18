@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import type { Period } from "@langwatch/analytics-browser-kit/period-selector";
+import type { Period } from "@langwatch/analytics-browser-kit";
 import { fromDate, nowInstant, subDays, type Instant } from "@langwatch/time";
 import { useEffect } from "react";
 

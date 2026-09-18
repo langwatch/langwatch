@@ -16,10 +16,8 @@ vi.mock("posthog-js", () => ({
 
 // The Langy announcement starts its conversation in place rather than routing.
 const askLangy = vi.fn();
-vi.mock("@langwatch/langy-browser/surfaces/langy-store", () => ({
+vi.mock("@langwatch/langy-browser-kit", () => ({
   useLangyStore: (selector: (s: unknown) => unknown) => selector({ askLangy }),
-}));
-vi.mock("@langwatch/langy-browser/surfaces/langy-mark", () => ({
   LangyMark: () => null,
 }));
 vi.mock("@langwatch/langy-browser/surfaces/asaplangy", () => ({

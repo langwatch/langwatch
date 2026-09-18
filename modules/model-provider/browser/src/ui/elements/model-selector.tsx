@@ -17,8 +17,9 @@ import { titleCase } from "@langwatch/design-system/string-casing";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   modelProviderIcons,
+  NoModelsConfiguredCallout,
   ProviderIconGlyph,
-} from "@langwatch/model-provider-browser-kit/provider-icons";
+} from "@langwatch/model-provider-browser-kit";
 import {
   isCodexModel,
   isModelAllowedForFeature,
@@ -34,8 +35,6 @@ import {
 import { AlertTriangle, Search } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { LuSettings2 } from "react-icons/lu";
-
-import { NoModelsConfiguredCallout } from "./no-models-configured-callout.tsx";
 
 export type ModelOption = {
   label: string;

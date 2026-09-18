@@ -10,17 +10,17 @@
   "main": "./src/index.ts",
   "types": "./dist/index.d.ts",
   "exports": {
-    "./api-fixture": {
-      "types": "./dist/api-fixture.d.ts",
-      "default": "./src/api-fixture.ts"
+    "./clickhouse": {
+      "types": "./dist/clickhouse-test-endpoints.d.ts",
+      "default": "./src/clickhouse-test-endpoints.ts"
     },
-    "./vitest-config": {
-      "types": "./dist/vitest-config.d.ts",
-      "default": "./src/vitest-config.ts"
+    "./nlpgo": {
+      "types": "./dist/nlpgo.d.ts",
+      "default": "./src/nlpgo.ts"
     },
-    "./vitest-browser-config": {
-      "types": "./dist/vitest-browser-config.d.ts",
-      "default": "./src/vitest-browser-config.ts"
+    "./prisma": {
+      "types": "./dist/cleanup-test-rows.d.ts",
+      "default": "./src/cleanup-test-rows.ts"
     },
     ".": {
       "types": "./dist/index.d.ts",
@@ -36,6 +36,7 @@
     "@clickhouse/client": "catalog:",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
     "@testcontainers/clickhouse": "catalog:",
     "nanoid": "catalog:",
     "picomatch": "^4.0.4",
@@ -43,23 +44,8 @@
     "typescript": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/workflow-process": "workspace:*",
     "@types/node": "catalog:",
     "@types/picomatch": "^4.0.2",
-    "@vitest/browser-playwright": "catalog:",
-    "playwright": "catalog:",
     "vitest": "catalog:"
-  },
-  "peerDependencies": {
-    "@vitest/browser-playwright": "^5.0.0",
-    "playwright": "*"
-  },
-  "peerDependenciesMeta": {
-    "@vitest/browser-playwright": {
-      "optional": true
-    },
-    "playwright": {
-      "optional": true
-    }
   }
 }

@@ -213,3 +213,8 @@ dev/docs/plans/handover-*.md
 
 # pnpm content-addressable store — a local package cache, never source
 .pnpm-store/
+
+# Nx task cache and project-graph state. The cache is machine-local and the
+# workspace-data directory is a derived index; neither is source (ADR-150).
+.nx/cache
+.nx/workspace-data

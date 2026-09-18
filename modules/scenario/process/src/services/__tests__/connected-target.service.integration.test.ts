@@ -1,7 +1,7 @@
 /** @vitest-environment node */
 /** @see specs/agents/connected-agents.feature */
 import type { Agent, AgentApi, AgentOverview } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { ConnectedTargetService } from "../connected-target.service.ts";

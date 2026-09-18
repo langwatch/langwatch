@@ -21,6 +21,10 @@ import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { nowInstant } from "@langwatch/time";
 import {
+  datasetDatabaseRecordsToInMemoryDataset,
+  inMemoryDatasetToNodeDataset,
+} from "@langwatch/workflow-browser-kit";
+import {
   getEntryInputs,
   parseStudioWorkflow,
   type Project,
@@ -35,10 +39,6 @@ import { useModelProviderKeys } from "../../../behavior/optimization_studio/use-
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { publishedWorkflowSchema } from "../../../model/published-workflow.ts";
-import {
-  datasetDatabaseRecordsToInMemoryDataset,
-  inMemoryDatasetToNodeDataset,
-} from "../../../model/studio-dataset.utils.ts";
 import { AddModelProviderKey } from "../../elements/optimization_studio/add-model-provider-key.tsx";
 import { RenderCode } from "../code/render-code.tsx";
 import { useVersionState } from "./history.tsx";

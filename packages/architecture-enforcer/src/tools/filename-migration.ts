@@ -1,9 +1,11 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, relative, resolve, sep } from "node:path";
-import ts from "typescript";
-import { walkFiles } from "../workspace/layout.ts";
+
 import { isLowerKebabFilename } from "@langwatch/oxlint-rules/grammar/feature-layout-policy.mjs";
+import ts from "typescript";
+
+import { walkFiles } from "../workspace/layout.ts";
 import { discoverClassifiedPackages } from "../workspace/snapshot.ts";
 
 const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
@@ -92,7 +94,10 @@ function canonicalFilename(name: string): string {
 
 function strictSourceFiles(root: string): string[] {
   const isFeatureSurface = (pkg: { kind: string }) =>
-    pkg.kind === "contract" || pkg.kind === "server" || pkg.kind === "web";
+    pkg.kind === "contract" ||
+    pkg.kind === "process" ||
+    pkg.kind === "browser" ||
+    pkg.kind === "browser-kit";
 
   return discoverClassifiedPackages(root)
     .packages.filter((pkg) => isFeatureSurface(pkg))

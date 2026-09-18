@@ -7,6 +7,7 @@ import { AuthUnavailableError } from "@langwatch/auth-contract";
  * @see specs/auth/auth-rest-family-mounted.feature
  */
 import { createLogger } from "@langwatch/observability";
+import { ScopedSecrets } from "@langwatch/secrets";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryAuthRepositories } from "../../repositories/memory/memory.auth.repositories.ts";
@@ -28,7 +29,7 @@ const VERIFIED: VerifiedBrowserSession = {
 } as VerifiedBrowserSession;
 
 /** `named` supplies NEXTAUTH_SECRET and NEXTAUTH_URL together, or neither. */
-function appFor(named = false): AuthApp {
+async function appFor(named = false): Promise<AuthApp> {
   return AuthApp.create({
     config: {
       sessionUrl: named ? BROWSER_SESSION.baseUrl : undefined,
@@ -50,8 +51,7 @@ function appFor(named = false): AuthApp {
       redis: null as never,
       rateLimiter: { check: async () => ({ allowed: true }) } as never,
       secrets: {
-        find: (key: string) =>
-          named && key === "NEXTAUTH_SECRET" ? BROWSER_SESSION.secret : undefined,
+        find: () => undefined,
         read: (key: string) => {
           throw new Error(`test double does not stub secrets.read("${key}")`);
         },
@@ -68,20 +68,23 @@ function appFor(named = false): AuthApp {
       processName: "langwatch-api",
     },
     resources: { own: () => undefined } as never,
-    secrets: {} as never,
+    // The deployment's session key reaches the app through its declared handle.
+    secrets: new ScopedSecrets(async (_handle, build) =>
+      build(named ? BROWSER_SESSION.secret : void 0),
+    ),
   });
 }
 
 describe("given a deployment that named no browser-session identity", () => {
-  it("composes no instance and refuses the sign-in door by name", () => {
-    const app = appFor();
+  it("composes no instance and refuses the sign-in door by name", async () => {
+    const app = await appFor();
 
     expect(() => app.betterAuth()).toThrowError(AuthUnavailableError);
     expect(() => app.betterAuth()).toThrowError(/NEXTAUTH_SECRET and NEXTAUTH_URL/);
   });
 
   it("verifies every caller as anonymous rather than failing", async () => {
-    const app = appFor();
+    const app = await appFor();
 
     await expect(app.tryVerifyBrowserSession({ headers: new Headers() })).resolves.toBeNull();
     await expect(
@@ -91,14 +94,14 @@ describe("given a deployment that named no browser-session identity", () => {
 });
 
 describe("given a deployment that named one", () => {
-  it("composes exactly one instance, shared by every caller", () => {
-    const app = appFor(true);
+  it("composes exactly one instance, shared by every caller", async () => {
+    const app = await appFor(true);
 
     expect(app.betterAuth()).toBe(app.betterAuth());
   });
 
   it("verifies a browser session through that instance and accepts what it accepts", async () => {
-    const app = appFor(true);
+    const app = await appFor(true);
     const getSession = vi.fn(async () => VERIFIED);
     app.betterAuth().api.getSession = getSession as never;
 
@@ -109,7 +112,7 @@ describe("given a deployment that named one", () => {
   });
 
   it("refuses a session that instance rejects, without raising", async () => {
-    const app = appFor(true);
+    const app = await appFor(true);
     app.betterAuth().api.getSession = (async () => null) as never;
 
     await expect(
@@ -120,7 +123,7 @@ describe("given a deployment that named one", () => {
 
 describe("when the born-finalized entrance is reached", () => {
   it("refuses by name rather than signing somebody up outside the birth context", async () => {
-    const app = appFor(true);
+    const app = await appFor(true);
 
     await expect(app.runWithIdentityBirth(async () => "unreached")).rejects.toThrowError(
       /identity birth context/,

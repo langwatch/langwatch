@@ -1,4 +1,4 @@
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { Span, TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 

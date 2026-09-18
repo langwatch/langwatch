@@ -7,6 +7,10 @@
 import { defineWebModule } from "@langwatch/ui-kernel";
 
 export const scenarioWeb = defineWebModule("scenario")
+  .withHosts({
+    requires: ["ScenarioHostApi"],
+    mounts: { ScenarioHostApi: { load: () => import("./behavior/scenario-host-mount.tsx") } },
+  })
   .withScreens({
     "pages/[project]/agent-testing/[[...path]]": {
       load: () => import("./ui/sections/simulations/agent-testing.screen.tsx"),

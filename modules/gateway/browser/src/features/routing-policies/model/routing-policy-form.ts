@@ -1,4 +1,4 @@
-import type { ScopeTriadEntry } from "@langwatch/authz-browser-kit/scope-picker";
+import type { ScopeTriadEntry } from "@langwatch/authz-browser-kit";
 /**
  * Routing-policy form schema and mappings between stored and editor formats.
  * Pure functions: testable without React/network/JSX.

@@ -7,7 +7,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { UpdatePromptCommand, VersionedPrompt } from "@langwatch/prompt-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createTestLogger } from "@langwatch/test-harness";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 

@@ -9,7 +9,11 @@
     "noEmitOnError": true,
     "strict": true,
     "jsx": "react-jsx",
-    "lib": ["es2023", "dom", "dom.iterable"],
+    "lib": [
+      "es2023",
+      "dom",
+      "dom.iterable"
+    ],
     "types": [
       "node",
       "react",
@@ -21,7 +25,9 @@
     "rootDir": "..",
     "outDir": ".cache/web-declarations",
     "tsBuildInfoFile": ".cache/web-declarations/tsconfig.build.tsbuildinfo",
-    "customConditions": ["langwatch-declaration-source"],
+    "customConditions": [
+      "langwatch-declaration-source"
+    ],
     "noUncheckedIndexedAccess": true,
     "target": "es2023",
     "verbatimModuleSyntax": true,
@@ -215,6 +221,24 @@
     },
     {
       "path": "../packages/browser-host/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/annotation/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/authz/browser-kit/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/coding-agent/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/langy/browser-kit/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/model-provider/browser-kit/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/trace/browser-kit/tsconfig.build.json"
     }
   ],
   "langwatchDeclarationGroup": {

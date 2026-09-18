@@ -34,10 +34,16 @@
       "path": "../../../packages/csv/tsconfig.build.json"
     },
     {
+      "path": "../browser-kit/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/error-presentation/tsconfig.build.json"
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
@@ -55,7 +61,10 @@
       "path": "../../../packages/ui-kernel/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/test-harness/tsconfig.build.json"
+      "path": "../../workflow/browser-kit/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/vitest-config/tsconfig.build.json"
     }
   ]
 }

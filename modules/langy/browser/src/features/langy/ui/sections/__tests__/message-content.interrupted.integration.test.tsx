@@ -47,7 +47,8 @@ vi.mock("recharts", async (importOriginal) => {
   };
 });
 
-import { useLangyStore } from "../../../../../behavior/langy.store.ts";
+import { useLangyStore } from "@langwatch/langy-browser-kit";
+
 import { MessageContent } from "../message-content.tsx";
 
 afterEach(cleanup);

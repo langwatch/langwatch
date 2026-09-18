@@ -63,9 +63,7 @@ function isNamedVariableDeclaration(
   return isVariableDeclaration(node) && !!node.name && isIdentifier(node.name);
 }
 
-function isNamedPropertyAssignment(
-  node: Node,
-): node is PropertyAssignment & { name: Identifier } {
+function isNamedPropertyAssignment(node: Node): node is PropertyAssignment & { name: Identifier } {
   return isPropertyAssignment(node) && isIdentifier(node.name);
 }
 
@@ -100,10 +98,7 @@ function stringDeclarations(source: SourceFile): Map<string, string> {
         // the members are walked through the API rather than indexed.
         init.forEachChild((property) => {
           if (isStringPropertyAssignment(property)) {
-            table.set(
-              `${name}.${property.name.text}`,
-              property.initializer.text,
-            );
+            table.set(`${name}.${property.name.text}`, property.initializer.text);
           }
         });
       }

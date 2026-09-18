@@ -36,9 +36,6 @@
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
-      "path": "../../dataset/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../evaluator/contract/tsconfig.build.json"
     },
     {

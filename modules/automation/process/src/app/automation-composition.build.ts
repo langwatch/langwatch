@@ -43,9 +43,9 @@ import type {
 import type { AutomationClock } from "./automation.members.ts";
 
 /**
- * What `buildAutomationInfrastructure` reads off process members.
- * `unsubscribeSecret` is reused cipher-key material, not automation's own
- * secret; where it comes from is still open, so it stays a member, not config.
+ * What `buildAutomationInfrastructure` reads off process members. The
+ * unsubscribe key is not among them: `stores` owns `CREDENTIALS_SECRET`, and
+ * the verifier built from it is what travels, never the key.
  */
 export type AutomationProcessMembers = Readonly<{
   prisma: ProcessMembers["prisma"];
@@ -53,19 +53,20 @@ export type AutomationProcessMembers = Readonly<{
   logger: Logger;
   encryption: Encryption;
   publicBaseUrl: string | undefined;
-  unsubscribeSecret: string | undefined;
+  secrets: Readonly<{ find(key: string): string | undefined }>;
 }>;
 
 /** Builds the {@link AutomationInfrastructure} `AutomationApp.create` composes over. */
 export function buildAutomationInfrastructure(input: {
   members: AutomationProcessMembers;
   auditLog: AuditLogApi;
+  verifier: AutomationInfrastructure["verifier"];
 }): AutomationInfrastructure {
   const { members } = input;
   const providers = AutomationProviderRegistryService.create(members.encryption);
 
   return {
-    verifier: HmacUnsubscribeTokenAdapter.create({ secret: members.unsubscribeSecret }),
+    verifier: input.verifier,
     // The report calendar, on the SAME `ScheduledJob` store the worker's loop
     // claims a due row through — Eventing's own, not a second narrowing of it,
     // so the row this process writes on save is the row that process reads.

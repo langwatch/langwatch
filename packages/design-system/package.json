@@ -12,11 +12,19 @@
   "exports": {
     "./format-money-display": {
       "types": "./dist/components/format-money-display.d.ts",
-      "default": "./src/components/format-money-display.ts"
+      "default": "./src/components/format-money-display.tsx"
     },
     "./copy-button": {
       "types": "./dist/components/copy-button.d.ts",
-      "default": "./src/components/copy-button.ts"
+      "default": "./src/components/copy-button.tsx"
+    },
+    "./form-error-display": {
+      "types": "./dist/components/form-error-display.d.ts",
+      "default": "./src/components/form-error-display.tsx"
+    },
+    "./use-reduced-motion": {
+      "types": "./dist/use-reduced-motion.d.ts",
+      "default": "./src/use-reduced-motion.ts"
     },
     ".": {
       "types": "./dist/index.d.ts",

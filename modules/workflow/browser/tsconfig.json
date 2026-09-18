@@ -23,6 +23,9 @@
       "path": "../../../dev/tsconfig.web-declarations.json"
     },
     {
+      "path": "../../agent/browser/tsconfig.build.json"
+    },
+    {
       "path": "../../agent/contract/tsconfig.build.json"
     },
     {
@@ -41,7 +44,16 @@
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/error-presentation/tsconfig.build.json"
+    },
+    {
+      "path": "../../evaluator/browser-kit/tsconfig.build.json"
+    },
+    {
       "path": "../../evaluator/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../experiment/browser-kit/tsconfig.build.json"
     },
     {
       "path": "../../experiment/contract/tsconfig.build.json"
@@ -74,10 +86,16 @@
       "path": "../../trace/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/ui-kernel/tsconfig.build.json"
+    },
+    {
       "path": "../browser-kit/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/vitest-config/tsconfig.build.json"
     }
   ]
 }

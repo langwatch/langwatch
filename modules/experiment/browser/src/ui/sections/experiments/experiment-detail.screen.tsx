@@ -5,6 +5,7 @@ import { api } from "@langwatch/browser-trpc/workflow-api";
 import { HandledErrorAlert } from "@langwatch/workflow-browser/handled-error-views";
 import { useOrganizationTeamProject } from "@langwatch/workflow-browser/studio-scope";
 
+import { useLegacyBatchEvaluations } from "../../../behavior/experiments/use-legacy-batch-evaluations.ts";
 import { ExperimentType } from "../../../model/prisma-types.ts";
 import BatchEvaluation from "../../../ui/elements/experiments/batch-evaluation.tsx";
 // BatchEvaluationV2 kept for reference but no longer used.
@@ -26,6 +27,12 @@ export default function ExperimentPage() {
       enabled: !!project && typeof experimentSlug === "string",
     },
   );
+
+  const legacyBatchEvaluations = useLegacyBatchEvaluations({
+    project,
+    experiment: experiment.data,
+    enabled: !!project && experiment.data?.type === ExperimentType.BATCH_EVALUATION,
+  });
 
   // Check for not found (query completed with error code NOT_FOUND)
   const experimentNotFound = isNotFound(experiment.error);
@@ -69,7 +76,11 @@ export default function ExperimentPage() {
       {project && experiment.data?.type === ExperimentType.DSPY ? (
         <DSPyExperiment project={project} experiment={experiment.data} />
       ) : project && experiment.data?.type === ExperimentType.BATCH_EVALUATION ? (
-        <BatchEvaluation project={project} experiment={experiment.data} />
+        <BatchEvaluation
+          project={project}
+          experiment={experiment.data}
+          evaluations={legacyBatchEvaluations}
+        />
       ) : !project ||
         experiment.data === undefined ||
         experiment.data.type === ExperimentType.BATCH_EVALUATION_V2 ||

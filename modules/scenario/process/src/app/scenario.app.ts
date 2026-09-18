@@ -174,16 +174,6 @@ export interface ScenarioAppInfrastructure {
    * product analytics and the lifecycle sender. Absent reports nothing.
    */
   activity?: ScenarioActivity;
-  agentAdapterFactory: AgentAdapterFactory;
-  cancellationPublisher: CancellationPublisher;
-  cancellationSubscriber: CancellationSubscriber;
-  scenarioChildBootstrap: ScenarioChildBootstrap;
-  scenarioChildExecutionSession: ScenarioChildExecutionSession;
-  scenarioExecutionPool: ScenarioExecutionPool;
-  scenarioExecutionRunner: ScenarioExecutionRunner;
-  scenarioHttp: ScenarioHttp;
-  scenarioProcessorServiceMetrics: ScenarioProcessorServiceMetrics;
-  scenarioTabStore: ScenarioTabStore;
 }
 
 /** The peer APIs this feature reads directly. */

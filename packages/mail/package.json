@@ -45,6 +45,7 @@
     "@chakra-ui/react": "catalog:",
     "@emotion/react": "catalog:",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",
     "@types/nodemailer": "catalog:",
     "@types/react": "catalog:",

@@ -1,5 +1,6 @@
 import type { PublicAppConfig } from "@langwatch/config/public-app-config";
 
+import { checkHostMounts } from "./ui-host-mounts.ts";
 import { UiFacilitiesSupply, UiShellSupply } from "./ui-supply.options.ts";
 import type {
   CheckedUiModules,
@@ -81,7 +82,15 @@ type UiSupplyState = Readonly<{
   mount: string | Element;
   modules: readonly SupplyModule[];
   supplied: SupplyRecord;
+  mountedByShell: readonly string[];
 }>;
+
+/**
+ * `UiScopeHost` is mounted by this package's own `createUiFeatureShell`
+ * (`ui-feature-shell.tsx`), unconditionally — no module declares it, so no
+ * module needs to.
+ */
+const KERNEL_MOUNTED_HOSTS: readonly string[] = ["UiScopeHost"];
 
 declare const uiSupplyState: unique symbol;
 
@@ -109,7 +118,7 @@ export class UiSupply<
   }
 
   static create(options: CreateUiOptions): UiSupply {
-    return new UiSupply({ ...options, modules: [], supplied: {} });
+    return new UiSupply({ ...options, modules: [], supplied: {}, mountedByShell: [] });
   }
 
   withModules<const Next extends readonly SupplyModule[]>(
@@ -119,6 +128,17 @@ export class UiSupply<
     return new UiSupply<[...Modules, ...Next], Supplied>({
       ...this.#state,
       modules: [...this.#state.modules, ...modules],
+    });
+  }
+
+  /**
+   * `*HostApi` names the composing application mounts itself, outside any
+   * module's tree — a mount this package otherwise cannot see.
+   */
+  withMountedHosts(hosts: readonly string[]): UiSupply<Modules, Supplied, Outstanding> {
+    return new UiSupply({
+      ...this.#state,
+      mountedByShell: [...this.#state.mountedByShell, ...hosts],
     });
   }
 
@@ -158,6 +178,10 @@ export class UiSupply<
   async #render(): Promise<UiRenderResult> {
     const missing = this.#missingSupplies();
     if (missing.length > 0) throw new BrowserSupplyMissingError(missing);
+    checkHostMounts({
+      modules: this.#state.modules,
+      mountedByShell: [...KERNEL_MOUNTED_HOSTS, ...this.#state.mountedByShell],
+    });
     const mount = this.#resolveMount();
     const config = this.#readConfig();
     return {

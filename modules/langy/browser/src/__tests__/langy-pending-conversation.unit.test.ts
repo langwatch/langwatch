@@ -1,6 +1,5 @@
+import { useLangyStore } from "@langwatch/langy-browser-kit";
 import { beforeEach, describe, expect, it } from "vitest";
-
-import { useLangyStore } from "../behavior/langy.store.ts";
 
 /**
  * The id a panel-open warm mints is held as `pendingConversationId` so the first send

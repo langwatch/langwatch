@@ -12,7 +12,7 @@ import {
 import { Avatar } from "@langwatch/design-system/avatar";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { HistoryIcon } from "@langwatch/model-provider-browser/history-icon";
+import { HistoryIcon } from "@langwatch/model-provider-browser-kit";
 import { useState } from "react";
 import { LuChevronRight } from "react-icons/lu";
 

@@ -1,7 +1,4 @@
-import {
-  INHERIT_SENTINEL,
-  ProviderModelSelector,
-} from "@langwatch/model-provider-browser/surfaces/provider-model-selector";
+import { INHERIT_SENTINEL, ProviderModelSelector } from "@langwatch/model-provider-browser-kit";
 import { useMemo } from "react";
 
 import { api } from "../../../behavior/scenario-api.ts";

@@ -27,6 +27,9 @@
   "references": [
     {
       "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../vitest-config/tsconfig.build.json"
     }
   ]
 }

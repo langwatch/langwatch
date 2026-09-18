@@ -6,7 +6,6 @@ export {
   LangyTrustedMessage,
   type PostgresLangyAdapterOptions,
 } from "./services/langy-postgres.service.ts";
-export type { LangyInfrastructure } from "./app/langy.members.ts";
 export { langyServer } from "./langy.server.ts";
 export { type LangyNavigateProject } from "./app/langy.members.ts";
 export type { LangyNavigateResourceLocator } from "./app/langy.members.ts";

@@ -29,16 +29,17 @@
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/kernel": "workspace:*",
-    "@langwatch/process-stores": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@trpc/server": "catalog:",
     "better-auth": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/api-fixture": "workspace:*",
     "@langwatch/auth-contract": "workspace:*",
-    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

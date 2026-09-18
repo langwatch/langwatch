@@ -1,6 +1,6 @@
 import type { DataPrivacyScope, ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
 import type { ProjectApi, ProjectWithTeam, Team } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 
 import {
   type DataPrivacyDirectoryReader,

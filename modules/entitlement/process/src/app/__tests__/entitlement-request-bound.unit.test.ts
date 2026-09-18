@@ -3,7 +3,7 @@ import { EntitlementApi, type Plan } from "@langwatch/entitlement-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { REQUEST_BOUND_KEYS, requestBounds } from "@langwatch/plans";
 import { createTestLogger } from "@langwatch/test-harness";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { createAbsentRequestBound, entitlementServer } from "../../entitlement.server.ts";

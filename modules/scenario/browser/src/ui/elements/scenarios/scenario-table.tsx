@@ -1,8 +1,5 @@
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
-import {
-  LangyContextTarget,
-  scenarioContextChip,
-} from "@langwatch/langy-browser/surfaces/langy-context";
+import { LangyContextTarget, scenarioContextChip } from "@langwatch/langy-browser-kit";
 import { fromDate } from "@langwatch/time";
 import type { ColumnFiltersState, RowSelectionState } from "@tanstack/react-table";
 

@@ -4,8 +4,9 @@
  * Spec: specs/setup/test-teardown-safety.feature
  */
 
-import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { describe, expect, it, vi } from "vitest";
+
 import { cleanupTestRows } from "../cleanup-test-rows.ts";
 
 function recordingPrisma() {

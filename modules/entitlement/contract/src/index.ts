@@ -1,4 +1,5 @@
 export { entitlementConfig, type EntitlementConfig } from "./entitlement.config.ts";
+export * from "./member-classification.ts";
 export type { MoneyByCurrency, Plan, PlanInfo, PlanSource } from "./plan.ts";
 export { EntitlementApi } from "./entitlement.api.ts";
 export type {

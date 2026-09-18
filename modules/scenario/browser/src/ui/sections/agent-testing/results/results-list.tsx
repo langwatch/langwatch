@@ -3,11 +3,7 @@ import { Box, EmptyState, HStack, Skeleton, Text, VStack } from "@chakra-ui/reac
  * The Results tab list: the filter row, the charts it drives, and the table.
  * @see specs/features/agent-testing/results-tabs.feature
  */
-import type {
-  Period,
-  PeriodMode,
-  RelativePresetKey,
-} from "@langwatch/analytics-browser-kit/period-selector";
+import type { Period, PeriodMode, RelativePresetKey } from "@langwatch/analytics-browser-kit";
 import type { Instant } from "@langwatch/time";
 import { FlaskConical, Plus } from "lucide-react";
 

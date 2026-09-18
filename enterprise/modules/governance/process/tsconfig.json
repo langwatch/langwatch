@@ -84,6 +84,9 @@
       "path": "../../../../modules/trace/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/api-fixture/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/clickhouse-client/tsconfig.build.json"
     },
     {
@@ -97,6 +100,9 @@
     },
     {
       "path": "../../../../modules/trace/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/vitest-config/tsconfig.build.json"
     }
   ]
 }

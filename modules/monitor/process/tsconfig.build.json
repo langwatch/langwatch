@@ -48,9 +48,6 @@
       "path": "../../evaluator/contract/tsconfig.build.json"
     },
     {
-      "path": "../../evaluator/process/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {

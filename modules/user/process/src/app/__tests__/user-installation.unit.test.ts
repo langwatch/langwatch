@@ -3,7 +3,7 @@ import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { UserApi } from "@langwatch/user-contract";
 import { hash } from "bcrypt";
 import { describe, expect, it } from "vitest";

@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { cleanupTestRows } from "@langwatch/test-harness";
+import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 /**
  * Real-Postgres coverage for Default Models read visibility when a member's project
  * access comes from ROLE BINDINGS only (org-scope MEMBER + team-scope MEMBER, no legacy

@@ -1,8 +1,10 @@
 import { join, relative, sep } from "node:path";
+
 import ts from "typescript";
+
+import type { ArchitectureViolation } from "../../types.ts";
 import { sourceFile } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
-import type { ArchitectureViolation } from "../../types.ts";
 
 const POLICY = "boundary-signature-mirrors";
 const UTILITY_TYPES = new Set(["Parameters", "ReturnType", "ConstructorParameters"]);
@@ -46,7 +48,7 @@ function isBoundarySource(file: string, root: string): boolean {
     isFeature && parts[2 + featureOffset] === "contract" && parts[3 + featureOffset] === "src";
 
   const isServerApp =
-    isFeature && parts[2 + featureOffset] === "server" && parts[4 + featureOffset] === "app";
+    isFeature && parts[2 + featureOffset] === "process" && parts[4 + featureOffset] === "app";
 
   const isApplicationComposition = isApplicationCompositionPath(parts, file);
 

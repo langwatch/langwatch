@@ -3,8 +3,8 @@
  */
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
+import { useReducedMotion, type LangyProgressSample } from "@langwatch/langy-browser-kit";
 
-import { useReducedMotion } from "../../../../../behavior/use-reduced-motion.ts";
 import {
   formatLangyPreviewCount,
   formatLangyProgressCount,
@@ -12,7 +12,6 @@ import {
 import type { CapabilitySurface } from "../../../../../model/langy-capability-catalog.ts";
 import { type CapabilityCommand } from "../../../../../model/langy-capability-digest.ts";
 import { langyThinkingShimmerStyles } from "../../../../../model/values/langy-shimmer.ts";
-import { type LangyProgressSample } from "../../../../../model/values/langy-turn.ts";
 import { LangyInterruptedNote } from "../../../../../ui/elements/langy-interrupted-note.tsx";
 import { useProjectedProgress } from "../../../../../ui/sections/streaming-status-line.tsx";
 import { useCapabilityData } from "../../../behavior/use-capability-data.ts";

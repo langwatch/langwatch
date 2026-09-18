@@ -12,9 +12,8 @@ import {
   toComparisonConfig,
   disambiguateNames,
 } from "@langwatch/experiment-contract";
-import { useLatestPromptVersion } from "@langwatch/prompt-browser/latest-prompt-version";
-import { VersionBadge } from "@langwatch/prompt-browser/prompt-version";
-import { ColorfulBlockIcon } from "@langwatch/workflow-browser-kit/workflow-icons";
+import { VersionBadge } from "@langwatch/prompt-browser-kit";
+import { ColorfulBlockIcon } from "@langwatch/workflow-browser-kit";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import { Bot, Swords, Trophy } from "lucide-react";
 import { memo, useMemo, useState } from "react";
@@ -36,6 +35,7 @@ import {
 } from "react-icons/lu";
 
 import { useEvaluationsV3Store } from "../../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
+import { useLatestPromptVersion } from "../../../../behavior/experiments-v3/use-latest-prompt-version.ts";
 import { usePromptTemplateFields } from "../../../../behavior/experiments-v3/use-prompt-template-fields.ts";
 import {
   useTargetName,
