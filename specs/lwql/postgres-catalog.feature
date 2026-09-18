@@ -77,6 +77,14 @@ Feature: Every tenant-scoped Postgres table is queryable through LangWatchQL by 
       When a caller in the first project queries the virtual_keys view
       Then they see only keys belonging to their own organization
 
+    # @unimplemented: IngestionSource carries teamId; the team's projects are the tenants.
+    @unit @unimplemented
+    Scenario: A team-scoped model fans out to one row per project in the team
+      Given a model whose tenant column is teamId
+      When the Postgres catalog is derived
+      Then the view joins through Team.projects and emits one row per project as TenantId
+      And the fan-out uses the same shared helper as the organization scope
+
     # @unimplemented: GatewayBudgetLedger has no tenant column of its own.
     @unit @unimplemented
     Scenario: A model without a tenant column is reached through a declared parent
@@ -159,7 +167,7 @@ Feature: Every tenant-scoped Postgres table is queryable through LangWatchQL by 
     Scenario: Topic clustering internals are not exposed
       Given the derived topics view
       When its columns are listed
-      Then centroid, embeddings_model and p95Distance are absent
+      Then Centroid, EmbeddingsModel and P95Distance are absent
       And TopicId, TopicName, ParentTopicId and TenantId are present
 
   Rule: The gap list burns down to zero
