@@ -45,7 +45,6 @@ function buildCaller(options: { manageable: readonly string[] }) {
         workflow: createApiFixture<WorkflowApi>(),
       },
       members: {
-        prisma: {} as never,
         logger: createLogger("prompt-tag-cascade-test"),
         rateLimiter: { check: async () => ({ allowed: true }) },
         publicBaseUrl: "https://app.langwatch.test",

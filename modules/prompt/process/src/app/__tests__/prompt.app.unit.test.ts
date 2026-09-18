@@ -11,6 +11,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { MemoryPromptRepositories } from "../../repositories/memory/memory.prompt.repositories.ts";
 import type { PromptService } from "../../services/prompt.service.ts";
 import { PromptApp } from "../prompt.app.ts";
 
@@ -68,7 +69,6 @@ function harness() {
         workflow: createApiFixture<WorkflowApi>(),
       },
       members: {
-        prisma: {} as never,
         logger: createTestLogger().logger,
         rateLimiter: { check: async () => ({ allowed: true }) },
         publicBaseUrl: "https://app.langwatch.test",
@@ -304,16 +304,8 @@ describe("PromptApp.commitMessageFor", () => {
 });
 
 describe("PromptApp.create", () => {
-  describe("given only the process members it declares reading", () => {
-    it("builds a working engine over `prisma`, rather than crashing on an undefined member", async () => {
-      // Before this app declared `reads("prisma", "logger")`, nothing built
-      // `members.prompts` and this call crashed with "Cannot read properties
-      // of undefined (reading 'getAllPrompts')" - the exact defect apidiff
-      // measured on GET /api/prompts, GET /api/prompts/tags, POST
-      // /api/prompts and POST /api/prompts/tags.
-      const fakePrisma = {
-        llmPromptConfig: { findMany: vi.fn(async () => []) },
-      } as never;
+  describe("given its declared repository bundle", () => {
+    it("builds a working engine over memory repositories", async () => {
       const { logger: fakeLogger, lines } = createTestLogger();
 
       const app = PromptApp.create({
@@ -327,7 +319,6 @@ describe("PromptApp.create", () => {
           workflow: createApiFixture<WorkflowApi>(),
         },
         members: {
-          prisma: fakePrisma,
           logger: fakeLogger,
           rateLimiter: { check: async () => ({ allowed: true }) },
           publicBaseUrl: "https://app.langwatch.test",
@@ -335,6 +326,7 @@ describe("PromptApp.create", () => {
         config: undefined,
         resources: { own: () => {}, ownService: () => {} },
         secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
+        repositories: MemoryPromptRepositories.create(),
       });
 
       await expect(

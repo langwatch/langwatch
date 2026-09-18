@@ -7,6 +7,7 @@ import {
   type PostgresPromptAdapterOptions,
 } from "./app/prompt-composition.build.ts";
 import { PromptApp } from "./app/prompt.app.ts";
+import { promptRepositories } from "./repositories/prompt-repositories.registry.ts";
 import { promptExecuteRest } from "./transport/prompt-execute.rest.ts";
 import { promptTagTrpcTransport } from "./transport/prompt-tag.trpc.ts";
 import { promptRest, promptRestCredential, promptRestFacts } from "./transport/prompt.rest.ts";
@@ -14,6 +15,7 @@ import { promptTrpcTransport } from "./transport/prompt.trpc.ts";
 
 /** Prompt library server — tRPC, REST, and the browser-only playground stream. */
 export const promptServer = defineServerModule("prompt")
+  .withRepositories(promptRepositories)
   .withApp(PromptApp)
   .withTransports(promptRest, promptExecuteRest, promptTrpcTransport, promptTagTrpcTransport)
   // Both facts come off the credential the request already carries: the

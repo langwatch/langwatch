@@ -39,11 +39,13 @@ import {
 } from "@langwatch/prompt-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
+import type { PromptRepositories } from "../repositories/prompt.repositories.ts";
 import { promptsPlatformUrl } from "../rules/prompt-platform-url.rules.ts";
 import { PromptExecuteBoundsService } from "../services/prompt-execute-bounds.service.ts";
 import { PromptExecutionService } from "../services/prompt-execution.service.ts";
-import type { PromptService } from "../services/prompt.service.ts";
-import { PostgresPromptAdapter } from "./prompt-composition.build.ts";
+import { PromptTagService } from "../services/prompt-tag.service.ts";
+import { PromptVersionService } from "../services/prompt-version.service.ts";
+import { PromptService } from "../services/prompt.service.ts";
 
 /**
  * The credential a tag write arrived on. A tag definition is one organization
@@ -96,10 +98,16 @@ type PromptDependencies = Readonly<{
  * itself knows. Absent where the deployment named no `BASE_HOST`, which the
  * platform-link read below already refuses on.
  */
-type PromptMembers = MembersRead<readonly ["prisma", "logger", "rateLimiter"]> &
+type PromptMembers = MembersRead<readonly ["logger", "rateLimiter"]> &
   Readonly<{ publicBaseUrl: string | undefined }>;
 
 type PromptSetup = FeatureSetup<PromptDependencies, PromptMembers, undefined>;
+type PromptRepositorySetup = FeatureSetup<
+  PromptDependencies,
+  PromptMembers,
+  undefined,
+  PromptRepositories
+>;
 
 /** No such tag in the organization's catalog. */
 export class PromptTagMissingError extends NotFoundError {
@@ -148,16 +156,18 @@ export class PromptApp implements PromptApi {
     workflow: WorkflowApi,
   };
   /**
-   * The one member the engine is built over; becomes a declared `repositories`
-   * bundle once the four repositories behind `PostgresPromptAdapter` move onto
-   * `defineRepositories`. `rateLimiter` is the playground door's run counter.
+   * `rateLimiter` is the playground door's run counter.
    */
-  static readonly reads = ["prisma", "logger", "rateLimiter", "publicBaseUrl"] as const;
+  static readonly reads = ["logger", "rateLimiter", "publicBaseUrl"] as const;
 
-  static create(setup: PromptSetup): PromptApp {
-    const prompts: PromptService = PostgresPromptAdapter.create({
-      database: setup.members.prisma,
-    }).build();
+  static create(setup: PromptRepositorySetup): PromptApp {
+    const prompts = PromptService.create({
+      repository: setup.repositories.configs,
+      versionService: PromptVersionService.create(),
+      tagRepository: setup.repositories.tagAssignments,
+      promptTagRepository: setup.repositories.tags,
+      tagService: PromptTagService.create(setup.repositories.tags),
+    });
 
     return PromptApp.createWithPrompts(setup, prompts);
   }
