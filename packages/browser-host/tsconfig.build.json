@@ -35,7 +35,11 @@
     "./src/markdown/index.tsx",
     "./src/isolated-error-boundary.tsx",
     "./src/copy-button.tsx",
-    "./src/drawer/index.ts"
+    "./src/drawer/index.ts",
+    "./src/transport.ts",
+    "./src/sse-subscription-link.ts",
+    "./src/browser-rpc.ts",
+    "./src/address.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
@@ -52,7 +56,13 @@
   ],
   "references": [
     {
+      "path": "../api/tsconfig.build.json"
+    },
+    {
       "path": "../browser-trpc/tsconfig.build.json"
+    },
+    {
+      "path": "../config/tsconfig.build.json"
     },
     {
       "path": "../design-system/tsconfig.build.json"

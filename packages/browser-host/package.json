@@ -117,6 +117,46 @@
     "./drawer": {
       "types": "./dist/drawer/index.d.ts",
       "default": "./src/drawer/index.ts"
+    },
+    "./transport": {
+      "types": "./dist/transport.d.ts",
+      "default": "./src/transport.ts"
+    },
+    "./sse-subscription-link": {
+      "types": "./dist/sse-subscription-link.d.ts",
+      "default": "./src/sse-subscription-link.ts"
+    },
+    "./browser-rpc": {
+      "types": "./dist/browser-rpc.d.ts",
+      "default": "./src/browser-rpc.ts"
+    },
+    "./address": {
+      "types": "./dist/address.d.ts",
+      "default": "./src/address.ts"
+    },
+    "./browser-analytics": {
+      "types": "./dist/browser-analytics.d.ts",
+      "default": "./src/browser-analytics.ts"
+    },
+    "./posthog": {
+      "types": "./dist/posthog.d.ts",
+      "default": "./src/posthog.ts"
+    },
+    "./gtag-readiness": {
+      "types": "./dist/gtag-readiness.d.ts",
+      "default": "./src/gtag-readiness.ts"
+    },
+    "./poll-for-global": {
+      "types": "./dist/poll-for-global.d.ts",
+      "default": "./src/poll-for-global.ts"
+    },
+    "./browser-tracing": {
+      "types": "./dist/browser-tracing.d.ts",
+      "default": "./src/browser-tracing.ts"
+    },
+    "./navigation-tracing": {
+      "types": "./dist/navigation-tracing.d.ts",
+      "default": "./src/navigation-tracing.ts"
     }
   },
   "scripts": {
@@ -124,8 +164,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@tanstack/react-query": "catalog:",
     "@chakra-ui/react": "catalog:",
+    "@langwatch/api": "workspace:*",
     "@langwatch/browser-trpc": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/design-system": "workspace:*",
@@ -133,8 +173,13 @@
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/react-rum": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@tanstack/react-query": "catalog:",
+    "@trpc/client": "catalog:",
+    "@trpc/server": "catalog:",
     "lucide-react": "catalog:",
+    "posthog-js": "catalog:",
     "qs": "catalog:",
     "react-error-boundary": "catalog:",
     "react-feather": "catalog:",
@@ -145,6 +190,9 @@
   },
   "devDependencies": {
     "@emotion/react": "catalog:",
+    "@opentelemetry/api": "catalog:",
+    "@opentelemetry/sdk-trace-base": "catalog:",
+    "@opentelemetry/semantic-conventions": "catalog:",
     "@testing-library/jest-dom": "catalog:",
     "@testing-library/react": "catalog:",
     "@testing-library/user-event": "catalog:",
