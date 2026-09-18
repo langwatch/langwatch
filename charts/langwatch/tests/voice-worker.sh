@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 #
-# Renders the chart and asserts the voice worker (Deployment, Service,
-# Ingress) behaves as documented: on by default but rendering nothing until a
-# public https:// origin resolves (from voice.publicBaseUrl or, failing
-# that, app.http.publicUrl), refusing to render only on an explicit bad
-# value, and shaped correctly once a public address is in play.
+# Renders the chart and asserts the opt-in voice worker (Deployment, Service,
+# Ingress) behaves as documented: absent unless enabled, refusing to render
+# without the two values it cannot work without, and shaped correctly once
+# turned on.
 #
 # This executes the template pipeline rather than reading the templates: the
-# gating conditions, the resolution priority, the required-value checks, and
-# the env/secretKeyRef wiring are only visible in what actually renders.
+# gating conditions, the required-value checks, and the env/secretKeyRef
+# wiring are only visible in what actually renders.
 #
 # See langwatch/langwatch#8015 and the env contract on #8014
 # (voice-env-contract comment).
@@ -52,7 +51,7 @@ render() {
   return $status
 }
 
-# @scenario "A stock install with no https:// URL anywhere renders no voice resources"
+# @scenario "The voice worker is not deployed unless the operator turns it on"
 test_default_has_no_voice_resources() {
   local out
   if ! out=$(render ""); then
@@ -60,10 +59,23 @@ test_default_has_no_voice_resources() {
     return
   fi
   if printf '%s' "$out" | grep -q "templates/voice/"; then
-    fail "default has no voice resources" "default render (no https:// public URL configured anywhere) includes a templates/voice/ manifest"
+    fail "default has no voice resources" "default render includes a templates/voice/ manifest"
     return
   fi
-  echo "ok   [default has no voice resources] stock install (voice.enabled=true, no https:// URL resolvable) renders no templates/voice/ source"
+  echo "ok   [default has no voice resources] no templates/voice/ source in the default render"
+}
+
+# @scenario "Turning the voice worker off explicitly changes nothing"
+test_explicit_false_matches_default() {
+  local default_out explicit_out
+  default_out=$(render "" | normalise)
+  explicit_out=$(render "--set voice.enabled=false" | normalise)
+  if [ "$default_out" != "$explicit_out" ]; then
+    fail "explicit false matches default" \
+      "rendered manifest differs between default and --set voice.enabled=false: $(diff <(printf '%s' "$default_out") <(printf '%s' "$explicit_out") | head -10 | tr '\n' ' ')"
+    return
+  fi
+  echo "ok   [explicit false matches default] --set voice.enabled=false renders identically to the default"
 }
 
 # Renders a profile and prints only one component's manifest, so a value from
@@ -76,21 +88,25 @@ render_component() {
   '
 }
 
-readonly ENABLED_FLAGS="--set voice.publicBaseUrl=https://voice.example.com"
+readonly ENABLED_FLAGS="--set voice.enabled=true --set voice.publicBaseUrl=https://voice.example.com"
 
 # @scenario "Turning on the voice worker brings up a single call handler"
 test_enabled_renders_deployment() {
   local block
   block=$(render_component "deployment.yaml" "$ENABLED_FLAGS")
   if [ -z "$block" ]; then
-    fail "voice deployment" "rendered no voice Deployment with voice.publicBaseUrl set"
+    fail "voice deployment" "rendered no voice Deployment with voice.enabled=true"
     return
   fi
   if ! printf '%s' "$block" | grep -q "replicas: 1"; then
     fail "voice deployment replicas" "expected replicas: 1"
     return
   fi
-  echo "ok   [voice deployment] replicas=1"
+  if ! printf '%s' "$block" | grep -A1 "name: VOICE_WORKER_ONLY" | grep -q 'value: "true"'; then
+    fail "voice deployment VOICE_WORKER_ONLY" "expected VOICE_WORKER_ONLY=true"
+    return
+  fi
+  echo "ok   [voice deployment] replicas=1, VOICE_WORKER_ONLY=true"
 }
 
 # @scenario "The voice worker's shutdown timing is its own, not borrowed from the background workers"
@@ -99,7 +115,7 @@ test_termination_grace_period_follows_voice_values() {
   block=$(render_component "deployment.yaml" \
     "$ENABLED_FLAGS --set voice.terminationGracePeriodSeconds=90 --set voice.shutdownDrainSeconds=60 --set workers.terminationGracePeriodSeconds=999")
   if [ -z "$block" ]; then
-    fail "voice terminationGracePeriodSeconds" "rendered no voice Deployment with voice.publicBaseUrl set"
+    fail "voice terminationGracePeriodSeconds" "rendered no voice Deployment with voice.enabled=true"
     return
   fi
   if ! printf '%s' "$block" | grep -q "terminationGracePeriodSeconds: 90"; then
@@ -109,86 +125,50 @@ test_termination_grace_period_follows_voice_values() {
   echo "ok   [voice terminationGracePeriodSeconds] follows --set voice.terminationGracePeriodSeconds, not workers.*"
 }
 
-# @scenario "The voice worker is reachable inside the cluster and exposed for Twilio by default"
-test_enabled_renders_service_and_ingress_by_default() {
+# @scenario "The voice worker is reachable inside the cluster by default, but not exposed publicly"
+test_enabled_renders_service_no_ingress() {
   local svc ing
   svc=$(render_component "service.yaml" "$ENABLED_FLAGS")
   if [ -z "$svc" ]; then
-    fail "voice service" "rendered no voice Service with voice.publicBaseUrl set"
+    fail "voice service" "rendered no voice Service with voice.enabled=true"
     return
   fi
   if ! printf '%s' "$svc" | grep -q "targetPort: voice-ws"; then
     fail "voice service targetPort" "expected targetPort: voice-ws"
     return
   fi
-  # voice.ingress.enabled now defaults to true, so a resolved public URL is
-  # enough on its own to get an Ingress with no extra values set.
   ing=$(render_component "ingress.yaml" "$ENABLED_FLAGS")
-  if [ -z "$ing" ]; then
-    fail "voice ingress renders by default" "voice.ingress.enabled defaults to true but no Ingress rendered with voice.publicBaseUrl set"
+  if [ -n "$ing" ]; then
+    fail "voice ingress absent by default" "voice.ingress.enabled defaults to false but an Ingress rendered anyway"
     return
   fi
-  echo "ok   [voice service / ingress by default] Service and Ingress both render with zero extra ingress config"
+  echo "ok   [voice service / no ingress] Service renders, Ingress does not (ingress.enabled defaults false)"
 }
 
-# @scenario "The voice worker's public hostname defaults to its resolved public address"
-test_ingress_host_defaults_to_public_base_url_hostname() {
+# @scenario "The voice worker gets its own public hostname for Twilio to call"
+test_ingress_enabled_renders() {
   local ing
-  ing=$(render_component "ingress.yaml" "$ENABLED_FLAGS")
+  ing=$(render_component "ingress.yaml" \
+    "$ENABLED_FLAGS --set voice.ingress.enabled=true --set voice.ingress.host=voice.example.com")
   if [ -z "$ing" ]; then
-    fail "voice ingress default host" "rendered no voice Ingress with voice.publicBaseUrl set"
+    fail "voice ingress enabled" "rendered no voice Ingress with voice.ingress.enabled=true"
     return
   fi
   if ! printf '%s' "$ing" | grep -q "host: \"voice.example.com\""; then
-    fail "voice ingress default host" "expected host: \"voice.example.com\" derived from voice.publicBaseUrl with no voice.ingress.host set, got: $(printf '%s' "$ing" | grep host:)"
+    fail "voice ingress host" "expected host: \"voice.example.com\""
     return
   fi
   if ! printf '%s' "$ing" | grep -q "path: /twilio"; then
     fail "voice ingress path" "expected path: /twilio"
     return
   fi
-  echo "ok   [voice ingress default host] Ingress host defaults to voice.example.com with no voice.ingress.host set"
-}
-
-# @scenario "An explicit public hostname for the voice worker still works"
-test_ingress_host_explicit_override_renders() {
-  local ing
-  ing=$(render_component "ingress.yaml" \
-    "$ENABLED_FLAGS --set voice.ingress.host=voice.example.com")
-  if [ -z "$ing" ]; then
-    fail "voice ingress explicit host" "rendered no voice Ingress with voice.ingress.host set explicitly"
-    return
-  fi
-  if ! printf '%s' "$ing" | grep -q "host: \"voice.example.com\""; then
-    fail "voice ingress explicit host" "expected host: \"voice.example.com\""
-    return
-  fi
-  echo "ok   [voice ingress explicit host] explicit voice.ingress.host matching voice.publicBaseUrl renders"
-}
-
-# @scenario "The voice worker's ingress carries WebSocket-safe timeout annotations by default"
-test_ingress_default_annotations_extend_websocket_timeout() {
-  local ing
-  ing=$(render_component "ingress.yaml" "$ENABLED_FLAGS")
-  if [ -z "$ing" ]; then
-    fail "voice ingress default annotations" "rendered no voice Ingress with voice.publicBaseUrl set"
-    return
-  fi
-  if ! printf '%s' "$ing" | grep -q 'nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"'; then
-    fail "voice ingress default annotations" "expected nginx.ingress.kubernetes.io/proxy-read-timeout: \"3600\" by default"
-    return
-  fi
-  if ! printf '%s' "$ing" | grep -q 'nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"'; then
-    fail "voice ingress default annotations" "expected nginx.ingress.kubernetes.io/proxy-send-timeout: \"3600\" by default"
-    return
-  fi
-  echo "ok   [voice ingress default annotations] nginx proxy-read/send-timeout default to 3600s"
+  echo "ok   [voice ingress enabled] Ingress renders for voice.example.com at /twilio"
 }
 
 # @scenario "The voice worker refuses to expose a hostname that doesn't match its own public address"
 test_ingress_host_mismatch_refuses() {
   local out
-  if out=$(render "$ENABLED_FLAGS --set voice.ingress.host=other.example.com"); then
+  if out=$(render "$ENABLED_FLAGS --set voice.ingress.enabled=true --set voice.ingress.host=other.example.com"); then
     fail "ingress host mismatch" "chart rendered when voice.ingress.host disagreed with voice.publicBaseUrl"
     return
   fi
@@ -200,84 +180,25 @@ test_ingress_host_mismatch_refuses() {
   esac
 }
 
-# @scenario "The voice worker does not render when only an http:// URL is available"
-test_stock_app_http_public_url_renders_nothing() {
+# @scenario "The voice worker refuses to start without knowing its own public address"
+test_enabled_without_public_base_url_refuses() {
   local out
-  if ! out=$(render "--set voice.enabled=true"); then
-    fail "http-only app.http.publicUrl" "chart failed to render at all: $(printf '%s' "$out" | tail -5)"
-    return
-  fi
-  if printf '%s' "$out" | grep -q "templates/voice/"; then
-    fail "http-only app.http.publicUrl" "voice.enabled=true with the default http:// app.http.publicUrl and no voice.publicBaseUrl still rendered voice resources"
-    return
-  fi
-  echo "ok   [http-only app.http.publicUrl] no https:// origin resolvable anywhere, voice.enabled=true still renders nothing (no failure either)"
-}
-
-# @scenario "Renders by default when an https:// public URL is configured"
-test_app_http_public_url_https_renders_by_default() {
-  local block
-  block=$(render_component "deployment.yaml" "--set app.http.publicUrl=https://app.langwatch.ai")
-  if [ -z "$block" ]; then
-    fail "app.http.publicUrl fallback" "rendered no voice Deployment with app.http.publicUrl=https://app.langwatch.ai and voice.enabled left at its default (true), no voice.publicBaseUrl set"
-    return
-  fi
-  if ! printf '%s' "$block" | grep -A1 "name: VOICE_PUBLIC_BASE_URL" | grep -q 'value: "https://app.langwatch.ai"'; then
-    fail "app.http.publicUrl fallback" "expected VOICE_PUBLIC_BASE_URL=https://app.langwatch.ai resolved from app.http.publicUrl"
-    return
-  fi
-  echo "ok   [app.http.publicUrl fallback] voice renders by default off app.http.publicUrl alone, zero voice.* values set"
-}
-
-# @scenario "An explicit voice public address wins over the app's own public URL"
-test_explicit_public_base_url_wins_over_app_http_public_url() {
-  local block
-  block=$(render_component "deployment.yaml" \
-    "--set app.http.publicUrl=https://app.langwatch.ai --set voice.publicBaseUrl=https://voice.langwatch.ai")
-  if [ -z "$block" ]; then
-    fail "explicit wins" "rendered no voice Deployment"
-    return
-  fi
-  if ! printf '%s' "$block" | grep -A1 "name: VOICE_PUBLIC_BASE_URL" | grep -q 'value: "https://voice.langwatch.ai"'; then
-    fail "explicit wins" "expected the explicit voice.publicBaseUrl (https://voice.langwatch.ai) to win over app.http.publicUrl (https://app.langwatch.ai)"
-    return
-  fi
-  echo "ok   [explicit wins] voice.publicBaseUrl overrides app.http.publicUrl when both are set"
-}
-
-# @scenario "Explicitly turning the voice worker off overrides a resolvable https:// URL"
-test_explicit_disabled_overrides_https_app_public_url() {
-  local out
-  if ! out=$(render "--set app.http.publicUrl=https://app.langwatch.ai --set voice.enabled=false"); then
-    fail "explicit disabled" "chart failed to render at all: $(printf '%s' "$out" | tail -5)"
-    return
-  fi
-  if printf '%s' "$out" | grep -q "templates/voice/"; then
-    fail "explicit disabled" "voice.enabled=false rendered voice resources even with an https:// app.http.publicUrl"
-    return
-  fi
-  echo "ok   [explicit disabled] voice.enabled=false opts out even with a resolvable https:// URL"
-}
-
-# @scenario "An explicit bad voice public address still fails even when the app's own public URL would resolve on its own"
-test_explicit_bad_public_base_url_refuses_even_with_https_app_url() {
-  local out
-  if out=$(render "--set app.http.publicUrl=https://app.langwatch.ai --set voice.publicBaseUrl=http://voice.example.com"); then
-    fail "explicit bad value" "chart rendered with an invalid voice.publicBaseUrl even though app.http.publicUrl was a valid https:// origin"
+  if out=$(render "--set voice.enabled=true"); then
+    fail "missing publicBaseUrl" "chart rendered when voice.publicBaseUrl was not set"
     return
   fi
   case "$out" in
-    *"must be an https origin only"*)
-      echo "ok   [explicit bad value] refused with the expected message even though app.http.publicUrl alone would have resolved" ;;
+    *"voice.publicBaseUrl is required"*)
+      echo "ok   [missing publicBaseUrl] refused with the expected message" ;;
     *)
-      fail "explicit bad value" "refused, but not for the expected reason: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-200)" ;;
+      fail "missing publicBaseUrl" "refused, but not for the expected reason: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-200)" ;;
   esac
 }
 
 # @scenario "The voice worker refuses a public address that is not a valid https:// origin"
 test_enabled_with_http_public_base_url_refuses() {
   local out
-  if out=$(render "--set voice.publicBaseUrl=http://voice.example.com"); then
+  if out=$(render "--set voice.enabled=true --set voice.publicBaseUrl=http://voice.example.com"); then
     fail "http publicBaseUrl" "chart rendered when voice.publicBaseUrl used http:// instead of https://"
     return
   fi
@@ -292,7 +213,7 @@ test_enabled_with_http_public_base_url_refuses() {
 # @scenario "Turning on the voice worker with a valid https:// public address renders"
 test_enabled_with_https_public_base_url_renders() {
   local block
-  block=$(render_component "deployment.yaml" "--set voice.publicBaseUrl=https://voice.example.com")
+  block=$(render_component "deployment.yaml" "--set voice.enabled=true --set voice.publicBaseUrl=https://voice.example.com")
   if [ -z "$block" ]; then
     fail "https publicBaseUrl" "rendered no voice Deployment with a valid https:// voice.publicBaseUrl"
     return
@@ -307,7 +228,7 @@ test_enabled_with_https_public_base_url_renders() {
 # @scenario "Turning on the voice worker with a valid https:// public address including a port renders"
 test_enabled_with_https_port_public_base_url_renders() {
   local block
-  block=$(render_component "deployment.yaml" "--set voice.publicBaseUrl=https://voice.example.com:8443")
+  block=$(render_component "deployment.yaml" "--set voice.enabled=true --set voice.publicBaseUrl=https://voice.example.com:8443")
   if [ -z "$block" ]; then
     fail "https publicBaseUrl with port" "rendered no voice Deployment with a valid https:// voice.publicBaseUrl including a port"
     return
@@ -319,36 +240,10 @@ test_enabled_with_https_port_public_base_url_renders() {
   echo "ok   [https publicBaseUrl with port] renders with VOICE_PUBLIC_BASE_URL=https://voice.example.com:8443"
 }
 
-# @scenario "The voice worker refuses a public address whose port is out of range"
-test_enabled_with_out_of_range_port_public_base_url_refuses() {
-  local out
-  if out=$(render "--set voice.publicBaseUrl=https://voice.example.com:65536"); then
-    fail "out-of-range port publicBaseUrl" "chart rendered when voice.publicBaseUrl used port 65536"
-    return
-  fi
-  case "$out" in
-    *"must be an https origin only"*)
-      echo "ok   [out-of-range port publicBaseUrl] refused with the expected message for port 65536" ;;
-    *)
-      fail "out-of-range port publicBaseUrl" "refused, but not for the expected reason: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-200)" ;;
-  esac
-
-  if out=$(render "--set voice.publicBaseUrl=https://voice.example.com:0"); then
-    fail "out-of-range port publicBaseUrl" "chart rendered when voice.publicBaseUrl used port 0"
-    return
-  fi
-  case "$out" in
-    *"must be an https origin only"*)
-      echo "ok   [out-of-range port publicBaseUrl] refused with the expected message for port 0" ;;
-    *)
-      fail "out-of-range port publicBaseUrl" "refused, but not for the expected reason: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-200)" ;;
-  esac
-}
-
 # @scenario "The voice worker refuses a public address that includes a path"
 test_enabled_with_path_public_base_url_refuses() {
   local out
-  if out=$(render "--set voice.publicBaseUrl=https://voice.example.com/twilio"); then
+  if out=$(render "--set voice.enabled=true --set voice.publicBaseUrl=https://voice.example.com/twilio"); then
     fail "publicBaseUrl with path" "chart rendered when voice.publicBaseUrl included a path"
     return
   fi
@@ -363,7 +258,7 @@ test_enabled_with_path_public_base_url_refuses() {
 # @scenario "The voice worker refuses a public address that includes a query string"
 test_enabled_with_query_public_base_url_refuses() {
   local out
-  if out=$(render "--set voice.publicBaseUrl=https://voice.example.com?x=1"); then
+  if out=$(render "--set voice.enabled=true --set voice.publicBaseUrl=https://voice.example.com?x=1"); then
     fail "publicBaseUrl with query" "chart rendered when voice.publicBaseUrl included a query string"
     return
   fi
@@ -378,7 +273,7 @@ test_enabled_with_query_public_base_url_refuses() {
 # @scenario "The voice worker refuses a public address with a trailing slash"
 test_enabled_with_trailing_slash_public_base_url_refuses() {
   local out
-  if out=$(render "--set voice.publicBaseUrl=https://voice.example.com/"); then
+  if out=$(render "--set voice.enabled=true --set voice.publicBaseUrl=https://voice.example.com/"); then
     fail "publicBaseUrl with trailing slash" "chart rendered when voice.publicBaseUrl had a trailing slash"
     return
   fi
@@ -393,7 +288,7 @@ test_enabled_with_trailing_slash_public_base_url_refuses() {
 # @scenario "The voice worker refuses a public address with a malformed hostname"
 test_enabled_with_malformed_host_public_base_url_refuses() {
   local out
-  if out=$(render "--set voice.publicBaseUrl=https://"); then
+  if out=$(render "--set voice.enabled=true --set voice.publicBaseUrl=https://"); then
     fail "publicBaseUrl with no hostname" "chart rendered when voice.publicBaseUrl had no hostname"
     return
   fi
@@ -403,7 +298,7 @@ test_enabled_with_malformed_host_public_base_url_refuses() {
     *)
       fail "publicBaseUrl with no hostname" "refused, but not for the expected reason: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-200)" ;;
   esac
-  if out=$(render "--set voice.publicBaseUrl=https://-bad.example.com"); then
+  if out=$(render "--set voice.enabled=true --set voice.publicBaseUrl=https://-bad.example.com"); then
     fail "publicBaseUrl with leading-hyphen hostname" "chart rendered when voice.publicBaseUrl's hostname started with a hyphen"
     return
   fi
@@ -416,22 +311,16 @@ test_enabled_with_malformed_host_public_base_url_refuses() {
 }
 
 test_default_has_no_voice_resources
+test_explicit_false_matches_default
 test_enabled_renders_deployment
 test_termination_grace_period_follows_voice_values
-test_enabled_renders_service_and_ingress_by_default
-test_ingress_host_defaults_to_public_base_url_hostname
-test_ingress_host_explicit_override_renders
-test_ingress_default_annotations_extend_websocket_timeout
+test_enabled_renders_service_no_ingress
+test_ingress_enabled_renders
 test_ingress_host_mismatch_refuses
-test_stock_app_http_public_url_renders_nothing
-test_app_http_public_url_https_renders_by_default
-test_explicit_public_base_url_wins_over_app_http_public_url
-test_explicit_disabled_overrides_https_app_public_url
-test_explicit_bad_public_base_url_refuses_even_with_https_app_url
+test_enabled_without_public_base_url_refuses
 test_enabled_with_http_public_base_url_refuses
 test_enabled_with_https_public_base_url_renders
 test_enabled_with_https_port_public_base_url_renders
-test_enabled_with_out_of_range_port_public_base_url_refuses
 test_enabled_with_path_public_base_url_refuses
 test_enabled_with_query_public_base_url_refuses
 test_enabled_with_trailing_slash_public_base_url_refuses

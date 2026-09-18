@@ -1,7 +1,4 @@
-{{/* Gated the same way as templates/voice/deployment.yaml: a Service with
-     nothing behind it is just as useless, and rendering it while the
-     Deployment stays silent would be a confusing half-install. */}}
-{{- if and .Values.voice.enabled (include "langwatch.voice.publicBaseUrl" .) }}
+{{- if .Values.voice.enabled }}
 # Service exposing the voice worker's Twilio Media Streams WebSocket port.
 apiVersion: v1
 kind: Service
