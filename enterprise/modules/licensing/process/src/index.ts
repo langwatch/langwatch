@@ -1,11 +1,10 @@
 export { NodeLicenseCryptographyAdapter } from "./services/node-license-cryptography.service.ts";
 export type { LicensingInfrastructure, LicensingRuntime } from "./app/licensing.app.ts";
+export { createDeploymentEntitlementSource, licensingServer } from "./licensing.server.ts";
 export {
-  createDeploymentEntitlementSource,
   createOrganizationLicenses,
   createUnavailableLicensingInfrastructure,
-  licensingServer,
-} from "./licensing.server.ts";
+} from "./services/licensing-infrastructure.service.ts";
 /**
  * The two declared tRPC surfaces, and the one fact the enforcement half asks
  * the process to resolve. A mount binds the fact; nothing else may.

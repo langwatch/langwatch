@@ -20,10 +20,12 @@ import {
   licensingServerConfigSchema,
 } from "@langwatch/enterprise-licensing-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
+import type { MembersRead } from "@langwatch/process-stores/members";
 import { getPlanTemplate, quotedPlanLimitsOf } from "@langwatch/plans";
 import { fromDate, nowInstant, Temporal } from "@langwatch/time";
 
 import { LicenseService, LicenseServiceConfiguration } from "../services/license.service.ts";
+import { createUnavailableLicensingInfrastructure } from "../services/licensing-infrastructure.service.ts";
 import { NodeLicenseCryptographyAdapter } from "../services/node-license-cryptography.service.ts";
 import type {
   LicenseCryptography,
@@ -74,9 +76,17 @@ export type LicensingRuntime = Readonly<
   Omit<LicensingInfrastructure, "repository" | "usage" | "retention" | "logger">
 >;
 
+/**
+ * Production supplies the closed members and the app derives its own
+ * infrastructure; `infrastructure` is the test-only fabric seam.
+ */
+type LicensingProcessMembers =
+  | (MembersRead<typeof LicensingApp.reads> & { infrastructure?: never })
+  | Readonly<{ prisma?: never; logger?: LicenseLogger; infrastructure: LicensingInfrastructure }>;
+
 type LicensingSetup = FeatureSetup<
   Record<never, never>,
-  LicensingInfrastructure,
+  LicensingProcessMembers,
   LicensingServerConfig
 >;
 
@@ -84,18 +94,7 @@ export class LicensingApp implements LicensingApiContract {
   static readonly contract: typeof LicensingApi = LicensingApi;
   static readonly dependencies: Readonly<Record<string, never>> = {};
   static readonly configSchema = licensingServerConfigSchema;
-  static readonly reads = [
-    "repository",
-    "usage",
-    "retention",
-    "configuredAuthProvider",
-    "platformSsoAllowed",
-    "authProviderIsMounted",
-    "reportSigningFailure",
-    "checkLimit",
-    "notifyLimitReached",
-    "reportError",
-  ] as const;
+  static readonly reads = ["prisma", "logger"] as const;
 
   readonly #service: LicenseService;
   readonly #cryptography: LicenseCryptography;
@@ -113,21 +112,25 @@ export class LicensingApp implements LicensingApiContract {
 
   static create({ members, config }: LicensingSetup): LicensingApp {
     const cryptography = NodeLicenseCryptographyAdapter.create({ publicKey: config.publicKey });
+    // Derived from the closed prisma member: the licence read is live, the
+    // mutation and enforcement ports refuse by name until a process composes
+    // them, and the auth questions answer "not configured" the same way.
+    const infrastructure =
+      members.infrastructure !== undefined
+        ? members.infrastructure
+        : createUnavailableLicensingInfrastructure({
+            database: members.prisma,
+            processName: "this process",
+          });
+    const { repository, usage, retention, logger, ...runtime } = infrastructure;
     const service = LicenseService.create({
-      repository: members.repository,
+      repository,
       cryptography,
-      usage: members.usage,
-      retention: members.retention,
-      logger: members.logger,
+      usage,
+      retention,
+      logger: logger ?? members.logger,
       configuration: LicenseServiceConfiguration.create(),
     });
-    const {
-      repository: _repository,
-      usage: _usage,
-      retention: _retention,
-      logger: _logger,
-      ...runtime
-    } = members;
     return new LicensingApp(service, cryptography, runtime);
   }
 
