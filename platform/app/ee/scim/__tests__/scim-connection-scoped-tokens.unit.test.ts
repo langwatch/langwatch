@@ -1,3 +1,5 @@
+import { createHash } from "crypto";
+
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
@@ -18,8 +20,15 @@
  * would be a bug in the double; the queries themselves are one `where` each
  * and are asserted directly.
  */
-import { createHash } from "crypto";
+import {
+  emptyScimSync,
+  reduceScimSync,
+  type ScimSyncState,
+} from "@langwatch/identity";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { ScimSyncGuards } from "../scim-sync-guards";
+import { ScimSyncLifecycle } from "../scim-sync.service";
 import { ScimTokenService } from "../scim-token.service";
 
 const ORG = "org_acme";
@@ -56,6 +65,12 @@ function createStore(connections: { id: string; organizationId: string }[]) {
   return {
     tokens,
     prisma: {
+      $transaction: async (operations: Promise<unknown>[]) =>
+        Promise.all(operations),
+      scimDirectoryUser: {
+        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      },
+      scimExternalId: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
       scimToken: {
         create: vi.fn(async ({ data }: { data: Partial<TokenRow> }) => {
           const row: TokenRow = {
@@ -279,7 +294,9 @@ describe("directory provisioning tokens", () => {
       // rather than a call that succeeds and provisions nothing.
       await expect(
         service.verifyEntitled({ token: doomed.token }),
-      ).resolves.toEqual({ status: "invalid_token" });
+      ).resolves.toEqual({
+        status: "invalid_token",
+      });
       // And the sync history says the connection's provisioning ended.
       expect(SYNC_LIFECYCLE.revoked).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -305,3 +322,47 @@ describe("directory provisioning tokens", () => {
 function hashOf(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
+
+/** @scenario "Rotating a token keeps the surviving connection sync live" */
+it("keeps recording pushes until the last token is revoked", async () => {
+  let state: ScimSyncState = emptyScimSync({ scimSyncId: CONNECTION });
+  let now = 1_800_000_000_000;
+  const lifecycle = new ScimSyncLifecycle({
+    guards: new ScimSyncGuards({ syncs: { findSync: async () => state } }),
+    now: () => now++,
+    ledger: {
+      commit: async ({ command, facts }) => {
+        for (const fact of facts)
+          state = reduceScimSync({
+            state,
+            fact: { ...fact, occurredAt: command.data.occurredAtMs },
+          });
+      },
+    },
+  });
+  const tokens = ScimTokenService.create(store.prisma as never, {
+    planProvider: ENTERPRISE as never,
+    syncLifecycle: lifecycle,
+  });
+  const first = await tokens.generate({
+    organizationId: ORG,
+    connectionId: CONNECTION,
+  });
+  const second = await tokens.generate({
+    organizationId: ORG,
+    connectionId: CONNECTION,
+  });
+  await tokens.revoke({ organizationId: ORG, tokenId: first.tokenId });
+  await lifecycle.userPushed({
+    organizationId: ORG,
+    connectionId: CONNECTION,
+    userId: "member",
+    externalId: "member",
+    op: "create",
+  });
+  expect(state.state).toBe("SYNCING");
+  expect(state.lastPushedAtMs).not.toBeNull();
+  expect(store.tokens.map((token) => token.id)).toEqual([second.tokenId]);
+  await tokens.revoke({ organizationId: ORG, tokenId: second.tokenId });
+  expect(state.state).toBe("REVOKED");
+});

@@ -27,6 +27,114 @@ async function runGuard(params: GuardParams): Promise<unknown> {
   return guardOrganizationId(params, next);
 }
 
+describe("SCIM tenant records", () => {
+  it("preserves explicitly bounded organization lists and refuses invalid or open-ended filters", async () => {
+    await expect(
+      runGuard({
+        model: "ScimUserResource",
+        action: "deleteMany",
+        args: { where: { organizationId: { in: ["org-a", "org-b"] } } },
+      }),
+    ).resolves.toBe("ok");
+    for (const organizationId of [
+      {},
+      { in: [] },
+      { in: ["org-a", void 0] },
+      { in: [null] },
+      { in: [""] },
+      { not: "org-a" },
+      { equals: void 0 },
+    ]) {
+      await expect(
+        runGuard({
+          model: "ScimUserResource",
+          action: "findMany",
+          args: { where: { organizationId } },
+        }),
+      ).rejects.toThrow();
+    }
+  });
+  it.each([null, void 0, "", "   ", false, 0])(
+    "rejects invalid organization scope %j in direct and composite predicates",
+    async (organizationId) => {
+      for (const where of [
+        { organizationId },
+        { organizationId_userId: { organizationId, userId: "shared-user" } },
+      ]) {
+        await expect(
+          runGuard({
+            model: "ScimUserResource",
+            action: "findMany",
+            args: { where },
+          }),
+        ).rejects.toThrow();
+      }
+      await expect(
+        runGuard({
+          model: "ScimUserResource",
+          action: "create",
+          args: { data: { organizationId, userId: "shared-user" } },
+        }),
+      ).rejects.toThrow();
+    },
+  );
+  it.each(["ScimUserResource", "ScimDirectoryUser", "ScimExternalId"])(
+    "requires organization scope for %s even when a global user is named",
+    async (model) => {
+      await expect(
+        runGuard({
+          model,
+          action: "findMany",
+          args: { where: { userId: "shared-user" } },
+        }),
+      ).rejects.toThrow();
+      await expect(
+        runGuard({
+          model,
+          action: "findMany",
+          args: { where: { organizationId: "org-a", userId: "shared-user" } },
+        }),
+      ).resolves.toBe("ok");
+      await expect(
+        runGuard({
+          model,
+          action: "create",
+          args: { data: { userId: "shared-user" } },
+        }),
+      ).rejects.toThrow();
+    },
+  );
+
+  it.each([
+    [
+      "ScimDirectoryUser",
+      "connectionId_userId",
+      { connectionId: "conn-a", userId: "shared-user" },
+    ],
+    [
+      "ScimExternalId",
+      "connectionId_externalId",
+      { connectionId: "conn-a", externalId: "directory-user" },
+    ],
+    [
+      "ScimUserResource",
+      "organizationId_userId",
+      { organizationId: "org-a", userId: "shared-user" },
+    ],
+  ] as const)(
+    "accepts the owning composite key for %s",
+    async (model, key, value) => {
+      await expect(
+        runGuard({
+          model,
+          action: "findUnique",
+          args: { where: { [key]: value } },
+        }),
+      ).resolves.toBe("ok");
+    },
+  );
+});
+
 describe("guardOrganizationId — original three models preserved", () => {
   describe("when querying OrganizationUser by the userId_organizationId composite", () => {
     it("does NOT throw — the composite key embeds organizationId", async () => {

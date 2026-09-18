@@ -3,6 +3,7 @@
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
+
 import type { Group, PrismaClient } from "~/generated/prisma/client";
 import {
   type GrantsLedgerWriter,
@@ -10,7 +11,16 @@ import {
 } from "~/server/app-layer/authz/ledger";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
+
 import { ScimWriteOutsideConnectionError } from "./errors";
+import { ScimDirectoryIdentityService } from "./scim-directory-identity.service";
+import { assertScimOrganizationId } from "./scim-organization-scope";
+import { parseScimFilter } from "./scim-filter";
+import { scimGrantsWritePathEnabled } from "./scim-grants-flag";
+import {
+  reconcileScimGrants,
+  retireScimMembershipGrants,
+} from "./scim-grants.reconciler";
 import type {
   ScimCreateGroupRequest,
   ScimError,
@@ -20,12 +30,6 @@ import type {
   ScimPatchRequest,
   ScimReplaceGroupRequest,
 } from "./scim.types";
-import { parseScimFilter } from "./scim-filter";
-import {
-  reconcileScimGrants,
-  retireScimMembershipGrants,
-} from "./scim-grants.reconciler";
-import { scimGrantsWritePathEnabled } from "./scim-grants-flag";
 
 const logger = createLogger("langwatch:scim:group");
 
@@ -47,6 +51,7 @@ type MemberInstruction =
 export class ScimGroupService {
   private readonly prisma: PrismaClient;
   private readonly writer: GrantsLedgerWriter;
+  readonly #directoryIdentity: ScimDirectoryIdentityService;
 
   constructor({
     prisma,
@@ -57,6 +62,7 @@ export class ScimGroupService {
   }) {
     this.prisma = prisma;
     this.writer = writer;
+    this.#directoryIdentity = ScimDirectoryIdentityService.create(prisma);
   }
 
   static create(options: {
@@ -81,6 +87,7 @@ export class ScimGroupService {
     count?: number;
     excludeMembers?: boolean;
   }): Promise<ScimListResponse<ScimGroup> | ScimError> {
+    assertScimOrganizationId(organizationId);
     const parsed = parseScimFilter({
       filter,
       supported: ["displayName", "externalId"],
@@ -97,12 +104,15 @@ export class ScimGroupService {
 
     const where = {
       organizationId,
-      // A directory lists ITS groups. Another connection's are as absent as
-      // another organization's, and for the same reason: a token's reach is
-      // the connection it was minted for. Groups with no connection predate
-      // per-connection scoping and stay reachable by any of the
-      // organization's tokens.
-      OR: [{ scimConnectionId: connectionId }, { scimConnectionId: null }],
+      // Legacy tokens retain organization-wide reach; scoped tokens also see legacy groups.
+      ...(connectionId === null
+        ? {}
+        : {
+            OR: [
+              { scimConnectionId: connectionId },
+              { scimConnectionId: null },
+            ],
+          }),
       scimSource: { not: null as string | null },
       ...(term?.attribute === "displayName"
         ? { name: { equals: term.value, mode: "insensitive" as const } }
@@ -158,6 +168,7 @@ export class ScimGroupService {
     connectionId?: string | null;
     excludeMembers?: boolean;
   }): Promise<ScimGroup | ScimError> {
+    assertScimOrganizationId(organizationId);
     const group = await this.findGroup({
       scimResourceId,
       organizationId,
@@ -183,6 +194,7 @@ export class ScimGroupService {
     organizationId: string;
     connectionId?: string | null;
   }): Promise<ScimGroup | ScimError> {
+    assertScimOrganizationId(organizationId);
     // The directory's own identifier first, and the display name second: a
     // group renamed in the directory is the same group, and matching on the
     // name would make it a second one.
@@ -199,6 +211,11 @@ export class ScimGroupService {
       });
     }
 
+    await this.authorizeMembers({
+      organizationId,
+      connectionId,
+      memberIds: (request.members ?? []).map((member) => member.value),
+    });
     const slug = await this.uniqueSlug(organizationId, request.displayName);
     const group = await this.prisma.group.create({
       data: {
@@ -239,6 +256,7 @@ export class ScimGroupService {
     connectionId?: string | null;
     request: ScimReplaceGroupRequest;
   }): Promise<ScimGroup | ScimError> {
+    assertScimOrganizationId(organizationId);
     const group = await this.findWritableGroup({
       scimResourceId,
       organizationId,
@@ -246,6 +264,19 @@ export class ScimGroupService {
     });
     if (!group)
       return this.scimError({ status: "404", detail: "Group not found" });
+
+    const currentMembers = await this.prisma.groupMembership.findMany({
+      where: { groupId: group.id },
+      select: { userId: true },
+    });
+    await this.authorizeMembers({
+      organizationId,
+      connectionId,
+      memberIds: [
+        ...currentMembers.map((member) => member.userId),
+        ...(request.members ?? []).map((member) => member.value),
+      ],
+    });
 
     // A PUT restates the whole resource, so it restates the directory's own
     // identifier too. It used to be accepted on create only, which meant a
@@ -307,6 +338,7 @@ export class ScimGroupService {
     connectionId?: string | null;
     patchRequest: ScimPatchRequest;
   }): Promise<ScimGroup | ScimError> {
+    assertScimOrganizationId(organizationId);
     const group = await this.findWritableGroup({
       scimResourceId,
       organizationId,
@@ -314,6 +346,37 @@ export class ScimGroupService {
     });
     if (!group)
       return this.scimError({ status: "404", detail: "Group not found" });
+
+    const memberIds = new Set<string>();
+    for (const operation of patchRequest.Operations) {
+      if (operation.op === "add" && operation.path === "members") {
+        for (const id of this.extractMemberIds(operation.value))
+          memberIds.add(id);
+      }
+      if (operation.op === "remove" && operation.path?.startsWith("members")) {
+        for (const id of this.extractMemberIdsFromPath(
+          operation.path,
+          operation.value,
+        ))
+          memberIds.add(id);
+      }
+      if (operation.op === "replace") {
+        const instruction = this.extractRequestedMemberIds(operation);
+        if (instruction.kind === "list") {
+          const current = await this.prisma.groupMembership.findMany({
+            where: { groupId: group.id },
+            select: { userId: true },
+          });
+          for (const id of instruction.ids) memberIds.add(id);
+          for (const member of current) memberIds.add(member.userId);
+        }
+      }
+    }
+    await this.authorizeMembers({
+      organizationId,
+      connectionId,
+      memberIds: [...memberIds],
+    });
 
     for (const operation of patchRequest.Operations) {
       await this.applyPatch({ group, operation, organizationId });
@@ -339,6 +402,7 @@ export class ScimGroupService {
     organizationId: string;
     connectionId?: string | null;
   }): Promise<ScimError | null> {
+    assertScimOrganizationId(organizationId);
     const group = await this.findWritableGroup({
       scimResourceId,
       organizationId,
@@ -346,6 +410,16 @@ export class ScimGroupService {
     });
     if (!group)
       return this.scimError({ status: "404", detail: "Group not found" });
+
+    const affectedMembers = await this.prisma.groupMembership.findMany({
+      where: { groupId: group.id },
+      select: { userId: true },
+    });
+    await this.authorizeMembers({
+      organizationId,
+      connectionId,
+      memberIds: affectedMembers.map((member) => member.userId),
+    });
 
     if (scimGrantsWritePathEnabled()) {
       const members = await this.prisma.groupMembership.findMany({
@@ -404,55 +478,34 @@ export class ScimGroupService {
     externalId: string | null;
     displayName: string;
   }): Promise<Group | null> {
-    if (connectionId && externalId) {
+    if (externalId) {
       const byIdentifier = await this.prisma.group.findFirst({
         where: { organizationId, scimConnectionId: connectionId, externalId },
       });
       if (byIdentifier) return byIdentifier;
     }
-    // THE SAME REACH THE READS HAVE. Every other query in this service is
-    // scoped to the connection that asked (or to the pre-scoping rows, which
-    // carry no connection), and this fallback was not — so a second directory
-    // pushing a group name the first one already used was told the name
-    // exists, while `listGroups` and `findGroup` refused to show it the row.
-    // Entra creates "Engineering", Okta cannot create it and cannot see it,
-    // and its provider retries the create forever, 409ing each time.
+    // Name matching has the same reach as reads, including legacy token authority.
     return this.prisma.group.findFirst({
       where: {
         organizationId,
         name: displayName,
         scimSource: { not: null },
-        OR: [{ scimConnectionId: connectionId }, { scimConnectionId: null }],
+        ...(connectionId === null
+          ? {}
+          : {
+              OR: [
+                { scimConnectionId: connectionId },
+                { scimConnectionId: null },
+              ],
+            }),
       },
     });
   }
 
   /**
-   * The group a `/Groups/:id` request names.
-   *
-   * `:id` is the SERVICE PROVIDER's identifier (RFC 7643 §3.1) — ours, minted
-   * by us and stored by the directory — so resolving it against `Group.id` is
-   * correct. What was wrong was the name: the parameter was called
-   * `externalScimId`, which says it is the DIRECTORY's identifier, and
-   * `externalId` is a different column that this never read. Renamed rather
-   * than re-pointed, because re-pointing it would break every identity
-   * provider that has already stored the ids we handed out.
-   */
-  /**
-   * The group a request names, or none — and "none" includes a group that
-   * belongs to a DIFFERENT connection in the same organization.
-   *
-   * `Group.scimConnectionId` records which directory owns a group, and the
-   * contract written on the column says a token minted for one connection can
-   * never touch another connection's people. Resolving by organization alone
-   * broke that for every group verb that takes an id: an Okta token could
-   * rename, re-member and delete the groups an Entra connection created — and
-   * `deleteGroup` reconciles grants, so it could strip role bindings the other
-   * directory granted.
-   *
-   * A group with no connection is reachable by any of the organization's
-   * tokens: those predate per-connection scoping and were written when the
-   * organization was the whole answer.
+   * Resource ids are our Group.id, not the directory's externalId. Concrete
+   * tokens cannot read sibling groups; null tokens retain organization-wide
+   * authority. Legacy groups remain visible to every token in the organization.
    */
   private async findGroup({
     scimResourceId,
@@ -467,7 +520,14 @@ export class ScimGroupService {
       where: {
         id: scimResourceId,
         organizationId,
-        OR: [{ scimConnectionId: connectionId }, { scimConnectionId: null }],
+        ...(connectionId === null
+          ? {}
+          : {
+              OR: [
+                { scimConnectionId: connectionId },
+                { scimConnectionId: null },
+              ],
+            }),
       },
     });
   }
@@ -500,6 +560,25 @@ export class ScimGroupService {
     }
 
     throw new ScimWriteOutsideConnectionError();
+  }
+
+  private async authorizeMembers({
+    organizationId,
+    connectionId,
+    memberIds,
+  }: {
+    organizationId: string;
+    connectionId: string | null;
+    memberIds: string[];
+  }): Promise<void> {
+    if (connectionId === null) return;
+    for (const userId of new Set(memberIds)) {
+      await this.#directoryIdentity.assertWritable({
+        organizationId,
+        connectionId,
+        userId,
+      });
+    }
   }
 
   private async addMembers({

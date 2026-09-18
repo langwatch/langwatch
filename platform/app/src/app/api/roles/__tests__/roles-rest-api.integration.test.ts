@@ -10,6 +10,7 @@
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
 import { createTestApp } from "~/server/app-layer/presets";
@@ -26,6 +27,7 @@ import {
   type ManagementTestOrg,
   seedManagementOrg,
 } from "~/test-utils/managementApiOrg";
+
 import { app } from "../[[...route]]/app";
 
 describe("Feature: Custom roles REST API", () => {
@@ -309,6 +311,10 @@ describe("Feature: Custom roles REST API", () => {
         (entry: { resource: string }) => entry.resource === "prompts",
       );
       expect(prompts.organizationExclusive).toBe(false);
+      const scim = body.resources.find(
+        (entry: { resource: string }) => entry.resource === "scim",
+      );
+      expect(scim.organizationExclusive).toBe(false);
     });
   });
 });

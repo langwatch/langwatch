@@ -111,6 +111,10 @@ export class SessionRevocationService {
   }): Promise<{ ended: number }> {
     if (sessions.length === 0) return { ended: 0 };
 
+    const ended = await this.deps.records.deleteByIds({
+      ids: sessions.map((session) => session.id),
+    });
+
     try {
       await this.deps.cache.dropSessions({
         tokens: sessions.map((session) => session.sessionToken),
@@ -119,13 +123,10 @@ export class SessionRevocationService {
     } catch (error) {
       logger.error(
         { error, userId, sessionCount: sessions.length },
-        "could not clear the session cache while ending selected sessions; the rows are still being deleted",
+        "could not clear the session cache while ending selected sessions; the rows have been deleted",
       );
     }
 
-    const ended = await this.deps.records.deleteByIds({
-      ids: sessions.map((session) => session.id),
-    });
     logger.info(
       { userId, deleted: ended, requested: sessions.length },
       "ended selected sessions",
@@ -263,6 +264,10 @@ export class SessionRevocationService {
     });
     if (doomed.length === 0) return { ended: 0 };
 
+    const ended = await this.deps.records.deleteByIds({
+      ids: doomed.map((session) => session.id),
+    });
+
     const doomedTokens = doomed.map((session) => session.sessionToken);
     try {
       const indexed = await this.deps.cache.readIndex({ userId });
@@ -280,13 +285,10 @@ export class SessionRevocationService {
     } catch (error) {
       logger.error(
         { error, userId, identifierId },
-        "could not clear the session cache while ending one sign-in method's sessions; the rows are still being deleted",
+        "could not clear the session cache while ending one sign-in method's sessions; the rows have been deleted",
       );
     }
 
-    const ended = await this.deps.records.deleteByIds({
-      ids: doomed.map((session) => session.id),
-    });
     logger.info(
       { userId, identifierId, deleted: ended },
       "ended the sessions one sign-in method minted",

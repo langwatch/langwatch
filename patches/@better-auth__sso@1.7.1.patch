@@ -1,0 +1,176 @@
+diff --git a/dist/index-CZytzKv6.d.mts b/dist/index-CZytzKv6.d.mts
+index 3ed18ca7542b1d84c1edf2a3732851a13cbc46ac..7c8ea784e1c456537303aba4963052e0337b2af9 100644
+--- a/dist/index-CZytzKv6.d.mts
++++ b/dist/index-CZytzKv6.d.mts
+@@ -318,6 +318,8 @@ interface SSOProviderMutationGuardContext {
+   database: DBTransactionAdapter;
+ }
+ interface SSOOptions {
++  /** Transport for every server-side OIDC request, independent of browser origin trust. */
++  oidcFetch?: typeof globalThis.fetch;
+   /**
+    * Resolve a verified provider identity to a Better Auth user.
+    *
+@@ -1801,6 +1803,8 @@ interface HydratedOIDCConfig {
+  * Parameters for the discoverOIDCConfig function.
+  */
+ interface DiscoverOIDCConfigParams {
++  /** Transport for the discovery request. */
++  oidcFetch?: typeof globalThis.fetch;
+   /** The issuer URL to discover configuration from */
+   issuer: string;
+   /**
+@@ -1875,7 +1879,7 @@ declare function validateDiscoveryUrl(url: string, isTrustedOrigin: DiscoverOIDC
+  * @returns The parsed discovery document
+  * @throws DiscoveryError on network errors, timeouts, or invalid responses
+  */
+-declare function fetchDiscoveryDocument(url: string, timeout?: number, isTrustedOrigin?: (url: string) => boolean): Promise<OIDCDiscoveryDocument>;
++declare function fetchDiscoveryDocument(url: string, timeout?: number, isTrustedOrigin?: (url: string) => boolean, fetchImpl?: typeof globalThis.fetch): Promise<OIDCDiscoveryDocument>;
+ /**
+  * Validate a discovery document.
+  *
+diff --git a/dist/index.mjs b/dist/index.mjs
+index a97a99f62724d7c23e75ae5df6bed9595f28ba5f..7934329cd3ec51973ce125e2a8f3790a19c85406 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -356,7 +356,7 @@ async function discoverOIDCConfig(params) {
+ 	const { issuer, existingConfig, timeout = DEFAULT_DISCOVERY_TIMEOUT } = params;
+ 	const discoveryUrl = params.discoveryEndpoint || existingConfig?.discoveryEndpoint || computeDiscoveryUrl(issuer);
+ 	validateDiscoveryUrl(discoveryUrl, params.isTrustedOrigin);
+-	const discoveryDoc = await fetchDiscoveryDocument(discoveryUrl, timeout, params.isTrustedOrigin);
++	const discoveryDoc = await fetchDiscoveryDocument(discoveryUrl, timeout, params.isTrustedOrigin, params.oidcFetch);
+ 	validateDiscoveryDocument(discoveryDoc, issuer);
+ 	const normalizedDoc = normalizeDiscoveryUrls(discoveryDoc, issuer, params.isTrustedOrigin);
+ 	const tokenEndpointAuth = selectTokenEndpointAuthMethod(normalizedDoc, existingConfig?.tokenEndpointAuthentication);
+@@ -539,12 +539,13 @@ function throwRedirectError(name, endpoint, status, location) {
+ * checks and redirect handling stay consistent across discovery, token, and
+ * userinfo calls.
+ */
+-async function fetchOIDCEndpoint(name, endpoint, options, isTrustedOrigin) {
++async function fetchOIDCEndpoint(name, endpoint, options, isTrustedOrigin, fetchImpl) {
+ 	await assertOIDCEndpointAllowed(name, endpoint, isTrustedOrigin);
+ 	let redirectLocation = null;
+ 	const { onError, ...fetchOptions } = options;
+ 	const response = await betterFetch(endpoint, {
+ 		...fetchOptions,
++		customFetchImpl: fetchImpl,
+ 		redirect: "manual",
+ 		onError: async (context) => {
+ 			if (isHttpRedirectStatus(context.response.status)) redirectLocation = context.response.headers.get("location");
+@@ -558,9 +559,9 @@ async function fetchOIDCEndpoint(name, endpoint, options, isTrustedOrigin) {
+ * Native-fetch variant for libraries that require a `fetch` implementation,
+ * such as jose's remote JWKS loader.
+ */
+-async function fetchOIDCEndpointResponse(name, endpoint, init, isTrustedOrigin) {
++async function fetchOIDCEndpointResponse(name, endpoint, init, isTrustedOrigin, fetchImpl) {
+ 	await assertOIDCEndpointAllowed(name, endpoint, isTrustedOrigin);
+-	const response = await fetch(endpoint, {
++	const response = await (fetchImpl ?? fetch)(endpoint, {
+ 		...init,
+ 		redirect: "manual"
+ 	});
+@@ -575,8 +576,8 @@ function assertOIDCAuthorizedParty(payload, clientId) {
+ * Validate an OIDC ID token using the same endpoint fetch policy as the rest of
+ * the SSO OIDC flow.
+ */
+-async function validateOIDCIdToken(token, jwksEndpoint, options, isTrustedOrigin) {
+-	const verified = await jwtVerify(token, createRemoteJWKSet(new URL(jwksEndpoint), { [customFetch]: (url, init) => fetchOIDCEndpointResponse("jwksEndpoint", url, init, isTrustedOrigin) }), {
++async function validateOIDCIdToken(token, jwksEndpoint, options, isTrustedOrigin, fetchImpl) {
++	const verified = await jwtVerify(token, createRemoteJWKSet(new URL(jwksEndpoint), { [customFetch]: (url, init) => fetchOIDCEndpointResponse("jwksEndpoint", url, init, isTrustedOrigin, fetchImpl) }), {
+ 		audience: options.audience,
+ 		issuer: options.issuer
+ 	});
+@@ -591,12 +592,12 @@ async function validateOIDCIdToken(token, jwksEndpoint, options, isTrustedOrigin
+ * @returns The parsed discovery document
+ * @throws DiscoveryError on network errors, timeouts, or invalid responses
+ */
+-async function fetchDiscoveryDocument(url, timeout = DEFAULT_DISCOVERY_TIMEOUT, isTrustedOrigin = () => false) {
++async function fetchDiscoveryDocument(url, timeout = DEFAULT_DISCOVERY_TIMEOUT, isTrustedOrigin = () => false, fetchImpl) {
+ 	try {
+ 		const response = await fetchOIDCEndpoint("discoveryEndpoint", url, {
+ 			method: "GET",
+ 			timeout
+-		}, isTrustedOrigin);
++		}, isTrustedOrigin, fetchImpl);
+ 		if (response.error) {
+ 			const { status } = response.error;
+ 			if (status === 404) throw new DiscoveryError("discovery_not_found", "Discovery endpoint not found", {
+@@ -764,12 +765,13 @@ function needsRuntimeDiscovery(config) {
+ * endpoints, and merges the hydrated fields back into the config.
+ * Throws if discovery fails.
+ */
+-async function ensureRuntimeDiscovery(config, issuer, isTrustedOrigin) {
++async function ensureRuntimeDiscovery(config, issuer, isTrustedOrigin, fetchImpl) {
+ 	let resolved = config;
+ 	if (needsRuntimeDiscovery(config)) {
+ 		const hydrated = await discoverOIDCConfig({
+ 			issuer,
+ 			existingConfig: config,
++			oidcFetch: fetchImpl,
+ 			isTrustedOrigin
+ 		});
+ 		resolved = {
+@@ -3406,7 +3408,8 @@ const registerSSOProvider = (options) => {
+ 					userInfoEndpoint: body.oidcConfig.userInfoEndpoint,
+ 					tokenEndpointAuthentication: body.oidcConfig.tokenEndpointAuthentication
+ 				},
+-				isTrustedOrigin: (url) => ctx.context.isTrustedOrigin(url)
++				isTrustedOrigin: (url) => ctx.context.isTrustedOrigin(url),
++				oidcFetch: options?.oidcFetch
+ 			});
+ 		} catch (error) {
+ 			if (error instanceof DiscoveryError) throw mapDiscoveryErrorToAPIError(error);
+@@ -3695,7 +3698,7 @@ const signInSSO = (options) => {
+ 		if (provider.oidcConfig && body.providerType !== "saml") {
+ 			let config = provider.oidcConfig;
+ 			try {
+-				config = await ensureRuntimeDiscovery(provider.oidcConfig, provider.issuer, (url) => ctx.context.isTrustedOrigin(url));
++				config = await ensureRuntimeDiscovery(provider.oidcConfig, provider.issuer, (url) => ctx.context.isTrustedOrigin(url), options?.oidcFetch);
+ 			} catch (error) {
+ 				if (error instanceof DiscoveryError) throw mapDiscoveryErrorToAPIError(error);
+ 				throw error;
+@@ -3819,7 +3822,7 @@ async function handleOIDCCallback(ctx, options, providerId, stateData, parsedPro
+ 	let config = provider.oidcConfig;
+ 	if (!config) throw ctx.redirect(`${errorURL || callbackURL}?error=invalid_provider&error_description=provider not found`);
+ 	try {
+-		config = await ensureRuntimeDiscovery(config, provider.issuer, (url) => ctx.context.isTrustedOrigin(url));
++		config = await ensureRuntimeDiscovery(config, provider.issuer, (url) => ctx.context.isTrustedOrigin(url), options?.oidcFetch);
+ 	} catch (error) {
+ 		if (error instanceof DiscoveryError) throw ctx.redirect(`${errorURL || callbackURL}?error=discovery_failed&error_description=${encodeURIComponent(error.message)}`);
+ 		throw ctx.redirect(`${errorURL || callbackURL}?error=discovery_failed&error_description=unexpected_discovery_error`);
+@@ -3873,7 +3876,7 @@ async function handleOIDCCallback(ctx, options, providerId, stateData, parsedPro
+ 			method: "POST",
+ 			body,
+ 			headers
+-		}, (url) => ctx.context.isTrustedOrigin(url));
++		}, (url) => ctx.context.isTrustedOrigin(url), options?.oidcFetch);
+ 		if (error) redirectOIDCError("invalid_provider", getOIDCErrorDescription(error, "token_response_error"));
+ 		if (!data) throw new Error("Token endpoint returned an empty response");
+ 		return getOAuth2Tokens(data);
+@@ -3898,7 +3901,7 @@ async function handleOIDCCallback(ctx, options, providerId, stateData, parsedPro
+ 		const verified = await validateOIDCIdToken(tokenResponse.idToken, jwksEndpoint, {
+ 			audience: config.clientId,
+ 			issuer: provider.issuer
+-		}, (url) => ctx.context.isTrustedOrigin(url)).catch((error) => {
++		}, (url) => ctx.context.isTrustedOrigin(url), options?.oidcFetch).catch((error) => {
+ 			if (error instanceof DiscoveryError) redirectOIDCError("invalid_provider", error.message);
+ 			ctx.context.logger.error(error);
+ 			return null;
+@@ -3909,7 +3912,7 @@ async function handleOIDCCallback(ctx, options, providerId, stateData, parsedPro
+ 	}
+ 	if (options?.resolveUser && !verifiedIdToken) redirectOIDCError("invalid_provider", "id_token_required_for_user_resolution");
+ 	if (config.userInfoEndpoint) {
+-		const userInfoResponse = await fetchOIDCEndpoint("userInfoEndpoint", config.userInfoEndpoint, { headers: { Authorization: `Bearer ${tokenResponse.accessToken}` } }, (url) => ctx.context.isTrustedOrigin(url)).catch((e) => {
++		const userInfoResponse = await fetchOIDCEndpoint("userInfoEndpoint", config.userInfoEndpoint, { headers: { Authorization: `Bearer ${tokenResponse.accessToken}` } }, (url) => ctx.context.isTrustedOrigin(url), options?.oidcFetch).catch((e) => {
+ 			if (e instanceof DiscoveryError) redirectOIDCError("invalid_provider", e.message);
+ 			throw e;
+ 		});
+@@ -4124,7 +4127,7 @@ async function bounceIfIdpInitiated(ctx, options, providerId) {
+ 	if (!provider?.oidcConfig?.allowIdpInitiated) return;
+ 	let config = provider.oidcConfig;
+ 	try {
+-		config = await ensureRuntimeDiscovery(config, provider.issuer, (url) => ctx.context.isTrustedOrigin(url));
++		config = await ensureRuntimeDiscovery(config, provider.issuer, (url) => ctx.context.isTrustedOrigin(url), options?.oidcFetch);
+ 	} catch (error) {
+ 		ctx.context.logger.error("IDP-initiated bounce skipped: OIDC discovery failed", {
+ 			providerId: provider.providerId,

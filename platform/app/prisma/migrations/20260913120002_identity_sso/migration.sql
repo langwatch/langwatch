@@ -20,6 +20,10 @@ ALTER TABLE "SsoConnection"
 
 CREATE INDEX "SsoConnection_organizationId_migrationPhase_idx" ON "SsoConnection"("organizationId", "migrationPhase");
 CREATE INDEX "SsoConnection_lapsedDomains_idx" ON "SsoConnection" USING GIN ("lapsedDomains");
+-- These indexes intentionally stop deployment when historical connections
+-- occupy the same live slot. REJECTED, DRAFT and CLAIMED still reserve slots.
+-- Run the duplicate-connection preflight in docs/self-hosting/upgrade.mdx
+-- and resolve conflicts through the existing connection lifecycle first.
 CREATE UNIQUE INDEX "SsoConnection_one_live_legacy_per_org" ON "SsoConnection"("organizationId")
   WHERE "source" = 'legacy-grandfathered' AND "state" NOT IN ('DISCARDED', 'TORN_DOWN');
 CREATE UNIQUE INDEX "SsoConnection_one_live_direct_per_org" ON "SsoConnection"("organizationId")

@@ -199,6 +199,7 @@ model User {
   passkeys                      Passkey[]
   teamMemberships               TeamUser[]
   orgMemberships                OrganizationUser[]
+  scimUserResources             ScimUserResource[]
   createdAt                     DateTime                 @default(now())
   updatedAt                     DateTime                 @default(now()) @updatedAt
   lastLoginAt                   DateTime?
@@ -1328,27 +1329,48 @@ model ScimToken {
 /// identities with them rather than stranding a mapping that resolves to
 /// nobody.
 model ScimExternalId {
-  id           String   @id @default(nanoid())
-  connectionId String
-  externalId   String
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @default(now()) @updatedAt
+  organizationId String
+  id             String   @id @default(nanoid())
+  connectionId   String
+  externalId     String
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
 
   @@unique([connectionId, externalId])
+  @@index([organizationId, userId])
   @@index([userId])
   @@index([connectionId])
+}
+
+/// Directory profile and lifecycle are tenant facts, independent of the shared account.
+model ScimUserResource {
+  organizationId String
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userName       String
+  name           String?
+  active         Boolean  @default(true)
+  deletedAt      DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  @@id([organizationId, userId])
+  /// Live nonblank names have a normalized partial unique index in 20260918171000_scim_user_resources.
+  @@index([organizationId, userName])
+  @@index([userId])
 }
 
 /// A connection's managed users, including resources without an externalId.
 /// Scalar keys only; readers exclude users that no longer exist.
 model ScimDirectoryUser {
-  connectionId String
-  userId       String
+  organizationId String
+  connectionId   String
+  userId         String
 
   @@id([connectionId, userId])
-  @@index([userId])
+  @@index([organizationId, userId])
 }
 
 /// D08 — one connection's directory sync, as the `scim-sync` pipeline's fold
@@ -3656,11 +3678,9 @@ model Group {
   updatedAt        DateTime          @default(now()) @updatedAt
 
   @@unique([organizationId, slug])
-  @@unique([organizationId, externalId])
-  /// D08: a directory's identifier for a group is its CONNECTION's, so two
-  /// connections in one organization each carry their own "engineering". The
-  /// organization-scoped uniqueness above stays as the legacy safety net for
-  /// the rows that carry no connection.
+  /// Legacy null-connection external IDs are unique per organization through
+  /// the partial index in 20260918170000_scim_group_external_id_namespaces.
+  /// Concrete connections each own their external-ID namespace.
   @@unique([scimConnectionId, externalId])
   @@index([organizationId])
   @@index([scimConnectionId])

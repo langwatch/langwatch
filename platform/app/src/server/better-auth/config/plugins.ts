@@ -46,6 +46,7 @@ export interface SsoProvisionedUsersPort {
 }
 
 export interface PluginsDeps {
+  ssoOidcFetch: typeof globalThis.fetch;
   /**
    * How many backup codes a set holds (D06).
    *
@@ -92,6 +93,7 @@ export interface PluginsDeps {
  * screen. Feature flags are read per project, and neither caller has one yet.
  */
 export function plugins({
+  ssoOidcFetch,
   backupCodeCount,
   passkeySignUp,
   confirmSignUpAddress,
@@ -197,6 +199,7 @@ export function plugins({
      * rebuildable by replay.
      */
     sso({
+      oidcFetch: ssoOidcFetch,
       // Provider rows are projections of the managed connection log. The
       // plugin's session-authenticated registration route must never become a
       // second writer for the same configuration.

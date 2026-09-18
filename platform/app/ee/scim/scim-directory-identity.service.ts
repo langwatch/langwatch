@@ -4,7 +4,11 @@
  * Real external identifiers resolve only within their connection.
  */
 import type { PrismaClient } from "~/generated/prisma/client";
-import { ScimWriteOutsideConnectionError } from "./errors";
+
+import {
+  ScimConnectionNotFoundError,
+  ScimWriteOutsideConnectionError,
+} from "./errors";
 
 export class ScimDirectoryIdentityService {
   constructor(private readonly prisma: PrismaClient) {}
@@ -33,25 +37,46 @@ export class ScimDirectoryIdentityService {
 
   /** Ownership is independent of the directory's optional external identifier. */
   async remember({
+    organizationId,
     connectionId,
     externalId,
     userId,
   }: {
     connectionId: string;
+    organizationId: string;
     externalId: string | null;
     userId: string;
   }): Promise<void> {
+    const connection = await this.connectionForOrganization({
+      organizationId,
+      connectionId,
+    });
+    const predecessor =
+      connection.migrationPhase === "FINALIZING" ||
+      connection.migrationPhase === "FINALIZED"
+        ? connection.replacesConnectionId
+        : null;
     await this.prisma.$transaction([
+      ...(predecessor
+        ? [
+            this.prisma.scimDirectoryUser.deleteMany({
+              where: { organizationId, connectionId: predecessor, userId },
+            }),
+            this.prisma.scimExternalId.deleteMany({
+              where: { organizationId, connectionId: predecessor, userId },
+            }),
+          ]
+        : []),
       this.prisma.scimDirectoryUser.upsert({
         where: { connectionId_userId: { connectionId, userId } },
-        create: { connectionId, userId },
+        create: { organizationId, connectionId, userId },
         update: {},
       }),
       ...(externalId
         ? [
             this.prisma.scimExternalId.upsert({
               where: { connectionId_externalId: { connectionId, externalId } },
-              create: { connectionId, externalId, userId },
+              create: { organizationId, connectionId, externalId, userId },
               update: { userId },
             }),
           ]
@@ -105,21 +130,56 @@ export class ScimDirectoryIdentityService {
    * check.
    */
   async assertWritable({
+    organizationId,
     connectionId,
     userId,
   }: {
+    organizationId: string;
     connectionId: string | null;
     userId: string;
   }): Promise<void> {
     if (!connectionId) return;
+    const connection = await this.connectionForOrganization({
+      organizationId,
+      connectionId,
+    });
     const claims = await this.prisma.scimDirectoryUser.findMany({
-      where: { userId },
+      where: { organizationId, userId },
       select: { connectionId: true },
     });
     if (claims.length === 0) return;
     if (claims.some((claim) => claim.connectionId === connectionId)) return;
-    // Names only the person the caller already sent. Which OTHER connection
-    // holds them is not the pushing directory's business.
-    throw new ScimWriteOutsideConnectionError({ userId });
+
+    const owners = await this.prisma.ssoConnection.findMany({
+      where: {
+        organizationId,
+        id: { in: claims.map((claim) => claim.connectionId) },
+        state: { notIn: ["DISCARDED", "TEARDOWN_PENDING", "TORN_DOWN"] },
+      },
+      select: { id: true },
+    });
+    const predecessor =
+      connection.migrationPhase === "FINALIZING" ||
+      connection.migrationPhase === "FINALIZED"
+        ? connection.replacesConnectionId
+        : null;
+    if (owners.some((owner) => owner.id !== predecessor)) {
+      throw new ScimWriteOutsideConnectionError({ userId });
+    }
+  }
+
+  private async connectionForOrganization({
+    organizationId,
+    connectionId,
+  }: {
+    organizationId: string;
+    connectionId: string;
+  }) {
+    const connection = await this.prisma.ssoConnection.findFirst({
+      where: { id: connectionId, organizationId },
+      select: { replacesConnectionId: true, migrationPhase: true },
+    });
+    if (!connection) throw new ScimConnectionNotFoundError(connectionId);
+    return connection;
   }
 }

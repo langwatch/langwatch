@@ -1,3 +1,4 @@
+import { createSsoOidcFetch } from "@ee/sso/sso-oidc-fetch";
 import { betterAuth } from "better-auth";
 import { nanoid } from "nanoid";
 import * as samlify from "samlify";
@@ -143,6 +144,7 @@ export async function createSamlFixture(
     trustedOrigins: [BASE_URL, "https://idp.saml.test"],
     databaseHooks: samlSessionHooks(options.databaseHooks),
     plugins: plugins({
+      ssoOidcFetch: createSsoOidcFetch({ dialableInternalOrigins: [] }),
       backupCodeCount: 10,
       passkeySignUp: () => {
         throw new Error("Passkey registration is outside this fixture");

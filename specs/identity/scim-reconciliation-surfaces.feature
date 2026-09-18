@@ -225,3 +225,10 @@ Feature: The SCIM reconciliation surfaces - directory sync you can read
     Given both views have been read for "acme"
     When the reconciliation projections are rebuilt from the event log
     Then the rebuilt views show what the live views showed
+
+  @unit @regression
+  Scenario: Recent directory removals survive a full page of live grants
+    Given an organization has more live directory grants than the activity limit
+    And an older grant was recently revoked
+    When the administrator reads recent directory changes
+    Then the recent removal is included in chronological order

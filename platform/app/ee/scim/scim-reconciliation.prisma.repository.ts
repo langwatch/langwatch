@@ -23,7 +23,9 @@
 
 import { rowToConnection } from "@ee/sso/sso-connection-projection.prisma.repository";
 import type { ScimSyncState } from "@langwatch/identity";
+
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
+
 import { rowToScimSync } from "./scim-sync-projection.prisma.repository";
 
 /**
@@ -181,7 +183,7 @@ export class PrismaScimReconciliationRepository
    * The membership changes the directory authored, newest first.
    *
    * `source: "scim"` is the whole predicate. It is set on ATTACH and survives
-   * the revoke, because a revoke marks the same row — so one query answers
+   * the revoke, because a revoke marks the same row — so the reads answer
    * both halves of "what did the directory do", and a removal cannot go
    * missing just because nothing re-stamped it on the way out.
    *
@@ -196,21 +198,35 @@ export class PrismaScimReconciliationRepository
     organizationId: string;
     limit: number;
   }): Promise<DirectoryCausedChange[]> {
-    const rows = await this.prisma.grant.findMany({
-      where: { organizationId, source: "scim" },
-      orderBy: [{ revokedAt: "desc" }, { occurredAt: "desc" }],
-      take: limit,
-      select: {
-        id: true,
-        principalType: true,
-        principalId: true,
-        roleKey: true,
-        scopeType: true,
-        scopeId: true,
-        occurredAt: true,
-        revokedAt: true,
-      },
-    });
+    const select = {
+      id: true,
+      principalType: true,
+      principalId: true,
+      roleKey: true,
+      scopeType: true,
+      scopeId: true,
+      occurredAt: true,
+      revokedAt: true,
+    } satisfies Prisma.GrantSelect;
+    const [occurred, removed] = await Promise.all([
+      this.prisma.grant.findMany({
+        where: { organizationId, source: "scim" },
+        orderBy: [{ occurredAt: "desc" }, { id: "asc" }],
+        take: limit,
+        select,
+      }),
+      this.prisma.grant.findMany({
+        where: { organizationId, source: "scim", revokedAt: { not: null } },
+        orderBy: [{ revokedAt: "desc" }, { id: "asc" }],
+        take: limit,
+        select,
+      }),
+    ]);
+    const rows = [
+      ...new Map(
+        [...occurred, ...removed].map((row) => [row.id, row]),
+      ).values(),
+    ];
     return rows
       .map((row) => ({
         grantId: row.id,
@@ -222,9 +238,16 @@ export class PrismaScimReconciliationRepository
         kind: (row.revokedAt ? "removed" : "attached") as
           | "attached"
           | "removed",
-        occurredAtMs: (row.revokedAt ?? row.occurredAt).getTime(),
+        occurredAtMs: Math.max(
+          row.occurredAt.getTime(),
+          row.revokedAt?.getTime() ?? 0,
+        ),
       }))
-      .sort((a, b) => b.occurredAtMs - a.occurredAtMs);
+      .sort(
+        (a, b) =>
+          b.occurredAtMs - a.occurredAtMs || a.grantId.localeCompare(b.grantId),
+      )
+      .slice(0, limit);
   }
 
   /**

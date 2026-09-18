@@ -13,6 +13,7 @@ WORKDIR /app
 # workspace definition live at the root and the install runs from there,
 # narrowed to this package and its workspace dependencies.
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc ./
+COPY patches ./patches
 COPY mcp/typescript/package.json ./mcp/typescript/
 COPY packages/handled-error ./packages/handled-error
 # Manifests only. `--frozen-lockfile` checks the lockfile against every

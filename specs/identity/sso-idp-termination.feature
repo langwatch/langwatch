@@ -536,3 +536,18 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     When its legacy access is retired
     Then retirement requires a verified replacement identifier for that user
     And accounts belonging only to another organization remain untouched
+
+  @unit @regression
+  Scenario: Metadata-only SAML registration requires a usable signing certificate
+    When identity provider metadata has no signing key or only an encryption key
+    Then registration is refused with sso_saml_metadata_invalid
+    And metadata with a usable signing key or a separately supplied certificate is accepted
+
+  @unit
+  Scenario: Runtime OIDC requests enforce the public-address policy independently of browser trust
+    Given an identity provider registered by an organization is trusted for browser sign-in
+    When discovery, token exchange, userinfo or signing-key retrieval targets a private address
+    Then the request is refused before transport and no session is created
+    And DNS changes and mixed public-private answers do not bypass the policy
+    And redirects never forward credentials to another endpoint
+    And only an operator-configured internal identity provider is exempt from public-address restrictions

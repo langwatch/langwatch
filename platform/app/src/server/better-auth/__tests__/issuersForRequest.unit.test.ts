@@ -25,23 +25,17 @@ const post = (url: string, body?: unknown) =>
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 
-const findAllIssuers = vi.fn();
+const findIssuerForDomain = vi.fn();
 const findIssuerForConnection = vi.fn();
 
-let now = 1_000;
 let allowlist: RegisteredIssuers;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  findAllIssuers.mockResolvedValue([
-    "https://acme.okta.com",
-    "https://globex.okta.com",
-  ]);
+  findIssuerForDomain.mockResolvedValue(null);
   findIssuerForConnection.mockResolvedValue("https://acme.okta.com");
-  now = 1_000;
   allowlist = new RegisteredIssuers({
-    issuers: { findAllIssuers, findIssuerForConnection },
-    now: () => now,
+    issuers: { findIssuerForConnection, findIssuerForDomain },
   });
 });
 
@@ -56,8 +50,6 @@ describe("given a request that names one connection", () => {
       expect(findIssuerForConnection).toHaveBeenCalledWith({
         connectionId: "ssoc_acme",
       });
-      // The whole set is never read for a request that named one.
-      expect(findAllIssuers).not.toHaveBeenCalled();
     });
   });
 
@@ -88,7 +80,6 @@ describe("given a request that names one connection", () => {
           post("https://app.langwatch.test/api/auth/sso/callback/ssoc_ghost"),
         ),
       ).toEqual([]);
-      expect(findAllIssuers).not.toHaveBeenCalled();
     });
   });
 
@@ -107,77 +98,14 @@ describe("given a request that names one connection", () => {
 
 describe("given a request that names no connection", () => {
   describe("when a domain-first sign-in has not resolved one yet", () => {
-    it("falls back to every issuer, because the discovery fetch still has to be allowed", async () => {
+    it("adds no tenant issuer origins to an unnamed request", async () => {
       const issuers = await allowlist.issuersForRequest(
         post("https://app.langwatch.test/api/auth/sign-in/sso", {
           email: "sam@acme.com",
         }),
       );
 
-      expect(issuers).toEqual([
-        "https://acme.okta.com",
-        "https://globex.okta.com",
-      ]);
-    });
-  });
-});
-
-/**
- * One ceremony is several requests that each resolve the trusted origins, so
- * the whole-set read is remembered for a few seconds. The memory is a field on
- * the instance rather than a module binding, which is what makes it one
- * memory — and what makes this assertable at all.
- */
-describe("given several requests of one sign-in ceremony", () => {
-  describe("when none of them names a connection", () => {
-    it("reads the whole set once for all of them", async () => {
-      const domainFirst = () =>
-        allowlist.issuersForRequest(
-          post("https://app.langwatch.test/api/auth/sign-in/sso", {
-            email: "sam@acme.com",
-          }),
-        );
-
-      await domainFirst();
-      await domainFirst();
-
-      expect(findAllIssuers).toHaveBeenCalledOnce();
-    });
-
-    it("reads it again once the window has passed", async () => {
-      await allowlist.registeredIssuers();
-      now += 5_001;
-      await allowlist.registeredIssuers();
-
-      expect(findAllIssuers).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  describe("when the read stops working", () => {
-    /**
-     * Degrading to the configured origins costs one refused single sign-in.
-     * Throwing would cost every sign-in of every kind, which is why an
-     * unreadable table answers with what was last known instead.
-     */
-    it("keeps answering what it last read rather than failing the request", async () => {
-      expect(await allowlist.registeredIssuers()).toEqual([
-        "https://acme.okta.com",
-        "https://globex.okta.com",
-      ]);
-
-      findAllIssuers.mockRejectedValue(new Error("database down"));
-      now += 5_001;
-
-      expect(await allowlist.registeredIssuers()).toEqual([
-        "https://acme.okta.com",
-        "https://globex.okta.com",
-      ]);
-    });
-
-    it("trusts nothing when it never read anything", async () => {
-      findAllIssuers.mockRejectedValue(new Error("database down"));
-
-      expect(await allowlist.registeredIssuers()).toEqual([]);
+      expect(issuers).toEqual([]);
     });
   });
 });
@@ -190,7 +118,6 @@ describe("given a request that is not about single sign-on", () => {
           post("https://app.langwatch.test/api/auth/sign-in/email"),
         ),
       ).toEqual([]);
-      expect(findAllIssuers).not.toHaveBeenCalled();
       expect(findIssuerForConnection).not.toHaveBeenCalled();
     });
 
@@ -198,4 +125,39 @@ describe("given a request that is not about single sign-on", () => {
       expect(await allowlist.issuersForRequest(undefined)).toEqual([]);
     });
   });
+});
+
+/** @scenario "Unnamed SSO requests cannot trust another tenant's origin" */
+it.each(["callbackURL", "redirectTo", "errorCallbackURL"])(
+  "does not widen trust for %s without a provider",
+  async (field) => {
+    const request = new Request(
+      "https://app.langwatch.test/api/auth/sign-in/sso",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "https://globex.okta.com",
+        },
+        body: JSON.stringify({
+          email: "sam@acme.com",
+          [field]: "https://globex.okta.com/return",
+        }),
+      },
+    );
+    expect(await allowlist.issuersForRequest(request)).toEqual([]);
+    expect(request.bodyUsed).toBe(false);
+  },
+);
+
+it("narrows a domain-first request to its resolved issuer", async () => {
+  findIssuerForDomain.mockResolvedValue("https://acme.okta.com");
+  const request = post("https://app.langwatch.test/api/auth/sign-in/sso", {
+    email: "sam@acme.com",
+    callbackURL: "https://globex.okta.com/return",
+  });
+  expect(await allowlist.issuersForRequest(request)).toEqual([
+    "https://acme.okta.com",
+  ]);
+  expect(findIssuerForDomain).toHaveBeenCalledWith({ domain: "acme.com" });
 });

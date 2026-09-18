@@ -14,6 +14,7 @@
  * at only one of the two seams would still drop the operation on the floor.
  */
 
+import { resourceStore } from "./scim-user-resource.fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { ScimService } from "../scim.service";
@@ -54,11 +55,14 @@ function parsePatch(body: unknown) {
 
 function createMockPrisma() {
   const mock = {
+    scimUserResource: resourceStore(),
     user: {
+      findFirst: vi.fn().mockResolvedValue(null),
       findUnique: vi.fn(),
       update: vi.fn(),
     },
     organizationUser: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
       findUnique: vi.fn(),
       findMany: vi.fn().mockResolvedValue([{ userId: "user-1" }]),
     },
@@ -167,10 +171,12 @@ describe("SCIM PATCH op casing", () => {
           }),
         });
 
-        expect(prisma.user.update).toHaveBeenCalledWith({
-          where: { id: "user-1" },
-          data: { deactivatedAt: expect.any(Date) },
-        });
+        expect(prisma.user.update).not.toHaveBeenCalled();
+        expect(prisma.scimUserResource.upsert).toHaveBeenCalledWith(
+          expect.objectContaining({
+            update: expect.objectContaining({ active: false }),
+          }),
+        );
         expect(result).toHaveProperty("active", false);
       });
     });

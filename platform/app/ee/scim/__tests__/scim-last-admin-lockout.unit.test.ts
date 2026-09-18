@@ -16,9 +16,12 @@
  * person — the act that would leave nobody able to administer it, which is
  * the same act `setMemberDisabled` already refuses by hand.
  */
+import { resourceStore } from "./scim-user-resource.fixture";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { PrismaClient, User } from "~/generated/prisma/client";
 import { CannotRemoveLastAdminError } from "~/server/app-layer/organizations/errors";
+
 import { ScimService } from "../scim.service";
 
 vi.mock("~/server/app-layer/app", () => ({
@@ -67,12 +70,15 @@ function buildUser(overrides: Partial<User> = {}): User {
 function createMockPrisma() {
   const deactivate = vi.fn().mockResolvedValue(buildUser());
   const prisma = {
+    scimUserResource: resourceStore(),
     user: {
+      findFirst: vi.fn().mockResolvedValue(null),
       findUnique: vi.fn().mockResolvedValue(buildUser()),
       create: vi.fn().mockResolvedValue(buildUser()),
       update: deactivate,
     },
     organizationUser: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
       findUnique: vi.fn().mockResolvedValue({ userId: ADMIN, role: "ADMIN" }),
       findMany: vi.fn().mockResolvedValue([]),
       create: vi.fn().mockResolvedValue({}),
@@ -80,6 +86,26 @@ function createMockPrisma() {
       update: vi.fn().mockResolvedValue({}),
     },
     roleBinding: { findMany: vi.fn().mockResolvedValue([]) },
+    ssoConnection: {
+      findFirst: vi.fn(
+        async ({ where }: { where: { id: string; organizationId: string } }) =>
+          where.id === "conn-okta" && where.organizationId === ORGANIZATION
+            ? { replacesConnectionId: null, migrationPhase: null }
+            : null,
+      ),
+      findMany: vi.fn(
+        async ({
+          where,
+        }: {
+          where: { id: { in: string[] }; organizationId: string };
+        }) =>
+          where.organizationId === ORGANIZATION
+            ? where.id.in
+                .filter((id) => id === "conn-entra")
+                .map((id) => ({ id }))
+            : [],
+      ),
+    },
     scimDirectoryUser: {
       findUnique: vi.fn().mockResolvedValue(null),
       findMany: vi.fn().mockResolvedValue([]),
@@ -150,16 +176,8 @@ describe("given the organization's only administrator", () => {
         }),
       ).rejects.toMatchObject({ code: "cannot_disable_last_admin" });
 
-      // THE ORDER IS THE POINT. A refusal that still wrote the flag would
-      // report the directory's requested state as reached while locking the
-      // organization out anyway. `replaceUser` does write the profile fields
-      // on its way here, so the assertion is about the one field that closes
-      // the door rather than about the call count.
-      const deactivatingWrites = deactivate.mock.calls.filter(
-        ([args]) =>
-          (args as { data?: Record<string, unknown> })?.data?.deactivatedAt,
-      );
-      expect(deactivatingWrites).toEqual([]);
+      expect(deactivate).not.toHaveBeenCalled();
+      expect(prisma.scimUserResource.upsert).not.toHaveBeenCalled();
     });
   });
 });
@@ -187,7 +205,10 @@ describe("given somebody who is not an administrator", () => {
     const { prisma } = createMockPrisma();
     (
       prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>
-    ).mockResolvedValue({ userId: ADMIN, role: "MEMBER" });
+    ).mockResolvedValue({
+      userId: ADMIN,
+      role: "MEMBER",
+    });
 
     await expect(
       buildService(prisma).replaceUser({

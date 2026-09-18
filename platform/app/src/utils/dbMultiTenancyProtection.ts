@@ -77,13 +77,6 @@ const GLOBAL_MODELS = [
   // The MFA aggregate's projection is keyed `tenantId = userId` (D06), so it
   // is per-user by construction like the identity projections above.
   "MfaEnrollment",
-  // The directory's `(connectionId, externalId) -> userId` map (D08). Not
-  // project-scoped and carries no organizationId; a SCIM push resolves a
-  // person through it before anything org-shaped is in hand. Cross-org safety
-  // comes from the token's connection scope, which is checked at the endpoint
-  // rather than here.
-  "ScimExternalId",
-  "ScimDirectoryUser",
   // Top-level tenancy entities, addressed by their own id / slug.
   "Organization",
   "Project",

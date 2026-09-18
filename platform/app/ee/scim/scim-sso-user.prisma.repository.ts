@@ -35,6 +35,8 @@ export class PrismaScimSsoUsers {
       );
     }
 
+    if (await this.#isDirectoryInactive(database, input)) return REFUSE;
+
     // SAML supplies a signed email attribute, without an OIDC verification flag.
     // The caller has already admitted that assertion through the domain gate.
     if (input.protocol === "oidc" && !input.providerUser.emailVerified) {
@@ -71,6 +73,48 @@ export class PrismaScimSsoUsers {
       return REFUSE;
     }
     return this.#resolveOwnedUser(database, input, user.id);
+  }
+
+  async #isDirectoryInactive(
+    database: Prisma.TransactionClient,
+    input: SSOUserResolutionInput,
+  ): Promise<boolean> {
+    const connection = await database.ssoConnection.findUnique({
+      where: { id: input.providerId },
+      select: { organizationId: true },
+    });
+    if (!connection) return false;
+
+    // An existing subject binding still identifies an inactive member when
+    // the IdP changes its email claim. Directory profile aliases confer no
+    // authority to link a different global account.
+    const inactive = await database.scimUserResource.findFirst({
+      where: {
+        organizationId: connection.organizationId,
+        active: false,
+        user: {
+          OR: [
+            {
+              email: {
+                equals: normalizeIdentifierValue(input.providerUser.email),
+                mode: "insensitive",
+              },
+            },
+            {
+              accounts: {
+                some: {
+                  provider: input.providerId,
+                  issuer: input.accountKey.issuer,
+                  providerAccountId: input.accountKey.accountId,
+                },
+              },
+            },
+          ],
+        },
+      },
+      select: { userId: true },
+    });
+    return inactive !== null;
   }
 
   async #resolveVerifiedSamlUser(

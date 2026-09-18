@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { SignInRouterService } from "@langwatch/identity-server";
+
 import type { SsoBreakGlassService } from "./break-glass.service";
 import type { SsoConnectionReadRepository } from "./sso-connection.repository";
 
@@ -35,7 +36,9 @@ export class SsoCredentialPolicy {
     const connectionId = decision.methodSet.find(
       (method) => method.connectionId !== null,
     )?.connectionId;
-    if (!connectionId) return false;
+    // Instance federation is governed by the deployment's request hook.
+    // Only an organization's connection can require its recovery grant here.
+    if (!connectionId) return true;
     const connection = await this.#deps.connections.findConnection({
       connectionId,
     });

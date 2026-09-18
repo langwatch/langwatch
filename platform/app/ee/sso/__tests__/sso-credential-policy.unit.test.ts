@@ -5,6 +5,7 @@ import {
 } from "@langwatch/identity";
 import { SignInRouterService } from "@langwatch/identity-server";
 import { describe, expect, it, vi } from "vitest";
+
 import { SsoBreakGlassService } from "../break-glass.service";
 import { SsoCredentialPolicy } from "../sso-credential-policy";
 import {
@@ -13,7 +14,7 @@ import {
 } from "./support/in-memory-break-glass";
 import { InMemoryConnections } from "./support/in-memory-connections";
 
-function build() {
+function build({ instanceFederation = false } = {}) {
   let now = Date.now();
   let nextId = 0;
   const bindings = new InMemoryBreakGlassBindings();
@@ -40,20 +41,22 @@ function build() {
     domains: {
       legacy: {
         findConnectionForDomain: async ({ domain }) =>
-          domain === "company.test" ? connection : null,
-        listActiveConnections: async () => [connection],
+          !instanceFederation && domain === "company.test" ? connection : null,
+        listActiveConnections: async () =>
+          instanceFederation ? [] : [connection],
       },
       connections: {
         findConnectionForDomain: async ({ domain }) =>
-          domain === "company.test" ? connection : null,
-        listActiveConnections: async () => [connection],
+          !instanceFederation && domain === "company.test" ? connection : null,
+        listActiveConnections: async () =>
+          instanceFederation ? [] : [connection],
       },
     },
     policy: {
       resolvePolicy: async () => ({
-        defaultMethods: [
-          { id: "password", kind: "password", connectionId: null },
-        ],
+        defaultMethods: instanceFederation
+          ? [{ id: "oidc", kind: "federated", connectionId: null }]
+          : [{ id: "password", kind: "password", connectionId: null }],
         localMethods: [
           { id: "password", kind: "password", connectionId: null },
         ],
@@ -65,7 +68,7 @@ function build() {
       findAccountMethods: async () => ({
         hasPassword: true,
         hasPasskey: false,
-        providerIds: [],
+        providerIds: instanceFederation ? ["oidc"] : [],
         connectionIds: [],
       }),
     },
@@ -92,6 +95,7 @@ function build() {
     });
   return {
     policy,
+    router,
     grant,
     breakGlass,
     holderIsEligible,
@@ -151,4 +155,15 @@ describe("SsoCredentialPolicy with the real router and recovery grants", () => {
     ).toBe(true);
     expect(holderIsEligible).toHaveBeenCalledTimes(1);
   });
+});
+
+/** @scenario "Instance federation leaves credential permission to the deployment policy" */
+it("leaves an actual null-connection router decision to deployment enforcement", async () => {
+  const { policy, router } = build({ instanceFederation: true });
+  const email = "holder@personal.test";
+  expect(await router.route({ identifier: email })).toMatchObject({
+    outcome: "redirect_to_connection",
+    methodSet: [{ id: "oidc", connectionId: null }],
+  });
+  expect(await policy.canSignIn({ userId: "holder", email })).toBe(true);
 });

@@ -6,6 +6,7 @@ import {
   SsoSamlMetadataInvalidError,
 } from "@langwatch/identity";
 import { withoutTrailingSlashes } from "@langwatch/identity-server";
+import { Extractor } from "samlify";
 import { z } from "zod";
 
 /**
@@ -115,6 +116,15 @@ export function validateSamlRegistration(
       "the supplied document is not a saml identity provider descriptor",
     );
   }
+  if (
+    metadataXml !== null &&
+    certificate === null &&
+    !hasSigningCertificate(metadataXml)
+  ) {
+    throw new SsoSamlMetadataInvalidError(
+      "the identity provider metadata must contain a readable signing certificate",
+    );
+  }
   if (certificate !== null && !looksLikeCertificate(certificate)) {
     throw new SsoCertificateInvalidError(
       "the supplied signing certificate could not be read",
@@ -182,6 +192,49 @@ function looksLikeSamlDescriptor(xml: string): boolean {
     /<(?:[A-Za-z0-9._-]+:)?Entit(?:y|ies)Descriptor[\s>]/.test(xml) &&
     /<(?:[A-Za-z0-9._-]+:)?IDPSSODescriptor[\s>]/.test(xml)
   );
+}
+
+function hasSigningCertificate(metadata: string): boolean {
+  try {
+    const descriptors = Extractor.extract(metadata, [
+      {
+        key: "keys",
+        localPath: ["EntityDescriptor", "IDPSSODescriptor", "KeyDescriptor"],
+        attributes: [],
+        context: true,
+      },
+    ]).keys;
+    const candidates = z
+      .union([z.string(), z.array(z.string())])
+      .parse(descriptors);
+    const keys = Array.isArray(candidates) ? candidates : [candidates];
+    return keys.some((key) => {
+      const extracted = Extractor.extract(key, [
+        { key: "use", localPath: ["KeyDescriptor"], attributes: ["use"] },
+        {
+          key: "certificate",
+          localPath: [
+            "KeyDescriptor",
+            "KeyInfo",
+            "X509Data",
+            "X509Certificate",
+          ],
+          attributes: [],
+        },
+      ]);
+      if (extracted.use && extracted.use !== "signing") return false;
+      const parsed = z
+        .union([z.string(), z.array(z.string())])
+        .safeParse(extracted.certificate);
+      if (!parsed.success) return false;
+      const certificates = Array.isArray(parsed.data)
+        ? parsed.data
+        : [parsed.data];
+      return certificates.some(looksLikeCertificate);
+    });
+  } catch {
+    return false;
+  }
 }
 
 /**

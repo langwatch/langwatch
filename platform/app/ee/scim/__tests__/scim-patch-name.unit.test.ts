@@ -11,8 +11,11 @@
  *
  * Spec: specs/identity/scim-connection-sync.feature
  */
+import { resourceStore } from "./scim-user-resource.fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { PrismaClient, User } from "~/generated/prisma/client";
+
 import { ScimService } from "../scim.service";
 
 vi.mock("~/server/app-layer/app", () => ({
@@ -56,12 +59,15 @@ function buildUser(overrides: Partial<User> = {}): User {
 function createMockPrisma() {
   const update = vi.fn().mockResolvedValue(buildUser());
   const prisma = {
+    scimUserResource: resourceStore(),
     user: {
+      findFirst: vi.fn().mockResolvedValue(null),
       findUnique: vi.fn().mockResolvedValue(buildUser()),
       create: vi.fn().mockResolvedValue(buildUser()),
       update,
     },
     organizationUser: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
       findUnique: vi.fn().mockResolvedValue({ userId: PERSON, role: "MEMBER" }),
       findMany: vi.fn().mockResolvedValue([]),
       count: vi.fn().mockResolvedValue(2),
@@ -70,6 +76,26 @@ function createMockPrisma() {
       update: vi.fn().mockResolvedValue({}),
     },
     roleBinding: { findMany: vi.fn().mockResolvedValue([]) },
+    ssoConnection: {
+      findFirst: vi.fn(
+        async ({ where }: { where: { id: string; organizationId: string } }) =>
+          where.id === "conn-okta" && where.organizationId === ORGANIZATION
+            ? { replacesConnectionId: null, migrationPhase: null }
+            : null,
+      ),
+      findMany: vi.fn(
+        async ({
+          where,
+        }: {
+          where: { id: { in: string[] }; organizationId: string };
+        }) =>
+          where.organizationId === ORGANIZATION
+            ? where.id.in
+                .filter((id) => id === "conn-entra")
+                .map((id) => ({ id }))
+            : [],
+      ),
+    },
     scimDirectoryUser: {
       findUnique: vi.fn().mockResolvedValue(null),
       findMany: vi.fn().mockResolvedValue([]),
@@ -111,7 +137,7 @@ function buildService(prisma: PrismaClient) {
 
 /** The name this PATCH stored, or undefined if it stored no name at all. */
 async function nameAfterPatch(operation: unknown): Promise<string | undefined> {
-  const { prisma, update } = createMockPrisma();
+  const { prisma } = createMockPrisma();
   await buildService(prisma).updateUser({
     id: PERSON,
     organizationId: ORGANIZATION,
@@ -121,10 +147,12 @@ async function nameAfterPatch(operation: unknown): Promise<string | undefined> {
     } as never,
     connectionId: "conn-okta",
   });
-  const names = update.mock.calls
-    .map(([args]) => (args as { data?: { name?: string } })?.data?.name)
-    .filter((name): name is string => typeof name === "string");
-  return names.at(-1);
+  const resource = await prisma.scimUserResource.findUnique({
+    where: {
+      organizationId_userId: { organizationId: ORGANIZATION, userId: PERSON },
+    },
+  });
+  return resource?.name ?? void 0;
 }
 
 beforeEach(() => {
@@ -211,13 +239,13 @@ describe("given a person stored as 'Ada Lovelace'", () => {
 
   describe("when the operation carries no name at all", () => {
     /** @scenario "A directory patches one half of a name with a dotted path" */
-    it("stores no name", async () => {
+    it("preserves the existing directory name", async () => {
       expect(
         await nameAfterPatch({
           op: "replace",
           value: { userName: "ada.new@acme.test" },
         }),
-      ).toBeUndefined();
+      ).toBe("Ada Lovelace");
     });
   });
 });

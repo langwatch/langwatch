@@ -1,5 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 import { signInProvedSecondFactor } from "@langwatch/identity";
+
 import { signInMethodLabelFor } from "./session-claims";
 import type {
   RevocableSession,
@@ -170,8 +171,8 @@ export class SessionInventoryService {
    * cannot end somebody else's sessions by naming an identifier that is not
    * theirs.
    *
-   * The cache is cleared BEFORE the rows go, so there is no window in which
-   * the row is gone and better-auth still answers from the cache.
+   * The rows are deleted before cache invalidation, matching single-session
+   * logout. Cache failures are logged by the revocation service.
    */
   async endSessionsForIdentifier({
     userId,

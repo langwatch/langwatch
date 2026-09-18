@@ -1431,21 +1431,12 @@ export function sessionMinter(): BetterAuthSessionMinter {
   return new BetterAuthSessionMinter();
 }
 
-/**
- * The trusted-origin allowlist for a single sign-on request.
- *
- * A memoized singleton, because the instance IS the few-second cache: a new
- * one per request would collapse nothing and turn one ceremony back into a
- * burst of identical queries. Its reads bypass the connection-issuer port's
- * own memo deliberately — see the repository for why a named connection is
- * read fresh.
- */
+/** Request-scoped SSO origin resolution reads the selected connection fresh. */
 let registeredIssuersInstance: RegisteredIssuers | null = null;
 
 export function ssoRegisteredIssuers(): RegisteredIssuers {
   registeredIssuersInstance ??= new RegisteredIssuers({
     issuers: new PrismaSsoConnectionIssuers(prisma),
-    now: Date.now,
   });
   return registeredIssuersInstance;
 }

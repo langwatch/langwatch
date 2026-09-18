@@ -1,5 +1,6 @@
 import type { SignInMethodPolicy } from "@langwatch/identity";
 import { describe, expect, it, vi } from "vitest";
+
 import { requestHooks } from "../config/request-hooks";
 
 /**
@@ -101,7 +102,9 @@ describe("the credential boundary on a deployment that issues its own passwords"
 
       await expect(
         submit({ policy: issuesOwnPasswords, routesToConnection }),
-      ).resolves.toEqual({ refused: false });
+      ).resolves.toEqual({
+        refused: false,
+      });
       expect(routesToConnection).not.toHaveBeenCalled();
     });
 
@@ -134,6 +137,7 @@ describe("the credential boundary on a deployment that issues its own passwords"
   });
 
   describe("given a deployment that does not issue its own passwords", () => {
+    /** @scenario "Instance federation leaves credential permission to the deployment policy" */
     it("never pays the connection lookup, because the policy already refused", async () => {
       const routesToConnection = vi.fn().mockResolvedValue(false);
 

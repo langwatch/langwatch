@@ -26,6 +26,7 @@ import {
 } from "@langwatch/authz";
 import type { Context } from "hono";
 import { z } from "zod";
+
 import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
 import type { CustomRole, Organization } from "~/generated/prisma/client";
 import { createManagementService } from "~/server/api/management/managed-service";
@@ -92,7 +93,9 @@ const roleWire = (
   role: Pick<
     CustomRole,
     "id" | "name" | "description" | "createdAt" | "updatedAt"
-  > & { permissions: string[] },
+  > & {
+    permissions: string[];
+  },
 ): z.infer<typeof roleSchema> => ({
   id: role.id,
   name: role.name,
@@ -135,14 +138,17 @@ const createRoleHandler = async (
   return roleWire(role);
 };
 
+function isOrganizationExclusiveResource(resource: string): boolean {
+  const tiers = permissionGrantTiers(`${resource}:view` as AuthzPermission);
+  return tiers.length > 0 && tiers.every((tier) => tier === "organization");
+}
+
 const permissionCatalogHandler = async () => {
   const actions = [...AUTHZ_ACTIONS];
   return {
     resources: CUSTOM_ROLE_RESOURCES.map((resource) => ({
       resource,
-      organizationExclusive: permissionGrantTiers(
-        `${resource}:view` as AuthzPermission,
-      ).every((tier) => tier === "organization"),
+      organizationExclusive: isOrganizationExclusiveResource(resource),
       actions,
       permissions: actions.map((action) => `${resource}:${action}`),
     })),

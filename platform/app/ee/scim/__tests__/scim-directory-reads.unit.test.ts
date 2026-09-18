@@ -45,20 +45,18 @@ function makeStore(rows: Row[]) {
   let unorderedReads = 0;
 
   const matches = (row: Row, where: Record<string, unknown>): boolean => {
-    if (where.organizationId !== ORG) return false;
-    const user = where.user as
-      | { email?: { equals?: string; mode?: string } }
+    const scope = where.OR as {
+      orgMemberships?: { some: { organizationId: string } };
+    }[];
+    if (scope[0]?.orgMemberships?.some.organizationId !== ORG) return false;
+    const filter = where.AND as
+      | { OR: { email?: { equals: string } }[] }[]
       | undefined;
-    if (user?.email?.equals !== undefined) {
-      if (row.email.toLowerCase() !== user.email.equals.toLowerCase()) {
-        return false;
-      }
-    }
-    const userId = where.userId as { in?: string[] } | undefined;
-    if (userId?.in !== undefined && !userId.in.includes(row.userId)) {
+    const email = filter?.[0]?.OR[1]?.email?.equals;
+    if (email !== undefined && row.email.toLowerCase() !== email.toLowerCase())
       return false;
-    }
-    return true;
+    const id = where.id as { in?: string[] } | undefined;
+    return id?.in === undefined || id.in.includes(row.userId);
   };
 
   const findMany = vi.fn(
@@ -71,11 +69,11 @@ function makeStore(rows: Row[]) {
       where: Record<string, unknown>;
       skip?: number;
       take?: number;
-      orderBy?: { userId?: "asc" | "desc" };
+      orderBy?: { id?: "asc" | "desc" };
     }) => {
       const matched = rows.filter((row) => matches(row, where));
       let ordered: Row[];
-      if (orderBy?.userId === "asc") {
+      if (orderBy?.id === "asc") {
         ordered = [...matched].sort((a, b) => a.userId.localeCompare(b.userId));
       } else {
         // No order asked for, so no order promised. Rotating by one on every
@@ -90,16 +88,14 @@ function makeStore(rows: Row[]) {
       );
       return Promise.resolve(
         page.map((row) => ({
-          userId: row.userId,
-          user: {
-            id: row.userId,
-            name: row.name,
-            email: row.email,
-            emailVerified: true,
-            createdAt: new Date("2024-01-01T00:00:00Z"),
-            updatedAt: new Date("2024-01-02T00:00:00Z"),
-            deactivatedAt: null,
-          },
+          scimUserResources: [],
+          id: row.userId,
+          name: row.name,
+          email: row.email,
+          emailVerified: true,
+          createdAt: new Date("2024-01-01T00:00:00Z"),
+          updatedAt: new Date("2024-01-02T00:00:00Z"),
+          deactivatedAt: null,
         })),
       );
     },
@@ -132,7 +128,7 @@ function makeStore(rows: Row[]) {
   );
 
   const prisma = {
-    organizationUser: { findMany, count },
+    user: { findMany, count },
     scimExternalId: { findUnique },
   } as unknown as PrismaClient;
 
@@ -217,7 +213,7 @@ describe("reading the directory back", () => {
       // The pin: without an order the store is free to rotate, and the two
       // reads above would disagree.
       expect(store.findMany.mock.calls[0]?.[0].orderBy).toEqual({
-        userId: "asc",
+        id: "asc",
       });
       expect(ids(again.Resources)).toEqual(ids(first.Resources));
     });

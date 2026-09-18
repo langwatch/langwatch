@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   CLI_LOGIN_KEY_NAME_PREFIX,
   HIDDEN_SYSTEM_KEY_NAMES,
@@ -14,13 +15,10 @@ import type { GuardMiddleware, GuardParams } from "./dbGuardMiddleware";
  * secret column, or a parent foreign key that itself belongs to exactly one
  * org). A bare `findMany()` throws instead of returning every tenant's rows.
  *
- * Single-organization invariant (ADR-021): scoping is always within ONE org.
- * No query may target two organizations at once, so if more than one distinct
- * `organizationId` literal appears anywhere in the WHERE tree (typically across
- * OR branches) the query is rejected. The middleware has no auth context and
- * cannot verify the org belongs to the caller (that is the tRPC layer's job),
- * but it can and does reject a WHERE that spans two organizations, which closes
- * the documented `{ OR: [{ projectId }, { organizationId: "other" }] }` gap.
+ * Scalar organization predicates cannot smuggle another organization into an
+ * OR branch. Maintenance queries may explicitly name a finite `in` list; every
+ * value must be a nonempty ID. The middleware has no authorization context, so
+ * callers remain responsible for authorization of every organization named.
  */
 
 type OrgScopedModelConfig = {
@@ -244,12 +242,20 @@ const isNonEmptyStringList = (value: any): boolean =>
   value.in.length > 0 &&
   value.in.every((v: any) => typeof v === "string");
 
-// A single organizationId literal is the canonical single-org predicate. We
-// deliberately do NOT accept `organizationId: { in: [...] }` here: a list of
-// org ids would target several organizations, which the single-organization
-// invariant forbids, and no call-site needs it.
-const hasOrganizationId = (clause: any): boolean =>
-  typeof clause?.organizationId === "string";
+// Maintenance queries may name an explicit finite set of organizations.
+// Missing values and open-ended operators must never count as tenant scope.
+const organizationIdSchema = z.string().trim().min(1);
+const organizationScopeSchema = z.object({
+  organizationId: organizationIdSchema,
+});
+const organizationQueryScopeSchema = z.object({
+  organizationId: z.union([
+    organizationIdSchema,
+    z.strictObject({ in: z.array(organizationIdSchema).min(1) }),
+  ]),
+});
+const hasOrganizationId = (clause: unknown): boolean =>
+  organizationQueryScopeSchema.safeParse(clause).success;
 
 const hasRowId = (clause: any): boolean =>
   typeof clause?.id === "string" ||
@@ -258,16 +264,14 @@ const hasRowId = (clause: any): boolean =>
 // Prisma names a compound unique key by joining its field names with "_"
 // (e.g. `userId_organizationId`, `organizationId_name`). A WHERE that targets
 // such a key embeds organizationId and therefore bounds to one org + one row.
-const hasCompositeOrgKey = (clause: any): boolean => {
-  if (!clause || typeof clause !== "object") return false;
-  return Object.keys(clause).some((key) => {
-    const value = (clause as any)[key];
-    return (
-      value &&
-      typeof value === "object" &&
-      key.split("_").includes("organizationId")
-    );
-  });
+const hasCompositeOrgKey = (clause: unknown): boolean => {
+  const parsed = z.record(z.string(), z.unknown()).safeParse(clause);
+  if (!parsed.success) return false;
+  return Object.entries(parsed.data).some(
+    ([key, value]) =>
+      key.split("_").includes("organizationId") &&
+      organizationScopeSchema.safeParse(value).success,
+  );
 };
 
 // An inline (scopeType, scopeId) target. scopeId is a globally-unique entity
@@ -375,6 +379,23 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   ScimSyncState: {
     extraBound: ({ clause }) =>
       typeof clauseField(clause, "connectionId") === "string",
+  },
+  ScimUserResource: {},
+  ScimDirectoryUser: {
+    extraBound: ({ clause }) =>
+      idPredicate(clauseField(clause, "connectionId")) ||
+      typeof clauseField(
+        clauseField(clause, "connectionId_userId"),
+        "connectionId",
+      ) === "string",
+  },
+  ScimExternalId: {
+    extraBound: ({ clause }) =>
+      idPredicate(clauseField(clause, "connectionId")) ||
+      typeof clauseField(
+        clauseField(clause, "connectionId_externalId"),
+        "connectionId",
+      ) === "string",
   },
   RoleBinding: {
     // Reachable by its parent api key / group (each owned by one org) or by
@@ -710,7 +731,7 @@ const _guardOrganizationId = ({ params }: { params: GuardParams }) => {
     const data = params.args?.data;
     const records = Array.isArray(data) ? data : [data];
     const everyRecordHasOrg = records.every(
-      (record) => record && typeof record.organizationId === "string",
+      (record) => organizationScopeSchema.safeParse(record).success,
     );
     if (!everyRecordHasOrg) {
       throw new Error(
@@ -756,7 +777,7 @@ const _guardOrganizationId = ({ params }: { params: GuardParams }) => {
   // the same "every create declares its owning organization" invariant.
   if (action === "upsert") {
     const createData = params.args?.create;
-    if (!createData || typeof createData.organizationId !== "string") {
+    if (!organizationScopeSchema.safeParse(createData).success) {
       throw new Error(
         `The upsert action on the ${model} model requires an 'organizationId' in the create payload`,
       );

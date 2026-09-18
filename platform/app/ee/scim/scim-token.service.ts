@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { createLogger } from "@langwatch/observability";
 import crypto from "crypto";
+
+import { createLogger } from "@langwatch/observability";
+
 import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { isEnterpriseTier } from "~/server/api/enterprise";
 import { getApp } from "~/server/app-layer/app";
 import type { PlanProvider } from "~/server/app-layer/subscription/plan-provider";
+
 import {
   ScimConnectionNotFoundError,
   ScimConnectionRequiredError,
@@ -296,7 +299,13 @@ export class ScimTokenService {
     if (count === 0) {
       throw new ScimTokenNotFoundError(tokenId);
     }
-    if (revoked?.connectionId) {
+    const remaining = revoked?.connectionId
+      ? await this.prisma.scimToken.findFirst({
+          where: { organizationId, connectionId: revoked.connectionId },
+          select: { id: true },
+        })
+      : null;
+    if (revoked?.connectionId && remaining === null) {
       await this.syncLifecycle.revoked({
         organizationId,
         connectionId: revoked.connectionId,
@@ -328,6 +337,14 @@ export class ScimTokenService {
     const { count } = await this.prisma.scimToken.deleteMany({
       where: { organizationId, connectionId },
     });
+    await this.prisma.$transaction([
+      this.prisma.scimDirectoryUser.deleteMany({
+        where: { organizationId, connectionId },
+      }),
+      this.prisma.scimExternalId.deleteMany({
+        where: { organizationId, connectionId },
+      }),
+    ]);
     // Stated even when no token existed: a connection torn down before
     // anyone minted one still ended its sync, and a projection that stayed
     // TOKEN_ISSUED would read as a setup somebody could still finish.

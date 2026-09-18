@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   type CachedSession,
   type RevocableSession,
@@ -116,17 +117,19 @@ const revocationOver = ({
     findForIdentifier: async ({ userId, identifierId }) =>
       rowsOf(userId)
         .filter((row) => row.identifierId === identifierId)
-        .map(
-          ({ id, sessionToken }): RevocableSession => ({
-            id,
-            sessionToken,
-          }),
-        ),
+        .map(({ id, sessionToken }): RevocableSession => ({
+          id,
+          sessionToken,
+        })),
     deleteAllForUser: async ({ userId }) =>
       remove((row) => row.userId === userId),
     deleteForUserExcept: async ({ userId, keepSessionId }) =>
       remove((row) => row.userId === userId && row.id !== keepSessionId),
-    deleteByIds: async ({ ids }) => remove((row) => ids.includes(row.id)),
+    deleteByIds: async ({ ids }) => {
+      if (databaseUnreachable) throw new Error("database unreachable");
+      await beforeDelete?.();
+      return remove((row) => ids.includes(row.id));
+    },
     deleteByToken: async ({ token }) => {
       if (databaseUnreachable) throw new Error("database unreachable");
       await beforeDelete?.();
@@ -553,4 +556,33 @@ describe("given somebody signing out of the browser they are reading in", () => 
       expect(stores.liveSessionIds()).toEqual([]);
     });
   });
+});
+
+describe("selected and method session invalidation order", () => {
+  /** @scenario "Selected session revocation deletes rows before invalidating cached sessions" */
+  it.each(["selected", "method"])(
+    "waits for %s row deletion before dropping cache entries",
+    async (kind) => {
+      const stores = revocationOver({
+        sessions: [sessionRow({ id: "selected", identifierId: "password" })],
+        beforeDelete: async () => {
+          expect(stores.liveSessionIds()).toEqual(["selected"]);
+          expect(stores.droppedTokens).toEqual([]);
+        },
+      });
+      if (kind === "selected") {
+        await stores.service.revokeSessions({
+          userId: "sam",
+          sessions: [{ id: "selected", sessionToken: "token-selected" }],
+        });
+      } else {
+        await stores.service.revokeForIdentifier({
+          userId: "sam",
+          identifierId: "password",
+        });
+      }
+      expect(stores.liveSessionIds()).toEqual([]);
+      expect(stores.droppedTokens).toEqual(["token-selected"]);
+    },
+  );
 });

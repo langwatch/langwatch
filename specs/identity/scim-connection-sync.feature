@@ -157,14 +157,15 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
   Scenario: Creating an inactive directory person grants no access
     Given a directory creates a person with active false and a cost center
     When the same inactive creation is submitted again
-    Then one inactive account exists and the directory owns it
+    Then one inactive directory resource exists and the directory owns it
+    And its shared account is not globally disabled
     And no organization membership, role binding or department assignment exists
 
   @integration @regression
   Scenario: Repeating an inactive creation does not restore a departed person's access
     Given a directory deactivated a person and their membership was removed
     When it submits that person for creation with active false again
-    Then the same account remains inactive
+    Then the same directory resource remains inactive
     And no membership, role binding or department assignment is restored
 
   @integration @regression
@@ -172,16 +173,16 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     Given an active account belongs to another organization
     And this directory does not own that account
     When the directory tries to create that email with active false
-    Then the push is refused with status 409
+    Then an inactive resource is recorded in the requesting organization
     And the existing account and its membership are unchanged
-    And the requesting directory acquires no ownership or access
+    And the requesting directory owns only its tenant resource and grants no access
 
   @integration @regression
   Scenario: Retained directory ownership cannot deactivate an account that has left the organization
     Given a directory-owned person no longer belongs to that organization
     And their active account administers another organization with a live session
     When the old directory submits their account for creation with active false
-    Then the push is refused with status 409
+    Then its directory resource is marked inactive
     And the active account, other organization's membership and session are unchanged
 
   @integration @regression
@@ -548,3 +549,101 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     Given a person the directory provisioned as "Ada Lovelace"
     When the directory sends both halves of a new name
     Then they are stored as exactly the name that was sent
+
+  @unit @regression
+  Scenario: Directory ownership is isolated by organization and follows connection retirement
+    Given two organizations provision the same user through different connections
+    Then each directory can update its own organization
+    And a sibling directory in the same organization is refused
+    When the owning connection is torn down or replaced at finalization
+    Then its ownership no longer prevents the authorized successor from provisioning
+    And a token without a connection retains organization-wide authority
+
+  @unit @regression
+  Scenario: Rotating a token keeps the surviving connection sync live
+    Given a connection has a working token A and a newly minted token B
+    When token A is revoked and token B pushes a user
+    Then the sync records the push and is not revoked
+    When its last token is revoked
+    Then the sync is revoked
+
+  @unit @regression
+  Scenario: Group membership writes respect directory ownership
+    Given a group belongs to one directory and a member belongs to a sibling directory
+    When the first directory adds or removes that member through POST PUT or PATCH
+    Then the write is refused with scim_write_outside_connection
+    And no membership is changed by the refused operation
+
+  @integration @regression
+  Scenario: Legacy SCIM tokens retain organization-wide group reads
+    Given an organization has legacy and connection-owned groups
+    When a token without a connection reads or matches a group by name
+    Then it sees every group in its organization
+    And groups in another organization remain absent
+
+  @integration @regression
+  Scenario: Concrete SCIM tokens keep sibling groups outside their reads
+    Given two directories own groups in the same organization
+    When one directory reads groups or provisions a sibling's group name
+    Then it sees only its own groups and legacy groups
+    And it can provision its own group with the sibling's name
+
+  @integration @regression
+  Scenario: Group external identifiers belong to their directory namespace
+    Given two directories and a legacy token provision groups in one organization
+    Then each can use the same external identifier for its own group
+    And a duplicate identifier within one directory or the legacy namespace is refused
+    And another organization's legacy namespace remains independent
+
+  @integration @regression
+  Scenario: Directory lifecycle and profile changes affect only their organization
+    Given a person belongs to two organizations and has an active session
+    When one directory changes their profile or deactivates them
+    Then only that organization's directory profile and access change
+    And the shared account identity and sessions remain unchanged
+    When that directory reactivates them
+    Then no membership or grants are restored
+    And a global account disable is not cleared
+
+  @integration @regression
+  Scenario: Inactive directory resources remain readable without granting access
+    When a directory provisions a person as inactive
+    Then GET and filtered paginated listings return the inactive resource
+    And no organization membership is granted
+    When the directory updates the inactive profile or cost center
+    Then no organization membership is granted
+    When the directory deletes the resource
+    Then GET no longer returns it
+    And listings and updates no longer reach it
+    And an inactive tenant tombstone continues blocking SSO
+    When the directory explicitly provisions the primary account again
+    Then the tombstone is cleared without creating a second account
+
+  @integration @regression
+  Scenario: An inactive directory user cannot sign in through its connection
+    Given a directory resource is inactive in an organization
+    When its identity provider asserts the same account through that organization's connection
+    Then sign-in is refused before provisioning membership or creating a session
+    And another organization's directory state does not block this connection
+
+  @integration @regression
+  Scenario: Existing directory ownership backfills tenant resources without reactivating shared accounts
+    Given a directory owns a globally disabled account and two organizations share another account
+    When the tenant resource migration runs
+    Then every distinct organization and user pair has one directory resource
+    And historical global disables and primary email addresses remain unchanged
+
+  @unit @regression
+  Scenario: Missing organization scope never widens a SCIM query
+    When a user or group operation receives a missing or blank organization
+    Then the scope is refused before any database query
+
+  @integration @regression
+  Scenario: Directory usernames stay unique without mutating a conflicting resource
+    Given two users have directory resources in one organization
+    When PUT or PATCH would assign the other user's normalized username
+    Then the request returns a uniqueness conflict before changing profile or access
+    And a manually added member's fallback username is protected before directory adoption
+    And the database refuses duplicate live names independently
+    When the original resource is deleted
+    Then its username can be assigned to another resource

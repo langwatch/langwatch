@@ -23,11 +23,10 @@
  * company in. The origins of the connections we hold are therefore the
  * trusted set, and it grows and shrinks with them rather than with a deploy.
  *
- * WHAT STILL PROTECTS US. Registration is the gate, not this list: only an
- * administrator of that organization can add an issuer, our own registration
- * checks the issuer answers before a fact is written, and the engine's
- * separate non-routable-host refusal still stands for anything an operator
- * has not explicitly vouched for.
+ * Server-side OIDC requests use `sso-oidc-fetch.ts`, independently of this
+ * browser allowlist. It validates and pins DNS answers on every request and
+ * refuses redirects. Only operator-configured internal IdP origins may reach
+ * private addresses; registering a tenant issuer never grants that exemption.
  *
  * TWO STATIC WAYS ON REMAIN, for the cases no registered connection covers:
  *

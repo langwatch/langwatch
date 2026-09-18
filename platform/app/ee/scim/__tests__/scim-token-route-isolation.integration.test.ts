@@ -14,6 +14,7 @@
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
@@ -28,6 +29,7 @@ import {
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { ENTERPRISE_TEST_PLAN } from "~/test-utils/managementApiOrg";
+
 import { app } from "../routes";
 import { ScimTokenService } from "../scim-token.service";
 
@@ -107,8 +109,8 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
       await cleanupTestRows(prisma, [
         ["scimRequestLog", { organizationId: { in: organizationIds } }],
         ["scimToken", { organizationId: { in: organizationIds } }],
-        ["scimExternalId", { userId: { in: userIds } }],
-        ["scimDirectoryUser", { userId: { in: userIds } }],
+        ["scimExternalId", { organizationId: { in: organizationIds } }],
+        ["scimDirectoryUser", { organizationId: { in: organizationIds } }],
         ["groupMembership", { userId: { in: userIds } }],
         ["roleBinding", { organizationId: { in: organizationIds } }],
         ["group", { organizationId: { in: organizationIds } }],
@@ -206,6 +208,9 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
   describe("given the grandfathered connection is still serving its own directory", () => {
     it("allows an own-resource mutation during active grace", async () => {
       await clearTokenUse(first.legacyConnectionId);
+      const globalUserBefore = await prisma.user.findUniqueOrThrow({
+        where: { id: legacyUserId },
+      });
       const otherOrganizationBefore = await authoritySnapshot(
         second.organizationId,
       );
@@ -227,11 +232,19 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
         name: { givenName: "Still", familyName: "Serving" },
       });
       await expect(
-        prisma.user.findUniqueOrThrow({
-          where: { id: legacyUserId },
+        prisma.scimUserResource.findUniqueOrThrow({
+          where: {
+            organizationId_userId: {
+              organizationId: first.organizationId,
+              userId: legacyUserId,
+            },
+          },
           select: { name: true },
         }),
       ).resolves.toEqual({ name: "Still Serving" });
+      expect(
+        await prisma.user.findUniqueOrThrow({ where: { id: legacyUserId } }),
+      ).toEqual(globalUserBefore);
       expect(await authoritySnapshot(second.organizationId)).toEqual(
         otherOrganizationBefore,
       );
@@ -391,13 +404,18 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
     });
     await prisma.scimExternalId.create({
       data: {
+        organizationId: pair.organizationId,
         connectionId,
         externalId: `${connectionId}-${label}`,
         userId: user.id,
       },
     });
     await prisma.scimDirectoryUser.create({
-      data: { connectionId, userId: user.id },
+      data: {
+        organizationId: pair.organizationId,
+        connectionId,
+        userId: user.id,
+      },
     });
     await prisma.roleBinding.create({
       data: {
@@ -456,6 +474,7 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
     const scopedUserIds = memberships.map(({ userId }) => userId);
     const [
       users,
+      directoryResources,
       directoryIds,
       directoryOwners,
       groups,
@@ -472,13 +491,17 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
         },
         orderBy: { id: "asc" },
       }),
+      prisma.scimUserResource.findMany({
+        where: { organizationId },
+        orderBy: { userId: "asc" },
+      }),
       prisma.scimExternalId.findMany({
-        where: { userId: { in: scopedUserIds } },
+        where: { organizationId, userId: { in: scopedUserIds } },
         select: { connectionId: true, externalId: true, userId: true },
         orderBy: [{ connectionId: "asc" }, { externalId: "asc" }],
       }),
       prisma.scimDirectoryUser.findMany({
-        where: { userId: { in: scopedUserIds } },
+        where: { organizationId, userId: { in: scopedUserIds } },
         orderBy: [{ connectionId: "asc" }, { userId: "asc" }],
       }),
       prisma.group.findMany({
@@ -512,6 +535,7 @@ describe("Feature: SCIM route writes stay inside their connection", () => {
 
     return {
       users,
+      directoryResources,
       memberships,
       directoryIds,
       directoryOwners,

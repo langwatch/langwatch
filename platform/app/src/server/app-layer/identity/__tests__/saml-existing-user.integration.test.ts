@@ -28,6 +28,40 @@ afterEach(async () => {
 });
 
 describe("an existing local user signing in through signed SAML", () => {
+  /** @scenario "An inactive directory user cannot sign in through its connection" */
+  it.each(["first", "linked", "deleted"])(
+    "refuses inactive tenant access on %s SAML sign-in",
+    async (kind) => {
+      const { email, user } = await fixture.createLocalUser();
+      if (kind !== "first") {
+        expect((await fixture.signIn(email)).session?.user.id).toBe(user.id);
+      }
+      const sessionsBefore = await prisma.session.count({
+        where: { userId: user.id },
+      });
+      await prisma.scimUserResource.create({
+        data: {
+          organizationId: fixture.organizationId,
+          userId: user.id,
+          userName: email,
+          active: false,
+          deletedAt: kind === "deleted" ? new Date() : null,
+        },
+      });
+
+      const result = await fixture.signIn(email);
+
+      expect(result.location).toContain("error=");
+      expect(result.session).toBeNull();
+      expect(await prisma.session.count({ where: { userId: user.id } })).toBe(
+        sessionsBefore,
+      );
+      expect(
+        await prisma.user.findUniqueOrThrow({ where: { id: user.id } }),
+      ).toMatchObject({ deactivatedAt: null, email });
+    },
+  );
+
   /** @scenario "Repeated SAML sessions retain their exact sign-in method" */
   it("attributes repeated callbacks for per-method revocation", async () => {
     const { email, user } = await fixture.createLocalUser();
@@ -187,14 +221,31 @@ describe("an existing local user signing in through signed SAML", () => {
         });
       }
     }
-    const before = await prisma.account.count();
+    const fixtureUsers = {
+      OR: [
+        { id: user.id },
+        {
+          email: {
+            endsWith: `@${fixture.domain}`,
+            mode: "insensitive" as const,
+          },
+        },
+      ],
+    };
+    const before = await prisma.account.count({
+      where: { user: fixtureUsers },
+    });
 
     const result = await fixture.signIn(email, kind === "tampered");
 
     expect(result.location).toContain("error=");
     expect(result.session).toBeNull();
-    expect(await prisma.account.count()).toBe(before);
-    expect(await prisma.session.count()).toBe(0);
+    expect(await prisma.account.count({ where: { user: fixtureUsers } })).toBe(
+      before,
+    );
+    expect(await prisma.session.count({ where: { user: fixtureUsers } })).toBe(
+      0,
+    );
     expect(
       await prisma.user.findUniqueOrThrow({ where: { id: user.id } }),
     ).toMatchObject({

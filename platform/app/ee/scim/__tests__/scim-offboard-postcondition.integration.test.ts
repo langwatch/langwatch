@@ -129,7 +129,9 @@ async function tearDown() {
   await prisma.organizationUser.deleteMany({
     where: { organizationId: ORGANIZATION },
   });
-  await prisma.scimExternalId.deleteMany({ where: { userId: USER } });
+  await prisma.scimExternalId.deleteMany({
+    where: { organizationId: ORGANIZATION, userId: USER },
+  });
   await prisma.user.deleteMany({ where: { id: USER } });
   await prisma.organization.deleteMany({ where: { id: ORGANIZATION } });
 }

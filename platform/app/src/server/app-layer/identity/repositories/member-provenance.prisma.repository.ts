@@ -12,6 +12,7 @@
  * table — so nothing new is recorded to answer the question.
  */
 import type { PrismaClient } from "~/generated/prisma/client";
+
 import type {
   DirectoryProvisionedMember,
   DomainAdmittedMember,
@@ -60,6 +61,7 @@ export class PrismaMemberProvenanceRepository implements MemberProvenancePort {
 
     const rows = await this.prisma.scimDirectoryUser.findMany({
       where: {
+        organizationId,
         connectionId: { in: [...providerById.keys()] },
         userId: { in: users.map((user) => user.id) },
       },

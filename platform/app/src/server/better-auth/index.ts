@@ -1,3 +1,5 @@
+import { createSsoOidcFetch } from "@ee/sso/sso-oidc-fetch";
+import { resolveDialableInternalOrigins } from "~/server/app-layer/identity/dialable-internal-origins";
 import { buildSocialProviders } from "@ee/sso/providers";
 import { createLogger } from "@langwatch/observability";
 import { betterAuth } from "better-auth";
@@ -182,6 +184,13 @@ export const auth = betterAuth({
   socialProviders: buildSocialProviders(env),
 
   plugins: plugins({
+    ssoOidcFetch: createSsoOidcFetch({
+      dialableInternalOrigins: resolveDialableInternalOrigins({
+        trustedIdpOrigins: env.SSO_TRUSTED_IDP_ORIGINS,
+        idpSimulatorUrl: env.LANGWATCH_IDPSIM_URL,
+        isProduction: env.NODE_ENV === "production",
+      }),
+    }),
     backupCodeCount: BACKUP_CODE_COUNT,
     passkeySignUp,
     confirmSignUpAddress: (ctx) =>

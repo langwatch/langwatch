@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { IdentityConnectionIssuersPort } from "@langwatch/identity-server/better-auth";
 import { createLogger } from "@langwatch/observability";
+
 import type { PrismaClient } from "~/generated/prisma/client";
+
+import { selectMigrationRoute } from "./sso-connection-routing.prisma.repository";
 
 const logger = createLogger("langwatch:identity:connection-issuers");
 
@@ -29,9 +32,7 @@ const logger = createLogger("langwatch:identity:connection-issuers");
  * and they raise: what an unreadable table costs THAT caller is its own
  * decision, and it makes a different one.
  */
-export class PrismaSsoConnectionIssuers
-  implements IdentityConnectionIssuersPort
-{
+export class PrismaSsoConnectionIssuers implements IdentityConnectionIssuersPort {
   /** Long enough to collapse one ceremony's requests, short enough that a
    *  just-registered connection is usable immediately. */
   private static readonly CACHE_TTL_MS = 5_000;
@@ -137,14 +138,28 @@ export class PrismaSsoConnectionIssuers
     });
   }
 
-  /** Every issuer any connection registered, read fresh and raising. */
-  async findAllIssuers(): Promise<readonly string[]> {
-    const rows = await this.prisma.ssoProvider.findMany({
-      select: { issuer: true },
+  async findIssuerForDomain({
+    domain,
+  }: {
+    domain: string;
+  }): Promise<string | null> {
+    const ownership = await this.prisma.ssoVerifiedDomain.findUnique({
+      where: { domain },
+      select: {
+        organizationId: true,
+        holders: { select: { connectionId: true } },
+      },
     });
-    return rows
-      .map((row) => row.issuer)
-      .filter((issuer): issuer is string => !!issuer);
+    if (!ownership) return null;
+    const connections = await this.prisma.ssoConnection.findMany({
+      where: {
+        organizationId: ownership.organizationId,
+        id: { in: ownership.holders.map((holder) => holder.connectionId) },
+      },
+    });
+    const connection = selectMigrationRoute(connections, "normal");
+    if (connection?.state !== "ACTIVE") return null;
+    return this.findIssuerForConnection({ connectionId: connection.id });
   }
 
   private async rows(): Promise<Array<{ providerId: string; issuer: string }>> {

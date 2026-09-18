@@ -4,6 +4,7 @@ import {
   type SsoConnectionState,
 } from "@langwatch/identity";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
   connectionIsDialable,
   engineProviderFor,
@@ -63,6 +64,7 @@ const CERTIFICATE = Buffer.concat([
 const IDP_METADATA = `<?xml version="1.0"?>
 <md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata" entityID="https://login.acme.example">
   <md:IDPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+    <md:KeyDescriptor use="signing"><ds:KeyInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#"><ds:X509Data><ds:X509Certificate>${CERTIFICATE}</ds:X509Certificate></ds:X509Data></ds:KeyInfo></md:KeyDescriptor>
     <md:SingleSignOnService Location="https://login.acme.example/sso"/>
   </md:IDPSSODescriptor>
 </md:EntityDescriptor>`;
@@ -796,3 +798,56 @@ function catchCode(run: () => unknown): string | undefined {
     return (error as { code?: string }).code;
   }
 }
+
+describe("metadata signing keys", () => {
+  /** @scenario "Metadata-only SAML registration requires a usable signing certificate" */
+  it.each(["missing", "encryption-only", "malformed"])(
+    "refuses a %s signing key before registration",
+    (kind) => {
+      const metadataXml =
+        kind === "missing"
+          ? IDP_METADATA.replace(
+              /<md:KeyDescriptor[\s\S]*?<\/md:KeyDescriptor>/,
+              "",
+            )
+          : kind === "encryption-only"
+            ? IDP_METADATA.replace('use="signing"', 'use="encryption"')
+            : IDP_METADATA.replace(CERTIFICATE, "not-a-certificate");
+      expect(() =>
+        validateSamlRegistration({
+          protocol: "saml",
+          entryPoint: "https://login.acme.example/sso",
+          entityId: null,
+          metadataXml,
+          certificate: null,
+        }),
+      ).toThrowError(
+        expect.objectContaining({ code: "sso_saml_metadata_invalid" }),
+      );
+    },
+  );
+
+  it("accepts an unspecified-use key and a separate certificate", () => {
+    const registration = {
+      protocol: "saml" as const,
+      entryPoint: "https://login.acme.example/sso",
+      entityId: null,
+      certificate: null,
+      metadataXml: IDP_METADATA.replace(' use="signing"', ""),
+    };
+    expect(validateSamlRegistration(registration).metadataXml).toBe(
+      registration.metadataXml,
+    );
+    const withoutKey = IDP_METADATA.replace(
+      /<md:KeyDescriptor[\s\S]*?<\/md:KeyDescriptor>/,
+      "",
+    );
+    expect(
+      validateSamlRegistration({
+        ...registration,
+        metadataXml: withoutKey,
+        certificate: CERTIFICATE,
+      }).certificate,
+    ).toBe(CERTIFICATE);
+  });
+});

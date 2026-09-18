@@ -85,3 +85,32 @@ Feature: Recovery credentials respect the organization's SSO route
     Then it keeps the same user and creates no new session
     When the pending recovery sign-in completes without that existing session
     Then it fails with EMAIL_PASSWORD_DISABLED and creates no session
+
+  @unit @regression
+  Scenario: Passkey sessions enforce recovery permission for the authenticated address
+    Given a passkey proves a user whose primary address is governed by SSO
+    When the user has no live recovery grant
+    Then the session guard refuses both passkey authentication and session-creating registration
+    And a submitted address cannot replace the authenticated user's primary address
+
+  @unit @regression
+  Scenario: Instance federation leaves credential permission to the deployment policy
+    Given routing selects an instance provider without an organization connection
+    When the credential session policy checks that decision
+    Then it requires no organization recovery grant
+    And deployments with local passwords disabled still refuse password requests
+
+  @unit @regression
+  Scenario: Unnamed SSO requests cannot trust another tenant's origin
+    Given organizations register different issuer origins
+    When an SSO request omits a connection and supplies a redirect or Origin
+    Then only the issuer resolved from its verified domain may be trusted
+    And an unresolved domain adds no issuer origins
+
+  @integration
+  Scenario: An upgrade restores verified domain routes and tenant-owned directory identities
+    Given an existing active SSO connection with verified domains and SCIM identities
+    When the ownership backfill runs
+    Then its domains route to the existing connection
+    And its SCIM identities belong to the connection's organization
+    And conflicting domain owners or orphaned identities refuse the upgrade

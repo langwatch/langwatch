@@ -39,6 +39,7 @@ COPY feature-map.json ./feature-map.json
 # than /app/platform/app, and is narrowed with a filter so the TypeScript SDK,
 # the skills compiler and the e2e suites never enter the image.
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc ./
+COPY patches ./patches
 COPY platform/app/package.json ./platform/app/
 # Every workspace member's manifest must be present or `--frozen-lockfile`
 # has nothing to check the lockfile against. This one carries no source into

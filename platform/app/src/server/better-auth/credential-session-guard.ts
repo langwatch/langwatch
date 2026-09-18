@@ -36,6 +36,7 @@ export class CredentialSessionGuard {
     userId: string;
     context: GenericEndpointContext | null;
   }): Promise<void> {
+    if (await this.#authorizePasskeySession({ userId, context })) return;
     if (context?.path === "/sign-in/email") {
       const { email } = addressSchema.parse(context.body);
       await this.#authorize({ userId, email });
@@ -68,6 +69,24 @@ export class CredentialSessionGuard {
       throw this.#refusal();
     }
     await this.#authorize({ userId, email: ceremony.email });
+  }
+
+  async #authorizePasskeySession({
+    userId,
+    context,
+  }: {
+    userId: string;
+    context: GenericEndpointContext | null;
+  }): Promise<boolean> {
+    if (
+      context?.path !== "/passkey/verify-authentication" &&
+      context?.path !== "/passkey/verify-registration"
+    )
+      return false;
+    const user = await context.context.internalAdapter.findUserById(userId);
+    if (!user) throw this.#refusal();
+    await this.#authorize({ userId, email: user.email });
+    return true;
   }
 
   /**
