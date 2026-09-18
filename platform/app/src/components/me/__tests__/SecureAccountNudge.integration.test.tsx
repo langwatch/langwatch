@@ -24,7 +24,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type SignedInWith = "password" | "passkey" | "federated" | "unknown";
 
-const { nudgeRef, dismissMock, cacheCalls, mountFetch } = vi.hoisted(() => {
+const {
+  nudgeRef,
+  dismissMock,
+  invalidateMock,
+  cacheCalls,
+  mountFetch,
+  dismissal,
+} = vi.hoisted(() => {
   const nudgeRef = {
     current: {
       offer: true,
@@ -43,11 +50,26 @@ const { nudgeRef, dismissMock, cacheCalls, mountFetch } = vi.hoisted(() => {
       nudgeRef.current = { ...nudgeRef.current, offer: true };
     },
   };
+  // The dismissal request, and TanStack Query's rule about which of its
+  // callbacks survive. One given to `useMutation` runs whatever happened to
+  // the component; one given to `mutate` is dropped when the observer is
+  // gone by the time the server answers.
+  type Callbacks = { onSettled?: () => void } | undefined;
+  const dismissal = {
+    onMutation: undefined as Callbacks,
+    onCall: undefined as Callbacks,
+    settle: ({ isStillMounted }: { isStillMounted: boolean }) => {
+      dismissal.onMutation?.onSettled?.();
+      if (isStillMounted) dismissal.onCall?.onSettled?.();
+    },
+  };
   return {
     nudgeRef,
     dismissMock: vi.fn(),
+    invalidateMock: vi.fn(),
     cacheCalls: [] as string[],
     mountFetch,
+    dismissal,
   };
 });
 
@@ -59,7 +81,7 @@ vi.mock("~/utils/api", () => ({
     useUtils: () => ({
       user: {
         secureAccountNudge: {
-          invalidate: vi.fn(),
+          invalidate: invalidateMock,
           cancel: async () => {
             cacheCalls.push("cancel");
             mountFetch.isCancelled = true;
@@ -79,7 +101,16 @@ vi.mock("~/utils/api", () => ({
     user: {
       secureAccountNudge: { useQuery: () => ({ data: nudgeRef.current }) },
       dismissSecureAccountNudge: {
-        useMutation: () => ({ mutate: dismissMock, isPending: false }),
+        useMutation: (options?: { onSettled?: () => void }) => {
+          dismissal.onMutation = options;
+          return {
+            mutate: (input: unknown, perCall?: { onSettled?: () => void }) => {
+              dismissal.onCall = perCall;
+              dismissMock(input);
+            },
+            isPending: false,
+          };
+        },
       },
     },
   },
@@ -121,6 +152,8 @@ describe("the secure-account offer", () => {
     arriveWith("password");
     cacheCalls.length = 0;
     mountFetch.isCancelled = false;
+    dismissal.onMutation = undefined;
+    dismissal.onCall = undefined;
   });
 
   afterEach(() => {
@@ -163,6 +196,26 @@ describe("the secure-account offer", () => {
 
         expect(screen.queryByTestId("secure-account-nudge")).toBeNull();
         expect(cacheCalls).toEqual(["cancel", "setData"]);
+      });
+    });
+
+    describe("when the dismissal settles after the dialog has left the tree", () => {
+      /** @scenario "A dismissal is remembered on the next page, not just in the dialog" */
+      it("still refreshes the offer from the server", async () => {
+        renderNudge();
+        fireEvent.click(screen.getByRole("button", { name: "Not now" }));
+
+        await waitFor(() => {
+          expect(dismissMock).toHaveBeenCalled();
+        });
+        // The answer writes `offer: false`, and that cached offer is what
+        // renders the dialog, so the component holding the mutation is gone
+        // before the server replies. Only a callback on the mutation itself
+        // is left to reconcile the optimistic write.
+        cleanup();
+        dismissal.settle({ isStillMounted: false });
+
+        expect(invalidateMock).toHaveBeenCalled();
       });
     });
   });

@@ -211,20 +211,30 @@ function NudgeActions({
  * while a mutation settles reads as the click not having registered.
  */
 function useNudgeAnswer() {
-  const dismiss = api.user.dismissSecureAccountNudge.useMutation();
   const apiContext = api.useUtils();
+  // Settled here rather than at the call, because by the time the server
+  // answers there is nothing left to answer to: the cached offer is what
+  // renders this dialog, so writing the answer into it takes the component
+  // out of the tree, and a callback handed to `mutate` goes with it. One on
+  // the mutation survives, which is what makes the refresh below happen at
+  // all.
+  const dismiss = api.user.dismissSecureAccountNudge.useMutation({
+    onSettled: () => {
+      void apiContext.user.secureAccountNudge.invalidate();
+    },
+  });
   const navigate = useNavigate();
   const [isCreating, setIsCreating] = useState(false);
   const [isAnswered, setIsAnswered] = useState(false);
 
   const later = async () => {
     setIsAnswered(true);
-    // `isAnswered` closes this dialog, and nothing else does: it is mounted on
-    // every page, so the next navigation remounts it and renders from the
-    // cached answer, which still says to offer. Write the answer into the
-    // cache before the mutation settles, then refresh it from the server.
-    // Without the first half the dialog returns over the page somebody was
-    // sent to, which is the opposite of what "Not now" promised.
+    // Two things close this dialog and both are needed. `isAnswered` closes it
+    // here and now, before any request goes out. The cached offer closes it on
+    // every later page: the dialog is mounted on all of them and renders from
+    // that cache, so without the write the answer is forgotten the moment
+    // somebody navigates, and the dialog returns over the page they were sent
+    // to, which is the opposite of what "Not now" promised.
     //
     // Cancel first: a mount refetch of this query can already be in flight,
     // and its response would land after the write and put the offer back.
@@ -232,14 +242,7 @@ function useNudgeAnswer() {
     apiContext.user.secureAccountNudge.setData({}, (previous) =>
       previous ? { ...previous, offer: false } : previous,
     );
-    dismiss.mutate(
-      {},
-      {
-        onSettled: () => {
-          void apiContext.user.secureAccountNudge.invalidate();
-        },
-      },
-    );
+    dismiss.mutate({});
   };
 
   const setUpTwoStep = async () => {
