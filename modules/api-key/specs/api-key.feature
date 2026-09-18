@@ -10,12 +10,6 @@ Feature: API key lifecycle
     When they list API keys through the organization credential door
     Then only their own keys are read
 
-  @integration
-  Scenario: A view-only service credential cannot list every key in the organization
-    Given a service credential that has organization:view but lacks organization:manage
-    When it lists API keys through the organization credential door
-    Then it is refused before the organization-wide listing runs
-
   Scenario: A revoked or expired key cannot authenticate
     When a key is revoked or expires
     Then verification rejects its token

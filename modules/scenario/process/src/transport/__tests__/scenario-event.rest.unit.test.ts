@@ -93,6 +93,7 @@ describe("the scenario-events REST declaration", () => {
       expect(getRunIdsForSet).not.toHaveBeenCalled();
     });
 
+    /** @scenario "Peer archive calls require exactly one scope" */
     it("gives peer callers the named scope error for absent or ambiguous scope", async () => {
       const world = createScenarioRestTestApp();
 
