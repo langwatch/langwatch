@@ -1,0 +1,43 @@
+{
+  "bad-negation-reframe.md": ["writing/negation-reframe"],
+  "bad-staccato.md": ["writing/staccato", "writing/unintroduced-first-name"],
+  "bad-banned-words.md": [
+    "writing/banned-words-2026-08-02",
+    "writing/most-vague-quantifier",
+    "writing/interesting-literal",
+    "writing/load-bearing",
+    "writing/ellipsis-shrug",
+    "writing/arrow-cta",
+    "writing/magic-reframe",
+    "writing/exclamation-marks",
+    "writing/narrator-sentence",
+    "writing/borrowed-structural-metaphor",
+    "writing/conspiratorial-hook",
+    "writing/gravitas-closer"
+  ],
+  "bad-docs-preamble.mdx": ["docs/preamble-opener", "docs/concept-opener"],
+  "bad-docs-marketing.mdx": ["docs/marketing-words", "docs/marketing-pitch", "docs/filler-sentence", "docs/vague-boundary", "docs/heading-indirect-form", "writing/keynote-closer"],
+  "bad-docs-literals.mdx": [
+    "docs/release-flag",
+    "docs/rollout-gate",
+    "docs/it-matters-because",
+    "docs/bare-ai-gateway",
+    "docs/product-casing",
+    "docs/dev-process",
+    "docs/pairs-with",
+    "docs/card-without-icon",
+    "docs/paragraph-over-80-words",
+    "docs/title-repeated-as-heading",
+    "docs/heading-question-mark",
+    "docs/concept-opener"
+  ],
+  "bad-em-dash.md": ["writing/em-dash"],
+  "bad-vibe-phrase.md": ["writing/vibe-phrases-literal", "writing/vibe-phrases"],
+  "bad-docs-artifact-verbs.mdx": ["docs/rides", "docs/artifact-verbs-literal", "docs/artifact-as-subject", "docs/indefinite-event-opener", "docs/unshown-ui-element"],
+  "bad-docs-indefinite-event.mdx": ["docs/indefinite-event-opener", "docs/heading-indirect-form"],
+  "clean-docs-task.mdx": [],
+  "clean-docs-concept.mdx": [],
+  "clean-docs-reference.mdx": [],
+  "clean-docs-troubleshooting.mdx": [],
+  "clean-post.md": []
+}

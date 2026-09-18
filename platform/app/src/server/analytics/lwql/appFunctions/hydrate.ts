@@ -32,7 +32,7 @@
  * module.
  *
  * @see ./catalog.ts — what each function is
- * @see ../../../../../specs/analytics/lwql-app-functions.feature
+ * @see ../../../../../specs/lwql/app-functions.feature
  */
 
 import { InstantEvalClassifierUnavailableError } from "~/server/app-layer/instant-evals/errors";
@@ -44,6 +44,7 @@ import type {
   LangWatchQLEvalUsage,
   LangWatchQLHydrationInput,
   LangWatchQLHydrationResult,
+  LangWatchQLHydrationTimings,
   ResolvedCall,
 } from "./hydration/contract";
 import {
@@ -51,7 +52,7 @@ import {
   evaluateCalls,
 } from "./hydration/evaluate";
 import { assertKeyCaps, collectKeys } from "./hydration/keys";
-import { readTraces } from "./hydration/read";
+import { type FetchedTraces, readTraces } from "./hydration/read";
 
 /**
  * Replaces every app-function key in a finished result with the value it names.
@@ -59,6 +60,10 @@ import { readTraces } from "./hydration/read";
  * Returns the result unchanged, and reads nothing, when the statement called no
  * app function — which is every LangWatchQL query that existed before this
  * feature.
+ *
+ * The two halves are also published on their own, {@link prepareLangWatchQLHydration}
+ * and {@link judgeLangWatchQLHydration}, so a caller that judges page after
+ * page can read the next page while the current one is being judged.
  *
  * @throws {LangWatchQLAppFunctionKeyCapError} when one execution needs more
  *   distinct keys of a kind than its cap allows.
@@ -69,6 +74,82 @@ import { readTraces } from "./hydration/read";
 export async function hydrateLangWatchQLAppFunctions(
   input: LangWatchQLHydrationInput,
 ): Promise<LangWatchQLHydrationResult> {
+  return await judgeLangWatchQLHydration({
+    prepared: await prepareLangWatchQLHydration(input),
+  });
+}
+
+/**
+ * Everything a hydration has read and extracted, and has not yet judged.
+ *
+ * The read half of the stage is the database and the trace store; the judge
+ * half is the classifier. Splitting them is what lets a page loop overlap one
+ * page's reads with the previous page's judging, which are bound by different
+ * services and do not contend.
+ */
+export interface LangWatchQLPreparedHydration {
+  readonly input: LangWatchQLHydrationInput;
+  readonly resolved: readonly ResolvedCall[];
+  readonly traces: FetchedTraces;
+  /** The extraction functions' values, computed; the judged columns are not here. */
+  readonly extracted: ComputedValues;
+  /** What the read half spent, which the judged result reports as its own. */
+  readonly timings: Omit<LangWatchQLHydrationTimings, "judgeMs">;
+}
+
+/**
+ * Steps 1 to 4: collect the keys, check the caps, read the traces, extract.
+ *
+ * Nothing here calls the classifier or spends anything, so a prepared page
+ * that is never judged cost only its reads.
+ */
+export async function prepareLangWatchQLHydration(
+  input: LangWatchQLHydrationInput,
+): Promise<LangWatchQLPreparedHydration> {
+  if (input.calls.length === 0) {
+    return {
+      input,
+      resolved: [],
+      traces: EMPTY_TRACES,
+      extracted: new Map(),
+      timings: { readMs: 0, computeMs: 0 },
+    };
+  }
+  const resolved = collectKeys(input);
+  assertKeyCaps(resolved);
+
+  const startedRead = Date.now();
+  const traces = await readTraces({ input, resolved });
+  const startedCompute = Date.now();
+  const extracted = await computeValues({ input, resolved, traces });
+  return {
+    input,
+    resolved,
+    traces,
+    extracted,
+    timings: {
+      readMs: startedCompute - startedRead,
+      computeMs: Date.now() - startedCompute,
+    },
+  };
+}
+
+/**
+ * Step 5, and the assembly: judge what was extracted and build the result.
+ *
+ * `signal` replaces the one the input carried, where the caller only learns
+ * how to cancel after the read: a run watches for cancellation per page, and
+ * the page was read before that watch existed.
+ */
+export async function judgeLangWatchQLHydration({
+  prepared,
+  signal,
+}: {
+  prepared: LangWatchQLPreparedHydration;
+  signal?: AbortSignal;
+}): Promise<LangWatchQLHydrationResult> {
+  const input =
+    signal === undefined ? prepared.input : { ...prepared.input, signal };
   if (input.calls.length === 0) {
     return {
       columns: input.columns,
@@ -79,13 +160,7 @@ export async function hydrateLangWatchQLAppFunctions(
     } satisfies LangWatchQLHydrationResult;
   }
 
-  const resolved = collectKeys(input);
-  assertKeyCaps(resolved);
-
-  const startedRead = Date.now();
-  const traces = await readTraces({ input, resolved });
-  const startedCompute = Date.now();
-  const extracted = await computeValues({ input, resolved, traces });
+  const { resolved, traces, extracted } = prepared;
   const startedJudge = Date.now();
   const judged = await judgeCalls({ input, resolved, traces });
   const finished = Date.now();
@@ -95,12 +170,29 @@ export async function hydrateLangWatchQLAppFunctions(
     resolved,
     computed: merge([extracted, judged.values]),
     ...(judged.usage ? { evalUsage: judged.usage } : {}),
-    timings: {
-      readMs: startedCompute - startedRead,
-      computeMs: startedJudge - startedCompute,
-      judgeMs: finished - startedJudge,
-    },
+    timings: { ...prepared.timings, judgeMs: finished - startedJudge },
   });
+}
+
+const EMPTY_TRACES: FetchedTraces = { byId: new Map(), byThread: new Map() };
+
+/**
+ * The project a judgement is rated and billed against.
+ *
+ * A judgement has one owner, so the validator admits an eval call only for a
+ * scope naming exactly one project. Reaching here with any other scope is a
+ * programming error rather than anything a caller wrote, so it is a plain
+ * `Error`: it degrades to an unknown failure with a trace id rather than
+ * telling a customer to fix something they did not do (ADR-045).
+ */
+function judgingProjectOf(input: LangWatchQLHydrationInput): string {
+  const only = input.projectIds.length === 1 ? input.projectIds[0] : undefined;
+  if (only === undefined) {
+    throw new Error(
+      `an eval function reached hydration with ${input.projectIds.length} projects in scope; the validator admits one`,
+    );
+  }
+  return only;
 }
 
 /**
@@ -127,7 +219,7 @@ async function judgeCalls({
 
   try {
     const outcome = await evaluateCalls({
-      projectId: input.projectId,
+      projectId: judgingProjectOf(input),
       resolved,
       traces,
       support,

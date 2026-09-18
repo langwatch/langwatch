@@ -74,7 +74,7 @@ function SecureAccountNudgeOffer({
     <Dialog.Root
       open
       onOpenChange={(details) => {
-        if (!details.open) answer.later();
+        if (!details.open) void answer.later();
       }}
       placement="center"
     >
@@ -211,22 +211,46 @@ function NudgeActions({
  * while a mutation settles reads as the click not having registered.
  */
 function useNudgeAnswer() {
-  const dismiss = api.user.dismissSecureAccountNudge.useMutation();
   const apiContext = api.useUtils();
+  // Settled here rather than at the call, because by the time the server
+  // answers there is nothing left to answer to: the cached offer is what
+  // renders this dialog, so writing the answer into it takes the component
+  // out of the tree, and a callback handed to `mutate` goes with it. One on
+  // the mutation survives, which is what makes the refresh below happen at
+  // all.
+  const dismiss = api.user.dismissSecureAccountNudge.useMutation({
+    onSettled: () => {
+      void apiContext.user.secureAccountNudge.invalidate();
+    },
+  });
   const navigate = useNavigate();
   const [isCreating, setIsCreating] = useState(false);
   const [isAnswered, setIsAnswered] = useState(false);
 
-  const later = () => {
+  const later = async () => {
     setIsAnswered(true);
+    // Two things close this dialog and both are needed. `isAnswered` closes it
+    // here and now, before any request goes out. The cached offer closes it on
+    // every later page: the dialog is mounted on all of them and renders from
+    // that cache, so without the write the answer is forgotten the moment
+    // somebody navigates, and the dialog returns over the page they were sent
+    // to, which is the opposite of what "Not now" promised.
+    //
+    // Cancel first: a mount refetch of this query can already be in flight,
+    // and its response would land after the write and put the offer back.
+    await apiContext.user.secureAccountNudge.cancel({});
+    apiContext.user.secureAccountNudge.setData({}, (previous) =>
+      previous ? { ...previous, offer: false } : previous,
+    );
     dismiss.mutate({});
   };
 
-  const setUpTwoStep = () => {
+  const setUpTwoStep = async () => {
     // Dismissed on the way, not on arrival: somebody who came here to set one
     // up has answered the question, and finding the dialog again behind the
-    // settings page would read as the product not listening.
-    later();
+    // settings page would read as the product not listening. Awaited, so the
+    // answer is in the cache before the page that reads it mounts.
+    await later();
     void navigate("/settings/security");
   };
 

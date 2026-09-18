@@ -242,7 +242,6 @@ describe("given a Redis that cannot be reached", () => {
           tenantId: "a",
         });
       }
-
       expect(clock.now - 1_000).toBeGreaterThanOrEqual(900);
     });
   });

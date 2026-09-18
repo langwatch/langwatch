@@ -26,7 +26,7 @@
  * alert bell has to stay excluded here for the identical reason it stays
  * excluded for a workbench row.
  *
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  * @see specs/analytics/custom-chart-playground-dashboard-placement.feature
  */
 

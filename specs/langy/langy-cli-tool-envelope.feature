@@ -134,6 +134,17 @@ Feature: Langy recognises its own CLI behind a shell tool call
       Then the card shows what gh said
       And the card does not claim the LangWatch GitHub App is missing
 
+    # The shell that delegates a command to the shared folder is registered as
+    # `bash`, the same name the sandbox shell answers to, so the name alone
+    # cannot say where a command ran. The settled call carries a marker that
+    # can, and that marker is what decides the card.
+    @unit
+    Scenario: A shell command that ran in the shared folder keeps gh's own instruction
+      When a shell call marked as run in the shared folder fails because gh has no login
+      Then the card shows what gh said
+      And the card does not claim the LangWatch GitHub App is missing
+      And an unmarked shell call with the same failure still says the GitHub App is missing
+
     # The card draws its conclusions from what the failure IS, never from
     # matching the English it happens to be phrased in — that pins user copy to
     # a pattern and hides whoever dropped the structure.

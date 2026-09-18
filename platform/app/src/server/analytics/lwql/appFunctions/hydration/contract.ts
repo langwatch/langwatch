@@ -53,8 +53,14 @@ export interface LangWatchQLUnresolvedKeys {
 }
 
 export interface LangWatchQLHydrationInput {
-  /** Logged and passed to the trace reads; the reads filter on it. */
-  readonly projectId: string;
+  /**
+   * The projects this key can read, which is what the trace reads filter on.
+   *
+   * A list rather than one id because a key with access to several projects
+   * gets the union of their rows unless the query narrows to one, so the keys
+   * a result carries can name traces in any of them.
+   */
+  readonly projectIds: readonly string[];
   /** Resolved server-side from the authenticated context, never the request. */
   readonly protections: Protections;
   /** The plan the validator's walk recorded. Empty means nothing to do. */

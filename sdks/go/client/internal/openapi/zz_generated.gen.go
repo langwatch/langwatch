@@ -5304,13 +5304,13 @@ func (e PatchApiMonitorsByIdJSONBodyMappingsMapping1Source1) Valid() bool {
 
 // Defines values for PatchApiMonitorsByIdJSONBodyMappingsMapping1Type.
 const (
-	Thread PatchApiMonitorsByIdJSONBodyMappingsMapping1Type = "thread"
+	PatchApiMonitorsByIdJSONBodyMappingsMapping1TypeThread PatchApiMonitorsByIdJSONBodyMappingsMapping1Type = "thread"
 )
 
 // Valid indicates whether the value is a known member of the PatchApiMonitorsByIdJSONBodyMappingsMapping1Type enum.
 func (e PatchApiMonitorsByIdJSONBodyMappingsMapping1Type) Valid() bool {
 	switch e {
-	case Thread:
+	case PatchApiMonitorsByIdJSONBodyMappingsMapping1TypeThread:
 		return true
 	default:
 		return false
@@ -12253,6 +12253,72 @@ func (e PostApiTeamsByIdMembersJSONBodyRole) Valid() bool {
 	}
 }
 
+// Defines values for GetApiTracesFacets200JSONResponseBody0FacetsKind.
+const (
+	GetApiTracesFacets200JSONResponseBody0FacetsKindCategorical GetApiTracesFacets200JSONResponseBody0FacetsKind = "categorical"
+	GetApiTracesFacets200JSONResponseBody0FacetsKindDynamicKeys GetApiTracesFacets200JSONResponseBody0FacetsKind = "dynamic_keys"
+	GetApiTracesFacets200JSONResponseBody0FacetsKindRange       GetApiTracesFacets200JSONResponseBody0FacetsKind = "range"
+)
+
+// Valid indicates whether the value is a known member of the GetApiTracesFacets200JSONResponseBody0FacetsKind enum.
+func (e GetApiTracesFacets200JSONResponseBody0FacetsKind) Valid() bool {
+	switch e {
+	case GetApiTracesFacets200JSONResponseBody0FacetsKindCategorical:
+		return true
+	case GetApiTracesFacets200JSONResponseBody0FacetsKindDynamicKeys:
+		return true
+	case GetApiTracesFacets200JSONResponseBody0FacetsKindRange:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTracesFacets403JSONResponseBodyError.
+const (
+	TraceAttributeValuesWithheld GetApiTracesFacets403JSONResponseBodyError = "trace_attribute_values_withheld"
+)
+
+// Valid indicates whether the value is a known member of the GetApiTracesFacets403JSONResponseBodyError enum.
+func (e GetApiTracesFacets403JSONResponseBodyError) Valid() bool {
+	switch e {
+	case TraceAttributeValuesWithheld:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTracesFacets422JSONResponseBodyError.
+const (
+	ValidationError GetApiTracesFacets422JSONResponseBodyError = "validation_error"
+)
+
+// Valid indicates whether the value is a known member of the GetApiTracesFacets422JSONResponseBodyError enum.
+func (e GetApiTracesFacets422JSONResponseBodyError) Valid() bool {
+	switch e {
+	case ValidationError:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTracesFacets422JSONResponseBodyTarget.
+const (
+	Query GetApiTracesFacets422JSONResponseBodyTarget = "query"
+)
+
+// Valid indicates whether the value is a known member of the GetApiTracesFacets422JSONResponseBodyTarget enum.
+func (e GetApiTracesFacets422JSONResponseBodyTarget) Valid() bool {
+	switch e {
+	case Query:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiTracesSearchJSONBodyDateField.
 const (
 	PostApiTracesSearchJSONBodyDateFieldOccurred PostApiTracesSearchJSONBodyDateField = "occurred"
@@ -13905,6 +13971,7 @@ const (
 	PostLangyControlFramesJSONBodyFrames2ErrorCodeCancelled         PostLangyControlFramesJSONBodyFrames2ErrorCode = "cancelled"
 	PostLangyControlFramesJSONBodyFrames2ErrorCodeCommandRefused    PostLangyControlFramesJSONBodyFrames2ErrorCode = "command_refused"
 	PostLangyControlFramesJSONBodyFrames2ErrorCodeExecFailed        PostLangyControlFramesJSONBodyFrames2ErrorCode = "exec_failed"
+	PostLangyControlFramesJSONBodyFrames2ErrorCodeKeyRefused        PostLangyControlFramesJSONBodyFrames2ErrorCode = "key_refused"
 	PostLangyControlFramesJSONBodyFrames2ErrorCodeNotFound          PostLangyControlFramesJSONBodyFrames2ErrorCode = "not_found"
 	PostLangyControlFramesJSONBodyFrames2ErrorCodePathRefused       PostLangyControlFramesJSONBodyFrames2ErrorCode = "path_refused"
 	PostLangyControlFramesJSONBodyFrames2ErrorCodePermissionDenied  PostLangyControlFramesJSONBodyFrames2ErrorCode = "permission_denied"
@@ -13920,6 +13987,8 @@ func (e PostLangyControlFramesJSONBodyFrames2ErrorCode) Valid() bool {
 	case PostLangyControlFramesJSONBodyFrames2ErrorCodeCommandRefused:
 		return true
 	case PostLangyControlFramesJSONBodyFrames2ErrorCodeExecFailed:
+		return true
+	case PostLangyControlFramesJSONBodyFrames2ErrorCodeKeyRefused:
 		return true
 	case PostLangyControlFramesJSONBodyFrames2ErrorCodeNotFound:
 		return true
@@ -14266,6 +14335,21 @@ const (
 func (e PollLangyControlSession200JSONResponseBodyFrames2Call6Tool) Valid() bool {
 	switch e {
 	case LocalLs:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PollLangyControlSession200JSONResponseBodyFrames2Call7Tool.
+const (
+	LocalLangwatchEnv PollLangyControlSession200JSONResponseBodyFrames2Call7Tool = "local_langwatch_env"
+)
+
+// Valid indicates whether the value is a known member of the PollLangyControlSession200JSONResponseBodyFrames2Call7Tool enum.
+func (e PollLangyControlSession200JSONResponseBodyFrames2Call7Tool) Valid() bool {
+	switch e {
+	case LocalLangwatchEnv:
 		return true
 	default:
 		return false
@@ -14775,19 +14859,22 @@ func (e PostApiV1QueryJSONBodyGranularitySeconds2) Valid() bool {
 
 // Defines values for PostApiV1Query200JSONResponseBodyDiagnosticsCode.
 const (
+	APPFUNCTIONRESULTTRUNCATED PostApiV1Query200JSONResponseBodyDiagnosticsCode = "APP_FUNCTION_RESULT_TRUNCATED"
 	APPFUNCTIONUNRESOLVEDKEYS  PostApiV1Query200JSONResponseBodyDiagnosticsCode = "APP_FUNCTION_UNRESOLVED_KEYS"
 	APPFUNCTIONVALUETRUNCATED  PostApiV1Query200JSONResponseBodyDiagnosticsCode = "APP_FUNCTION_VALUE_TRUNCATED"
 	INCOMPLETECOMPARISONPERIOD PostApiV1Query200JSONResponseBodyDiagnosticsCode = "INCOMPLETE_COMPARISON_PERIOD"
 	INSTANTEVALSKIPPED         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "INSTANT_EVAL_SKIPPED"
 	MISSINGTIMEBUCKETS         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "MISSING_TIME_BUCKETS"
+	MULTIPROJECTRESULT         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "MULTI_PROJECT_RESULT"
 	POSSIBLEFANOUT             PostApiV1Query200JSONResponseBodyDiagnosticsCode = "POSSIBLE_FANOUT"
-	RESULTTRUNCATED            PostApiV1Query200JSONResponseBodyDiagnosticsCode = "RESULT_TRUNCATED"
 	UNBOUNDEDTIMERANGE         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "UNBOUNDED_TIME_RANGE"
 )
 
 // Valid indicates whether the value is a known member of the PostApiV1Query200JSONResponseBodyDiagnosticsCode enum.
 func (e PostApiV1Query200JSONResponseBodyDiagnosticsCode) Valid() bool {
 	switch e {
+	case APPFUNCTIONRESULTTRUNCATED:
+		return true
 	case APPFUNCTIONUNRESOLVEDKEYS:
 		return true
 	case APPFUNCTIONVALUETRUNCATED:
@@ -14798,9 +14885,9 @@ func (e PostApiV1Query200JSONResponseBodyDiagnosticsCode) Valid() bool {
 		return true
 	case MISSINGTIMEBUCKETS:
 		return true
-	case POSSIBLEFANOUT:
+	case MULTIPROJECTRESULT:
 		return true
-	case RESULTTRUNCATED:
+	case POSSIBLEFANOUT:
 		return true
 	case UNBOUNDEDTIMERANGE:
 		return true
@@ -14809,129 +14896,390 @@ func (e PostApiV1Query200JSONResponseBodyDiagnosticsCode) Valid() bool {
 	}
 }
 
-// Defines values for GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates.
+// Defines values for GetApiV1QueryReference200JSONResponseBodyExamplesIntent.
 const (
-	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGatesCosts  GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates = "costs"
-	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGatesInput  GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates = "input"
-	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGatesOutput GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates = "output"
+	Conversations GetApiV1QueryReference200JSONResponseBodyExamplesIntent = "conversations"
+	Cost          GetApiV1QueryReference200JSONResponseBodyExamplesIntent = "cost"
+	Discovery     GetApiV1QueryReference200JSONResponseBodyExamplesIntent = "discovery"
+	Export        GetApiV1QueryReference200JSONResponseBodyExamplesIntent = "export"
+	Latency       GetApiV1QueryReference200JSONResponseBodyExamplesIntent = "latency"
+	Quality       GetApiV1QueryReference200JSONResponseBodyExamplesIntent = "quality"
+	Triage        GetApiV1QueryReference200JSONResponseBodyExamplesIntent = "triage"
 )
 
-// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates enum.
-func (e GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates) Valid() bool {
+// Valid indicates whether the value is a known member of the GetApiV1QueryReference200JSONResponseBodyExamplesIntent enum.
+func (e GetApiV1QueryReference200JSONResponseBodyExamplesIntent) Valid() bool {
 	switch e {
-	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGatesCosts:
+	case Conversations:
 		return true
-	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGatesInput:
+	case Cost:
 		return true
-	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGatesOutput:
+	case Discovery:
+		return true
+	case Export:
+		return true
+	case Latency:
+		return true
+	case Quality:
+		return true
+	case Triage:
 		return true
 	default:
 		return false
 	}
 }
 
-// Defines values for GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit.
+// Defines values for GetApiV1QueryReference200JSONResponseBodyExamplesLanguage.
 const (
-	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitLessThannil GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "<nil>"
-	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitMs          GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "ms"
-	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitTokens      GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "tokens"
-	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitTokenss     GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "tokens/s"
-	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitUSD         GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "USD"
+	Lwql        GetApiV1QueryReference200JSONResponseBodyExamplesLanguage = "lwql"
+	TraceFilter GetApiV1QueryReference200JSONResponseBodyExamplesLanguage = "trace-filter"
 )
 
-// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit enum.
-func (e GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit) Valid() bool {
+// Valid indicates whether the value is a known member of the GetApiV1QueryReference200JSONResponseBodyExamplesLanguage enum.
+func (e GetApiV1QueryReference200JSONResponseBodyExamplesLanguage) Valid() bool {
 	switch e {
-	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitLessThannil:
+	case Lwql:
 		return true
-	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitMs:
-		return true
-	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitTokens:
-		return true
-	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitTokenss:
-		return true
-	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitUSD:
+	case TraceFilter:
 		return true
 	default:
 		return false
 	}
 }
 
-// Defines values for GetApiV1QuerySchema200JSONResponseBodyFunctionsEncoding.
+// Defines values for GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates.
 const (
-	GetApiV1QuerySchema200JSONResponseBodyFunctionsEncodingJson GetApiV1QuerySchema200JSONResponseBodyFunctionsEncoding = "json"
-	GetApiV1QuerySchema200JSONResponseBodyFunctionsEncodingText GetApiV1QuerySchema200JSONResponseBodyFunctionsEncoding = "text"
+	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGatesCosts  GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates = "costs"
+	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGatesInput  GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates = "input"
+	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGatesOutput GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates = "output"
 )
 
-// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyFunctionsEncoding enum.
-func (e GetApiV1QuerySchema200JSONResponseBodyFunctionsEncoding) Valid() bool {
+// Valid indicates whether the value is a known member of the GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates enum.
+func (e GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates) Valid() bool {
 	switch e {
-	case GetApiV1QuerySchema200JSONResponseBodyFunctionsEncodingJson:
+	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGatesCosts:
 		return true
-	case GetApiV1QuerySchema200JSONResponseBodyFunctionsEncodingText:
+	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGatesInput:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGatesOutput:
 		return true
 	default:
 		return false
 	}
 }
 
-// Defines values for GetApiV1QuerySchema200JSONResponseBodyFunctionsGates.
+// Defines values for GetApiV1QueryReference200JSONResponseBodyLwqlEndpointsMethod.
 const (
-	GetApiV1QuerySchema200JSONResponseBodyFunctionsGatesCosts  GetApiV1QuerySchema200JSONResponseBodyFunctionsGates = "costs"
-	GetApiV1QuerySchema200JSONResponseBodyFunctionsGatesInput  GetApiV1QuerySchema200JSONResponseBodyFunctionsGates = "input"
-	GetApiV1QuerySchema200JSONResponseBodyFunctionsGatesOutput GetApiV1QuerySchema200JSONResponseBodyFunctionsGates = "output"
+	GetApiV1QueryReference200JSONResponseBodyLwqlEndpointsMethodGET  GetApiV1QueryReference200JSONResponseBodyLwqlEndpointsMethod = "GET"
+	GetApiV1QueryReference200JSONResponseBodyLwqlEndpointsMethodPOST GetApiV1QueryReference200JSONResponseBodyLwqlEndpointsMethod = "POST"
 )
 
-// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyFunctionsGates enum.
-func (e GetApiV1QuerySchema200JSONResponseBodyFunctionsGates) Valid() bool {
+// Valid indicates whether the value is a known member of the GetApiV1QueryReference200JSONResponseBodyLwqlEndpointsMethod enum.
+func (e GetApiV1QueryReference200JSONResponseBodyLwqlEndpointsMethod) Valid() bool {
 	switch e {
-	case GetApiV1QuerySchema200JSONResponseBodyFunctionsGatesCosts:
+	case GetApiV1QueryReference200JSONResponseBodyLwqlEndpointsMethodGET:
 		return true
-	case GetApiV1QuerySchema200JSONResponseBodyFunctionsGatesInput:
-		return true
-	case GetApiV1QuerySchema200JSONResponseBodyFunctionsGatesOutput:
+	case GetApiV1QueryReference200JSONResponseBodyLwqlEndpointsMethodPOST:
 		return true
 	default:
 		return false
 	}
 }
 
-// Defines values for GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind.
+// Defines values for GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsEncoding.
 const (
-	GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKindSpan   GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind = "span"
-	GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKindText   GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind = "text"
-	GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKindThread GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind = "thread"
-	GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKindTrace  GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind = "trace"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsEncodingJson GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsEncoding = "json"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsEncodingText GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsEncoding = "text"
 )
 
-// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind enum.
-func (e GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind) Valid() bool {
+// Valid indicates whether the value is a known member of the GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsEncoding enum.
+func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsEncoding) Valid() bool {
 	switch e {
-	case GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKindSpan:
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsEncodingJson:
 		return true
-	case GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKindText:
-		return true
-	case GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKindThread:
-		return true
-	case GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKindTrace:
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsEncodingText:
 		return true
 	default:
 		return false
 	}
 }
 
-// Defines values for GetApiV1QuerySchema200JSONResponseBodyFunctionsKind.
+// Defines values for GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates.
 const (
-	Eval       GetApiV1QuerySchema200JSONResponseBodyFunctionsKind = "eval"
-	Extraction GetApiV1QuerySchema200JSONResponseBodyFunctionsKind = "extraction"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGatesCosts  GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates = "costs"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGatesInput  GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates = "input"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGatesOutput GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates = "output"
 )
 
-// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyFunctionsKind enum.
-func (e GetApiV1QuerySchema200JSONResponseBodyFunctionsKind) Valid() bool {
+// Valid indicates whether the value is a known member of the GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates enum.
+func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates) Valid() bool {
 	switch e {
-	case Eval:
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGatesCosts:
 		return true
-	case Extraction:
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGatesInput:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGatesOutput:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKind.
+const (
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKindSpan   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKind = "span"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKindText   GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKind = "text"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKindThread GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKind = "thread"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKindTrace  GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKind = "trace"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKind enum.
+func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKind) Valid() bool {
+	switch e {
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKindSpan:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKindText:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKindThread:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKindTrace:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKind.
+const (
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKindEval       GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKind = "eval"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKindExtraction GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKind = "extraction"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKind enum.
+func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKind) Valid() bool {
+	switch e {
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKindEval:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKindExtraction:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates.
+const (
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGatesCosts  GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates = "costs"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGatesInput  GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates = "input"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGatesOutput GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates = "output"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates enum.
+func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates) Valid() bool {
+	switch e {
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGatesCosts:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGatesInput:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGatesOutput:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsUnit.
+const (
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsUnitLessThannil GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsUnit = "<nil>"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsUnitMs          GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsUnit = "ms"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsUnitTokens      GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsUnit = "tokens"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsUnitTokenss     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsUnit = "tokens/s"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsUnitUSD         GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsUnit = "USD"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsUnit enum.
+func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsUnit) Valid() bool {
+	switch e {
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsUnitLessThannil:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsUnitMs:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsUnitTokens:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsUnitTokenss:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsUnitUSD:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1QueryReference200JSONResponseBodyTraceFilterEndpointsMethod.
+const (
+	GetApiV1QueryReference200JSONResponseBodyTraceFilterEndpointsMethodGET  GetApiV1QueryReference200JSONResponseBodyTraceFilterEndpointsMethod = "GET"
+	GetApiV1QueryReference200JSONResponseBodyTraceFilterEndpointsMethodPOST GetApiV1QueryReference200JSONResponseBodyTraceFilterEndpointsMethod = "POST"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1QueryReference200JSONResponseBodyTraceFilterEndpointsMethod enum.
+func (e GetApiV1QueryReference200JSONResponseBodyTraceFilterEndpointsMethod) Valid() bool {
+	switch e {
+	case GetApiV1QueryReference200JSONResponseBodyTraceFilterEndpointsMethodGET:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyTraceFilterEndpointsMethodPOST:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueType.
+const (
+	GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueTypeCategorical GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueType = "categorical"
+	GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueTypeExistence   GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueType = "existence"
+	GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueTypeRange       GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueType = "range"
+	GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueTypeText        GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueType = "text"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueType enum.
+func (e GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueType) Valid() bool {
+	switch e {
+	case GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueTypeCategorical:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueTypeExistence:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueTypeRange:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueTypeText:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncoding.
+const (
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncodingJson GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncoding = "json"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncodingText GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncoding = "text"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncoding enum.
+func (e GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncoding) Valid() bool {
+	switch e {
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncodingJson:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncodingText:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates.
+const (
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGatesCosts  GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates = "costs"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGatesInput  GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates = "input"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGatesOutput GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates = "output"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates enum.
+func (e GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates) Valid() bool {
+	switch e {
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGatesCosts:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGatesInput:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGatesOutput:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind.
+const (
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKindSpan   GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind = "span"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKindText   GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind = "text"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKindThread GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind = "thread"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKindTrace  GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind = "trace"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind enum.
+func (e GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind) Valid() bool {
+	switch e {
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKindSpan:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKindText:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKindThread:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKindTrace:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKind.
+const (
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKindEval       GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKind = "eval"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKindExtraction GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKind = "extraction"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKind enum.
+func (e GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKind) Valid() bool {
+	switch e {
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKindEval:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKindExtraction:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates.
+const (
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGatesCosts  GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates = "costs"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGatesInput  GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates = "input"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGatesOutput GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates = "output"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates enum.
+func (e GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates) Valid() bool {
+	switch e {
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGatesCosts:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGatesInput:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGatesOutput:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit.
+const (
+	LessThannil GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit = "<nil>"
+	Ms          GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit = "ms"
+	Tokens      GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit = "tokens"
+	Tokenss     GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit = "tokens/s"
+	USD         GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit = "USD"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit enum.
+func (e GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit) Valid() bool {
+	switch e {
+	case LessThannil:
+		return true
+	case Ms:
+		return true
+	case Tokens:
+		return true
+	case Tokenss:
+		return true
+	case USD:
 		return true
 	default:
 		return false
@@ -15864,19 +16212,19 @@ func (e UpdateTestSuite200JSONResponseBodyEvaluatorsMappings1Type) Valid() bool 
 
 // Defines values for UpdateTestSuite200JSONResponseBodyFieldsType.
 const (
-	UpdateTestSuite200JSONResponseBodyFieldsTypeBoolean UpdateTestSuite200JSONResponseBodyFieldsType = "boolean"
-	UpdateTestSuite200JSONResponseBodyFieldsTypeNumber  UpdateTestSuite200JSONResponseBodyFieldsType = "number"
-	UpdateTestSuite200JSONResponseBodyFieldsTypeText    UpdateTestSuite200JSONResponseBodyFieldsType = "text"
+	Boolean UpdateTestSuite200JSONResponseBodyFieldsType = "boolean"
+	Number  UpdateTestSuite200JSONResponseBodyFieldsType = "number"
+	Text    UpdateTestSuite200JSONResponseBodyFieldsType = "text"
 )
 
 // Valid indicates whether the value is a known member of the UpdateTestSuite200JSONResponseBodyFieldsType enum.
 func (e UpdateTestSuite200JSONResponseBodyFieldsType) Valid() bool {
 	switch e {
-	case UpdateTestSuite200JSONResponseBodyFieldsTypeBoolean:
+	case Boolean:
 		return true
-	case UpdateTestSuite200JSONResponseBodyFieldsTypeNumber:
+	case Number:
 		return true
-	case UpdateTestSuite200JSONResponseBodyFieldsTypeText:
+	case Text:
 		return true
 	default:
 		return false
@@ -16825,8 +17173,9 @@ type PostApiAgentCacheByNameClaimJSONBody struct {
 
 // PostApiAnalyticsJSONBody defines parameters for PostApiAnalytics.
 type PostApiAnalyticsJSONBody struct {
-	EndDate float32 `json:"endDate"`
-	Filters *struct {
+	EndDate        float32   `json:"endDate"`
+	ExcludeOrigins *[]string `json:"excludeOrigins,omitempty"`
+	Filters        *struct {
 		AnnotationsHasAnnotation             PostApiAnalyticsJSONBody_Filters_AnnotationsHasAnnotation             `json:"annotations.hasAnnotation"`
 		EvaluationsEvaluatorId               PostApiAnalyticsJSONBody_Filters_EvaluationsEvaluatorId               `json:"evaluations.evaluator_id"`
 		EvaluationsEvaluatorIdGuardrailsOnly PostApiAnalyticsJSONBody_Filters_EvaluationsEvaluatorIdGuardrailsOnly `json:"evaluations.evaluator_id.guardrails_only"`
@@ -17733,8 +18082,9 @@ type PostApiAnalytics403JSONResponseBody struct {
 
 // PostApiAnalyticsTimeseriesJSONBody defines parameters for PostApiAnalyticsTimeseries.
 type PostApiAnalyticsTimeseriesJSONBody struct {
-	EndDate PostApiAnalyticsTimeseriesJSONBody_EndDate `json:"endDate"`
-	Filters *struct {
+	EndDate        PostApiAnalyticsTimeseriesJSONBody_EndDate `json:"endDate"`
+	ExcludeOrigins *[]string                                  `json:"excludeOrigins,omitempty"`
+	Filters        *struct {
 		AnnotationsHasAnnotation             *PostApiAnalyticsTimeseriesJSONBody_Filters_AnnotationsHasAnnotation             `json:"annotations.hasAnnotation,omitempty"`
 		EvaluationsEvaluatorId               *PostApiAnalyticsTimeseriesJSONBody_Filters_EvaluationsEvaluatorId               `json:"evaluations.evaluator_id,omitempty"`
 		EvaluationsEvaluatorIdGuardrailsOnly *PostApiAnalyticsTimeseriesJSONBody_Filters_EvaluationsEvaluatorIdGuardrailsOnly `json:"evaluations.evaluator_id.guardrails_only,omitempty"`
@@ -20658,6 +21008,7 @@ type PostApiGatewayV1VirtualKeysJSONBody struct {
 	Name            string                                          `json:"name"`
 	PrincipalUserId *string                                         `json:"principal_user_id,omitempty"`
 	Purpose         *PostApiGatewayV1VirtualKeysJSONBodyPurpose     `json:"purpose,omitempty"`
+	RevealOnce      *bool                                           `json:"reveal_once,omitempty"`
 	RoutingMode     *PostApiGatewayV1VirtualKeysJSONBodyRoutingMode `json:"routing_mode,omitempty"`
 	RoutingPolicyId *string                                         `json:"routing_policy_id,omitempty"`
 	Scopes          *[]struct {
@@ -24209,12 +24560,73 @@ type PostApiTeamsByIdMembersJSONBody struct {
 // PostApiTeamsByIdMembersJSONBodyRole defines parameters for PostApiTeamsByIdMembers.
 type PostApiTeamsByIdMembersJSONBodyRole string
 
+// GetApiTracesFacetsParams defines parameters for GetApiTracesFacets.
+type GetApiTracesFacetsParams struct {
+	Field     *string `form:"field,omitempty" json:"field,omitempty"`
+	Prefix    *string `form:"prefix,omitempty" json:"prefix,omitempty"`
+	Limit     *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset    *int    `form:"offset,omitempty" json:"offset,omitempty"`
+	StartDate *string `form:"startDate,omitempty" json:"startDate,omitempty"`
+	EndDate   *string `form:"endDate,omitempty" json:"endDate,omitempty"`
+}
+
+// GetApiTracesFacets200JSONResponseBody0 defines parameters for GetApiTracesFacets.
+type GetApiTracesFacets200JSONResponseBody0 struct {
+	Facets []GetApiTracesFacets200JSONResponseBody_0_Facets_Item `json:"facets"`
+
+	// Pending True when the payload is still being computed and what you have is the last committed one, possibly empty. Call again shortly.
+	Pending bool `json:"pending"`
+}
+
+// GetApiTracesFacets200JSONResponseBody0FacetsKind defines parameters for GetApiTracesFacets.
+type GetApiTracesFacets200JSONResponseBody0FacetsKind string
+
+// GetApiTracesFacets200JSONResponseBody_0_Facets_Item defines parameters for GetApiTracesFacets.
+type GetApiTracesFacets200JSONResponseBody_0_Facets_Item struct {
+	Group                string                                           `json:"group"`
+	Key                  string                                           `json:"key"`
+	Kind                 GetApiTracesFacets200JSONResponseBody0FacetsKind `json:"kind"`
+	Label                string                                           `json:"label"`
+	AdditionalProperties map[string]interface{}                           `json:"-"`
+}
+
+// GetApiTracesFacets200JSONResponseBody1 defines parameters for GetApiTracesFacets.
+type GetApiTracesFacets200JSONResponseBody1 struct {
+	HasMore bool `json:"hasMore"`
+
+	// Total Distinct values the field holds in the window, before paging.
+	Total  float32 `json:"total"`
+	Values []struct {
+		Count float32 `json:"count"`
+		Label *string `json:"label,omitempty"`
+		Value string  `json:"value"`
+	} `json:"values"`
+}
+
+// GetApiTracesFacets200JSONResponseBody defines parameters for GetApiTracesFacets.
+type GetApiTracesFacets200JSONResponseBody struct {
+	union json.RawMessage
+}
+
+// GetApiTracesFacets403JSONResponseBodyError defines parameters for GetApiTracesFacets.
+type GetApiTracesFacets403JSONResponseBodyError string
+
+// GetApiTracesFacets422JSONResponseBodyError defines parameters for GetApiTracesFacets.
+type GetApiTracesFacets422JSONResponseBodyError string
+
+// GetApiTracesFacets422JSONResponseBodyTarget defines parameters for GetApiTracesFacets.
+type GetApiTracesFacets422JSONResponseBodyTarget string
+
 // PostApiTracesSearchJSONBody defines parameters for PostApiTracesSearch.
 type PostApiTracesSearchJSONBody struct {
 	// DateField Which timestamp the startDate/endDate window filters on. 'occurred' (default) selects traces by when they happened. 'updated' selects traces by when they were last modified — use this for incremental ETL ('give me everything changed since my last pull'), since a trace can occur long before it gains a later evaluation or annotation.
-	DateField *PostApiTracesSearchJSONBodyDateField `json:"dateField,omitempty"`
-	EndDate   PostApiTracesSearchJSONBody_EndDate   `json:"endDate"`
-	Filters   *struct {
+	DateField      *PostApiTracesSearchJSONBodyDateField `json:"dateField,omitempty"`
+	EndDate        PostApiTracesSearchJSONBody_EndDate   `json:"endDate"`
+	ExcludeOrigins *[]string                             `json:"excludeOrigins,omitempty"`
+
+	// Filter A trace filter string in the same language the Trace Explorer's search bar speaks — `status:error AND model:gpt-*`, `trace.attribute.langwatch.user_id:alice`, `evaluatorVerdict:fail`, a quoted phrase for free text. It is combined with `filters`, `query` and `traceIds` rather than replacing any of them, so every condition you send must hold. `GET /api/v1/query/reference` lists every field and the syntax; `GET /api/traces/facets` says what values a field actually holds. A malformed filter, or one naming a field the language does not have, is a 422 that names the field.
+	Filter  *string `json:"filter,omitempty"`
+	Filters *struct {
 		AnnotationsHasAnnotation             *PostApiTracesSearchJSONBody_Filters_AnnotationsHasAnnotation             `json:"annotations.hasAnnotation,omitempty"`
 		EvaluationsEvaluatorId               *PostApiTracesSearchJSONBody_Filters_EvaluationsEvaluatorId               `json:"evaluations.evaluator_id,omitempty"`
 		EvaluationsEvaluatorIdGuardrailsOnly *PostApiTracesSearchJSONBody_Filters_EvaluationsEvaluatorIdGuardrailsOnly `json:"evaluations.evaluator_id.guardrails_only,omitempty"`
@@ -26152,6 +26564,7 @@ type PostLangyControlFramesJSONBodyFrames0 struct {
 		GitBranch       *string `json:"gitBranch,omitempty"`
 		GitDirty        *bool   `json:"gitDirty,omitempty"`
 		GitRemote       *string `json:"gitRemote,omitempty"`
+		GitRepository   *bool   `json:"gitRepository,omitempty"`
 		Name            string  `json:"name"`
 		NodeVersion     *string `json:"nodeVersion,omitempty"`
 		Os              string  `json:"os"`
@@ -26343,13 +26756,26 @@ type PollLangyControlSession200JSONResponseBodyFrames2Call1Tool string
 // PollLangyControlSession200JSONResponseBodyFrames2Call2 defines parameters for PollLangyControlSession.
 type PollLangyControlSession200JSONResponseBodyFrames2Call2 struct {
 	Params struct {
-		Edits []struct {
-			NewText string `json:"newText"`
-			OldText string `json:"oldText"`
-		} `json:"edits"`
-		Path string `json:"path"`
+		Edits []PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item `json:"edits"`
+		Path  string                                                                         `json:"path"`
 	} `json:"params"`
 	Tool PollLangyControlSession200JSONResponseBodyFrames2Call2Tool `json:"tool"`
+}
+
+// PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0 defines parameters for PollLangyControlSession.
+type PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0 struct {
+	NewText string `json:"newText"`
+	OldText string `json:"oldText"`
+}
+
+// PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1 defines parameters for PollLangyControlSession.
+type PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1 struct {
+	Append string `json:"append"`
+}
+
+// PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item defines parameters for PollLangyControlSession.
+type PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item struct {
+	union json.RawMessage
 }
 
 // PollLangyControlSession200JSONResponseBodyFrames2Call2Tool defines parameters for PollLangyControlSession.
@@ -26409,6 +26835,17 @@ type PollLangyControlSession200JSONResponseBodyFrames2Call6 struct {
 
 // PollLangyControlSession200JSONResponseBodyFrames2Call6Tool defines parameters for PollLangyControlSession.
 type PollLangyControlSession200JSONResponseBodyFrames2Call6Tool string
+
+// PollLangyControlSession200JSONResponseBodyFrames2Call7 defines parameters for PollLangyControlSession.
+type PollLangyControlSession200JSONResponseBodyFrames2Call7 struct {
+	Params struct {
+		Path *string `json:"path,omitempty"`
+	} `json:"params"`
+	Tool PollLangyControlSession200JSONResponseBodyFrames2Call7Tool `json:"tool"`
+}
+
+// PollLangyControlSession200JSONResponseBodyFrames2Call7Tool defines parameters for PollLangyControlSession.
+type PollLangyControlSession200JSONResponseBodyFrames2Call7Tool string
 
 // PollLangyControlSession200JSONResponseBody_Frames_2_Call defines parameters for PollLangyControlSession.
 type PollLangyControlSession200JSONResponseBody_Frames_2_Call struct {
@@ -26507,6 +26944,7 @@ type RegisterLangyControlSessionJSONBody struct {
 		GitBranch       *string `json:"gitBranch,omitempty"`
 		GitDirty        *bool   `json:"gitDirty,omitempty"`
 		GitRemote       *string `json:"gitRemote,omitempty"`
+		GitRepository   *bool   `json:"gitRepository,omitempty"`
 		Name            string  `json:"name"`
 		NodeVersion     *string `json:"nodeVersion,omitempty"`
 		Os              string  `json:"os"`
@@ -26573,6 +27011,7 @@ type ApproveLangyControlRequestJSONBody struct {
 		GitBranch       *string `json:"gitBranch,omitempty"`
 		GitDirty        *bool   `json:"gitDirty,omitempty"`
 		GitRemote       *string `json:"gitRemote,omitempty"`
+		GitRepository   *bool   `json:"gitRepository,omitempty"`
 		Name            string  `json:"name"`
 		NodeVersion     *string `json:"nodeVersion,omitempty"`
 		Os              string  `json:"os"`
@@ -26830,23 +27269,59 @@ type PostApiV1QueryJSONBody_TimeWindow_Start struct {
 // PostApiV1Query200JSONResponseBodyDiagnosticsCode defines parameters for PostApiV1Query.
 type PostApiV1Query200JSONResponseBodyDiagnosticsCode string
 
-// GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates defines parameters for GetApiV1QuerySchema.
-type GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates string
+// GetApiV1QueryReference200JSONResponseBodyExamplesIntent defines parameters for GetApiV1QueryReference.
+type GetApiV1QueryReference200JSONResponseBodyExamplesIntent string
 
-// GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit defines parameters for GetApiV1QuerySchema.
-type GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit string
+// GetApiV1QueryReference200JSONResponseBodyExamplesLanguage defines parameters for GetApiV1QueryReference.
+type GetApiV1QueryReference200JSONResponseBodyExamplesLanguage string
 
-// GetApiV1QuerySchema200JSONResponseBodyFunctionsEncoding defines parameters for GetApiV1QuerySchema.
-type GetApiV1QuerySchema200JSONResponseBodyFunctionsEncoding string
+// GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates defines parameters for GetApiV1QueryReference.
+type GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates string
 
-// GetApiV1QuerySchema200JSONResponseBodyFunctionsGates defines parameters for GetApiV1QuerySchema.
-type GetApiV1QuerySchema200JSONResponseBodyFunctionsGates string
+// GetApiV1QueryReference200JSONResponseBodyLwqlEndpointsMethod defines parameters for GetApiV1QueryReference.
+type GetApiV1QueryReference200JSONResponseBodyLwqlEndpointsMethod string
 
-// GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind defines parameters for GetApiV1QuerySchema.
-type GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind string
+// GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsEncoding defines parameters for GetApiV1QueryReference.
+type GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsEncoding string
 
-// GetApiV1QuerySchema200JSONResponseBodyFunctionsKind defines parameters for GetApiV1QuerySchema.
-type GetApiV1QuerySchema200JSONResponseBodyFunctionsKind string
+// GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates defines parameters for GetApiV1QueryReference.
+type GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates string
+
+// GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKind defines parameters for GetApiV1QueryReference.
+type GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKind string
+
+// GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKind defines parameters for GetApiV1QueryReference.
+type GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKind string
+
+// GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates defines parameters for GetApiV1QueryReference.
+type GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates string
+
+// GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsUnit defines parameters for GetApiV1QueryReference.
+type GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsUnit string
+
+// GetApiV1QueryReference200JSONResponseBodyTraceFilterEndpointsMethod defines parameters for GetApiV1QueryReference.
+type GetApiV1QueryReference200JSONResponseBodyTraceFilterEndpointsMethod string
+
+// GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueType defines parameters for GetApiV1QueryReference.
+type GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueType string
+
+// GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncoding defines parameters for GetApiV1QuerySchema.
+type GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncoding string
+
+// GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates defines parameters for GetApiV1QuerySchema.
+type GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates string
+
+// GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind defines parameters for GetApiV1QuerySchema.
+type GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind string
+
+// GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKind defines parameters for GetApiV1QuerySchema.
+type GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKind string
+
+// GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates defines parameters for GetApiV1QuerySchema.
+type GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates string
+
+// GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit defines parameters for GetApiV1QuerySchema.
+type GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit string
 
 // ListRunPlansParams defines parameters for ListRunPlans.
 type ListRunPlansParams struct {
@@ -33704,6 +34179,111 @@ func (a PostApiScenarioEventsJSONBody_0_Metadata) MarshalJSON() ([]byte, error) 
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling 'note': %w", err)
 		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for GetApiTracesFacets200JSONResponseBody_0_Facets_Item. Returns the specified
+// element and whether it was found
+func (a GetApiTracesFacets200JSONResponseBody_0_Facets_Item) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for GetApiTracesFacets200JSONResponseBody_0_Facets_Item
+func (a *GetApiTracesFacets200JSONResponseBody_0_Facets_Item) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for GetApiTracesFacets200JSONResponseBody_0_Facets_Item to handle AdditionalProperties
+func (a *GetApiTracesFacets200JSONResponseBody_0_Facets_Item) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["group"]; found {
+		err = json.Unmarshal(raw, &a.Group)
+		if err != nil {
+			return fmt.Errorf("error reading 'group': %w", err)
+		}
+		delete(object, "group")
+	}
+
+	if raw, found := object["key"]; found {
+		err = json.Unmarshal(raw, &a.Key)
+		if err != nil {
+			return fmt.Errorf("error reading 'key': %w", err)
+		}
+		delete(object, "key")
+	}
+
+	if raw, found := object["kind"]; found {
+		err = json.Unmarshal(raw, &a.Kind)
+		if err != nil {
+			return fmt.Errorf("error reading 'kind': %w", err)
+		}
+		delete(object, "kind")
+	}
+
+	if raw, found := object["label"]; found {
+		err = json.Unmarshal(raw, &a.Label)
+		if err != nil {
+			return fmt.Errorf("error reading 'label': %w", err)
+		}
+		delete(object, "label")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for GetApiTracesFacets200JSONResponseBody_0_Facets_Item to handle AdditionalProperties
+func (a GetApiTracesFacets200JSONResponseBody_0_Facets_Item) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["group"], err = json.Marshal(a.Group)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'group': %w", err)
+	}
+
+	object["key"], err = json.Marshal(a.Key)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'key': %w", err)
+	}
+
+	object["kind"], err = json.Marshal(a.Kind)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'kind': %w", err)
+	}
+
+	object["label"], err = json.Marshal(a.Label)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'label': %w", err)
 	}
 
 	for fieldName, field := range a.AdditionalProperties {
@@ -58185,6 +58765,68 @@ func (t *PostApiSuitesByIdRun200JSONResponseBody_Items_Target_RunParameters_Addi
 	return err
 }
 
+// AsGetApiTracesFacets200JSONResponseBody0 returns the union data inside the GetApiTracesFacets200JSONResponseBody as a GetApiTracesFacets200JSONResponseBody0
+func (t GetApiTracesFacets200JSONResponseBody) AsGetApiTracesFacets200JSONResponseBody0() (GetApiTracesFacets200JSONResponseBody0, error) {
+	var body GetApiTracesFacets200JSONResponseBody0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTracesFacets200JSONResponseBody0 overwrites any union data inside the GetApiTracesFacets200JSONResponseBody as the provided GetApiTracesFacets200JSONResponseBody0
+func (t *GetApiTracesFacets200JSONResponseBody) FromGetApiTracesFacets200JSONResponseBody0(v GetApiTracesFacets200JSONResponseBody0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTracesFacets200JSONResponseBody0 performs a merge with any union data inside the GetApiTracesFacets200JSONResponseBody, using the provided GetApiTracesFacets200JSONResponseBody0
+func (t *GetApiTracesFacets200JSONResponseBody) MergeGetApiTracesFacets200JSONResponseBody0(v GetApiTracesFacets200JSONResponseBody0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTracesFacets200JSONResponseBody1 returns the union data inside the GetApiTracesFacets200JSONResponseBody as a GetApiTracesFacets200JSONResponseBody1
+func (t GetApiTracesFacets200JSONResponseBody) AsGetApiTracesFacets200JSONResponseBody1() (GetApiTracesFacets200JSONResponseBody1, error) {
+	var body GetApiTracesFacets200JSONResponseBody1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTracesFacets200JSONResponseBody1 overwrites any union data inside the GetApiTracesFacets200JSONResponseBody as the provided GetApiTracesFacets200JSONResponseBody1
+func (t *GetApiTracesFacets200JSONResponseBody) FromGetApiTracesFacets200JSONResponseBody1(v GetApiTracesFacets200JSONResponseBody1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTracesFacets200JSONResponseBody1 performs a merge with any union data inside the GetApiTracesFacets200JSONResponseBody, using the provided GetApiTracesFacets200JSONResponseBody1
+func (t *GetApiTracesFacets200JSONResponseBody) MergeGetApiTracesFacets200JSONResponseBody1(v GetApiTracesFacets200JSONResponseBody1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTracesFacets200JSONResponseBody) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTracesFacets200JSONResponseBody) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsPostApiTracesSearchJSONBodyEndDate0 returns the union data inside the PostApiTracesSearchJSONBody_EndDate as a PostApiTracesSearchJSONBodyEndDate0
 func (t PostApiTracesSearchJSONBody_EndDate) AsPostApiTracesSearchJSONBodyEndDate0() (PostApiTracesSearchJSONBodyEndDate0, error) {
 	var body PostApiTracesSearchJSONBodyEndDate0
@@ -65515,6 +66157,68 @@ func (t *PostLangyControlFramesJSONBody_Frames_Item) UnmarshalJSON(b []byte) err
 	return err
 }
 
+// AsPollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0 returns the union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item as a PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0
+func (t PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item) AsPollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0() (PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0, error) {
+	var body PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0 overwrites any union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item as the provided PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0
+func (t *PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item) FromPollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0(v PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0 performs a merge with any union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item, using the provided PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0
+func (t *PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item) MergePollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0(v PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1 returns the union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item as a PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1
+func (t PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item) AsPollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1() (PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1, error) {
+	var body PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1 overwrites any union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item as the provided PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1
+func (t *PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item) FromPollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1(v PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1 performs a merge with any union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item, using the provided PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1
+func (t *PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item) MergePollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1(v PollLangyControlSession200JSONResponseBodyFrames2Call2ParamsEdits1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PollLangyControlSession200JSONResponseBody_Frames_2_Call_2_Params_Edits_Item) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsPollLangyControlSession200JSONResponseBodyFrames2Call0 returns the union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call as a PollLangyControlSession200JSONResponseBodyFrames2Call0
 func (t PollLangyControlSession200JSONResponseBody_Frames_2_Call) AsPollLangyControlSession200JSONResponseBodyFrames2Call0() (PollLangyControlSession200JSONResponseBodyFrames2Call0, error) {
 	var body PollLangyControlSession200JSONResponseBodyFrames2Call0
@@ -65687,6 +66391,32 @@ func (t *PollLangyControlSession200JSONResponseBody_Frames_2_Call) FromPollLangy
 
 // MergePollLangyControlSession200JSONResponseBodyFrames2Call6 performs a merge with any union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call, using the provided PollLangyControlSession200JSONResponseBodyFrames2Call6
 func (t *PollLangyControlSession200JSONResponseBody_Frames_2_Call) MergePollLangyControlSession200JSONResponseBodyFrames2Call6(v PollLangyControlSession200JSONResponseBodyFrames2Call6) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPollLangyControlSession200JSONResponseBodyFrames2Call7 returns the union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call as a PollLangyControlSession200JSONResponseBodyFrames2Call7
+func (t PollLangyControlSession200JSONResponseBody_Frames_2_Call) AsPollLangyControlSession200JSONResponseBodyFrames2Call7() (PollLangyControlSession200JSONResponseBodyFrames2Call7, error) {
+	var body PollLangyControlSession200JSONResponseBodyFrames2Call7
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPollLangyControlSession200JSONResponseBodyFrames2Call7 overwrites any union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call as the provided PollLangyControlSession200JSONResponseBodyFrames2Call7
+func (t *PollLangyControlSession200JSONResponseBody_Frames_2_Call) FromPollLangyControlSession200JSONResponseBodyFrames2Call7(v PollLangyControlSession200JSONResponseBodyFrames2Call7) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePollLangyControlSession200JSONResponseBodyFrames2Call7 performs a merge with any union data inside the PollLangyControlSession200JSONResponseBody_Frames_2_Call, using the provided PollLangyControlSession200JSONResponseBodyFrames2Call7
+func (t *PollLangyControlSession200JSONResponseBody_Frames_2_Call) MergePollLangyControlSession200JSONResponseBodyFrames2Call7(v PollLangyControlSession200JSONResponseBodyFrames2Call7) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -70123,6 +70853,9 @@ type ClientInterface interface {
 	// PostApiTraceIdUnshare request
 	PostApiTraceIdUnshare(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetApiTracesFacets request
+	GetApiTracesFacets(ctx context.Context, params *GetApiTracesFacetsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// PostApiTracesSearchWithBody request with any body
 	PostApiTracesSearchWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -70320,6 +71053,9 @@ type ClientInterface interface {
 	PostApiV1QueryWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	PostApiV1Query(ctx context.Context, body PostApiV1QueryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetApiV1QueryReference request
+	GetApiV1QueryReference(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetApiV1QuerySchema request
 	GetApiV1QuerySchema(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -74265,6 +75001,18 @@ func (c *Client) PostApiTraceIdUnshare(ctx context.Context, id string, reqEditor
 	return c.Client.Do(req)
 }
 
+func (c *Client) GetApiTracesFacets(ctx context.Context, params *GetApiTracesFacetsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiTracesFacetsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) PostApiTracesSearchWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostApiTracesSearchRequestWithBody(c.Server, contentType, body)
 	if err != nil {
@@ -75143,6 +75891,18 @@ func (c *Client) PostApiV1QueryWithBody(ctx context.Context, contentType string,
 
 func (c *Client) PostApiV1Query(ctx context.Context, body PostApiV1QueryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostApiV1QueryRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiV1QueryReference(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiV1QueryReferenceRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -86117,6 +86877,120 @@ func NewPostApiTraceIdUnshareRequest(server string, id string) (*http.Request, e
 	return req, nil
 }
 
+// NewGetApiTracesFacetsRequest generates requests for GetApiTracesFacets
+func NewGetApiTracesFacetsRequest(server string, params *GetApiTracesFacetsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/traces/facets")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Field != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "field", *params.Field, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Prefix != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "prefix", *params.Prefix, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Offset != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "offset", *params.Offset, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.StartDate != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "startDate", *params.StartDate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.EndDate != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "endDate", *params.EndDate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewPostApiTracesSearchRequest calls the generic PostApiTracesSearch builder with application/json body
 func NewPostApiTracesSearchRequest(server string, body PostApiTracesSearchJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -88329,6 +89203,33 @@ func NewPostApiV1QueryRequestWithBody(server string, contentType string, body io
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetApiV1QueryReferenceRequest generates requests for GetApiV1QueryReference
+func NewGetApiV1QueryReferenceRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/query/reference")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -90559,6 +91460,9 @@ type ClientWithResponsesInterface interface {
 	// PostApiTraceIdUnshareWithResponse request
 	PostApiTraceIdUnshareWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*PostApiTraceIdUnshareResponse, error)
 
+	// GetApiTracesFacetsWithResponse request
+	GetApiTracesFacetsWithResponse(ctx context.Context, params *GetApiTracesFacetsParams, reqEditors ...RequestEditorFn) (*GetApiTracesFacetsResponse, error)
+
 	// PostApiTracesSearchWithBodyWithResponse request with any body
 	PostApiTracesSearchWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiTracesSearchResponse, error)
 
@@ -90756,6 +91660,9 @@ type ClientWithResponsesInterface interface {
 	PostApiV1QueryWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiV1QueryResponse, error)
 
 	PostApiV1QueryWithResponse(ctx context.Context, body PostApiV1QueryJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiV1QueryResponse, error)
+
+	// GetApiV1QueryReferenceWithResponse request
+	GetApiV1QueryReferenceWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiV1QueryReferenceResponse, error)
 
 	// GetApiV1QuerySchemaWithResponse request
 	GetApiV1QuerySchemaWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiV1QuerySchemaResponse, error)
@@ -96159,7 +97066,14 @@ type PostApiGatewayV1VirtualKeysResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON201      *struct {
-		Secret     string `json:"secret"`
+		// Preview With `reveal_once`: the key's display prefix, safe to show in place of the secret.
+		Preview *string `json:"preview,omitempty"`
+
+		// RevealId With `reveal_once`: the id that serves the secret once, through the app.
+		RevealId *string `json:"reveal_id,omitempty"`
+
+		// Secret The secret, absent when `reveal_once` was set.
+		Secret     *string `json:"secret,omitempty"`
 		VirtualKey struct {
 			Config        interface{} `json:"config,omitempty"`
 			CreatedAt     time.Time   `json:"created_at"`
@@ -105097,6 +106011,70 @@ func (r PostApiTraceIdUnshareResponse) ContentType() string {
 	return ""
 }
 
+type GetApiTracesFacetsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *GetApiTracesFacets200JSONResponseBody
+	JSON400      *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON401 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON403 *struct {
+		Error   GetApiTracesFacets403JSONResponseBodyError `json:"error"`
+		Message string                                     `json:"message"`
+		Trace   *string                                    `json:"trace,omitempty"`
+	}
+	JSON422 *struct {
+		Error   GetApiTracesFacets422JSONResponseBodyError `json:"error"`
+		Fields  []string                                   `json:"fields"`
+		Message string                                     `json:"message"`
+		Reasons []struct {
+			Code string `json:"code"`
+			Meta *struct {
+				Expected *[]string `json:"expected,omitempty"`
+				Field    *string   `json:"field,omitempty"`
+				Message  *string   `json:"message,omitempty"`
+				Received *string   `json:"received,omitempty"`
+				Type     *string   `json:"type,omitempty"`
+			} `json:"meta,omitempty"`
+		} `json:"reasons"`
+		Target GetApiTracesFacets422JSONResponseBodyTarget `json:"target"`
+		Trace  *string                                     `json:"trace,omitempty"`
+	}
+	JSON500 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiTracesFacetsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiTracesFacetsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiTracesFacetsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type PostApiTracesSearchResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -108575,7 +109553,6 @@ type PostApiV1QueryResponse struct {
 			RowsRead     float32 `json:"rowsRead"`
 			RowsReturned float32 `json:"rowsReturned"`
 		} `json:"statistics"`
-		Truncated bool `json:"truncated"`
 	}
 	JSON400 *struct {
 		Error struct {
@@ -108653,19 +109630,200 @@ func (r PostApiV1QueryResponse) ContentType() string {
 	return ""
 }
 
+type GetApiV1QueryReferenceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		DecisionTable []struct {
+			Use  string `json:"use"`
+			When string `json:"when"`
+			Why  string `json:"why"`
+		} `json:"decisionTable"`
+		Examples []struct {
+			Available  bool                                                      `json:"available"`
+			Id         string                                                    `json:"id"`
+			Intent     GetApiV1QueryReference200JSONResponseBodyExamplesIntent   `json:"intent"`
+			Language   GetApiV1QueryReference200JSONResponseBodyExamplesLanguage `json:"language"`
+			Notes      *string                                                   `json:"notes,omitempty"`
+			Parameters []struct {
+				Description string `json:"description"`
+				Name        string `json:"name"`
+				Type        string `json:"type"`
+			} `json:"parameters"`
+			Requires struct {
+				Functions []string                                                         `json:"functions"`
+				Gates     []GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates `json:"gates"`
+			} `json:"requires"`
+			Tags  []string `json:"tags"`
+			Text  string   `json:"text"`
+			Title string   `json:"title"`
+		} `json:"examples"`
+		Lwql struct {
+			Enabled   bool `json:"enabled"`
+			Endpoints []struct {
+				Description string                                                       `json:"description"`
+				Method      GetApiV1QueryReference200JSONResponseBodyLwqlEndpointsMethod `json:"method"`
+				Path        string                                                       `json:"path"`
+			} `json:"endpoints"`
+			Limits struct {
+				MaxExecutionTimeSeconds float32 `json:"maxExecutionTimeSeconds"`
+				MaxResultBytes          float32 `json:"maxResultBytes"`
+				MaxRowsReturned         float32 `json:"maxRowsReturned"`
+				MaxStatementLength      float32 `json:"maxStatementLength"`
+				Pagination              string  `json:"pagination"`
+			} `json:"limits"`
+			Schema struct {
+				AppFunctions []struct {
+					Available   bool                                                                    `json:"available"`
+					Cap         int                                                                     `json:"cap"`
+					Description string                                                                  `json:"description"`
+					Encoding    GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsEncoding `json:"encoding"`
+					ExampleSql  string                                                                  `json:"exampleSql"`
+					Gates       []GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates  `json:"gates"`
+					KeyKind     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKind  `json:"keyKind"`
+					Kind        GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKind     `json:"kind"`
+					Name        string                                                                  `json:"name"`
+					Returns     string                                                                  `json:"returns"`
+					Signature   string                                                                  `json:"signature"`
+				} `json:"appFunctions"`
+				Database  string   `json:"database"`
+				Functions []string `json:"functions"`
+				Views     []struct {
+					Columns []struct {
+						Available   bool                                                                   `json:"available"`
+						Description string                                                                 `json:"description"`
+						Gates       []GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates `json:"gates"`
+						Name        string                                                                 `json:"name"`
+						Type        string                                                                 `json:"type"`
+						Unit        *GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsUnit   `json:"unit"`
+					} `json:"columns"`
+					Description string   `json:"description"`
+					ExampleSql  string   `json:"exampleSql"`
+					Freshness   string   `json:"freshness"`
+					Grain       string   `json:"grain"`
+					JoinKeys    []string `json:"joinKeys"`
+					Name        string   `json:"name"`
+					TimeColumn  string   `json:"timeColumn"`
+				} `json:"views"`
+			} `json:"schema"`
+		} `json:"lwql"`
+		TraceFilter struct {
+			DynamicPrefixes []struct {
+				Aliases     []string `json:"aliases"`
+				Description string   `json:"description"`
+				Label       string   `json:"label"`
+				Prefix      string   `json:"prefix"`
+			} `json:"dynamicPrefixes"`
+			Endpoints []struct {
+				Description string                                                              `json:"description"`
+				Method      GetApiV1QueryReference200JSONResponseBodyTraceFilterEndpointsMethod `json:"method"`
+				Path        string                                                              `json:"path"`
+			} `json:"endpoints"`
+			Fields []struct {
+				Facetable   bool                                                                `json:"facetable"`
+				Group       *string                                                             `json:"group"`
+				KnownValues []string                                                            `json:"knownValues"`
+				Label       string                                                              `json:"label"`
+				Name        string                                                              `json:"name"`
+				ValueType   GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueType `json:"valueType"`
+			} `json:"fields"`
+			Syntax string `json:"syntax"`
+		} `json:"traceFilter"`
+		Version string `json:"version"`
+	}
+	JSON400 *struct {
+		Error struct {
+			Code    string                  `json:"code"`
+			Message string                  `json:"message"`
+			Meta    *map[string]interface{} `json:"meta,omitempty"`
+			SpanId  *string                 `json:"span_id,omitempty"`
+			TraceId *string                 `json:"trace_id,omitempty"`
+			Type    string                  `json:"type"`
+		} `json:"error"`
+	}
+	JSON401 *struct {
+		Error struct {
+			Code    string                  `json:"code"`
+			Message string                  `json:"message"`
+			Meta    *map[string]interface{} `json:"meta,omitempty"`
+			SpanId  *string                 `json:"span_id,omitempty"`
+			TraceId *string                 `json:"trace_id,omitempty"`
+			Type    string                  `json:"type"`
+		} `json:"error"`
+	}
+	JSON403 *struct {
+		Error struct {
+			Code    string                  `json:"code"`
+			Message string                  `json:"message"`
+			Meta    *map[string]interface{} `json:"meta,omitempty"`
+			SpanId  *string                 `json:"span_id,omitempty"`
+			TraceId *string                 `json:"trace_id,omitempty"`
+			Type    string                  `json:"type"`
+		} `json:"error"`
+	}
+	JSON500 *struct {
+		Error struct {
+			Code    string                  `json:"code"`
+			Message string                  `json:"message"`
+			Meta    *map[string]interface{} `json:"meta,omitempty"`
+			SpanId  *string                 `json:"span_id,omitempty"`
+			TraceId *string                 `json:"trace_id,omitempty"`
+			Type    string                  `json:"type"`
+		} `json:"error"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiV1QueryReferenceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiV1QueryReferenceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiV1QueryReferenceResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetApiV1QuerySchemaResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
-		Database string `json:"database"`
-		Datasets []struct {
+		AppFunctions []struct {
+			Available   bool                                                       `json:"available"`
+			Cap         int                                                        `json:"cap"`
+			Description string                                                     `json:"description"`
+			Encoding    GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncoding `json:"encoding"`
+			ExampleSql  string                                                     `json:"exampleSql"`
+			Gates       []GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates  `json:"gates"`
+			KeyKind     GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind  `json:"keyKind"`
+			Kind        GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKind     `json:"kind"`
+			Name        string                                                     `json:"name"`
+			Returns     string                                                     `json:"returns"`
+			Signature   string                                                     `json:"signature"`
+		} `json:"appFunctions"`
+		Database  string   `json:"database"`
+		Functions []string `json:"functions"`
+		Views     []struct {
 			Columns []struct {
-				Available   bool                                                         `json:"available"`
-				Description string                                                       `json:"description"`
-				Gates       []GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates `json:"gates"`
-				Name        string                                                       `json:"name"`
-				Type        string                                                       `json:"type"`
-				Unit        *GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit   `json:"unit"`
+				Available   bool                                                      `json:"available"`
+				Description string                                                    `json:"description"`
+				Gates       []GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates `json:"gates"`
+				Name        string                                                    `json:"name"`
+				Type        string                                                    `json:"type"`
+				Unit        *GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit   `json:"unit"`
 			} `json:"columns"`
 			Description string   `json:"description"`
 			ExampleSql  string   `json:"exampleSql"`
@@ -108674,20 +109832,7 @@ type GetApiV1QuerySchemaResponse struct {
 			JoinKeys    []string `json:"joinKeys"`
 			Name        string   `json:"name"`
 			TimeColumn  string   `json:"timeColumn"`
-		} `json:"datasets"`
-		Functions []struct {
-			Available   bool                                                    `json:"available"`
-			Cap         int                                                     `json:"cap"`
-			Description string                                                  `json:"description"`
-			Encoding    GetApiV1QuerySchema200JSONResponseBodyFunctionsEncoding `json:"encoding"`
-			ExampleSql  string                                                  `json:"exampleSql"`
-			Gates       []GetApiV1QuerySchema200JSONResponseBodyFunctionsGates  `json:"gates"`
-			KeyKind     GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind  `json:"keyKind"`
-			Kind        GetApiV1QuerySchema200JSONResponseBodyFunctionsKind     `json:"kind"`
-			Name        string                                                  `json:"name"`
-			Returns     string                                                  `json:"returns"`
-			Signature   string                                                  `json:"signature"`
-		} `json:"functions"`
+		} `json:"views"`
 	}
 	JSON400 *struct {
 		Error struct {
@@ -113737,6 +114882,15 @@ func (c *ClientWithResponses) PostApiTraceIdUnshareWithResponse(ctx context.Cont
 	return ParsePostApiTraceIdUnshareResponse(rsp)
 }
 
+// GetApiTracesFacetsWithResponse request returning *GetApiTracesFacetsResponse
+func (c *ClientWithResponses) GetApiTracesFacetsWithResponse(ctx context.Context, params *GetApiTracesFacetsParams, reqEditors ...RequestEditorFn) (*GetApiTracesFacetsResponse, error) {
+	rsp, err := c.GetApiTracesFacets(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiTracesFacetsResponse(rsp)
+}
+
 // PostApiTracesSearchWithBodyWithResponse request with arbitrary body returning *PostApiTracesSearchResponse
 func (c *ClientWithResponses) PostApiTracesSearchWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiTracesSearchResponse, error) {
 	rsp, err := c.PostApiTracesSearchWithBody(ctx, contentType, body, reqEditors...)
@@ -114377,6 +115531,15 @@ func (c *ClientWithResponses) PostApiV1QueryWithResponse(ctx context.Context, bo
 		return nil, err
 	}
 	return ParsePostApiV1QueryResponse(rsp)
+}
+
+// GetApiV1QueryReferenceWithResponse request returning *GetApiV1QueryReferenceResponse
+func (c *ClientWithResponses) GetApiV1QueryReferenceWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiV1QueryReferenceResponse, error) {
+	rsp, err := c.GetApiV1QueryReference(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiV1QueryReferenceResponse(rsp)
 }
 
 // GetApiV1QuerySchemaWithResponse request returning *GetApiV1QuerySchemaResponse
@@ -120805,7 +121968,14 @@ func ParsePostApiGatewayV1VirtualKeysResponse(rsp *http.Response) (*PostApiGatew
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
 		var dest struct {
-			Secret     string `json:"secret"`
+			// Preview With `reveal_once`: the key's display prefix, safe to show in place of the secret.
+			Preview *string `json:"preview,omitempty"`
+
+			// RevealId With `reveal_once`: the id that serves the secret once, through the app.
+			RevealId *string `json:"reveal_id,omitempty"`
+
+			// Secret The secret, absent when `reveal_once` was set.
+			Secret     *string `json:"secret,omitempty"`
 			VirtualKey struct {
 				Config        interface{} `json:"config,omitempty"`
 				CreatedAt     time.Time   `json:"created_at"`
@@ -131299,6 +132469,96 @@ func ParsePostApiTraceIdUnshareResponse(rsp *http.Response) (*PostApiTraceIdUnsh
 	return response, nil
 }
 
+// ParseGetApiTracesFacetsResponse parses an HTTP response from a GetApiTracesFacetsWithResponse call
+func ParseGetApiTracesFacetsResponse(rsp *http.Response) (*GetApiTracesFacetsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiTracesFacetsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GetApiTracesFacets200JSONResponseBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Error   GetApiTracesFacets403JSONResponseBodyError `json:"error"`
+			Message string                                     `json:"message"`
+			Trace   *string                                    `json:"trace,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest struct {
+			Error   GetApiTracesFacets422JSONResponseBodyError `json:"error"`
+			Fields  []string                                   `json:"fields"`
+			Message string                                     `json:"message"`
+			Reasons []struct {
+				Code string `json:"code"`
+				Meta *struct {
+					Expected *[]string `json:"expected,omitempty"`
+					Field    *string   `json:"field,omitempty"`
+					Message  *string   `json:"message,omitempty"`
+					Received *string   `json:"received,omitempty"`
+					Type     *string   `json:"type,omitempty"`
+				} `json:"meta,omitempty"`
+			} `json:"reasons"`
+			Target GetApiTracesFacets422JSONResponseBodyTarget `json:"target"`
+			Trace  *string                                     `json:"trace,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParsePostApiTracesSearchResponse parses an HTTP response from a PostApiTracesSearchWithResponse call
 func ParsePostApiTracesSearchResponse(rsp *http.Response) (*PostApiTracesSearchResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -135235,7 +136495,6 @@ func ParsePostApiV1QueryResponse(rsp *http.Response) (*PostApiV1QueryResponse, e
 				RowsRead     float32 `json:"rowsRead"`
 				RowsReturned float32 `json:"rowsReturned"`
 			} `json:"statistics"`
-			Truncated bool `json:"truncated"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -135327,6 +136586,193 @@ func ParsePostApiV1QueryResponse(rsp *http.Response) (*PostApiV1QueryResponse, e
 	return response, nil
 }
 
+// ParseGetApiV1QueryReferenceResponse parses an HTTP response from a GetApiV1QueryReferenceWithResponse call
+func ParseGetApiV1QueryReferenceResponse(rsp *http.Response) (*GetApiV1QueryReferenceResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiV1QueryReferenceResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			DecisionTable []struct {
+				Use  string `json:"use"`
+				When string `json:"when"`
+				Why  string `json:"why"`
+			} `json:"decisionTable"`
+			Examples []struct {
+				Available  bool                                                      `json:"available"`
+				Id         string                                                    `json:"id"`
+				Intent     GetApiV1QueryReference200JSONResponseBodyExamplesIntent   `json:"intent"`
+				Language   GetApiV1QueryReference200JSONResponseBodyExamplesLanguage `json:"language"`
+				Notes      *string                                                   `json:"notes,omitempty"`
+				Parameters []struct {
+					Description string `json:"description"`
+					Name        string `json:"name"`
+					Type        string `json:"type"`
+				} `json:"parameters"`
+				Requires struct {
+					Functions []string                                                         `json:"functions"`
+					Gates     []GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates `json:"gates"`
+				} `json:"requires"`
+				Tags  []string `json:"tags"`
+				Text  string   `json:"text"`
+				Title string   `json:"title"`
+			} `json:"examples"`
+			Lwql struct {
+				Enabled   bool `json:"enabled"`
+				Endpoints []struct {
+					Description string                                                       `json:"description"`
+					Method      GetApiV1QueryReference200JSONResponseBodyLwqlEndpointsMethod `json:"method"`
+					Path        string                                                       `json:"path"`
+				} `json:"endpoints"`
+				Limits struct {
+					MaxExecutionTimeSeconds float32 `json:"maxExecutionTimeSeconds"`
+					MaxResultBytes          float32 `json:"maxResultBytes"`
+					MaxRowsReturned         float32 `json:"maxRowsReturned"`
+					MaxStatementLength      float32 `json:"maxStatementLength"`
+					Pagination              string  `json:"pagination"`
+				} `json:"limits"`
+				Schema struct {
+					AppFunctions []struct {
+						Available   bool                                                                    `json:"available"`
+						Cap         int                                                                     `json:"cap"`
+						Description string                                                                  `json:"description"`
+						Encoding    GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsEncoding `json:"encoding"`
+						ExampleSql  string                                                                  `json:"exampleSql"`
+						Gates       []GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates  `json:"gates"`
+						KeyKind     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKeyKind  `json:"keyKind"`
+						Kind        GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsKind     `json:"kind"`
+						Name        string                                                                  `json:"name"`
+						Returns     string                                                                  `json:"returns"`
+						Signature   string                                                                  `json:"signature"`
+					} `json:"appFunctions"`
+					Database  string   `json:"database"`
+					Functions []string `json:"functions"`
+					Views     []struct {
+						Columns []struct {
+							Available   bool                                                                   `json:"available"`
+							Description string                                                                 `json:"description"`
+							Gates       []GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates `json:"gates"`
+							Name        string                                                                 `json:"name"`
+							Type        string                                                                 `json:"type"`
+							Unit        *GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsUnit   `json:"unit"`
+						} `json:"columns"`
+						Description string   `json:"description"`
+						ExampleSql  string   `json:"exampleSql"`
+						Freshness   string   `json:"freshness"`
+						Grain       string   `json:"grain"`
+						JoinKeys    []string `json:"joinKeys"`
+						Name        string   `json:"name"`
+						TimeColumn  string   `json:"timeColumn"`
+					} `json:"views"`
+				} `json:"schema"`
+			} `json:"lwql"`
+			TraceFilter struct {
+				DynamicPrefixes []struct {
+					Aliases     []string `json:"aliases"`
+					Description string   `json:"description"`
+					Label       string   `json:"label"`
+					Prefix      string   `json:"prefix"`
+				} `json:"dynamicPrefixes"`
+				Endpoints []struct {
+					Description string                                                              `json:"description"`
+					Method      GetApiV1QueryReference200JSONResponseBodyTraceFilterEndpointsMethod `json:"method"`
+					Path        string                                                              `json:"path"`
+				} `json:"endpoints"`
+				Fields []struct {
+					Facetable   bool                                                                `json:"facetable"`
+					Group       *string                                                             `json:"group"`
+					KnownValues []string                                                            `json:"knownValues"`
+					Label       string                                                              `json:"label"`
+					Name        string                                                              `json:"name"`
+					ValueType   GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueType `json:"valueType"`
+				} `json:"fields"`
+				Syntax string `json:"syntax"`
+			} `json:"traceFilter"`
+			Version string `json:"version"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Error struct {
+				Code    string                  `json:"code"`
+				Message string                  `json:"message"`
+				Meta    *map[string]interface{} `json:"meta,omitempty"`
+				SpanId  *string                 `json:"span_id,omitempty"`
+				TraceId *string                 `json:"trace_id,omitempty"`
+				Type    string                  `json:"type"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Error struct {
+				Code    string                  `json:"code"`
+				Message string                  `json:"message"`
+				Meta    *map[string]interface{} `json:"meta,omitempty"`
+				SpanId  *string                 `json:"span_id,omitempty"`
+				TraceId *string                 `json:"trace_id,omitempty"`
+				Type    string                  `json:"type"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Error struct {
+				Code    string                  `json:"code"`
+				Message string                  `json:"message"`
+				Meta    *map[string]interface{} `json:"meta,omitempty"`
+				SpanId  *string                 `json:"span_id,omitempty"`
+				TraceId *string                 `json:"trace_id,omitempty"`
+				Type    string                  `json:"type"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Error struct {
+				Code    string                  `json:"code"`
+				Message string                  `json:"message"`
+				Meta    *map[string]interface{} `json:"meta,omitempty"`
+				SpanId  *string                 `json:"span_id,omitempty"`
+				TraceId *string                 `json:"trace_id,omitempty"`
+				Type    string                  `json:"type"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetApiV1QuerySchemaResponse parses an HTTP response from a GetApiV1QuerySchemaWithResponse call
 func ParseGetApiV1QuerySchemaResponse(rsp *http.Response) (*GetApiV1QuerySchemaResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -135343,15 +136789,29 @@ func ParseGetApiV1QuerySchemaResponse(rsp *http.Response) (*GetApiV1QuerySchemaR
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			Database string `json:"database"`
-			Datasets []struct {
+			AppFunctions []struct {
+				Available   bool                                                       `json:"available"`
+				Cap         int                                                        `json:"cap"`
+				Description string                                                     `json:"description"`
+				Encoding    GetApiV1QuerySchema200JSONResponseBodyAppFunctionsEncoding `json:"encoding"`
+				ExampleSql  string                                                     `json:"exampleSql"`
+				Gates       []GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates  `json:"gates"`
+				KeyKind     GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKeyKind  `json:"keyKind"`
+				Kind        GetApiV1QuerySchema200JSONResponseBodyAppFunctionsKind     `json:"kind"`
+				Name        string                                                     `json:"name"`
+				Returns     string                                                     `json:"returns"`
+				Signature   string                                                     `json:"signature"`
+			} `json:"appFunctions"`
+			Database  string   `json:"database"`
+			Functions []string `json:"functions"`
+			Views     []struct {
 				Columns []struct {
-					Available   bool                                                         `json:"available"`
-					Description string                                                       `json:"description"`
-					Gates       []GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates `json:"gates"`
-					Name        string                                                       `json:"name"`
-					Type        string                                                       `json:"type"`
-					Unit        *GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit   `json:"unit"`
+					Available   bool                                                      `json:"available"`
+					Description string                                                    `json:"description"`
+					Gates       []GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates `json:"gates"`
+					Name        string                                                    `json:"name"`
+					Type        string                                                    `json:"type"`
+					Unit        *GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit   `json:"unit"`
 				} `json:"columns"`
 				Description string   `json:"description"`
 				ExampleSql  string   `json:"exampleSql"`
@@ -135360,20 +136820,7 @@ func ParseGetApiV1QuerySchemaResponse(rsp *http.Response) (*GetApiV1QuerySchemaR
 				JoinKeys    []string `json:"joinKeys"`
 				Name        string   `json:"name"`
 				TimeColumn  string   `json:"timeColumn"`
-			} `json:"datasets"`
-			Functions []struct {
-				Available   bool                                                    `json:"available"`
-				Cap         int                                                     `json:"cap"`
-				Description string                                                  `json:"description"`
-				Encoding    GetApiV1QuerySchema200JSONResponseBodyFunctionsEncoding `json:"encoding"`
-				ExampleSql  string                                                  `json:"exampleSql"`
-				Gates       []GetApiV1QuerySchema200JSONResponseBodyFunctionsGates  `json:"gates"`
-				KeyKind     GetApiV1QuerySchema200JSONResponseBodyFunctionsKeyKind  `json:"keyKind"`
-				Kind        GetApiV1QuerySchema200JSONResponseBodyFunctionsKind     `json:"kind"`
-				Name        string                                                  `json:"name"`
-				Returns     string                                                  `json:"returns"`
-				Signature   string                                                  `json:"signature"`
-			} `json:"functions"`
+			} `json:"views"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err

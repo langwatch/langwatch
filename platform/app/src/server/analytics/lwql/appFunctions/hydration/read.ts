@@ -2,7 +2,7 @@
  * Step 3 of the hydration stage: one read per key kind, tenant-scoped.
  *
  * The row policy bounded the query, not this. Every read goes through the
- * trace source with the caller's project and protections, so a key that came
+ * trace source with the caller's projects and protections, so a key that came
  * back from the database cannot be used to read something the caller could not
  * have selected.
  *
@@ -36,18 +36,33 @@ export async function readTraces({
   const { traceIds, threadKeys } = distinctKeys(resolved);
 
   try {
-    const [byIdTraces, byThreadTraces] = await Promise.all([
-      input.traceSource.tracesByIds({
-        projectId: input.projectId,
-        traceIds: [...traceIds],
-        protections: input.protections,
-      }),
-      input.traceSource.tracesByThreadKeys({
-        projectId: input.projectId,
-        threadKeys: [...threadKeys],
-        protections: input.protections,
-      }),
+    // One read per project per kind. The trace path filters on a single
+    // tenant, so a key that names a trace in the second project a caller can
+    // read is only found by asking that project — and asking them all is what
+    // keeps a multi-project result from hydrating its first project's rows and
+    // reporting the rest as unresolved.
+    const [byIdReads, byThreadReads] = await Promise.all([
+      Promise.all(
+        input.projectIds.map((projectId) =>
+          input.traceSource.tracesByIds({
+            projectId,
+            traceIds: [...traceIds],
+            protections: input.protections,
+          }),
+        ),
+      ),
+      Promise.all(
+        input.projectIds.map((projectId) =>
+          input.traceSource.tracesByThreadKeys({
+            projectId,
+            threadKeys: [...threadKeys],
+            protections: input.protections,
+          }),
+        ),
+      ),
     ]);
+    const byIdTraces = byIdReads.flat();
+    const byThreadTraces = byThreadReads.flat();
     return {
       byId: new Map(byIdTraces.map((trace) => [trace.trace_id, trace])),
       byThread: groupByThread({ traces: byThreadTraces, threadKeys }),

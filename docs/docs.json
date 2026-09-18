@@ -168,6 +168,7 @@
                   "user-events/custom"
                 ]
               },
+              "features/querying-your-data",
               "features/automations",
               "features/embedded-analytics"
             ]
@@ -1053,6 +1054,7 @@
             "group": "Traces",
             "pages": [
               "api-reference/traces/overview",
+              "api-reference/traces/discover-what-the-trace-filter-fields-ho",
               "api-reference/traces/search",
               "api-reference/traces/get-trace",
               "api-reference/traces/get-transcript",
@@ -1411,6 +1413,7 @@
             "group": "Query",
             "pages": [
               "api-reference/query/overview",
+              "api-reference/query/discover-both-query-languages",
               "api-reference/query/discover-the-queryable-langwatchql-schema",
               "api-reference/query/run-a-langwatchql-query",
               "api-reference/query/extraction-functions"
@@ -1692,7 +1695,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1789308461",
+      "source": "/ci/cache/busted/1789766850",
       "destination": "/introduction"
     },
     {

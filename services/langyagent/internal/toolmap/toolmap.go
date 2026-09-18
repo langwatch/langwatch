@@ -39,6 +39,22 @@ func IsTodoWriteTool(name string) bool {
 	return strings.EqualFold(name, todowriteToolName)
 }
 
+// The `say` tool shows a line to the person where the call happens; the panel
+// draws its text as reply prose, never as an activity row.
+const sayToolName = "say"
+
+// IsSayTool reports whether a tool name is the say tool.
+func IsSayTool(name string) bool {
+	return strings.EqualFold(name, sayToolName)
+}
+
+// isBookkeepingTool reports whether a settled call is bookkeeping rather than
+// work: the plan rewrite and a line said to the person take no measurable
+// time, so neither feeds the batch timing a progress sample carries.
+func isBookkeepingTool(name string) bool {
+	return IsTodoWriteTool(name) || IsSayTool(name)
+}
+
 // truncatePlanContent caps one item's text at MaxPlanContentChars runes, marking
 // an overflow with an ellipsis (truncate, never drop).
 func truncatePlanContent(s string) string {
@@ -112,19 +128,22 @@ func BoundPlanItems(items []frames.PlanItem) ([]frames.PlanItem, bool) {
 
 // The tools whose work happens outside the sandbox: the seven local mirrors run
 // on the developer's own machine through the shared folder (ADR-129), and
-// `code_access` and `question` speak to the person, not to the model. pi sends
-// no title of its own, so the manager supplies one here and the panel's activity
-// row can say where the call runs instead of showing a bare tool name.
+// `code_access`, `question`, `say` and `secret_snippet` speak to the person,
+// not to the model. pi sends no title of its own, so the manager supplies one
+// here and the panel's activity row can say where the call runs instead of
+// showing a bare tool name.
 var toolTitles = map[string]string{
-	"code_access": "Code access",
-	"question":    "Question",
-	"local_read":  "Read on your machine",
-	"local_write": "Write on your machine",
-	"local_edit":  "Edit on your machine",
-	"local_bash":  "Run on your machine",
-	"local_grep":  "Search on your machine",
-	"local_find":  "Find on your machine",
-	"local_ls":    "List on your machine",
+	"code_access":    "Code access",
+	"question":       "Question",
+	"say":            "Say",
+	"secret_snippet": "Secret snippet",
+	"local_read":     "Read on your machine",
+	"local_write":    "Write on your machine",
+	"local_edit":     "Edit on your machine",
+	"local_bash":     "Run on your machine",
+	"local_grep":     "Search on your machine",
+	"local_find":     "Find on your machine",
+	"local_ls":       "List on your machine",
 }
 
 // ToolTitle returns the activity row label for a tool name, or "" when the tool
@@ -398,15 +417,16 @@ func (t *ToolCallTracker) StartIfNew(id string) bool {
 }
 
 // EndIfNew marks id as settled and reports whether this is the FIRST settle,
-// the caller emits the end frame exactly when it answers true. A settled
-// non-plan call updates the last-work duration the progress mapper reads
-// (todowrite is bookkeeping, not work, so it never contributes timing).
+// the caller emits the end frame exactly when it answers true. A settled call
+// that did work updates the last-work duration the progress mapper reads
+// (todowrite and say are bookkeeping, not work, so they never contribute
+// timing).
 func (t *ToolCallTracker) EndIfNew(id, toolName string) bool {
 	if _, seen := t.ended[id]; seen {
 		return false
 	}
 	t.ended[id] = struct{}{}
-	if startedAt, ok := t.startedAt[id]; ok && !IsTodoWriteTool(toolName) {
+	if startedAt, ok := t.startedAt[id]; ok && !isBookkeepingTool(toolName) {
 		if elapsed := t.now().Sub(startedAt).Milliseconds(); elapsed > 0 {
 			t.lastWorkMs = elapsed
 		}

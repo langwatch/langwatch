@@ -6,7 +6,7 @@
 
 **Relates to:** [ADR-081](./081-lwql-table-function-and-ssrf-policy.md) (why the caller can never write `postgresql()` themselves), [ADR-082](./082-lwql-analytics-views-invoker-column-grants-final-dedup.md) (the invoker-view and column-grant model this extends across a second residence).
 
-Behavioural contract: [specs/analytics/lwql-api.feature](../../../specs/analytics/lwql-api.feature).
+Behavioural contract: [specs/lwql/api.feature](../../../specs/lwql/api.feature).
 
 ## Context
 

@@ -24,25 +24,30 @@ import {
   createLangWatchQLAppFunctionTraceSource,
   createLangWatchQLExecutor,
   DEFAULT_LWQL_RESULT_LIMITS,
-  hydrateLangWatchQLAppFunctions,
+  judgeLangWatchQLHydration,
   type LangWatchQLAppFunctionCall,
   type LangWatchQLAppFunctionTraceSource,
   type LangWatchQLColumn,
   type LangWatchQLEvalUsage,
   type LangWatchQLExecutor,
+  type LangWatchQLPreparedHydration,
   lwqlAppFunction,
   lwqlConnectionFromEnv,
   lwqlTenantCapability,
+  prepareLangWatchQLHydration,
 } from "~/server/analytics/lwql";
 import type { Protections } from "~/server/traces/protections";
 import type { InstantEvalClassifier } from "../classifier/classifier";
 import { INSTANT_EVAL_OPTIONAL_KEY_COLUMNS } from "./composition";
 import {
   countPass,
+  type InstantEvalPassExecution,
   type InstantEvalPasses,
   judgePass,
+  judgePreparedPass,
   keyPass,
   probePass,
+  readPass,
   sampleKeysPass,
   textPass,
 } from "./row-source.passes";
@@ -118,6 +123,22 @@ export interface InstantEvalJudgedPage {
   readonly timings: InstantEvalPageTimings;
 }
 
+/**
+ * One page read and extracted, with nothing judged yet.
+ *
+ * What {@link InstantEvalRowSource.read} answers and
+ * {@link InstantEvalRowSource.judgePrepared} takes. Opaque to the run on
+ * purpose: it holds the traces and the rendered texts of up to a page of rows,
+ * and the run only ever hands it back.
+ */
+export interface InstantEvalPreparedPage {
+  /** Rows the page owns, which is what will be judged. */
+  readonly rows: number;
+  /** How long the page statement took, for the judged page's timings. */
+  readonly queryMs: number;
+  readonly hydration: LangWatchQLPreparedHydration;
+}
+
 export interface InstantEvalRowSource {
   /** What the statement projects, without reading a row or judging anything. */
   probe(input: {
@@ -171,8 +192,13 @@ export interface InstantEvalRowSource {
     total: number;
   }): Promise<readonly InstantEvalRowKey[]>;
 
-  /** One page of rows, judged. */
-  judge(input: {
+  /**
+   * One page of rows, read and extracted but not judged.
+   *
+   * The half of {@link judge} that costs nothing, separated so a run can read
+   * its next page while the classifier is busy with this one.
+   */
+  read(input: {
     caller: InstantEvalRunCaller;
     protections: Protections;
     sql: string;
@@ -180,6 +206,24 @@ export interface InstantEvalRowSource {
     /** The hydration plan the validator recorded for the inner statement. */
     calls: readonly LangWatchQLAppFunctionCall[];
     /** The page's own keys, which are also what its rows are matched against. */
+    keys: readonly InstantEvalRowKey[];
+    classifier: InstantEvalClassifier;
+    maxConcurrency: number;
+  }): Promise<InstantEvalPreparedPage>;
+
+  /** The other half: judges a page {@link read} prepared. */
+  judgePrepared(input: {
+    page: InstantEvalPreparedPage;
+    signal?: AbortSignal;
+  }): Promise<InstantEvalJudgedPage>;
+
+  /** One page of rows, judged: {@link read} then {@link judgePrepared}. */
+  judge(input: {
+    caller: InstantEvalRunCaller;
+    protections: Protections;
+    sql: string;
+    parameters?: Readonly<Record<string, unknown>>;
+    calls: readonly LangWatchQLAppFunctionCall[];
     keys: readonly InstantEvalRowKey[];
     classifier: InstantEvalClassifier;
     maxConcurrency: number;
@@ -298,23 +342,25 @@ export function createInstantEvalRowSource(
     parameters?: Readonly<Record<string, unknown>>;
     maxRows: number;
   }) =>
-    await executorOrRefuse().execute({
-      sql,
-      ...(parameters && Object.keys(parameters).length > 0
-        ? { parameters }
-        : {}),
-      tenantCapability: lwqlTenantCapability({ secret: caller.lwqlKey }),
-      limits: { ...DEFAULT_LWQL_RESULT_LIMITS, maxRows },
-      usesAppFunctions: true,
+    await runBounded({
+      execute: () =>
+        executorOrRefuse().execute({
+          sql,
+          ...(parameters && Object.keys(parameters).length > 0
+            ? { parameters }
+            : {}),
+          tenantCapability: lwqlTenantCapability({ secret: caller.lwqlKey }),
+          usesAppFunctions: true,
+        }),
+      maxRows,
     });
 
-  const hydrate = async ({
+  const prepare = async ({
     caller,
     protections,
     calls,
     execution,
     instantEvals,
-    signal,
   }: {
     caller: InstantEvalRunCaller;
     protections: Protections;
@@ -325,10 +371,11 @@ export function createInstantEvalRowSource(
       maxConcurrency: number;
       queryTokenBudget: number;
     };
-    signal?: AbortSignal;
   }) =>
-    await hydrateLangWatchQLAppFunctions({
-      projectId: caller.id,
+    await prepareLangWatchQLHydration({
+      // A run belongs to one project, which is the scope every judgement in it
+      // is rated and billed against.
+      projectIds: [caller.id],
       protections,
       calls,
       columns: execution.columns,
@@ -336,17 +383,58 @@ export function createInstantEvalRowSource(
       limits: DEFAULT_LWQL_RESULT_LIMITS,
       traceSource: traceSource(),
       ...(instantEvals ? { instantEvals } : {}),
+    });
+
+  const judge = async ({
+    prepared,
+    signal,
+  }: {
+    prepared: LangWatchQLPreparedHydration;
+    signal?: AbortSignal;
+  }) =>
+    await judgeLangWatchQLHydration({
+      prepared,
       ...(signal ? { signal } : {}),
     });
 
-  const passes: InstantEvalPasses = { run, hydrate };
+  const passes: InstantEvalPasses = { run, prepare, judge };
 
+  return instantEvalRowSourceOver(passes);
+}
+
+/** The row source's eight reads, each one pass composed over the three above. */
+function instantEvalRowSourceOver(
+  passes: InstantEvalPasses,
+): InstantEvalRowSource {
   return {
     probe: (input) => probePass(passes, input),
     count: (input) => countPass(passes, input),
     keys: (input) => keyPass(passes, input),
     sampleKeys: (input) => sampleKeysPass(passes, input),
+    read: (input) => readPass(passes, input),
+    judgePrepared: (input) => judgePreparedPass(passes, input),
     judge: (input) => judgePass(passes, input),
     texts: (input) => textPass(passes, input),
   };
+}
+
+/**
+ * Runs one pass's statement and says whether the result outgrew its bound.
+ *
+ * The executor hands back every row the database returned — bounding a result
+ * is the caller's business, and for a run it is per pass: the probe, the count
+ * and the key pass bound themselves in SQL, while the page pass is bounded by
+ * how far its traces expand. A row count above the bound is what the passes
+ * refuse on, because a page read as whole when it was cut is the one failure a
+ * run cannot notice later.
+ */
+async function runBounded({
+  execute,
+  maxRows,
+}: {
+  execute: () => Promise<Awaited<ReturnType<LangWatchQLExecutor["execute"]>>>;
+  maxRows: number;
+}): Promise<InstantEvalPassExecution> {
+  const execution = await execute();
+  return { ...execution, truncated: execution.rows.length > maxRows };
 }

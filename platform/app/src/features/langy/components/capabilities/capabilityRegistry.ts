@@ -54,6 +54,7 @@ import {
   CAPABILITY_CATALOG,
   type CapabilityBodyWidget,
   type CapabilityCatalogEntry,
+  type CapabilityFact,
   type CapabilityIconName,
   type CapabilitySurface,
 } from "./capabilityCatalog";
@@ -82,6 +83,8 @@ export interface CapabilityDescriptor {
   body: CapabilityBodyWidget;
   /** The resource in customer words, both numbers. */
   noun: { singular: string; plural: string };
+  /** The fields a single resource's card shows, when the catalog names them. */
+  facts?: readonly CapabilityFact[];
   /** Overline icon override, when the catalog names one. */
   icon?: CapabilityIconName;
 }
@@ -333,6 +336,8 @@ export interface CliCapability {
   body: CapabilityBodyWidget;
   /** The resource in customer words, both numbers. */
   noun: { singular: string; plural: string };
+  /** The fields a single resource's card shows, when the catalog names them. */
+  facts?: readonly CapabilityFact[];
   /** Overline icon override, when the catalog names one. */
   icon?: CapabilityIconName;
 }
@@ -478,6 +483,7 @@ export function resolveCliCapability(rawName: string): CliCapability | null {
       tone,
       body,
       noun: entry.noun,
+      ...(entry.facts ? { facts: entry.facts } : {}),
       ...(entry.icon ? { icon: entry.icon } : {}),
     };
   }
@@ -611,6 +617,7 @@ export function resolveCapability(
     command: cli.command,
     body: cli.body,
     noun: cli.noun,
+    ...(cli.facts ? { facts: cli.facts } : {}),
     ...(cli.icon ? { icon: cli.icon } : {}),
   };
 }

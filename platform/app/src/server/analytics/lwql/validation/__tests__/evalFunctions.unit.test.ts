@@ -7,7 +7,7 @@
  * unparseable or the table wrong would be reporting a guard that is not there.
  *
  * @see ../../appFunctions/evalCatalog.ts
- * @see specs/analytics/lwql-eval-functions.feature
+ * @see specs/lwql/eval-functions.feature
  */
 import { describe, expect, it } from "vitest";
 
@@ -329,7 +329,7 @@ describe("given a project the feature is not open to", () => {
       });
 
       expect(codesOf(result)).toContain("APP_FUNCTION_GATED");
-      expect(messagesOf(result)).toContain("not switched on for this project");
+      expect(messagesOf(result)).toContain("Instant Evals switched on");
     });
 
     it("still admits an extraction function, which is not gated on it", () => {

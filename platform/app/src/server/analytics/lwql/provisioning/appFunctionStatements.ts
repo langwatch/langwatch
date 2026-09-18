@@ -52,7 +52,7 @@
  *
  * @see ../appFunctions/catalog.ts — the declaration these statements render
  * @see dev/docs/adr/136-lwql-app-functions-identity-udfs.md
- * @see ../../../../../specs/analytics/lwql-app-functions.feature
+ * @see ../../../../../specs/lwql/app-functions.feature
  */
 
 import {

@@ -168,7 +168,8 @@ describe("given a page of a run", () => {
         keyColumns: [],
       });
 
-      expect(rowSource.judge).not.toHaveBeenCalled();
+      expect(rowSource.read).not.toHaveBeenCalled();
+      expect(rowSource.judgePrepared).not.toHaveBeenCalled();
       expect(outcome).toMatchObject({ rows: 0, hasNextPage: false });
     });
   });

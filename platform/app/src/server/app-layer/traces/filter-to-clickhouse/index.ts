@@ -1,6 +1,7 @@
 export {
   extractFreeTextTerms,
   type FilterTagTranslator,
+  queryNamesField,
   translateFilterAst,
   translateFilterToClickHouse,
 } from "./ast";

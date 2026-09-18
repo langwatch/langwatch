@@ -22,7 +22,7 @@
  *
  * @see ../evalQuestions.ts
  * @see ../../../../app-layer/instant-evals/classifier/classifier.ts
- * @see ../../../../../../specs/analytics/lwql-eval-functions.feature
+ * @see ../../../../../../specs/lwql/eval-functions.feature
  */
 
 import type {

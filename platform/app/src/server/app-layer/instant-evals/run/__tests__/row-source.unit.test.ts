@@ -12,7 +12,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import type { LangWatchQLQueryResult } from "~/server/analytics/lwql";
+import type { LangWatchQLExecutionResult } from "~/server/analytics/lwql";
 import {
   createInstantEvalRowSource,
   InstantEvalResultTruncatedError,
@@ -24,21 +24,17 @@ const CALLER = { id: "project-1", lwqlKey: "lwql-secret" };
 const SQL = "SELECT TraceId, eval(x, 'y') AS annoyed FROM analytics.traces";
 
 function execution(
-  overrides: Partial<LangWatchQLQueryResult> = {},
-): LangWatchQLQueryResult {
+  overrides: Partial<LangWatchQLExecutionResult> = {},
+): LangWatchQLExecutionResult {
   return {
     columns: [{ name: "TraceId", type: "String" }],
     rows: [{ TraceId: "t1" }],
-    truncated: false,
     statistics: { elapsedMs: 1, rowsRead: 1, bytesRead: 1, rowsReturned: 1 },
-    diagnostics: [],
-    followsTimeWindow: false,
-    followsGranularity: false,
     ...overrides,
   };
 }
 
-function sourceOver(result: LangWatchQLQueryResult) {
+function sourceOver(result: LangWatchQLExecutionResult) {
   return createInstantEvalRowSource({
     executor: { execute: vi.fn(async () => result) },
     traceSource: {} as never,
@@ -49,12 +45,13 @@ function key(traceId: string, spanId = ""): InstantEvalRowKey {
   return { traceId, threadId: "", spanId, occurredAt: null };
 }
 
-describe("given a read the executor cut short at its byte ceiling", () => {
+describe("given a read that came back longer than the pass bounded it to", () => {
   describe("when the count pass reads it", () => {
     /** @scenario "A read that came back truncated fails the step" */
     it("refuses it rather than reporting a smaller total", async () => {
+      // The count pass asks for one row; two means the bound did not hold.
       const source = sourceOver(
-        execution({ rows: [{ total: 12 }], truncated: true }),
+        execution({ rows: [{ total: 12 }, { total: 13 }] }),
       );
 
       await expect(
@@ -66,7 +63,15 @@ describe("given a read the executor cut short at its byte ceiling", () => {
   describe("when the key pass reads it", () => {
     /** @scenario "A read that came back truncated fails the step" */
     it("refuses it rather than serving a shorter page", async () => {
-      const source = sourceOver(execution({ truncated: true }));
+      // The key pass asks for one row past the page so it can see whether
+      // another follows; more than that means the read outgrew its bound.
+      const source = sourceOver(
+        execution({
+          rows: [...Array(502).keys()].map((index) => ({
+            TraceId: `t${index}`,
+          })),
+        }),
+      );
 
       await expect(
         source.keys({

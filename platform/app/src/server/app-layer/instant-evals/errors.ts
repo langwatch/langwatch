@@ -10,7 +10,7 @@
  * response body.
  *
  * @see dev/docs/best_practices/error-handling.md
- * @see ../../../../specs/analytics/lwql-eval-functions.feature
+ * @see ../../../../specs/lwql/eval-functions.feature
  */
 
 import { HandledError } from "@langwatch/handled-error";

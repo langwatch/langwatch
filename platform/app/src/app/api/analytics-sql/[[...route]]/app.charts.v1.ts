@@ -29,7 +29,7 @@
  * slice 1 exists to prevent.
  *
  * @see ~/server/analytics/saved-workbench-charts — the service and its schema
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { describeRoute, resolver } from "hono-openapi";

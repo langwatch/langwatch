@@ -102,6 +102,17 @@ Feature: Langy composer, feedback, and card polish
       Then it says to answer the card above
       And it does not say Langy is working
 
+    # A film ended a turn with a card entry still reading pending on the live
+    # side, and the message field kept saying to answer a card that was not
+    # there. A card holds a turn; with no turn, there is nothing to answer.
+    @integration
+    Scenario: A card left from a finished turn does not lock the message field
+      Given no Langy turn is in flight
+      And a card entry that still reads pending
+      When the customer looks at the message field
+      Then it reads the ordinary placeholder
+      And it does not say to answer a card
+
     @integration
     Scenario: Enter during a turn keeps the message instead of sending it
       Given a Langy turn is in flight

@@ -27,7 +27,7 @@
  *
  * @see ./provisioning/accessModel.ts — the identity, the profile, and the key map
  * @see ./capability.ts — the value sent as the tenant setting
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
@@ -36,6 +36,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   isClickHouseObjectAccessDeniedError,
   isClickHouseObjectMissingError,
+  isClickHouseResultTooLargeError,
   isClickHouseUnknownFunctionError,
   isClickHouseUnknownIdentifierError,
   translateClickHouseQueryError,
@@ -49,10 +50,15 @@ import {
 import {
   LangWatchQLAppFunctionUnavailableError,
   LangWatchQLProvisioningIncompleteError,
+  LangWatchQLResultTooLargeError,
   LangWatchQLUnavailableError,
   LangWatchQLUnknownIdentifierError,
 } from "./errors";
-import { DEFAULT_LWQL_RESOURCE_LIMITS } from "./limits";
+import {
+  DEFAULT_LWQL_RESOURCE_LIMITS,
+  LWQL_MAX_RESULT_BYTES,
+  LWQL_MAX_RESULT_ROWS,
+} from "./limits";
 
 const logger = createLogger("langwatch:analytics:lwql:executor");
 
@@ -70,19 +76,22 @@ export interface LangWatchQLStatistics {
   /** Physical rows read off the parts — the number partition pruning moves. */
   readonly rowsRead: number;
   readonly bytesRead: number;
-  /** Rows handed back, after the result ceilings. */
+  /** Rows handed back. */
   readonly rowsReturned: number;
 }
 
-/** A submitted, already-validated query and the ceilings on what it returns. */
+/** A submitted, already-validated query as it reaches the transport. */
 export interface LangWatchQLExecutionRequest {
-  /** Exactly as the caller wrote it. Never rewritten. */
+  /**
+   * The statement to run. The caller's, with one exception: the service appends
+   * a default `LIMIT` to a statement that names none (see `LWQL_MAX_RESULT_ROWS`
+   * and `lwql.service.ts`). Nothing else is ever added.
+   */
   readonly sql: string;
   /** Values for the parameters the SQL declares. */
   readonly parameters?: Readonly<Record<string, unknown>>;
   /** The caller's tenant capability, sent as the one changeable setting. */
   readonly tenantCapability: string;
-  readonly limits: LangWatchQLResultLimits;
   /**
    * Whether this statement calls an app function.
    *
@@ -97,19 +106,16 @@ export interface LangWatchQLExecutionRequest {
 }
 
 /**
- * How much of a result reaches the caller.
- *
- * Distinct from the ceilings the settings profile pins, and the distinction is
- * the whole design: the database's ceilings decide whether the query is allowed
- * to *finish* and throw when it is not, while these decide how much of a
- * finished result is serialised into the response. Overflow here is never
- * silent — the result carries `truncated`, and the service turns that into a
- * diagnostic the caller can branch on.
+ * The two numeric bounds this API applies to a result, held together because
+ * `DEFAULT_LWQL_RESULT_LIMITS` and every test that lowers a bound name them as a
+ * pair. Neither is enforced *here*: the executor is a pure transport now. The
+ * service reads `maxRows` to size the `LIMIT` it appends to an unbounded
+ * statement, and `maxResultBytes` to reject an oversized result outright.
  */
 export interface LangWatchQLResultLimits {
-  /** Most rows a response may carry. */
+  /** The row cap — the `LIMIT` appended to a bare statement. */
   readonly maxRows: number;
-  /** Approximate JSON byte budget for those rows. */
+  /** The hard JSON byte ceiling; a result past it is refused, never cut. */
   readonly maxResultBytes: number;
   /**
    * Byte budget for the result *after* the app-function hydration stage has
@@ -135,27 +141,24 @@ export interface LangWatchQLResultLimits {
 }
 
 /**
- * The shipped result ceilings.
+ * The shipped result bounds.
  *
- * Sized so a full page of an analytical answer fits comfortably — the shapes
- * the issue enumerates aggregate to tens or hundreds of rows — while a query
- * that forgot to aggregate is cut off long before the response becomes
- * something a caller has to stream.
+ * Single-sourced from `./limits.ts` so the validator (which refuses a too-high
+ * `LIMIT`), the service (which appends the default one and enforces the byte
+ * ceiling) and this default all read the same two numbers.
  */
 export const DEFAULT_LWQL_RESULT_LIMITS: LangWatchQLResultLimits = {
-  maxRows: 10_000,
-  maxResultBytes: 8_000_000,
+  maxRows: LWQL_MAX_RESULT_ROWS,
+  maxResultBytes: LWQL_MAX_RESULT_BYTES,
   maxHydratedBytes: 32_000_000,
   maxHydratedValueBytes: 4_000_000,
 };
 
-/** A finished execution, already bounded by the result ceilings. */
+/** A finished execution. Every row the database returned; the service bounds them. */
 export interface LangWatchQLExecutionResult {
   readonly columns: readonly LangWatchQLColumn[];
   readonly rows: readonly Record<string, unknown>[];
   readonly statistics: LangWatchQLStatistics;
-  /** Whether a ceiling cut the result short. Never silent. */
-  readonly truncated: boolean;
 }
 
 /** The narrow seam the service depends on. */
@@ -173,39 +176,6 @@ export interface LangWatchQLExecutor {
    * same server for the lifetime of the process.
    */
   close?(): Promise<void>;
-}
-
-/**
- * Applies the row ceiling, then the byte ceiling, reporting whether either bit.
- *
- * Byte cost is measured on the JSON encoding of each retained row, which is
- * what the response body actually carries. It is an accounting of the *result*,
- * not of the query: the rows were already materialised by the time this runs,
- * so this bounds what a caller receives rather than what the gateway holds.
- * Bounding the latter is the database's job and it already does it, with
- * `max_memory_usage` pinned `CONST` by the profile.
- */
-export function applyLangWatchQLResultLimits({
-  rows,
-  limits,
-}: {
-  rows: readonly Record<string, unknown>[];
-  limits: Pick<LangWatchQLResultLimits, "maxRows" | "maxResultBytes">;
-}): { rows: Record<string, unknown>[]; truncated: boolean } {
-  const capped = rows.slice(0, limits.maxRows);
-  let truncated = capped.length < rows.length;
-
-  const kept: Record<string, unknown>[] = [];
-  let bytes = 0;
-  for (const row of capped) {
-    bytes += JSON.stringify(row)?.length ?? 0;
-    if (bytes > limits.maxResultBytes) {
-      truncated = true;
-      break;
-    }
-    kept.push(row);
-  }
-  return { rows: kept, truncated };
 }
 
 /** ClickHouse reports elapsed time in seconds; the response speaks milliseconds. */
@@ -298,6 +268,15 @@ function refusalFor({
       reasons: [toError(error)],
     });
   }
+  if (isClickHouseResultTooLargeError(error)) {
+    // The server-side backstop (`max_result_rows` / `max_result_bytes`)
+    // fired — the validator's static LIMIT check cannot see a bound
+    // parameter, but the profile's ceiling still catches it. Same customer
+    // code as the post-fetch byte check, never the raw driver diagnostic.
+    return new LangWatchQLResultTooLargeError(LWQL_MAX_RESULT_BYTES, {
+      reasons: [toError(error)],
+    });
+  }
   // An unknown function in a statement that calls one of ours cannot be the
   // caller's either: the catalog is what the provisioning DDL is generated
   // from, so the server is missing the projection UDFs this API declares,
@@ -334,32 +313,23 @@ export function createLangWatchQLExecutor(
   });
 
   return {
-    async execute({
-      sql,
-      parameters,
-      tenantCapability,
-      limits,
-      usesAppFunctions,
-    }) {
+    async execute({ sql, parameters, tenantCapability, usesAppFunctions }) {
       const startedAt = Date.now();
       try {
         const resultSet = await client.query({
-          // The submitted statement, unmodified. The only thing the transport
-          // adds is the `FORMAT` the driver appends to read the response.
+          // The statement the service handed down — the caller's, save for a
+          // default `LIMIT` appended upstream when they named none. The only
+          // thing the transport adds is the `FORMAT` the driver needs.
           query: sql,
           format: "JSON",
           clickhouse_settings: { [connection.tenantSetting]: tenantCapability },
           query_params: parameters as Record<string, unknown> | undefined,
         });
         const response = await resultSet.json<Record<string, unknown>>();
-        const { rows, truncated } = applyLangWatchQLResultLimits({
-          rows: response.data,
-          limits,
-        });
+        const rows = response.data;
         return {
           columns: response.meta ?? [],
           rows,
-          truncated,
           statistics: {
             elapsedMs: elapsedMs(response.statistics?.elapsed),
             rowsRead: response.statistics?.rows_read ?? 0,

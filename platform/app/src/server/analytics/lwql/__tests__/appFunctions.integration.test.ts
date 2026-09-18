@@ -19,7 +19,7 @@
  * thing it guards proves the copy.
  *
  * @see ../provisioning/appFunctionStatements.ts
- * @see specs/analytics/lwql-app-functions.feature
+ * @see specs/lwql/app-functions.feature
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";

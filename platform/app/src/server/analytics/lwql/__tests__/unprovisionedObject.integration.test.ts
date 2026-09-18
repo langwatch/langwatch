@@ -32,7 +32,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   createLangWatchQLExecutor,
-  DEFAULT_LWQL_RESULT_LIMITS,
   type LangWatchQLExecutor,
 } from "../executor";
 import {
@@ -57,7 +56,6 @@ describe("given a deployment whose LangWatchQL objects are incomplete", () => {
       await executor.execute({
         sql,
         tenantCapability: harness.tenantA.keyHash,
-        limits: DEFAULT_LWQL_RESULT_LIMITS,
       });
     } catch (error) {
       return (error as { code?: unknown }).code;
@@ -106,7 +104,6 @@ describe("given a deployment whose LangWatchQL objects are incomplete", () => {
       const result = await executor.execute({
         sql: `SELECT TraceId FROM ${database}.traces ORDER BY TraceId`,
         tenantCapability: harness.tenantA.keyHash,
-        limits: DEFAULT_LWQL_RESULT_LIMITS,
       });
 
       expect(result.rows.length).toBe(control.tenantA);

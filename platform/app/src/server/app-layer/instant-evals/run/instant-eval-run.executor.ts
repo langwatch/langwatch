@@ -20,6 +20,15 @@
  * the two costs a redelivery, and the redelivery re-inserts the same rows
  * rather than doubling them.
  *
+ * ## Why the next page is read while this one judges
+ *
+ * A page is a read (the statement, the traces, the texts) and then a judging,
+ * and the two are bound by different services. Run one after the other, the
+ * read sits on the critical path of every page; run the next page's read
+ * while this page judges and it does not. One page still judges at a time,
+ * because the judge is what saturates and the tenant's share of it bounds a
+ * run anyway. See {@link InstantEvalPrefetches}.
+ *
  * @see ./row-source.ts
  * @see ./cancellation-watch.ts: how a page already judging is stopped
  * @see ./instant-eval-run.plan.ts: the planning step
@@ -54,7 +63,13 @@ import {
   mapInstantEvalPage,
 } from "./judgments";
 import { readInstantEvalRunQuestions } from "./questions";
-import type { InstantEvalRowKey, InstantEvalRowSource } from "./row-source";
+import type {
+  InstantEvalJudgedPage,
+  InstantEvalKeyPage,
+  InstantEvalPreparedPage,
+  InstantEvalRowKey,
+  InstantEvalRowSource,
+} from "./row-source";
 
 const logger = createLogger("langwatch:instant-evals:run-executor");
 
@@ -201,110 +216,213 @@ export function instantEvalAverageTextBytes({
 export function createInstantEvalRunExecutor(
   deps: InstantEvalRunExecutorDependencies,
 ): InstantEvalRunPort {
+  const prefetches = new InstantEvalPrefetches();
   return {
     plan: (input) => planRun(deps, input),
-    judgePage: (input) => judgeRunPage(deps, input),
-    finish: (input) => finishRun(deps, input),
+    judgePage: (input) => judgeRunPage(deps, prefetches, input),
+    finish: (input) => {
+      prefetches.discard(input.runId);
+      return finishRun(deps, input);
+    },
   };
+}
+
+/** What the next page needs to have been read with, to be the same page. */
+interface PrefetchKey {
+  readonly runId: string;
+  readonly afterTraceId: string | null;
+  readonly afterSpanId: string | null;
+  readonly limit: number;
+}
+
+/** One page's keys and its read, started before the run asked for it. */
+interface PrefetchedPage {
+  readonly keyPage: InstantEvalKeyPage;
+  readonly prepared: InstantEvalPreparedPage | null;
+  /** How long the key pass took, for the page profile. */
+  readonly keyMs: number;
+}
+
+/**
+ * The next page of each run, read while the current one is judged.
+ *
+ * The judge is the bottleneck of a run and it is a different service from the
+ * database and the trace store, so a page's reads only lengthen the run when
+ * they sit on the critical path. The page after the one being judged is
+ * therefore started here, keyed by the cursor the next intent will arrive
+ * with, and handed over when it does. One page judges at a time, exactly as
+ * before: only the reading overlaps.
+ *
+ * Per executor and per pod, and best-effort throughout: an intent that lands
+ * on another pod misses and reads the page itself, a run that stops or fails
+ * drops what it had read, and a prefetch that fails is discarded rather than
+ * surfaced, because the page it read will be read again by the intent that
+ * needs it. Nothing here is recorded anywhere, so nothing here changes what a
+ * redelivery does.
+ */
+class InstantEvalPrefetches {
+  private readonly byRun = new Map<
+    string,
+    { key: PrefetchKey; page: Promise<PrefetchedPage> }
+  >();
+
+  start(key: PrefetchKey, read: () => Promise<PrefetchedPage>): void {
+    const page = read();
+    // A prefetch nobody consumes must not surface as an unhandled rejection;
+    // its failure is observed, if at all, by the intent that takes it.
+    page.catch(() => undefined);
+    this.byRun.set(key.runId, { key, page });
+  }
+
+  /** The page read for this key, or null when none was, or it was another page. */
+  async take(key: PrefetchKey): Promise<PrefetchedPage | null> {
+    const entry = this.byRun.get(key.runId);
+    if (!entry) return null;
+    this.byRun.delete(key.runId);
+    if (
+      entry.key.afterTraceId !== key.afterTraceId ||
+      entry.key.afterSpanId !== key.afterSpanId ||
+      entry.key.limit !== key.limit
+    ) {
+      return null;
+    }
+    try {
+      return await entry.page;
+    } catch (error) {
+      logger.warn(
+        { runId: key.runId, error },
+        "Instant Eval prefetched page failed; reading it again",
+      );
+      return null;
+    }
+  }
+
+  discard(runId: string): void {
+    this.byRun.delete(runId);
+  }
 }
 
 /** One page: its keys, its verdicts, and what it added to the run. */
 async function judgeRunPage(
   deps: InstantEvalRunExecutorDependencies,
+  prefetches: InstantEvalPrefetches,
   input: Parameters<InstantEvalRunPort["judgePage"]>[0],
 ): Promise<InstantEvalPageOutcome> {
-  const {
-    runId,
-    projectId,
-    page,
-    afterTraceId,
-    afterSpanId,
-    pageSize,
-    remaining,
-  } = input;
-  const { row, caller, questions, parameters } = await loadRun({
-    deps,
-    projectId,
-    runId,
-  });
-
-  // Checked before the page rather than during it: a page is seconds of
-  // judging, and stopping between pages is what the cancel contract
-  // promises. The signal below is what stops one already under way.
-  if (await deps.isCancelled?.({ projectId, runId })) {
-    return emptyPage();
+  try {
+    return await judgeRunPageOrThrow(deps, prefetches, input);
+  } catch (error) {
+    // Whatever was read ahead belongs to a loop that just broke; the retry
+    // starts from the recorded cursor and reads for itself.
+    prefetches.discard(input.runId);
+    throw error;
   }
+}
 
+/** Where a key pass resumes from, and how many keys it asks for. */
+interface PageCursor {
+  afterTraceId: string | null;
+  afterSpanId: string | null;
+  limit: number;
+}
+
+/**
+ * One page's keys, and the rows behind them, read and extracted but unjudged.
+ *
+ * Its own function because both the page being judged now and the page being
+ * read ahead go through it, and the read-ahead has to be the same read or the
+ * page it hands over would not be the page the next intent asked for.
+ */
+async function readPage({
+  deps,
+  projectId,
+  row,
+  caller,
+  parameters,
+  keyColumns,
+  after,
+}: {
+  deps: InstantEvalRunExecutorDependencies;
+  projectId: string;
+  row: Awaited<ReturnType<typeof loadRun>>["row"];
+  caller: Awaited<ReturnType<typeof loadRun>>["caller"];
+  parameters: Awaited<ReturnType<typeof loadRun>>["parameters"];
+  keyColumns: Parameters<InstantEvalRunPort["judgePage"]>[0]["keyColumns"];
+  after: PageCursor;
+}): Promise<PrefetchedPage> {
   const startedKeys = Date.now();
   const keyPage = await deps.rowSource.keys({
     caller,
     sql: row.sql,
     parameters,
-    keyColumns: input.keyColumns,
-    limit: Math.max(1, Math.min(pageSize, remaining)),
-    ...(afterTraceId === null
+    keyColumns,
+    limit: after.limit,
+    ...(after.afterTraceId === null
       ? {}
-      : { after: { traceId: afterTraceId, spanId: afterSpanId } }),
+      : {
+          after: {
+            traceId: after.afterTraceId,
+            spanId: after.afterSpanId,
+          },
+        }),
   });
   const keyMs = Date.now() - startedKeys;
-  if (keyPage.keys.length === 0) return emptyPage();
-
-  const judged = await judgeUnderCancellation({
-    deps,
-    projectId,
-    runId,
+  if (keyPage.keys.length === 0) return { keyPage, prepared: null, keyMs };
+  const prepared = await deps.rowSource.read({
     caller,
-    row,
+    protections: await deps.protections(projectId),
+    sql: row.sql,
     parameters,
+    calls: instantEvalHydrationPlan(row.plan),
     keys: keyPage.keys,
+    classifier: deps.classifier(),
+    maxConcurrency: deps.maxConcurrency,
   });
-
-  const { mapping, insertMs } = await writePageJudgements({
-    deps,
-    projectId,
-    runId,
-    page,
-    questions,
-    judged,
-    keys: keyPage.keys,
-  });
-
-  recordPageProfile({
-    projectId,
-    runId,
-    page,
-    rows: mapping.counters.rows,
-    startedKeys,
-    keyMs,
-    insertMs,
-    judged,
-  });
-
-  const last = keyPage.keys.at(-1);
-  return {
-    ...mapping.counters,
-    inputTokens: judged.usage.inputTokens,
-    requests: judged.usage.requests,
-    cursor: last?.traceId ?? null,
-    // Empty when the statement has one row per trace, which is what tells the
-    // next key pass to compare the trace alone.
-    cursorSpanId: last?.spanId ? last.spanId : null,
-    hasNextPage: keyPage.hasMore && remaining - mapping.counters.rows > 0,
-  };
+  return { keyPage, prepared, keyMs };
 }
 
 /**
- * One page's verdicts, mapped to judgement rows and written.
+ * Starts the next page's read while this one judges.
  *
- * A page that mostly failed throws instead, so the outbox delivers it again
- * rather than baking a bad minute of the provider's day into the answer. Thrown
- * BEFORE the write, so the retry is the only thing that records it.
- *
- * The write itself happens before the page is recorded as judged, so a crash
- * between the two costs a redelivery rather than a lost page, and the
- * redelivery re-inserts the same keyed rows rather than doubling them.
+ * Its limit is what the next intent will ask for when every key of this page
+ * becomes a judged row, which is the common case; an intent that arrives
+ * asking for anything else misses and reads for itself.
  */
-async function writePageJudgements({
+function startNextPageRead({
+  prefetches,
+  runId,
+  read,
+  last,
+  hasMore,
+  remaining,
+  pageSize,
+}: {
+  prefetches: InstantEvalPrefetches;
+  runId: string;
+  read: (after: PageCursor) => Promise<PrefetchedPage>;
+  last: InstantEvalRowKey | undefined;
+  hasMore: boolean;
+  remaining: number;
+  pageSize: number;
+}): void {
+  if (!hasMore || remaining <= 0 || !last) return;
+  const after: PageCursor = {
+    afterTraceId: last.traceId,
+    afterSpanId: last.spanId ? last.spanId : null,
+    limit: Math.max(1, Math.min(pageSize, remaining)),
+  };
+  prefetches.start({ runId, ...after }, () => read(after));
+}
+
+/**
+ * Maps a judged page onto judgement rows and writes them.
+ *
+ * A page that mostly failed is thrown instead, so the outbox delivers it again
+ * rather than baking a bad minute of the provider's day into the answer. The
+ * throw comes BEFORE the write, so the retry is the only thing that records
+ * it; the write comes before the page is recorded, so a crash between the two
+ * costs a redelivery rather than a lost page.
+ */
+async function writeJudgedPage({
   deps,
   projectId,
   runId,
@@ -317,8 +435,8 @@ async function writePageJudgements({
   projectId: string;
   runId: string;
   page: number;
-  questions: ReturnType<typeof readInstantEvalRunQuestions>;
-  judged: Awaited<ReturnType<InstantEvalRowSource["judge"]>>;
+  questions: Awaited<ReturnType<typeof loadRun>>["questions"];
+  judged: Awaited<ReturnType<typeof judgeUnderCancellation>>;
   keys: readonly InstantEvalRowKey[];
 }): Promise<{
   mapping: ReturnType<typeof mapInstantEvalPage>;
@@ -349,6 +467,110 @@ async function writePageJudgements({
   return { mapping, insertMs: Date.now() - startedInsert };
 }
 
+async function judgeRunPageOrThrow(
+  deps: InstantEvalRunExecutorDependencies,
+  prefetches: InstantEvalPrefetches,
+  input: Parameters<InstantEvalRunPort["judgePage"]>[0],
+): Promise<InstantEvalPageOutcome> {
+  const {
+    runId,
+    projectId,
+    page,
+    afterTraceId,
+    afterSpanId,
+    pageSize,
+    remaining,
+  } = input;
+  const { row, caller, questions, parameters } = await loadRun({
+    deps,
+    projectId,
+    runId,
+  });
+
+  // Checked before the page rather than during it: a page is seconds of
+  // judging, and stopping between pages is what the cancel contract
+  // promises. The signal below is what stops one already under way.
+  if (await deps.isCancelled?.({ projectId, runId })) {
+    prefetches.discard(runId);
+    return emptyPage();
+  }
+
+  const startedPage = Date.now();
+  const limit = Math.max(1, Math.min(pageSize, remaining));
+  const read = (after: PageCursor) =>
+    readPage({
+      deps,
+      projectId,
+      row,
+      caller,
+      parameters,
+      keyColumns: input.keyColumns,
+      after,
+    });
+
+  const prefetched = await prefetches.take({
+    runId,
+    afterTraceId,
+    afterSpanId,
+    limit,
+  });
+  const current =
+    prefetched ?? (await read({ afterTraceId, afterSpanId, limit }));
+  const { keyPage, prepared, keyMs } = current;
+  if (keyPage.keys.length === 0 || prepared === null) return emptyPage();
+
+  const last = keyPage.keys.at(-1);
+  startNextPageRead({
+    prefetches,
+    runId,
+    read,
+    last,
+    hasMore: keyPage.hasMore,
+    remaining: remaining - keyPage.keys.length,
+    pageSize,
+  });
+
+  const judged = await judgeUnderCancellation({
+    deps,
+    projectId,
+    runId,
+    prepared,
+  });
+
+  const { mapping, insertMs } = await writeJudgedPage({
+    deps,
+    projectId,
+    runId,
+    page,
+    questions,
+    judged,
+    keys: keyPage.keys,
+  });
+
+  recordPageProfile({
+    projectId,
+    runId,
+    page,
+    rows: mapping.counters.rows,
+    startedPage,
+    prefetched: prefetched !== null,
+    keyMs,
+    insertMs,
+    judged,
+  });
+
+  return {
+    ...mapping.counters,
+    inputTokens: judged.usage.inputTokens,
+    requests: judged.usage.requests,
+    cursor: last?.traceId ?? null,
+    // Empty when the statement has one row per trace, which is what tells the
+    // next key pass to compare the trace alone.
+    cursorSpanId: last?.spanId ? last.spanId : null,
+    hasNextPage: keyPage.hasMore && remaining - mapping.counters.rows > 0,
+  };
+}
+
 /**
  * What one page spent its wall clock on, at debug level.
  *
@@ -356,14 +578,17 @@ async function writePageJudgements({
  * should be is explained by one of these numbers rather than by the total.
  * `gapMs` is the part no step here owns: the time between the previous page of
  * this run finishing and this one starting, which is what the pipeline spent
- * delivering the page event and scheduling the next intent.
+ * delivering the page event and scheduling the next intent. `keyMs` and
+ * `queryMs` are off this page's clock when `prefetched` is true, because the
+ * previous page paid for them while it was judging.
  */
 function recordPageProfile({
   projectId,
   runId,
   page,
   rows,
-  startedKeys,
+  startedPage,
+  prefetched,
   keyMs,
   insertMs,
   judged,
@@ -372,7 +597,8 @@ function recordPageProfile({
   runId: string;
   page: number;
   rows: number;
-  startedKeys: number;
+  startedPage: number;
+  prefetched: boolean;
   keyMs: number;
   insertMs: number;
   judged: Awaited<ReturnType<InstantEvalRowSource["judge"]>>;
@@ -386,7 +612,8 @@ function recordPageProfile({
       page,
       rows,
       inputTokens: judged.usage.inputTokens,
-      gapMs: previous === undefined ? null : startedKeys - previous,
+      gapMs: previous === undefined ? null : startedPage - previous,
+      prefetched,
       keyMs,
       queryMs: judged.timings.queryMs,
       readMs: judged.timings.readMs,
@@ -394,7 +621,7 @@ function recordPageProfile({
       judgeMs: judged.timings.judgeMs,
       limiterWaitMs: judged.usage.limiterWaitMs,
       insertMs,
-      pageMs: finishedAt - startedKeys,
+      pageMs: finishedAt - startedPage,
     },
     "Instant Eval page profile",
   );
@@ -402,7 +629,7 @@ function recordPageProfile({
 }
 
 /**
- * One page, judged, with a cancel able to stop it part way.
+ * One prepared page, judged, with a cancel able to stop it part way.
  *
  * A cancel asked for mid-page stops the page rather than the run's next one.
  * The hydration stage takes the signal and abandons the classifications it has
@@ -413,34 +640,21 @@ async function judgeUnderCancellation({
   deps,
   projectId,
   runId,
-  caller,
-  row,
-  parameters,
-  keys,
+  prepared,
 }: {
   deps: InstantEvalRunExecutorDependencies;
   projectId: string;
   runId: string;
-  caller: { id: string; lwqlKey: string };
-  row: { sql: string; plan: unknown };
-  parameters: Record<string, unknown>;
-  keys: readonly InstantEvalRowKey[];
-}): Promise<Awaited<ReturnType<InstantEvalRowSource["judge"]>>> {
+  prepared: InstantEvalPreparedPage;
+}): Promise<InstantEvalJudgedPage> {
   const cancelWatch = watchForCancellation({
     ...(deps.isCancelled ? { isCancelled: deps.isCancelled } : {}),
     projectId,
     runId,
   });
   try {
-    return await deps.rowSource.judge({
-      caller,
-      protections: await deps.protections(projectId),
-      sql: row.sql,
-      parameters,
-      calls: instantEvalHydrationPlan(row.plan),
-      keys,
-      classifier: deps.classifier(),
-      maxConcurrency: deps.maxConcurrency,
+    return await deps.rowSource.judgePrepared({
+      page: prepared,
       ...(cancelWatch ? { signal: cancelWatch.signal } : {}),
     });
   } finally {

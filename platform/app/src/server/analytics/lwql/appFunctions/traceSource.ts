@@ -57,11 +57,22 @@ export interface LangWatchQLAppFunctionTraceSource {
  * process-wide instance would be a second lifecycle to reason about for no
  * saving.
  */
-export function createLangWatchQLAppFunctionTraceSource(): LangWatchQLAppFunctionTraceSource {
-  const service = TraceService.create(
-    undefined,
-    buildTraceBlobResolutionDeps(),
-  );
+/**
+ * Traces one thread may contribute to a read before the rest are dropped.
+ *
+ * The thread read's ceiling is a single number over every thread asked for,
+ * and a page of two hundred conversations at a handful of traces each is past
+ * a thousand, so the ceiling is sized by the threads: a page never loses a
+ * trace unless one conversation alone holds more than this.
+ */
+export const LWQL_TRACES_PER_THREAD_CEILING = 1_000;
+
+export function createLangWatchQLAppFunctionTraceSource(
+  service: Pick<
+    TraceService,
+    "getTracesWithSpans" | "getTracesWithSpansByThreadIds"
+  > = TraceService.create(undefined, buildTraceBlobResolutionDeps()),
+): LangWatchQLAppFunctionTraceSource {
   return {
     async tracesByIds({ projectId, traceIds, protections }) {
       if (traceIds.length === 0) return [];
@@ -79,7 +90,10 @@ export function createLangWatchQLAppFunctionTraceSource(): LangWatchQLAppFunctio
         projectId,
         [...threadKeys],
         protections,
-        { full: true },
+        {
+          full: true,
+          maxTraces: threadKeys.length * LWQL_TRACES_PER_THREAD_CEILING,
+        },
       );
     },
   };

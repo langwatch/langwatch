@@ -1,5 +1,5 @@
 /**
- * The five reads a run performs, each one a wrapper around the caller's own
+ * The eight reads a run performs, each one a wrapper around the caller's own
  * statement.
  *
  * Separate from `./row-source.ts`, which holds the contract and the types,
@@ -13,10 +13,11 @@
  */
 
 import type {
-  hydrateLangWatchQLAppFunctions,
+  judgeLangWatchQLHydration,
   LangWatchQLAppFunctionCall,
   LangWatchQLColumn,
   LangWatchQLExecutor,
+  LangWatchQLPreparedHydration,
 } from "~/server/analytics/lwql";
 import type { Protections } from "~/server/traces/protections";
 import type { InstantEvalClassifier } from "../classifier/classifier";
@@ -36,6 +37,7 @@ import {
   instantEvalSampleKeysSql,
 } from "./composition";
 import {
+  type InstantEvalPreparedPage,
   InstantEvalResultTruncatedError,
   type InstantEvalRowKey,
   type InstantEvalRowSource,
@@ -76,15 +78,31 @@ function toRowKey(row: Record<string, unknown>): InstantEvalRowKey {
  */
 export const INSTANT_EVAL_PAGE_ROW_CEILING = 5_000;
 
-/** The two reads every pass is built from, closed over one caller's executor. */
+/**
+ * What one pass read, with the fact every pass has to check before trusting it.
+ *
+ * `truncated` is decided here rather than by the executor, which returns every
+ * row the database gave it: a pass asks for a bounded number of rows and a
+ * result above that bound means the selection outgrew what the pass can own.
+ * Reading a cut page as if it were whole is the one failure a run cannot
+ * detect afterwards, so each pass refuses instead.
+ */
+export type InstantEvalPassExecution = Awaited<
+  ReturnType<LangWatchQLExecutor["execute"]>
+> & { readonly truncated: boolean };
+
+/**
+ * The three operations every pass is built from, closed over one caller's
+ * executor: the statement, the read half of hydration, and the judge half.
+ */
 export interface InstantEvalPasses {
   run(input: {
     caller: InstantEvalRunCaller;
     sql: string;
     parameters?: Readonly<Record<string, unknown>>;
     maxRows: number;
-  }): Promise<Awaited<ReturnType<LangWatchQLExecutor["execute"]>>>;
-  hydrate(input: {
+  }): Promise<InstantEvalPassExecution>;
+  prepare(input: {
     caller: InstantEvalRunCaller;
     protections: Protections;
     calls: readonly LangWatchQLAppFunctionCall[];
@@ -94,8 +112,11 @@ export interface InstantEvalPasses {
       maxConcurrency: number;
       queryTokenBudget: number;
     };
+  }): Promise<LangWatchQLPreparedHydration>;
+  judge(input: {
+    prepared: LangWatchQLPreparedHydration;
     signal?: AbortSignal;
-  }): Promise<Awaited<ReturnType<typeof hydrateLangWatchQLAppFunctions>>>;
+  }): Promise<Awaited<ReturnType<typeof judgeLangWatchQLHydration>>>;
 }
 
 /** What the statement projects, learned without reading a row. */
@@ -208,8 +229,8 @@ export async function sampleKeysPass(
   return execution.rows.map(toRowKey);
 }
 
-/** One page of rows, judged. */
-export async function judgePass(
+/** One page of rows, read and extracted, with nothing judged. */
+export async function readPass(
   passes: InstantEvalPasses,
   {
     caller,
@@ -220,9 +241,8 @@ export async function judgePass(
     keys,
     classifier,
     maxConcurrency,
-    signal,
-  }: Parameters<InstantEvalRowSource["judge"]>[0],
-): ReturnType<InstantEvalRowSource["judge"]> {
+  }: Parameters<InstantEvalRowSource["read"]>[0],
+): Promise<InstantEvalPreparedPage> {
   const traceIds = [...new Set(keys.map((key) => key.traceId))];
   const startedQuery = Date.now();
   const execution = await passes.run({
@@ -239,7 +259,7 @@ export async function judgePass(
   // own them. Judging happens after this, so a dropped row is never paid for.
   const owned = instantEvalOwnedRows({ rows: execution.rows, keys });
 
-  const hydration = await passes.hydrate({
+  const hydration = await passes.prepare({
     caller,
     protections,
     calls,
@@ -253,6 +273,17 @@ export async function judgePass(
       queryTokenBudget:
         Math.max(1, owned.length) * classifier.limits.stateTokens,
     },
+  });
+  return { rows: owned.length, queryMs, hydration };
+}
+
+/** Judges a page {@link readPass} prepared. */
+export async function judgePreparedPass(
+  passes: InstantEvalPasses,
+  { page, signal }: Parameters<InstantEvalRowSource["judgePrepared"]>[0],
+): ReturnType<InstantEvalRowSource["judgePrepared"]> {
+  const hydration = await passes.judge({
+    prepared: page.hydration,
     ...(signal ? { signal } : {}),
   });
   return {
@@ -265,12 +296,24 @@ export async function judgePass(
       limiterWaitMs: 0,
     },
     timings: {
-      queryMs,
+      queryMs: page.queryMs,
       readMs: hydration.timings?.readMs ?? 0,
       computeMs: hydration.timings?.computeMs ?? 0,
       judgeMs: hydration.timings?.judgeMs ?? 0,
     },
   };
+}
+
+/** One page of rows, judged: the read, then the judging. */
+export async function judgePass(
+  passes: InstantEvalPasses,
+  { signal, ...input }: Parameters<InstantEvalRowSource["judge"]>[0],
+): ReturnType<InstantEvalRowSource["judge"]> {
+  const page = await readPass(passes, input);
+  return await judgePreparedPass(passes, {
+    page,
+    ...(signal ? { signal } : {}),
+  });
 }
 
 /**
@@ -322,11 +365,13 @@ export async function textPass(
     parameters: { ...parameters, [INSTANT_EVAL_PAGE_PARAMETER]: traceIds },
     maxRows: INSTANT_EVAL_PAGE_ROW_CEILING,
   });
-  const hydration = await passes.hydrate({
-    caller,
-    protections,
-    calls: instantEvalTextPlan(calls),
-    execution,
+  const hydration = await passes.judge({
+    prepared: await passes.prepare({
+      caller,
+      protections,
+      calls: instantEvalTextPlan(calls),
+      execution,
+    }),
   });
   return hydration.rows;
 }

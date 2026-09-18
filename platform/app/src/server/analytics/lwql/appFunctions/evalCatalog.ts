@@ -25,7 +25,7 @@
  *
  * @see ./catalog.ts — the shared declaration these join
  * @see ../../../app-layer/instant-evals/classifier/classifier.ts
- * @see ../../../../../specs/analytics/lwql-eval-functions.feature
+ * @see ../../../../../specs/lwql/eval-functions.feature
  */
 
 import type { InstantEvalQuestionKind } from "~/server/app-layer/instant-evals/classifier/classifier";
