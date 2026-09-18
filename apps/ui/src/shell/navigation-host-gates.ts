@@ -4,7 +4,7 @@
  * turn sees no entry rather than one that refuses when pressed.
  */
 
-import { isLangyDemoProject } from "@langwatch/langy-browser/surfaces/langy-demo-project";
+import { isLangyDemoProject } from "@langwatch/langy-browser-kit";
 import type { NavigationOpsAccess } from "@langwatch/navigation-browser/navigation";
 
 /**

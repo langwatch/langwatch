@@ -1,4 +1,4 @@
-import { parseFragment } from "@langwatch/trace-browser/surfaces/trace-filters";
+import { parseFragment } from "@langwatch/trace-browser-kit";
 import { describe, expect, it } from "vitest";
 
 import { resolveTracesHrefForKey, tracesHrefForKey } from "../model/traces-href-for-key.ts";

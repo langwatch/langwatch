@@ -10,8 +10,7 @@ import { useUiAddress } from "@langwatch/browser-host/address";
 import { useUiCapabilities, useUiRpc, useUiScope } from "@langwatch/browser-host/capabilities";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { routePatternOf } from "@langwatch/browser-host/navigation-tracing";
-import { LangyMark, LangyMarkGradientDefs } from "@langwatch/langy-browser/surfaces/langy-mark";
-import { useLangyStore } from "@langwatch/langy-browser/surfaces/langy-store";
+import { LangyMark, LangyMarkGradientDefs, useLangyStore } from "@langwatch/langy-browser-kit";
 import {
   NavigationHostProvider,
   type NavigationAccountMenu,
