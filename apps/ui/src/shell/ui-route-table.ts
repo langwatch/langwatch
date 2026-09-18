@@ -37,7 +37,7 @@ export type UiPageRouteDescriptor = {
 };
 
 /** A pathless layout the SHELL draws itself: chrome is composition, not a module page. */
-export type UiShellLayout = "chrome";
+export type UiShellLayout = "auth" | "chrome";
 
 /**
  * A layout route the shell resolves from its own source. It carries no page
@@ -146,26 +146,35 @@ export const uiLegacyRedirectRoutes: readonly UiRedirectRouteDescriptor[] = [
 ];
 
 export const uiRouteTable: readonly UiRouteDescriptor[] = [
-  // Auth (public)
-  { path: "/auth/signin", page: "pages/auth/signin" },
-  { path: "/auth/signup", page: "pages/auth/signup" },
+  // Auth (public), under the host every front-door screen reads its
+  // deployment shape and its own address through.
   {
-    path: "/auth/forgot-password",
-    page: "pages/auth/forgot-password",
+    layout: "auth",
+    children: [
+      { path: "/auth/signin", page: "pages/auth/signin" },
+      { path: "/auth/signup", page: "pages/auth/signup" },
+      {
+        path: "/auth/forgot-password",
+        page: "pages/auth/forgot-password",
+      },
+      {
+        path: "/auth/reset-password",
+        page: "pages/auth/reset-password",
+      },
+      // The email-verification magic link lands here; it renders only (D01).
+      {
+        path: "/auth/verify-email",
+        page: "pages/auth/verify-email",
+      },
+      { path: "/auth/error", page: "pages/auth/error" },
+      // Join before create (ADR-117 §6): a new account passes through here on
+      // its way to making an organization. Renders nothing until D12 fills it.
+      { path: "/auth/join", page: "pages/auth/join" },
+      // Auth's own screen, and it reads auth's host: accepting an invite is a
+      // front-door act, done signed-out as often as signed-in.
+      { path: "/invite/accept", page: "pages/invite/accept" },
+    ],
   },
-  {
-    path: "/auth/reset-password",
-    page: "pages/auth/reset-password",
-  },
-  // The email-verification magic link lands here; it renders only (D01).
-  {
-    path: "/auth/verify-email",
-    page: "pages/auth/verify-email",
-  },
-  { path: "/auth/error", page: "pages/auth/error" },
-  // Join before create (ADR-117 §6): a new account passes through here on its
-  // way to making an organization. Renders nothing until D12 fills it.
-  { path: "/auth/join", page: "pages/auth/join" },
 
   // Top-level pages
   { path: "/authorize", page: "pages/authorize" },
@@ -191,7 +200,6 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
       },
     },
   },
-  { path: "/invite/accept", page: "pages/invite/accept" },
   { path: "/mcp/authorize", page: "pages/mcp/authorize" },
   { path: "/share/:id", page: "pages/share/[id]" },
   // Public — no auth required; token in query-string is the authorisation
