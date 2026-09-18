@@ -484,12 +484,13 @@ process holding DDL locks is how deploys die.
 **Clients appear in exactly one place: the chain.** From there only registry
 and channel factories touch them. There is no second path.
 
-**Resolving is the ClickHouse client's own concept** (ruled 2026-09-18,
-landing): nothing outside `@langwatch/clickhouse-client` knows what
-"resolving" a client means — you never hold an unresolved client; the
-`clickhouse` member is tenant-resolving by construction. The per-module
-resolver adapters (`create<F>ClickHouseResolver`) are transitional and die
-when this lands.
+**Resolving is invisible: callers just call the client** (ruled 2026-09-18,
+landing): a module holds the `clickhouse` member and queries it — every
+query already names `TenantId`, and `@langwatch/clickhouse-client` routes to
+the right physical endpoint internally, per call. No resolver type, no
+`.resolve()` step, and no adapter exists outside that package; a caller
+never thinks about resolution at all. The per-module resolver adapters
+(`create<F>ClickHouseResolver`) are transitional and die when this lands.
 
 ---
 
