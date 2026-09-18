@@ -7,10 +7,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../src/application.ts";
-import { memberSourceOf } from "./member-source.ts";
 import { defineServerModule, type FeatureSetup } from "../src/feature-installer.ts";
 import type { FeatureEventing, FeatureEventingSetup } from "../src/module-eventing.ts";
 import { defineRepositories } from "../src/repository-registry.ts";
+import { memberSourceOf } from "./member-source.ts";
 
 /** One row store, so two graphs over the same rows are distinguishable. */
 class KeyDatabase {
@@ -103,6 +103,14 @@ function eventingHost(participation: "produce" | "consume") {
   };
 }
 
+/** An eventing runtime as every normal process holds one: it states no half. */
+function runtimeStatingNothing() {
+  return {
+    processStore: { pruned: [] as string[] },
+    register: () => ({ commands: { startSweep: { send: vi.fn() } } }),
+  };
+}
+
 describe("given a module that declares its event sourcing with withEventing", () => {
   describe("when the process holds an eventing runtime", () => {
     /** @scenario "A module declares its event sourcing beside its transports" */
@@ -176,6 +184,44 @@ describe("given a module that declares its event sourcing with withEventing", ()
         .boot();
 
       expect(eventing.host.processStore.pruned).toEqual(["agent_sandbox_maintenance"]);
+    });
+  });
+
+  describe("when the runtime states no participation of its own", () => {
+    /** @scenario "The role decides which half a process installs" */
+    it("installs the worker's declaration as a consumer", async () => {
+      const declaration = keyEventing();
+      const module = defineServerModule("api-key")
+        .withRepositories(keyRepositories)
+        .withApp(ComposedKeyApp)
+        .withEventing(declaration);
+
+      await createApp({
+        role: "worker",
+        members: memberSourceOf({ eventing: runtimeStatingNothing() }),
+      })
+        .withModules([module])
+        .boot();
+
+      expect(declaration.built[0]!.participation).toBe("consume");
+    });
+
+    /** @scenario "The role decides which half a process installs" */
+    it("installs the api's declaration as a producer", async () => {
+      const declaration = keyEventing();
+      const module = defineServerModule("api-key")
+        .withRepositories(keyRepositories)
+        .withApp(ComposedKeyApp)
+        .withEventing(declaration);
+
+      await createApp({
+        role: "api",
+        members: memberSourceOf({ eventing: runtimeStatingNothing() }),
+      })
+        .withModules([module])
+        .boot();
+
+      expect(declaration.built[0]!.participation).toBe("produce");
     });
   });
 

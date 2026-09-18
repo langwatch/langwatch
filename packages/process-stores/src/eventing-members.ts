@@ -27,6 +27,7 @@ import {
   type GroupQueuePolicy,
   type GroupQueueStorage,
 } from "@langwatch/group-queue";
+import type { EventingParticipation } from "@langwatch/kernel";
 import {
   createContextFromJobData,
   getJobContextMetadata,
@@ -38,7 +39,11 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import type { EventingConfig, EventingGroupQueueConfig, EventingStoreConfig } from "./config.ts";
 import type { BuiltMember } from "./datastore-members.ts";
 
-/** What either role states beyond the half of event sourcing it runs. */
+/**
+ * What either role states beyond the half of event sourcing it runs. Neither
+ * names `participation`: which half a process installs follows its role, and
+ * these factories name only the substrate that half needs.
+ */
 interface EventingRoleOptions {
   /** Which tier a command this process sends records as its origin. */
   readonly executionTarget: ExecutionTarget;
@@ -101,6 +106,8 @@ export function buildEventing(options: {
   readonly redis?: RedisConnection;
   /** Absent on a role that drains nothing and so reads no event log. */
   readonly eventLog?: EventingEventLogMembers;
+  /** Overrides the half this process's role would otherwise install. */
+  readonly participation?: EventingParticipation;
 }): BuiltMember<EventSourcing> {
   const { config } = options;
   const stores = eventingStores({
@@ -124,6 +131,7 @@ export function buildEventing(options: {
     executionTarget: config.executionTarget,
     processManagerMode: config.processManagerMode ?? "run",
     warnWhenProjectionsRunInline: false,
+    ...(options.participation === undefined ? {} : { participation: options.participation }),
     ...(queueFactory === undefined ? {} : { queueFactory }),
     ...(stores.processStore === undefined ? {} : { processStore: stores.processStore }),
     ...(config.killSwitch === undefined ? {} : { killSwitch: config.killSwitch }),

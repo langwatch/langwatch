@@ -163,6 +163,7 @@ export function createProcessMembers(options: {
       return buildEventing({
         config: eventing,
         processName: config.processName,
+        ...(eventing.participation === undefined ? {} : { participation: eventing.participation }),
         ...(eventing.groupQueue === undefined ? {} : { redis: read("redis") }),
         ...(eventing.store.kind === "producer-only"
           ? {}

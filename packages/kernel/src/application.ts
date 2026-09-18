@@ -377,7 +377,7 @@ export class ApplicationBuilder<
     // Belt and braces over the union above: a source that answered a claimed
     // member with null built something a factory cannot use.
     assertRepositoryBackend(declarations, selections);
-    const eventing = eventingHostFrom(eventingMemberFor(declarations, this.source));
+    const eventing = eventingHostFrom(eventingMemberFor(declarations, this.source), role);
     const scope = new ResourceScope();
     const featureServices: RuntimeService[] = [];
     const installed = new Map<string, InstalledFeatureState>();

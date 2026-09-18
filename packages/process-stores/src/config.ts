@@ -4,6 +4,7 @@
  * eventing's store/queue factory and the process store a process-manager role supplies.
  */
 import type { ExecutionTarget, KillSwitch } from "@langwatch/eventing";
+import type { EventingParticipation } from "@langwatch/kernel";
 import type { GroupQueuePolicy, GroupQueueStorage } from "@langwatch/group-queue";
 
 /** Postgres, as one guarded client per process. */
@@ -94,6 +95,8 @@ export interface EventingConfig {
   readonly executionTarget: ExecutionTarget;
   /** Whether this role runs the process managers its pipelines declare. */
   readonly processManagerMode?: "run" | "producer-only";
+  /** Overrides the half this process's role would otherwise install. */
+  readonly participation?: EventingParticipation;
   /** Per-tenant operator stop for every component the pipelines mount. */
   readonly killSwitch?: KillSwitch;
 }

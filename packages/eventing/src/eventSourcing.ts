@@ -1,9 +1,13 @@
+import type { EventingParticipation } from "@langwatch/kernel";
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
+
 import { DisabledPipeline } from "./disabledPipeline.ts";
-import type { Event, Projection } from "./domain/types.ts";
 import { createEventCatalogue } from "./domain/definitions.ts";
+import type { Event, Projection } from "./domain/types.ts";
+import type { KillSwitch } from "./kill-switch/index.ts";
 import type {
   NoCommands,
   RegisteredCommand,
@@ -30,8 +34,6 @@ import {
 import type { JobRegistryEntry } from "./services/queues/queueManager.ts";
 import { resolveCoalesceMaxBatch } from "./services/queues/queueManager.ts";
 import type { EventStore } from "./stores/eventStore.types.ts";
-import type { KillSwitch } from "./kill-switch/index.ts";
-import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:event-sourcing");
 
@@ -67,6 +69,12 @@ export interface EventSourcingOptions {
    * Process manager mode: "run" (default, requires ProcessStore) or "producer-only".
    */
   processManagerMode?: "run" | "producer-only";
+  /**
+   * Which half of a pipeline the process installing modules on this runtime
+   * runs. Absent lets the role decide (api produces, worker consumes), which
+   * is what every normal process wants; state it only for one that differs.
+   */
+  participation?: EventingParticipation;
 }
 
 /**
@@ -114,6 +122,7 @@ export class EventSourcing {
   private readonly _warnWhenProjectionsRunInline: boolean;
   private readonly _processStore?: ProcessStore;
   private readonly _processManagerMode: "run" | "producer-only";
+  private readonly _participation?: EventingParticipation;
   private _processRuntimeInstance?: ProcessRuntime;
   /** The process managers this producer registered and will not run. */
   private readonly _unrunProcessManagers = new Set<string>();
@@ -131,6 +140,7 @@ export class EventSourcing {
     this._warnWhenProjectionsRunInline = options.warnWhenProjectionsRunInline ?? false;
     this._processStore = options.processStore;
     this._processManagerMode = options.processManagerMode ?? "run";
+    this._participation = options.participation;
 
     this.projectionRegistry = new ProjectionRegistry<Event>();
     options.configureGlobalProjections?.(this.projectionRegistry);
@@ -138,6 +148,23 @@ export class EventSourcing {
 
   get isEnabled(): boolean {
     return this._enabled;
+  }
+
+  /**
+   * What this runtime states about which half it runs, for the composition
+   * installing modules on it. Absent is the normal answer: the role decides.
+   */
+  get participation(): EventingParticipation | undefined {
+    return this._participation;
+  }
+
+  /**
+   * The durable process state this runtime leases, as composition hands it to
+   * a module's declaration. A producer holds none, and says so by answering
+   * nothing rather than by throwing the way `processRuntime` does.
+   */
+  get processStore(): ProcessStore | undefined {
+    return this._processStore;
   }
 
   /**

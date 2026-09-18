@@ -3,6 +3,7 @@
  * Composition names no pipeline, projection or subscriber, keeping
  * `@langwatch/eventing` and the Prisma/ioredis/ClickHouse graph off this package.
  */
+import type { ServerRole } from "./feature-installer.ts";
 
 /**
  * Whether this process only sends on a pipeline, or also drains it. The api
@@ -10,6 +11,15 @@
  * the one branch a declaration reading its own projections is allowed to take.
  */
 export type EventingParticipation = "produce" | "consume";
+
+/**
+ * Which half the role runs. The worker is the one role that drains: it claims
+ * the shared job queue, so every other role sends and drains nothing. No main
+ * states this — a process that must differ says so on its own member.
+ */
+export function participationForRole(role: ServerRole): EventingParticipation {
+  return role === "worker" ? "consume" : "produce";
+}
 
 /** What a module's eventing declaration is handed when a process installs it. */
 export interface FeatureEventingSetup<Repositories, App, ProcessStore> {
@@ -59,17 +69,22 @@ export interface EventingHost {
 
 /**
  * The eventing runtime a process holds, or nothing. Read by name, the way a
- * repository tier reads `prisma`: a module never names the member, so a
- * process running no event sourcing declares none and every declaration is inert.
+ * repository tier reads `prisma`, so a process running none ignores every
+ * declaration. Participation follows the role unless the member states its own.
  */
-export function eventingHostFrom(pool: unknown): EventingHost | undefined {
+export function eventingHostFrom(pool: unknown, role: ServerRole): EventingHost | undefined {
   if (typeof pool !== "object" || pool === null) return void 0;
   const candidate = (pool as Readonly<Record<string, unknown>>).eventing;
   if (typeof candidate !== "object" || candidate === null) return void 0;
   const host = candidate as Partial<EventingHost>;
   if (typeof host.register !== "function") return void 0;
-  if (host.participation !== "produce" && host.participation !== "consume") return void 0;
-  return host as EventingHost;
+  const stated = host.participation;
+  return {
+    participation:
+      stated === "produce" || stated === "consume" ? stated : participationForRole(role),
+    processStore: host.processStore,
+    register: host.register.bind(candidate),
+  };
 }
 
 /** What `register` answered, read back without asserting a shape it may not have. */
