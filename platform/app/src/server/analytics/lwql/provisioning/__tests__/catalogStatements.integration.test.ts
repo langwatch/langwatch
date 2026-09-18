@@ -142,8 +142,8 @@ const COLUMN_SET_POSITIONS = (database: string) =>
     ],
     [
       "a matcher in a UNION ALL branch",
-      `SELECT TraceId FROM ${database}.traces ` +
-        `UNION ALL SELECT COLUMNS('^Captured') FROM ${database}.spans`,
+      `SELECT TraceId FROM ${database}.traces LIMIT 10 ` +
+        `UNION ALL SELECT COLUMNS('^Captured') FROM ${database}.spans LIMIT 10`,
     ],
     [
       "the spans equivalent for CapturedOutput",
