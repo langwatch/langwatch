@@ -1,9 +1,21 @@
 /**
  * Writes a finished voice call down as a scenario-style run the results pages
  * render: one message per turn (caller → user, agent → assistant), the caller
- * marked human, and no verdict — a drawer call is not judged against a scenario
- * (AC13). Kept apart from the session service so the service stays a pure
- * orchestrator over injected ports.
+ * marked human.
+ *
+ * Two shapes, one writer:
+ *  - A drawer call ("Talk to it") lands in the voice-call set under a synthetic
+ *    per-agent scenario id, and carries no verdict — it is not judged against a
+ *    scenario (AC13).
+ *  - A "Call it myself" scenario call (AC23) lands under the real scenario id
+ *    and its set, beside the scenario's simulated runs, tagged
+ *    `metadata.langwatch.callerKind = "human"`. Finishing it emits a
+ *    RunFinished that names the scenario, which is what the scenario-evaluations
+ *    subscriber keys on to grade the human transcript against the scenario's
+ *    attached evaluators — the same grading a simulated run gets.
+ *
+ * Kept apart from the session service so the service stays a pure orchestrator
+ * over injected ports.
  */
 
 import { VOICE_CALL_SCENARIO_SET_ID } from "~/server/agents/voice/voice-agent.config";
@@ -30,23 +42,46 @@ function toMessages(record: CallRecord): VoiceRunMessage[] {
   }));
 }
 
+/**
+ * The scenario a "Call it myself" run is written under, and the set it shares
+ * with that scenario's simulated runs. Absent for a drawer call.
+ */
+export interface VoiceRunScenario {
+  scenarioId: string;
+  scenarioSetId: string;
+}
+
 export async function writeVoiceCallRun({
   projectId,
   scenarioRunId,
   agentRowId,
   agentDisplayName,
   record,
+  scenario,
 }: {
   projectId: string;
   scenarioRunId: string;
   agentRowId: string;
   agentDisplayName: string;
   record: CallRecord;
+  scenario?: VoiceRunScenario;
 }): Promise<void> {
-  const scenarioId = `voiceagent_${agentRowId}`;
+  // A scenario call lands under the real scenario and its set; a drawer call
+  // lands in the voice-call set under a synthetic per-agent id.
+  const scenarioId = scenario?.scenarioId ?? `voiceagent_${agentRowId}`;
+  const scenarioSetId = scenario?.scenarioSetId ?? VOICE_CALL_SCENARIO_SET_ID;
+
   const metadata = {
     name: agentDisplayName,
     caller: "You",
+    // The results table and run header read the caller off langwatch metadata,
+    // the same place a simulated run records "simulated" (AC24), so a scenario
+    // call shows "You" in the scenario's run list beside them.
+    langwatch: {
+      targetType: "voice" as const,
+      targetReferenceId: agentRowId,
+      callerKind: HUMAN_CALLER_KIND,
+    },
     callerKind: HUMAN_CALLER_KIND,
     source: record.source,
     transport: record.transport,
@@ -61,7 +96,7 @@ export async function writeVoiceCallRun({
     scenarioRunId,
     scenarioId,
     batchRunId: scenarioRunId,
-    scenarioSetId: VOICE_CALL_SCENARIO_SET_ID,
+    scenarioSetId,
     name: agentDisplayName,
     metadata,
     occurredAt: record.startedAt,
@@ -75,13 +110,22 @@ export async function writeVoiceCallRun({
     occurredAt: record.endedAt,
   });
 
-  // No results envelope: a drawer call carries no verdict (AC13). The status is
-  // SUCCESS — the call completed — while the absence of results leaves the run
-  // unjudged.
+  // No results envelope: the verdict is not decided here. A drawer call carries
+  // no verdict at all (AC13). A scenario call is finished SUCCESS with the
+  // scenario id named on the event, so the scenario-evaluations subscriber
+  // grades the transcript against the scenario's attached evaluators (AC23) —
+  // exactly the path a simulated run's finish takes.
   await getApp().simulations.finishRun({
     tenantId: projectId,
     scenarioRunId,
     status: "SUCCESS",
+    ...(scenario
+      ? {
+          scenarioId: scenario.scenarioId,
+          scenarioSetId: scenario.scenarioSetId,
+          batchRunId: scenarioRunId,
+        }
+      : {}),
     occurredAt: record.endedAt,
   });
 }

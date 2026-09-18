@@ -54,6 +54,12 @@ export interface TalkToItPanelProps {
   name?: string;
   /** Told the row id when the call created the agent, so the drawer adopts it. */
   onAgentCreated?: (agentRowId: string) => void;
+  /**
+   * The scenario a "Call it myself" run is scored under (AC23). When set, the
+   * finished call is written under this scenario, listed beside its simulated
+   * runs and graded against its criteria. Absent for a drawer call.
+   */
+  scenarioId?: string;
 }
 
 function formatMmSs(totalSeconds: number): string {
@@ -75,6 +81,9 @@ export function TalkToItPanel(props: TalkToItPanelProps) {
   const startedAtRef = useRef<number>(0);
   const conversationIdRef = useRef<string | undefined>(undefined);
   const maxSecondsRef = useRef<number>(300);
+  // The set the finished run landed in, learned from the finish response, so a
+  // scenario call links to the scenario's set rather than the voice-call set.
+  const runSetIdRef = useRef<string | undefined>(undefined);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [micLevel, setMicLevel] = useState(0);
   const [pendingName, setPendingName] = useState("");
@@ -102,6 +111,7 @@ export function TalkToItPanel(props: TalkToItPanelProps) {
         startedAt: startedAtRef.current || Date.now(),
         endedAt: Date.now(),
         cutAtLimit,
+        ...(props.scenarioId ? { scenarioId: props.scenarioId } : {}),
       };
       const res = await fetch(
         `/api/voice/session/${encodeURIComponent(
@@ -134,6 +144,9 @@ export function TalkToItPanel(props: TalkToItPanelProps) {
       if (typeof data.agentId === "string" && data.agentId) {
         createdRowIdRef.current = data.agentId;
         if (!props.agentRowId) props.onAgentCreated?.(data.agentId);
+      }
+      if (typeof data.scenarioSetId === "string" && data.scenarioSetId) {
+        runSetIdRef.current = data.scenarioSetId;
       }
       dispatch({
         type: "SAVED",
@@ -262,9 +275,9 @@ export function TalkToItPanel(props: TalkToItPanelProps) {
 
   const runHref =
     state.kind === "done" && state.runId
-      ? `/${props.projectSlug}/simulations/${VOICE_CALL_SCENARIO_SET_ID}/${encodeURIComponent(
-          state.runId,
-        )}`
+      ? `/${props.projectSlug}/simulations/${
+          runSetIdRef.current ?? VOICE_CALL_SCENARIO_SET_ID
+        }/${encodeURIComponent(state.runId)}`
       : undefined;
 
   return (
