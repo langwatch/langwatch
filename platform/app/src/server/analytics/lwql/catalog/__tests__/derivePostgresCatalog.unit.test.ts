@@ -1,10 +1,13 @@
 /**
- * The Postgres catalog derivation: naming, tenant scope, safe defaults and
- * overrides.
+ * The Postgres catalog derivation: tenant scope, safe defaults and label
+ * columns.
  *
  * These bind the @unit scenarios of `specs/lwql/postgres-catalog.feature` that
- * are about the derivation itself — the coverage guard lives in
- * `./tenantModelCoverage.unit.test.ts`, and the content-gating and
+ * are about the derivation itself — naming/type helpers move to
+ * `./derivePostgresCatalog.naming.unit.test.ts`, override handling (the six
+ * formerly-hand-written views, re-admits, the skip-list guard) to
+ * `./derivePostgresCatalog.overrides.unit.test.ts`, the coverage guard lives
+ * in `./tenantModelCoverage.unit.test.ts`, and the content-gating and
  * ground-truth scenarios bind elsewhere.
  *
  * @see ../derivePostgresCatalog.ts — the code under test
@@ -17,22 +20,13 @@ import {
   teamTenantPath,
 } from "../../provisioning/postgresMapping";
 import {
-  clickHouseTypeFor,
   derivePostgresCatalog,
-  exposedColumnName,
   isStrippedByDefault,
-  type PostgresDatasetOverride,
-  postgresDatasetName,
   resolveTenantScope,
 } from "../derivePostgresCatalog";
-import {
-  assertPostgresSkipReasons,
-  LWQL_POSTGRES_SKIPPED_MODELS,
-  POSTGRES_SKIP_REASON_PREFIXES,
-} from "../postgresSkippedModels";
+import { LWQL_POSTGRES_SKIPPED_MODELS } from "../postgresSkippedModels";
 import { LWQL_POSTGRES_ALL_OVERRIDES } from "../postgresViews";
 import { LWQL_PRISMA_MANIFEST, prismaManifestModel } from "../prismaManifest";
-import type { PrismaField } from "../prismaSchema";
 
 const catalog = derivePostgresCatalog({
   manifest: LWQL_PRISMA_MANIFEST,
@@ -43,95 +37,6 @@ const byModel = new Map(
   catalog.map((view) => [view.postgres!.baseRelation, view]),
 );
 const byName = new Map(catalog.map((view) => [view.name, view]));
-
-const scalarField = (over: Partial<PrismaField>): PrismaField => ({
-  name: "f",
-  columnName: "f",
-  type: "String",
-  kind: "scalar",
-  isList: false,
-  isOptional: false,
-  documentation: "",
-  ...over,
-});
-
-describe("given the Postgres catalog naming helpers", () => {
-  describe("when a model name becomes a view name", () => {
-    it("snake-cases acronym-aware and pluralises the last word", () => {
-      expect(postgresDatasetName("CustomLLMModelCost")).toBe(
-        "custom_llm_model_costs",
-      );
-      expect(postgresDatasetName("Topic")).toBe("topics");
-      expect(postgresDatasetName("RoutingPolicy")).toBe("routing_policies");
-      expect(postgresDatasetName("Analytics")).toBe("analytics");
-      expect(postgresDatasetName("AnnotationQueue")).toBe("annotation_queues");
-    });
-  });
-
-  describe("when a field name becomes a column name", () => {
-    it("maps the primary key `id` to `<Model>Id` and PascalCases the rest", () => {
-      expect(
-        exposedColumnName({
-          modelName: "Topic",
-          fieldName: "id",
-          primaryKey: ["id"],
-        }),
-      ).toBe("TopicId");
-      expect(
-        exposedColumnName({
-          modelName: "Topic",
-          fieldName: "embeddings_model",
-          primaryKey: ["id"],
-        }),
-      ).toBe("EmbeddingsModel");
-      expect(
-        exposedColumnName({
-          modelName: "Topic",
-          fieldName: "p95Distance",
-          primaryKey: ["id"],
-        }),
-      ).toBe("P95Distance");
-    });
-  });
-
-  describe("when a Prisma type becomes a ClickHouse type", () => {
-    it("maps each scalar, wraps lists and optionals, strips binary", () => {
-      expect(clickHouseTypeFor(scalarField({ type: "String" }))).toBe("String");
-      expect(clickHouseTypeFor(scalarField({ type: "Int" }))).toBe("Int32");
-      expect(clickHouseTypeFor(scalarField({ type: "BigInt" }))).toBe("Int64");
-      expect(clickHouseTypeFor(scalarField({ type: "Float" }))).toBe("Float64");
-      expect(clickHouseTypeFor(scalarField({ type: "Boolean" }))).toBe("Bool");
-      expect(clickHouseTypeFor(scalarField({ type: "DateTime" }))).toBe(
-        "DateTime64(3)",
-      );
-      expect(clickHouseTypeFor(scalarField({ type: "Json" }))).toBe("String");
-      expect(
-        clickHouseTypeFor(scalarField({ kind: "enum", type: "MyEnum" })),
-      ).toBe("String");
-      expect(
-        clickHouseTypeFor(
-          scalarField({
-            type: "Decimal",
-            decimal: { precision: 10, scale: 2 },
-          }),
-        ),
-      ).toBe("Decimal(10, 2)");
-      expect(clickHouseTypeFor(scalarField({ type: "Decimal" }))).toBe(
-        "Decimal(65, 30)",
-      );
-      expect(
-        clickHouseTypeFor(scalarField({ type: "String", isOptional: true })),
-      ).toBe("Nullable(String)");
-      expect(
-        clickHouseTypeFor(scalarField({ type: "String", isList: true })),
-      ).toBe("Array(String)");
-      expect(clickHouseTypeFor(scalarField({ type: "Bytes" }))).toBeNull();
-      expect(
-        clickHouseTypeFor(scalarField({ kind: "unsupported", type: "geo" })),
-      ).toBeNull();
-    });
-  });
-});
 
 describe("given the derived Postgres catalog", () => {
   describe("when a model carries a projectId column", () => {
@@ -264,6 +169,11 @@ describe("given the derived Postgres catalog", () => {
       expect(isStrippedByDefault("customKeys")).toBeDefined();
       expect(isStrippedByDefault("email")).toBeDefined();
       expect(isStrippedByDefault("reviewerEmail")).toBeDefined();
+      // A name merely containing "email" is stripped too, not just an exact
+      // match or `Email` suffix.
+      expect(isStrippedByDefault("reviewer_email")).toBeDefined();
+      expect(isStrippedByDefault("notificationEmails")).toBeDefined();
+      expect(isStrippedByDefault("emailAddress")).toBeDefined();
       expect(isStrippedByDefault("parentId")).toBeUndefined();
       // `tokens` is a count, not a credential — kept.
       expect(isStrippedByDefault("promptTokens")).toBeUndefined();
@@ -333,188 +243,6 @@ describe("given the derived Postgres catalog", () => {
       )!;
       expect(valueJson.sourceColumns).toEqual(["value"]);
       expect(valueJson.gates).toEqual(["output"]);
-    });
-  });
-
-  describe("when the six formerly-hand-written views are derived", () => {
-    /** @scenario "A hand-written view is an override on the derived default, not a second definition" */
-    it("produces each one exactly once under its unchanged exposed names", () => {
-      const legacy: Record<string, Record<string, string>> = {
-        annotations: {
-          TenantId: "projectId",
-          AnnotationId: "id",
-          TraceId: "traceId",
-          IsThumbsUp: "isThumbsUp",
-          CreatedAt: "createdAt",
-          UpdatedAt: "updatedAt",
-        },
-        projects: {
-          TenantId: "id",
-          ProjectName: "name",
-          ProjectSlug: "slug",
-          CreatedAt: "createdAt",
-        },
-        prompts: {
-          TenantId: "projectId",
-          PromptId: "id",
-          PromptName: "name",
-          PromptHandle: "handle",
-          CreatedAt: "createdAt",
-          DeletedAt: "deletedAt",
-        },
-        prompt_versions: {
-          TenantId: "projectId",
-          PromptVersionId: "id",
-          PromptId: "configId",
-          VersionNumber: "version",
-          CreatedAt: "createdAt",
-        },
-        experiments: {
-          TenantId: "projectId",
-          ExperimentId: "id",
-          ExperimentName: "name",
-          ExperimentSlug: "slug",
-          ExperimentType: "type",
-          CreatedAt: "createdAt",
-          ArchivedAt: "archivedAt",
-        },
-        batch_evaluations: {
-          TenantId: "projectId",
-          BatchEvaluationId: "id",
-          ExperimentId: "experimentId",
-          DatasetId: "datasetId",
-          Cost: "cost",
-          CreatedAt: "createdAt",
-        },
-      };
-      for (const [name, columns] of Object.entries(legacy)) {
-        const view = byName.get(name);
-        expect(view, `${name} should be derived`).toBeDefined();
-        expect(catalog.filter((entry) => entry.name === name)).toHaveLength(1);
-        for (const [exposed, source] of Object.entries(columns)) {
-          const column = view!.columns.find((entry) => entry.name === exposed);
-          expect(
-            column?.sourceColumns,
-            `${name}.${exposed} keeps reading ${source}`,
-          ).toEqual([source]);
-        }
-      }
-      // The legacy Cost column still carries its USD unit and cost gate.
-      const cost = byName
-        .get("batch_evaluations")!
-        .columns.find((column) => column.name === "Cost")!;
-      expect(cost.unit).toBe("USD");
-      expect(cost.gates).toEqual(["costs"]);
-    });
-  });
-
-  describe("when the topics view is derived", () => {
-    /** @scenario "Topic clustering internals are not exposed" */
-    it("exposes the name and hierarchy, not the clustering internals", () => {
-      const columns = byName
-        .get("topics")!
-        .columns.map((column) => column.name);
-      expect(columns).toContain("TopicId");
-      expect(columns).toContain("TopicName");
-      expect(columns).toContain("ParentTopicId");
-      expect(columns).toContain("TenantId");
-      expect(columns).not.toContain("Centroid");
-      expect(columns).not.toContain("EmbeddingsModel");
-      expect(columns).not.toContain("P95Distance");
-    });
-  });
-
-  describe("when an override re-admits a stripped column", () => {
-    /** @scenario "An override that re-admits a stripped column carries a reason" */
-    it("requires a reason and refuses one without", () => {
-      const withReason: Record<string, PostgresDatasetOverride> = {
-        Annotation: { reAdmit: { Email: "the reviewer's own email, opt-in" } },
-      };
-      expect(() =>
-        derivePostgresCatalog({
-          manifest: LWQL_PRISMA_MANIFEST,
-          skip: LWQL_POSTGRES_SKIPPED_MODELS,
-          overrides: { ...LWQL_POSTGRES_ALL_OVERRIDES, ...withReason },
-        }),
-      ).not.toThrow();
-
-      const withoutReason: Record<string, PostgresDatasetOverride> = {
-        Annotation: { reAdmit: { Email: "" } },
-      };
-      expect(() =>
-        derivePostgresCatalog({
-          manifest: LWQL_PRISMA_MANIFEST,
-          skip: LWQL_POSTGRES_SKIPPED_MODELS,
-          overrides: { ...LWQL_POSTGRES_ALL_OVERRIDES, ...withoutReason },
-        }),
-      ).toThrow(/re-admits/);
-    });
-  });
-
-  describe("when a sensitive column dodges the name rules", () => {
-    /** The column is recorded as stripped and no exposed column reads it. */
-    const assertStripped = (baseRelation: string, source: string) => {
-      const view = byModel.get(baseRelation);
-      expect(view, `${baseRelation} should be derived`).toBeDefined();
-      expect(
-        view!.skipColumns[source],
-        `${baseRelation}.${source} should be recorded as stripped`,
-      ).toBeDefined();
-      expect(
-        view!.columns.some((column) => column.sourceColumns.includes(source)),
-        `${baseRelation}.${source} must not be exposed`,
-      ).toBe(false);
-    };
-
-    it("strips WebhookEndpoint.sqsExternalId despite its Id suffix", () => {
-      assertStripped("WebhookEndpoint", "sqsExternalId");
-    });
-
-    it("strips ModelProvider.customKeys by the plural-key suffix rule", () => {
-      const view = byModel.get("ModelProvider")!;
-      expect(view.columns.some((column) => column.name === "CustomKeys")).toBe(
-        false,
-      );
-      expect(view.skipColumns.customKeys).toBeDefined();
-    });
-
-    it("strips DiscoveredPerson raw external identity", () => {
-      assertStripped("DiscoveredPerson", "rawActorId");
-      assertStripped("DiscoveredPerson", "displayText");
-    });
-
-    it("strips AuditLog request forensics and payload diffs", () => {
-      for (const source of [
-        "ipAddress",
-        "userAgent",
-        "args",
-        "before",
-        "after",
-      ]) {
-        assertStripped("AuditLog", source);
-      }
-    });
-
-    it("strips IngestionSource credential-bearing config", () => {
-      assertStripped("IngestionSource", "parserConfig");
-      assertStripped("IngestionSource", "pollerCursor");
-    });
-  });
-
-  describe("when the skip list is validated", () => {
-    /** @scenario "A skip needs a recorded reason" */
-    it("accepts every category prefix and refuses empty, low-value or unprefixed reasons", () => {
-      for (const prefix of POSTGRES_SKIP_REASON_PREFIXES) {
-        expect(
-          () => assertPostgresSkipReasons({ X: `${prefix} really` }),
-          `"${prefix}" should be an accepted category`,
-        ).not.toThrow();
-      }
-      expect(() => assertPostgresSkipReasons({ X: "" })).toThrow();
-      expect(() => assertPostgresSkipReasons({ X: "low value" })).toThrow();
-      expect(() =>
-        assertPostgresSkipReasons({ X: "some arbitrary unprefixed reason" }),
-      ).toThrow();
     });
   });
 });
