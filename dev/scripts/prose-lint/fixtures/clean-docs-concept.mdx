@@ -1,0 +1,14 @@
+---
+title: Run parameters
+description: Named values a scenario receives when a run starts, for setup conditions and fixtures.
+---
+
+## What is a run parameter
+
+A run parameter is a named value that a scenario receives when a run starts. The scenario declares the parameter with a name and a default, and the run supplies a value for it, so the same scenario tests several setups without a copy per setup.
+
+For example, a scenario that tests a cancellation flow declares a `plan` parameter with the default `starter`, and a run passes `plan=enterprise` to test the same conversation against the enterprise cancellation rules.
+
+## When to use one
+
+Use a run parameter when the conversation stays the same and only the setup changes: the tenant the agent acts for, the plan the customer is on, the fixture the agent reads, or the model the agent runs on. A parameter holds one scalar value per run, so put a list of records in a fixture file and pass its path as the parameter value.
