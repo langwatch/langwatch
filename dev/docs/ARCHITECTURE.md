@@ -984,6 +984,17 @@ invented:
   capability beside it. If `auth-browser` finds itself importing
   `organization-browser`, the split has been done wrong — the composition root
   installs the two side by side, and neither module imports the other.
+
+  Known debt, recorded rather than fixed (2026-09-18): the legacy scope host
+  behind `useOrganizationTeamProject` — read in 506 files — answers
+  `hasPermission` and `hasOrganizationPermission` as well as the scope. That
+  conflation is what makes session and scope mutually dependent at all, and
+  moving those two reads onto the session capability would remove the knot at
+  its source. It was not done here because `modules/trace` and
+  `modules/scenario` build their own scope hosts for PUBLIC shared pages where
+  no session is mounted, so changing who answers `hasPermission` changes
+  authorization behaviour on those pages. That is a change with its own spec
+  and its own scenarios, not a side effect of a file move.
 - **State defaults to server state**: react-query over the derived tRPC
   client is the normal answer, so cross-module client state is rare and ruled
   case by case. The unit of browser sharing is the **published hook** — the
@@ -1012,6 +1023,16 @@ invented:
   module serves, and every module that declares its own screens shrinks it —
   so it ends at nothing rather than moving. Until then it is composition input,
   named by `main.tsx`, not machinery.
+
+  Which settles what "nothing but its composition" admits, since the two
+  sentences above read as a contradiction otherwise (clarified 2026-09-18):
+  `apps/ui/src` holds the entry point, `styles/`, and the shrinking route
+  table — the three things that are true of THIS deployment of the product and
+  of nothing else. Everything a second browser application would also need is
+  machinery and leaves. The test is not "is it small" or "is it composition-
+  adjacent"; it is **would a second browser application want this file** — if
+  yes it belongs in `@langwatch/browser-host` or `@langwatch/ui-kernel`, and if
+  no it is composition and may stay until it dissolves.
 
 ---
 

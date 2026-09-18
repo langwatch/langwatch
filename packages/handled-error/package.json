@@ -23,6 +23,10 @@
       "types": "./dist/docs-url.d.ts",
       "default": "./src/docs-url.ts"
     },
+    "./is-server-unreachable": {
+      "types": "./dist/is-server-unreachable.d.ts",
+      "default": "./src/is-server-unreachable.ts"
+    },
     "./presentation": {
       "types": "./dist/presentation.d.ts",
       "default": "./src/presentation.ts"
@@ -45,9 +49,9 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "catalog:",
     "@chakra-ui/react": "catalog:",
     "@emotion/react": "catalog:",
+    "@types/node": "catalog:",
     "@types/react": "catalog:",
     "react": "catalog:",
     "typescript": "catalog:",

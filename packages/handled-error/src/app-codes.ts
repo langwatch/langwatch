@@ -6,8 +6,8 @@
  * added an error code and never wrote the copy" from a runtime shrug into a
  * `pnpm typecheck` failure.
  *
- * Kept honest by `apps/ui/src/model/errors/__tests__/codes.unit.test.ts`,
- * which scans every tree that
+ * Kept honest by `__tests__/codes.unit.test.ts`, alongside this file, which
+ * scans every tree that
  * raises a handled error — this app, the API and worker processes, the
  * workspace `packages/`, and the platform application while it still exists —
  * and fails when this list and the code drift apart in either direction. A
