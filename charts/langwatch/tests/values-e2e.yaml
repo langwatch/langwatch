@@ -48,6 +48,19 @@ workers:
   # (validates the gate added in c74fb13a3).
   enabled: false
 
+voice:
+  # Unlike app/workers, the voice Deployment's replicas are fixed at 1 (see
+  # charts/langwatch/templates/voice/deployment.yaml) — there is no
+  # replicaCount: 0 knob to fall back on. It uses the same images.app image
+  # as app/workers, which this file sets to pullPolicy: Never with no image
+  # built or loaded into the e2e kind cluster, so a live install that
+  # resolves a public https:// origin (e.g. the access-ingress.yaml overlay)
+  # would schedule a real voice pod that can never pull its image, and
+  # `helm --wait` would time out. Disable it here the same way the other
+  # private-image workloads are disabled; the chart's own rendering behavior
+  # for voice is already covered by tests/voice-worker.sh via `helm template`.
+  enabled: false
+
 langwatch_nlp:
   replicaCount: 0
 
