@@ -23,9 +23,10 @@ import { lwqlQuerySchema } from "../[[...route]]/schemas";
 
 const RUN_PATH = "/api/v1/query";
 const SCHEMA_PATH = "/api/v1/query/schema";
+const REFERENCE_PATH = "/api/v1/query/reference";
 
 /**
- * The door is shut to an anonymous caller.
+ * The doors are shut to an anonymous caller.
  *
  * A regression suite for a real hole. The door is `handlerManagedAuth` — it
  * fans any key out across the projects it can read, which no route-level policy
@@ -61,10 +62,14 @@ describe("given a caller presents no credential", () => {
 
   const schemaCall = () => send(SCHEMA_PATH, { method: "GET" });
 
-  describe("when either door is called", () => {
+  const referenceCall = () => send(REFERENCE_PATH, { method: "GET" });
+
+  describe("when any door is called", () => {
+    /** @scenario "An anonymous caller is refused before reaching the handler" */
     it.each([
       ["POST /api/v1/query", runCall],
       ["GET /api/v1/query/schema", schemaCall],
+      ["GET /api/v1/query/reference", referenceCall],
     ])("refuses %s with 401 rather than reaching the handler", async (_label, call) => {
       const { status, body } = await call();
 

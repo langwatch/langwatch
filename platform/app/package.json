@@ -18,6 +18,7 @@
 		"lint": "node ../../dev/scripts/check-queue.mjs pnpm exec biome check ./src ./ee ./scripts ./e2e ./prisma ./vite --max-diagnostics=1000",
 		"lint:plugins": "node ../../dev/scripts/check-queue.mjs pnpm exec biome lint --only=plugin --max-diagnostics=none ./src ./ee",
 		"lint:fix": "node ../../dev/scripts/check-queue.mjs pnpm exec biome check --write ./src ./ee ./scripts ./e2e ./prisma ./vite --max-diagnostics=1000",
+		"generate:query-reference-fixture": "tsx scripts/generate-query-reference-fixture.ts",
 		"check:feature-parity": "tsx scripts/check-feature-parity.ts",
 		"check:openapi-completeness": "tsx scripts/check-openapi-completeness.ts",
 		"check:openapi-route-coverage": "tsx scripts/check-openapi-route-coverage.ts",

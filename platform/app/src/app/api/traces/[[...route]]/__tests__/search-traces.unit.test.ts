@@ -650,3 +650,188 @@ describe("POST /search", () => {
     });
   });
 });
+
+/**
+ * The `filter` field: the Trace Explorer's query language over the API-key
+ * door.
+ *
+ * The translation is real here — the parser, the semantic check and the
+ * ClickHouse compiler all run — and only the datastore is mocked, so a filter
+ * that stops compiling fails as a 422 assertion rather than as a silently
+ * ignored condition.
+ */
+describe("POST /search with a trace filter", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetAllTracesForProject.mockResolvedValue({
+      groups: [],
+      totalHits: 0,
+      traceChecks: {},
+    });
+  });
+
+  describe("when the filter is well formed", () => {
+    it("passes a compiled condition down, not the string", async () => {
+      await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        filter: "status:error",
+      });
+      const options = mockGetAllTracesForProject.mock.calls[0]?.[2] as {
+        filterWhere?: { sql: string; params: Record<string, unknown> };
+      };
+      expect(options.filterWhere?.sql).toContain("ContainsErrorStatus");
+      expect(options.filterWhere?.params.tenantId).toBe("project-123");
+    });
+
+    it("bounds the translation to the window the search asked for", async () => {
+      await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        filter: "status:error",
+      });
+      const options = mockGetAllTracesForProject.mock.calls[0]?.[2] as {
+        filterWhere?: { params: Record<string, unknown> };
+      };
+      expect(options.filterWhere?.params.timeFrom).toBe(1000);
+      expect(options.filterWhere?.params.timeTo).toBe(5000);
+    });
+
+    it("does not forward the raw string as a search field", async () => {
+      await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        filter: "status:error",
+      });
+      const input = mockGetAllTracesForProject.mock.calls[0]?.[0] as {
+        filter?: string;
+      };
+      expect(input.filter).toBeUndefined();
+    });
+  });
+
+  describe("when no filter is sent", () => {
+    /** @scenario "An empty filter is the same request as no filter" */
+    it("sends no condition at all", async () => {
+      await searchRequest({ startDate: 1000, endDate: 5000 });
+      const options = mockGetAllTracesForProject.mock.calls[0]?.[2] as {
+        filterWhere?: unknown;
+      };
+      expect(options.filterWhere).toBeUndefined();
+    });
+  });
+
+  describe("when the filter is whitespace", () => {
+    it("is the same request as no filter", async () => {
+      await searchRequest({ startDate: 1000, endDate: 5000, filter: "   " });
+      const options = mockGetAllTracesForProject.mock.calls[0]?.[2] as {
+        filterWhere?: unknown;
+      };
+      expect(options.filterWhere).toBeUndefined();
+    });
+  });
+
+  describe("when the filter cannot be parsed", () => {
+    /** @scenario "A malformed filter is a validation failure naming the field" */
+    it("answers 422 naming the filter field", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        filter: "status:",
+      });
+      expect(res.status).toBe(422);
+      const body = (await res.json()) as {
+        error: string;
+        fields: string[];
+        reasons: { meta: { type: string; received?: string } }[];
+      };
+      expect(body.error).toBe("validation_error");
+      expect(body.fields).toEqual(["filter"]);
+      expect(body.reasons[0]?.meta.type).toBe("invalid_filter_syntax");
+      expect(mockGetAllTracesForProject).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a span clause rides the updated axis", () => {
+    /**
+     * A span clause matches spans by when they started; the updated axis
+     * selects traces by when they were last modified. A trace modified today
+     * can have started last week, and combining the two would drop it with
+     * nothing in the response to say so.
+     */
+    /** @scenario "A span clause is refused on the updated axis rather than silently dropping traces" */
+    it("answers 422 rather than a result set missing rows", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        dateField: "updated",
+        filter: "span.attribute.gen_ai.request.model:gpt-5-mini",
+      });
+      expect(res.status).toBe(422);
+      const body = (await res.json()) as {
+        fields: string[];
+        reasons: { meta: { type: string } }[];
+      };
+      expect(body.fields).toEqual(["filter"]);
+      expect(body.reasons[0]?.meta.type).toBe(
+        "filter_unsupported_on_updated_axis",
+      );
+      expect(mockGetAllTracesForProject).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A span clause is refused on the updated axis rather than silently dropping traces" */
+    it("allows a trace-level clause on the same axis", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        dateField: "updated",
+        filter: "status:error",
+      });
+      expect(res.status).toBe(200);
+      const options = mockGetAllTracesForProject.mock.calls[0]?.[2] as {
+        filterWhere?: { sql: string };
+      };
+      expect(options.filterWhere?.sql).toContain("ContainsErrorStatus");
+    });
+
+    /** @scenario "A span clause is refused on the updated axis rather than silently dropping traces" */
+    it("allows the same span clause on the occurred axis", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        filter: "span.attribute.gen_ai.request.model:gpt-5-mini",
+      });
+      expect(res.status).toBe(200);
+      const options = mockGetAllTracesForProject.mock.calls[0]?.[2] as {
+        filterWhere?: { sql: string };
+      };
+      expect(options.filterWhere?.sql).toContain("stored_spans");
+    });
+  });
+
+  describe("when the filter names a field the language does not have", () => {
+    /** @scenario "A filter naming an unknown field lists the fields that exist" */
+    it("answers 422 and names the fields that exist", async () => {
+      const res = await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        filter: "statuz:error",
+      });
+      expect(res.status).toBe(422);
+      const body = (await res.json()) as {
+        error: string;
+        fields: string[];
+        reasons: {
+          meta: { type: string; expected?: string[]; received?: string };
+        }[];
+      };
+      expect(body.error).toBe("validation_error");
+      expect(body.fields).toEqual(["filter"]);
+      const reason = body.reasons[0]?.meta;
+      expect(reason?.type).toBe("unknown_filter_field");
+      expect(reason?.received).toBe("statuz");
+      expect(reason?.expected).toContain("status");
+      expect(mockGetAllTracesForProject).not.toHaveBeenCalled();
+    });
+  });
+});

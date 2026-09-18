@@ -411,29 +411,6 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
-  // LangWatchQL query — the door a headless coding agent runs analytics SQL
-  // through. Project-implicit: no `--project` flag, no `X-Project-Id`
-  // header, the configured API key alone decides the reachable rows. Speaks
-  // the output port: `data` is the rows array, so `-o json` is the primary
-  // spelling; `table` is the human fallback.
-  emitsResult(
-    program
-      .command("query <sql>")
-      .description(
-        "Run a read-only LangWatchQL SELECT against your analytics data and print the rows.",
-      ),
-    async (sql: string) => {
-      try {
-        const { queryCommand } = await import("./commands/query.js");
-        return await queryCommand(sql);
-      } catch (error) {
-        const { reportCommandError } = await import("./utils/errorOutput.js");
-        reportCommandError({ error });
-        process.exit(1);
-      }
-    },
-  );
-
   // AI Gateway governance — wrapped tool runners.
   // Each `langwatch <tool>` exec's the underlying binary with the
   // right ANTHROPIC_*/OPENAI_*/GEMINI_* env vars injected pointing
@@ -2897,6 +2874,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         "-q, --query <query>",
         "Text search query. Plain text only: AND, OR and NOT are matched as words, not as operators",
       )
+      .option(
+        "--filter <filter>",
+        'Trace filter, the language the Trace Explorer search bar speaks: "status:error AND model:gpt-*", "trace.attribute.langwatch.user_id:alice", "evaluatorVerdict:fail". Combined with -q and the other flags. `langwatch trace fields` lists every field',
+      )
       .option("--start-date <date>", "Start date (ISO string or epoch ms, default: 24h ago)")
       .option("--end-date <date>", "End date (ISO string or epoch ms, default: now)")
       .option("--limit <n>", "Max results to return (default: 25)")
@@ -2966,6 +2947,126 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     const { transcriptTraceCommand: impl } = await import("./commands/traces/transcript.js");
     await impl(traceId, command.optsWithGlobals());
   });
+
+  emitsResult(
+    traceCmd
+      .command("facets [field]")
+      .description(
+        "Discover what the filter fields actually hold in this project. With no field, every facet and its top values; with a field, that field's values and counts",
+      )
+      .option("--prefix <prefix>", "Only values starting with this. Needs a field")
+      .option("--limit <n>", "Values to return, 1 to 1000 (default: 50). Needs a field")
+      .option("--start-date <date>", "Start date (ISO string or epoch ms, default: 24h ago)")
+      .option("--end-date <date>", "End date (ISO string or epoch ms, default: now)")
+      .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (field: string | undefined, options: Record<string, string>) => {
+      const { traceFacetsCommand: impl } = await import("./commands/traces/facets.js");
+      return impl(field, options);
+    },
+  );
+
+  emitsResult(
+    traceCmd
+      .command("fields")
+      .description(
+        "List every field a trace filter can name, with its value type and group",
+      )
+      .option("--syntax", "Print the filter language's syntax instead of the field list")
+      .option("--examples", "Print worked filter queries instead of the field list")
+      .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: Record<string, string>) => {
+      const { traceFieldsCommand: impl } = await import("./commands/traces/fields.js");
+      return impl(options);
+    },
+  );
+
+  // Add query command group — LangWatchQL analytics SQL, run as written.
+  //
+  // `run` is the DEFAULT subcommand, so `langwatch query "SELECT …"` reaches it
+  // with the statement as its argument while `langwatch query schema` still
+  // resolves to the sibling. Without the default, commander would read the
+  // statement as an unknown subcommand name.
+  const queryCmd = program
+    .command("query")
+    .description("Run LangWatchQL analytics SQL and discover what can be queried");
+
+  emitsResult(
+    queryCmd
+      .command("run [sql]", { isDefault: true })
+      .description("Run one LangWatchQL statement, exactly as written")
+      .option("--sql-file <path>", "Read the statement from a file instead of the argument")
+      .option(
+        "--start <datetime>",
+        "Period start for statements declaring {dashboard_context_period_start:DateTime}",
+      )
+      .option(
+        "--end <datetime>",
+        "Period end for statements declaring {dashboard_context_period_end:DateTime}",
+      )
+      .option("--param <key=value>", "Bound parameter value (repeatable)", collectParam)
+      .option("--limit <n>", "Rows to keep from the result")
+      .option(
+        "--format <format>",
+        "table (default), json, jsonl (one object per row, JSON columns parsed back) or csv",
+        "table",
+      )
+      .option(
+        "--page-by <mode>",
+        "keyset: walk every page by rebinding the statement's {after_ts} and {after_id} parameters, without rewriting the statement",
+      )
+      .option("--out <file>", "Write the result to a file instead of stdout")
+      .option("--project <idOrSlug>", PROJECT_FLAG_HELP),
+    async (sql: string | undefined, options: Record<string, string>) => {
+      const { runQueryCommand: impl } = await import("./commands/query/run.js");
+      return impl(sql, options);
+    },
+  );
+
+  emitsResult(
+    queryCmd
+      .command("schema")
+      .description("List the analytics views and columns a statement can name")
+      .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { project?: string }) => {
+      const { queryLwqlSchemaCommand: impl } = await import("./commands/query/schema.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    queryCmd
+      .command("reference")
+      .description(
+        "Describe both query languages: the analytics SQL, the trace filter, worked examples, and which one answers which question",
+      )
+      .option(
+        "--section <section>",
+        "Print one section only: lwql, trace-filter, examples or decisions",
+      )
+      .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { section?: string; project?: string }) => {
+      const { queryReferenceCommand: impl } = await import("./commands/query/reference.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    queryCmd
+      .command("examples")
+      .description("Print worked queries in both languages, with their parameters")
+      .option("--tag <tag>", "Only examples carrying this tag or intent")
+      .option("--language <language>", "Only examples in this language: lwql or trace-filter")
+      .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { tag?: string; language?: string; project?: string }) => {
+      const { queryExamplesCommand: impl } = await import("./commands/query/examples.js");
+      return impl(options);
+    },
+  );
 
   // Add session command group
   const sessionCmd = program

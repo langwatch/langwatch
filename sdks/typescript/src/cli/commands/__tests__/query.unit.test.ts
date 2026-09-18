@@ -67,7 +67,10 @@ beforeEach(() => {
   });
   vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
     exited.push(code ?? 0);
-    return undefined as never;
+    // Thrown rather than returned: the real `process.exit` never comes back,
+    // and a stub that does lets the command run on past its own refusal and
+    // fail on state the exit was there to avoid reaching.
+    throw new ProcessExitError(code ?? 0);
   }) as never);
 });
 
@@ -80,11 +83,22 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** The sentinel the `process.exit` stub throws, so a refusal stops the command. */
+class ProcessExitError extends Error {
+  constructor(readonly code: number) {
+    super(`process.exit(${code})`);
+  }
+}
+
 const runQuery = async (argv: string[]): Promise<void> => {
   const { buildProgram } = await import("../../program.js");
   const program = buildProgram();
   program.exitOverride();
-  await program.parseAsync(["query", ...argv], { from: "user" });
+  try {
+    await program.parseAsync(["query", ...argv], { from: "user" });
+  } catch (error) {
+    if (!(error instanceof ProcessExitError)) throw error;
+  }
 };
 
 describe("given a QueryApiService that returns rows", () => {
