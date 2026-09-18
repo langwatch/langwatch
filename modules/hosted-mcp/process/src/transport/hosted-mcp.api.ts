@@ -27,16 +27,12 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 
 import type { HostedMcpRedis, HostedMcpDependencies } from "../app/hosted-mcp-members.ts";
+import { RedisMcpOAuthTokenRepository } from "../repositories/redis/redis.mcp-oauth-token.repository.ts";
 import { McpOAuthClientRegistryService } from "../services/mcp-oauth-client-registry.service.ts";
+import { McpOAuthTokenService } from "../services/mcp-oauth-token.service.ts";
 import { McpRateLimitService } from "../services/mcp-rate-limit.service.ts";
 
 const logger = createLogger("langwatch:mcp");
-
-/** Redis key prefix for OAuth tokens. */
-const REDIS_TOKEN_PREFIX = "mcp:oauth:token:";
-
-/** Redis key prefix for MCP authorization codes. */
-const REDIS_AUTH_CODE_PREFIX = "mcp:auth_code:";
 
 /** Redis key prefix for MCP transport sessions. */
 const REDIS_SESSION_PREFIX = "mcp:session:";
@@ -73,7 +69,6 @@ const GRANT_REVOKED_CODE = "mcp_grant_revoked";
 const MAX_SESSIONS_PER_KEY = 20;
 
 /** Entropy sources; never read back by kind, only ever re-hashed or opaque. */
-const OAUTH_TOKEN_ENTROPY_KSUID_RESOURCE = "mcptoken";
 const OAUTH_CLIENT_KSUID_RESOURCE = "mcp";
 const SESSION_KSUID_RESOURCE = "mcpsession";
 
@@ -128,14 +123,6 @@ interface SseSessionState {
   apiKey: string;
   userId?: string;
   lastActivityAt: number;
-}
-
-/** OAuth token entry stored in memory and Redis. */
-interface OAuthTokenEntry {
-  apiKey: string;
-  /** OAuth-flowing user id captured at /mcp/authorize. */
-  userId?: string;
-  expiresAt: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -291,7 +278,10 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
   // Use Map to avoid prototype pollution — sessionId comes from user input
   const sessions = new Map<string, SessionState>();
   const sseSessions = new Map<string, SseSessionState>();
-  const oauthTokens = new Map<string, OAuthTokenEntry>();
+  const oauthTokens = McpOAuthTokenService.create({
+    repository: RedisMcpOAuthTokenRepository.create({ redis }),
+    cipher,
+  });
 
   // The last answer the grant probe gave for a bearer, and when. Read by the
   // 401 senders so a refused caller learns the grant is gone rather than that
@@ -345,12 +335,8 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
       }
     }
 
-    // Sweep expired in-memory OAuth token cache (Redis is source of truth)
-    for (const [token, entry] of oauthTokens) {
-      if (now >= entry.expiresAt) {
-        oauthTokens.delete(token);
-      }
-    }
+    // Sweep expired in-memory OAuth token cache (Redis is source of truth).
+    oauthTokens.reapExpired();
 
     // Sweep grant probes that have gone stale; the next request re-proves them.
     for (const [token, check] of grantChecks) {
@@ -558,7 +544,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
   async function resolveSessionContext(
     token: string,
   ): Promise<{ apiKey: string; userId?: string } | null> {
-    const context = await lookupSessionContext(token);
+    const context = await oauthTokens.resolve(token);
     if (!context) return null;
     // A token minted by the OAuth flow carries the person who approved it, and
     // that approval is what this endpoint runs on. A direct project key carries
@@ -605,55 +591,6 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
   /** Whether this bearer was refused because its minting grant is gone. */
   function isGrantRevoked(token: string): boolean {
     return grantChecks.get(token)?.granted === false;
-  }
-
-  async function lookupSessionContext(
-    token: string,
-  ): Promise<{ apiKey: string; userId?: string } | null> {
-    // 1. Check in-memory OAuth token cache
-    const memEntry = oauthTokens.get(token);
-    if (memEntry) {
-      if (nowInstant().epochMilliseconds < memEntry.expiresAt) {
-        return { apiKey: memEntry.apiKey, userId: memEntry.userId };
-      }
-      oauthTokens.delete(token);
-      return null;
-    }
-
-    // 2. Check Redis for OAuth token (API key is encrypted at rest)
-    if (redis) {
-      try {
-        const redisData = await redis.get(`${REDIS_TOKEN_PREFIX}${token}`);
-        if (redisData) {
-          const stored = JSON.parse(redisData) as {
-            encryptedApiKey: string;
-            userId?: string;
-            expiresAt: number;
-          };
-          if (nowInstant().epochMilliseconds < stored.expiresAt) {
-            const apiKey = decrypt(stored.encryptedApiKey);
-            // Re-populate in-memory cache
-            oauthTokens.set(token, {
-              apiKey,
-              userId: stored.userId,
-              expiresAt: stored.expiresAt,
-            });
-            return { apiKey, userId: stored.userId };
-          }
-          await redis.del(`${REDIS_TOKEN_PREFIX}${token}`);
-          return null;
-        }
-      } catch (err) {
-        // Redis is down — fall through to treat token as a direct API key.
-        // This is safe because validateApiKey() will still check the key
-        // against the database, rejecting any invalid tokens.
-        logger.error({ error: err }, "Redis token lookup failed");
-      }
-    }
-
-    // 3. Treat as direct API key (only reached when token was not found in
-    //    either the in-memory cache or Redis). No OAuth user identity.
-    return { apiKey: token };
   }
 
   /**
@@ -720,46 +657,6 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
       "Running with session config",
     );
     return runWithConfig({ ...baseConfig, apiKey }, fn);
-  }
-
-  // -------------------------------------------------------------------------
-  // OAuth token generation
-  // -------------------------------------------------------------------------
-
-  function generateAccessToken(): string {
-    return createHash("sha256")
-      .update(generate(OAUTH_TOKEN_ENTROPY_KSUID_RESOURCE).toString())
-      .digest("hex");
-  }
-
-  async function storeOAuthToken(
-    accessToken: string,
-    apiKey: string,
-    expiresIn: number,
-    userId?: string,
-  ): Promise<void> {
-    const entry: OAuthTokenEntry = {
-      apiKey,
-      userId,
-      expiresAt: nowInstant().epochMilliseconds + expiresIn * 1000,
-    };
-
-    // Store in memory (plaintext — process-local, not persisted)
-    oauthTokens.set(accessToken, entry);
-
-    // Store in Redis with encrypted API key
-    if (redis) {
-      try {
-        const redisEntry = JSON.stringify({
-          encryptedApiKey: encrypt(apiKey),
-          userId,
-          expiresAt: entry.expiresAt,
-        });
-        await redis.set(`${REDIS_TOKEN_PREFIX}${accessToken}`, redisEntry, "EX", expiresIn);
-      } catch (err) {
-        logger.error({ error: err }, "Failed to store OAuth token in Redis");
-      }
-    }
   }
 
   // -------------------------------------------------------------------------
@@ -1143,172 +1040,17 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
     const raw = await readRawBody(req, res);
     if (raw === undefined) return;
     const params = parseFormBody(raw);
+    const clientId = params.client_id ?? clientIdFromBasicAuth(req);
+    if (clientId) noteLogFields(res, { clientId });
 
-    if (params.grant_type !== "authorization_code") {
-      sendJson(res, 400, {
-        error: "unsupported_grant_type",
-        error_description: "Only authorization_code grant type is supported",
-      });
-      return;
-    }
-
-    const code = params.code;
-    if (!code) {
-      sendJson(res, 400, {
-        error: "invalid_request",
-        error_description: "code is required",
-      });
-      return;
-    }
-
-    const codeVerifier = params.code_verifier;
-    if (!codeVerifier) {
-      sendJson(res, 400, {
-        error: "invalid_request",
-        error_description: "code_verifier is required",
-      });
-      return;
-    }
-
-    // RFC 6749 §4.1.3: redirect_uri MUST be present here and MUST be
-    // identical to the one used at the authorization request. §3.2.1: a
-    // public client (this one — token_endpoint_auth_method "none") MUST
-    // include client_id. Both are re-checked against what /mcp/authorize
-    // bound to the code below, once it's decoded.
-    const redirectUriParam = params.redirect_uri;
-    if (!redirectUriParam) {
-      sendJson(res, 400, {
-        error: "invalid_request",
-        error_description: "redirect_uri is required",
-      });
-      return;
-    }
-    const clientIdParam = params.client_id ?? clientIdFromBasicAuth(req);
-    if (!clientIdParam) {
-      sendJson(res, 400, {
-        error: "invalid_request",
-        error_description: "client_id is required",
-      });
-      return;
-    }
-    noteLogFields(res, { clientId: clientIdParam });
-
-    // Look up auth code from Redis
-    if (!redis) {
-      sendJson(res, 500, { error: "server_error" });
-      return;
-    }
-
-    const redisKey = `${REDIS_AUTH_CODE_PREFIX}${code}`;
-    let authCodeData: string | null;
-    try {
-      authCodeData = await redis.get(redisKey);
-    } catch (err) {
-      logger.error({ error: err }, "Redis auth code lookup failed");
-      sendJson(res, 500, { error: "server_error" });
-      return;
-    }
-
-    if (!authCodeData) {
-      // A registration that fell out of Redis takes its outstanding codes with
-      // it, and both failures look the same from here. Telling a client whose
-      // registration is gone that its *code* was bad sends it round the
-      // authorize loop forever; `invalid_client` is the code that makes it
-      // register again (RFC 6749 §5.2).
-      const registeredClient = await McpOAuthClientRegistryService.get({
-        redis,
-        clientId: clientIdParam,
-      }).catch(() => null);
-      if (!registeredClient) {
-        sendJson(res, 401, {
-          error: "invalid_client",
-          error_description: "Unknown client_id — register again via dynamic client registration",
-        });
-        return;
-      }
-      sendJson(res, 400, {
-        error: "invalid_grant",
-        error_description: "Invalid or expired authorization code",
-      });
-      return;
-    }
-
-    // Delete the code immediately (one-time use)
-    await redis.del(redisKey).catch((err: unknown) => {
-      logger.error({ error: err }, "Failed to delete auth code from Redis");
+    const exchange = await oauthTokens.redeem({
+      grantType: params.grant_type,
+      code: params.code,
+      codeVerifier: params.code_verifier,
+      redirectUri: params.redirect_uri,
+      clientId,
     });
-
-    let stored: {
-      projectId: string;
-      encryptedApiKey: string;
-      userId?: string;
-      codeChallenge: string;
-      codeChallengeMethod: string;
-      redirectUri: string;
-      clientId: string;
-      expiresAt: number;
-    };
-    try {
-      stored = JSON.parse(authCodeData);
-    } catch {
-      sendJson(res, 400, {
-        error: "invalid_grant",
-        error_description: "Corrupted authorization code",
-      });
-      return;
-    }
-
-    // Bind the exchange to the exact client_id + redirect_uri /mcp/authorize
-    // validated and recorded for this code — a code minted for one client's
-    // registered URI must never be redeemable against a different one.
-    if (stored.redirectUri !== redirectUriParam) {
-      sendJson(res, 400, {
-        error: "invalid_grant",
-        error_description: "redirect_uri does not match the authorization request",
-      });
-      return;
-    }
-    if (stored.clientId !== clientIdParam) {
-      sendJson(res, 400, {
-        error: "invalid_grant",
-        error_description: "client_id does not match the authorization request",
-      });
-      return;
-    }
-
-    // Check expiration
-    if (nowInstant().epochMilliseconds >= stored.expiresAt) {
-      sendJson(res, 400, {
-        error: "invalid_grant",
-        error_description: "Authorization code has expired",
-      });
-      return;
-    }
-
-    // PKCE S256 verification: base64url(SHA256(code_verifier)) == code_challenge
-    const computedChallenge = createHash("sha256").update(codeVerifier).digest("base64url");
-
-    if (computedChallenge !== stored.codeChallenge) {
-      sendJson(res, 400, {
-        error: "invalid_grant",
-        error_description: "PKCE code_verifier does not match code_challenge",
-      });
-      return;
-    }
-
-    // Decrypt the API key
-    const apiKey = decrypt(stored.encryptedApiKey);
-
-    const expiresIn = TOKEN_TTL_SECONDS;
-    const accessToken = generateAccessToken();
-
-    await storeOAuthToken(accessToken, apiKey, expiresIn, stored.userId);
-
-    sendJson(res, 200, {
-      access_token: accessToken,
-      token_type: "Bearer",
-      expires_in: expiresIn,
-    });
+    sendJson(res, exchange.status, exchange.body);
   }
 
   /**
@@ -1960,7 +1702,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
   // -------------------------------------------------------------------------
 
   function clearTokenCache(): void {
-    oauthTokens.clear();
+    oauthTokens.clearCache();
     grantChecks.clear();
   }
 

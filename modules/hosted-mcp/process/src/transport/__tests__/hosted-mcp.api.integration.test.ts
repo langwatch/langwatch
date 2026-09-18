@@ -40,6 +40,7 @@ const mockPrisma = {
 
 const mockRedis = {
   get: vi.fn(),
+  call: vi.fn(),
   set: vi.fn(),
   del: vi.fn(),
   expire: vi.fn(),
@@ -249,6 +250,12 @@ function mockAuthCodeInRedis({
   mockRedis.get.mockImplementation((key: string) =>
     redisGetWithRegisteredClient(key, { [`mcp:auth_code:${code}`]: entry }),
   );
+  mockRedis.call.mockImplementation((command: string, key: string) => {
+    if (command === "GETDEL" && key === `mcp:auth_code:${code}`) return Promise.resolve(entry);
+    return Promise.resolve(null);
+  });
+
+  return entry;
 }
 
 async function sendRequest({
@@ -348,6 +355,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRedis.get.mockImplementation((key: string) => redisGetWithRegisteredClient(key));
+    mockRedis.call.mockResolvedValue(null);
     mockRedis.set.mockResolvedValue("OK");
     mockRedis.del.mockResolvedValue(1);
     mockRedis.expire.mockResolvedValue(1);
@@ -475,8 +483,43 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       expect(body.token_type).toBe("Bearer");
       expect(body.expires_in).toBe(30 * 24 * 3600); // 30 days
 
-      // Verify the auth code was deleted (one-time use)
-      expect(mockRedis.del).toHaveBeenCalledWith(`mcp:auth_code:${code}`);
+      // Atomic consume makes the authorization code one-time even under concurrent exchanges.
+      expect(mockRedis.call).toHaveBeenCalledWith("GETDEL", `mcp:auth_code:${code}`);
+    });
+  });
+
+  describe("when two clients redeem the same authorization code concurrently", () => {
+    it("issues one token and rejects the spent exchange", async () => {
+      const code = randomUUID();
+      const { codeVerifier, codeChallenge } = createPkceChallenge();
+      const entry = mockAuthCodeInRedis({ code, codeChallenge });
+      mockRedis.call.mockReset();
+      mockRedis.call.mockResolvedValueOnce(entry).mockResolvedValue(null);
+
+      const addr = server.address();
+      const port = typeof addr === "object" && addr ? addr.port : 0;
+      const request = () =>
+        fetch(`http://127.0.0.1:${port}/oauth/token`, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: formBody({
+            grant_type: "authorization_code",
+            code,
+            code_verifier: codeVerifier,
+            redirect_uri: TEST_REDIRECT_URI,
+            client_id: TEST_CLIENT_ID,
+          }),
+        });
+
+      const responses = await Promise.all([request(), request()]);
+      const successful = responses.find((response) => response.status === 200);
+      const refused = responses.find((response) => response.status === 400);
+
+      expect(successful).toBeDefined();
+      expect(refused).toBeDefined();
+      expect(((await successful!.json()) as Record<string, unknown>).access_token).toBeDefined();
+      expect(((await refused!.json()) as Record<string, unknown>).error).toBe("invalid_grant");
+      expect(mockRedis.call).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -505,6 +548,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       const body = (await res.json()) as Record<string, unknown>;
       expect(body.error).toBe("invalid_grant");
       expect(body.error_description).toContain("code_verifier");
+      expect(mockRedis.call).toHaveBeenCalledWith("GETDEL", `mcp:auth_code:${code}`);
     });
   });
 
@@ -1120,6 +1164,22 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       });
 
       expect(res.status).toBe(401);
+    });
+  });
+
+  describe("when a present OAuth token record is corrupted", () => {
+    it("removes it and refuses the token instead of treating it as a direct API key", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue(validProject());
+      mockRedis.get.mockResolvedValue("not-json");
+
+      const res = await sendRequest({
+        server,
+        body: mcpInitializeBody(),
+        headers: { authorization: `Bearer ${VALID_API_KEY}` },
+      });
+
+      expect(res.status).toBe(401);
+      expect(mockRedis.del).toHaveBeenCalledWith(`mcp:oauth:token:${VALID_API_KEY}`);
     });
   });
 
