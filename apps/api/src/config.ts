@@ -1,4 +1,18 @@
+import { agentServerConfigDefinition } from "@langwatch/agent-contract";
 import {
+  analyticsServerConfigDefinition,
+  assertAnalyticsServerConfig,
+} from "@langwatch/analytics-contract";
+import { apiKeyServerConfigDefinition } from "@langwatch/api-key-contract";
+import { assertAuthServerConfig, authServerConfigDefinition } from "@langwatch/auth-contract";
+import { authzServerConfigDefinition } from "@langwatch/authz-contract";
+import {
+  parseRoutingTable,
+  poolSizingFromEnv,
+  type PoolSizingInput,
+} from "@langwatch/clickhouse-client";
+import {
+  deploymentPublicBaseUrl,
   assertObservabilityDoesNotSelfIngest,
   clickhouseConfigDefinition,
   Config,
@@ -18,40 +32,33 @@ import {
   portSchema,
   type ConfigValue,
 } from "@langwatch/config";
-import { agentServerConfigDefinition } from "@langwatch/agent-contract";
-import {
-  analyticsServerConfigDefinition,
-  assertAnalyticsServerConfig,
-} from "@langwatch/analytics-contract";
-import { apiKeyServerConfigDefinition } from "@langwatch/api-key-contract";
-import { assertAuthServerConfig, authServerConfigDefinition } from "@langwatch/auth-contract";
-import { authzServerConfigDefinition } from "@langwatch/authz-contract";
-import {
-  assertBillingServerConfig,
-  billingServerConfigDefinition,
-} from "@langwatch/enterprise-billing-contract";
 import {
   dataRetentionServerConfigDefinition,
   resolvePlatformDefaultRetentionDays,
 } from "@langwatch/data-retention-contract";
+import {
+  assertBillingServerConfig,
+  billingServerConfigDefinition,
+} from "@langwatch/enterprise-billing-contract";
+import { licensingServerConfigDefinition } from "@langwatch/enterprise-licensing-contract";
+import { managedProviderServerConfigDefinition } from "@langwatch/enterprise-managed-provider-contract";
+import { saasServerConfigDefinition } from "@langwatch/enterprise-saas-contract";
+import { scimServerConfigDefinition } from "@langwatch/enterprise-scim-contract";
 import { evaluationServerConfigDefinition } from "@langwatch/evaluation-contract";
+import { resolveFeatureFlagConfig, type FeatureFlagConfig } from "@langwatch/feature-flag-contract";
 import {
   assertGatewaySecretsAllOrNone,
   gatewayServerConfigDefinition,
 } from "@langwatch/gateway-contract";
 import { githubServerConfigDefinition } from "@langwatch/github-contract";
+import { resolveGroupQueuePolicyFromEnv, type GroupQueuePolicy } from "@langwatch/group-queue";
 import { langyServerConfigDefinition } from "@langwatch/langy-contract";
-import { licensingServerConfigDefinition } from "@langwatch/enterprise-licensing-contract";
-import { managedProviderServerConfigDefinition } from "@langwatch/enterprise-managed-provider-contract";
-import { modelProviderServerConfigDefinition,getLatestOpenAIChatFlagship } from "@langwatch/model-provider-contract";
+import {
+  modelProviderServerConfigDefinition,
+  getLatestOpenAIChatFlagship,
+} from "@langwatch/model-provider-contract";
 import { notificationServerConfigDefinition } from "@langwatch/notification-contract";
-import { opsServerConfigDefinition } from "@langwatch/ops-contract";
-import { platformHealthServerConfigDefinition } from "@langwatch/platform-health-contract";
-import { saasServerConfigDefinition } from "@langwatch/enterprise-saas-contract";
-import { scimServerConfigDefinition } from "@langwatch/enterprise-scim-contract";
-import { secretServerConfigDefinition } from "@langwatch/secret-contract";
-import { storedObjectServerConfigDefinition } from "@langwatch/stored-object-contract";
-import { workflowServerConfigDefinition } from "@langwatch/workflow-contract";
+import { EmailProviderService, type MailerConfiguration } from "@langwatch/notification-process";
 import {
   createLogger,
   loggerConfigurationFrom,
@@ -59,25 +66,22 @@ import {
   type LoggerConfiguration,
 } from "@langwatch/observability";
 import {
-  parseRoutingTable,
-  poolSizingFromEnv,
-  type PoolSizingInput,
-} from "@langwatch/clickhouse-client";
-import {
   otlpMetricsExportOptionsFrom,
   type OtlpMetricsExportOptions,
   type ProcessObservabilityOptions,
 } from "@langwatch/observability/node";
-import { resolveGroupQueuePolicyFromEnv, type GroupQueuePolicy } from "@langwatch/group-queue";
-import { EmailProviderService, type MailerConfiguration } from "@langwatch/notification-server";
-import { resolveFeatureFlagConfig, type FeatureFlagConfig } from "@langwatch/feature-flag-contract";
+import { opsServerConfigDefinition } from "@langwatch/ops-contract";
+import type { RequestBoundsOverrides } from "@langwatch/plans";
+import { platformHealthServerConfigDefinition } from "@langwatch/platform-health-contract";
 import { RedisConfigService, type RedisConfigResolution } from "@langwatch/redis-client";
+import { secretServerConfigDefinition } from "@langwatch/secret-contract";
+import { storedObjectServerConfigDefinition } from "@langwatch/stored-object-contract";
 import type {
   AzureBlobCredentialsConfig,
   AzureInjectedIdentity,
-} from "@langwatch/stored-object-server";
-import { buildStudioLambdaConfig, type StudioLambdaConfig } from "@langwatch/workflow-server";
-import type { RequestBoundsOverrides } from "@langwatch/plans";
+} from "@langwatch/stored-object-process";
+import { workflowServerConfigDefinition } from "@langwatch/workflow-contract";
+import { buildStudioLambdaConfig, type StudioLambdaConfig } from "@langwatch/workflow-process";
 import { z } from "zod";
 
 const optionalEnvironmentString = z.string().optional();
@@ -292,7 +296,7 @@ export const apiConfigDefinition = RuntimeConfig.define({
      */
     execution: {
       langevalsEndpoint: evaluationServerConfigDefinition.langevalsEndpoint,
-      publicBaseUrl: Config.value(optionalEnvironmentString, { env: "BASE_HOST" }),
+      publicBaseUrl: deploymentPublicBaseUrl,
     },
     /**
      * `isSaas` gates SYSTEM providers explicitly, never inferred from an
@@ -450,7 +454,7 @@ export type ApiStoredObjectsConfigResolution = Readonly<{
   }>;
   /**
    * The Azure Blob block, as read. Every rule about which of these a given
-   * auth mode requires lives in `@langwatch/stored-object-server`, so this is
+   * auth mode requires lives in `@langwatch/stored-object-process`, so this is
    * the raw shape its resolver takes rather than a validated credential.
    */
   azure: AzureBlobCredentialsConfig & { identity: AzureInjectedIdentity };

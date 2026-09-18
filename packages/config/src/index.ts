@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import { Config, RuntimeConfig, type ConfigValue } from "./runtime-config.ts";
 
+export { deploymentPublicBaseUrl } from "./deployment-facts.ts";
+
 export {
   nodeEnvironmentSchema,
   environmentBooleanSchema,

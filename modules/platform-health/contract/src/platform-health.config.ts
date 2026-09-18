@@ -1,4 +1,10 @@
-import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@langwatch/config";
+import {
+  Config,
+  compileRuntimeConfig,
+  deploymentPublicBaseUrl,
+  RuntimeConfig,
+  type ConfigValue,
+} from "@langwatch/config";
 import { z } from "zod";
 
 /**
@@ -11,7 +17,7 @@ import { z } from "zod";
 export const platformHealthServerConfigDefinition = RuntimeConfig.define({
   apiKey: Config.optionalSecret({ env: "PLATFORM_HEALTH_API_KEY" }),
   probeApiKey: Config.optionalSecret({ env: "PLATFORM_HEALTH_PROBE_API_KEY" }),
-  publicBaseUrl: Config.value(z.string().optional(), { env: "BASE_HOST" }),
+  publicBaseUrl: deploymentPublicBaseUrl,
 });
 
 export type PlatformHealthServerConfig = ConfigValue<typeof platformHealthServerConfigDefinition>;

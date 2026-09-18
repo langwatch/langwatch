@@ -8,6 +8,7 @@ import {
   type PoolSizingInput,
 } from "@langwatch/clickhouse-client";
 import {
+  deploymentPublicBaseUrl,
   assertObservabilityDoesNotSelfIngest,
   clickhouseConfigDefinition,
   Config,
@@ -164,7 +165,7 @@ export const workerConfigDefinition = RuntimeConfig.define({
    * `resolveWorkerMailConfig` for what its absence refuses.
    */
   mail: {
-    baseHost: Config.value(optionalEnvironmentString, { env: "BASE_HOST" }),
+    baseHost: deploymentPublicBaseUrl,
     ...notificationServerConfigDefinition,
   },
   /**

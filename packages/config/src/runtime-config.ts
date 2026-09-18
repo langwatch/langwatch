@@ -272,16 +272,19 @@ function envName(path: readonly string[]): string {
 }
 
 function compileDefinition(definition: ConfigDefinitionRoot): z.ZodTypeAny {
-  const claimed = new Map<string, string>();
+  const claimed = new Map<string, { owner: string; leaf: unknown }>();
 
-  const claim = (binding: string, path: string[]): void => {
-    const owner = claimed.get(binding);
-    if (owner !== undefined) {
+  // One env var, one meaning: a binding is exclusive unless both claimants
+  // are literally the same canonical leaf, shared through @langwatch/config.
+  const claim = (binding: string, path: string[], leaf?: unknown): void => {
+    const existing = claimed.get(binding);
+    if (existing !== undefined) {
+      if (leaf !== undefined && existing.leaf === leaf) return;
       throw new Error(
-        `Duplicate configuration environment binding: ${path.join(".")} (${binding}) is already bound by ${owner}.`,
+        `Duplicate configuration environment binding: ${path.join(".")} (${binding}) is already bound by ${existing.owner}.`,
       );
     }
-    claimed.set(binding, path.join("."));
+    claimed.set(binding, { owner: path.join("."), leaf });
   };
 
   const compile = (node: ConfigDefinitionRoot, path: string[]): z.ZodTypeAny => {
@@ -292,7 +295,7 @@ function compileDefinition(definition: ConfigDefinitionRoot): z.ZodTypeAny {
       const nextPath = [...path, key];
 
       if (isConfigLeaf(value)) {
-        claim(value.env ?? envName(nextPath), nextPath);
+        claim(value.env ?? envName(nextPath), nextPath, value);
         shape[key] = value.schema;
       } else if (typeof value === "object" && value !== null) {
         shape[key] = compile(value, nextPath);
