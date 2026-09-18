@@ -25,11 +25,17 @@ export class BrowserUiRpc extends UiRpc {
     super();
   }
 
-  query(path: string, input: unknown): Promise<unknown> {
-    return this.queryClient.fetchQuery({
-      queryKey: trpcQueryKey(path, { input, type: "query" }),
-      queryFn: () => this.transport.query(path, input),
-    });
+  /**
+   * The transport directly, then published under the shared key. NOT
+   * `fetchQuery`: it joins a fetch already in flight for that key, and the
+   * caller of this IS regularly that fetch — a `useQuery` on the same key
+   * whose `queryFn` dispatches here then awaits its own promise and never
+   * settles. See `browser-rpc-self-dispatch.integration.test.tsx`.
+   */
+  async query(path: string, input: unknown): Promise<unknown> {
+    const answer = await this.transport.query(path, input);
+    this.queryClient.setQueryData(trpcQueryKey(path, { input, type: "query" }), answer);
+    return answer;
   }
 
   subscribe(path: string, input: unknown, handlers: UiRpcSubscriptionHandlers): UiRpcSubscription {

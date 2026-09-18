@@ -25,6 +25,7 @@ function keyFor(path: string, input: unknown): readonly unknown[] {
 
 describe("given a procedure dispatched by name", () => {
   describe("when it has been read", () => {
+    /** @scenario "A dispatched procedure lands under the typed hook's key" */
     it("is invalidated by a tRPC invalidation naming that procedure", async () => {
       const queryClient = new QueryClient();
       const { transport } = transportAnswering({ rows: [] });
