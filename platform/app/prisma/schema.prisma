@@ -97,31 +97,31 @@ model AccountCredential {
 }
 
 model Session {
-  id            String   @id @default(nanoid())
-  sessionToken  String   @unique
-  userId        String
-  expires       DateTime
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  impersonating Json?
-  ipAddress     String?
-  userAgent     String?  @db.Text
+  id                     String    @id @default(nanoid())
+  sessionToken           String    @unique
+  userId                 String
+  expires                DateTime
+  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  impersonating          Json?
+  ipAddress              String?
+  userAgent              String?   @db.Text
   /// Which of the user's sign-in methods minted this session (D06). NULL on
   /// every session that predates the column and on any mint we could not
   /// attribute - an ordinary value, not an error. Nothing reads it to decide
   /// whether the session is valid, so no session was ended to add it.
-  identifierId  String?
+  identifierId           String?
   /// What the sign-in that minted this session PROVED, as RFC 8176 method
   /// references (D06). Empty on every session minted before the column, and
   /// on any ordinary password sign-in. An organization that requires a second
   /// factor reads this when a member reaches its data; it is never read at
   /// mint and never ends a session.
-  amr           String[] @default([])
+  amr                    String[]  @default([])
   actorUserId            String?
   subjectUserId          String?
   impersonationReason    String?   @db.Text
   impersonationExpiresAt DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @default(now()) @updatedAt
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @default(now()) @updatedAt
 
   @@index([userId])
   @@index([identifierId])
@@ -266,14 +266,6 @@ model Identifier {
   lastUsedAt        DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @default(now()) @updatedAt
-
-  @@index([userId])
-  @@index([identifierHash])
-  @@index([value])
-  @@index([domain])
-  @@index([provider, providerAccountId])
-  @@index([issuer, providerAccountId])
-  @@index([accountId])
   // A PARTIAL UNIQUE INDEX on (providerId, providerAccountId), over the live
   // states only, is added by migration 20260824120004 - Prisma cannot express
   // a partial index, so it is raw SQL there and this comment is its home in
@@ -302,6 +294,14 @@ model Identifier {
   // sign-in and a Google sign-in are two rows with one email, both VERIFIED),
   // so "one USER per proven address" is not a row-level rule. It lives in
   // `IdentifierReservation`, claimed before any fact is stated.
+
+  @@index([userId])
+  @@index([identifierHash])
+  @@index([value])
+  @@index([domain])
+  @@index([provider, providerAccountId])
+  @@index([issuer, providerAccountId])
+  @@index([accountId])
 }
 
 // The address lock (ADR-116 §6). ROW-TRUTH, and deliberately not a projection:
@@ -993,6 +993,7 @@ model Project {
   pinnedTraces        PinnedTrace[]
   traceEditOverlays   TraceEditOverlay[]
   emailSuppressions   EmailSuppression[]
+  instantEvalRuns     InstantEvalRun[]
 
   // Denormalised mirror of parent Team's personal flag for fast
   // lookup at trace ingest time without a Team join. Always equals
@@ -1220,6 +1221,104 @@ model Cost {
   @@index([costType])
   @@index([projectId])
   @@index([projectId, createdAt])
+}
+
+/// The state of one Instant Eval run: a LangWatchQL statement executed as a
+/// job, judging up to a hundred thousand rows with progress.
+///
+/// PROJECTION of the `lw.obs.instant_eval.*` event stream, written only by
+/// the run fold projection and rebuildable by replay. The judgements
+/// themselves are not here: they are one ClickHouse row per trace and
+/// question in `instant_eval_judgments`, because a hundred thousand rows
+/// times three questions is not a shape Postgres should hold. This row is
+/// the run's counters, which is what a caller polls.
+model InstantEvalRun {
+  id        String  @id
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+
+  /// What the caller called the run. Theirs to choose.
+  name String?
+
+  /// The statement, exactly as submitted. Never rewritten: the run composes a
+  /// wrapper around it to bound each page, and hands this back so an agent can
+  /// copy it, edit it and resubmit.
+  sql String
+
+  /// Values for the parameters the statement declares.
+  parameters Json @default("{}")
+
+  /// One entry per eval function the statement projects, derived from it at
+  /// creation: the output column it lands in, what kind of question it is, and
+  /// how its answer is read. Stored rather than re-derived so a run reads back
+  /// the same way after the catalog moves under it.
+  questions Json @default("[]")
+
+  /// The hydration plan the query validator recorded for the statement: one
+  /// entry per app-function call in its projection. Stored because a page is
+  /// executed as a wrapper around the statement and hydrated against this
+  /// plan, and re-parsing the statement per page would be a second answer to
+  /// what its columns mean.
+  plan Json @default("[]")
+
+  /// Rows this run may judge. Ten thousand by default, up to a hundred
+  /// thousand on a plan that lifts the cap.
+  rowLimit Int
+
+  status InstantEvalRunStatus @default(QUEUED)
+
+  /// Rows the key pass found, bounded by rowLimit. Null until it has run.
+  total Int?
+
+  /// Rows judged so far, across every page.
+  progress Int @default(0)
+
+  /// Judgements that matched, in total and per question. A boolean matches
+  /// when it passed; a score and a category are counted as judged.
+  matched           Int  @default(0)
+  matchedByQuestion Json @default("{}")
+
+  /// Rows the judge could not answer, and rows it declined to answer.
+  failed  Int @default(0)
+  skipped Int @default(0)
+
+  /// Input tokens the judge billed for, and what that cost us and the customer.
+  tokens   Int   @default(0)
+  costUsd  Float @default(0)
+  priceUsd Float @default(0)
+
+  /// The code of the failure that ended the run, when one did. A code, never
+  /// prose: the words a customer reads come from the client presentation
+  /// registry.
+  error String?
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @default(now()) @updatedAt
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  /// The projection's checkpoint over the run's own event stream: the
+  /// business time of the latest applied event, the event log's acceptance
+  /// time, the event id that breaks a tie inside one millisecond, and the
+  /// projection version that wrote the counters. Null until the first event
+  /// is folded, because the row is created by the service that accepted the
+  /// run rather than by the projection.
+  occurredAt        Float?
+  acceptedAt        Float?
+  lastEventId       String?
+  projectionVersion String?
+
+  @@index([projectId, createdAt])
+  @@index([projectId, status])
+}
+
+enum InstantEvalRunStatus {
+  QUEUED
+  PLANNING
+  RUNNING
+  FINISHED
+  FAILED
+  CANCELLED
 }
 
 /// PROJECTION of the topic-clustering event stream (ADR-051): topics are
@@ -1661,7 +1760,7 @@ model Experiment {
   // by one, and the bump is the compare-and-set guard: a writer names the
   // version it read, and a write whose expected version no longer matches the
   // stored one is refused before anything is written. Existing rows read 0.
-  workbenchVersion Int               @default(0)
+  workbenchVersion Int @default(0)
 
   @@unique([projectId, slug])
   @@index([projectId])
@@ -1702,7 +1801,7 @@ model ExperimentVersion {
   autoSaved     Boolean @default(false)
   commitMessage String?
 
-  authorId String?
+  authorId    String?
   /// Who wrote this version: "user", "langy" or "api".
   authorLabel String
   /// The run that wrote this version, when a run wrote it.
@@ -1712,9 +1811,9 @@ model ExperimentVersion {
   /// somebody else's write, refuses to save, and asks the reader to reload
   /// over their own unsaved edits. Named here, the page adopts the version and
   /// carries on.
-  runId String?
+  runId       String?
 
-  state Json
+  state         Json
   /// Schema version of `state`, so a later shape change can be read forward.
   schemaVersion String @default("1")
 
@@ -2896,9 +2995,9 @@ model Evaluator {
 }
 
 model Scenario {
-  id              String    @id @default(nanoid())
+  id              String            @id @default(nanoid())
   projectId       String
-  project         Project   @relation(fields: [projectId], references: [id])
+  project         Project           @relation(fields: [projectId], references: [id])
   name            String
   situation       String
   criteria        String[]
@@ -2939,18 +3038,18 @@ model Scenario {
   // (server/suites/test-suite-membership.ts).
   // See specs/suites/test-suite-membership-invariant.feature.
   testSuiteId     String?
-  testSuite       SimulationSuite? @relation("TestSuiteScenarios", fields: [testSuiteId], references: [id], onDelete: SetNull)
+  testSuite       SimulationSuite?  @relation("TestSuiteScenarios", fields: [testSuiteId], references: [id], onDelete: SetNull)
   // Counts one up on every save of the editable fields. Each number has a
   // ScenarioVersion row holding the state as saved; the unique constraint
   // there is what keeps two concurrent saves from sharing a number. See
   // specs/scenarios/scenario-versioning.feature.
-  version         Int       @default(1)
+  version         Int               @default(1)
   versions        ScenarioVersion[]
   lastUpdatedById String?
-  lastUpdatedBy   User?     @relation(fields: [lastUpdatedById], references: [id])
+  lastUpdatedBy   User?             @relation(fields: [lastUpdatedById], references: [id])
   archivedAt      DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @default(now()) @updatedAt
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @default(now()) @updatedAt
 
   @@index([projectId])
   @@index([projectId, testSuiteId])
@@ -2961,7 +3060,7 @@ model Scenario {
 // specs/scenarios/scenario-versioning.feature and
 // specs/scenarios/scenario-version-restore.feature.
 model ScenarioVersion {
-  id         String @id @default(nanoid())
+  id         String   @id @default(nanoid())
   scenarioId String
   /// Deleting the case takes its history with it. Under relationMode="prisma"
   /// the cascade is the client's, so a raw SQL delete still has to clear these
@@ -2973,7 +3072,7 @@ model ScenarioVersion {
   projectId  String
   version    Int
 
-  authorId String?
+  authorId    String?
   /// Who wrote this version: "user", "api", "cli" or "langy".
   authorLabel String
 
@@ -2981,9 +3080,9 @@ model ScenarioVersion {
 
   /// Envelope { schemaVersion, fields, changedFields } holding the editable
   /// field set as saved and the names of the fields this save changed.
-  snapshot Json
+  snapshot      Json
   /// Schema version of `snapshot`, so a later shape change can be read forward.
-  schemaVersion Int @default(1)
+  schemaVersion Int  @default(1)
 
   createdAt DateTime @default(now())
 
@@ -2996,51 +3095,51 @@ model ScenarioVersion {
 }
 
 model SimulationSuite {
-  id             String    @id @default(nanoid())
-  projectId      String
-  project        Project   @relation(fields: [projectId], references: [id])
-  name           String
-  slug           String
-  description    String?
-  scenarioIds    String[]
-  targets        Json // Array of { type: "prompt" | "http", referenceId: string }
-  repeatCount    Int       @default(1)
-  labels         String[]
+  id                 String     @id @default(nanoid())
+  projectId          String
+  project            Project    @relation(fields: [projectId], references: [id])
+  name               String
+  slug               String
+  description        String?
+  scenarioIds        String[]
+  targets            Json // Array of { type: "prompt" | "http", referenceId: string }
+  repeatCount        Int        @default(1)
+  labels             String[]
   // Optional run-plan-wide model overrides. When set they take precedence
   // over each scenario's own override for every scenario in the run; when
   // null the per-scenario value (or the project default) applies. See
   // specs/suites/suite-model-selection.feature.
-  simulatorModel String?
-  judgeModel     String?
+  simulatorModel     String?
+  judgeModel         String?
   // "test_suite" | "run_plan" (see SUITE_KINDS in server/suites/types.ts). A
   // test suite groups scenarios through Scenario.testSuiteId; a run plan is
   // hand-assembled. String rather than a Prisma enum so a new kind needs no
   // database migration.
-  kind            String     @default("run_plan")
+  kind               String     @default("run_plan")
   // What the plan covers, as { mode } plus the mode's own field: "all",
   // "test_suites" with testSuiteIds, "labels" with labels, or "scenarios",
   // which runs the stored scenarioIds. Null reads as "scenarios", so a plan
   // written before scopes keeps the list it already held. A test suite carries
   // none: its members come from Scenario.testSuiteId. See
   // server/suites/scope.ts and specs/suites/run-plan-dynamic-scopes.feature.
-  scope           Json?
+  scope              Json?
   // The fields a test suite declares beyond situation and criteria, as an
   // array of { identifier, type } with type text, number or boolean. Every
   // scenario filed in the suite carries a value per field in Scenario.fields.
   // A run plan carries none. Null reads as no fields. See
   // server/scenarios/suite-fields.ts and specs/scenarios/scenario-fields.feature.
-  fields          Json?
+  fields             Json?
   // The evaluators that run after every scenario run of this suite or plan,
   // as an array of { id, evaluatorId, required, mappings }. A mapping names
   // where an evaluator input reads its value: the conversation, the scenario
   // (situation, criteria or a field) or the trace. A run plan's attachments
   // run beside the ones of the test suites its scenarios belong to. Null
   // reads as none. See server/scenarios/evaluator-attachments.ts.
-  evaluators      Json?
+  evaluators         Json?
   testSuiteScenarios Scenario[] @relation("TestSuiteScenarios")
-  archivedAt     DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @default(now()) @updatedAt
+  archivedAt         DateTime?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @default(now()) @updatedAt
 
   @@unique([projectId, slug])
   @@index([projectId])
@@ -5255,20 +5354,20 @@ model SystemMigrationEnrollment {
 /// is no platform user to key on and a user-deletion event can never fire for
 /// them.
 model DiscoveredPerson {
-  id              String    @id @default(nanoid())
-  organizationId  String
+  id                 String    @id @default(nanoid())
+  organizationId     String
   /// "anthropic" | "openai" | "databricks" | ... - the provider that named them.
-  provider        String
+  provider           String
   /// What the provider calls them, verbatim. The join key onto the money rows'
   /// RawActorId. Replaced by a deterministic pseudonym on erasure, which keeps
   /// the row addressable for spend attribution without keeping the identifier.
-  rawActorId      String
+  rawActorId         String
   /// Name or email text as seen. Pseudonymized alongside rawActorId on erasure.
-  displayText     String
+  displayText        String
   /// person | service_account - determined deterministically per ADR-128 §10
   /// (a bare UUID in Databricks `executed_by` is a service account, never an
   /// agent), never guessed from the shape of a name.
-  kind            String
+  kind               String
   /// The department the provider's directory filed this person under, verbatim.
   /// An OBSERVATION, not the `Department` entity: it is free text a tenant owns
   /// on their side, it exists for people who hold no LangWatch account, and
@@ -5277,9 +5376,9 @@ model DiscoveredPerson {
   /// Null means no directory has named one - never "no department", because a
   /// blank field in the tenant's directory and a person no directory lists are
   /// the same null here.
-  department      String?
-  firstSeenAt     DateTime
-  lastSeenAt      DateTime
+  department         String?
+  firstSeenAt        DateTime
+  lastSeenAt         DateTime
   /// Set when this row's identity has been erased. The row survives so its
   /// spend stays attributable to *someone*; the identifier does not.
   erasedAt           DateTime?
@@ -5300,11 +5399,11 @@ model DiscoveredPerson {
   /// identity because evidence pointed at two candidates, or contradicted an
   /// existing link. Stored HERE rather than on the suggestion rows, because a
   /// halt on auto-linking that a recompute or a restart clears is not a halt.
-  suspendedAt     DateTime?
+  suspendedAt        DateTime?
   /// What tripped the suspension, for the human who reviews it.
-  suspendedReason String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @default(now()) @updatedAt
+  suspendedReason    String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @default(now()) @updatedAt
 
   @@unique([organizationId, provider, rawActorId])
   // The identity screens list an organization's people newest-seen first.

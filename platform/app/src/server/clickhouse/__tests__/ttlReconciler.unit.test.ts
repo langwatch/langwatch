@@ -363,6 +363,10 @@ describe("ttlReconciler", () => {
         // to 0 (keep forever) rather than to a category-resolved day count.
         "governance_cost_rollup_1d",
         "governance_cost_rollup_restatement_index",
+        // Instant Eval judgements, also outside the cascade: a verdict holds no
+        // customer content, so there is no trace-shaped category to map it to
+        // and nothing to meter as storage.
+        "instant_eval_judgments",
       ]);
     });
 

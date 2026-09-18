@@ -24,7 +24,7 @@ import {
 } from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
-/** What one query spent on judgements. */
+/** What one query or one run spent on judgements. */
 export interface InstantEvalCostRecord {
   readonly projectId: string;
   /** Input tokens the classifier billed for. */
@@ -35,6 +35,15 @@ export interface InstantEvalCostRecord {
   readonly costUsd: number;
   /** What the customer is charged, in USD. */
   readonly priceUsd: number;
+  /**
+   * The run this cost belongs to, when it belongs to one.
+   *
+   * A synchronous query has no durable resource to point at, so it leaves this
+   * absent and the row points at the project. A run does have one, and naming
+   * it is what lets "what did that run cost" be a query rather than a guess
+   * from timestamps.
+   */
+  readonly runId?: string;
 }
 
 export interface InstantEvalCostRecorder {
@@ -51,12 +60,12 @@ export class PrismaInstantEvalCostRecorder implements InstantEvalCostRecorder {
         id: costId,
         projectId: record.projectId,
         costType: CostType.INSTANT_EVAL,
-        costName: "Instant Eval query",
+        costName: record.runId ? "Instant Eval run" : "Instant Eval query",
         referenceType: CostReferenceType.INSTANT_EVAL,
-        // The project itself: a synchronous query has no durable resource to
-        // point at, and inventing an id per request would index a column no
-        // query could ever join on.
-        referenceId: record.projectId,
+        // The run when there is one, and otherwise the project: a synchronous
+        // query has no durable resource to point at, and inventing an id per
+        // request would index a column no query could ever join on.
+        referenceId: record.runId ?? record.projectId,
         amount: record.costUsd,
         currency: "USD",
         extraInfo: {

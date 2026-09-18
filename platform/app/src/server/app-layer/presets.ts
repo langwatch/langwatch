@@ -265,6 +265,8 @@ import {
   PrismaSsoConnectionStrandingRepository,
 } from "./identity/repositories/sso-connection-reads.prisma.repository";
 import { SsoConnectionTeardownDispatcher } from "./identity/sso-connection-teardown";
+import { createInstantEvalRunPortFromEnv } from "./instant-evals/run";
+import { PrismaInstantEvalRunProjectionStore } from "./instant-evals/run/instant-eval-run.repository";
 import { LangyConversationService } from "./langy/langy-conversation.service";
 import {
   createLangyTrustedMessageReader,
@@ -995,6 +997,7 @@ export function initializeDefaultApp(options?: {
       prisma,
       new EmailJoinRequestNotifier(prisma),
     ),
+    instantEvalRun: new PrismaInstantEvalRunProjectionStore(prisma),
     topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
       prisma,
     ),
@@ -1430,6 +1433,7 @@ export function initializeDefaultApp(options?: {
           }),
       },
     },
+    instantEvals: { runPort: createInstantEvalRunPortFromEnv() },
     enterprisePipelines: {
       prisma,
       runsWorkers: roleRunsWorkers(config.processRole),
@@ -2600,6 +2604,13 @@ export function createTestApp(overrides?: TestAppOverrides): App {
         recordClusteringRunFailed: noop,
         recordTopics: noop,
       } as AppCommands["topicClustering"],
+      instantEvals: {
+        requestRun: noop,
+        recordPlanned: noop,
+        recordPageJudged: noop,
+        requestCancel: noop,
+        recordFinished: noop,
+      } as AppCommands["instantEvals"],
       ...createNoopEnterprisePipelineCommands(),
       billing: {
         reportUsageForMonth: noop,
