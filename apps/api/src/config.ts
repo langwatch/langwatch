@@ -74,7 +74,7 @@ import {
 import { opsServerConfigDefinition } from "@langwatch/ops-contract";
 import type { RequestBoundsOverrides } from "@langwatch/plans";
 import { platformHealthServerConfigDefinition } from "@langwatch/platform-health-contract";
-import type { MailConfig, ProcessConfig } from "@langwatch/process-stores";
+import { producerEventing, type MailConfig, type ProcessConfig } from "@langwatch/process-stores";
 import { RedisConfigService, type RedisConfigResolution } from "@langwatch/redis-client";
 import { secretServerConfigDefinition } from "@langwatch/secret-contract";
 import { storedObjectServerConfigDefinition } from "@langwatch/stored-object-contract";
@@ -1398,9 +1398,20 @@ export function apiProcessConfig(options: {
         }
       : {}),
     ...redisSlice(infrastructure.redis),
+    ...eventingSlice(config),
     ...objectStorageSlice(s3),
     mail: mailSlice(config),
   };
+}
+
+/**
+ * The api produces and drains nothing: it sends onto the same Group Queue the
+ * worker claims, and its store refuses a read by name. No Redis is no queue,
+ * so the member refuses rather than dispatching into nowhere.
+ */
+function eventingSlice(config: ApiConfig): Pick<ProcessConfig, "eventing"> | Record<string, never> {
+  if (!config.infrastructure.redis.configured) return {};
+  return { eventing: producerEventing({ executionTarget: "api" }) };
 }
 
 function redisSlice(

@@ -63,7 +63,7 @@ import {
 } from "@langwatch/observability/node";
 import { opsServerConfigDefinition } from "@langwatch/ops-contract";
 import type { RequestBoundsOverrides } from "@langwatch/plans";
-import type { MailConfig, ProcessConfig } from "@langwatch/process-stores";
+import { consumingEventing, type MailConfig, type ProcessConfig } from "@langwatch/process-stores";
 import { RedisConfigService, type RedisConfigResolution } from "@langwatch/redis-client";
 import { secretServerConfigDefinition } from "@langwatch/secret-contract";
 import { storedObjectServerConfigDefinition } from "@langwatch/stored-object-contract";
@@ -1344,8 +1344,26 @@ export function workerProcessConfig(options: {
         }
       : {}),
     ...workerRedisSlice(infrastructure.redis),
+    ...workerEventingSlice(config),
     ...objectStorageSlice(s3),
     mail: workerMailSlice(config),
+  };
+}
+
+/**
+ * The worker claims the queue: it folds projections, runs subscribers and owns
+ * the process managers, so it reads the event log rather than refusing. No
+ * Redis is no queue, and the member refuses rather than draining nothing.
+ */
+function workerEventingSlice(
+  config: WorkerConfig,
+): Pick<ProcessConfig, "eventing"> | Record<string, never> {
+  if (!config.infrastructure.redis.configured) return {};
+  return {
+    eventing: consumingEventing({
+      executionTarget: "worker",
+      defaultRetentionDays: config.retention.defaultDays,
+    }),
   };
 }
 

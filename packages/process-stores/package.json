@@ -29,6 +29,7 @@
     "@clickhouse/client": "catalog:",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/eventing": "workspace:*",
+    "@langwatch/group-queue": "workspace:*",
     "@langwatch/mail": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",

@@ -35,6 +35,8 @@ export type {
   ClickHousePrivateRoute,
   DatabaseConfig,
   EventingConfig,
+  EventingGroupQueueConfig,
+  EventingStoreConfig,
   MailConfig,
   MailProvider,
   ObjectStorageAccount,
@@ -45,6 +47,11 @@ export type {
   RedisConfig,
 } from "./config.ts";
 export { aesEncryption, loggedTelemetry, resolvedSecrets, systemClock } from "./config-members.ts";
+export {
+  consumingEventing,
+  producerEventing,
+  type EventingEventLogMembers,
+} from "./eventing-members.ts";
 export { redisCache, redisIdempotency, redisRateLimiter } from "./redis-members.ts";
 export {
   cachedTenantDirectory,

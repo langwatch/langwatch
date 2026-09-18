@@ -3,7 +3,8 @@
  * already parsed, never a pre-built collaborator. Two exceptions carry one:
  * eventing's store/queue factory and the process store a process-manager role supplies.
  */
-import type { EventStore, ExecutionTarget, KillSwitch, ProcessStore, EventSourcingOptions } from "@langwatch/eventing";
+import type { ExecutionTarget, KillSwitch } from "@langwatch/eventing";
+import type { GroupQueuePolicy, GroupQueueStorage } from "@langwatch/group-queue";
 
 /** Postgres, as one guarded client per process. */
 export interface DatabaseConfig {
@@ -53,23 +54,46 @@ export interface RedisConfig {
 }
 
 /**
+ * The queue a role dispatches through, built over the ONE Redis connection
+ * this process opened — never a second one, so a drain cannot outlive the
+ * connection it drains through.
+ */
+export interface EventingGroupQueueConfig {
+  /** Retry, lease and concurrency shape. Absent uses the queue's own. */
+  readonly policy?: GroupQueuePolicy;
+  /** Where an oversized payload's body is offloaded. Absent keeps it inline. */
+  readonly storage?: GroupQueueStorage;
+}
+
+/**
+ * Where events are appended and read, as the role states it: a role that only
+ * sends refuses every read by name, and a role that drains reads the event log
+ * this deployment's ClickHouse holds, leasing its process state in Postgres.
+ */
+export type EventingStoreConfig =
+  | Readonly<{ readonly kind: "producer-only" }>
+  | Readonly<{
+      readonly kind: "event-log";
+      /** The fallback retention for rows whose tenant states none, in days. */
+      readonly defaultRetentionDays: number;
+    }>;
+
+/**
  * Event sourcing, which is a runtime rather than a client: this package builds
  * the runtime, and the process states which log it appends to and which queue
  * it dispatches through, because those differ by role.
  */
 export interface EventingConfig {
-  /** Where events are appended and read. A producer supplies a producer-only store. */
-  readonly eventStore: EventStore;
+  /** Which half of event sourcing this role runs, and over what. */
+  readonly store: EventingStoreConfig;
   /** How a command reaches its consumer. Absent runs projections inline. */
-  readonly queueFactory?: EventSourcingOptions["queueFactory"];
+  readonly groupQueue?: EventingGroupQueueConfig;
   /** Whether this role claims the queue, or only produces onto it. */
   readonly consumersEnabled: boolean;
   /** Which tier a command records as its origin. */
   readonly executionTarget: ExecutionTarget;
   /** Whether this role runs the process managers its pipelines declare. */
   readonly processManagerMode?: "run" | "producer-only";
-  /** Durable inbox, state, outbox, leases and wakes, on a role that runs them. */
-  readonly processStore?: ProcessStore;
   /** Per-tenant operator stop for every component the pipelines mount. */
   readonly killSwitch?: KillSwitch;
 }

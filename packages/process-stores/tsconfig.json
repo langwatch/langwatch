@@ -27,6 +27,9 @@
       "path": "../eventing/tsconfig.build.json"
     },
     {
+      "path": "../group-queue/tsconfig.build.json"
+    },
+    {
       "path": "../kernel/tsconfig.build.json"
     },
     {

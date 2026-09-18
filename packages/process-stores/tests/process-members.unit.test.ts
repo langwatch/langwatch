@@ -1,3 +1,4 @@
+import type { RedisConnection } from "@langwatch/redis-client";
 /**
  * What a process builds, what it refuses, and what it closes.
  *
@@ -6,13 +7,18 @@
  * a boot seam depends on.
  */
 import { describe, expect, it, vi } from "vitest";
-import type { RedisConnection } from "@langwatch/redis-client";
+
+import {
+  aesEncryption,
+  loggedTelemetry,
+  resolvedSecrets,
+  systemClock,
+} from "../src/config-members.ts";
 import {
   createProcessMembers,
   MemberNotConfiguredError,
   MemberSuppliedUndefinedError,
 } from "../src/create-members.ts";
-import { aesEncryption, loggedTelemetry, resolvedSecrets, systemClock } from "../src/config-members.ts";
 import { MEMBER_NAMES, reads, type ProcessConfig } from "../src/index.ts";
 
 /** A process that named no datastore at all, and says so about its mail. */
@@ -131,12 +137,14 @@ describe("given a member source with several clients open", () => {
   describe("when it is disposed", () => {
     it("closes what it opened, in reverse construction order", async () => {
       const closed: string[] = [];
+      // A role that states no queue, so the only client this source opens is
+      // the runtime itself and the close it records is the one asserted below.
       const members = createProcessMembers({
         config: config({
           eventing: {
-            eventStore: {} as never,
+            store: { kind: "producer-only" },
             consumersEnabled: false,
-            executionTarget: "api" as never,
+            executionTarget: "api",
           },
         }),
       });

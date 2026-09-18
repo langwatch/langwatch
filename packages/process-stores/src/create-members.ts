@@ -4,15 +4,12 @@
  * keyspaces. An unconfigured member REFUSES BY NAME, never a silent omission.
  */
 import { createLogger } from "@langwatch/observability";
+
 import { buildClickHouse } from "./clickhouse-member.ts";
 import { aesEncryption, loggedTelemetry, resolvedSecrets, systemClock } from "./config-members.ts";
 import type { ProcessConfig } from "./config.ts";
-import {
-  buildEventing,
-  buildPrisma,
-  buildRedis,
-  type BuiltMember,
-} from "./datastore-members.ts";
+import { buildPrisma, buildRedis, type BuiltMember } from "./datastore-members.ts";
+import { buildEventing } from "./eventing-members.ts";
 import { buildMail } from "./mail-member.ts";
 import { MEMBER_NAMES, type MemberName, type ProcessMembers } from "./members.ts";
 import { buildObjectStorage } from "./object-storage-member.ts";
@@ -157,10 +154,20 @@ export function createProcessMembers(options: {
       return buildRedis(config.redis);
     },
     eventing: () => {
-      if (!config.eventing) {
+      const eventing = config.eventing;
+      if (!eventing) {
         throw new MemberNotConfiguredError("eventing", "name this role's event store and queue");
       }
-      return buildEventing(config.eventing);
+      // Read BEFORE the runtime is built, so the reverse close drains the
+      // queue before the clients it dispatches and appends through go away.
+      return buildEventing({
+        config: eventing,
+        processName: config.processName,
+        ...(eventing.groupQueue === undefined ? {} : { redis: read("redis") }),
+        ...(eventing.store.kind === "producer-only"
+          ? {}
+          : { eventLog: { prisma: read("prisma"), clickhouse: read("clickhouse") } }),
+      });
     },
     mail: () => {
       // `off` is a statement rather than an absence, so it refuses here for a

@@ -1,9 +1,8 @@
 /**
- * Postgres, Redis and the event-sourcing runtime, each built from the config
- * slice that names it. A slice not given is a refusal by name, never a
- * quieter member answering from an empty store as if healthy.
+ * Postgres and Redis, each built from the config slice that names it. A slice
+ * not given is a refusal by name, never a quieter member answering from an
+ * empty store as if healthy. Event sourcing builds in `eventing-members.ts`.
  */
-import { EventSourcing } from "@langwatch/eventing";
 import type { Logger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -18,7 +17,8 @@ import {
   RedisShutdownService,
   type RedisConnection,
 } from "@langwatch/redis-client";
-import type { DatabaseConfig, EventingConfig, RedisConfig } from "./config.ts";
+
+import type { DatabaseConfig, RedisConfig } from "./config.ts";
 
 /** One member, with the close its construction earned. */
 export interface BuiltMember<Value> {
@@ -78,25 +78,4 @@ export function buildRedis(config: RedisConfig): BuiltMember<RedisConnection> {
     value: connection,
     close: () => RedisShutdownService.create().shutdown(connection),
   };
-}
-
-/**
- * The store and queue factory are the process's - which log a role appends to
- * and whether it claims the queue are role decisions; everything else about
- * the runtime is the same everywhere and is settled here.
- */
-export function buildEventing(config: EventingConfig): BuiltMember<EventSourcing> {
-  const eventing = new EventSourcing({
-    enabled: true,
-    eventStore: config.eventStore,
-    consumersEnabled: config.consumersEnabled,
-    executionTarget: config.executionTarget,
-    processManagerMode: config.processManagerMode ?? "run",
-    warnWhenProjectionsRunInline: false,
-    ...(config.queueFactory === undefined ? {} : { queueFactory: config.queueFactory }),
-    ...(config.processStore === undefined ? {} : { processStore: config.processStore }),
-    ...(config.killSwitch === undefined ? {} : { killSwitch: config.killSwitch }),
-  });
-
-  return { value: eventing, close: () => eventing.close() };
 }
