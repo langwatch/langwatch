@@ -1,9 +1,10 @@
 /**
  * The routing {@link QueryDriver}: sends one statement to the server its
- * tenant belongs on, regardless of an unscoped declaration. Only a
- * statement naming no tenant (a migration, a `system.*` read) goes shared.
+ * tenant or explicit organisation belongs on, regardless of an unscoped
+ * declaration. Statements naming neither route to the shared instance.
  */
 import { nowInstant } from "@langwatch/time";
+
 import type { ClickHouseCloseableClient, ClickHouseConnection } from "./connection.ts";
 import type { InsertRequest, QueryDriver, QueryRequest, QueryResult } from "./query.ts";
 
@@ -20,9 +21,13 @@ export interface RoutableStatementClient extends ClickHouseCloseableClient {
 
 async function serverFor<Client extends RoutableStatementClient>(
   connection: ClickHouseConnection<Client>,
-  tenantId: string,
+  request: Pick<QueryRequest, "tenantId" | "organizationId">,
 ): Promise<Client> {
-  return tenantId === "" ? connection.shared() : await connection.resolve(tenantId);
+  if (request.organizationId !== void 0) {
+    return connection.resolveOrganization(request.organizationId);
+  }
+
+  return request.tenantId === "" ? connection.shared() : await connection.resolve(request.tenantId);
 }
 
 function insertParams(request: InsertRequest): Record<string, unknown> {
@@ -64,17 +69,17 @@ export function routingDriver<Client extends RoutableStatementClient>(
 ): QueryDriver {
   return {
     async insert(request: InsertRequest): Promise<void> {
-      const vendor = await serverFor(connection, request.tenantId);
+      const vendor = await serverFor(connection, request);
       await vendor.insert(insertParams(request));
     },
 
     async command(request: QueryRequest): Promise<void> {
-      const vendor = await serverFor(connection, request.tenantId);
+      const vendor = await serverFor(connection, request);
       await vendor.command(queryParams(request));
     },
 
     async execute<Row>(request: QueryRequest): Promise<QueryResult<Row>> {
-      const vendor = await serverFor(connection, request.tenantId);
+      const vendor = await serverFor(connection, request);
 
       const started = nowInstant().epochMilliseconds;
       const resultSet = await vendor.query({ ...queryParams(request), format: "JSONEachRow" });

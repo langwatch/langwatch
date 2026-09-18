@@ -25,6 +25,8 @@ export interface QueryRequest {
    * a request that cannot name its tenant cannot be routed or audited safely.
    */
   tenantId: string;
+  /** Route an organisation-wide operation directly; tenant scope checks still apply. */
+  organizationId?: string;
   sql: string;
   params?: Record<string, unknown> | undefined;
   /** The primary table, used for metrics and span attributes. */
@@ -54,6 +56,8 @@ export interface InsertRequest {
    * that cannot name its tenant cannot be routed.
    */
   tenantId: string;
+  /** Route to the known billing organisation without changing the rows' tenant. */
+  organizationId?: string;
   /** The table the rows are written to. */
   table: string;
   /**
