@@ -19,7 +19,7 @@ import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import { TopicApi } from "@langwatch/topic-contract";
-import type { RecordSpanCommandData } from "@langwatch/trace-contract";
+import { TraceApi, type RecordSpanCommandData } from "@langwatch/trace-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it } from "vitest";
 
@@ -31,7 +31,7 @@ import { TraceBlobStoreService } from "../../services/trace-blob-store.service.t
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import { NullTraceSpanDedupAdapter } from "../../services/trace-span-dedup.service.ts";
 import { traceServer } from "../../trace.server.ts";
-import { OtlpIngestApi, otlpIngestRest } from "../otlp-ingest.rest.ts";
+import { otlpIngestRest } from "../otlp-ingest.rest.ts";
 
 const PROJECT = {
   id: "project-123",
@@ -203,8 +203,8 @@ function deployment(access: OtlpAccess = {}) {
   );
 
   const apis = new LocalFeatureApis();
-  apis.declare(OtlpIngestApi);
-  apis.bind(OtlpIngestApi, app);
+  apis.declare(TraceApi);
+  apis.bind(TraceApi, app);
   apis.ready();
 
   const runtime = createRestRuntime({
@@ -225,7 +225,7 @@ function deployment(access: OtlpAccess = {}) {
   const mounted = servesOtlp
     ? [
         runtime.mount(otlpIngestRest.router(), {
-          app: () => apis.reference(OtlpIngestApi),
+          app: () => apis.reference(TraceApi),
           // The receiver binds NO transport fact: it is declared public and
           // resolves the project credential inside its handler.
           credential: "public",
@@ -376,6 +376,27 @@ describe("given the trace module as a process composes it", () => {
       const { post, recordedSpans } = deployment();
 
       const response = await post("/api/otel/v1/traces", otlpTraceBody(), { "X-Auth-Token": "" });
+
+      expect(response.status).toBe(401);
+      expect(recordedSpans).toHaveLength(0);
+    });
+  });
+
+  describe("when an exporter appends the signal to a root-level base", () => {
+    it("accepts the same bytes and returns the canonical trace status", async () => {
+      const { post, recordedSpans } = deployment();
+
+      const response = await post("/v1/traces", otlpTraceBody());
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ message: "Trace received successfully." });
+      expect(recordedSpans).toHaveLength(1);
+    });
+
+    it("applies the canonical credential refusal before parsing the alias body", async () => {
+      const { post, recordedSpans } = deployment();
+
+      const response = await post("/v1/traces", otlpTraceBody(), { "X-Auth-Token": "" });
 
       expect(response.status).toBe(401);
       expect(recordedSpans).toHaveLength(0);

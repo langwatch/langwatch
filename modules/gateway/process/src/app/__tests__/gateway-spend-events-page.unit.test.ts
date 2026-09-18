@@ -6,7 +6,6 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { ResourceScope } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { resolvedSecrets } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -84,7 +83,7 @@ function fakePrisma(): PrismaClient {
 const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
 
 /** The slice of the application this surface reaches, and nothing else. */
-function gatewayAppStub(): GatewayApp {
+async function gatewayAppStub(): Promise<GatewayApp> {
   return GatewayApp.create({
     dependencies: {
       webhooks: peer("webhooks"),
@@ -99,7 +98,6 @@ function gatewayAppStub(): GatewayApp {
     members: {
       prisma: fakePrisma(),
       clickhouse: fakeClickHouse(),
-      secrets: resolvedSecrets({}),
       elevenLabsWebhook: void 0,
       gatewayInternalProtocol: {},
     },
@@ -130,7 +128,7 @@ describe("GatewayApp.findSpendEventsPage", () => {
   describe("given a page request carrying filters and a cursor", () => {
     /** @scenario Ledger filters and cursor pass through to the repository page read */
     it("passes filters and cursor through to the repository page read", async () => {
-      const app = gatewayAppStub();
+      const app = await gatewayAppStub();
       await app.findSpendEventsPage({
         ...BASE_INPUT,
         filters: {
@@ -165,7 +163,7 @@ describe("GatewayApp.findSpendEventsPage", () => {
   describe("given rows naming a virtual key", () => {
     /** @scenario Ledger rows resolve virtual key display names */
     it("resolves virtual-key display names alongside the rows", async () => {
-      const app = gatewayAppStub();
+      const app = await gatewayAppStub();
       const result = await app.findSpendEventsPage(BASE_INPUT);
 
       expect(result?.rows).toHaveLength(1);
@@ -184,7 +182,7 @@ describe("GatewayApp.findSpendEventsPage", () => {
     /** @scenario Unknown project tenants do not resolve virtual-key names */
     it("keeps virtual-key names empty", async () => {
       findOrganizationId.mockResolvedValue(undefined);
-      const app = gatewayAppStub();
+      const app = await gatewayAppStub();
 
       const result = await app.findSpendEventsPage(BASE_INPUT);
 

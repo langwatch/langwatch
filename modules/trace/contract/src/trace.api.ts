@@ -1,5 +1,6 @@
 import { moduleApi } from "@langwatch/kernel/module-api";
 
+import type { TraceOtlpIngestApi } from "./otlp-ingest.rest.ts";
 import type { RecordCapturedSpanInput } from "./trace-captured-span.commands.ts";
 import type { DerivedTraceEvent } from "./trace-derived-event.ts";
 import type { TraceEditOverlayDto, TraceEditOverlayPatch } from "./trace-edit-overlay.contract.ts";
@@ -63,7 +64,7 @@ export type TraceAnnotationCommands = Readonly<{
 }>;
 
 /** Public Trace operations shared by process peers after boot composition. */
-export interface TraceApi {
+export interface TraceApi extends TraceOtlpIngestApi {
   downloadTraceExport(input: TraceExportDownloadInput): Promise<TraceExportDownload>;
   formatSpansDigest(input: { spans: Span[] }): Promise<string>;
   recordCapturedSpan(input: RecordCapturedSpanInput): Promise<void>;

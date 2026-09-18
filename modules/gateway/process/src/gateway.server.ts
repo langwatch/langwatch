@@ -24,7 +24,6 @@ import {
   type BudgetChangeEventDedupeService,
 } from "./services/gateway-budget-change-dedupe.service.ts";
 import { GatewayElevenLabsCredentialService } from "./services/gateway-elevenlabs-credential.service.ts";
-import { GatewayInternalIdentity } from "./services/gateway-internal-identity.service.ts";
 import {
   elevenLabsConversationReportSchema,
   GatewayRealtimeSessionReconciliationService,
@@ -42,10 +41,10 @@ import {
 import { ModelCatalogGatewaySpendRatingService } from "./services/model-catalog-gateway-spend-rating.service.ts";
 import { agentCacheRest } from "./transport/agent-cache.rest.ts";
 import { elevenLabsSignature, elevenLabsWebhookRest } from "./transport/elevenlabs-webhook.rest.ts";
-import { gatewayInternalRest } from "./transport/gateway-internal.rest.ts";
 import { gatewayBudgetTrpcTransport } from "./transport/gateway-budget.trpc.ts";
 import { gatewayCacheRuleTrpcTransport } from "./transport/gateway-cache-rule.trpc.ts";
 import { gatewayGuardrailTrpcTransport } from "./transport/gateway-guardrail.trpc.ts";
+import { gatewayInternalRest } from "./transport/gateway-internal.rest.ts";
 import { gatewayPlatformRest } from "./transport/gateway-platform.rest.ts";
 import { gatewaySpendEventTrpcTransport } from "./transport/gateway-spend-event.trpc.ts";
 import { gatewaySpendBillingPlanGate, gatewaySpendRest } from "./transport/gateway-spend.rest.ts";
@@ -69,37 +68,41 @@ export const gatewayServer = defineServerModule("gateway")
     gatewayUsageTrpcTransport,
     virtualKeyTrpcTransport,
   )
-  .withTransportFacts(({ dependencies, members }) => [
-    // The gateway control plane is signed rather than bearer-authenticated.
-    // It owns the same declared secret as the data-plane client.
-    bindRestCredential("internalSecret", () =>
-      GatewayInternalIdentity.create(members.secrets.find("LW_GATEWAY_INTERNAL_SECRET")),
-    ),
-    // The callback arrives publicly and the application verifies the raw bytes
-    // against the provider row's own stored secret, so the header is all the
-    // transport carries.
-    bindRestMiddleware(elevenLabsSignature, (context) => ({
-      signature: context.req.header("elevenlabs-signature"),
-    })),
-    /**
-     * ADR-072: the reconciliation pull gates under the webhook platform's
-     * plan flag, resolved per request after auth and the permission check.
-     * Fail-closed: a rejected lookup refuses; no plan store refuses at boot.
-     */
-    bindRestMiddleware(gatewaySpendBillingPlanGate, async (context) => {
-      const organization = context.get("organization") as { id: string };
-      const plan = await dependencies.entitlement.getActivePlan({
-        organizationId: organization.id,
-      });
-      if (plan.webhookEndpointsEnabled !== true) {
-        throw new ForbiddenError(
-          "The billing events API is an enterprise feature; this organization's plan does not include it.",
-        );
-      }
+  .withTransportFacts(({ app, dependencies }) => {
+    if (!(app instanceof GatewayApp)) {
+      throw new TypeError("Gateway transport requires its constructed application");
+    }
 
-      return {};
-    }),
-  ]);
+    return [
+      // The gateway control plane is signed rather than bearer-authenticated.
+      // It owns the same declared secret as the data-plane client.
+      bindRestCredential("internalSecret", () => app.internalDoor),
+      // The callback arrives publicly and the application verifies the raw bytes
+      // against the provider row's own stored secret, so the header is all the
+      // transport carries.
+      bindRestMiddleware(elevenLabsSignature, (context) => ({
+        signature: context.req.header("elevenlabs-signature"),
+      })),
+      /**
+       * ADR-072: the reconciliation pull gates under the webhook platform's
+       * plan flag, resolved per request after auth and the permission check.
+       * Fail-closed: a rejected lookup refuses; no plan store refuses at boot.
+       */
+      bindRestMiddleware(gatewaySpendBillingPlanGate, async (context) => {
+        const organization = context.get("organization") as { id: string };
+        const plan = await dependencies.entitlement.getActivePlan({
+          organizationId: organization.id,
+        });
+        if (plan.webhookEndpointsEnabled !== true) {
+          throw new ForbiddenError(
+            "The billing events API is an enterprise feature; this organization's plan does not include it.",
+          );
+        }
+
+        return {};
+      }),
+    ];
+  });
 
 /**
  * The advisory dedupe window a spend graph debits through: without it

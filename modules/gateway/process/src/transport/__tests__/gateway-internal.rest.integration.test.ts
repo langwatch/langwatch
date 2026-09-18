@@ -12,6 +12,7 @@ import type { MonitorApi } from "@langwatch/monitor-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { GatewayChangeEvents } from "../../app/gateway.members.ts";
+import { gatewayServer } from "../../gateway.server.ts";
 import {
   GatewayGuardrailRepository,
   type GatewayGuardrailCheckRow,
@@ -24,7 +25,6 @@ import {
 } from "../../services/gateway-internal-identity.service.ts";
 import type { GatewaySpendCommandSender } from "../../services/gateway-internal-protocol.service.ts";
 import { ModelCatalogGatewaySpendRatingService } from "../../services/model-catalog-gateway-spend-rating.service.ts";
-import { gatewayServer } from "../../gateway.server.ts";
 import { gatewayInternalRest } from "../gateway-internal.rest.ts";
 import {
   mountGatewayInternalRest,

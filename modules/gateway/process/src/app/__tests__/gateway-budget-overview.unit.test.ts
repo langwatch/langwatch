@@ -8,7 +8,6 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { resolvedSecrets } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -69,7 +68,7 @@ function fakePrisma(overrides: {
 }
 
 /** The slice of the application this surface reaches, and nothing else. */
-function gatewayAppStub(): GatewayApp {
+async function gatewayAppStub(): Promise<GatewayApp> {
   return GatewayApp.create({
     dependencies: {
       webhooks: peer("webhooks"),
@@ -88,7 +87,6 @@ function gatewayAppStub(): GatewayApp {
         gatewayBudget: { findMany: gatewayBudgetFindMany },
       }),
       clickhouse: fakeClickHouse({ query: vi.fn(), insert: vi.fn() }),
-      secrets: resolvedSecrets({}),
       elevenLabsWebhook: void 0,
       gatewayInternalProtocol: {},
     },
@@ -114,7 +112,7 @@ describe("GatewayApp.budgetOverviewForUser", () => {
     /** @scenario A per-member overview refuses a caller outside the organization */
     it("reports no gateway access and never reads the organization's keys or budgets", async () => {
       isMember.mockResolvedValue(false);
-      const app = gatewayAppStub();
+      const app = await gatewayAppStub();
 
       const overview = await app.budgetOverviewForUser({
         organizationId: OTHER_ORG_ID,
@@ -132,7 +130,7 @@ describe("GatewayApp.budgetOverviewForUser", () => {
     /** @scenario A member's overview reads only their own organization's budgets */
     it("answers with access, and scopes the underlying budget read to that organization", async () => {
       isMember.mockResolvedValue(true);
-      const app = gatewayAppStub();
+      const app = await gatewayAppStub();
 
       const overview = await app.budgetOverviewForUser({
         organizationId: ORG_ID,

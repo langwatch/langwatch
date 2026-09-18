@@ -8,12 +8,17 @@ import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
+import type {
+  OtlpIngestCredential,
+  OtlpIngestCredentialInput,
+  OtlpIngestRefusalStatus,
+} from "@langwatch/trace-contract";
 
 import type { CollectorCredential } from "../transport/collector.rest.ts";
-import type { OtlpIngestCredential } from "../transport/otlp-ingest.rest.ts";
 import {
+  readTraceIngestCredentials,
   readTraceLegacyRequestCredentials,
+  type TraceLegacyRequestCredentials,
   TRACE_LEGACY_INVALID_CREDENTIAL_MESSAGE,
   TRACE_LEGACY_MISSING_CREDENTIAL_MESSAGE,
 } from "./trace-legacy-credential.service.ts";
@@ -27,7 +32,7 @@ const INGEST_PERMISSION = "traces:create" as const;
 /** A resolved ingestion credential, or the status and body its refusal earned. */
 type TraceIngestResolution =
   | Readonly<{ ok: true; resolved: ResolvedApiKeyCredential; markUsed: () => void }>
-  | Readonly<{ ok: false; status: ContentfulStatusCode; body: object }>;
+  | Readonly<{ ok: false; status: OtlpIngestRefusalStatus; body: object }>;
 
 /** The two peers this door reads, and nothing else. */
 export type TraceIngestCredentialOptions = Readonly<{
@@ -81,8 +86,8 @@ export class TraceIngestCredentialService {
   }
 
   /** The receiver's vocabulary, plus the identity it stamps provenance from. */
-  async resolveForOtlp(input: { request: Request }): Promise<OtlpIngestCredential> {
-    const resolution = await this.#authenticate(input.request);
+  async resolveForOtlp(input: OtlpIngestCredentialInput): Promise<OtlpIngestCredential> {
+    const resolution = await this.#authenticateCredentials(readTraceIngestCredentials(input));
     if (!resolution.ok) {
       return { ok: false, status: resolution.status, body: resolution.body };
     }
@@ -107,8 +112,12 @@ export class TraceIngestCredentialService {
               ingestSourceType: null,
               ingestionTemplateId: null,
             },
-      markUsed: resolution.markUsed,
     };
+  }
+
+  /** The receiver calls this only after it has parsed a valid signal body. */
+  markOtlpCredentialUsed(input: { apiKeyId: string }): void {
+    void this.#apiKeys.markUsed({ id: input.apiKeyId });
   }
 
   /**
@@ -116,7 +125,12 @@ export class TraceIngestCredentialService {
    * caller with no credential at all is never told a permission is missing.
    */
   async #authenticate(request: Request): Promise<TraceIngestResolution> {
-    const credentials = readTraceLegacyRequestCredentials(request);
+    return this.#authenticateCredentials(readTraceLegacyRequestCredentials(request));
+  }
+
+  async #authenticateCredentials(
+    credentials: TraceLegacyRequestCredentials | null,
+  ): Promise<TraceIngestResolution> {
     if (!credentials) {
       return { ok: false, status: 401, body: { message: TRACE_LEGACY_MISSING_CREDENTIAL_MESSAGE } };
     }
@@ -140,7 +154,7 @@ export class TraceIngestCredentialService {
         const refusal = this.#ceilingRefusal(resolved);
         return {
           ok: false,
-          status: (refusal.httpStatus ?? 403) as ContentfulStatusCode,
+          status: refusal.httpStatus === 401 ? 401 : 403,
           body: handledErrorResponseBody(refusal),
         };
       }

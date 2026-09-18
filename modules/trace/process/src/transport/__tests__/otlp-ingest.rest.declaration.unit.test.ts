@@ -12,6 +12,12 @@ import { otlpIngestRest } from "../otlp-ingest.rest.ts";
 const declaration = otlpIngestRest.router();
 
 const RECEIVERS = ["ingestOtlpTraces", "ingestOtlpLogs", "ingestOtlpMetrics"];
+const ALIASES = [
+  "ingestOtlpAliasOtel",
+  "ingestOtlpAliasCollector",
+  "ingestOtlpAliasApiV1",
+  "ingestOtlpAliasRootV1",
+];
 
 describe("the OTLP receiver family", () => {
   describe("given the declaration a process mounts", () => {
@@ -20,7 +26,7 @@ describe("the OTLP receiver family", () => {
         declaration.routes.map((route) => [route.operation, route.bodyLimit?.maxBytes]),
       );
 
-      for (const operation of RECEIVERS) {
+      for (const operation of [...RECEIVERS, ...ALIASES]) {
         expect(caps[operation]).toBe(resolveRequestBound("bodyLimitBulkBytes", "ENTERPRISE"));
       }
     });
@@ -29,6 +35,19 @@ describe("the OTLP receiver family", () => {
       for (const route of declaration.routes) {
         expect([route.operation, route.rawBody?.form]).toEqual([route.operation, "bytes"]);
       }
+    });
+
+    it("keeps every corrected exporter base in the receiver's one declaration", () => {
+      expect(declaration.addressing).toBe("literal");
+      expect(declaration.routes.map((route) => route.path)).toEqual([
+        "/api/otel/v1/traces",
+        "/api/otel/v1/logs",
+        "/api/otel/v1/metrics",
+        "/api/otel/*",
+        "/api/collector/*",
+        "/api/v1/*",
+        "/v1/*",
+      ]);
     });
   });
 });

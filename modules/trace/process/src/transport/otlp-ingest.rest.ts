@@ -9,12 +9,10 @@ import {
   MANAGEMENT_API_VERSION,
   type RestRawResult,
 } from "@langwatch/api/rest";
-import { moduleApi } from "@langwatch/kernel/module-api";
 import { createLogger, type Logger } from "@langwatch/observability";
 import {
   applyOtlpReceiverPolicy,
   canonicalOtlpPath,
-  type OtlpReceiverPolicy,
   type OtlpReceiverRequest,
   decodeBase64OpenTelemetryId,
   OTLP_CORRECTED_PATH_HEADER,
@@ -28,137 +26,19 @@ import {
 } from "@langwatch/otlp";
 import { resolveRequestBound } from "@langwatch/plans";
 import { nowInstant } from "@langwatch/time";
-import { OtlpIngestSourceBillingUnavailableError } from "@langwatch/trace-contract";
+import {
+  OtlpIngestSourceBillingUnavailableError,
+  TraceApi,
+  type OtlpIngestCredentialInput,
+  type OtlpIngestIdentity,
+  type OtlpIngestRefusalStatus,
+  type TraceOtlpIngestApi,
+} from "@langwatch/trace-contract";
 import { SpanKind, SpanStatusCode, type Span } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { getLangWatchTracer } from "langwatch";
-
-/** The project a receiver writes into. */
-export type OtlpIngestProject = Readonly<{
-  id: string;
-  teamId: string;
-  organizationId: string;
-}>;
-
-/**
- * What the receiver needs to know about the credential BEYOND which project it
- * opens, stated as its own narrow shape rather than as the API-key contract's
- * resolved token.
- */
-export type OtlpIngestIdentity = Readonly<{
-  /**
-   * The scoped key's id, or null for a legacy project key. Rewritten onto
-   * every authenticated request, never conditional: the redaction deny-list
-   * exempts this name, sound only while it can't come from the payload.
-   */
-  apiKeyId: string | null;
-  organizationId: string;
-  /** Set only on an INGESTION key: which tool's feed this is. */
-  ingestSourceType: string | null;
-  ingestionTemplateId: string | null;
-  sourcePolicy?:
-    | { status: "ready"; policies: Record<"traces" | "logs" | "metrics", OtlpReceiverPolicy> }
-    | { status: "failed"; error: unknown };
-}>;
-
-/** A resolved credential, or the refusal this family publishes for it. */
-export type OtlpIngestCredential =
-  | Readonly<{
-      ok: true;
-      project: OtlpIngestProject;
-      identity: OtlpIngestIdentity;
-      /** Stamps the key's last-used clock, only once the body has parsed. */
-      markUsed: () => void;
-    }>
-  | Readonly<{ ok: false; status: ContentfulStatusCode; body: object }>;
-
-/** How this process turns a request into a project credential. */
-export type OtlpIngestCredentialResolver = (input: {
-  request: Request;
-}) => Promise<OtlpIngestCredential>;
-
-/** The plan allowance, enforced before a byte of the batch is parsed. */
-export type OtlpIngestUsageLimit = (input: {
-  project: OtlpIngestProject;
-  /** Best-effort, for correlating a rejection to a customer-supplied id. */
-  customerTraceIds: string[];
-}) => Promise<void>;
-
-/** The trace signal's collection: raw OTLP in, per-span tally out. */
-export type OtlpTraceCollectionResult = Readonly<{
-  rejectedSpans?: number;
-  errorMessage?: string;
-}>;
-
-export type OtlpTraceCollection = (input: {
-  tenantId: string;
-  traceRequest: IExportTraceServiceRequest;
-}) => Promise<OtlpTraceCollectionResult | undefined>;
-
-/**
- * The log and metric signals answer a discriminated outcome rather than a
- * counter pair, because `partialSuccess` and "nothing landed, retry" are
- * different instructions to an exporter and a counter cannot tell them apart.
- */
-export type OtlpLogCollectionOutcome =
-  | Readonly<{
-      outcome: "collected";
-      rejectedLogRecords: number;
-      errorMessage?: string | undefined;
-    }>
-  | Readonly<{ outcome: "unavailable"; errorMessage: string }>
-  /**
-   * This deployment composed no log collection, so no batch can ever land.
-   * Distinct from `unavailable` (a retryable blip): a retryable status here
-   * would turn every fleet posting here into an unbounded retry loop.
-   */
-  | Readonly<{ outcome: "not-served"; errorMessage: string }>;
-
-export type OtlpLogCollection = (input: {
-  tenantId: string;
-  organizationId: string;
-  logRequest: unknown;
-}) => Promise<OtlpLogCollectionOutcome>;
-
-export type OtlpMetricCollectionOutcome =
-  | Readonly<{
-      outcome: "collected";
-      rejectedDataPoints: number;
-      errorMessage?: string | undefined;
-    }>
-  | Readonly<{ outcome: "unavailable"; errorMessage: string }>
-  /** As {@link OtlpLogCollectionOutcome}'s own: permanent, not a blip. */
-  | Readonly<{ outcome: "not-served"; errorMessage: string }>;
-
-export type OtlpMetricCollection = (input: {
-  tenantId: string;
-  organizationId: string;
-  metricRequest: unknown;
-}) => Promise<OtlpMetricCollectionOutcome>;
-
-/** Reports a failure the receiver answered but did not raise. */
-export type OtlpIngestErrorReport = (
-  error: Error,
-  context: Readonly<{ projectId: string; customerTraceIds: string[] }>,
-) => void;
-
-/**
- * The whole of what the three OTLP routes ask the process for. NONE is
- * optional: the operations-only proxy throws a `TypeError` on any
- * unserved name, so stating all six here is a build failure, not a 500.
- */
-export type OtlpIngestRestMembers = Readonly<{
-  otlpCredential: OtlpIngestCredentialResolver;
-  otlpUsageLimit: OtlpIngestUsageLimit;
-  otlpTraces: OtlpTraceCollection;
-  otlpLogs: OtlpLogCollection;
-  otlpMetrics: OtlpMetricCollection;
-  otlpReportError: OtlpIngestErrorReport;
-}>;
-
-export const OtlpIngestApi = moduleApi<OtlpIngestRestMembers>()("trace");
 
 const loggerTraces = createLogger("langwatch:otel:v1:traces");
 const loggerLogs = createLogger("langwatch:otel:v1:logs");
@@ -238,9 +118,8 @@ type OtlpAuthenticated =
   | Readonly<{
       project: { id: string; teamId: string; organizationId: string };
       identity: OtlpIngestIdentity;
-      markUsed: () => void;
     }>
-  | Readonly<{ refusal: { status: ContentfulStatusCode; body: object } }>;
+  | Readonly<{ refusal: { status: OtlpIngestRefusalStatus; body: object } }>;
 
 /**
  * Resolves the credential and logs an auth-diagnostic fingerprint on every
@@ -249,7 +128,7 @@ type OtlpAuthenticated =
  */
 async function authenticate(
   request: Request,
-  credential: OtlpIngestRestMembers["otlpCredential"],
+  credential: TraceOtlpIngestApi["otlpCredential"],
   logger: Logger,
 ): Promise<OtlpAuthenticated> {
   const url = new URL(request.url);
@@ -258,7 +137,12 @@ async function authenticate(
     method: request.method,
     header: (name: string) => request.headers.get(name) ?? undefined,
   });
-  const resolution = await credential({ request });
+  const credentialInput: OtlpIngestCredentialInput = {
+    authorization: request.headers.get("authorization"),
+    xAuthToken: request.headers.get("x-auth-token"),
+    xProjectId: request.headers.get("x-project-id"),
+  };
+  const resolution = await credential(credentialInput);
 
   if (!resolution.ok) {
     logger.warn(
@@ -274,7 +158,6 @@ async function authenticate(
   return {
     project: resolution.project,
     identity: resolution.identity,
-    markUsed: resolution.markUsed,
   };
 }
 
@@ -395,7 +278,7 @@ async function handleTracesRequest(
   request: Request,
   span: Span,
   rawBytes: Uint8Array,
-  ports: OtlpIngestRestMembers,
+  ports: TraceOtlpIngestApi,
 ): Promise<RestRawResult> {
   // Auth runs before decompression, but the raw-body middleware has already
   // buffered the wire body — the declared body cap is what keeps a 401 cheap.
@@ -405,7 +288,7 @@ async function handleTracesRequest(
     return jsonAnswer(authenticated.refusal.body, authenticated.refusal.status);
   }
 
-  const { project, identity, markUsed } = authenticated;
+  const { project, identity } = authenticated;
   span.setAttribute("langwatch.project.id", project.id);
 
   const body = await readOtlpBody(requestForDecompression(request, rawBytes));
@@ -443,7 +326,7 @@ async function handleTracesRequest(
   }
 
   // Body successfully parsed - only now is the key marked used.
-  markUsed();
+  if (identity.apiKeyId) ports.otlpMarkCredentialUsed({ apiKeyId: identity.apiKeyId });
 
   applyReceiverProvenance({
     request: parsed.request,
@@ -471,7 +354,7 @@ async function handleLogsRequest(
   request: Request,
   span: Span,
   rawBytes: Uint8Array,
-  ports: OtlpIngestRestMembers,
+  ports: TraceOtlpIngestApi,
 ): Promise<RestRawResult> {
   const authenticated = await authenticate(request, ports.otlpCredential, loggerLogs);
   if ("refusal" in authenticated) {
@@ -479,7 +362,7 @@ async function handleLogsRequest(
     return jsonAnswer(authenticated.refusal.body, authenticated.refusal.status);
   }
 
-  const { project, identity, markUsed } = authenticated;
+  const { project, identity } = authenticated;
   span.setAttribute("langwatch.project.id", project.id);
 
   await ports.otlpUsageLimit({ project, customerTraceIds: [] });
@@ -497,7 +380,7 @@ async function handleLogsRequest(
     return jsonAnswer({ error: "Failed to parse logs" }, 400);
   }
 
-  markUsed();
+  if (identity.apiKeyId) ports.otlpMarkCredentialUsed({ apiKeyId: identity.apiKeyId });
 
   applyReceiverProvenance({
     request: parsed.request,
@@ -546,7 +429,7 @@ async function handleMetricsRequest(
   request: Request,
   span: Span,
   rawBytes: Uint8Array,
-  ports: OtlpIngestRestMembers,
+  ports: TraceOtlpIngestApi,
 ): Promise<RestRawResult> {
   const authenticated = await authenticate(request, ports.otlpCredential, loggerMetrics);
   if ("refusal" in authenticated) {
@@ -554,7 +437,7 @@ async function handleMetricsRequest(
     return jsonAnswer(authenticated.refusal.body, authenticated.refusal.status);
   }
 
-  const { project, identity, markUsed } = authenticated;
+  const { project, identity } = authenticated;
   span.setAttribute("langwatch.project.id", project.id);
 
   await ports.otlpUsageLimit({ project, customerTraceIds: [] });
@@ -582,7 +465,7 @@ async function handleMetricsRequest(
     logger: loggerMetrics,
   });
 
-  markUsed();
+  if (identity.apiKeyId) ports.otlpMarkCredentialUsed({ apiKeyId: identity.apiKeyId });
 
   const result = await ports.otlpMetrics({
     tenantId: project.id,
@@ -629,7 +512,7 @@ async function handleOtlpPathAlias({
   raw,
   request,
 }: {
-  app: OtlpIngestRestMembers;
+  app: TraceOtlpIngestApi;
   raw: Uint8Array;
   request: Request;
 }): Promise<RestRawResult> {
@@ -664,7 +547,7 @@ async function handleOtlpPathAlias({
   }
 }
 
-export const otlpIngestRest = defineRestRouter(OtlpIngestApi)
+export const otlpIngestRest = defineRestRouter(TraceApi)
   .withNamespace("otel")
   .withVersion(MANAGEMENT_API_VERSION)
   .withAddressing("literal", { v1Twin: false })
@@ -722,9 +605,7 @@ export const otlpIngestRest = defineRestRouter(OtlpIngestApi)
   .withAccess(PUBLIC_ACCESS)
   .withRawResponse({ produces: "application/json" })
   .withDocs({ hide: true })
-  .handle(({ app, raw, request }) =>
-    handleOtlpPathAlias({ app, raw: raw as Uint8Array, request }),
-  )
+  .handle(({ app, raw, request }) => handleOtlpPathAlias({ app, raw: raw as Uint8Array, request }))
 
   .post("/api/collector/*", "ingestOtlpAliasCollector")
   .withRawBody("bytes")
@@ -732,9 +613,7 @@ export const otlpIngestRest = defineRestRouter(OtlpIngestApi)
   .withAccess(PUBLIC_ACCESS)
   .withRawResponse({ produces: "application/json" })
   .withDocs({ hide: true })
-  .handle(({ app, raw, request }) =>
-    handleOtlpPathAlias({ app, raw: raw as Uint8Array, request }),
-  )
+  .handle(({ app, raw, request }) => handleOtlpPathAlias({ app, raw: raw as Uint8Array, request }))
 
   .post("/api/v1/*", "ingestOtlpAliasApiV1")
   .withRawBody("bytes")
@@ -742,9 +621,7 @@ export const otlpIngestRest = defineRestRouter(OtlpIngestApi)
   .withAccess(PUBLIC_ACCESS)
   .withRawResponse({ produces: "application/json" })
   .withDocs({ hide: true })
-  .handle(({ app, raw, request }) =>
-    handleOtlpPathAlias({ app, raw: raw as Uint8Array, request }),
-  )
+  .handle(({ app, raw, request }) => handleOtlpPathAlias({ app, raw: raw as Uint8Array, request }))
 
   .post("/v1/*", "ingestOtlpAliasRootV1")
   .withRawBody("bytes")
@@ -752,8 +629,6 @@ export const otlpIngestRest = defineRestRouter(OtlpIngestApi)
   .withAccess(PUBLIC_ACCESS)
   .withRawResponse({ produces: "application/json" })
   .withDocs({ hide: true })
-  .handle(({ app, raw, request }) =>
-    handleOtlpPathAlias({ app, raw: raw as Uint8Array, request }),
-  )
+  .handle(({ app, raw, request }) => handleOtlpPathAlias({ app, raw: raw as Uint8Array, request }))
 
   .build();

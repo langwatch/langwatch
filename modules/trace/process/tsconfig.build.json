@@ -2,9 +2,7 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "paths": {
-      "@langwatch/trace-process": [
-        "./src/index.ts"
-      ]
+      "@langwatch/trace-process": ["./src/index.ts"]
     },
     "composite": true,
     "declaration": true,
@@ -31,11 +29,7 @@
     "./src/transport/collector.rest.ts",
     "src/repositories/clickhouse/__tests__/stored-span-row.test-fakes.ts"
   ],
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "src/**/*.json"
-  ],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",
     "**/__mocks__/**",

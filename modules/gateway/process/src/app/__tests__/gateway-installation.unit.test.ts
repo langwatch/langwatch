@@ -1,13 +1,19 @@
+import { BearerIdentity, RestHost, type RestCredentialBinding } from "@langwatch/api/rest";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { GatewayApi } from "@langwatch/gateway-contract";
-import { createApp } from "@langwatch/kernel";
+import { ResourceScope } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { resolvedSecrets } from "@langwatch/process-stores";
+import { ScopedSecrets } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 
 import { gatewayServer } from "../../gateway.server.ts";
+import {
+  buildGatewayCanonicalString,
+  computeGatewaySignature,
+} from "../../services/gateway-internal-identity.service.ts";
+import { gatewayInternalRest } from "../../transport/gateway-internal.rest.ts";
 import type { GatewaySpendApp } from "../../transport/gateway-spend.rest.ts";
-import type { GatewayApp } from "../gateway.app.ts";
+import { GatewayApp } from "../gateway.app.ts";
 
 /**
  * `withTransports` type-checks a family's declared Api, never its App, so a
@@ -59,46 +65,102 @@ function peer(name: string): never {
   ) as never;
 }
 
-function process() {
-  return createApp({ role: "api" })
-    .withModules([gatewayServer])
-    .withConfig({
-      gateway: {
-        spendSettlementGraceMs: undefined,
+const INTERNAL_SECRET = "0123456789abcdef0123456789abcdef";
+
+async function installGateway() {
+  const resources = new ResourceScope();
+  const secrets = new ScopedSecrets(async (handle, build) =>
+    build(handle.id === "LW_GATEWAY_INTERNAL_SECRET" ? INTERNAL_SECRET : undefined),
+  );
+
+  try {
+    const state = await gatewayServer.install({
+      resources,
+      config: { spendSettlementGraceMs: undefined },
+      members: {
+        prisma: relationalWithoutStore(),
+        clickhouse: analyticalWithoutStore(),
+        elevenLabsWebhook: undefined,
+        gatewayInternalProtocol: {},
       },
-    })
-    .withRelational(relationalWithoutStore())
-    .withAnalytical(analyticalWithoutStore())
-    .withSecrets(resolvedSecrets({}))
-    .withMember("elevenLabsWebhook", undefined)
-    .withMember("gatewayInternalProtocol", {})
-    .provide({
-      webhook: peer("webhook"),
-      entitlement: peer("entitlement"),
-      authz: peer("authz"),
-      project: peer("project"),
-      evaluator: peer("evaluator"),
-      monitor: peer("monitor"),
-      organization: peer("organization"),
-      "feature-flag": peer("featureFlag"),
+      role: "api",
+      secrets,
+      resolve: () => peer("gateway dependency"),
     });
+
+    return { state, resources };
+  } catch (error) {
+    await resources.close();
+    throw error;
+  }
+}
+
+function signedHealthRequest(): Request {
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const path = "/api/internal/gateway/health";
+  const signature = computeGatewaySignature(
+    INTERNAL_SECRET,
+    buildGatewayCanonicalString({ method: "GET", path, timestamp, body: "" }),
+  );
+
+  return new Request(`http://api.test${path}`, {
+    headers: {
+      "X-LangWatch-Gateway-Signature": signature,
+      "X-LangWatch-Gateway-Timestamp": timestamp,
+    },
+  });
+}
+
+function isInternalCredential(binding: object): binding is RestCredentialBinding {
+  return (
+    "credential" in binding &&
+    binding.credential === "internalSecret" &&
+    "resolveIdentity" in binding &&
+    typeof binding.resolveIdentity === "function"
+  );
 }
 
 describe("gateway app installation", () => {
   describe("given a process that supplied the members and the peers", () => {
     it("serves the control plane instead of refusing by name", async () => {
-      const runtime = await process().boot();
+      const { state, resources } = await installGateway();
 
       try {
-        const app = runtime.service(GatewayApi);
+        const app = state.provided;
+        if (!(app instanceof GatewayApp)) {
+          throw new Error("Gateway installation did not provide GatewayApp");
+        }
+        const credential = state.facts?.find(isInternalCredential);
+        if (!credential)
+          throw new Error("Gateway installation did not bind its internal credential");
 
-        expect(runtime.module(gatewayServer).provided).toBe(app);
+        expect(GatewayApp.contract).toBe(GatewayApi);
         expect(spendFamilyIsWhole).toBe(true);
+        expect(credential.resolveIdentity()).toBe(app.internalDoor);
+
+        const closed = BearerIdentity.create({ name: "unconfigured", token: undefined });
+        const runtime = RestHost.create({
+          identities: {
+            project: closed,
+            organization: closed,
+            scimToken: closed,
+            "instance-admin": closed,
+            browser: closed,
+          },
+          bearers: () => closed,
+          audit: { record: async () => undefined },
+        });
+        runtime.mount(gatewayInternalRest.router(), () => app, {
+          facts: state.facts,
+        });
+
+        const health = await runtime.app.request(signedHealthRequest());
+        expect(health.status).toBe(200);
 
         // Each of these reads `#dependencies`, which is what threw "The
         // gateway control plane was not installed" on every process while the
         // App was handed an empty member record.
-        const installed = runtime.module(gatewayServer).provided;
+        const installed = app;
         expect(installed.isSpendSourceAvailable()).toBe(true);
         expect(installed.parseVirtualKeyBudget({ limitUsd: "10.00", window: "DAY" }).success).toBe(
           true,
@@ -106,7 +168,7 @@ describe("gateway app installation", () => {
         expect(typeof installed.findVirtualKeyBySecret).toBe("function");
         expect(typeof installed.submitSpendCommands).toBe("function");
       } finally {
-        await runtime.stop();
+        await resources.close();
       }
     });
   });

@@ -8,7 +8,6 @@ import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { ResourceScope } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { resolvedSecrets } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { initTRPC } from "@trpc/server";
@@ -150,8 +149,8 @@ function projectsStub(overrides: Partial<ProjectApi>): ProjectApi {
 /** No handle is ever resolved through it in these tests. */
 const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
 
-function callerFor(budgets: Record<string, unknown>[]) {
-  const app = GatewayApp.create({
+async function callerFor(budgets: Record<string, unknown>[]) {
+  const app = await GatewayApp.create({
     dependencies: {
       webhooks: peer("webhooks"),
       entitlement: peer("entitlement"),
@@ -184,7 +183,6 @@ function callerFor(budgets: Record<string, unknown>[]) {
     members: {
       prisma: fakePrisma(budgets),
       clickhouse: fakeClickHouse(),
-      secrets: resolvedSecrets({}),
       elevenLabsWebhook: void 0,
       gatewayInternalProtocol: {},
     },
@@ -220,7 +218,7 @@ describe("gatewayBudgets.list for a per-person template", () => {
         { ScopeId: "enduser-under", SpentNanoUSD: "500000000" },
       ];
 
-      const { budgets } = await callerFor([budgetRow()]).list({ organizationId: ORG_ID });
+      const { budgets } = await (await callerFor([budgetRow()])).list({ organizationId: ORG_ID });
 
       expect(budgets[0]?.endUsersSeen).toBe(2);
       expect(budgets[0]?.endUsersOver).toBe(1);
@@ -232,7 +230,7 @@ describe("gatewayBudgets.list for a per-person template", () => {
     it("reports zero seen and zero over", async () => {
       bucketRows = [];
 
-      const { budgets } = await callerFor([budgetRow()]).list({ organizationId: ORG_ID });
+      const { budgets } = await (await callerFor([budgetRow()])).list({ organizationId: ORG_ID });
 
       expect(budgets[0]?.endUsersSeen).toBe(0);
       expect(budgets[0]?.endUsersOver).toBe(0);
@@ -242,7 +240,7 @@ describe("gatewayBudgets.list for a per-person template", () => {
   describe("given a template anchored on a virtual key", () => {
     /** @scenario "Budget list Scope column renders the shared scope chip on one line" */
     it("names the virtual key the template anchors on", async () => {
-      const { budgets } = await callerFor([budgetRow()]).list({ organizationId: ORG_ID });
+      const { budgets } = await (await callerFor([budgetRow()])).list({ organizationId: ORG_ID });
 
       expect(budgets[0]?.scopeTarget).toMatchObject({
         kind: "ATTRIBUTED_USER",
@@ -256,7 +254,9 @@ describe("gatewayBudgets.list for a per-person template", () => {
   describe("given a template anchored on a project", () => {
     /** @scenario "Budget list Scope column renders the shared scope chip on one line" */
     it("names the project the template anchors on", async () => {
-      const { budgets } = await callerFor([budgetRow({ scopeId: ANCHOR_PROJECT_ID })]).list({
+      const { budgets } = await (
+        await callerFor([budgetRow({ scopeId: ANCHOR_PROJECT_ID })])
+      ).list({
         organizationId: ORG_ID,
       });
 
@@ -271,13 +271,15 @@ describe("gatewayBudgets.list for a per-person template", () => {
   describe("given a scope that is not a per-person template", () => {
     /** @scenario "A per-person template counts the people it has seen and the people over cap" */
     it("leaves the standing null", async () => {
-      const { budgets } = await callerFor([
-        budgetRow({
-          id: "bdg_project",
-          scopeType: "PROJECT",
-          scopeId: ANCHOR_PROJECT_ID,
-        }),
-      ]).list({ organizationId: ORG_ID });
+      const { budgets } = await (
+        await callerFor([
+          budgetRow({
+            id: "bdg_project",
+            scopeType: "PROJECT",
+            scopeId: ANCHOR_PROJECT_ID,
+          }),
+        ])
+      ).list({ organizationId: ORG_ID });
 
       expect(budgets[0]?.endUsersSeen).toBeNull();
       expect(budgets[0]?.endUsersOver).toBeNull();

@@ -2,6 +2,7 @@
 // reachable": one taxonomy for an unreachable ClickHouse, shared with every
 // other read of it.
 import { ClickHouseUnavailableError } from "@langwatch/analytics-process";
+import type { RestIdentity } from "@langwatch/api/rest";
 import { type AuthzPermission, AuthzApi } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
@@ -48,7 +49,6 @@ import { WebhookApi, eventMatches } from "@langwatch/webhook-contract";
 import { createWebhookEnvelopes, type WebhookEnvelopes } from "@langwatch/webhook-process";
 import type { z } from "zod";
 
-import { GatewayEndUserCapsAdapter } from "./gateway-end-user-caps.composition.ts";
 import { settlementGraceMs } from "../eventing/gateway-spend-settlement.intent.ts";
 import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
 import { PrismaGatewayGuardrailRepository } from "../repositories/prisma/prisma.gateway-guardrail.repository.ts";
@@ -76,6 +76,7 @@ import {
   GatewayGuardrailEvaluationService,
   type EvaluatorRunner,
 } from "../services/gateway-guardrail-evaluation.service.ts";
+import { GatewayInternalIdentity } from "../services/gateway-internal-identity.service.ts";
 import { GatewayInternalProtocolService } from "../services/gateway-internal-protocol.service.ts";
 import type {
   GatewayCodexRefresh,
@@ -91,6 +92,7 @@ import type {
 } from "../services/gateway-virtual-key-dto.service.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
 import { buildGatewayControlPlane } from "./gateway-composition.build.ts";
+import { GatewayEndUserCapsAdapter } from "./gateway-end-user-caps.composition.ts";
 import {
   type GatewayBudgetSpend,
   type GatewayConfigAssembly,
@@ -494,7 +496,7 @@ const unusedBudgetOverviewRepository: GatewayBudgetOverviewRepository = {
 
 type GatewaySetup = FeatureSetup<
   typeof GatewayApp.dependencies,
-  Pick<ProcessMembers, "prisma" | "clickhouse" | "secrets"> &
+  Pick<ProcessMembers, "prisma" | "clickhouse"> &
     Readonly<{
       elevenLabsWebhook: ElevenLabsWebhookCollaborators | undefined;
       gatewayInternalProtocol: GatewayInternalProtocolCollaborators;
@@ -563,12 +565,28 @@ export class GatewayApp implements GatewayApi {
   static readonly reads = [
     "prisma",
     "clickhouse",
-    "secrets",
     "elevenLabsWebhook",
     "gatewayInternalProtocol",
   ] as const;
 
-  static create(setup: GatewaySetup): GatewayApp {
+  static async create(setup: GatewaySetup): Promise<GatewayApp> {
+    return setup.secrets.into(GatewayApp.secrets.internalSecret, (internalSecret) =>
+      setup.secrets.into(GatewayApp.secrets.jwtSecret, (jwtSecret) =>
+        setup.secrets.into(GatewayApp.secrets.virtualKeyPepper, (virtualKeyPepper) =>
+          GatewayApp.#createWithSecrets(setup, { internalSecret, jwtSecret, virtualKeyPepper }),
+        ),
+      ),
+    );
+  }
+
+  static #createWithSecrets(
+    setup: GatewaySetup,
+    secrets: Readonly<{
+      internalSecret: string | undefined;
+      jwtSecret: string | undefined;
+      virtualKeyPepper: string | undefined;
+    }>,
+  ): GatewayApp {
     const controlPlane = buildGatewayControlPlane({
       prisma: setup.members.prisma,
       clickhouse: setup.members.clickhouse,
@@ -578,7 +596,7 @@ export class GatewayApp implements GatewayApi {
         evaluators: setup.dependencies.evaluators,
         monitors: setup.dependencies.monitors,
       },
-      virtualKeyPepper: setup.members.secrets.find("LW_VIRTUAL_KEY_PEPPER"),
+      virtualKeyPepper: secrets.virtualKeyPepper,
     });
     const internalCollaborators = setup.members.gatewayInternalProtocol;
     const config =
@@ -600,11 +618,10 @@ export class GatewayApp implements GatewayApi {
           runEvaluator: internalCollaborators.evaluatorRunner,
         })
       : void 0;
-    const jwtSecret = setup.members.secrets.find("LW_GATEWAY_JWT_SECRET");
     const internalProtocol = GatewayInternalProtocolService.create({
       virtualKeys: controlPlane.internalVirtualKeys,
       projects: setup.dependencies.projects,
-      jwt: jwtSecret ? GatewayJwtService.create({ secret: jwtSecret }) : void 0,
+      jwt: secrets.jwtSecret ? GatewayJwtService.create({ secret: secrets.jwtSecret }) : void 0,
       store: PrismaGatewayInternalStoreRepository.create({ database: setup.members.prisma }),
       changes: controlPlane.internalChanges,
       config,
@@ -624,6 +641,7 @@ export class GatewayApp implements GatewayApi {
           : {}),
       },
       internalProtocol,
+      GatewayInternalIdentity.create(secrets.internalSecret),
       {
         prisma: setup.members.prisma,
         webhooks: setup.dependencies.webhooks,
@@ -631,7 +649,7 @@ export class GatewayApp implements GatewayApi {
         // raw `LW_SPEND_SETTLEMENT_GRACE_MS` string, so this carries it as
         // written and never reads a second answer out of it. `setup.config`
         // is undefined only in a test stub that does not care about billing
-        // config; a real boot always parses one through `configSchema`.
+        // config; a real boot always states one through the process parse.
         settlementGraceMs: settlementGraceMs(setup.config?.spendSettlementGraceMs),
       },
       {
@@ -650,16 +668,19 @@ export class GatewayApp implements GatewayApi {
   #budgetOverviewDeps: GatewayBudgetOverviewDeps | undefined;
   #budgetOverview: BudgetOverviewService | undefined;
   #internalProtocol: GatewayInternalProtocolService;
+  #internalDoor: RestIdentity;
   readonly #envelopes: WebhookEnvelopes = createWebhookEnvelopes();
 
   private constructor(
     members: GatewayInfrastructure,
     internalProtocol: GatewayInternalProtocolService,
+    internalDoor: RestIdentity,
     spend?: GatewaySpendCollaborators,
     budgetOverviewDeps?: GatewayBudgetOverviewDeps,
   ) {
     this.#spend = spend;
     this.#internalProtocol = internalProtocol;
+    this.#internalDoor = internalDoor;
     this.#budgetOverviewDeps = budgetOverviewDeps;
     // The union's second arm exists for the REST-only composition (agent cache
     // and the ElevenLabs callback), which carries no control plane. Every
@@ -671,6 +692,10 @@ export class GatewayApp implements GatewayApi {
     this.#elevenLabsWebhook = members.elevenLabsWebhook
       ? GatewayElevenLabsWebhookService.create(members.elevenLabsWebhook)
       : void 0;
+  }
+
+  get internalDoor(): RestIdentity {
+    return this.#internalDoor;
   }
 
   findVirtualKeyBySecret(

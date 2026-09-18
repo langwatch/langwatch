@@ -93,6 +93,7 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/otlp": "workspace:*",
     "@langwatch/plans": "workspace:*",
+    "@langwatch/presence-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
@@ -119,8 +120,7 @@
     "papaparse": "catalog:",
     "ts-pattern": "catalog:",
     "zod": "catalog:",
-    "zod-validation-error": "catalog:",
-    "@langwatch/presence-contract": "workspace:*"
+    "zod-validation-error": "catalog:"
   },
   "devDependencies": {
     "@clickhouse/client": "catalog:",

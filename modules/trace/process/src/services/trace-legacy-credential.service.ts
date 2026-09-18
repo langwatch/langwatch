@@ -6,6 +6,7 @@ import { credentialPrincipalOfToken } from "@langwatch/api/rest";
 import type { AuthzApi, AuthzPermission } from "@langwatch/authz-contract";
 import type { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
+import type { OtlpIngestCredentialInput } from "@langwatch/trace-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import type { TraceLegacyCredential } from "../transport/trace-legacy.rest.ts";
@@ -34,9 +35,18 @@ export type TraceLegacyRequestCredentials = Readonly<{
 export function readTraceLegacyRequestCredentials(
   request: Request,
 ): TraceLegacyRequestCredentials | null {
-  const authorization = request.headers.get("authorization");
-  const xAuthToken = request.headers.get("x-auth-token");
-  const xProjectId = request.headers.get("x-project-id");
+  return readTraceIngestCredentials({
+    authorization: request.headers.get("authorization"),
+    xAuthToken: request.headers.get("x-auth-token"),
+    xProjectId: request.headers.get("x-project-id"),
+  });
+}
+
+/** The portable credential facts both the OTLP route and collector resolve. */
+export function readTraceIngestCredentials(
+  input: OtlpIngestCredentialInput,
+): TraceLegacyRequestCredentials | null {
+  const { authorization, xAuthToken, xProjectId } = input;
 
   if (authorization?.toLowerCase().startsWith("basic ")) {
     const parsed = parseBasicCredentials(authorization.slice(6));

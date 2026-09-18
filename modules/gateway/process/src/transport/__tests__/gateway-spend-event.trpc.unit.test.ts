@@ -8,7 +8,6 @@ import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { ResourceScope } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { resolvedSecrets } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { initTRPC } from "@trpc/server";
@@ -120,7 +119,7 @@ function fakePrisma(): PrismaClient {
 const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
 
 /** The slice of the application this surface reaches, and nothing else. */
-function gatewayAppStub(): GatewayApp {
+async function gatewayAppStub(): Promise<GatewayApp> {
   return GatewayApp.create({
     dependencies: {
       webhooks: peer("webhooks"),
@@ -135,7 +134,6 @@ function gatewayAppStub(): GatewayApp {
     members: {
       prisma: fakePrisma(),
       clickhouse: fakeClickHouse(),
-      secrets: resolvedSecrets({}),
       elevenLabsWebhook: void 0,
       gatewayInternalProtocol: {},
     },
@@ -153,8 +151,8 @@ const BASE_INPUT = {
   toMs: Date.parse("2026-07-29T00:00:00Z"),
 };
 
-function caller(permits?: (permission: AuthzPermission) => boolean) {
-  const app = gatewayAppStub();
+async function caller(permits?: (permission: AuthzPermission) => boolean) {
+  const app = await gatewayAppStub();
   const trpc = initTRPC.context<GatewayTrpcTestContext>().create();
   const router = createTrpcRuntime<GatewayTrpcTestContext>({
     root: trpc,
@@ -175,7 +173,7 @@ describe("gatewaySpendEvents.list", () => {
     /** @scenario Ledger rows resolve virtual key display names */
     /** @scenario "Spend history is served with no ClickHouse-absent degrade path" */
     it("answers the page the application resolved", async () => {
-      const result = await caller().list(BASE_INPUT);
+      const result = await (await caller()).list(BASE_INPUT);
 
       expect(result.virtualKeyNames).toEqual({ vk_1: "Customer A key" });
       expect(result.clickHouseDisabled).toBe(false);
@@ -188,7 +186,7 @@ describe("gatewaySpendEvents.list", () => {
   describe("when the caller lacks gatewayUsage:view", () => {
     /** @scenario The ledger requires the gateway usage view scope */
     it("never reaches the application", async () => {
-      await expect(caller(() => false).list(BASE_INPUT)).rejects.toMatchObject({
+      await expect((await caller(() => false)).list(BASE_INPUT)).rejects.toMatchObject({
         code: "FORBIDDEN",
       });
       expect(clickHouseQuery).not.toHaveBeenCalled();

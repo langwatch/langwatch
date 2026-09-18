@@ -61,6 +61,7 @@ import {
   type TraceContentReadService,
   type TraceViewerService,
   type TraceApi,
+  type TraceOtlpIngestApi,
   type TraceAnnotationCommands,
   type TraceAnnotationMarker,
   type TraceSuggestionTarget,
@@ -79,6 +80,12 @@ import {
   predefinedEventTypes,
   TRACK_EVENT_SPAN_NAME,
   type TrackEventRESTParamsValidator,
+  type OtlpIngestCredential,
+  type OtlpIngestCredentialInput,
+  type OtlpIngestProject,
+  type OtlpLogCollectionOutcome,
+  type OtlpMetricCollectionOutcome,
+  type OtlpTraceCollectionResult,
   TraceApi as TraceApiToken,
   DEFAULT_PII_REDACTION_LEVEL,
 } from "@langwatch/trace-contract";
@@ -113,17 +120,6 @@ import type {
   CollectorCredential,
   CollectorProject,
 } from "../transport/collector.rest.ts";
-import type {
-  OtlpIngestCredential,
-  OtlpIngestProject,
-  OtlpIngestRestMembers,
-  OtlpLogCollection,
-  OtlpLogCollectionOutcome,
-  OtlpMetricCollection,
-  OtlpMetricCollectionOutcome,
-  OtlpTraceCollection,
-  OtlpTraceCollectionResult,
-} from "../transport/otlp-ingest.rest.ts";
 import { buildTraceCollaborators } from "./trace-composition.build.ts";
 import { traceDependencies } from "./trace-composition.types.ts";
 import { composeTraceAppDependencies } from "./trace-read.composition.ts";
@@ -459,9 +455,9 @@ export interface TraceAppDependencies {
    * — the Log module owns the collection and this module may not import it.
    * Absent, the door refuses permanently rather than retrying forever.
    */
-  logCollection?: OtlpLogCollection;
+  logCollection?: TraceOtlpIngestApi["otlpLogs"];
   /** The metric signal's twin of {@link logCollection}, absent for the same reason. */
-  metricCollection?: OtlpMetricCollection;
+  metricCollection?: TraceOtlpIngestApi["otlpMetrics"];
   /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
   publicBaseUrl?: string;
 }
@@ -501,12 +497,8 @@ type TraceSetup = FeatureSetup<
   TraceRepositories
 >;
 
-/**
- * The trace feature's application: implements {@link TraceApi},
- * {@link CollectorApp} and {@link OtlpIngestRestMembers} explicitly, so an
- * unserved door member fails the build instead of throwing at runtime.
- */
-export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
+/** Trace implements its public API and the collector's internal transport seam. */
+export class TraceApp implements TraceApi, CollectorApp {
   static readonly contract = TraceApiToken;
   static readonly dependencies = traceDependencies;
   /**
@@ -1632,7 +1624,7 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
    * The project credential the receiver resolves for itself — same
    * raise-rather-than-refuse reasoning as {@link collectorCredential}.
    */
-  otlpCredential(input: { request: Request }): Promise<OtlpIngestCredential> {
+  otlpCredential(input: OtlpIngestCredentialInput): Promise<OtlpIngestCredential> {
     if (!this.#dependencies.ingestCredential) {
       throw new Error(
         "The OTLP receiver asked for a credential, and this process composed Trace without the API-key directory it resolves through",
@@ -1640,6 +1632,16 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
     }
 
     return this.#dependencies.ingestCredential.resolveForOtlp(input);
+  }
+
+  otlpMarkCredentialUsed(input: { apiKeyId: string }): void {
+    if (!this.#dependencies.ingestCredential) {
+      throw new Error(
+        "The OTLP receiver asked to record credential usage, and this process composed Trace without the API-key directory it resolves through",
+      );
+    }
+
+    this.#dependencies.ingestCredential.markOtlpCredentialUsed(input);
   }
 
   /**
@@ -1656,18 +1658,16 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
 
   /** The trace signal: the same receiver `POST /api/collector` writes through. */
   otlpTraces(
-    input: Parameters<OtlpTraceCollection>[0],
-  ): Promise<OtlpTraceCollectionResult | undefined> {
+    input: Parameters<TraceOtlpIngestApi["otlpTraces"]>[0],
+  ): Promise<OtlpTraceCollectionResult> {
     const ingestion = this.#dependencies.ingestion;
     if (!ingestion) {
       throw new TraceIngestionUnavailableError();
     }
 
-    return ingestion.handleOtlpTraceRequest(
-      input.tenantId,
-      input.traceRequest,
-      DEFAULT_PII_REDACTION_LEVEL,
-    );
+    return ingestion
+      .handleOtlpTraceRequest(input.tenantId, input.traceRequest, DEFAULT_PII_REDACTION_LEVEL)
+      .then((result) => result ?? {});
   }
 
   /**
@@ -1675,7 +1675,9 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
    * module owns the collection and this module may not import it. Said in
    * the answer, not thrown, so exporters don't retry forever.
    */
-  otlpLogs(input: Parameters<OtlpLogCollection>[0]): Promise<OtlpLogCollectionOutcome> {
+  otlpLogs(
+    input: Parameters<TraceOtlpIngestApi["otlpLogs"]>[0],
+  ): Promise<OtlpLogCollectionOutcome> {
     const collection = this.#dependencies.logCollection;
     if (!collection) {
       return Promise.resolve({
@@ -1688,7 +1690,9 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
   }
 
   /** The metric signal, absent for the reason {@link otlpLogs} gives. */
-  otlpMetrics(input: Parameters<OtlpMetricCollection>[0]): Promise<OtlpMetricCollectionOutcome> {
+  otlpMetrics(
+    input: Parameters<TraceOtlpIngestApi["otlpMetrics"]>[0],
+  ): Promise<OtlpMetricCollectionOutcome> {
     const collection = this.#dependencies.metricCollection;
     if (!collection) {
       return Promise.resolve({

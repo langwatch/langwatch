@@ -4,6 +4,89 @@
  * `Request` dependency neither the browser SDK nor another module needs.
  */
 import { HandledError } from "@langwatch/handled-error";
+import type { OtlpReceiverPolicy } from "@langwatch/otlp";
+import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
+
+/** The two authentication refusals OTLP preserves from the key directory. */
+export type OtlpIngestRefusalStatus = 401 | 403;
+
+export type OtlpIngestCredentialInput = Readonly<{
+  authorization: string | null;
+  xAuthToken: string | null;
+  xProjectId: string | null;
+}>;
+
+export type OtlpIngestProject = Readonly<{
+  id: string;
+  teamId: string;
+  organizationId: string;
+}>;
+
+export type OtlpIngestIdentity = Readonly<{
+  apiKeyId: string | null;
+  organizationId: string;
+  ingestSourceType: string | null;
+  ingestionTemplateId: string | null;
+  sourcePolicy?:
+    | { status: "ready"; policies: Record<"traces" | "logs" | "metrics", OtlpReceiverPolicy> }
+    | { status: "failed"; error: unknown };
+}>;
+
+export type OtlpIngestCredential =
+  | Readonly<{
+      ok: true;
+      project: OtlpIngestProject;
+      identity: OtlpIngestIdentity;
+    }>
+  | Readonly<{ ok: false; status: OtlpIngestRefusalStatus; body: object }>;
+
+export type OtlpTraceCollectionResult = Readonly<{
+  rejectedSpans?: number;
+  errorMessage?: string;
+}>;
+
+export type OtlpLogCollectionOutcome =
+  | Readonly<{
+      outcome: "collected";
+      rejectedLogRecords: number;
+      errorMessage?: string | undefined;
+    }>
+  | Readonly<{ outcome: "unavailable"; errorMessage: string }>
+  | Readonly<{ outcome: "not-served"; errorMessage: string }>;
+
+export type OtlpMetricCollectionOutcome =
+  | Readonly<{
+      outcome: "collected";
+      rejectedDataPoints: number;
+      errorMessage?: string | undefined;
+    }>
+  | Readonly<{ outcome: "unavailable"; errorMessage: string }>
+  | Readonly<{ outcome: "not-served"; errorMessage: string }>;
+
+/** OTLP operations are part of Trace's one public process API. */
+export type TraceOtlpIngestApi = Readonly<{
+  otlpCredential(input: OtlpIngestCredentialInput): Promise<OtlpIngestCredential>;
+  otlpMarkCredentialUsed(input: { apiKeyId: string }): void;
+  otlpUsageLimit(input: { project: OtlpIngestProject; customerTraceIds: string[] }): Promise<void>;
+  otlpTraces(input: {
+    tenantId: string;
+    traceRequest: IExportTraceServiceRequest;
+  }): Promise<OtlpTraceCollectionResult>;
+  otlpLogs(input: {
+    tenantId: string;
+    organizationId: string;
+    logRequest: unknown;
+  }): Promise<OtlpLogCollectionOutcome>;
+  otlpMetrics(input: {
+    tenantId: string;
+    organizationId: string;
+    metricRequest: unknown;
+  }): Promise<OtlpMetricCollectionOutcome>;
+  otlpReportError(
+    error: Error,
+    context: Readonly<{ projectId: string; customerTraceIds: string[] }>,
+  ): void;
+}>;
 
 /**
  * An ingestion key arrived on a process that resolves no source billing.
