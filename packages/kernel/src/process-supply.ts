@@ -327,10 +327,15 @@ export class ProcessSupply<
    * member lazily, in their own build order; the tier rides the value.
    */
   withStores(stores: StoresMemberSource) {
-    type Supplied = Pick<RequiredMemberSet, Extract<StoreSuppliedNames, keyof RequiredMemberSet>>;
+    return this.#withStores<
+      Pick<RequiredMemberSet, Extract<StoreSuppliedNames, keyof RequiredMemberSet>>
+    >(stores);
+  }
+
+  #withStores<Next extends object>(stores: StoresMemberSource) {
     return new ProcessSupply<
       Modules,
-      Merge<Members, Supplied>,
+      Merge<Members, Next>,
       Config,
       Peers,
       MissingFrom<
@@ -339,7 +344,7 @@ export class ProcessSupply<
         RequiredPeerSet,
         InstalledPeerSet,
         InstalledPeerSetInAnyBranch,
-        Merge<Members, Supplied>,
+        Merge<Members, Next>,
         Config,
         Peers
       >,
