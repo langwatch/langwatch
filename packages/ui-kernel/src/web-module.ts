@@ -55,12 +55,16 @@ export type WebSurfacePublication = Readonly<{
 }>;
 export type WebSurfacePublications = Readonly<Record<string, WebSurfacePublication>>;
 
+/** What a module's capability implementation is, as the composition receives it. */
+export type WebCapabilities = Readonly<Record<string, unknown>>;
+
 type WebModuleDeclaration = Readonly<{
   screens: WebScreens;
   drawers: WebDrawers;
   publications: WebSurfacePublications;
   mounts: readonly string[];
   flags: readonly string[];
+  capabilities: WebCapabilities;
 }>;
 
 type EmptyDeclaration = Readonly<{
@@ -69,6 +73,7 @@ type EmptyDeclaration = Readonly<{
   publications: Empty;
   mounts: readonly [];
   flags: readonly [];
+  capabilities: Empty;
 }>;
 
 export type WebModuleConfig = Readonly<{
@@ -85,6 +90,7 @@ export type WebModuleInstallation = Readonly<{
   publications: WebSurfacePublications;
   mounts: readonly string[];
   flags: readonly string[];
+  capabilities: WebCapabilities;
   api?: unknown;
   commands?: unknown;
   slots: readonly string[];
@@ -149,14 +155,21 @@ export class WebModule<
       publications: {},
       mounts: [],
       flags: [],
+      capabilities: {},
       slots: [],
       seatTypeCopy: false,
       failureInterceptors: [],
     });
   }
 
-  get installation(): WebModuleInstallation {
-    return this.#installation;
+  /**
+   * Sound: only `withCapabilities` writes the wide store and the precise
+   * `Declaration`, in one call, so they cannot drift. ADR-140.
+   */
+  get installation(): Omit<WebModuleInstallation, "capabilities"> &
+    Readonly<{ capabilities: Declaration["capabilities"] }> {
+    return this.#installation as Omit<WebModuleInstallation, "capabilities"> &
+      Readonly<{ capabilities: Declaration["capabilities"] }>;
   }
 
   requires<const Names extends readonly UiSupplyName[]>(
@@ -203,6 +216,18 @@ export class WebModule<
     Precise
   > {
     return this.#next({ ...this.#installation, drawers });
+  }
+
+  withCapabilities<const Capabilities extends WebCapabilities>(
+    capabilities: Capabilities,
+  ): WebModule<
+    Name,
+    Requirements,
+    Config,
+    Merge<Declaration, { readonly capabilities: Capabilities }>,
+    Precise
+  > {
+    return this.#next({ ...this.#installation, capabilities });
   }
 
   withApi<Api>(

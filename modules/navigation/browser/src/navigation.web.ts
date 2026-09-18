@@ -6,7 +6,11 @@
 
 import { defineWebModule } from "@langwatch/ui-kernel";
 
-export const navigationWeb = defineWebModule("navigation").withScreens({
+import { navigationApi } from "./behavior/navigation-api.ts";
+
+export const navigationWeb = defineWebModule("navigation")
+  .withApi(navigationApi)
+  .withScreens({
   "pages/index": {
     load: () => import("./ui/sections/navigation/landing.screen.tsx"),
   },

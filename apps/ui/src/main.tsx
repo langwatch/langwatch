@@ -17,6 +17,7 @@ import { BrowserUiFeedback, resolveUiFailureCopy } from "@langwatch/browser-host
 import { registerChunkReloadListener } from "@langwatch/browser-host/navigation";
 import {
   createUiFeatureApiClient,
+  type UiFeatureApiBinding,
   type UiFeatureApiTransport,
 } from "@langwatch/browser-host/transport";
 import type { PublicAppConfig } from "@langwatch/config/public-app-config";
@@ -32,6 +33,7 @@ import { createUiApplication, type UiApplication } from "@langwatch/ui-kernel/ap
 import { UiApplicationShell } from "@langwatch/ui-kernel/application-shell";
 import { UiErrorToaster } from "@langwatch/ui-kernel/error-toaster";
 import { GraphicsQualityProvider } from "@langwatch/ui-kernel/graphics-quality-provider";
+import { installedModuleApis } from "@langwatch/ui-kernel/module-apis";
 import { installedModuleDrawers } from "@langwatch/ui-kernel/module-drawers";
 import { installedModuleScreens, type UiModuleScreens } from "@langwatch/ui-kernel/module-screens";
 import { UiPageFailure } from "@langwatch/ui-kernel/page-fallbacks";
@@ -117,6 +119,7 @@ class BrowserUiShell extends UiShell {
     isDevelopment: boolean,
     deployment: UiDeployment,
     screens: UiModuleScreens,
+    apis: readonly UiFeatureApiBinding[],
     drawers: UiDrawerRegistry,
     transport: UiFeatureApiTransport,
   ): BrowserUiShell {
@@ -127,6 +130,7 @@ class BrowserUiShell extends UiShell {
         features: {
           loaders: screens.loaders,
           routes: screens.routes,
+          apis,
           transport,
           // Without these the shell resolves the REFUSING defaults, so the first
           // session read throws instead of answering. See ARCHITECTURE.md 10.1.
@@ -211,6 +215,7 @@ export async function startUi(): Promise<void> {
       config.mode === "development",
       deriveUiDeployment(config),
       installedModuleScreens(installed.modules),
+      installedModuleApis(installed.modules),
       installedModuleDrawers(installed.modules),
       transport,
     ),
