@@ -25,8 +25,12 @@ const BANNED_NAMES = new Map([
     "createTestInfrastructure",
     "pass the doubles the test needs as `members` and let the rest be built from config",
   ],
-  ["createTestApp", "call `createProcess({ role, config, members })` with the doubles the test needs"],
+  ["createTestApp", "call `createApp({ role, config }).boot()`, which registers nothing on a server, and drive `start`/`stop` on the returned runtime"],
   ["persistenceFor", "install the module on its `{ live, memory }` tier"],
+  [
+    "createProcess",
+    "call `Server.start({ name, config })` for the process and `createApp({ role, config }).boot()` for its installed modules",
+  ],
 ]);
 
 /** Builder methods the composition no longer offers, and what to call instead. */

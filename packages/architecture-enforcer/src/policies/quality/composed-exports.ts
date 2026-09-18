@@ -31,8 +31,8 @@ const BASELINE_FILE = "composed-exports-baseline.json";
  * see, and seeding the walk with it would hide every orphan composition.
  */
 const ENTRYPOINTS = [
-  "apps/api/src/api.entrypoint.ts",
-  "apps/worker/src/worker.entrypoint.ts",
+  "apps/api/src/main.ts",
+  "apps/worker/src/main.ts",
   "packages/scenario-child/src/scenario-child.entrypoint.ts",
   "apps/tasks/src/tasks.entrypoint.ts",
   "apps/server/src/cli.ts",

@@ -48,7 +48,7 @@ function reported(): string[] {
 function writeWorkspace(): void {
   manifest("apps/api", "@fixture/api");
   write(
-    "apps/api/src/api.entrypoint.ts",
+    "apps/api/src/main.ts",
     `import { composeApi } from "./app/api.composition.ts";\ncomposeApi();\n`,
   );
   write(
@@ -127,7 +127,7 @@ describe("composed exports", () => {
         `export { UncomposedService } from "@fixture/thing-server";\n`,
       );
       write(
-        "apps/api/src/api.entrypoint.ts",
+        "apps/api/src/main.ts",
         `import { composeApi } from "./app/api.composition.ts";\n` +
           `import "./app/barrel.ts";\ncomposeApi();\n`,
       );

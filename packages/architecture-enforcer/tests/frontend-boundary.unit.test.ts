@@ -59,8 +59,8 @@ const WORKER_SRC = join(REPO_ROOT, "apps", "worker", "src");
 const applicationRoots = (): string[] => {
   const roots: string[] = [];
   for (const entrypoint of [
-    join(API_SRC, "api.main.ts"),
-    join(WORKER_SRC, "worker.entrypoint.ts"),
+    join(API_SRC, "main.ts"),
+    join(WORKER_SRC, "main.ts"),
   ]) {
     if (existsSync(entrypoint)) roots.push(entrypoint);
   }
@@ -193,8 +193,8 @@ describe("browser-only UI never reaches backend code", () => {
     // a moved package tree — would make every assertion below pass over
     // nothing, which reads exactly like finding nothing.
     it("roots the walk at the process entrypoints, the compositions and every server package", () => {
-      expect(BACKEND_ROOTS).toContain(join(API_SRC, "api.main.ts"));
-      expect(BACKEND_ROOTS).toContain(join(WORKER_SRC, "worker.entrypoint.ts"));
+      expect(BACKEND_ROOTS).toContain(join(API_SRC, "main.ts"));
+      expect(BACKEND_ROOTS).toContain(join(WORKER_SRC, "main.ts"));
       expect(
         BACKEND_ROOTS.filter((file) => file.endsWith(".composition.ts")).length,
       ).toBeGreaterThan(50);
@@ -286,7 +286,7 @@ describe("browser-only UI never reaches backend code", () => {
     it("reports a chain through the barrel", () => {
       const barrel = resolver.resolve({
         specifier: "@langwatch/react-rum",
-        file: join(API_SRC, "api.main.ts"),
+        file: join(API_SRC, "main.ts"),
       });
 
       expect(barrel).toBeDefined();
@@ -296,7 +296,7 @@ describe("browser-only UI never reaches backend code", () => {
     it("reports none through its framework-free constants subpath", () => {
       const constants = resolver.resolve({
         specifier: "@langwatch/react-rum/constants",
-        file: join(API_SRC, "api.main.ts"),
+        file: join(API_SRC, "main.ts"),
       });
 
       expect(constants).toBeDefined();
@@ -415,7 +415,7 @@ describe("browser-only UI never reaches backend code", () => {
       // And the walk stops there: the composition reaches the package, the
       // package renders React, and no chain is reported for either.
       expect(chainFromFile({ file: composition })).toBeUndefined();
-      expect(chainFromFile({ file: join(WORKER_SRC, "worker.entrypoint.ts") })).toBeUndefined();
+      expect(chainFromFile({ file: join(WORKER_SRC, "main.ts") })).toBeUndefined();
     });
   });
 });

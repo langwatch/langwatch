@@ -93,9 +93,7 @@ function isFeatureServerCompositionRoot(workspacePath) {
   // one place the import is unavoidable, and the only ways out are to stop testing the wiring
   // or to record a rule gap as if it were debt. A test elsewhere is still held: this is scoped
   // to the composition workspaces, not to test files in general.
-  return /^(apps\/(api|worker|tasks)|enterprise\/packages\/composition\/(api|worker))\/(?:src|tests)\//.test(
-    workspacePath,
-  );
+  return /^apps\/(api|worker|tasks)\/(?:src|tests)\//.test(workspacePath);
 }
 
 function isRecognizedTestSource(workspacePath) {
@@ -163,7 +161,7 @@ export const boundaryRule = defineRule({
     },
     coreImportsEnterprise: {
       what: "`{{specifier}}` is an enterprise package, and this is core code.",
-      fix: "Declare the capability as an interface in this feature's contract package, depend on that interface here, and register the implementation from `{{specifier}}` in `enterprise/packages/composition/<api|worker>`.",
+      fix: "Declare the capability as a peer API in this feature's contract package (its `*Api` token) and depend on that interface here; the enterprise module installs like any other and the process resolves the peer, so core code never names `{{specifier}}` directly.",
     },
     deadAlias: {
       what: "`{{specifier}}` is a deleted alias (`~/`, `@app/`, `@ee/`); nothing resolves it any more.",

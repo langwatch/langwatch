@@ -43,16 +43,6 @@ const SUBSTITUTED_TABLE = new RegExp(
 );
 const READING_VERBS = new Set(["from", "join"]);
 
-const APPLICATION_FEATURE_ROOTS = [
-  "apps/api/src/features",
-  "apps/worker/src/features",
-  "apps/tasks/src/features",
-];
-const COMPOSITION_ROOTS = [
-  "enterprise/packages/composition/api/src",
-  "enterprise/packages/composition/worker/src",
-];
-
 type Access = { module: string; table: string; file: string; line: number; write: boolean };
 type ScanRoot = { module: string; directory: string };
 
@@ -108,29 +98,18 @@ function foldMaterialisedViews(live: ReadonlyMap<string, string>): Map<string, s
   return folded;
 }
 
-/** The directories a module's ClickHouse access can live in, module by module. */
+/**
+ * The directories a module's ClickHouse access can live in, module by
+ * module. Every feature root is registered centrally in
+ * `modules/catalogue.json` now, so the catalogue is the whole answer; the
+ * older per-application `features/` trees and the enterprise composition
+ * roots this used to also scan are gone.
+ */
 function scanRoots(root: string, catalogue: readonly FeatureCatalogueEntry[]): ScanRoot[] {
-  const ids = new Set(catalogue.map((feature) => feature.id));
-
-  const roots = catalogue.map((feature) => ({
+  return catalogue.map((feature) => ({
     module: feature.id,
     directory: join(root, feature.root),
   }));
-
-  for (const parent of [...APPLICATION_FEATURE_ROOTS, ...COMPOSITION_ROOTS]) {
-    const directory = join(root, parent);
-    if (!existsSync(directory)) continue;
-
-    for (const entry of readdirSync(directory, { withFileTypes: true })) {
-      if (!entry.isDirectory()) continue;
-
-      if (!ids.has(entry.name)) continue;
-
-      roots.push({ module: entry.name, directory: join(directory, entry.name) });
-    }
-  }
-
-  return roots;
 }
 
 /** File-level `const NAME = "table"` bindings, so `FROM ${NAME}` resolves. */

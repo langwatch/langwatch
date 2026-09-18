@@ -87,12 +87,7 @@ const TARGET: Record<FeatureShapeLegacyKind, string> = {
     "Public web pieces are flat entries src/<id>.ts exported as ./<id>; the screens/ and surfaces/ directories are the older spelling. A flat entry must be declared in apps/ui/src/features/catalogue.json (uses.screens or uses.surfaces) and its package listed as governed there, or frontend-ui-boundaries refuses the import.",
 };
 
-const BOOT_SCAN_ROOTS = [
-  "apps/api/src",
-  "apps/worker/src",
-  "apps/tasks/src",
-  "enterprise/packages/composition",
-];
+const BOOT_SCAN_ROOTS = ["apps/api/src", "apps/worker/src", "apps/tasks/src"];
 const COMPOSITION_ROOTS = ["apps/api/src/features", "apps/worker/src/features"];
 const BOOTED_INSTALLER = /withModule\(\s*([A-Za-z0-9_]+)/g;
 const REFUSING_EXPORT = /export function refusing/;

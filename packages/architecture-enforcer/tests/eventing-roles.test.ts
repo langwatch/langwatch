@@ -38,6 +38,22 @@ function strictServer(feature = "agent"): ClassifiedPackage {
   };
 }
 
+function enterpriseServer(feature: string): ClassifiedPackage {
+  const packageRoot = join(root, "enterprise", "modules", feature, "server");
+  return {
+    name: `@langwatch/enterprise-${feature}-server`,
+    root: packageRoot,
+    manifestPath: join(packageRoot, "package.json"),
+    manifest: { name: `@langwatch/enterprise-${feature}-server` },
+    kind: "server",
+    feature,
+    featureRoot: join(root, "enterprise", "modules", feature),
+    layoutVersion: 0,
+    subjects: [feature],
+    enterprise: true,
+  };
+}
+
 function policies(packages: readonly ClassifiedPackage[] = []): string[] {
   return lintEventingRoles(snapshotOf({ root, packages })).map(({ policy }) => policy);
 }
@@ -86,17 +102,17 @@ describe("Eventing role lint", () => {
     expect(policies()).toContain("eventing-process-purity");
   });
 
-  it("applies executable eventing rules in Enterprise API and worker composition", () => {
+  it("applies executable eventing rules inside an Enterprise module's server package", () => {
     write(
-      "enterprise/packages/composition/api/src/processes/unsafe.process.ts",
+      "enterprise/modules/governance/server/src/processes/unsafe.process.ts",
       'import "node:http"; export async function evolve() { await fetch("https://example.com"); }',
     );
     write(
-      "enterprise/packages/composition/worker/src/governance/unsafe.projection.ts",
+      "enterprise/modules/governance/server/src/eventing/unsafe.projection.ts",
       'import "node:http"; export async function project() { await fetch("https://example.com"); }',
     );
 
-    expect(policies()).toEqual(
+    expect(policies([enterpriseServer("governance")])).toEqual(
       expect.arrayContaining(["eventing-process-purity", "eventing-projection-purity"]),
     );
   });
