@@ -122,11 +122,25 @@ spec:
             # Ceiling on how long a workflow code block may run before nlpgo
             # kills it. Kept below the engine's stream idle timeout by default
             # so the code-block ceiling can't race the stream shutting down.
-            {{- if ge (int (.Values.langwatch_nlp.codeBlockTimeoutSeconds | default 600)) 720 }}
+            # Validated through langwatch.positiveSeconds (the same helper the
+            # shutdown-drain env uses) instead of a bare `int` cast — Helm's
+            # `int` silently turns "abc", "719.9", or a quoted value into 0,
+            # which would pass a naive `< 720` check and reach nlpgo unbounded.
+            {{- $codeBlockTimeout := include "langwatch.positiveSeconds" (dict "name" "langwatch_nlp.codeBlockTimeoutSeconds" "value" .Values.langwatch_nlp.codeBlockTimeoutSeconds "fallback" 600) }}
+            {{- if ge (int $codeBlockTimeout) 720 }}
             {{- fail "langwatch_nlp.codeBlockTimeoutSeconds must stay below the engine's stream idle timeout (720s) — a code-block ceiling at or above it races the stream shutting down" }}
             {{- end }}
+            {{/* extraEnvs renders after this block and the kubelet takes the
+                 LAST duplicate, so a same-named extraEnvs entry would silently
+                 override the guarded value and bypass the <720s ceiling — the
+                 same trap the SHUTDOWN_DRAIN_TIMEOUT_MS guard above exists for. */}}
+            {{- range (default (list) .Values.langwatch_nlp.extraEnvs) }}
+            {{- if eq .name "NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS" }}
+            {{- fail "NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS must not be set through extraEnvs — it would override the value langwatch_nlp.codeBlockTimeoutSeconds renders and bypass the below-720s guard. Set langwatch_nlp.codeBlockTimeoutSeconds instead." }}
+            {{- end }}
+            {{- end }}
             - name: NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS
-              value: {{ .Values.langwatch_nlp.codeBlockTimeoutSeconds | default 600 | quote }}
+              value: {{ $codeBlockTimeout | quote }}
 
             {{- with .Values.langwatch_nlp.extraEnvs}}
             {{- toYaml . | nindent 12 }}
