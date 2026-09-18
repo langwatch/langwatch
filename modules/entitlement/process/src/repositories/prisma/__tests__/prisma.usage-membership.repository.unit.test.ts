@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationUserRole, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { PrismaUsageMembershipRepository } from "../prisma.usage-membership.repository.ts";
 
 /**

@@ -19,7 +19,7 @@ import {
   type Plan as CataloguePlan,
 } from "@langwatch/plans";
 
-import type { EntitlementAppConfig, EntitlementInfrastructure } from "./entitlement.app.ts";
+import type { EntitlementInfrastructure } from "./entitlement.app.ts";
 import { USAGE_UNKNOWN, type UsageCounter, type UsageWarning } from "./entitlement.members.ts";
 
 /** Which plan source this deployment could not compose, said once at composition. */
@@ -132,7 +132,9 @@ export function createAbsentRequestBound(): Pick<EntitlementApiContract, "reques
 /** What this module hands `EntitlementApp` at boot. */
 export function buildEntitlementInfrastructure(input: {
   logger: Logger;
-  config: EntitlementAppConfig;
+  /** OUT OF SCOPE for this port; carried through exactly as before. */
+  isSaas: boolean;
+  processName: string;
   /** The activated license source the process composition root supplied. */
   license: EntitlementSource;
   /** Overridable for tests; defaults to the process logger. */
@@ -143,12 +145,12 @@ export function buildEntitlementInfrastructure(input: {
   // Ported from the deleted composition: subscription absence is reported
   // only on a hosted deployment — a self-hosted deployment never had a
   // subscription to miss.
-  if (input.config.isSaas) report.absent("subscription");
+  if (input.isSaas) report.absent("subscription");
 
   return {
-    baseline: coreBaseline(input.config.isSaas),
+    baseline: coreBaseline(input.isSaas),
     license: input.license,
     counter: AbsentUsageCounter.create(report),
-    warnings: AbsentUsageWarning.create(report, input.config.processName),
+    warnings: AbsentUsageWarning.create(report, input.processName),
   };
 }

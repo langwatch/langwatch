@@ -9,6 +9,7 @@ import type {
 } from "@langwatch/entitlement-contract";
 import type { PrismaClient, Project } from "@langwatch/prisma-client/generated";
 import { Temporal, toDate } from "@langwatch/time";
+
 import type { OrganizationSpendRepository } from "../organization-spend.repository.ts";
 
 export class PrismaOrganizationSpendRepository implements OrganizationSpendRepository {

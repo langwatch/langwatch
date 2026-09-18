@@ -1,3 +1,4 @@
+import type { PlanInfo } from "@langwatch/entitlement-contract";
 /**
  * @vitest-environment node
  * Enforcement asks the month's volume of every ingested batch. Within the
@@ -6,9 +7,13 @@
  * @see specs/licensing/enforcement-messages.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import type { PlanInfo } from "@langwatch/entitlement-contract";
+
 import { InProcessUsageCache } from "../../app/entitlement.members.ts";
-import type { UsageOrganization,UsageVolumeCounter,ProjectUsageCounts } from "../../app/entitlement.members.ts";
+import type {
+  UsageOrganization,
+  UsageVolumeCounter,
+  ProjectUsageCounts,
+} from "../../app/entitlement.members.ts";
 import { UsageService } from "../usage-enforcement.service.ts";
 
 const PLAN: PlanInfo = {

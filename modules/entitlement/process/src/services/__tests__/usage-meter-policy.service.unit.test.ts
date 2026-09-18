@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import { PricingModel } from "@langwatch/prisma-client/generated";
+import { describe, expect, it } from "vitest";
+
 import * as UsageMeterPolicyService from "../../rules/usage-meter-policy.rules.ts";
 
 describe("resolveUsageMeter", () => {

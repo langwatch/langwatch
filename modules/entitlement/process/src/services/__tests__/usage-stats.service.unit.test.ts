@@ -5,6 +5,7 @@
  */
 import { usageStatsSchema, type Plan, type PlanProvider } from "@langwatch/entitlement-contract";
 import { describe, expect, it } from "vitest";
+
 import type { UsageCounter, UsageCount } from "../../app/entitlement.members.ts";
 import type { UsageMembershipRepository } from "../../repositories/usage-membership.repository.ts";
 import { UNCAPPED_MONTHLY_USAGE_LIMIT, UsageStatsService } from "../usage-stats.service.ts";
@@ -41,8 +42,7 @@ class StubMembership implements UsageMembershipRepository {
 }
 
 class StubCounter implements UsageCounter {
-  constructor(private readonly count: UsageCount) {
-  }
+  constructor(private readonly count: UsageCount) {}
   async getCurrentMonthCountForDisplay(): Promise<UsageCount> {
     return this.count;
   }

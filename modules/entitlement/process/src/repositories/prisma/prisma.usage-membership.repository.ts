@@ -8,6 +8,7 @@ import {
   type PrismaClient,
   RoleBindingScopeType,
 } from "@langwatch/prisma-client/generated";
+
 import { isFullMember, isLiteMember } from "../../rules/member-classification.rules.ts";
 import type { UsageMembershipRepository } from "../usage-membership.repository.ts";
 

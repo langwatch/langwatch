@@ -1,7 +1,9 @@
+import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { EntitlementApi, type Plan } from "@langwatch/entitlement-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { REQUEST_BOUND_KEYS, requestBounds } from "@langwatch/plans";
 import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { createAbsentRequestBound, entitlementServer } from "../../entitlement.server.ts";
@@ -136,18 +138,19 @@ describe("EntitlementApp.requestBound", () => {
       .withModules([withMemoryRepositories(entitlementServer)])
       .withConfig({
         entitlement: {
-          isSaas: true,
-          processName: "test",
           // The unlicensed cloud baseline resolves FREE, so the override must
           // name the free tier to be observed — exercising the module schema's
           // tier-record arm end to end.
           requestBounds: { tracesPageSizeMax: { free: 3_000 } },
         },
       })
+      .withMembers({ isSaas: true, processName: "test" })
       .withObservability((observability) => observability.withLogging(logger))
       .provide({
         user: createEntitlementTestUsers(),
-        licenseSource: fixedEntitlementSource(null),
+        licensing: createApiFixture<LicensingApi>({
+          resolve: async () => free,
+        }),
       })
       .boot();
 

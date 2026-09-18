@@ -2,6 +2,7 @@ import type {
   ListOrganizationSpendInput,
   ProjectSpendRollup,
 } from "@langwatch/entitlement-contract";
+
 import type { OrganizationSpendRepository } from "../organization-spend.repository.ts";
 import { MemoryEntitlementDatabase } from "./memory.entitlement.database.ts";
 

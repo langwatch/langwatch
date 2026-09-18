@@ -1,9 +1,11 @@
+import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import {
-  ActivatedLicenseSource,
+  entitlementConfig,
   EntitlementApi,
   type AuthorizationContextResolver,
   type BaselinePlanSource,
   type EntitlementApi as EntitlementApiContract,
+  type EntitlementConfig,
   type EntitlementOperator,
   type EntitlementSource,
   type GetUsageInput,
@@ -15,23 +17,24 @@ import {
   type ResolvePlanInput,
   type SendUsageLimitWarningInput,
   type UsageLimitWarning,
-  type UsageStats,type PricingModel
+  type UsageStats,
+  type PricingModel,
 } from "@langwatch/entitlement-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import type { FeatureSetup } from "@langwatch/kernel";
 import {
   resolveRequestBound,
   type RequestBoundKey,
   type RequestBoundsOverrides,
 } from "@langwatch/plans";
-import type { FeatureSetup } from "@langwatch/kernel";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { nowInstant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
-import { z } from "zod";
-import { buildEntitlementInfrastructure } from "./entitlement-composition.build.ts";
-import type { UsageCounter,UsageWarning } from "./entitlement.members.ts";
+
 import type { EntitlementRepositories } from "../repositories/entitlement.repositories.ts";
 import { EntitlementService } from "../services/entitlement.service.ts";
 import { UsageStatsService } from "../services/usage-stats.service.ts";
+import { buildEntitlementInfrastructure } from "./entitlement-composition.build.ts";
+import type { UsageCounter, UsageWarning } from "./entitlement.members.ts";
 
 /**
  * One plan on the purchase ladder. Annual and monthly variants of one tier
@@ -83,32 +86,15 @@ export type EntitlementInfrastructure = Readonly<{
 /** How recent an end date has to be for the rollup to read it as "up to now". */
 const RECENT_SPEND_WINDOW_MS = 1000 * 60 * 60;
 
-/**
- * Config schema: the hosted flag (picks the baseline plan and whether a
- * missing subscription is worth reporting), this process's name in refusals,
- * and optional boot overrides for the request-bounds registry.
- */
-const entitlementAppConfigSchema = z.object({
-  isSaas: z.boolean().default(false),
-  processName: z.string().default("langwatch"),
-  /**
-   * Only registry keys and the tier names free/paid/enterprise are ever read
-   * off this record, so the schema validates shapes here and leaves the key
-   * and tier spelling checks to config time.
-   */
-  requestBounds: z
-    .record(
-      z.string(),
-      z.union([z.number().int().positive(), z.record(z.string(), z.number().int().positive())]),
-    )
-    .optional(),
-});
-export type EntitlementAppConfig = z.infer<typeof entitlementAppConfigSchema>;
+/** `isSaas` (out of scope, see the handoff) and `processName` (a process
+ * fact) are unclassified facts this module could not turn into env config. */
+type EntitlementMembers = MembersRead<readonly ["logger"]> &
+  Readonly<{ isSaas: boolean; processName: string }>;
 
 type EntitlementSetup = FeatureSetup<
   typeof EntitlementApp.dependencies,
-  MembersRead<typeof EntitlementApp.reads>,
-  EntitlementAppConfig,
+  EntitlementMembers,
+  EntitlementConfig,
   EntitlementRepositories
 >;
 
@@ -125,16 +111,11 @@ type EntitlementCallerLookup = Pick<EntitlementDependencies, "users">;
 /** What a plan allows, and what has been used and spent against it. */
 export class EntitlementApp implements EntitlementApiContract {
   static readonly contract = EntitlementApi;
-  /**
-   * `license` is mandatory in every role: a process installing
-   * `entitlementServer` without `withProvided(ActivatedLicenseSource, ...)`
-   * refuses to boot rather than silently resolving the baseline. See `ActivatedLicenseSource`.
-   */
-  static readonly dependencies = { users: UserApi, license: ActivatedLicenseSource };
-  static readonly configSchema = entitlementAppConfigSchema;
-  /** The logger for absence report. The literal call is what the members
-   * generator reads. */
-  static readonly reads = reads("logger");
+  static readonly dependencies = { users: UserApi, license: LicensingApi };
+  static readonly config = entitlementConfig;
+  /** `logger` is the closed member; `isSaas`/`processName` are named raw so
+   * `withMember`/`withMembers` can answer them (see {@link EntitlementMembers}). */
+  static readonly reads = [...reads("logger"), "isSaas", "processName"] as const;
 
   #plans: EntitlementService;
   #usage: UsageStatsService;
@@ -147,7 +128,7 @@ export class EntitlementApp implements EntitlementApiContract {
     repositories: EntitlementRepositories,
     members: EntitlementInfrastructure,
     dependencies: EntitlementCallerLookup,
-    config: Pick<EntitlementAppConfig, "requestBounds">,
+    config: EntitlementConfig,
   ) {
     this.#plans = EntitlementService.create(members);
     this.#usage = UsageStatsService.create({
@@ -164,7 +145,8 @@ export class EntitlementApp implements EntitlementApiContract {
   static create({ repositories, members, dependencies, config }: EntitlementSetup): EntitlementApp {
     const infrastructure = buildEntitlementInfrastructure({
       logger: members.logger,
-      config,
+      isSaas: members.isSaas,
+      processName: members.processName,
       license: dependencies.license,
     });
 
@@ -180,7 +162,7 @@ export class EntitlementApp implements EntitlementApiContract {
     repositories: EntitlementRepositories;
     members: EntitlementInfrastructure;
     dependencies: EntitlementCallerLookup;
-    config?: Pick<EntitlementAppConfig, "requestBounds">;
+    config?: EntitlementConfig;
   }): EntitlementApp {
     return new EntitlementApp(setup.repositories, setup.members, setup.dependencies, {
       requestBounds: setup.config?.requestBounds,

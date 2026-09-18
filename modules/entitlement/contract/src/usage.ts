@@ -3,6 +3,7 @@
  * copy shared across UI, settings, and email.
  */
 import { z } from "zod";
+
 import { planSchema } from "./plan.ts";
 
 /** Where usage stands against the allowance. */

@@ -1,5 +1,6 @@
 import type { Plan, PricingModel } from "@langwatch/entitlement-contract";
 import { describe, expect, it } from "vitest";
+
 import type { CataloguePlan, PlanCatalogueReader } from "../../app/entitlement.app.ts";
 import { PlanNextStepService } from "../plan-next-step.service.ts";
 

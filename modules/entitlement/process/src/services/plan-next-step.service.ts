@@ -5,6 +5,7 @@ import {
   type PricingModel,
 } from "@langwatch/entitlement-contract";
 import { planNextStepCeilingsOf } from "@langwatch/plans";
+
 import type { PlanCatalogueReader } from "../app/entitlement.app.ts";
 
 /**

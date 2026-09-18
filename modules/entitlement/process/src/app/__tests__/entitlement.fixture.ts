@@ -1,4 +1,5 @@
 import type {
+  EntitlementConfig,
   EntitlementSource,
   Plan,
   SendUsageLimitWarningInput,
@@ -7,11 +8,17 @@ import type {
 } from "@langwatch/entitlement-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
-import { USAGE_UNKNOWN, type UsageCounter, type UsageCount,type UsageWarning } from "../entitlement.members.ts";
+
 import type { EntitlementRepositories } from "../../repositories/entitlement.repositories.ts";
 import { MemoryEntitlementRepositories } from "../../repositories/memory/memory.entitlement.repositories.ts";
 import { EntitlementApp } from "../entitlement.app.ts";
-import type { EntitlementAppConfig, EntitlementInfrastructure } from "../entitlement.app.ts";
+import type { EntitlementInfrastructure } from "../entitlement.app.ts";
+import {
+  USAGE_UNKNOWN,
+  type UsageCounter,
+  type UsageCount,
+  type UsageWarning,
+} from "../entitlement.members.ts";
 
 /** A source that always answers the same plan, or none at all. */
 export function fixedEntitlementSource(plan: Plan | null): EntitlementSource {
@@ -68,7 +75,7 @@ export function createEntitlementTestApp(
     members: Omit<EntitlementInfrastructure, "counter" | "warnings"> &
       Partial<Pick<EntitlementInfrastructure, "counter" | "warnings">>;
     dependencies?: Partial<{ users: UserApi }>;
-    config?: Pick<EntitlementAppConfig, "requestBounds">;
+    config?: EntitlementConfig;
   }>,
 ): EntitlementApp {
   return EntitlementApp.createForTesting({

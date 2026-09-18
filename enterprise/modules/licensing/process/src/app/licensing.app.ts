@@ -17,14 +17,16 @@ import {
   type LicensingServerConfig,
   type MintLicenseKeyInput,
   type SsoGateStatus,
-  licensingServerConfigSchema,
+  licensingConfig,
 } from "@langwatch/enterprise-licensing-contract";
+import type { ResolvePlanInput } from "@langwatch/entitlement-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
-import type { MembersRead } from "@langwatch/process-stores/members";
 import { getPlanTemplate, quotedPlanLimitsOf } from "@langwatch/plans";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { fromDate, nowInstant, Temporal } from "@langwatch/time";
 
 import { LicenseService, LicenseServiceConfiguration } from "../services/license.service.ts";
+import { LicensingEntitlementSourceAdapter } from "../services/licensing-entitlement-source.service.ts";
 import { createUnavailableLicensingInfrastructure } from "../services/licensing-infrastructure.service.ts";
 import { NodeLicenseCryptographyAdapter } from "../services/node-license-cryptography.service.ts";
 import type {
@@ -93,10 +95,11 @@ type LicensingSetup = FeatureSetup<
 export class LicensingApp implements LicensingApiContract {
   static readonly contract: typeof LicensingApi = LicensingApi;
   static readonly dependencies: Readonly<Record<string, never>> = {};
-  static readonly configSchema = licensingServerConfigSchema;
-  static readonly reads = ["prisma", "logger"] as const;
+  static readonly config = licensingConfig;
+  static readonly reads = reads("prisma", "logger");
 
   readonly #service: LicenseService;
+  readonly #entitlements: LicensingEntitlementSourceAdapter;
   readonly #cryptography: LicenseCryptography;
   readonly #runtime: LicensingRuntime;
 
@@ -104,8 +107,10 @@ export class LicensingApp implements LicensingApiContract {
     service: LicenseService,
     cryptography: LicenseCryptography,
     runtime: LicensingRuntime,
+    entitlements: LicensingEntitlementSourceAdapter,
   ) {
     this.#service = service;
+    this.#entitlements = entitlements;
     this.#cryptography = cryptography;
     this.#runtime = runtime;
   }
@@ -131,7 +136,19 @@ export class LicensingApp implements LicensingApiContract {
       logger: logger ?? members.logger,
       configuration: LicenseServiceConfiguration.create(),
     });
-    return new LicensingApp(service, cryptography, runtime);
+    return new LicensingApp(
+      service,
+      cryptography,
+      runtime,
+      LicensingEntitlementSourceAdapter.create({
+        licensing: service,
+        mode: config.isSaas ? "cloud" : "self-hosted",
+      }),
+    );
+  }
+
+  resolve(input: ResolvePlanInput) {
+    return this.#entitlements.resolve(input);
   }
 
   /** The license an organization is running on, its plan and its usage. */

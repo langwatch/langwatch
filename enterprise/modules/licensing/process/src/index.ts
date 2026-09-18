@@ -1,6 +1,6 @@
 export { NodeLicenseCryptographyAdapter } from "./services/node-license-cryptography.service.ts";
 export type { LicensingInfrastructure, LicensingRuntime } from "./app/licensing.app.ts";
-export { createDeploymentEntitlementSource, licensingServer } from "./licensing.server.ts";
+export { licensingServer } from "./licensing.server.ts";
 export {
   createOrganizationLicenses,
   createUnavailableLicensingInfrastructure,
@@ -15,7 +15,6 @@ export {
 } from "./transport/license-enforcement.trpc.ts";
 export { licenseTrpcTransport } from "./transport/licensing.trpc.ts";
 /** The signed-license source an API-role process supplies to plan resolution. */
-export { createActivatedLicenseSource } from "./licensing.server.ts";
 export {
   LicensingEntitlementSourceAdapter,
   type LicensePlanReader,

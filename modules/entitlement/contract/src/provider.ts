@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import type { Plan } from "./plan.ts";
 
 export const planProviderUserSchema = z.object({

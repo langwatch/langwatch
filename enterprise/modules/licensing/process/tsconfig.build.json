@@ -29,6 +29,7 @@
     "**/testing.tsx"
   ],
   "references": [
+    { "path": "../../../../packages/process-stores/tsconfig.build.json" },
     {
       "path": "../../../../packages/api/tsconfig.build.json"
     },
@@ -52,6 +53,9 @@
     },
     {
       "path": "../../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/secrets/tsconfig.build.json"
     }
   ]
 }

@@ -1,3 +1,4 @@
+import type { ResolvePlanInput } from "@langwatch/entitlement-contract";
 import { moduleApi } from "@langwatch/kernel";
 
 import type { LimitCheckResult, LimitType } from "./license-limit-type.ts";
@@ -27,6 +28,7 @@ export type LicenseLimitCheck = Readonly<{
 
 /** The portable signed-license capability supplied to process peers. */
 export interface LicensingApi {
+  resolve(input: ResolvePlanInput): Promise<PlanInfo>;
   inspectPlatformAccess(input: {
     instanceLicenseKey?: string | undefined;
   }): Promise<PlatformLicenseAccess>;

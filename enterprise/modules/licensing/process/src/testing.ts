@@ -6,6 +6,7 @@
 import type { LicenseData } from "@langwatch/enterprise-licensing-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import { planQuantities } from "@langwatch/plans";
+import { ScopedSecrets } from "@langwatch/secrets";
 
 import { LicensingApp, type LicensingInfrastructure } from "./app/licensing.app.ts";
 import { type LicenseStorage, type StoredLicense } from "./app/licensing.members.ts";
@@ -176,7 +177,8 @@ export function createTestLicensingApp(
         reportError,
       },
     },
-    config: { publicKey: TEST_PUBLIC_KEY },
+    config: { publicKey: TEST_PUBLIC_KEY, isSaas: false },
     resources: new ResourceScope(),
+    secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
 }

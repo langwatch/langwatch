@@ -1,6 +1,6 @@
+export { entitlementConfig, type EntitlementConfig } from "./entitlement.config.ts";
 export type { MoneyByCurrency, Plan, PlanInfo, PlanSource } from "./plan.ts";
 export { EntitlementApi } from "./entitlement.api.ts";
-export { ActivatedLicenseSource, createAbsentLicenseSource } from "./license-source.ts";
 export type {
   BaselinePlanSource,
   AuthorizationContextResolver,
@@ -38,4 +38,8 @@ export {
   EnterprisePlanRequiredError,
   isEnterpriseTier,
 } from "./plan-gate.errors.ts";
-export { assertEnterprisePlan, assertEnterprisePlanType, requireEnterprisePlan } from "./plan-gate.ts";
+export {
+  assertEnterprisePlan,
+  assertEnterprisePlanType,
+  requireEnterprisePlan,
+} from "./plan-gate.ts";

@@ -42,6 +42,8 @@
     "@langwatch/kernel": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@trpc/server": "catalog:",
     "zod": "catalog:"

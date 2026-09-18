@@ -1,5 +1,6 @@
 import type { OrganizationUserRole } from "@langwatch/authz-contract";
 import { defineServerModule } from "@langwatch/kernel";
+
 import { EntitlementApp } from "./app/entitlement.app.ts";
 import type { PlanCatalogueReader } from "./app/entitlement.app.ts";
 import { entitlementRepositories } from "./repositories/entitlement-repositories.registry.ts";
@@ -9,14 +10,14 @@ import {
 } from "./repositories/prisma/prisma.usage-membership.repository.ts";
 import type { UsageMembershipRepository } from "./repositories/usage-membership.repository.ts";
 import {
-  EntitlementService,
-  type EntitlementServiceOptions,
-} from "./services/entitlement.service.ts";
-import {
   getRoleChangeType,
   isViewOnlyCustomRole as classifyViewOnlyCustomRole,
   type RoleChangeType,
 } from "./rules/member-classification.rules.ts";
+import {
+  EntitlementService,
+  type EntitlementServiceOptions,
+} from "./services/entitlement.service.ts";
 import { PlanNextStepService } from "./services/plan-next-step.service.ts";
 import { organizationSpendTrpcTransport } from "./transport/organization-spend.trpc.ts";
 import { planTrpcTransport } from "./transport/plan.trpc.ts";
