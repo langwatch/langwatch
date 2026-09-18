@@ -17,6 +17,7 @@ import {
   type InstantEvalRunExecutorDependencies,
   instantEvalAverageTextBytes,
   instantEvalHydrationPlan,
+  instantEvalKeyCapFor,
   instantEvalPageSizeFor,
   loadRun,
 } from "./instant-eval-run.executor";
@@ -76,7 +77,10 @@ export async function planRun(
 
   return {
     total: Math.min(total, row.rowLimit),
-    pageSize: instantEvalPageSizeFor(averageTextBytes),
+    pageSize: instantEvalPageSizeFor(
+      averageTextBytes,
+      instantEvalKeyCapFor(instantEvalHydrationPlan(row.plan)),
+    ),
     isCapped,
     keyColumns,
   };

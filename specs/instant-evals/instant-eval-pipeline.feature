@@ -71,6 +71,24 @@ Feature: The Instant Eval run on the queue, plan, judge page by page, finish
     Then it is a hundred rows rather than five hundred
 
   @unit
+  Scenario: A page never exceeds the key cap of the statement's own functions
+    Given a run whose statement extracts conversations, whose keys cap lower than a page
+    When the run is planned
+    Then the page is cut to that cap, rather than failing the run on it
+
+  @unit
+  Scenario: A statement over traces keeps the full page
+    Given a run whose statement extracts traces
+    When the run is planned
+    Then the page stays at the default size
+
+  @unit
+  Scenario: A large-text page stays small even when the cap is higher
+    Given a run whose texts are large and whose key cap is not the binding one
+    When the run is planned
+    Then the smaller of the two bounds is the page size
+
+  @unit
   Scenario: The next page is read while the current one is judged
     Given a run whose classifier is busy with a page
     When that page is being judged
