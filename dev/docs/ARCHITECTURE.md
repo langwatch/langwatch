@@ -253,8 +253,11 @@ import "@langwatch/time/polyfill";
 
 const server = await Server.create("langwatch-api")
   .withConfig(apiConfig)                // §6 parse from the installed modules' own schemas — FIRST
-  .withSecrets((config) =>              // config feeds secrets (ruled 2026-09-18): the fluent
-    Secrets.chain().env().file().onePassword(config.process.secretsVault))
+  .withSecrets((config, secrets) =>     // config feeds secrets; the builder is handed in, never
+    secrets.chain()                     //   imported, and adapters speak the house words
+      .withEnv()
+      .withFile()
+      .withOnePassword(config.process.secretsVault))
   .withTelemetry(grafanaTelemetry())    // logger + trace links + OTLP export, from config
   .withMetrics(prometheusMetrics())     // scrape endpoint, token from config
   .start();                             // fatal handlers → parse → secrets → /healthz live
@@ -596,10 +599,11 @@ replaces them.
 **Secrets are the sibling package, and a secret is a value you may only
 pass through** (approved 2026-09-18). A module declares its handles beside
 its config (`Secret.define`, env spellings, optionality); the app builds
-only the READER — a fluent adapter chain,
-`Secrets.chain().env().file().onePassword(...)` — installed on the Server
-preamble AFTER `withConfig`, as a function of the parsed config, so config
-can feed secrets (the 1Password vault key is a config fact). `boot()`
+only the READER — a fluent adapter chain built from a handed-in builder,
+`.withSecrets((config, secrets) => secrets.chain().withEnv().withFile()
+.withOnePassword(...))` — installed on the Server preamble AFTER
+`withConfig`, so config can feed secrets (the 1Password vault key is a
+config fact) and the builder is never imported. `boot()`
 scopes the resolver per module: a `create()` can resolve only the handles
 its own module declared, each resolve validates against the handle's
 schema and hands the value to a closure —
