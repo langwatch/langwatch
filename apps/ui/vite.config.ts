@@ -35,12 +35,8 @@ function childDirectories(base: string): string[] {
     .map((entry) => path.join(base, entry.name));
 }
 
-function escapeForExactRegex(specifier: string): string {
-  return specifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-/** One alias entry per real subpath a package's own exports map declares. */
-function aliasesForPackage(dir: string): { find: RegExp; replacement: string }[] {
+/** One entry per real subpath a package's own exports map declares. */
+function sourceEntriesForPackage(dir: string): { specifier: string; target: string }[] {
   const packageJsonPath = path.join(dir, "package.json");
   if (!existsSync(packageJsonPath)) return [];
 
@@ -50,32 +46,57 @@ function aliasesForPackage(dir: string): { find: RegExp; replacement: string }[]
   };
   if (!pkg.name?.startsWith("@langwatch/") || !pkg.exports) return [];
 
-  const aliases: { find: RegExp; replacement: string }[] = [];
+  const entries: { specifier: string; target: string }[] = [];
   for (const [subpath, target] of Object.entries(pkg.exports)) {
     if (subpath.includes("*") || subpath === "./package.json") continue;
     const relativeTarget = typeof target === "string" ? target : target.default;
     if (!relativeTarget) continue;
 
     const specifier = subpath === "." ? pkg.name : `${pkg.name}${subpath.slice(1)}`;
-    aliases.push({
-      find: new RegExp(`^${escapeForExactRegex(specifier)}$`),
-      replacement: path.resolve(dir, relativeTarget),
-    });
+    entries.push({ specifier, target: path.resolve(dir, relativeTarget) });
   }
-  return aliases;
+  return entries;
 }
 
-// Dev only (see the `resolve.alias` wiring below): resolves every
-// `@langwatch/*` workspace package straight from source, bypassing the
-// node_modules symlink `pnpm install` normally has to create first —
-// see dev-experience defect investigated 2026-09-18.
-function workspaceSourceAliases(): { find: RegExp; replacement: string }[] {
-  const packageDirs = [
-    ...childDirectories(path.join(repoRoot, "packages")),
-    ...childDirectories(path.join(repoRoot, "modules")).flatMap(childDirectories),
-    ...childDirectories(path.join(repoRoot, "enterprise", "modules")).flatMap(childDirectories),
-  ];
-  return packageDirs.flatMap(aliasesForPackage);
+/**
+ * Dev only: every `@langwatch/*` workspace package resolves from source, so
+ * declaring a dependency is enough. A plugin, not `resolve.alias` — see below.
+ */
+function workspaceSourcePlugin(): Plugin {
+  // Lazy on purpose. Vite restarts the dev server when its resolved CONFIG
+  // hash moves, so an alias list derived from exports maps made every new
+  // export a restart plus a full dependency re-optimize — measured at four
+  // restarts in eight minutes during a fan-out. A plugin reads the same maps
+  // on demand and the config never moves.
+  let sources: Map<string, string> | undefined;
+
+  const build = (): Map<string, string> => {
+    const found = new Map<string, string>();
+    const packageDirs = [
+      ...childDirectories(path.join(repoRoot, "packages")),
+      ...childDirectories(path.join(repoRoot, "modules")).flatMap(childDirectories),
+      ...childDirectories(path.join(repoRoot, "enterprise", "modules")).flatMap(childDirectories),
+    ];
+    for (const dir of packageDirs) {
+      for (const { specifier, target } of sourceEntriesForPackage(dir))
+        found.set(specifier, target);
+    }
+    return found;
+  };
+
+  return {
+    name: "langwatch:workspace-source",
+    apply: "serve",
+    resolveId(source) {
+      if (!source.startsWith("@langwatch/")) return null;
+      sources ??= build();
+      return sources.get(source) ?? null;
+    },
+    watchChange(id) {
+      // A new export or dependency invalidates the map — and nothing else.
+      if (id.endsWith("package.json")) sources = void 0;
+    },
+  };
 }
 
 // Load .env for Vite config (matches API config source); dotenv won't override haven's vars.
@@ -202,6 +223,7 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       ...(publicConfig ? [injectDevelopmentPublicConfig(publicConfig)] : []),
       havenHmrGate(),
       designSystemStorybook({ appPort: FRONTEND_PORT }),
+      workspaceSourcePlugin(),
     ],
     resolve: {
       // ONE zod instance for the app AND linked workspace packages
@@ -209,9 +231,6 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       // z.record's key/value overload detection), so a second physical copy
       // resolved from a package's own node_modules silently mis-parses.
       dedupe: ["zod"],
-      // Dev only: see workspaceSourceAliases above. Production keeps the
-      // ordinary node_modules/exports-map resolution untouched.
-      alias: command === "serve" ? workspaceSourceAliases() : [],
     },
     define: {
       // Literal replacements for process.env references in browser code.
