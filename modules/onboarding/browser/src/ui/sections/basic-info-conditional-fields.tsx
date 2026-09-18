@@ -1,14 +1,19 @@
 import { Field, VStack } from "@chakra-ui/react";
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
-import { useAnalytics } from "react-contextual-analytics";
 
 import { companySizeItems, solutionTypeItems } from "../../behavior/onboarding-data.ts";
-import type { CompanySize, SolutionType, UsageStyle } from "../../behavior/types.ts";
+import type {
+  CompanySize,
+  OnboardingScreenProps,
+  SolutionType,
+  UsageStyle,
+} from "../../behavior/types.ts";
 import { IconRadioCardGroup } from "../elements/forms/icon-radio-card-group.tsx";
 import { PhoneNumberInput } from "../elements/inputs/phone-number-input.tsx";
 
-interface BasicInfoConditionalFieldsProps {
+interface BasicInfoConditionalFieldsProps extends OnboardingScreenProps {
   usageStyle: UsageStyle | undefined;
   phoneNumber: string | undefined;
   setPhoneNumber: (value: string) => void;
@@ -21,6 +26,7 @@ interface BasicInfoConditionalFieldsProps {
 }
 
 export const BasicInfoConditionalFields: React.FC<BasicInfoConditionalFieldsProps> = ({
+  surface,
   usageStyle,
   phoneNumber,
   setPhoneNumber,
@@ -35,7 +41,15 @@ export const BasicInfoConditionalFields: React.FC<BasicInfoConditionalFieldsProp
 
   const [phoneHasValue, setLocalPhoneHasValue] = useState<boolean>(Boolean(phoneNumber));
   const [phoneIsValid, setLocalPhoneIsValid] = useState<boolean>(true);
-  const { emit } = useAnalytics({ usageStyle });
+  const analytics = useUiAnalytics();
+  // `usageStyle` was a hook-level attribute, which the vendor spread last.
+  const track = (action: string, name: string, attributes?: Record<string, unknown>) =>
+    analytics.track({
+      boundary: surface.boundary,
+      action,
+      name,
+      attributes: { ...surface.attributes, ...attributes, usageStyle },
+    });
 
   return (
     <AnimatePresence>
@@ -53,7 +67,7 @@ export const BasicInfoConditionalFields: React.FC<BasicInfoConditionalFieldsProp
               <PhoneNumberInput
                 autoDetectDefaultCountry
                 value={phoneNumber}
-                onFocus={() => emit("focused", "phone_number")}
+                onFocus={() => track("focused", "phone_number")}
                 onChange={(e164, meta) => {
                   setPhoneNumber(e164 ?? "");
                   const hasValue = meta.national.trim().length > 0;
@@ -73,7 +87,7 @@ export const BasicInfoConditionalFields: React.FC<BasicInfoConditionalFieldsProp
                 onChange={(value) => {
                   if (value) {
                     setCompanySize(value);
-                    emit("selected", "company_size", { value });
+                    track("selected", "company_size", { value });
                   }
                 }}
                 direction="horizontal"
@@ -88,7 +102,7 @@ export const BasicInfoConditionalFields: React.FC<BasicInfoConditionalFieldsProp
                 value={solutionType}
                 onChange={(value) => {
                   setSolutionType(value);
-                  emit("selected", "solution_type", { value });
+                  track("selected", "solution_type", { value });
                 }}
                 direction="horizontal"
               />

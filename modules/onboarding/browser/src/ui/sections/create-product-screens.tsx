@@ -3,12 +3,13 @@
  * model-provider family's own credential form through `model-provider/model-provider-setup`
  * rather than a copy of it, and only the "via the platform" flavour reaches it.
  */
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { useEffect, useMemo, useRef } from "react";
-import { useAnalytics } from "react-contextual-analytics";
 
 import {
   type ProductFlowConfig,
   type OnboardingScreen,
+  type OnboardingScreenProps,
   ProductScreenIndex,
   type ProductSelection,
 } from "../../behavior/types.ts";
@@ -19,18 +20,24 @@ import { ViaClaudeCodeScreen } from "./via-claude-code-screen.tsx";
 import { ViaMcpClientScreen } from "./via-claude-desktop-screen.tsx";
 import { ViaPlatformScreen } from "./via-platform-screen.tsx";
 
-interface ProductSelectionScreenWithAnalyticsProps {
+interface ProductSelectionScreenWithAnalyticsProps extends OnboardingScreenProps {
   onSelectProduct: (product: ProductSelection) => void;
 }
 
 const ProductSelectionScreenWithAnalytics: React.FC<ProductSelectionScreenWithAnalyticsProps> = ({
+  surface,
   onSelectProduct,
 }) => {
-  const { emit } = useAnalytics();
+  const analytics = useUiAnalytics();
   return (
     <ProductSelectionScreen
       onSelectProduct={(product) => {
-        emit("selected", "product", { product });
+        analytics.track({
+          boundary: surface.boundary,
+          action: "selected",
+          name: "product",
+          attributes: { ...surface.attributes, product },
+        });
         onSelectProduct(product);
       }}
     />
@@ -49,10 +56,15 @@ export const useCreateProductScreens = ({
   onSelectProduct,
   onContinue,
 }: UseProductScreensProps): OnboardingScreen[] => {
-  const BoundProductSelectionScreen = useMemo<React.FC>(
+  const BoundProductSelectionScreen = useMemo<React.FC<OnboardingScreenProps>>(
     () =>
-      function BoundProductSelectionScreen() {
-        return <ProductSelectionScreenWithAnalytics onSelectProduct={onSelectProduct} />;
+      function BoundProductSelectionScreen({ surface }: OnboardingScreenProps) {
+        return (
+          <ProductSelectionScreenWithAnalytics
+            surface={surface}
+            onSelectProduct={onSelectProduct}
+          />
+        );
       },
     [onSelectProduct],
   );
@@ -65,10 +77,12 @@ export const useCreateProductScreens = ({
   useEffect(() => {
     onContinueRef.current = onContinue;
   }, [onContinue]);
-  const BoundModelProviderStepScreen = useMemo<React.FC>(
+  const BoundModelProviderStepScreen = useMemo<React.FC<OnboardingScreenProps>>(
     () =>
-      function BoundModelProviderStepScreen() {
-        return <ModelProviderStepScreen onContinue={() => onContinueRef.current()} />;
+      function BoundModelProviderStepScreen({ surface }: OnboardingScreenProps) {
+        return (
+          <ModelProviderStepScreen surface={surface} onContinue={() => onContinueRef.current()} />
+        );
       },
     [],
   );

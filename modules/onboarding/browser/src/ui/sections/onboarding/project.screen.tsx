@@ -13,10 +13,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useRouter } from "@langwatch/browser-host/use-router";
-import {
-  type ProjectFormData,
-  TechStackSelector,
-} from "@langwatch/project-browser/surfaces/tech-stack";
 import { useEffect } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 
@@ -26,6 +22,7 @@ import { useRequiredSession } from "../../../behavior/use-required-session.ts";
 import { getSafeReturnToPath } from "../../../model/get-safe-return-to-path.ts";
 import ErrorPage from "../../../ui/elements/compat/next-error.tsx";
 import { SetupLayout } from "../../../ui/elements/setup-layout.tsx";
+import { type ProjectFormData, TechStackSelector } from "../../blocks/tech-stack.tsx";
 
 export default function ProjectOnboarding() {
   useRequiredSession();

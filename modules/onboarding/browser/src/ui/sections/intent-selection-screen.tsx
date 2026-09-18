@@ -1,9 +1,10 @@
 import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import type { OrganizationIntent } from "@langwatch/organization-contract";
 import { ChartNoAxesColumn, Telescope } from "lucide-react";
 import type React from "react";
-import { useAnalytics } from "react-contextual-analytics";
 
+import type { OnboardingScreenProps } from "../../behavior/types.ts";
 import {
   accentChipBg,
   accentChipBorder,
@@ -40,9 +41,9 @@ const intentOptions: IntentOption[] = [
   },
 ];
 
-export const IntentSelectionScreen: React.FC = () => {
+export const IntentSelectionScreen: React.FC<OnboardingScreenProps> = ({ surface }) => {
   const { intent, setIntent } = useOnboardingFormContext();
-  const { emit } = useAnalytics();
+  const analytics = useUiAnalytics();
 
   return (
     <VStack
@@ -74,7 +75,12 @@ export const IntentSelectionScreen: React.FC = () => {
             _hover={{ borderColor: "orange.300" }}
             onClick={() => {
               setIntent(opt.value);
-              emit("selected", "intent", { value: opt.value });
+              analytics.track({
+                boundary: surface.boundary,
+                action: "selected",
+                name: "intent",
+                attributes: { ...surface.attributes, value: opt.value },
+              });
             }}
           >
             <HStack gap={4} align="center">

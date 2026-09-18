@@ -1,8 +1,8 @@
 import { Checkbox, Field, Icon, Input, VStack } from "@chakra-ui/react";
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { ExternalLink } from "lucide-react";
 import type React from "react";
 import { useMemo } from "react";
-import { useAnalytics } from "react-contextual-analytics";
 
 import { LEGAL_LINKS } from "../../behavior/legal-links.ts";
 import { desireItems, roleItems, usageStyleItems } from "../../behavior/onboarding-data.ts";
@@ -11,6 +11,7 @@ import {
   type OnboardingFlowConfig,
   type OnboardingScreen,
   OnboardingScreenIndex,
+  type OnboardingScreenProps,
   type RoleType,
   type UsageStyle,
 } from "../../behavior/types.ts";
@@ -22,10 +23,10 @@ import { useOnboardingFormContext } from "./form-context.tsx";
 import { IntentSelectionScreen } from "./intent-selection-screen.tsx";
 
 // Module-scope screen components and their props
-const OrganizationScreen: React.FC = () => {
+const OrganizationScreen: React.FC<OnboardingScreenProps> = ({ surface }) => {
   const { organizationName, agreement, setOrganizationName, setAgreement } =
     useOnboardingFormContext();
-  const { emit } = useAnalytics();
+  const analytics = useUiAnalytics();
 
   return (
     <VStack gap={5} align="stretch" w="full" minW="0">
@@ -52,7 +53,12 @@ const OrganizationScreen: React.FC = () => {
           onCheckedChange={(details) => {
             const checked = details.checked === true;
             setAgreement(checked);
-            emit("toggled", "terms_agreement", { checked });
+            analytics.track({
+              boundary: surface.boundary,
+              action: "toggled",
+              name: "terms_agreement",
+              attributes: { ...surface.attributes, checked },
+            });
           }}
         >
           <Checkbox.HiddenInput />
@@ -86,7 +92,7 @@ const OrganizationScreen: React.FC = () => {
   );
 };
 
-const BasicInfoScreen: React.FC = () => {
+const BasicInfoScreen: React.FC<OnboardingScreenProps> = ({ surface }) => {
   const {
     usageStyle,
     phoneNumber,
@@ -99,7 +105,7 @@ const BasicInfoScreen: React.FC = () => {
     setCompanySize,
     setSolutionType,
   } = useOnboardingFormContext();
-  const { emit } = useAnalytics();
+  const analytics = useUiAnalytics();
 
   return (
     <VStack gap={0} align="stretch" w="full" minW="0">
@@ -109,13 +115,19 @@ const BasicInfoScreen: React.FC = () => {
           value={usageStyle}
           onChange={(value) => {
             setUsageStyle(value);
-            emit("selected", "usage_style", { value });
+            analytics.track({
+              boundary: surface.boundary,
+              action: "selected",
+              name: "usage_style",
+              attributes: { ...surface.attributes, value },
+            });
           }}
           direction="horizontal"
         />
       </Field.Root>
 
       <BasicInfoConditionalFields
+        surface={surface}
         usageStyle={usageStyle}
         phoneNumber={phoneNumber}
         setPhoneNumber={setPhoneNumber}
@@ -130,9 +142,9 @@ const BasicInfoScreen: React.FC = () => {
   );
 };
 
-const DesiresScreen: React.FC = () => {
+const DesiresScreen: React.FC<OnboardingScreenProps> = ({ surface }) => {
   const { selectedDesires, setDesires } = useOnboardingFormContext();
-  const { emit } = useAnalytics();
+  const analytics = useUiAnalytics();
 
   return (
     <IconCheckboxCardGroup<DesireType>
@@ -140,15 +152,20 @@ const DesiresScreen: React.FC = () => {
       value={selectedDesires}
       onChange={(values) => {
         setDesires(values);
-        emit("selected", "desires", { values, count: values.length });
+        analytics.track({
+          boundary: surface.boundary,
+          action: "selected",
+          name: "desires",
+          attributes: { ...surface.attributes, values, count: values.length },
+        });
       }}
     />
   );
 };
 
-const RoleScreen: React.FC = () => {
+const RoleScreen: React.FC<OnboardingScreenProps> = ({ surface }) => {
   const { role, setRole } = useOnboardingFormContext();
-  const { emit } = useAnalytics();
+  const analytics = useUiAnalytics();
 
   return (
     <Field.Root colorPalette="orange" w="full" minW="0">
@@ -157,7 +174,12 @@ const RoleScreen: React.FC = () => {
         value={role}
         onChange={(value) => {
           setRole(value);
-          emit("selected", "role", { value });
+          analytics.track({
+            boundary: surface.boundary,
+            action: "selected",
+            name: "role",
+            attributes: { ...surface.attributes, value },
+          });
         }}
         direction="vertical"
       />

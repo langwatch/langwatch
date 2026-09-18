@@ -4,20 +4,31 @@
  * Spec: specs/features/onboarding/intent-fork.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { UiAnalytics, type UiAnalyticsEvent } from "@langwatch/browser-host/analytics";
+import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
+import "@testing-library/jest-dom/vitest";
+import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import type { OrganizationIntent } from "@langwatch/organization-contract";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import "@testing-library/jest-dom/vitest";
-
-vi.mock("react-contextual-analytics", () => ({
-  useAnalytics: () => ({ emit: vi.fn() }),
-}));
-
-import type { OrganizationIntent } from "@langwatch/organization-contract";
 
 import { OnboardingFormProvider } from "../form-context.tsx";
 import { IntentSelectionScreen } from "../intent-selection-screen.tsx";
 
 const noop = () => void 0;
+
+class RecordingUiAnalytics extends UiAnalytics {
+  readonly tracked: UiAnalyticsEvent[] = [];
+
+  track(event: UiAnalyticsEvent): void {
+    this.tracked.push(event);
+  }
+}
+
+const SURFACE = {
+  boundary: "onboarding_welcome.intent",
+  attributes: { screenIndex: 1, variant: "cloud" },
+};
 
 function renderScreen({
   intent,
@@ -50,16 +61,21 @@ function renderScreen({
     setRole: noop,
   };
 
+  const analytics = new RecordingUiAnalytics();
+  const host = { route: () => ({ params: {}, query: {} }), navigate: noop };
+
   render(
     <ChakraProvider value={defaultSystem}>
-      <OnboardingFormProvider
-        value={contextValue as Parameters<typeof OnboardingFormProvider>[0]["value"]}
-      >
-        <IntentSelectionScreen />
-      </OnboardingFormProvider>
+      <UiCapabilityContextProvider value={{ ...createUiCapabilitiesFromHost(host), analytics }}>
+        <OnboardingFormProvider
+          value={contextValue as Parameters<typeof OnboardingFormProvider>[0]["value"]}
+        >
+          <IntentSelectionScreen surface={SURFACE} />
+        </OnboardingFormProvider>
+      </UiCapabilityContextProvider>
     </ChakraProvider>,
   );
-  return { setIntent };
+  return { setIntent, analytics };
 }
 
 describe("IntentSelectionScreen", () => {
@@ -107,6 +123,20 @@ describe("IntentSelectionScreen", () => {
         const { setIntent } = renderScreen();
         fireEvent.click(screen.getByText("Monitor & evaluate my LLM app"));
         expect(setIntent).toHaveBeenCalledWith("LLM_OPS");
+      });
+
+      it("names the surface it was mounted on, and carries that surface's facts", () => {
+        const { analytics } = renderScreen();
+        fireEvent.click(screen.getByText("Track AI coding agents"));
+
+        expect(analytics.tracked).toEqual([
+          {
+            boundary: "onboarding_welcome.intent",
+            action: "selected",
+            name: "intent",
+            attributes: { screenIndex: 1, variant: "cloud", value: "AGENT_GOVERNANCE" },
+          },
+        ]);
       });
     });
   });

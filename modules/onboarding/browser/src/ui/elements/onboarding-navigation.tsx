@@ -1,7 +1,9 @@
 import { Button, HStack, VStack } from "@chakra-ui/react";
-import { useAnalytics } from "react-contextual-analytics";
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 
 interface OnboardingNavigationProps<T extends number = number> {
+  /** The surface these clicks happened on, named by whoever mounted the flow. */
+  boundary: string;
   currentScreenIndex: T;
   onPrev: () => void;
   onNext: () => void;
@@ -15,6 +17,7 @@ interface OnboardingNavigationProps<T extends number = number> {
 }
 
 export const OnboardingNavigation = <T extends number = number>({
+  boundary,
   currentScreenIndex,
   onPrev,
   onNext,
@@ -26,7 +29,7 @@ export const OnboardingNavigation = <T extends number = number>({
   isFirstScreen = false,
   isLastScreen = false,
 }: OnboardingNavigationProps<T>) => {
-  const { emit } = useAnalytics();
+  const analytics = useUiAnalytics();
   const buttonText = isLastScreen ? "Finish" : "Next";
 
   return (
@@ -40,9 +43,11 @@ export const OnboardingNavigation = <T extends number = number>({
         fontWeight="600"
         h="44px"
         onClick={() => {
-          emit("clicked", isLastScreen ? "finish" : "next", {
-            currentScreenIndex,
-            canProceed,
+          analytics.track({
+            boundary,
+            action: "clicked",
+            name: isLastScreen ? "finish" : "next",
+            attributes: { currentScreenIndex, canProceed },
           });
           if (isLastScreen) onFinish();
           else onNext();
@@ -65,7 +70,12 @@ export const OnboardingNavigation = <T extends number = number>({
             disabled={isSubmitting}
             _hover={{ color: "fg", bg: "bg.muted" }}
             onClick={() => {
-              emit("clicked", "previous", { currentScreenIndex });
+              analytics.track({
+                boundary,
+                action: "clicked",
+                name: "previous",
+                attributes: { currentScreenIndex },
+              });
               onPrev();
             }}
           >
@@ -83,8 +93,11 @@ export const OnboardingNavigation = <T extends number = number>({
             borderRadius="8px"
             _hover={{ color: "fg", bg: "bg.muted" }}
             onClick={() => {
-              emit("clicked", isLastScreen ? "finish" : "skip", {
-                currentScreenIndex,
+              analytics.track({
+                boundary,
+                action: "clicked",
+                name: isLastScreen ? "finish" : "skip",
+                attributes: { currentScreenIndex },
               });
               if (isLastScreen) onFinish();
               else onSkip();

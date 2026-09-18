@@ -65,6 +65,7 @@ export const onboardingWeb = defineWebModule("onboarding")
     "surfaces/platform-grid": {
       load: () => import("./ui/sections/observability/platform-grid.tsx"),
     },
+    "surfaces/tech-stack": { load: () => import("./ui/blocks/tech-stack.tsx") },
     "surfaces/via-claude-code-screen": {
       load: () => import("./ui/sections/via-claude-code-screen.tsx"),
     },

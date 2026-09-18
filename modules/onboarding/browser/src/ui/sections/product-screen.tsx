@@ -12,6 +12,8 @@ import { ScreenLifecycle } from "../elements/screen-lifecycle.tsx";
 import { ActiveProjectProvider } from "./active-project-context.tsx";
 import { useCreateProductScreens } from "./create-product-screens.tsx";
 
+const PRODUCT_BOUNDARY = "onboarding_product";
+
 export const ProductScreen: React.FC = () => {
   const { currentScreenIndex, flow, navigation, canGoBack, handleSelectProduct } = useProductFlow();
   const { organization, isLoading } = useOrganizationTeamProject({
@@ -53,9 +55,10 @@ export const ProductScreen: React.FC = () => {
   }
 
   return (
-    <AnalyticsBoundary name="onboarding_product" sendViewedEvent>
-      <ScreenLifecycle />
+    <>
+      <ScreenLifecycle boundary={PRODUCT_BOUNDARY} />
       <OnboardingContainer
+        boundary={PRODUCT_BOUNDARY}
         title={currentScreen.heading}
         subTitle={currentScreen.subHeading}
         loading={delayedLoading}
@@ -68,15 +71,21 @@ export const ProductScreen: React.FC = () => {
         <Box w="full">
           <ActiveProjectProvider value={{ project: activeProject, organization }}>
             {!isLoading && currentScreen.component ? (
-              <AnalyticsBoundary key={currentScreen.id} name={currentScreen.id} sendViewedEvent>
-                <ScreenLifecycle />
-                <currentScreen.component />
-              </AnalyticsBoundary>
+              <>
+                <ScreenLifecycle key={currentScreen.id} boundary={currentScreen.id} />
+                {/*
+                 * Kept ambient: `currentScreen.component` can be `ViaClaudeCodeScreen`,
+                 * reused by other modules through this context, not a `surface` prop.
+                 */}
+                <AnalyticsBoundary name={currentScreen.id}>
+                  <currentScreen.component surface={{ boundary: currentScreen.id }} />
+                </AnalyticsBoundary>
+              </>
             ) : null}
           </ActiveProjectProvider>
         </Box>
       </OnboardingContainer>
-    </AnalyticsBoundary>
+    </>
   );
 };
 export default ProductScreen;

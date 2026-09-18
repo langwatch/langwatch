@@ -1,11 +1,12 @@
 import { Box, HStack, VStack } from "@chakra-ui/react";
+import { type UiAnalytics, useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
-import { useEffect, useState } from "react";
-import { AnalyticsBoundary } from "react-contextual-analytics";
+import { useEffect, useRef, useState } from "react";
 
 import { api } from "../../behavior/onboarding-api.ts";
+import type { OnboardingAnalyticsSurface } from "../../behavior/types.ts";
 import { useOnboardingFlow } from "../../behavior/use-onboarding-flow.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 import { useRequiredSession } from "../../behavior/use-required-session.ts";
@@ -17,8 +18,46 @@ import { OnboardingNavigation } from "../elements/onboarding-navigation.tsx";
 import { useCreateWelcomeScreens } from "./create-welcome-screens.tsx";
 import { OnboardingFormProvider } from "./form-context.tsx";
 
+/** The surface every event this flow emits names. */
+const WELCOME_BOUNDARY = "onboarding_welcome";
+
+/**
+ * Announces the flow once and each screen it shows once. The surface's facts
+ * are read at emit time: a change of screen re-announces it, a change of the
+ * facts about that screen does not.
+ */
+function useWelcomeViews({
+  analytics,
+  isFlowMounted,
+  surface,
+}: {
+  analytics: UiAnalytics;
+  isFlowMounted: boolean;
+  surface: OnboardingAnalyticsSurface;
+}): void {
+  const surfaceRef = useRef(surface);
+  surfaceRef.current = surface;
+  const screenBoundary = surface.boundary;
+
+  // The screen announces itself before the flow does, which is the order
+  // React ran these in when they were a nested pair of boundary components.
+  useEffect(() => {
+    if (!isFlowMounted) return;
+    analytics.track({
+      action: "viewed",
+      boundary: screenBoundary,
+      attributes: surfaceRef.current.attributes,
+    });
+  }, [analytics, isFlowMounted, screenBoundary]);
+
+  useEffect(() => {
+    if (isFlowMounted) analytics.track({ action: "viewed", boundary: WELCOME_BOUNDARY });
+  }, [analytics, isFlowMounted]);
+}
+
 export const WelcomeScreen: React.FC = () => {
   const host = useOnboardingHost();
+  const analytics = useUiAnalytics();
   const router = useRouter();
   const { data: session } = useRequiredSession();
   const [onboardingNeeded, setOnboardingNeeded] = useState<boolean | undefined>(void 0);
@@ -139,10 +178,6 @@ export const WelcomeScreen: React.FC = () => {
     );
   }
 
-  if (!session || !onboardingNeeded || (organizationIsLoading && !organization)) {
-    return <LoadingScreen />;
-  }
-
   const currentVisibleIndex = flow.visibleScreens.findIndex((s) => s === currentScreenIndex);
   const currentScreen = currentVisibleIndex >= 0 ? screens[currentVisibleIndex] : undefined;
 
@@ -152,112 +187,122 @@ export const WelcomeScreen: React.FC = () => {
     currentVisibleIndex === flow.visibleScreens.length - 1 &&
     (flow.variant !== "self_hosted" || !isPublicEnvLoading);
 
+  const screenSurface = {
+    boundary: `${WELCOME_BOUNDARY}.${currentScreen?.id ?? "unknown"}`,
+    attributes: {
+      screenIndex: currentVisibleIndex,
+      variant: flow.variant,
+      total: flow.total,
+      isFirst: isFirstScreen,
+      isLast: isLastScreen,
+      // Per-track funnel segmentation (ADR-038 I6)
+      intent: formContextValue.intent ?? null,
+    },
+  };
+
+  const isFlowMounted = Boolean(
+    session && onboardingNeeded && !(organizationIsLoading && !organization),
+  );
+  useWelcomeViews({ analytics, isFlowMounted, surface: screenSurface });
+
+  if (!isFlowMounted) {
+    return <LoadingScreen />;
+  }
+
   const pendingOrSuccessful = initializeOrganization.isPending || initializeOrganization.isSuccess;
 
   return (
-    <AnalyticsBoundary name="onboarding_welcome" sendViewedEvent>
-      <OnboardingContainer
-        title={currentScreen?.heading ?? "Welcome aboard"}
-        subTitle={currentScreen?.subHeading}
-        showBackButton={false}
-      >
-        <VStack gap={5} align="stretch" w="full" minW="0">
-          <Box position="relative" overflow="hidden" py="1" px="2" my="-1" mx="-2">
-            <AnimatePresence mode="popLayout" custom={direction} initial={false}>
-              <motion.div
-                key={currentScreenIndex}
-                custom={direction}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                layout
-                variants={{
-                  enter: (dir: number) => ({
-                    opacity: 0,
-                    x: dir > 0 ? 30 : -30,
-                    filter: "blur(3px)",
-                  }),
-                  center: {
-                    opacity: 1,
-                    x: 0,
-                    filter: "blur(0px)",
-                  },
-                  exit: (dir: number) => ({
-                    opacity: 0,
-                    x: dir > 0 ? -30 : 30,
-                    filter: "blur(3px)",
-                    position: "absolute" as const,
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                  }),
-                }}
-                transition={{
-                  duration: 0.3,
-                  ease: [0.32, 0.72, 0, 1],
-                }}
-                style={{ width: "100%" }}
-              >
-                <AnalyticsBoundary
-                  name={currentScreen?.id ?? "unknown"}
-                  attributes={{
-                    screenIndex: currentVisibleIndex,
-                    variant: flow.variant,
-                    total: flow.total,
-                    isFirst: isFirstScreen,
-                    isLast: isLastScreen,
-                    // Per-track funnel segmentation (ADR-038 I6)
-                    intent: formContextValue.intent ?? null,
-                  }}
-                  sendViewedEvent
-                >
-                  <OnboardingFormProvider value={formContextValue}>
-                    <fieldset disabled={pendingOrSuccessful} style={{ width: "100%", minWidth: 0 }}>
-                      {currentScreen?.component ? <currentScreen.component /> : null}
-                    </fieldset>
-                  </OnboardingFormProvider>
-                </AnalyticsBoundary>
-              </motion.div>
-            </AnimatePresence>
-          </Box>
+    <OnboardingContainer
+      boundary={WELCOME_BOUNDARY}
+      title={currentScreen?.heading ?? "Welcome aboard"}
+      subTitle={currentScreen?.subHeading}
+      showBackButton={false}
+    >
+      <VStack gap={5} align="stretch" w="full" minW="0">
+        <Box position="relative" overflow="hidden" py="1" px="2" my="-1" mx="-2">
+          <AnimatePresence mode="popLayout" custom={direction} initial={false}>
+            <motion.div
+              key={currentScreenIndex}
+              custom={direction}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              layout
+              variants={{
+                enter: (dir: number) => ({
+                  opacity: 0,
+                  x: dir > 0 ? 30 : -30,
+                  filter: "blur(3px)",
+                }),
+                center: {
+                  opacity: 1,
+                  x: 0,
+                  filter: "blur(0px)",
+                },
+                exit: (dir: number) => ({
+                  opacity: 0,
+                  x: dir > 0 ? -30 : 30,
+                  filter: "blur(3px)",
+                  position: "absolute" as const,
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                }),
+              }}
+              transition={{
+                duration: 0.3,
+                ease: [0.32, 0.72, 0, 1],
+              }}
+              style={{ width: "100%" }}
+            >
+              <OnboardingFormProvider value={formContextValue}>
+                <fieldset disabled={pendingOrSuccessful} style={{ width: "100%", minWidth: 0 }}>
+                  {currentScreen?.component ? (
+                    <currentScreen.component surface={screenSurface} />
+                  ) : null}
+                </fieldset>
+              </OnboardingFormProvider>
+            </motion.div>
+          </AnimatePresence>
+        </Box>
 
-          <motion.div layout transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}>
-            <OnboardingNavigation
-              currentScreenIndex={currentScreenIndex}
-              onPrev={navigation.prevScreen}
-              onNext={navigation.nextScreen}
-              onSkip={navigation.skipScreen}
-              canProceed={navigation.canProceed()}
-              isSkippable={!currentScreen?.required}
-              isSubmitting={pendingOrSuccessful}
-              onFinish={handleFinalizeSubmit}
-              isFirstScreen={isFirstScreen}
-              isLastScreen={isLastScreen}
-            />
-          </motion.div>
+        <motion.div layout transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}>
+          <OnboardingNavigation
+            boundary={WELCOME_BOUNDARY}
+            currentScreenIndex={currentScreenIndex}
+            onPrev={navigation.prevScreen}
+            onNext={navigation.nextScreen}
+            onSkip={navigation.skipScreen}
+            canProceed={navigation.canProceed()}
+            isSkippable={!currentScreen?.required}
+            isSubmitting={pendingOrSuccessful}
+            onFinish={handleFinalizeSubmit}
+            isFirstScreen={isFirstScreen}
+            isLastScreen={isLastScreen}
+          />
+        </motion.div>
 
-          <motion.div layout transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}>
-            <HStack justify="center" gap={1.5}>
-              {flow.visibleScreens.map((_, idx) => (
-                <Box
-                  key={idx}
-                  w={currentVisibleIndex === idx ? "16px" : "5px"}
-                  h="5px"
-                  borderRadius="full"
-                  bg={
-                    currentVisibleIndex === idx
-                      ? "orange.400"
-                      : idx < currentVisibleIndex
-                        ? "orange.300"
-                        : "gray.200"
-                  }
-                  transition="all 0.3s ease"
-                />
-              ))}
-            </HStack>
-          </motion.div>
-        </VStack>
-      </OnboardingContainer>
-    </AnalyticsBoundary>
+        <motion.div layout transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}>
+          <HStack justify="center" gap={1.5}>
+            {flow.visibleScreens.map((_, idx) => (
+              <Box
+                key={idx}
+                w={currentVisibleIndex === idx ? "16px" : "5px"}
+                h="5px"
+                borderRadius="full"
+                bg={
+                  currentVisibleIndex === idx
+                    ? "orange.400"
+                    : idx < currentVisibleIndex
+                      ? "orange.300"
+                      : "gray.200"
+                }
+                transition="all 0.3s ease"
+              />
+            ))}
+          </HStack>
+        </motion.div>
+      </VStack>
+    </OnboardingContainer>
   );
 };

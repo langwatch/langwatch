@@ -5,10 +5,11 @@
  */
 
 import { Box, Button, HStack, VStack } from "@chakra-ui/react";
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import type React from "react";
 import { useState } from "react";
-import { useAnalytics } from "react-contextual-analytics";
 
+import type { OnboardingScreenProps } from "../../behavior/types.ts";
 import {
   onboardingModelProviders,
   RECOMMENDED_ONBOARDING_PROVIDER,
@@ -16,7 +17,7 @@ import {
 import { ModelProviderGrid } from "./model-provider/model-provider-grid.tsx";
 import { ModelProviderSetup } from "./model-provider/model-provider-setup.tsx";
 
-interface ModelProviderStepScreenProps {
+interface ModelProviderStepScreenProps extends OnboardingScreenProps {
   /** Advances the onboarding flow, on provider save or on skip. */
   onContinue: () => void;
 }
@@ -27,9 +28,10 @@ function leadingProvider(): string {
 }
 
 export function ModelProviderStepScreen({
+  surface,
   onContinue,
 }: ModelProviderStepScreenProps): React.ReactElement {
-  const { emit } = useAnalytics();
+  const analytics = useUiAnalytics();
   const [providerKey, setProviderKey] = useState<string>(leadingProvider);
 
   return (
@@ -50,7 +52,12 @@ export function ModelProviderStepScreen({
           borderRadius="8px"
           _hover={{ color: "fg", bg: "bg.muted" }}
           onClick={() => {
-            emit("clicked", "skip");
+            analytics.track({
+              boundary: surface.boundary,
+              action: "clicked",
+              name: "skip",
+              attributes: surface.attributes,
+            });
             onContinue();
           }}
         >

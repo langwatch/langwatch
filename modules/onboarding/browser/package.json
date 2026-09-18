@@ -8,6 +8,11 @@
   ],
   "type": "module",
   "exports": {
+    "./surfaces/tech-stack": {
+      "langwatch-declaration-source": "./src/ui/blocks/tech-stack.tsx",
+      "types": "./dist/ui/blocks/tech-stack.d.ts",
+      "default": "./src/ui/blocks/tech-stack.tsx"
+    },
     "./declaration": {
       "langwatch-declaration-source": "./src/onboarding.web.ts",
       "types": "./dist/onboarding.web.d.ts",

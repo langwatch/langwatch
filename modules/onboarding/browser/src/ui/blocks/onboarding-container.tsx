@@ -1,8 +1,8 @@
 import { Box, Center, Container, IconButton, Text, VStack } from "@chakra-ui/react";
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ArrowLeft, ArrowRight, LogOut } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useAnalytics } from "react-contextual-analytics";
 
 import { useOnboardingHost } from "../../model/onboarding-host.ts";
 import { FullLogo } from "../elements/icons/full-logo.tsx";
@@ -15,6 +15,8 @@ const MotionCenter = motion.create(Center);
 const MotionText = motion.create(Text);
 
 interface OnboardingContainerProps extends React.PropsWithChildren {
+  /** The surface this chrome's events happened on, named by the flow above it. */
+  boundary: string;
   loading?: boolean;
   title: string;
   subTitle?: string;
@@ -29,6 +31,7 @@ interface OnboardingContainerProps extends React.PropsWithChildren {
 
 export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
   children,
+  boundary,
   title,
   subTitle,
   loading,
@@ -39,7 +42,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
   skipHref,
   isLogoInside,
 }) => {
-  const { emit } = useAnalytics();
+  const analytics = useUiAnalytics();
   const host = useOnboardingHost();
   const isFullWidth = widthVariant === "full";
 
@@ -136,7 +139,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
             color="fg.subtle"
             _hover={{ bg: "bg.muted", color: "fg" }}
             onClick={() => {
-              emit("clicked", "sign_out");
+              analytics.track({ boundary, action: "clicked", name: "sign_out" });
               void host.signOut();
             }}
           >

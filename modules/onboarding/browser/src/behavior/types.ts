@@ -78,6 +78,18 @@ export interface OnboardingFormData {
   attribution?: Attribution;
 }
 
+/** The surface a screen names on every event it emits, supplied by the flow that mounts it. */
+export interface OnboardingAnalyticsSurface {
+  boundary: string;
+  /** Facts about the surface itself, which ride on every event emitted from it. */
+  attributes?: Readonly<Record<string, unknown>>;
+}
+
+/** What every screen a flow mounts receives. */
+export interface OnboardingScreenProps {
+  surface: OnboardingAnalyticsSurface;
+}
+
 export interface OnboardingScreen {
   id: string;
   required: boolean;
