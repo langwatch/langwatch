@@ -39,7 +39,7 @@ import { reconcileSkipPolicy } from "#rules/langy-local-skip-policy.rules";
 import { LangyKeyIdentityService } from "#services/langy-key-identity.service";
 import { ControlRequestService } from "#services/langy-local-control-request.service";
 
-import type { UserWaitEvents } from "../../rules/langy-local-user-wait-record.rules.ts";
+import type { UserWaitEvents } from "../rules/langy-local-user-wait-record.rules.ts";
 
 /** A local call is a small JSON document, never an upload. */
 const MAX_BODY_BYTES = 256 * 1024;

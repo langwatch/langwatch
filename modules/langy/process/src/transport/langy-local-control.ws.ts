@@ -18,13 +18,13 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { WebSocket, WebSocketServer } from "ws";
 
-import type { PresenceHeartbeat } from "../../repositories/langy-local-presence.repository.ts";
+import type { PresenceHeartbeat } from "../repositories/langy-local-presence.repository.ts";
 import type {
   ControlCredential,
   ControlSession,
-} from "../../rules/langy-local-session-contract.rules.ts";
-import { DeliveredCallsService } from "../../services/langy-local-delivered-calls.service.ts";
-import type { LocalControlSessionCoreService } from "../../services/langy-local-session.service.ts";
+} from "../rules/langy-local-session-contract.rules.ts";
+import { DeliveredCallsService } from "../services/langy-local-delivered-calls.service.ts";
+import type { LocalControlSessionCoreService } from "../services/langy-local-session.service.ts";
 
 const logger = createLogger("langwatch:langy:local-control:gateway");
 
@@ -355,7 +355,8 @@ export class LocalControlGateway {
    * pending for the pod that picks the sockets up.
    */
   async close(): Promise<void> {
-    for (const live of [...this.sockets]) {
+    const sockets = Array.from(this.sockets);
+    for (const live of sockets) {
       live.socket.close(SERVICE_RESTART_CLOSE_CODE, "service restart");
       await this.detach(live);
     }

@@ -21,10 +21,7 @@ import {
   registerFrameSchema,
   langyControlIdParamsSchema,
   langyControlCancelResultSchema,
-  langyControlRegisterAnswerSchema,
-  langyControlPollAnswerSchema,
   langyControlFramesBodySchema,
-  langyControlFramesAnswerSchema,
   langyControlPollQuerySchema,
 } from "@langwatch/langy-contract";
 import { z } from "zod";
@@ -33,7 +30,7 @@ import type { LocalControlRuntime } from "#repositories/redis/redis.langy-local-
 import { conversationUrl } from "#rules/langy-local-session-text.rules";
 import { ControlRequestService } from "#services/langy-local-control-request.service";
 
-import type { LocalControlLongPoll } from "./langy-local-control-long-poll.api.ts";
+import type { LocalControlLongPoll } from "./langy-local-control-long-poll.rest.ts";
 
 /** Everything the control family reaches that Langy does not own. */
 export type LangyLocalControlRestMembers = Readonly<{
@@ -269,9 +266,3 @@ export const langyLocalControlRest = defineRestRouter(LangyApi)
   })
 
   .build();
-
-export type { RegisterAnswer };
-type RegisterAnswer = z.infer<typeof langyControlRegisterAnswerSchema>;
-type PollAnswer = z.infer<typeof langyControlPollAnswerSchema>;
-type FramesAnswer = z.infer<typeof langyControlFramesAnswerSchema>;
-export type { PollAnswer, FramesAnswer };

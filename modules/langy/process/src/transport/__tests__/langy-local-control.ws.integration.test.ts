@@ -19,19 +19,20 @@ import {
   SessionStateStoreFactory,
 } from "@langwatch/redis-client";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import WebSocket from "ws";
 
-import { testRedisUrl } from "../../../__tests__/support/test-redis-url.ts";
+import { testRedisUrl } from "../../__tests__/support/test-redis-url.ts";
 import {
   RedisLangyLocalControlRuntimeRepository,
   type LocalControlRuntime,
-} from "../../../repositories/redis/redis.langy-local-control-runtime.repository.ts";
-import { presenceKey } from "../../../rules/langy-local-control-keys.rules.ts";
-import { LocalControlSessionCoreService } from "../../../services/langy-local-session.service.ts";
-import { LocalControlLongPoll } from "../../api-rest/langy-local-control-long-poll.api.ts";
-import { CONTROL_CONNECT_PATH, LocalControlGateway } from "../langy-local-control.api.ts";
+} from "../../repositories/redis/redis.langy-local-control-runtime.repository.ts";
+import { presenceKey } from "../../rules/langy-local-control-keys.rules.ts";
+import { LocalControlSessionCoreService } from "../../services/langy-local-session.service.ts";
+import { LocalControlLongPoll } from "../langy-local-control-long-poll.rest.ts";
+import { CONTROL_CONNECT_PATH, LocalControlGateway } from "../langy-local-control.ws.ts";
 
 const ns = `local-control-${nanoid(8)}`;
 
@@ -96,7 +97,7 @@ const mintedKeys = new Map<string, { apiKeyId: string; userId: string }>();
 /** What `personalToken` resolves to: a real key of the project, not a session key. */
 const personalKey = { apiKeyId: `apikey_${nanoid(10)}`, userId };
 
-const apiKeys = {
+const apiKeys = createApiFixture<ApiKeyApi>({
   async findResolvedToken({ token }: { token: string }): Promise<ResolvedApiKeyCredential | null> {
     // The developer's own key resolves like any other real key: it belongs to
     // a person, and it is simply not the key approving a control request
@@ -123,7 +124,7 @@ const apiKeys = {
       },
     };
   },
-} as unknown as ApiKeyApi;
+});
 
 /** One `upgrade` listener per pod, the same shape the process router has. */
 function upgradeRouterFor(server: Server) {

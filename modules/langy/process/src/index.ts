@@ -205,7 +205,7 @@ export {
   langyUiActionsRestMembers,
   LangyUiActionRestCatalog,
   type LangyUiActionsRestMembers,
-} from "./transport/api-rest/langy-ui-actions.api.ts";
+} from "./transport/langy-ui-actions.rest.ts";
 export { langyInternalRest } from "./transport/langy-internal.rest.ts";
 export type { RelayTally } from "@langwatch/langy-contract";
 export type {
@@ -219,7 +219,7 @@ export {
   type LangyRestCeiling,
   type LangyRestCredentialMembers,
   type LangyRestCredentialReader,
-} from "./transport/api-rest/langy-rest-credentials.api.ts";
+} from "./transport/langy-rest-credentials.ts";
 export type {
   LangyActorResolution,
   LangyActorUserReader,
@@ -277,18 +277,18 @@ export {
   type LangyGithubInstallationReader,
   type LangyLocalRestCommands,
   type LangyLocalRestMembers,
-} from "./transport/api-rest/langy-local.api.ts";
+} from "./transport/langy-local.rest.ts";
 export {
   langyLocalControlRest,
   langyLocalControlRestMembers,
   type LangyLocalControlRestMembers,
-} from "./transport/api-rest/langy-local-control.api.ts";
+} from "./transport/langy-local-control.rest.ts";
 export {
   LocalControlLongPoll,
   type LocalControlLongPollOptions,
-} from "./transport/api-rest/langy-local-control-long-poll.api.ts";
+} from "./transport/langy-local-control-long-poll.rest.ts";
 export {
   CONTROL_CONNECT_PATH,
   LocalControlGateway,
   type ControlGatewayOptions,
-} from "./transport/api-ws/langy-local-control.api.ts";
+} from "./transport/langy-local-control.ws.ts";

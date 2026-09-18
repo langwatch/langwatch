@@ -17,9 +17,9 @@ import type { Unsubscribe } from "@langwatch/redis-client/session-state";
 import { nowInstant } from "@langwatch/time";
 import { nanoid } from "nanoid";
 
-import type { ControlSession } from "../../rules/langy-local-session-contract.rules.ts";
-import { DeliveredCallsService } from "../../services/langy-local-delivered-calls.service.ts";
-import type { LocalControlSessionCoreService } from "../../services/langy-local-session.service.ts";
+import type { ControlSession } from "../rules/langy-local-session-contract.rules.ts";
+import { DeliveredCallsService } from "../services/langy-local-delivered-calls.service.ts";
+import type { LocalControlSessionCoreService } from "../services/langy-local-session.service.ts";
 
 const logger = createLogger("langwatch:langy:local-control:long-poll");
 
@@ -29,7 +29,7 @@ const HTTP_SESSION_TTL_SECONDS = 60;
 /** The most frames one poll answers with. */
 const MAX_FRAMES_PER_POLL = 50;
 
-export interface LongPollRegisterOutcome {
+interface LongPollRegisterOutcome {
   ok: boolean;
   /** The token every later poll and post carries. */
   token?: string;
@@ -228,7 +228,8 @@ export class LocalControlLongPoll {
    * mid-poll would leave one open on this pod.
    */
   async sweep(now = nowInstant().epochMilliseconds): Promise<void> {
-    for (const [token, entry] of [...this.sessions]) {
+    const sessions = Array.from(this.sessions);
+    for (const [token, entry] of sessions) {
       if (now - entry.lastSeenAt < HTTP_SESSION_TTL_SECONDS * 1000) continue;
       logger.info(
         { conversationId: entry.session.conversationId },
@@ -240,7 +241,8 @@ export class LocalControlLongPoll {
 
   /** Closes every session this pod holds. */
   async close(): Promise<void> {
-    for (const [token] of [...this.sessions]) {
+    const sessions = Array.from(this.sessions);
+    for (const [token] of sessions) {
       await this.retire(token, "cli_exit");
     }
   }
@@ -251,15 +253,24 @@ export class LocalControlLongPoll {
 }
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve) => {
-    const timer = setTimeout(done, ms);
-    function done(): void {
-      signal?.removeEventListener("abort", done);
-      clearTimeout(timer);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let onAbort: (() => void) | undefined;
+  const timerFinished = new Promise<void>((resolve) => {
+    timer = setTimeout(() => {
+      if (onAbort) signal?.removeEventListener("abort", onAbort);
       resolve();
-    }
-    signal?.addEventListener("abort", done, { once: true });
+    }, ms);
   });
+  timer?.unref();
+  if (!signal) return timerFinished;
+
+  const aborted = new Promise<void>((resolve) => {
+    onAbort = () => {
+      resolve();
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+  return Promise.race([timerFinished, aborted]);
 }
 
 /**

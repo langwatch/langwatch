@@ -16,7 +16,7 @@ import {
   langyLocalRest,
   langyLocalRestMembers,
   type LangyLocalRestMembers,
-} from "../langy-local.api.ts";
+} from "../langy-local.rest.ts";
 
 const PROJECT_ID = "project-123";
 const ORGANIZATION_ID = "organization-1";

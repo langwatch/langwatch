@@ -31,7 +31,7 @@ import {
   type UiActionRedis,
 } from "#services/langy-ui-action.service";
 
-import type { LangyRestCeiling } from "./langy-rest-credentials.api.ts";
+import type { LangyRestCeiling } from "./langy-rest-credentials.ts";
 
 const AUTH_REASON =
   "the dispatched action's own kind names the permission it requires, so the ceiling is the " +

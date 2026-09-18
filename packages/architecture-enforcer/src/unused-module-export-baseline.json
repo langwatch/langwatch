@@ -2655,22 +2655,6 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/langy/process/src/transport/api-rest/langy-local-control-long-poll.api.ts|LongPollRegisterOutcome",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/langy/process/src/transport/api-rest/langy-local-control.api.ts|FramesAnswer",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/langy/process/src/transport/api-rest/langy-local-control.api.ts|PollAnswer",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/langy/process/src/transport/api-rest/langy-local-control.api.ts|RegisterAnswer",
-      "measured": "2026-09-10"
-    },
-    {
       "key": "modules/log/process/src/app/log.infrastructure.ts|LogInfrastructure",
       "measured": "2026-09-10"
     },
