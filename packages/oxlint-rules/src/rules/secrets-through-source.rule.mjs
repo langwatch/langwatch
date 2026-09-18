@@ -1,13 +1,10 @@
-import registry from "@langwatch/secrets/keys.json" with { type: "json" };
 import { defineRule } from "../define-rule.mjs";
 
-// A secret arrives through the SecretSource chain the boot seam resolves, so
-// the value a feature reads has already been through classification and
-// redaction. A direct `process.env.OPENAI_API_KEY` skips all of it.
-
-const SECRET_KEYS = new Set(
-  registry.keys.filter((entry) => entry.class === "secret").map((entry) => entry.key),
-);
+// A secret arrives through the secrets chain the boot seam resolves. The old
+// central keys.json classification died with the config rewrite (2026-09-18);
+// until the decentralised wall lands (declared handles vs config leaves,
+// cross-checked at boot) this rule holds no keys and stays quiet.
+const SECRET_KEYS = new Set();
 
 /** The package that owns the classification, and the seams that resolve it. */
 function isSecretResolutionSite(workspacePath) {

@@ -3073,12 +3073,18 @@ importers:
 
   modules:
     dependencies:
+      '@langwatch/agent-browser':
+        specifier: workspace:*
+        version: link:agent/browser
       '@langwatch/agent-contract':
         specifier: workspace:*
         version: link:agent/contract
       '@langwatch/agent-process':
         specifier: workspace:*
         version: link:agent/process
+      '@langwatch/analytics-browser':
+        specifier: workspace:*
+        version: link:analytics/browser
       '@langwatch/analytics-contract':
         specifier: workspace:*
         version: link:analytics/contract
@@ -3217,6 +3223,9 @@ importers:
       '@langwatch/evaluator-process':
         specifier: workspace:*
         version: link:evaluator/process
+      '@langwatch/experiment-browser':
+        specifier: workspace:*
+        version: link:experiment/browser
       '@langwatch/experiment-process':
         specifier: workspace:*
         version: link:experiment/process
@@ -3229,6 +3238,9 @@ importers:
       '@langwatch/feature-flag-process':
         specifier: workspace:*
         version: link:feature-flag/process
+      '@langwatch/gateway-browser':
+        specifier: workspace:*
+        version: link:gateway/browser
       '@langwatch/gateway-contract':
         specifier: workspace:*
         version: link:gateway/contract
@@ -3298,6 +3310,9 @@ importers:
       '@langwatch/onboarding-browser':
         specifier: workspace:*
         version: link:onboarding/browser
+      '@langwatch/ops-browser':
+        specifier: workspace:*
+        version: link:ops/browser
       '@langwatch/ops-contract':
         specifier: workspace:*
         version: link:ops/contract
@@ -3343,9 +3358,6 @@ importers:
       '@langwatch/secret-browser':
         specifier: workspace:*
         version: link:secret/browser
-      '@langwatch/secret-contract':
-        specifier: workspace:*
-        version: link:secret/contract
       '@langwatch/secret-process':
         specifier: workspace:*
         version: link:secret/process
@@ -7273,6 +7285,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
+      '@langwatch/process-stores':
+        specifier: workspace:*
+        version: link:../../../packages/process-stores
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
@@ -12798,22 +12813,10 @@ importers:
 
   packages/config:
     dependencies:
-      '@langwatch/plans':
-        specifier: workspace:*
-        version: link:../plans
-      '@langwatch/secrets':
-        specifier: workspace:*
-        version: link:../secrets
       zod:
         specifier: 'catalog:'
         version: 4.4.3
-      zod-validation-error:
-        specifier: 'catalog:'
-        version: 5.0.0(zod@4.4.3)
     devDependencies:
-      '@types/node':
-        specifier: ^26.0.1
-        version: 26.2.0
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -13370,6 +13373,9 @@ importers:
 
   packages/process-server:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../api
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../kernel
@@ -13579,10 +13585,6 @@ importers:
         version: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
   packages/secrets:
-    dependencies:
-      zod:
-        specifier: 'catalog:'
-        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^26.0.1

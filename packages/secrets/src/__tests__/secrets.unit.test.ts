@@ -1,0 +1,94 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+import { afterAll, describe, expect, it } from "vitest";
+
+import { SecretsChain } from "../chain.ts";
+import {
+  AbsentSecretError,
+  SealedSecretsError,
+  SecretsPreflightError,
+  SecretsResolver,
+  UndeclaredSecretError,
+} from "../resolver.ts";
+import { Secret } from "../secret.ts";
+
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), "secrets-"));
+const dotenv = path.join(dir, ".env");
+fs.writeFileSync(dotenv, 'FILE_ONLY="from-file"\nSHADOWED=file-loses\n# COMMENTED=nope\n');
+afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+const chain = SecretsChain.start({ environment: { SHADOWED: "env-wins", IN_ENV: "abc" } })
+  .withEnv()
+  .withFile(dotenv);
+
+describe("the chain", () => {
+  it("answers one id at a time, front to back, first adapter wins", async () => {
+    await expect(chain.fetch("SHADOWED")).resolves.toBe("env-wins");
+    await expect(chain.fetch("FILE_ONLY")).resolves.toBe("from-file");
+    await expect(chain.fetch("COMMENTED")).resolves.toBeUndefined();
+    await expect(chain.fetch("NOWHERE")).resolves.toBeUndefined();
+  });
+
+  it("treats a missing dotenv file as ordinary absence", async () => {
+    const bare = SecretsChain.start({ environment: {} }).withFile(path.join(dir, "absent"));
+    await expect(bare.fetch("ANYTHING")).resolves.toBeUndefined();
+  });
+
+  it("leaves withOnePassword inert without an account", async () => {
+    const same = chain.withOnePassword(undefined).withOnePassword("  ");
+    await expect(same.fetch("IN_ENV")).resolves.toBe("abc");
+  });
+});
+
+describe("the scoped resolver", () => {
+  const inEnv = Secret.load("IN_ENV");
+  const missing = Secret.load("NOWHERE");
+  const maybe = Secret.load("NOWHERE_EITHER", { optional: true });
+
+  it("hands the value to the closure and only the collaborator escapes", async () => {
+    const scoped = SecretsResolver.over(chain).scopeTo("github", [inEnv]);
+    const collaborator = await scoped.into(inEnv, (value) => ({ holds: value.length }));
+    expect(collaborator).toEqual({ holds: 3 });
+  });
+
+  it("refuses a handle the owner never declared, naming both", async () => {
+    const scoped = SecretsResolver.over(chain).scopeTo("github", [inEnv]);
+    await expect(scoped.into(missing, (v) => v)).rejects.toThrowError(UndeclaredSecretError);
+  });
+
+  it("refuses a required absence by its one id, passes an optional one as undefined", async () => {
+    const scoped = SecretsResolver.over(chain).scopeTo("x", [missing, maybe]);
+    await expect(scoped.into(missing, (v) => v)).rejects.toThrowError(AbsentSecretError);
+    await expect(scoped.into(maybe, (v) => v)).resolves.toBeUndefined();
+  });
+
+  it("seals: after boot the capability is gone", async () => {
+    const resolver = SecretsResolver.over(chain);
+    const scoped = resolver.scopeTo("github", [inEnv]);
+    resolver.seal();
+    await expect(scoped.into(inEnv, (v) => v)).rejects.toThrowError(SealedSecretsError);
+  });
+});
+
+describe("the preflight", () => {
+  it("names every unanswerable required handle at once, ignores optional ones", async () => {
+    const resolver = SecretsResolver.over(chain);
+    const handles = [
+      Secret.load("IN_ENV"),
+      Secret.load("MISSING_ONE"),
+      Secret.load("MISSING_TWO"),
+      Secret.load("MISSING_OPTIONAL", { optional: true }),
+    ];
+
+    const failure = await resolver.preflight(handles).then(
+      () => undefined,
+      (error: unknown) => error,
+    );
+    expect(failure).toBeInstanceOf(SecretsPreflightError);
+    expect((failure as SecretsPreflightError).missing).toEqual(["MISSING_ONE", "MISSING_TWO"]);
+
+    await expect(resolver.preflight([Secret.load("IN_ENV")])).resolves.toBeUndefined();
+  });
+});
