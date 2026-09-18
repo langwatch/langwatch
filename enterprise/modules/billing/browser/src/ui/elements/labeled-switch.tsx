@@ -1,6 +1,6 @@
 import { HStack, Text } from "@chakra-ui/react";
-import { useId } from "react";
 import { Switch } from "@langwatch/design-system/switch";
+import { useId } from "react";
 
 interface LabeledSwitchProps<T extends string> {
   left: { label: string; value: T };

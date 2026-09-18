@@ -21,8 +21,9 @@ import {
   mapUsageToLimits,
   RESOURCE_LABELS,
   ResourceLimitsDisplay,
-} from "@langwatch/enterprise-licensing-web/surfaces/resource-limits";
+} from "@langwatch/enterprise-licensing-browser/surfaces/resource-limits";
 import { ArrowRight } from "lucide-react";
+
 import { billingApi } from "../../behavior/billing-api.ts";
 import { useBillingHost } from "../../model/billing-host.ts";
 import {

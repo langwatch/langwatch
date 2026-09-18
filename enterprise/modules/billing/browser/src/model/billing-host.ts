@@ -4,6 +4,7 @@
  */
 
 import { createContext, useContext } from "react";
+
 import type { PricingModel } from "./prisma-types.ts";
 
 /** The organization every billing read is scoped to. */

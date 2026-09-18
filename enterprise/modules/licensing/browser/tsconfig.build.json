@@ -13,6 +13,7 @@
   },
   "files": [
     "./src/licensing.ts",
+    "./src/licensing.web.ts",
     "./src/ui/sections/global-upgrade-modal/index.ts",
     "./src/ui/sections/license-error-interceptor/index.ts",
     "./src/ui/sections/resource-limits/index.ts",
@@ -49,6 +50,9 @@
     },
     {
       "path": "../../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/ui-kernel/tsconfig.build.json"
     }
   ]
 }

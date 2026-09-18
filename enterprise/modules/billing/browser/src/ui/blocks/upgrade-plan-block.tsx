@@ -4,6 +4,7 @@
 import { Button, Card, Flex, HStack, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { Check } from "lucide-react";
 import type React from "react";
+
 import { PricingSummary } from "../elements/pricing-summary.tsx";
 
 export function UpgradePlanBlock({

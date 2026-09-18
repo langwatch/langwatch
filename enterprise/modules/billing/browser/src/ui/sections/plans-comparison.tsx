@@ -11,12 +11,12 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { Currency as PrismaCurrency } from "@langwatch/enterprise-billing-contract";
+import { CONTACT_SALES_URL } from "@langwatch/enterprise-licensing-contract";
 import { ArrowLeft, Check, DollarSign, Euro, Info } from "lucide-react";
 import { useState } from "react";
-import { Currency as PrismaCurrency } from "@langwatch/enterprise-billing-contract";
+
 import { billingApi } from "../../behavior/billing-api.ts";
-import { Link } from "../../ui/elements/link.tsx";
-import { CONTACT_SALES_URL } from "@langwatch/enterprise-licensing-contract";
 import {
   type BillingInterval,
   type Currency,
@@ -31,6 +31,7 @@ import {
   type ComparisonPlanId,
   resolveCurrentComparisonPlan,
 } from "../../model/plan-current-resolver.ts";
+import { Link } from "../../ui/elements/link.tsx";
 
 /** The public list of every event type that counts toward the usage lines below. */
 const BILLABLE_EVENTS_DOCS_URL = "https://docs.langwatch.ai/pricing/billable-events";

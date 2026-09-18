@@ -31,10 +31,10 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
-      "path": "../../licensing/contract/tsconfig.build.json"
+      "path": "../../licensing/browser/tsconfig.build.json"
     },
     {
-      "path": "../../licensing/web/tsconfig.build.json"
+      "path": "../../licensing/contract/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/entitlement/contract/tsconfig.build.json"
@@ -44,6 +44,9 @@
     },
     {
       "path": "../../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/ui-kernel/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/test-harness/tsconfig.build.json"

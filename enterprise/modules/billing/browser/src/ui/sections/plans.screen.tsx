@@ -5,6 +5,7 @@
  */
 
 import { Spinner } from "@chakra-ui/react";
+
 import { billingApi } from "../../behavior/billing-api.ts";
 import { useBillingHost } from "../../model/billing-host.ts";
 import { PlansComparisonPage } from "./plans-comparison.tsx";

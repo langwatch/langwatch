@@ -2477,6 +2477,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../../packages/ui-kernel
       lucide-react:
         specifier: 'catalog:'
         version: 1.22.0(react@19.2.8)
@@ -2746,6 +2749,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../../packages/ui-kernel
       lucide-react:
         specifier: 'catalog:'
         version: 1.22.0(react@19.2.8)
@@ -3154,12 +3160,21 @@ importers:
       '@langwatch/dataset-process':
         specifier: workspace:*
         version: link:dataset/process
+      '@langwatch/enterprise-billing-browser':
+        specifier: workspace:*
+        version: link:../enterprise/modules/billing/browser
       '@langwatch/enterprise-billing-contract':
         specifier: workspace:*
         version: link:../enterprise/modules/billing/contract
+      '@langwatch/enterprise-governance-browser':
+        specifier: workspace:*
+        version: link:../enterprise/modules/governance/browser
       '@langwatch/enterprise-governance-process':
         specifier: workspace:*
         version: link:../enterprise/modules/governance/process
+      '@langwatch/enterprise-licensing-browser':
+        specifier: workspace:*
+        version: link:../enterprise/modules/licensing/browser
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../enterprise/modules/licensing/contract
@@ -3175,6 +3190,9 @@ importers:
       '@langwatch/enterprise-saas-contract':
         specifier: workspace:*
         version: link:../enterprise/modules/saas/contract
+      '@langwatch/enterprise-scim-browser':
+        specifier: workspace:*
+        version: link:../enterprise/modules/scim/browser
       '@langwatch/enterprise-scim-contract':
         specifier: workspace:*
         version: link:../enterprise/modules/scim/contract

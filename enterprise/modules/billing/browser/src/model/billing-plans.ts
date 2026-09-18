@@ -12,6 +12,7 @@ import {
 } from "@langwatch/enterprise-billing-contract";
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import numeral from "numeral";
+
 import { BillingPricingService } from "./billing-pricing.service.ts";
 
 const formatNumber = (value: number): string => numeral(value).format("0,0");

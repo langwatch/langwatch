@@ -9,6 +9,11 @@
   ],
   "type": "module",
   "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/scim.web.ts",
+      "types": "./dist/scim.web.d.ts",
+      "default": "./src/scim.web.ts"
+    },
     "./scim": {
       "types": "./dist/scim.d.ts",
       "default": "./src/scim.ts"
@@ -22,6 +27,7 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
     "lucide-react": "catalog:"
   },
   "devDependencies": {

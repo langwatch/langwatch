@@ -1,4 +1,5 @@
 import type { MemberType } from "@langwatch/enterprise-licensing-contract";
+
 import {
   type BillingInterval,
   type Currency,

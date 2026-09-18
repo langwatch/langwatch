@@ -17,10 +17,11 @@ import {
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Key, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
+
 import { scimApi } from "../../behavior/scim-api.ts";
+import { readableDate } from "../../model/display-formatters.ts";
 import { useScimHost } from "../../model/scim-host.ts";
 import { CopyInput } from "../../ui/elements/copy-input.tsx";
-import { readableDate } from "../../model/display-formatters.ts";
 
 export default function ScimScreen() {
   const organizationId = useScimHost().organizationId();

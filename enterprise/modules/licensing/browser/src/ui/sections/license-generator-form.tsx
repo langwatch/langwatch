@@ -10,20 +10,21 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { Upload, X } from "lucide-react";
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Radio, RadioGroup } from "@langwatch/design-system/radio";
 import { Select } from "@langwatch/design-system/select";
-import { licensingApi } from "../../behavior/licensing-api.ts";
-import { useLicensingHost } from "../../model/licensing-host.ts";
 import { ENTERPRISE_TEMPLATE, quotedPlanLimitsOf, templateFormDefaults } from "@langwatch/plans";
+import { nowInstant, toDate } from "@langwatch/time";
+import { Upload, X } from "lucide-react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+
+import { licensingApi } from "../../behavior/licensing-api.ts";
+import { readableDate } from "../../model/display-formatters.ts";
 // A package that self-references through its own `exports` resolves at runtime
 // and not under `moduleResolution: "bundler"`, so the names this file already
 // shared with the package entry are reached by relative path.
 import { formatFileSize } from "../../model/license-status.ts";
+import { useLicensingHost } from "../../model/licensing-host.ts";
 import { getPlanDefaults, type PlanType } from "../../model/plan-form-defaults.ts";
-import { nowInstant, toDate } from "@langwatch/time";
-import { readableDate } from "../../model/display-formatters.ts";
 
 const planTypeCollection = createListCollection({
   items: [

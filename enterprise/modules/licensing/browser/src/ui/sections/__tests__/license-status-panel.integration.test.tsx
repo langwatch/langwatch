@@ -6,10 +6,11 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { LicenseStatus as LicenseStatusPayload } from "@langwatch/enterprise-licensing-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { LicenseStatus as LicenseStatusPayload } from "@langwatch/enterprise-licensing-contract";
+
 import { LicenseStatusPanel } from "../license-status-panel.tsx";
 
 const { statusResult } = vi.hoisted(() => ({

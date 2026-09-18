@@ -14,19 +14,17 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ArrowRight, Check } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { Currency as PrismaCurrency } from "@langwatch/enterprise-billing-contract";
 import { Select } from "@langwatch/design-system/select";
-import { billingApi } from "../../behavior/billing-api.ts";
-import { useBillingHost } from "../../model/billing-host.ts";
-import { classifyMemberType } from "../../model/member-classification.ts";
-import { OrganizationUserRole, PricingModel, TeamUserRole } from "../../model/prisma-types.ts";
-import { LabeledSwitch } from "../../ui/elements/labeled-switch.tsx";
-import { Link } from "../../ui/elements/link.tsx";
+import { Currency as PrismaCurrency } from "@langwatch/enterprise-billing-contract";
 import { CONTACT_SALES_URL, type MemberType } from "@langwatch/enterprise-licensing-contract";
 import { planSeatsAndVolume } from "@langwatch/plans";
+import { nowInstant } from "@langwatch/time";
+import { ArrowRight, Check } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+
+import { billingApi } from "../../behavior/billing-api.ts";
 import { useBillingPricing } from "../../behavior/use-billing-pricing.ts";
+import { useBillingHost } from "../../model/billing-host.ts";
 import {
   type BillingInterval,
   buildEnterprisePlanFeatures,
@@ -39,6 +37,8 @@ import {
   isAnnualTieredPlan,
   parseGrowthSeatPlanType,
 } from "../../model/billing-plans.ts";
+import { classifyMemberType } from "../../model/member-classification.ts";
+import { OrganizationUserRole, PricingModel, TeamUserRole } from "../../model/prisma-types.ts";
 import {
   countFullMembers,
   type DrawerSaveResult,
@@ -46,14 +46,15 @@ import {
   type PlannedUser,
   type SubscriptionUser,
 } from "../../model/subscription-types.ts";
-import { ContactSalesBlock } from "./contact-sales/index.ts";
 import { UpdateSeatsBlock } from "../../ui/blocks/update-seats-block.tsx";
 import { UpgradePlanBlock } from "../../ui/blocks/upgrade-plan-block.tsx";
+import { LabeledSwitch } from "../../ui/elements/labeled-switch.tsx";
+import { Link } from "../../ui/elements/link.tsx";
+import { ContactSalesBlock } from "./contact-sales/index.ts";
 import { CurrentPlanBlock } from "./current-plan-block.tsx";
 import { InvoicesBlock } from "./invoices-block.tsx";
-import { UserManagementDrawer } from "./user-management-drawer.tsx";
 import { useSubscriptionActions } from "./use-subscription-actions.ts";
-import { nowInstant } from "@langwatch/time";
+import { UserManagementDrawer } from "./user-management-drawer.tsx";
 
 const currencyOptions = [
   { label: "\u20AC EUR", value: PrismaCurrency.EUR },

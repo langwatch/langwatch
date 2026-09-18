@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { BillingPricingService } from "../model/billing-pricing.service.ts";
 
 describe("BillingPricingService", () => {

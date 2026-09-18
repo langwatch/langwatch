@@ -1,5 +1,5 @@
 {
-  "name": "@langwatch/enterprise-licensing-web",
+  "name": "@langwatch/enterprise-licensing-browser",
   "version": "0.1.0",
   "private": true,
   "description": "Browser-safe LangWatch Enterprise licensing surfaces: license state, seat and limit display, and the mint form's plan defaults.",
@@ -9,6 +9,11 @@
   ],
   "type": "module",
   "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/licensing.web.ts",
+      "types": "./dist/licensing.web.d.ts",
+      "default": "./src/licensing.web.ts"
+    },
     "./surfaces/global-upgrade-modal": {
       "types": "./dist/ui/sections/global-upgrade-modal/index.d.ts",
       "default": "./src/ui/sections/global-upgrade-modal/index.ts"
@@ -36,11 +41,12 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/browser-host": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
     "lucide-react": "catalog:"
   },
   "devDependencies": {

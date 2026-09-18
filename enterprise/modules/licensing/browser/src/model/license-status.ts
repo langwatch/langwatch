@@ -1,5 +1,6 @@
 import type { LicenseStatus } from "@langwatch/enterprise-licensing-contract";
 import { toEpochMs } from "@langwatch/time";
+
 import { readableDate } from "./display-formatters.ts";
 
 /** License status with metadata fields (excludes corrupted/no-license states) */

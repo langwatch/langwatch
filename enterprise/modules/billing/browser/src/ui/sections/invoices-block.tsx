@@ -4,6 +4,7 @@
  */
 import { Badge, Card, Flex, HStack, Skeleton, Table, Text, VStack } from "@chakra-ui/react";
 import { Download, ExternalLink } from "lucide-react";
+
 import { billingApi } from "../../behavior/billing-api.ts";
 import {
   formatInvoiceAmount,

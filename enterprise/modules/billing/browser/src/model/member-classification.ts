@@ -4,6 +4,7 @@
  */
 
 import type { MemberType } from "@langwatch/enterprise-licensing-contract";
+
 import { OrganizationUserRole } from "./prisma-types.ts";
 
 /**

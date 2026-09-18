@@ -4,9 +4,10 @@
  * exception, importing from `@langwatch/api/web`.
  */
 
-import type { licenseTrpc } from "@langwatch/enterprise-licensing-contract";
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
+import type { licenseTrpc } from "@langwatch/enterprise-licensing-contract";
 import type { TimeInput } from "@langwatch/time";
+
 import type { PlanType } from "../model/plan-form-defaults.ts";
 
 /** The plan template a minted key carries, as the generator form fills it in. */

@@ -1,6 +1,7 @@
 import { Badge, Box, Button, HStack, Link, Text, VStack } from "@chakra-ui/react";
 import type { LicenseStatus } from "@langwatch/enterprise-licensing-contract";
 import { CONTACT_SALES_URL } from "@langwatch/enterprise-licensing-contract";
+
 import {
   formatLicenseDate,
   hasLicenseMetadata,

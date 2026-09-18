@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import { ENTERPRISE_TEMPLATE, PRO_TEMPLATE } from "@langwatch/plans";
+import { describe, expect, it } from "vitest";
+
 import { getPlanDefaults, PLAN_DEFAULTS, type PlanType } from "../model/plan-form-defaults.ts";
 
 /**

@@ -8,6 +8,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+
 import { OverSeatsCallout } from "../over-seats-callout.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

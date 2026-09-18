@@ -3,6 +3,7 @@
  * InvoicesBlock (status color, date and amount formatting).
  */
 import { describe, expect, it } from "vitest";
+
 import {
   formatInvoiceAmount,
   formatInvoiceDate,

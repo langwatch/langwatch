@@ -3,8 +3,8 @@
  * generate returns plaintext once. This is the sole ADR-004 exception.
  */
 
-import type { scimTokenTrpc } from "@langwatch/enterprise-scim-contract";
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
+import type { scimTokenTrpc } from "@langwatch/enterprise-scim-contract";
 
 /** One bearer token, as the table renders it: metadata, never the secret. */
 export type ScimTokenRow = {

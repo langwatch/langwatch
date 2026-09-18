@@ -1,15 +1,16 @@
 import { Box, Button, Field, HStack, Text, Textarea, VStack } from "@chakra-ui/react";
-import { Upload, X } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
-import { Link } from "../../ui/elements/link.tsx";
 import { Radio, RadioGroup } from "@langwatch/design-system/radio";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useLicensingHost } from "../../model/licensing-host.ts";
 import {
   CONTACT_SALES_URL,
   DEFAULT_LICENSE_PURCHASE_URL,
 } from "@langwatch/enterprise-licensing-contract";
+import { Upload, X } from "lucide-react";
+import { useCallback, useRef, useState } from "react";
+
 import { formatFileSize } from "../../model/license-status.ts";
+import { useLicensingHost } from "../../model/licensing-host.ts";
+import { Link } from "../../ui/elements/link.tsx";
 
 type ActivationMethod = "file" | "key";
 

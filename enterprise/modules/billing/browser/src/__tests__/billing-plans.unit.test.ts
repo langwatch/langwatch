@@ -3,8 +3,9 @@
  * per-100K events pricing line each currency's growth features produce.
  */
 
-import { describe, expect, it } from "vitest";
 import { Currency } from "@langwatch/enterprise-billing-contract";
+import { describe, expect, it } from "vitest";
+
 import {
   buildEnterprisePlanFeatures,
   ENTERPRISE_PLAN_FEATURES,

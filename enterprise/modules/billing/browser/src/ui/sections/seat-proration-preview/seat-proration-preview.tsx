@@ -1,7 +1,7 @@
 import { Box, Button, HStack, Separator, Spinner, Text, VStack } from "@chakra-ui/react";
-import { Dialog } from "@langwatch/design-system/dialog";
 import { describeError, showErrorToast } from "@langwatch/browser-host/errors";
 import type { UiSlotProps } from "@langwatch/browser-host/slots";
+import { Dialog } from "@langwatch/design-system/dialog";
 import { Crown } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
