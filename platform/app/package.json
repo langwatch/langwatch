@@ -59,6 +59,7 @@
     "prisma:seed": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.portless prisma/seed.ts",
     "seed:sample-traces": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.portless scripts/seed-sample-traces.ts",
     "seed:realistic-platform": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.portless scripts/seed-realistic-platform-data.ts",
+    "seed:agent-economics": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.portless scripts/seed-agent-economics.ts",
     "seed:mass": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.portless scripts/seed-mass.ts",
     "seed:retention": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.portless scripts/seed-retention.ts",
     "seed:langy-prompts": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.portless scripts/seed-langy-prompts.ts",
