@@ -1,7 +1,7 @@
+import { useViewStore } from "@langwatch/trace-browser-kit";
 import { useMemo } from "react";
 
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { useViewStore } from "../../../../behavior/view.store.ts";
 import {
   type AnnotationByTrace,
   useAnnotationsByTraceIds,

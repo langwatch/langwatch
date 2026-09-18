@@ -90,7 +90,7 @@ export function useTerminalReplay({ projectId, projectSlug }: TerminalReplayInpu
 
   const prefetch = useCallback(
     (row: ReplayableSession) => {
-      void utils.tracesV2.conversationContext.prefetch({
+      void utils.traces.conversationContext.prefetch({
         projectId,
         conversationId: row.sessionId,
       });

@@ -66,7 +66,7 @@ export function useFeatureFlag(
       enabled: queryEnabled,
       // Flag checks are mounted at app shell (MainMenu, command bar) and fire
       // alongside the page's data queries. Without splitting, an in-flight
-      // tracesV2.list (~1s) would block the menu from rendering its links —
+      // traces.list (~1s) would block the menu from rendering its links —
       // and the list's perceived latency would absorb the flag round-trip.
       // Run on its own connection.
       trpc: { context: { skipBatch: true } },

@@ -23,7 +23,7 @@ export function useTraceHeader({
   enabled?: boolean;
   staleTimeMs?: number;
 }): UseTraceHeaderResult {
-  const query = traceApi.tracesV2.header.useQuery(
+  const query = traceApi.traces.header.useQuery(
     {
       projectId,
       traceId,

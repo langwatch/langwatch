@@ -131,7 +131,7 @@ export type LangyApiMap = {
   /** The connect-your-repository card the GitHub skill offers. */
   github: { getConnectionStatus: Q; getInstallation: Q; getRepositories: QL; setRepository: M };
   /** The rows a capability card hydrates fresh, rather than trusting the turn's copy. */
-  tracesV2: { list: Q; header: Q; discover: Q };
+  traces: { list: Q; header: Q; discover: Q };
   dataset: { getAll: QL; getById: Q };
   prompts: { getAllPromptsForProject: QL; getByIdOrHandle: Q };
   experiments: { getAllByProjectId: QL; getExperimentBySlug: Q };

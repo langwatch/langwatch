@@ -10,22 +10,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 // useFacetSearch (exercised for real here) reads project + time range and
-// fires the tracesV2.facetValues query. Mock those three boundaries so the
+// fires the traces.facetValues query. Mock those three boundaries so the
 // hook runs against a controllable server response.
 const apiMock = vi.hoisted(() => ({ useQuery: vi.fn() }));
 
 vi.mock("../../../trace-api.ts", () => ({
-  api: { tracesV2: { facetValues: { useQuery: apiMock.useQuery } } },
+  api: { traces: { facetValues: { useQuery: apiMock.useQuery } } },
 }));
 
 vi.mock("../../../use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
 }));
 
-vi.mock("../../../filter.store.ts", () => ({
-  useFilterStore: (selector: (s: unknown) => unknown) =>
-    selector({ debouncedTimeRange: { from: 1, to: 2, label: undefined } }),
-}));
+vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@langwatch/trace-browser-kit")>();
+  return {
+    ...actual,
+    useFilterStore: (selector: (s: unknown) => unknown) =>
+      selector({ debouncedTimeRange: { from: 1, to: 2, label: undefined } }),
+  };
+});
 
 import { FacetSection } from "../../../../ui/sections/explorer/filter-sidebar/facet-section.tsx";
 import type { FacetItem, FacetValueState } from "../types.ts";

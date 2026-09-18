@@ -2,7 +2,7 @@ import { Box, Flex, IconButton } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { nowInstant } from "@langwatch/time";
-import type { ConnectionState } from "@langwatch/trace-browser-kit/sse-subscription";
+import type { ConnectionState } from "@langwatch/trace-browser-kit";
 import { RefreshCw, Wifi, WifiOff } from "lucide-react";
 import type React from "react";
 

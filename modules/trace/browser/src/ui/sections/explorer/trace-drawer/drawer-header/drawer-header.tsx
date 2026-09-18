@@ -15,6 +15,7 @@ import { toaster } from "@langwatch/design-system/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { TracePresenceAvatars } from "@langwatch/presence-browser";
+import { Chip, useFilterStore } from "@langwatch/trace-browser-kit";
 import type { TraceHeader } from "@langwatch/trace-contract";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -29,7 +30,6 @@ import {
 
 import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
 import { useRetainedTraceHeader } from "../../../../../behavior/explorer/trace-drawer/drawer-header/use-retained-trace-header.ts";
-import { useFilterStore } from "../../../../../behavior/filter.store.ts";
 import { useFocusSectionStore } from "../../../../../behavior/focus-section.store.ts";
 import { useDrawer } from "../../../../../behavior/use-drawer.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
@@ -51,7 +51,6 @@ import { isTerminalOrigin } from "../../../../../model/terminal-origin.ts";
 import { TokenBreakdownTooltipContent } from "../../../../blocks/explorer/shared/token-breakdown-tooltip.tsx";
 import { splitChipsForOverflow } from "../../../../blocks/explorer/trace-drawer/chip-bar.tsx";
 import { SyntheticTraceBadge } from "../../../../blocks/explorer/trace-drawer/drawer-header/synthetic-trace-badge.tsx";
-import { Chip } from "../../../../elements/explorer/trace-drawer/chip.tsx";
 import { ExceptionsContent } from "../../../../elements/explorer/trace-drawer/exceptions-content.tsx";
 import { EditableTraceName } from "../../../editable-trace-name.tsx";
 import { showErrorToast } from "../../../errors/index.ts";
@@ -1119,9 +1118,9 @@ function HeaderActions({
             isRefreshing
               ? {
                   "& svg": {
-                    animation: "tracesV2DrawerRefreshSpin 0.9s linear infinite",
+                    animation: "tracesDrawerRefreshSpin 0.9s linear infinite",
                   },
-                  "@keyframes tracesV2DrawerRefreshSpin": {
+                  "@keyframes tracesDrawerRefreshSpin": {
                     from: { transform: "rotate(0deg)" },
                     to: { transform: "rotate(360deg)" },
                   },
@@ -1376,7 +1375,7 @@ function HeaderModeSwitch({
         viewMode={viewMode}
         onViewModeChange={onViewModeChange}
         hasConversation={!!trace.conversationId}
-        // Conversation mode needs a session (tracesV2.list + annotation
+        // Conversation mode needs a session (traces.list + annotation
         // reads), so share viewers don't get the tab at all. See ADR-057.
         isConversationHidden={readOnly}
         // `useConversationContext` returns `isLoading: true` while the
@@ -1390,7 +1389,7 @@ function HeaderModeSwitch({
           conversationContext.turns.length === 0
         }
         traceId={trace.traceId}
-        // Usage/Terminal ride the session-backed tracesV2 reads, which are
+        // Usage/Terminal ride the session-backed traces reads, which are
         // protected — share viewers don't get those tabs either.
         showTerminal={
           !readOnly &&

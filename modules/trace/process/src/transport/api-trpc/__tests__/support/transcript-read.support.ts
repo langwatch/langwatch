@@ -15,7 +15,7 @@ import {
   DERIVED_OUTPUT_ATTR_PREFIX,
 } from "../../../../rules/trace-log-content-derivation.rules.ts";
 import { TraceReadRedactionService } from "../../../../services/trace-read-redaction.service.ts";
-import type { TracesV2ReadMembers } from "../../../../services/trace-transcript-read.service.ts";
+import type { TracesReadMembers } from "../../../../services/trace-transcript-read.service.ts";
 
 /** One of the two stores the read is driven from. */
 export type TranscriptStoreMock = ReturnType<
@@ -46,7 +46,7 @@ export function createTranscriptApp(codingAgents: CodingAgentApi): {
  * `getVisibilityCutoffMs` answers "no window": that cutoff is a SEPARATE
  * gate resolved by the process, and leaving it on would mask what these suites measure.
  */
-export function createTranscriptReadPorts(): TracesV2ReadMembers {
+export function createTranscriptReadPorts(): TracesReadMembers {
   return {
     getVisibilityCutoffMs: async () => null,
     derivedAttrPrefixes: {

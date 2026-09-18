@@ -4,15 +4,15 @@ import { LimitExceededError } from "@langwatch/enterprise-licensing-contract";
 import {
   ENTERPRISE_FEATURE_ERRORS,
   assertEnterprisePlanType,
+  getRoleChangeType,
+  isViewOnlyCustomRole,
   type EntitlementApi,
   type Plan,
   type PlanProviderUser,
+  type RoleChangeType,
 } from "@langwatch/entitlement-contract";
 import {
-  getRoleChangeType,
-  isViewOnlyCustomRole,
   PrismaUsageMembershipRepository,
-  type RoleChangeType,
   type UsageMembershipRepository,
 } from "@langwatch/entitlement-process";
 import type { IdentityApi } from "@langwatch/identity-contract";

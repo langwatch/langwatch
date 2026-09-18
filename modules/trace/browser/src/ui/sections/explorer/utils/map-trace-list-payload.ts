@@ -7,7 +7,7 @@ interface TraceListPayload {
 }
 
 /**
- * Normalize the raw `tracesV2.list` payload into `TraceListItem` rows: attach each
+ * Normalize the raw `traces.list` payload into `TraceListItem` rows: attach each
  * trace's evaluations and default the optional spanCount field.
  */
 export function mapTraceListPayload(data: TraceListPayload | undefined): TraceListItem[] {

@@ -16,7 +16,7 @@ import type { ConversationTurn } from "../../../../../model/explorer/conversatio
 import { useConversationContext } from "../../hooks/use-conversation-context.ts";
 
 /**
- * How many turns `tracesV2.conversationContext` returns. A session longer than
+ * How many turns `traces.conversationContext` returns. A session longer than
  * this cannot be walked to its start, and the view says so rather than
  * pretending the oldest turn it can see is the beginning.
  */
@@ -72,9 +72,9 @@ async function readTurn({
     occurredAtMs: target.timestamp,
   };
   const [transcript, spans, events] = await Promise.all([
-    utils.tracesV2.codingAgentTranscript.fetch(input, EARLIER_TURN_FETCH),
-    utils.tracesV2.spansFull.fetch(input, EARLIER_TURN_FETCH).catch(() => []),
-    utils.tracesV2.traceEvents.fetch(input, EARLIER_TURN_FETCH).catch(() => []),
+    utils.traces.codingAgentTranscript.fetch(input, EARLIER_TURN_FETCH),
+    utils.traces.spansFull.fetch(input, EARLIER_TURN_FETCH).catch(() => []),
+    utils.traces.traceEvents.fetch(input, EARLIER_TURN_FETCH).catch(() => []),
   ]);
 
   return {

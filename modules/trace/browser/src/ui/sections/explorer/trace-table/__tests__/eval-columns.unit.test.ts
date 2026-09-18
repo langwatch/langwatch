@@ -1,10 +1,10 @@
-import { describe, expect, it } from "vitest";
-
 import {
   formatEvalColumnId,
   isEvalColumnId,
   parseEvalColumnId,
-} from "../../../../../model/lens-eval-column-id.ts";
+} from "@langwatch/trace-browser-kit";
+import { describe, expect, it } from "vitest";
+
 import type { TraceEvalResult, TraceListItem } from "../../types/trace.ts";
 import {
   buildEvalColumnDef,

@@ -28,7 +28,7 @@ vi.mock("../../../../behavior/use-drawer.ts", () => ({
   useDrawer: () => ({ openDrawer: openDrawerMock }),
 }));
 
-// The popover's body and its `tracesV2.header` read now live in
+// The popover's body and its `traces.header` read now live in
 // `@langwatch/trace-browser` as `TracePeekSummary`. This file still owns the
 // partition-pruning hint, so capture what the hover hands the summary; that the
 // summary forwards it to the header query is asserted in the package, beside

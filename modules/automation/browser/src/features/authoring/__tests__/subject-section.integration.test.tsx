@@ -59,7 +59,7 @@ vi.mock("../../../behavior/automation-api.ts", () => ({
     dashboards: {
       getAll: { useQuery: () => ({ data: [], isLoading: false }) },
     },
-    tracesV2: { list: { useQuery: () => server.preview } },
+    traces: { list: { useQuery: () => server.preview } },
     automation: { getDailyCap: { useQuery: () => server.cap } },
     useUtils: () => ({}),
   },

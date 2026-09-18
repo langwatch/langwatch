@@ -1,3 +1,9 @@
+import {
+  INITIAL_TIME_RANGE,
+  useFilterStore,
+  ACTIVE_LENS_KEY,
+  useViewStore,
+} from "@langwatch/trace-browser-kit";
 // @vitest-environment jsdom
 /**
  * Browser Back is the documented gesture for dismissing the trace drawer, and the
@@ -11,9 +17,7 @@ import { act, renderHook } from "@testing-library/react";
 import { BrowserRouter } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { INITIAL_TIME_RANGE, useFilterStore } from "../../../../../behavior/filter.store.ts";
 import { getPresetById } from "../../../../../behavior/time-range-presets.ts";
-import { ACTIVE_LENS_KEY, useViewStore } from "../../../../../behavior/view.store.ts";
 import { useURLSync } from "../use-url-sync.ts";
 
 const renderURLSync = () => renderHook(() => useURLSync(), { wrapper: BrowserRouter });

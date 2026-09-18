@@ -28,10 +28,10 @@ type TrpcUtils = ReturnType<typeof api.useUtils>;
 /**
  * React Query key of the assembled span tree — identical to the key the tRPC
  * `spanTree.useQuery` hook would produce, so setData / invalidate / cancel via
- * `utils.tracesV2.spanTree` keep operating on the same cache entry.
+ * `utils.traces.spanTree` keep operating on the same cache entry.
  */
 export function spanTreeQueryKey(input: SpanTreeQueryInput) {
-  return getQueryKey(api.tracesV2.spanTree, input, "query");
+  return getQueryKey(api.traces.spanTree, input, "query");
 }
 
 /**
@@ -76,17 +76,17 @@ export async function fetchSpanTreePages({
     utils.client as unknown as Parameters<typeof getUntypedClient>[0],
   );
   const queryPage = client.query.bind(client) as (
-    path: "tracesV2.spanTreePaginated",
+    path: "traces.spanTreePaginated",
     input: SpanTreeQueryInput & { limit: number; cursor?: SpanTreeCursor },
     opts?: { signal?: AbortSignal },
-  ) => Promise<RouterOutputs["tracesV2"]["spanTreePaginated"]>;
+  ) => Promise<RouterOutputs["traces"]["spanTreePaginated"]>;
   let cursor: SpanTreeCursor | undefined;
   for (;;) {
     if (signal?.aborted) {
       throw new DOMException("span tree fetch aborted", "AbortError");
     }
     const page = await queryPage(
-      "tracesV2.spanTreePaginated",
+      "traces.spanTreePaginated",
       { ...input, limit: SPAN_TREE_PAGE_SIZE, cursor },
       { signal },
     );

@@ -2,8 +2,8 @@
 // shimmer, so arrival feels intentional not accidental.
 import { Box, Circle, Flex, Icon } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
+import { getDisplayRoleVisuals } from "@langwatch/trace-browser-kit";
 
-import { getDisplayRoleVisuals } from "../../elements/scenario-role.tsx";
 import type { ConversationRoleMode } from "./conversation.types.ts";
 
 const shimmer = keyframes`

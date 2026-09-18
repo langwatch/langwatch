@@ -15,7 +15,7 @@ const TINT_RESTING = "color-mix(in srgb, var(--chakra-colors-blue-subtle) 50%, t
 const TINT_BLINK_PEAK = "var(--chakra-colors-blue-subtle)";
 
 const BLINK_KEYFRAMES = `
-@keyframes tracesV2FocusedTurnBlink {
+@keyframes tracesFocusedTurnBlink {
   0% { background-color: ${TINT_RESTING}; }
   35% { background-color: ${TINT_BLINK_PEAK}; }
   100% { background-color: ${TINT_RESTING}; }
@@ -76,7 +76,7 @@ export function FocusedTurnFrame({
       borderRadius="lg"
       padding={`${TINT_BLEED_PX}px`}
       margin={`-${TINT_BLEED_PX}px`}
-      animation={isBlinking ? `tracesV2FocusedTurnBlink ${BLINK_MS}ms ease-in-out` : undefined}
+      animation={isBlinking ? `tracesFocusedTurnBlink ${BLINK_MS}ms ease-in-out` : undefined}
     >
       <style>{BLINK_KEYFRAMES}</style>
       {children}

@@ -8,11 +8,9 @@ import {
 } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
+import { type GroupingMode, useViewStore } from "@langwatch/trace-browser-kit";
 import { ChevronDown, Layers } from "lucide-react";
 import type React from "react";
-
-import type { GroupingMode } from "../../../../behavior/view.store.ts";
-import { useViewStore } from "../../../../behavior/view.store.ts";
 
 const GROUPING_OPTIONS: Record<GroupingMode, string> = {
   flat: "Flat",

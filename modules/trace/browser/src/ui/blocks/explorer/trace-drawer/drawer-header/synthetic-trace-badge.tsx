@@ -1,7 +1,6 @@
 import { Text, VStack } from "@chakra-ui/react";
+import { Chip } from "@langwatch/trace-browser-kit";
 import { LuLayers } from "react-icons/lu";
-
-import { Chip } from "../../../../elements/explorer/trace-drawer/chip.tsx";
 
 /**
  * Attribute the ingestion path stamps on a trace whose trace id LangWatch minted

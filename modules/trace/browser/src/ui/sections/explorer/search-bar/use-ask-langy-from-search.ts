@@ -1,7 +1,7 @@
-import { useLangyStore } from "@langwatch/langy-browser/surfaces/langy-store";
+import { useLangyStore } from "@langwatch/langy-browser-kit";
+import { useFilterStore } from "@langwatch/trace-browser-kit";
 import { useCallback } from "react";
 
-import { useFilterStore } from "../../../../behavior/filter.store.ts";
 import { useCanAskLangy } from "../../../../behavior/langy/use-can-ask-langy.ts";
 import { useShowLangy } from "../../langy/hooks/use-show-langy.ts";
 import { handOffSearchToLangy } from "./search-langy-handoff.ts";

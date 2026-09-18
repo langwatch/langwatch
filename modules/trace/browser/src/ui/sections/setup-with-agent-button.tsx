@@ -2,7 +2,7 @@ import { Box, Button, chakra, HStack, Text } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "@langwatch/design-system/toaster";
-import { useLangyStore } from "@langwatch/langy-browser/surfaces/langy-store";
+import { useLangyStore } from "@langwatch/langy-browser-kit";
 import type React from "react";
 import { useState } from "react";
 import { LuBookOpen, LuChevronDown, LuSparkles, LuTerminal } from "react-icons/lu";

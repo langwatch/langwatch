@@ -54,7 +54,7 @@ export function useSpanTreeCanonical() {
   // re-running the tree query would restart the whole page walk — `ceil(N/500)`
   // sequential requests on exactly the huge live traces paging exists for.
   const tree = treeQuery.isPlaceholderData ? undefined : treeQuery.data;
-  const deltaQuery = api.tracesV2.spanTreeDelta.useQuery(
+  const deltaQuery = api.traces.spanTreeDelta.useQuery(
     {
       ...queryArgs,
       sinceUpdatedAtMs: tree !== undefined ? spanTreeDeltaSinceMs(tree) : 0,
@@ -91,7 +91,7 @@ export function useSpanTreeCanonical() {
     wasSseConnected.current = sseConnected;
     const shouldRefetch = reconnected && isReady && isLive && !shared;
     if (!shouldRefetch) return;
-    void utils.tracesV2.spanTreeDelta.invalidate({
+    void utils.traces.spanTreeDelta.invalidate({
       projectId: queryArgs.projectId,
       traceId: queryArgs.traceId,
     });

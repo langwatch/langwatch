@@ -1,6 +1,7 @@
 import { Box, chakra, Flex, HStack, Icon, IconButton, Text, VStack } from "@chakra-ui/react";
 import { Kbd } from "@langwatch/design-system/kbd";
-import { useLangyStore } from "@langwatch/langy-browser/surfaces/langy-store";
+import { useLangyStore } from "@langwatch/langy-browser-kit";
+import { useFilterStore } from "@langwatch/trace-browser-kit";
 import type { AiActionError } from "@langwatch/trace-contract";
 import { SEARCH_FIELDS } from "@langwatch/trace-contract";
 import { AlertCircle, ChevronDown, ChevronUp, Search, X } from "lucide-react";
@@ -12,7 +13,6 @@ import { editorStyles } from "../../../../behavior/editor-styles.ts";
 import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
 import { setFilterChipLabels } from "../../../../behavior/explorer/search-bar/filter-highlight.ts";
 import { useFacetHoverStore } from "../../../../behavior/facet-hover.store.ts";
-import { useFilterStore } from "../../../../behavior/filter.store.ts";
 import { useFloatRect } from "../../../../behavior/use-float-rect.ts";
 import { useGlobalAiShortcut } from "../../../../behavior/use-global-ai-shortcut.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";

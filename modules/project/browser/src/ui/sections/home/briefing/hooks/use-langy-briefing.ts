@@ -657,7 +657,7 @@ export function useLangyBriefing(): LangyBriefingResult {
   // Exact error-message facet counts provide the "shape" comparison. The API
   // is already time-windowed; errorMessage is non-empty only on errored traces,
   // so it needs no inferred filter or new backend endpoint.
-  const currentErrorShapes = homeApi.tracesV2.facetValues.useQuery(
+  const currentErrorShapes = homeApi.traces.facetValues.useQuery(
     {
       projectId: project?.id ?? "",
       timeRange: {
@@ -677,7 +677,7 @@ export function useLangyBriefing(): LangyBriefingResult {
     },
   );
 
-  const previousErrorShapes = homeApi.tracesV2.facetValues.useQuery(
+  const previousErrorShapes = homeApi.traces.facetValues.useQuery(
     {
       projectId: project?.id ?? "",
       timeRange: {

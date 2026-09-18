@@ -40,7 +40,7 @@ interface CachedFacetValues {
 
 const FACET_VALUES_CACHE = new TtlCache<CachedFacetValues>(
   FACET_VALUES_TTL_MS,
-  "tracesV2:facetValues:",
+  "traces:facetValues:",
 );
 
 export class TraceFacetValuesService {

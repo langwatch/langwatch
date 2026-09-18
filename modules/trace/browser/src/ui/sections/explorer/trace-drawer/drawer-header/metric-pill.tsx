@@ -1,12 +1,12 @@
 import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { Chip, type ChipTone } from "@langwatch/trace-browser-kit";
 import { useCallback } from "react";
 import { LuArrowUpRight, LuFilter, LuPin, LuSparkles } from "react-icons/lu";
 
 import type { PinnedAttribute } from "../../../../../behavior/pinned-attributes.store.ts";
 import { useCopyToClipboard } from "../../../../../index.ts";
 import { TooltipRow } from "../../../../elements/explorer/shared/tooltip-row.tsx";
-import { Chip, type ChipTone } from "../../../../elements/explorer/trace-drawer/chip.tsx";
 
 /**
  * Thin wrapper around `<Chip>` for the duration / spans / cost / tokens / model row in

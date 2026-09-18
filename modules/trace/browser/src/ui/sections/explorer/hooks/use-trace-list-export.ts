@@ -1,4 +1,5 @@
-import { useFilterStore } from "../../../../behavior/filter.store.ts";
+import { useFilterStore } from "@langwatch/trace-browser-kit";
+
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { useExportTraces } from "./use-export-traces.ts";
 

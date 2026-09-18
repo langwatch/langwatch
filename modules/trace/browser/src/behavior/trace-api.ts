@@ -30,6 +30,7 @@ import type { MediaProbeResult } from "@langwatch/scenario-browser/surfaces/medi
 import type { SimulationRunStatus } from "@langwatch/scenario-contract";
 import type { ShareLink, ShareResourceType, ShareVisibility } from "@langwatch/share-contract";
 import { type TimeInput } from "@langwatch/time";
+import type { ExportProgress, ExportProgressEvent } from "@langwatch/trace-browser-kit";
 import type {
   AiActionResult,
   ChangeTraceNameCommand,
@@ -56,7 +57,6 @@ import type {
 
 import type { ConversationTurn } from "../model/explorer/conversation-turn.ts";
 import type { SessionGroupPayloadItem } from "../model/explorer/session-group-payload.ts";
-import type { ExportProgress, ExportProgressEvent } from "../model/export-types.ts";
 
 /** The project every trace procedure is scoped to. */
 type ProjectScope = { projectId: string };
@@ -111,7 +111,7 @@ export type TraceScenarioRunRead = {
 } | null;
 
 export type TraceApiMap = {
-  tracesV2: {
+  traces: {
     /** One page of the trace list. */
     list: {
       query: {
@@ -278,9 +278,7 @@ export type TraceApiMap = {
     traceLogs: {
       query: { input: TraceScope & SpanReadHint; output: TraceLogRecordDto[] };
     };
-  };
 
-  traces: {
     /** Every evaluation attached to a trace. */
     getEvaluations: {
       query: { input: TraceScope; output: SharedTraceDto["evaluations"] };

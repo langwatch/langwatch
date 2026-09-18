@@ -42,7 +42,7 @@ export function useConversationPrefetch(
         if (!turn) continue;
         // Fire and forget. tRPC's prefetch is a no-op when the entry is already fresh
         // in cache, so subsequent passes don't re-hit the server.
-        void utils.tracesV2.header.prefetch({
+        void utils.traces.header.prefetch({
           projectId,
           traceId: turn.traceId,
           occurredAtMs: turn.timestamp,

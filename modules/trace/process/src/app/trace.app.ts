@@ -92,6 +92,7 @@ import {
 } from "@langwatch/trace-contract";
 import { z } from "zod";
 
+import { ClickHouseTraceQueryRepository } from "../repositories/clickhouse/clickhouse.trace-query.repository.ts";
 import type { TraceExistenceRepository } from "../repositories/read/trace-existence.repository.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 import {
@@ -165,7 +166,7 @@ export type TraceLogRecordReadRow = Readonly<{
 }>;
 
 /** The list, facet and discover reads behind the grid and its sidebar. */
-export type TracesV2ListReader = Readonly<{
+export type TracesListReader = Readonly<{
   getList(params: {
     tenantId: string;
     timeRange: { from: number; to: number };
@@ -208,7 +209,7 @@ export type TracesV2ListReader = Readonly<{
 }>;
 
 /** The Sessions lens read. */
-export type TracesV2SessionGroupsReader = Readonly<{
+export type TracesSessionGroupsReader = Readonly<{
   getSessionGroups(params: {
     tenantId: string;
     timeRange: { from: number; to: number; live?: boolean };
@@ -224,7 +225,7 @@ export type TracesV2SessionGroupsReader = Readonly<{
 type ByTrace = { tenantId: string; traceId: string; occurredAtMs?: number };
 
 /** Every per-span read the drawer, the waterfall and the share page issue. */
-export type TracesV2SpanReader = Readonly<{
+export type TracesSpanReader = Readonly<{
   getSpansByTraceId(
     params: ByTrace & { limit?: number; visibilityCutoffMs?: number | null },
   ): Promise<Span[]>;
@@ -399,9 +400,9 @@ export interface TraceAppDependencies {
     existence: TraceExistenceRepository;
     /** The legacy trace read the `traces.*` and `spans.*` surfaces call. */
     read: TraceLegacyRead;
-    list: TracesV2ListReader;
-    sessionGroups: TracesV2SessionGroupsReader;
-    spans: TracesV2SpanReader;
+    list: TracesListReader;
+    sessionGroups: TracesSessionGroupsReader;
+    spans: TracesSpanReader;
     summary: TraceSummaryReader;
     tree: TraceTreeService;
     logRecords: TraceLogRecordReader;
@@ -478,6 +479,12 @@ function occurredAtHint(occurredAtMs?: number): { occurredAtMs: number } | Recor
  * import the licensing contract.
  */
 const TRACE_FALLBACK_VISIBILITY_DAYS = 14;
+
+/**
+ * The query-language translator behind `translateTraceFilter`/`extractTraceFreeTextTerms`.
+ * Stateless (no store, no client), so one instance serves every request.
+ */
+const traceQueryTranslator = ClickHouseTraceQueryRepository.create();
 
 /**
  * The store members this process opens, plus the three facts the process
@@ -927,6 +934,20 @@ export class TraceApp implements TraceApi, CollectorApp {
     );
   }
 
+  /** The trace query language's free-text filter, compiled to a ClickHouse WHERE fragment. */
+  translateTraceFilter(input: {
+    query: string;
+    tenantId: string;
+    timeRange: { from: number; to: number };
+  }): { sql: string; params: Record<string, unknown> } | null {
+    return traceQueryTranslator.translateFilter(input.query, input.tenantId, input.timeRange);
+  }
+
+  /** The query's positive bare-word terms, for a content (log-body) search. */
+  extractTraceFreeTextTerms(query: string): string[] {
+    return traceQueryTranslator.extractFreeTextTerms(query);
+  }
+
   /** One LLM span reshaped for the prompt studio, or null when it is not one. */
   findPromptStudioSpan(input: {
     projectId: string;
@@ -984,42 +1005,40 @@ export class TraceApp implements TraceApi, CollectorApp {
   // -------------------------------------------------------------------------
 
   /** One page of the trace grid. */
-  readTraceList(params: Parameters<TracesV2ListReader["getList"]>[0]): Promise<TraceListPage> {
+  readTraceList(params: Parameters<TracesListReader["getList"]>[0]): Promise<TraceListPage> {
     return this.#dependencies.traces.list.getList(params);
   }
 
   /** One page of the Sessions lens. */
   readSessionGroups(
-    params: Parameters<TracesV2SessionGroupsReader["getSessionGroups"]>[0],
+    params: Parameters<TracesSessionGroupsReader["getSessionGroups"]>[0],
   ): Promise<SessionGroupsResult> {
     return this.#dependencies.traces.sessionGroups.getSessionGroups(params);
   }
 
   /** The filter sidebar's counts. */
-  readFacets(
-    params: Parameters<TracesV2ListReader["getFacets"]>[0],
-  ): Promise<TraceListFacetCounts> {
+  readFacets(params: Parameters<TracesListReader["getFacets"]>[0]): Promise<TraceListFacetCounts> {
     return this.#dependencies.traces.list.getFacets(params);
   }
 
   /** How many traces have arrived since the grid last painted. */
-  readNewCount(params: Parameters<TracesV2ListReader["getNewCount"]>[0]): Promise<number> {
+  readNewCount(params: Parameters<TracesListReader["getNewCount"]>[0]): Promise<number> {
     return this.#dependencies.traces.list.getNewCount(params);
   }
 
   /** The typeahead's values for one field. */
-  readSuggestions(params: Parameters<TracesV2ListReader["getSuggestions"]>[0]): Promise<string[]> {
+  readSuggestions(params: Parameters<TracesListReader["getSuggestions"]>[0]): Promise<string[]> {
     return this.#dependencies.traces.list.getSuggestions(params);
   }
 
   /** The facet payload the sidebar opens with. */
-  readDiscover(params: Parameters<TracesV2ListReader["getDiscover"]>[0]): Promise<DiscoverResult> {
+  readDiscover(params: Parameters<TracesListReader["getDiscover"]>[0]): Promise<DiscoverResult> {
     return this.#dependencies.traces.list.getDiscover(params);
   }
 
   /** One facet's values, paged. */
   readFacetValues(
-    params: Parameters<TracesV2ListReader["getFacetValues"]>[0],
+    params: Parameters<TracesListReader["getFacetValues"]>[0],
   ): Promise<FacetValuesResult> {
     return this.#dependencies.traces.list.getFacetValues(params);
   }

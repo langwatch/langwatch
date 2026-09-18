@@ -10,7 +10,7 @@ const capturedHeaderInputs: { full?: boolean }[] = [];
 
 vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
-    tracesV2: {
+    traces: {
       header: {
         useQuery: (input: { full?: boolean }) => {
           capturedHeaderInputs.push(input);

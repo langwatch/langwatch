@@ -15,7 +15,7 @@ export async function lastTurnOfSession({
   projectId: string;
   sessionId: string;
 }): Promise<ConversationTurn | null> {
-  const context = await utils.tracesV2.conversationContext.fetch({
+  const context = await utils.traces.conversationContext.fetch({
     projectId,
     conversationId: sessionId,
   });

@@ -1,21 +1,23 @@
+import {
+  type TimeRange,
+  useFilterStore,
+  type LensConfig,
+  getPersistedActiveLensId,
+  useViewStore,
+  type BarStateOverrides,
+  type FragmentState,
+  buildFragment,
+  computeOverrides,
+  isOverridesEmpty,
+  parseFragment,
+} from "@langwatch/trace-browser-kit";
 /**
  * URL fragment synchronization for traces-v2 bar state.
  */
 import { useCallback, useEffect, useRef } from "react";
 import { useLocation } from "react-router";
 
-import type { TimeRange } from "../../../../behavior/filter.store.ts";
-import { useFilterStore } from "../../../../behavior/filter.store.ts";
 import { getPresetById } from "../../../../behavior/time-range-presets.ts";
-import type { LensConfig } from "../../../../behavior/view.store.ts";
-import { getPersistedActiveLensId, useViewStore } from "../../../../behavior/view.store.ts";
-import type { BarStateOverrides, FragmentState } from "../../../../model/url-state.ts";
-import {
-  buildFragment,
-  computeOverrides,
-  isOverridesEmpty,
-  parseFragment,
-} from "../../../../model/url-state.ts";
 
 const DEFAULT_LENS_ID = "all-traces";
 const DEFAULT_PRESET_ID = "30d";

@@ -2,11 +2,11 @@
 // accounting for hidden columns.
 // @vitest-environment jsdom
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { LensColumnOption } from "@langwatch/trace-browser-kit";
 import { cleanup, fireEvent, render } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { LensColumnOption } from "../../../../../../behavior/lens-capabilities.ts";
 import { VisibleOrderStrip } from "../visible-order-strip.tsx";
 
 afterEach(() => cleanup());

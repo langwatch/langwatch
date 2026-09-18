@@ -50,7 +50,7 @@ vi.mock("../../../langy/hooks/use-show-langy.ts", () => ({
 vi.mock("../../../../../behavior/langy/use-can-ask-langy.ts", () => ({
   useCanAskLangy: () => false,
 }));
-vi.mock("@langwatch/langy-browser/surfaces/langy-store", async (importOriginal) => {
+vi.mock("@langwatch/langy-browser-kit", async (importOriginal) => {
   const actual = (await importOriginal()) as object;
   const state = () => ({
     isOpen: false,
@@ -63,9 +63,9 @@ vi.mock("@langwatch/langy-browser/surfaces/langy-store", async (importOriginal) 
   return { ...actual, useLangyStore };
 });
 
+import { useFilterStore } from "@langwatch/trace-browser-kit";
 import type { AiActionError } from "@langwatch/trace-contract";
 
-import { useFilterStore } from "../../../../../behavior/filter.store.ts";
 import { explainAnyError } from "../../../errors/index.ts";
 import { SearchBar } from "../search-bar.tsx";
 

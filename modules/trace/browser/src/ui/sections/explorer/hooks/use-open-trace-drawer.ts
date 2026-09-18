@@ -70,11 +70,11 @@ export function useOpenTraceDrawer() {
         // `occurredAtMs`. `full: true` matches useTraceHeader's own query key, so the seed must
         // land under the same key or the drawer's mount sees a cache miss and reloads anyway.
         const seed = (prev?: TraceHeader) => prev ?? listItemToHeader(trace);
-        utils.tracesV2.header.setData(
+        utils.traces.header.setData(
           { projectId: project.id, traceId: trace.traceId, full: true },
           seed,
         );
-        utils.tracesV2.header.setData(
+        utils.traces.header.setData(
           {
             projectId: project.id,
             traceId: trace.traceId,
@@ -91,11 +91,11 @@ export function useOpenTraceDrawer() {
               ? buildRichArrivalTraceDetail()
               : buildPreviewTraceDetail(trace);
 
-          utils.tracesV2.header.setData(
+          utils.traces.header.setData(
             { projectId: project.id, traceId: trace.traceId, full: true },
             detail.header,
           );
-          utils.tracesV2.header.setData(
+          utils.traces.header.setData(
             {
               projectId: project.id,
               traceId: trace.traceId,
@@ -105,11 +105,11 @@ export function useOpenTraceDrawer() {
             detail.header,
           );
 
-          utils.tracesV2.spanTree.setData(
+          utils.traces.spanTree.setData(
             { projectId: project.id, traceId: trace.traceId },
             detail.spanTree,
           );
-          utils.tracesV2.spanTree.setData(
+          utils.traces.spanTree.setData(
             {
               projectId: project.id,
               traceId: trace.traceId,
@@ -118,11 +118,11 @@ export function useOpenTraceDrawer() {
             detail.spanTree,
           );
 
-          utils.tracesV2.spansFull.setData(
+          utils.traces.spansFull.setData(
             { projectId: project.id, traceId: trace.traceId },
             detail.spansFull,
           );
-          utils.tracesV2.spansFull.setData(
+          utils.traces.spansFull.setData(
             {
               projectId: project.id,
               traceId: trace.traceId,
@@ -132,7 +132,7 @@ export function useOpenTraceDrawer() {
           );
 
           for (const span of detail.spanDetails) {
-            utils.tracesV2.spanDetail.setData(
+            utils.traces.spanDetail.setData(
               {
                 projectId: project.id,
                 traceId: trace.traceId,
@@ -140,7 +140,7 @@ export function useOpenTraceDrawer() {
               },
               span,
             );
-            utils.tracesV2.spanDetail.setData(
+            utils.traces.spanDetail.setData(
               {
                 projectId: project.id,
                 traceId: trace.traceId,
@@ -154,11 +154,11 @@ export function useOpenTraceDrawer() {
           // No LangWatch-instrumentation signals on the synthetic spans —
           // seed an empty array so the badges UI doesn't spin while the
           // disabled query "loads".
-          utils.tracesV2.spanLangwatchSignals.setData(
+          utils.traces.spanLangwatchSignals.setData(
             { projectId: project.id, traceId: trace.traceId },
             [],
           );
-          utils.tracesV2.spanLangwatchSignals.setData(
+          utils.traces.spanLangwatchSignals.setData(
             {
               projectId: project.id,
               traceId: trace.traceId,
@@ -167,8 +167,8 @@ export function useOpenTraceDrawer() {
             [],
           );
 
-          utils.tracesV2.traceEvents.setData({ projectId: project.id, traceId: trace.traceId }, []);
-          utils.tracesV2.traceEvents.setData(
+          utils.traces.traceEvents.setData({ projectId: project.id, traceId: trace.traceId }, []);
+          utils.traces.traceEvents.setData(
             {
               projectId: project.id,
               traceId: trace.traceId,
@@ -177,13 +177,13 @@ export function useOpenTraceDrawer() {
             [],
           );
 
-          utils.tracesV2.evals.setData(
+          utils.traces.evals.setData(
             { projectId: project.id, traceId: trace.traceId },
             detail.evaluations,
           );
 
           if (trace.conversationId) {
-            utils.tracesV2.conversationContext.setData(
+            utils.traces.conversationContext.setData(
               {
                 projectId: project.id,
                 conversationId: trace.conversationId,
@@ -204,7 +204,7 @@ export function useOpenTraceDrawer() {
         const opts = { staleTime: 300_000 };
         // The row seed above paints the header instantly, but the list row carries no attribute
         // map, so everything the header reads from attributes stays blank until this resolves.
-        void utils.tracesV2.header.prefetch({ ...input, full: true }, { staleTime: 0 });
+        void utils.traces.header.prefetch({ ...input, full: true }, { staleTime: 0 });
         // Same key + queryFn as `useSpanTree`, so the drawer's mount joins
         // this in-flight paged fetch instead of firing a second one.
         void queryClient.prefetchQuery({
@@ -212,9 +212,9 @@ export function useOpenTraceDrawer() {
           queryFn: spanTreeQueryFn({ utils, queryClient, input }),
           ...opts,
         });
-        void utils.tracesV2.spanLangwatchSignals.prefetch(input, opts);
-        void utils.tracesV2.traceEvents.prefetch(input, opts);
-        void utils.tracesV2.resourceInfo.prefetch(input, opts);
+        void utils.traces.spanLangwatchSignals.prefetch(input, opts);
+        void utils.traces.traceEvents.prefetch(input, opts);
+        void utils.traces.resourceInfo.prefetch(input, opts);
       }
       // Push into the store before route change so drawer hooks render with the right
       // traceId/occurredAtMs on the very next frame.

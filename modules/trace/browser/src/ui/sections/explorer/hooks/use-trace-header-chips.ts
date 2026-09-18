@@ -1,7 +1,7 @@
+import { useFilterStore } from "@langwatch/trace-browser-kit";
 import type { TraceHeader } from "@langwatch/trace-contract";
 
 import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
-import { useFilterStore } from "../../../../behavior/filter.store.ts";
 import { useFocusSectionStore } from "../../../../behavior/focus-section.store.ts";
 import { useDrawer } from "../../../../behavior/use-drawer.ts";
 import type { SdkInfo } from "../../../../model/sdk-info.ts";

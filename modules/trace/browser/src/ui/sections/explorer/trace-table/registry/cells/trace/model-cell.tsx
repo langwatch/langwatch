@@ -1,8 +1,8 @@
 import { Badge, chakra, HoverCard, Icon, Portal, Text, VStack } from "@chakra-ui/react";
+import { useFilterStore } from "@langwatch/trace-browser-kit";
 import { CircleHelp } from "lucide-react";
 import type React from "react";
 
-import { useFilterStore } from "../../../../../../../behavior/filter.store.ts";
 import { FilterChip } from "../../../../../../blocks/explorer/trace-table/registry/cells/filter-chip.tsx";
 import {
   modelProviderIcons,

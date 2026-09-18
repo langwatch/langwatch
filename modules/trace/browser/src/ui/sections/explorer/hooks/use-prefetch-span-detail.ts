@@ -18,7 +18,7 @@ export function usePrefetchSpanDetail() {
   return useCallback(
     (spanId: string) => {
       if (!project?.id || !traceId || !spanId) return;
-      void utils.tracesV2.spanDetail.prefetch(
+      void utils.traces.spanDetail.prefetch(
         {
           projectId: project.id,
           traceId,

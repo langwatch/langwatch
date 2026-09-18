@@ -1,12 +1,8 @@
+import { type LensConfig, setLensSyncBridge, useViewStore } from "@langwatch/trace-browser-kit";
 import { useEffect, useRef } from "react";
 
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import {
-  type LensConfig,
-  setLensSyncBridge,
-  useViewStore,
-} from "../../../../behavior/view.store.ts";
 
 /** Discriminator stored on each SavedView row so the traces v2 lens
  * persistence doesn't collide with the v1 filter views — rows left behind by

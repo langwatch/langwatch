@@ -17,7 +17,7 @@ const { fetchTranscript, fetchSpans, fetchEvents, utils, conversation } = vi.hoi
     fetchSpans,
     fetchEvents,
     utils: {
-      tracesV2: {
+      traces: {
         codingAgentTranscript: { fetch: fetchTranscript },
         spansFull: { fetch: fetchSpans },
         traceEvents: { fetch: fetchEvents },

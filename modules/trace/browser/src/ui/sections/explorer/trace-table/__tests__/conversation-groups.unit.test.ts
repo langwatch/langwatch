@@ -1,6 +1,6 @@
+import { LENS_CAPABILITIES } from "@langwatch/trace-browser-kit";
 import { describe, expect, it } from "vitest";
 
-import { LENS_CAPABILITIES } from "../../../../../behavior/lens-capabilities.ts";
 import type { TraceListItem } from "../../types/trace.ts";
 import { type ConversationGroup, sortConversationGroups } from "../conversation-groups.ts";
 

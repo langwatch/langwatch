@@ -39,7 +39,7 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
 vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
     useUtils: () => ({
-      tracesV2: {
+      traces: {
         header: { cancel: vi.fn() },
         spanTree: { cancel: vi.fn() },
       },

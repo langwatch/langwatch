@@ -4,7 +4,7 @@ import {
   useLangyContextTarget,
   traceChipDisplayName,
   traceContextChip,
-} from "@langwatch/langy-browser/surfaces/langy-context";
+} from "@langwatch/langy-browser-kit";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { useRef } from "react";
 
@@ -146,13 +146,13 @@ export function TraceDrawerContent({
                 isHumanCaller={trace.attributes["voice.call.caller"] === "human"}
               >
                 {/* Conversation view is suppressed for read-only share
-                    viewers: it is backed by `tracesV2.list` (disabled without
+                    viewers: it is backed by `traces.list` (disabled without
                     a session), so rendering it would show an empty pane and
                     fire protected annotation reads that 401. The gate also
                     covers a `viewMode` persisted as "conversation" from an
                     earlier in-app session. See ADR-057. */}
                 {/* Usage/Terminal are coding-agent surfaces backed by the
-                    protected tracesV2 session reads, so share viewers fall
+                    protected traces session reads, so share viewers fall
                     through to the trace panes — same reasoning (and same
                     persisted-viewMode hole) as the conversation gate below. */}
                 <ViewModePane
@@ -194,8 +194,8 @@ function TraceSwitchOverlay() {
       backdropFilter="blur(8px) saturate(140%)"
       pointerEvents="none"
       css={{
-        animation: "tracesV2DrawerSwitchFade 140ms ease-out",
-        "@keyframes tracesV2DrawerSwitchFade": {
+        animation: "tracesDrawerSwitchFade 140ms ease-out",
+        "@keyframes tracesDrawerSwitchFade": {
           from: { opacity: 0 },
           to: { opacity: 1 },
         },
@@ -337,7 +337,7 @@ function ViewModePane({
   trace: TraceHeader;
   viewMode: DrawerViewMode;
 }) {
-  // Usage/Terminal are coding-agent surfaces backed by the protected tracesV2
+  // Usage/Terminal are coding-agent surfaces backed by the protected traces
   // session reads, so share viewers fall through to the trace panes — the same
   // reasoning (and the same persisted-viewMode hole) as the conversation gate.
   if (!readOnly) {

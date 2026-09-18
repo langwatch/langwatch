@@ -173,3 +173,18 @@ export class TraceIngestionUnavailableError extends HandledError {
     this.name = "TraceIngestionUnavailableError";
   }
 }
+
+/**
+ * `traces.aiQuery`/`traces.aiAction` declare the merged-in `traces` shape,
+ * but no model-invocation capability is wired into the transport yet — see
+ * the merge-traces-v2 handoff.
+ */
+export class TraceAiQueryUnavailableError extends HandledError {
+  constructor() {
+    super("service_unavailable", "AI-assisted trace search is not available on this deployment.", {
+      httpStatus: 503,
+      fault: "platform",
+    });
+    this.name = "TraceAiQueryUnavailableError";
+  }
+}

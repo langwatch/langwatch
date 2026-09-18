@@ -19,7 +19,7 @@ const mockSetReplacingData = vi.fn();
 
 // ─── Store mocks ─────────────────────────────────────────────────────────────
 
-vi.mock("../../../../../behavior/filter.store.ts", () => ({
+vi.mock("@langwatch/trace-browser-kit", () => ({
   useFilterStore: (selector: (s: unknown) => unknown) =>
     selector({
       debouncedQueryText: mockQueryText,
@@ -31,9 +31,6 @@ vi.mock("../../../../../behavior/filter.store.ts", () => ({
       page: mockPage,
       pageSize: mockPageSize,
     }),
-}));
-
-vi.mock("../../../../../behavior/view.store.ts", () => ({
   useViewStore: (selector: (s: unknown) => unknown) =>
     selector({
       sort: { columnId: mockSortColumnId, direction: mockSortDirection },

@@ -8,7 +8,7 @@ export {
 export { ErrorMessage } from "./error-message.tsx";
 export { findStructuredOutput } from "./structured-output.ts";
 export type { RenderMediaPart } from "./parts.tsx";
-export { TRACE_QUERY_CONFIG } from "./trace-query.ts";
+export { TRACE_QUERY_CONFIG } from "@langwatch/trace-browser-kit";
 export type {
   ConversationAudioPlayback,
   ConversationRoleMode,

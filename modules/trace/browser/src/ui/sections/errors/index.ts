@@ -14,20 +14,20 @@ export {
   applyHandledErrorToForm,
   FORM_SERVER_ERROR,
 } from "../../../behavior/errors/logic/apply-handled-error-to-form.ts";
-export type { AppErrorCode } from "@langwatch/handled-error/app-codes";
-export type { ErrorExplanation, ErrorPresentation } from "@langwatch/handled-error/presentation";
+export type { AppErrorCode } from "@langwatch/error-presentation/app-codes";
+export type { ErrorExplanation, ErrorPresentation } from "@langwatch/error-presentation/presentation";
 export {
   explainAnyError,
   explainHandledError,
   explainSerializedError,
   UNKNOWN_ERROR_PRESENTATION,
-} from "@langwatch/handled-error/presentation";
-export type { HandledErrorShape } from "@langwatch/handled-error/read-handled-error";
+} from "@langwatch/error-presentation/presentation";
+export type { HandledErrorShape } from "@langwatch/error-presentation/read-handled-error";
 // No export for rendering a third party's own sentence, deliberately: there is
 // no surface that does. A failure we can name resolves to our copy through the
 // code-keyed registry; one we cannot resolves to the generic line and a trace
 // id. See the note above `isRecord` in `readHandledError`.
-export { readHandledError } from "@langwatch/handled-error/read-handled-error";
+export { readHandledError } from "@langwatch/error-presentation/read-handled-error";
 export type { ResolvedErrorCopy } from "../../../behavior/errors/logic/resolve-error-copy.ts";
 export { resolveErrorCopy } from "../../../behavior/errors/logic/resolve-error-copy.ts";
 export type { ShowErrorToastOptions } from "../../../behavior/errors/logic/show-error-toast.ts";

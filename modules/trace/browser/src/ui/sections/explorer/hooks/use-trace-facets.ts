@@ -1,8 +1,8 @@
+import { useFilterStore } from "@langwatch/trace-browser-kit";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef } from "react";
 
 import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
-import { useFilterStore } from "../../../../behavior/filter.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { SAMPLE_DISCOVER_DESCRIPTORS } from "../onboarding/data/sample-descriptors.ts";
@@ -31,7 +31,7 @@ export function useTraceFacets() {
   // render cycle, and we don't want a state update to retrigger the query.
   const pendingPollAttemptsRef = useRef(0);
 
-  const query = api.tracesV2.discover.useQuery(
+  const query = api.traces.discover.useQuery(
     {
       projectId: projectId ?? "",
       timeRange: {

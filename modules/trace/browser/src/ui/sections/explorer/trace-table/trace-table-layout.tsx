@@ -1,4 +1,5 @@
 import { Box, Flex } from "@chakra-ui/react";
+import type { PageCursor } from "@langwatch/trace-browser-kit";
 import { motion } from "motion/react";
 import type React from "react";
 import { useCallback, useEffect, useRef } from "react";
@@ -7,7 +8,6 @@ import {
   releaseTraceTableScrollElement,
   setTraceTableScrollElement,
 } from "../../../../behavior/explorer/trace-table/scroll-context.ts";
-import type { PageCursor } from "../../../../behavior/filter.store.ts";
 import { useRefreshUIStore } from "../../../../behavior/refresh-ui.store.ts";
 import { RefreshProgressBar } from "../traces-page/refresh-progress-bar.tsx";
 import { ColumnEducationDialog } from "./column-education-dialog.tsx";

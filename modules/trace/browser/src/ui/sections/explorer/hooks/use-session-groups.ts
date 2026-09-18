@@ -1,10 +1,9 @@
+import { useFilterStore, useViewStore } from "@langwatch/trace-browser-kit";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 
-import { useFilterStore } from "../../../../behavior/filter.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { useViewStore } from "../../../../behavior/view.store.ts";
 import { useSamplePreview } from "../onboarding/index.ts";
 import type { ConversationGroup } from "../trace-table/conversation-groups.ts";
 import {
@@ -26,14 +25,14 @@ export interface SessionGroupsResult {
 }
 
 /**
- * Server page ceiling of `tracesV2.sessions`, mirrored by the pagination chrome while
+ * Server page ceiling of `traces.sessions`, mirrored by the pagination chrome while
  * this lens is active so the range copy and the offered page sizes never claim more
  * rows than a page can hold.
  */
 export const SESSIONS_MAX_PAGE_SIZE = 100;
 
 /**
- * The `tracesV2.sessions` input for the current lens state. Sorts the server
+ * The `traces.sessions` input for the current lens state. Sorts the server
  * does not understand are dropped rather than sent, so the read falls back to
  * its default order instead of erroring.
  */
@@ -76,7 +75,7 @@ const settledResult = (groups: ConversationGroup[]): SessionGroupsResult => ({
   error: null,
 });
 
-/** Sort dimensions `tracesV2.sessions` understands (see SessionGroupsService). */
+/** Sort dimensions `traces.sessions` understands (see SessionGroupsService). */
 const SERVER_SORTABLE = new Set(["started", "lastTurn", "duration", "cost", "tokens", "turns"]);
 
 /**
@@ -121,7 +120,7 @@ export function useSessionGroups(): SessionGroupsResult {
     if (isActive && page > 1 && sessionCursor === undefined) setPage(1);
   }, [isActive, page, sessionCursor, setPage]);
 
-  const query = api.tracesV2.sessions.useQuery(
+  const query = api.traces.sessions.useQuery(
     sessionsQueryInput({
       projectId: project?.id ?? "",
       timeRange,

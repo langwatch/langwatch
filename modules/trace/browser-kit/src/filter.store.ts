@@ -38,7 +38,7 @@ export interface TraceListCursor {
 
 /**
  * Cursor recorded per visited page. The flat lens stores the structured trace keyset
- * cursor; the sessions lens stores the opaque string cursor `tracesV2.sessions` hands
+ * cursor; the sessions lens stores the opaque string cursor `traces.sessions` hands
  * back.
  */
 export type PageCursor = TraceListCursor | string;

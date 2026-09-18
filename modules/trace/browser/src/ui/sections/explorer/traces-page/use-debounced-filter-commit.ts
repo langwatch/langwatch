@@ -1,6 +1,5 @@
+import { useFilterStore } from "@langwatch/trace-browser-kit";
 import { useEffect } from "react";
-
-import { useFilterStore } from "../../../../behavior/filter.store.ts";
 
 // Query-text edits wait longer than time-range changes before hitting the backend.
 const QUERY_DEBOUNCE_MS = 600;

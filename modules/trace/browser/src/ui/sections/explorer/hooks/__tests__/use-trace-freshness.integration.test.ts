@@ -22,7 +22,7 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
 
 // The discover-freshness subscription opens a real SSE connection when
 // unmocked; these tests only exercise the trace_summary_updated paths.
-vi.mock("@langwatch/trace-browser-kit/sse-subscription", () => ({
+vi.mock("@langwatch/trace-browser-kit", () => ({
   useSSESubscription: () => ({
     connectionState: "disconnected" as const,
     retryCount: 0,
@@ -60,9 +60,9 @@ vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
     // The hook passes this procedure object to (the mocked)
     // useSSESubscription — it only needs to exist, not function.
-    tracesV2: { onDiscoverUpdate: {} },
+    traces: { onDiscoverUpdate: {} },
     useUtils: () => ({
-      tracesV2: {
+      traces: {
         list: {
           cancel: mockListCancel,
           invalidate: mockListInvalidate,

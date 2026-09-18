@@ -9,7 +9,7 @@ import { useSpanLogs } from "../use-span-logs.ts";
 
 vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
-    tracesV2: {
+    traces: {
       header: { useQuery: vi.fn() },
       traceLogs: { useQuery: vi.fn() },
     },
@@ -23,8 +23,8 @@ vi.mock("../use-trace-query-args.ts", () => ({
   }),
 }));
 
-const headerQuery = vi.mocked(api.tracesV2.header.useQuery);
-const traceLogsQuery = vi.mocked(api.tracesV2.traceLogs.useQuery);
+const headerQuery = vi.mocked(api.traces.header.useQuery);
+const traceLogsQuery = vi.mocked(api.traces.traceLogs.useQuery);
 
 function headerData(over: { attributes?: Record<string, string>; origin?: string } = {}) {
   return {
@@ -32,7 +32,7 @@ function headerData(over: { attributes?: Record<string, string>; origin?: string
       attributes: over.attributes ?? {},
       origin: over.origin ?? "application",
     },
-  } as ReturnType<typeof api.tracesV2.header.useQuery>;
+  } as ReturnType<typeof api.traces.header.useQuery>;
 }
 
 function logsEnabled(): boolean {
@@ -46,7 +46,7 @@ describe("useSpanLogs gating", () => {
     traceLogsQuery.mockReturnValue({
       data: [],
       isLoading: false,
-    } as unknown as ReturnType<typeof api.tracesV2.traceLogs.useQuery>);
+    } as unknown as ReturnType<typeof api.traces.traceLogs.useQuery>);
   });
 
   describe("when the open trace is an ordinary LLM trace with zero log records", () => {
@@ -87,7 +87,7 @@ describe("useSpanLogs gating", () => {
     it("holds the traceLogs query back rather than firing blind", () => {
       headerQuery.mockReturnValue({
         data: undefined,
-      } as ReturnType<typeof api.tracesV2.header.useQuery>);
+      } as ReturnType<typeof api.traces.header.useQuery>);
 
       renderHook(() => useSpanLogs());
 

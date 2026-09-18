@@ -1,4 +1,9 @@
 import { Box, Flex, HStack, useBreakpointValue, VStack } from "@chakra-ui/react";
+import {
+  useFilterStore,
+  SELECT_ALL_MATCHING_CAP,
+  useSelectionStore,
+} from "@langwatch/trace-browser-kit";
 import { AnimatePresence, motion } from "motion/react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
@@ -6,18 +11,13 @@ import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
 import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
 import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
 import { useProjectHasTraces } from "../../../../behavior/explorer/use-project-has-traces.ts";
-import { useFilterStore } from "../../../../behavior/filter.store.ts";
-import {
-  SELECT_ALL_MATCHING_CAP,
-  useSelectionStore,
-} from "../../../../behavior/selection.store.ts";
 import { useUIStore } from "../../../../behavior/ui.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { ExportProgress } from "../../../elements/explorer/export-progress.tsx";
 import { SidebarResizeHandle } from "../../../elements/explorer/filter-sidebar/sidebar-resize-handle.tsx";
 import { SampleDataBanner } from "../../../elements/explorer/onboarding/sample-data-banner.tsx";
 import { AuroraSvg } from "../../../elements/explorer/traces-page/aurora-svg.tsx";
-import { useTracesV2Presence } from "../../presence/hooks/use-traces-v2-presence.ts";
+import { useTracesPresence } from "../../presence/hooks/use-traces-v2-presence.ts";
 import { DensityProvider } from "../density-provider.tsx";
 import { ExportConfigDialog } from "../export-config-dialog.tsx";
 import { FilterSidebar } from "../filter-sidebar/filter-sidebar.tsx";
@@ -75,7 +75,7 @@ export const TracesPage: React.FC = () => {
   useURLSync();
   useRollingTimeRange();
   useTraceFreshness();
-  useTracesV2Presence();
+  useTracesPresence();
   useDebouncedFilterCommit();
   useLensFilterDirtySync();
   useLensSync();

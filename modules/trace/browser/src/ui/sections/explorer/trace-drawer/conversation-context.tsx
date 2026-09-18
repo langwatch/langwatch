@@ -670,8 +670,8 @@ const ConversationRow = memo(function ConversationRow({
         css={
           isCurrent
             ? {
-                animation: "tracesV2CurrentRowPulse 0.6s ease-out",
-                "@keyframes tracesV2CurrentRowPulse": {
+                animation: "tracesCurrentRowPulse 0.6s ease-out",
+                "@keyframes tracesCurrentRowPulse": {
                   "0%": {
                     backgroundColor:
                       "color-mix(in srgb, var(--chakra-colors-blue-500) 18%, transparent)",

@@ -1,4 +1,4 @@
-// useFacetSearch wires facet value search to tracesV2.facetValues; also the
+// useFacetSearch wires facet value search to traces.facetValues; also the
 // engine for useAttributeValues (prefix="", limit 30).
 // @vitest-environment jsdom
 
@@ -11,7 +11,7 @@ const harness = vi.hoisted(() => ({
 }));
 
 vi.mock("../../../../../behavior/trace-api.ts", () => ({
-  api: { tracesV2: { facetValues: { useQuery: harness.useQuery } } },
+  api: { traces: { facetValues: { useQuery: harness.useQuery } } },
 }));
 
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
@@ -20,7 +20,7 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   }),
 }));
 
-vi.mock("../../../../../behavior/filter.store.ts", () => ({
+vi.mock("@langwatch/trace-browser-kit", () => ({
   useFilterStore: (selector: (s: unknown) => unknown) =>
     selector({ debouncedTimeRange: { from: 10, to: 20, label: undefined } }),
 }));

@@ -4,7 +4,7 @@
 import type { RouterOutputs } from "../../../../../behavior/trace-api.ts";
 import { SAMPLE_PREVIEW_TRACES } from "./sample-preview-traces.ts";
 
-type DiscoverDescriptors = RouterOutputs["tracesV2"]["discover"]["facets"];
+type DiscoverDescriptors = RouterOutputs["traces"]["discover"]["facets"];
 
 function buildCategorical({
   key,

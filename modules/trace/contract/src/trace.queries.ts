@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { spanTreeCursorSchema } from "./trace.ts";
 
-/** Exact transport input of `tracesV2.spanTreePaginated`. */
+/** Exact transport input of `traces.spanTreePaginated`. */
 export const spanTreeTransportInputSchema = z.object({
   projectId: z.string(),
   traceId: z.string(),
@@ -21,7 +21,7 @@ export const spanTreeInputSchema = z.object({
 
 export type SpanTreeInput = z.infer<typeof spanTreeInputSchema>;
 
-/** Exact transport input of `tracesV2.spanTreeDelta`. */
+/** Exact transport input of `traces.spanTreeDelta`. */
 export const spanTreeDeltaTransportInputSchema = z.object({
   projectId: z.string(),
   traceId: z.string(),

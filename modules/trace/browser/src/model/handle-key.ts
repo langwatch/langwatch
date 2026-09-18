@@ -1,4 +1,4 @@
-import type { SuggestionState } from "./get-suggestion-state.ts";
+import type { SuggestionState } from "@langwatch/trace-browser-kit";
 
 const FIELD_VALUE_SEPARATOR = ":";
 

@@ -25,9 +25,9 @@ import {
   TraceApp,
   type TraceEditOverlayStore,
   type TraceSummaryReader,
-  type TracesV2ListReader,
-  type TracesV2SessionGroupsReader,
-  type TracesV2SpanReader,
+  type TracesListReader,
+  type TracesSessionGroupsReader,
+  type TracesSpanReader,
 } from "../trace.app.ts";
 import type { TraceLegacyRead } from "../trace.members.ts";
 import { createTraceTestRequestBounds } from "./trace-bounds.fixture.ts";
@@ -108,7 +108,7 @@ function harness(
     getTracesWithSpans,
   };
 
-  const spans: Partial<TracesV2SpanReader> = {
+  const spans: Partial<TracesSpanReader> = {
     getSpansByTraceId: record("getSpansByTraceId"),
     getSpanSummaryByTraceId: record("getSpanSummaryByTraceId"),
   };
@@ -120,10 +120,10 @@ function harness(
     traces: {
       existence: { findExistingTraceIds: async ({ traceIds }) => [...traceIds] },
       read: read as TraceLegacyRead,
-      spans: spans as TracesV2SpanReader,
+      spans: spans as TracesSpanReader,
       summary,
-      list: {} as TracesV2ListReader,
-      sessionGroups: {} as TracesV2SessionGroupsReader,
+      list: {} as TracesListReader,
+      sessionGroups: {} as TracesSessionGroupsReader,
       tree: {} as TraceTreeService,
       logRecords: { getLogsByTraceId: async () => [] },
       canonicalisation: {} as TraceCanonicalisationService,

@@ -1,4 +1,4 @@
-import { useSSESubscription } from "@langwatch/trace-browser-kit/sse-subscription";
+import { useSSESubscription } from "@langwatch/trace-browser-kit";
 import { useCallback, useEffect, useRef } from "react";
 
 import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
@@ -9,7 +9,7 @@ import { useOrganizationTeamProject } from "../../../../behavior/use-organizatio
 import { useTraceUpdateListener } from "../../use-trace-update-listener.ts";
 import { useVisibleTraceIds } from "./use-visible-trace-ids.ts";
 
-// Facets (`tracesV2.discover`) are ~10x more expensive than the table list
+// Facets (`traces.discover`) are ~10x more expensive than the table list
 // (~1.2s vs ~0.1s in our perf capture) and they only change when a *new*
 // attribute value appears — far less frequently than a trace update. Coalesce
 // invalidations into a longer window so a steady stream of new traces
@@ -56,8 +56,8 @@ export function useTraceFreshness() {
       if (!newCountInvalidateTimer.current) {
         newCountInvalidateTimer.current = setTimeout(() => {
           newCountInvalidateTimer.current = null;
-          void trpcUtils.tracesV2.newCount.cancel();
-          void trpcUtils.tracesV2.newCount.invalidate();
+          void trpcUtils.traces.newCount.cancel();
+          void trpcUtils.traces.newCount.invalidate();
         }, NEWCOUNT_INVALIDATE_DEBOUNCE_MS);
       }
 
@@ -90,8 +90,8 @@ export function useTraceFreshness() {
         // to opt in by clicking it. Cancel any in-flight list fetch
         // before kicking a new one so a slow previous round-trip can't
         // race the fresh one and overwrite the view with stale data.
-        void trpcUtils.tracesV2.list.cancel();
-        void trpcUtils.tracesV2.list.invalidate();
+        void trpcUtils.traces.list.cancel();
+        void trpcUtils.traces.list.invalidate();
       }
 
       // Discover (facets) is heavy. Coalesce into a 30s window so a
@@ -101,8 +101,8 @@ export function useTraceFreshness() {
       if (mode === "live" && !discoverInvalidateTimer.current) {
         discoverInvalidateTimer.current = setTimeout(() => {
           discoverInvalidateTimer.current = null;
-          void trpcUtils.tracesV2.discover.cancel();
-          void trpcUtils.tracesV2.discover.invalidate();
+          void trpcUtils.traces.discover.cancel();
+          void trpcUtils.traces.discover.invalidate();
         }, DISCOVER_INVALIDATE_DEBOUNCE_MS);
       }
 
@@ -115,15 +115,15 @@ export function useTraceFreshness() {
       const { traceId: openTraceId } = useDrawerStore.getState();
       const projectId = project?.id;
       if (openTraceId && projectId && traceIds.includes(openTraceId)) {
-        void trpcUtils.tracesV2.header.invalidate({
+        void trpcUtils.traces.header.invalidate({
           projectId,
           traceId: openTraceId,
         });
-        void trpcUtils.tracesV2.spanTree.invalidate({
+        void trpcUtils.traces.spanTree.invalidate({
           projectId,
           traceId: openTraceId,
         });
-        void trpcUtils.tracesV2.evals.invalidate({
+        void trpcUtils.traces.evals.invalidate({
           projectId,
           traceId: openTraceId,
         });
@@ -142,11 +142,11 @@ export function useTraceFreshness() {
       // keeps the cache push-fresh so the per-hook refetchInterval can stay off while
       // SSE is connected.
       const key = { projectId, traceId: openTraceId };
-      void trpcUtils.tracesV2.spanTreeDelta.invalidate(key);
-      void trpcUtils.tracesV2.spanDetail.invalidate(key);
-      void trpcUtils.tracesV2.spanLangwatchSignals.invalidate(key);
-      void trpcUtils.tracesV2.traceEvents.invalidate(key);
-      void trpcUtils.tracesV2.resourceInfo.invalidate(key);
+      void trpcUtils.traces.spanTreeDelta.invalidate(key);
+      void trpcUtils.traces.spanDetail.invalidate(key);
+      void trpcUtils.traces.spanLangwatchSignals.invalidate(key);
+      void trpcUtils.traces.traceEvents.invalidate(key);
+      void trpcUtils.traces.resourceInfo.invalidate(key);
     },
     [trpcUtils, project?.id],
   );
@@ -171,12 +171,12 @@ export function useTraceFreshness() {
   useSSESubscription<{ tenantId: string; timestamp: number }, { projectId: string }>(
     // @ts-expect-error - tRPC subscription type isn't perfectly inferred for the
     // hook's generic; the underlying procedure shape matches.
-    api.tracesV2.onDiscoverUpdate,
+    api.traces.onDiscoverUpdate,
     { projectId: project?.id ?? "" },
     {
       enabled: !!project?.id,
       onData: () => {
-        void trpcUtils.tracesV2.discover.invalidate();
+        void trpcUtils.traces.discover.invalidate();
       },
     },
   );

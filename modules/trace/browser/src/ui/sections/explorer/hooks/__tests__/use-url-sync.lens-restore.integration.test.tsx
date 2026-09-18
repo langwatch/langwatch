@@ -25,32 +25,33 @@ const SHARED_LENS = { id: "custom-abc", name: "Shared", filterText: "" };
 let allLenses = BUILT_INS;
 let activeLensId = "all-traces";
 
-vi.mock("../../../../../behavior/view.store.ts", () => ({
-  useViewStore: (sel: (s: unknown) => unknown) =>
-    sel({
-      activeLensId,
-      allLenses,
-      draftState: new Map(),
-      selectLens: selectLensMock,
-    }),
-  getPersistedActiveLensId: () => persistedLens,
-}));
-
-vi.mock("../../../../../behavior/filter.store.ts", () => ({
-  useFilterStore: (sel: (s: unknown) => unknown) =>
-    sel({
-      queryText: "",
-      timeRange: {
-        from: 0,
-        to: 1,
-        label: "Last 30 days",
-        presetId: "30d",
-      },
-      applyQueryText: vi.fn(),
-      setTimeRange: vi.fn(),
-      resetPagination: vi.fn(),
-    }),
-}));
+vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@langwatch/trace-browser-kit")>();
+  return {
+    ...actual,
+    useViewStore: (sel: (s: unknown) => unknown) =>
+      sel({
+        activeLensId,
+        allLenses,
+        draftState: new Map(),
+        selectLens: selectLensMock,
+      }),
+    getPersistedActiveLensId: () => persistedLens,
+    useFilterStore: (sel: (s: unknown) => unknown) =>
+      sel({
+        queryText: "",
+        timeRange: {
+          from: 0,
+          to: 1,
+          label: "Last 30 days",
+          presetId: "30d",
+        },
+        applyQueryText: vi.fn(),
+        setTimeRange: vi.fn(),
+        resetPagination: vi.fn(),
+      }),
+  };
+});
 
 import { useURLSync } from "../use-url-sync.ts";
 

@@ -1,8 +1,8 @@
+import { ORIGIN_DISPLAY } from "@langwatch/trace-browser-kit";
 import { isValidElement, type ReactElement } from "react";
 import { describe, expect, it } from "vitest";
 
 import { FACET_COLORS } from "../../../../../behavior/facet-constants.ts";
-import { ORIGIN_DISPLAY } from "../../../../../model/origin-display.ts";
 import { OriginCell } from "../../trace-table/registry/cells/trace/simple-cells.tsx";
 import type { TraceListItem } from "../../types/trace.ts";
 import { facetLabel, paletteFromColor } from "../utils.ts";

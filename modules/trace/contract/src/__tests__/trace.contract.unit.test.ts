@@ -42,7 +42,7 @@ describe("Trace span-tree contract", () => {
     expect(SPAN_MAX_PAST_MS).toBe(31 * 24 * 60 * 60 * 1000);
   });
 
-  it("characterizes every live tracesV2 SpanTreeNode field", () => {
+  it("characterizes every live traces SpanTreeNode field", () => {
     expect(nodeParity).toBe(true);
     const node = spanTreeNodeSchema.parse({
       spanId: "span_1",

@@ -1,10 +1,8 @@
+import { type PageCursor, useFilterStore, useViewStore } from "@langwatch/trace-browser-kit";
 import { TRACE_LIST_MAX_OFFSET_ROWS } from "@langwatch/trace-contract";
 import type React from "react";
 
 import { useTraceTableScrollElement } from "../../../../behavior/explorer/trace-table/scroll-context.ts";
-import type { PageCursor } from "../../../../behavior/filter.store.ts";
-import { useFilterStore } from "../../../../behavior/filter.store.ts";
-import { useViewStore } from "../../../../behavior/view.store.ts";
 import { Pagination as PaginationBar } from "../../../elements/pagination.tsx";
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 250, 500, 1000] as const;

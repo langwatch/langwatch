@@ -50,14 +50,14 @@ interface CachedDiscover {
   timestamp: number;
 }
 
-const DISCOVER_CACHE = new TtlCache<CachedDiscover>(DISCOVER_TTL_MS, "tracesV2:discover:");
+const DISCOVER_CACHE = new TtlCache<CachedDiscover>(DISCOVER_TTL_MS, "traces:discover:");
 
 /**
  * Cross-pod refresh lock — a separate cache because the leadership lease needs a short TTL so a
  * crashed refresher self-recovers quickly, while the value cache keeps a long one. Reusing the
  * value cache for locks would mean half an hour of stale data after a refresher crash.
  */
-const DISCOVER_REFRESH_LOCK_CACHE = new TtlCache<number>(60_000, "tracesV2:discover:refresh-lock:");
+const DISCOVER_REFRESH_LOCK_CACHE = new TtlCache<number>(60_000, "traces:discover:refresh-lock:");
 
 /**
  * Optional sink for "discover finished refreshing" pushes, registered once at bootstrap so the

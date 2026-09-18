@@ -14,7 +14,7 @@ export function useSpansFullCanonical(enabled: boolean) {
   const shared = useSharedTrace();
   const { isReady, queryArgs } = useTraceQueryArgs();
 
-  const query = api.tracesV2.spansFull.useQuery(queryArgs, {
+  const query = api.traces.spansFull.useQuery(queryArgs, {
     enabled: enabled && isReady && !shared,
     staleTime: 300_000,
     // Hold the span tree in cache for 30 min after the last observer

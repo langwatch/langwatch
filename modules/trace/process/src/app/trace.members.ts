@@ -39,37 +39,6 @@ import type {
 } from "@langwatch/trace-contract";
 
 import type { EventingTracePipelineAdapter } from "../services/eventing.trace-pipeline.service.ts";
-export interface TraceInfrastructure {
-  traceEdgeMediaTelemetry: TraceEdgeMediaTelemetry;
-  traceEvaluationDispatch: TraceEvaluationDispatch;
-  traceEvaluationLoopMetrics: TraceEvaluationLoopMetrics;
-  traceEvaluationMonitor: TraceEvaluationMonitor;
-  traceEventDerivation: TraceEventDerivation;
-  traceFullIo: TraceFullIo;
-  traceIoExtraction: TraceIoExtraction;
-  traceLegacyRead: TraceLegacyRead;
-  traceMediaReferenceResolver: TraceMediaReferenceResolver;
-  traceMediaStore: TraceMediaStore;
-  traceModelCost: TraceModelCost;
-  traceModelCostCatalog: TraceModelCostCatalog;
-  traceProcessingInstaller: TraceProcessingInstaller;
-  traceProcessingPipeline: TraceProcessingPipeline;
-  traceProductAnalytics: TraceProductAnalytics;
-  traceProjectMetadata: TraceProjectMetadata;
-  traceQueryClassifier: TraceQueryClassifier;
-  traceSpanContentDrop: TraceSpanContentDrop;
-  traceSpanCostEnrichment: TraceSpanCostEnrichment;
-  traceSpanIngest: TraceSpanIngest;
-  traceSpanNormalization: TraceSpanNormalization;
-  traceSpanPiiRedaction: TraceSpanPiiRedaction;
-  traceSpanSpool: TraceSpanSpool;
-  traceSpanTokenEstimation: TraceSpanTokenEstimation;
-  traceSpoolLegacyObject: TraceSpoolLegacyObject;
-  traceSpoolStorage: TraceSpoolStorage;
-  traceTenantBroadcast: TraceTenantBroadcast;
-  traceTokenCounter: TraceTokenCounter;
-  traceTopicAssignmentCommand: TraceTopicAssignmentCommand;
-}
 
 /**
  * Dispatch online-evaluator runs for ingested traces. Payload is Trace's

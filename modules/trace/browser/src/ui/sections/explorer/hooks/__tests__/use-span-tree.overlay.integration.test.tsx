@@ -26,9 +26,9 @@ vi.mock("@tanstack/react-query", () => ({
 vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
     useUtils: () => ({
-      tracesV2: { spanTreeDelta: { invalidate: vi.fn() } },
+      traces: { spanTreeDelta: { invalidate: vi.fn() } },
     }),
-    tracesV2: {
+    traces: {
       spanTreeDelta: {
         useQuery: vi.fn(() => ({ data: undefined, dataUpdatedAt: 0 })),
       },

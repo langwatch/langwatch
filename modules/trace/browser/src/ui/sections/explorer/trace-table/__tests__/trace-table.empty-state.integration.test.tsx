@@ -51,7 +51,7 @@ vi.mock("../../hooks/use-session-groups.ts", () => ({
 // gating through the same table shell.
 let mockGrouping: "flat" | "by-conversation" = "flat";
 
-vi.mock("../../../../../behavior/view.store.ts", () => ({
+vi.mock("@langwatch/trace-browser-kit", () => ({
   useViewStore: (selector: (s: unknown) => unknown) =>
     selector({
       activeLensId: "all-traces",
@@ -65,6 +65,17 @@ vi.mock("../../../../../behavior/view.store.ts", () => ({
   }),
   rowKindForGrouping: (grouping: string) =>
     grouping === "by-conversation" ? "conversation" : "trace",
+  useFilterStore: (selector: (s: unknown) => unknown) =>
+    selector({
+      queryText: "",
+      timeRange: {
+        from: Date.now() - 3600000,
+        to: Date.now(),
+        label: "Last 1h",
+      },
+      clearAll: vi.fn(),
+      setTimeRange: vi.fn(),
+    }),
 }));
 
 // ─── Lens body stubs ──────────────────────────────────────────────────────────
@@ -107,20 +118,6 @@ vi.mock("../../../../../behavior/explorer/onboarding/store/onboarding-store.ts",
       setupDismissedByProject: {},
       setSetupDismissedForProject: vi.fn(),
       reset: vi.fn(),
-    }),
-}));
-
-vi.mock("../../../../../behavior/filter.store.ts", () => ({
-  useFilterStore: (selector: (s: unknown) => unknown) =>
-    selector({
-      queryText: "",
-      timeRange: {
-        from: Date.now() - 3600000,
-        to: Date.now(),
-        label: "Last 1h",
-      },
-      clearAll: vi.fn(),
-      setTimeRange: vi.fn(),
     }),
 }));
 

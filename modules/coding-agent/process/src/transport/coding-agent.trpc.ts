@@ -1,6 +1,6 @@
 /**
  * The server half of `codingAgents.*`, the session read surface the browser
- * calls (ADR-056). Project-scoped and gated by `traces:view`, like tracesV2;
+ * calls (ADR-056). Project-scoped and gated by `traces:view`, like traces;
  * viewer-scoped redaction is the application's, whichever door asks.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";

@@ -5,13 +5,13 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { useFilterStore } from "@langwatch/trace-browser-kit";
 import { EMPTY_AST, parse } from "@langwatch/trace-contract";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { FacetItem } from "../../../../../behavior/explorer/filter-sidebar/types.ts";
-import { useFilterStore } from "../../../../../behavior/filter.store.ts";
 import { EventDrilldown } from "../event-drilldown.tsx";
 
 const buildItem = ({

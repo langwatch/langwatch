@@ -4,7 +4,7 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { useSelectionStore } from "../../../behavior/selection.store.ts";
+import { useSelectionStore } from "../selection.store.ts";
 
 const selection = () => Array.from(useSelectionStore.getState().traceIds);
 

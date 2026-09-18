@@ -29,7 +29,7 @@ const NULL_RESULT: ConversationContextResult = {
 
 /**
  * Conversation context for a trace. Backed by the dedicated
- * `tracesV2.conversationContext` endpoint, which builds a typed WHERE fragment
+ * `traces.conversationContext` endpoint, which builds a typed WHERE fragment
  * server-side (no liqe parsing fragility around weird conversationId chars).
  */
 export function useConversationContext(
@@ -44,7 +44,7 @@ export function useConversationContext(
   const isPreview = !!traceId && isPreviewTraceId(traceId);
   const fetchEnabled = !!projectId && !!conversationId && !isPreview && !shared;
 
-  const query = api.tracesV2.conversationContext.useQuery(
+  const query = api.traces.conversationContext.useQuery(
     {
       projectId,
       conversationId: conversationId ?? "",

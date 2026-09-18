@@ -1,10 +1,9 @@
+import { useFilterStore, useViewStore } from "@langwatch/trace-browser-kit";
 import type { AiActionError, AiActionErrorDetails } from "@langwatch/trace-contract";
 import { useEffect, useRef, useState } from "react";
 
-import { useFilterStore } from "../../../../behavior/filter.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { useViewStore } from "../../../../behavior/view.store.ts";
 import { readHandledError } from "../../errors/index.ts";
 
 /**
@@ -96,7 +95,7 @@ export function useAiTraceAction({
     };
   }, []);
 
-  const aiAction = api.tracesV2.aiAction.useMutation({
+  const aiAction = api.traces.aiAction.useMutation({
     onSuccess: (result) => {
       if (cancelledRef.current) return;
       applyAiActionResult({

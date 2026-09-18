@@ -22,15 +22,19 @@ vi.mock("../../hooks/use-evaluator-options.ts", () => ({
   useEvaluatorOptions: () => ({ options: [], nameByKey: new Map() }),
 }));
 
-vi.mock("../../../../../behavior/view.store.ts", () => ({
-  useViewStore: (selector: (s: unknown) => unknown) =>
-    selector({
-      columnOrder: ["time", "trace"],
-      grouping: "flat",
-      toggleColumn: vi.fn(),
-      reorderColumns: vi.fn(),
-    }),
-}));
+vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@langwatch/trace-browser-kit")>();
+  return {
+    ...actual,
+    useViewStore: (selector: (s: unknown) => unknown) =>
+      selector({
+        columnOrder: ["time", "trace"],
+        grouping: "flat",
+        toggleColumn: vi.fn(),
+        reorderColumns: vi.fn(),
+      }),
+  };
+});
 
 vi.mock("../../../../../behavior/time-format.store.ts", () => ({
   useTimeFormatStore: (selector: (s: unknown) => unknown) =>

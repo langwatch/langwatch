@@ -55,7 +55,7 @@ const queryResult: {
 
 vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
-    tracesV2: {
+    traces: {
       newCount: {
         useQuery: (input: QueryInput, options: QueryOptions) => {
           capturedCalls.push({ input, options });
@@ -64,7 +64,7 @@ vi.mock("../../../../../behavior/trace-api.ts", () => ({
       },
     },
     useUtils: () => ({
-      tracesV2: {
+      traces: {
         newCount: { invalidate: vi.fn() },
       },
     }),
@@ -75,17 +75,20 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "p1" } }),
 }));
 
-vi.mock("../../../../../behavior/use-page-visibility.ts", () => ({
-  usePageVisibility: () => true,
-}));
-
-vi.mock("../../../../../behavior/filter.store.ts", () => ({
-  useFilterStore: (selector: (s: unknown) => unknown) =>
-    selector({
-      debouncedTimeRange: stores.debouncedTimeRange,
-      debouncedQueryText: stores.debouncedQueryText,
-    }),
-}));
+vi.mock("@langwatch/trace-browser-kit", async () => {
+  const actual = await vi.importActual<typeof import("@langwatch/trace-browser-kit")>(
+    "@langwatch/trace-browser-kit",
+  );
+  return {
+    ...actual,
+    usePageVisibility: () => true,
+    useFilterStore: (selector: (s: unknown) => unknown) =>
+      selector({
+        debouncedTimeRange: stores.debouncedTimeRange,
+        debouncedQueryText: stores.debouncedQueryText,
+      }),
+  };
+});
 
 vi.mock("../../../../../behavior/sse-status.store.ts", () => ({
   useSseStatusStore: Object.assign(

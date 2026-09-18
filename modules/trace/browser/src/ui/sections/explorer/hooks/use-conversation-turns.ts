@@ -37,7 +37,7 @@ export function useConversationTurns(conversationId: string | null) {
     [projectId, conversationId],
   );
 
-  return api.tracesV2.list.useQuery(
+  return api.traces.list.useQuery(
     {
       projectId,
       timeRange,
@@ -49,7 +49,7 @@ export function useConversationTurns(conversationId: string | null) {
         : "",
     },
     {
-      // Backed by `tracesV2.list`, which stays project-protected (it is the
+      // Backed by `traces.list`, which stays project-protected (it is the
       // traces-table query with arbitrary filters). A share grant must never
       // open it, so read-only viewers skip conversation turns entirely.
       enabled: !!projectId && !!conversationId && !isReadOnly,

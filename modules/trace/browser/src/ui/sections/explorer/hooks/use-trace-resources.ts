@@ -36,7 +36,7 @@ export function useTraceResources(traceId: string | null | undefined): TraceReso
   const occurredAtMs = useDrawerStore((s) => s.occurredAtMs);
   const enabled = !!project?.id && !!traceId && !shared;
 
-  const query = api.tracesV2.resourceInfo.useQuery(
+  const query = api.traces.resourceInfo.useQuery(
     {
       projectId: project?.id ?? "",
       traceId: traceId ?? "",

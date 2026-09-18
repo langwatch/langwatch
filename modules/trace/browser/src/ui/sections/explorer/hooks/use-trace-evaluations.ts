@@ -99,7 +99,7 @@ export function useTraceEvaluations(): TraceEvaluationsResult {
   const storeTraceId = useDrawerStore((s) => s.traceId);
   const traceId = shared?.header.traceId ?? storeTraceId;
 
-  // TODO(traces-v2): migrate to `tracesV2.evals` once the v2 schema carries `spanId`,
+  // TODO(traces-v2): migrate to `traces.evals` once the v2 schema carries `spanId`,
   // `errorStacktrace`, and `retries` — the rich evaluations panel surfaces all three.
   const isPreview = !!traceId && isPreviewTraceId(traceId);
   const query = api.traces.getEvaluations.useQuery(

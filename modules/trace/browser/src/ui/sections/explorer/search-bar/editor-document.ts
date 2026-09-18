@@ -1,7 +1,6 @@
+import { getSuggestionState, type SuggestionState } from "@langwatch/trace-browser-kit";
 import type { Editor } from "@tiptap/react";
 
-import type { SuggestionState } from "../../../../model/get-suggestion-state.ts";
-import { getSuggestionState } from "../../../../model/get-suggestion-state.ts";
 import type { KeyAction } from "../../../../model/handle-key.ts";
 
 // TipTap wraps text in a paragraph node, so cursor positions in

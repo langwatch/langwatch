@@ -1,11 +1,11 @@
 import { Box, HStack, Icon, Text } from "@chakra-ui/react";
+import { useFilterStore } from "@langwatch/trace-browser-kit";
 import { Lightbulb } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { useFilterStore } from "../../../../behavior/filter.store.ts";
 import type { FloatRect } from "../../../../behavior/use-float-rect.ts";
 import { AiQueryComposer } from "./ai-query-composer.tsx";
 import { AiShaderBackdrop } from "./ai-shader-backdrop.tsx";

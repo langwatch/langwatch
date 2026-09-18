@@ -1,4 +1,4 @@
-import type { LangyAttachedContext } from "@langwatch/langy-browser/surfaces/langy-store";
+import type { LangyAttachedContext } from "@langwatch/langy-browser-kit";
 
 import { filterContextChip } from "../../langy/hooks/use-langy-filter-context.ts";
 

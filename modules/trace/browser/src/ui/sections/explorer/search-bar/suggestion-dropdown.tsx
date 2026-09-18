@@ -1,4 +1,9 @@
 import { Badge, Box, Button, chakra, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import type {
+  SuggestionRow,
+  SuggestionState,
+  SuggestionUIState,
+} from "@langwatch/trace-browser-kit";
 import { SEARCH_FIELDS, type SearchFieldMeta } from "@langwatch/trace-contract";
 import { BookOpen } from "lucide-react";
 import type React from "react";
@@ -11,9 +16,7 @@ import {
   GROUP_ICONS,
 } from "../../../../behavior/facet-constants.ts";
 import { useUIStore } from "../../../../behavior/ui.store.ts";
-import type { SuggestionState } from "../../../../model/get-suggestion-state.ts";
 import { getFacetIcon } from "../filter-sidebar/utils.ts";
-import type { SuggestionRow, SuggestionUIState } from "./suggestion-ui.ts";
 
 interface SuggestionDropdownProps {
   ui: SuggestionUIState;

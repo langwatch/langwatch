@@ -1,11 +1,8 @@
 import { Circle, HStack, Text } from "@chakra-ui/react";
+import { EVAL_FIELD_LABELS, type EvalColumnField } from "@langwatch/trace-browser-kit";
 import type React from "react";
 
 import { getEvalChipDisplay } from "../../../../../../../model/evaluation-results.ts";
-import {
-  EVAL_FIELD_LABELS,
-  type EvalColumnField,
-} from "../../../../../../../model/lens-eval-column-id.ts";
 import { dash } from "../../../../../../elements/explorer/trace-table/registry/cells/dash-placeholder.tsx";
 import type { TraceListItem } from "../../../../types/trace.ts";
 import { latestEvalForKey } from "../../../eval-columns.ts";

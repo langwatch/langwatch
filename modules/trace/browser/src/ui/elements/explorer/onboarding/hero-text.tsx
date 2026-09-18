@@ -18,8 +18,8 @@ export const BlinkingCursor: React.FC<{ color?: string }> = ({ color = "fg" }) =
     verticalAlign="-0.12em"
     backgroundColor={color}
     css={{
-      animation: "tracesV2TypewriterBlink 1.05s steps(1) infinite",
-      "@keyframes tracesV2TypewriterBlink": {
+      animation: "tracesTypewriterBlink 1.05s steps(1) infinite",
+      "@keyframes tracesTypewriterBlink": {
         "0%, 50%": { opacity: 1 },
         "50.01%, 100%": { opacity: 0 },
       },
@@ -63,8 +63,8 @@ const AuroraTextShimmer: React.FC<{ children: React.ReactNode }> = ({ children }
       backgroundClip: "text",
       color: "transparent",
       WebkitTextFillColor: "transparent",
-      animation: "tracesV2AuroraTextShimmer 5s linear infinite",
-      "@keyframes tracesV2AuroraTextShimmer": {
+      animation: "tracesAuroraTextShimmer 5s linear infinite",
+      "@keyframes tracesAuroraTextShimmer": {
         "0%": { backgroundPosition: "0% 50%" },
         "100%": { backgroundPosition: "300% 50%" },
       },

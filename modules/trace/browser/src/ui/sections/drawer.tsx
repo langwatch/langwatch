@@ -4,8 +4,8 @@ import {
   LANGY_DODGE_STAGGER_MS,
   LANGY_TRANSITION,
   SIDEBAR_PANEL_WIDTH,
-} from "@langwatch/langy-browser/surfaces/langy-panel-layout";
-import { useLangyStore } from "@langwatch/langy-browser/surfaces/langy-store";
+  useLangyStore,
+} from "@langwatch/langy-browser-kit";
 import * as React from "react";
 
 import { CloseButton } from "../elements/close-button.tsx";

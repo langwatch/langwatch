@@ -22,7 +22,7 @@ vi.mock("../../../../../behavior/langy/use-can-ask-langy.ts", () => ({
   useCanAskLangy: () => true,
 }));
 
-vi.mock("@langwatch/langy-browser/surfaces/langy-store", async (importOriginal) => ({
+vi.mock("@langwatch/langy-browser-kit", async (importOriginal) => ({
   ...((await importOriginal()) as object),
   useLangyStore: (selector: (s: { askLangy: () => void }) => unknown) =>
     selector({ askLangy: vi.fn() }),

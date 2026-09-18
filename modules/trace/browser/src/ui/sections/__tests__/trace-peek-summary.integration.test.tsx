@@ -85,7 +85,7 @@ describe("TracePeekSummary", () => {
 
       await waitFor(() => expect(calls.length).toBeGreaterThan(0));
       expect(calls[0]).toMatchObject({
-        path: "tracesV2.header",
+        path: "traces.header",
         input: { projectId: "p1", traceId: "trace-1", occurredAtMs: 1_700_000_000_000 },
       });
     });

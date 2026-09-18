@@ -1,7 +1,7 @@
 import { useTabSessionId } from "@langwatch/presence-browser";
 import type { PresenceCursorEvent } from "@langwatch/presence-contract";
 import { nowInstant } from "@langwatch/time";
-import { useSSESubscription } from "@langwatch/trace-browser-kit/sse-subscription";
+import { useSSESubscription } from "@langwatch/trace-browser-kit";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { api } from "../../../../behavior/trace-api.ts";

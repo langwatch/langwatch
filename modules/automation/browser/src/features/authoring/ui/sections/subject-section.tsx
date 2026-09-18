@@ -423,7 +423,7 @@ function TraceQuerySubject({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debounced]);
 
-  const preview = api.tracesV2.list.useQuery(
+  const preview = api.traces.list.useQuery(
     {
       projectId,
       timeRange,

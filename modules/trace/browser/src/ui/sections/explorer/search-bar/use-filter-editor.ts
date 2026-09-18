@@ -11,8 +11,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { FilterHighlight } from "../../../../behavior/explorer/search-bar/filter-highlight.ts";
 import { useLatestRef } from "../../../../behavior/use-latest-ref.ts";
-import type { SuggestionState } from "../../../../model/get-suggestion-state.ts";
-import { getSuggestionState } from "../../../../model/get-suggestion-state.ts";
 import { handleKey } from "../../../../model/handle-key.ts";
 import { AutoUppercaseOperators } from "./auto-uppercase-operators.ts";
 import {
@@ -32,10 +30,12 @@ const FILTER_CHIP_CONTROL_SELECTORS = [
 import {
   buildSuggestionUI,
   CLOSED_SUGGESTION,
+  getSuggestionState,
   highlightedRow,
   navigateSuggestion,
+  type SuggestionState,
   type SuggestionUIState,
-} from "./suggestion-ui.ts";
+} from "@langwatch/trace-browser-kit";
 
 const TRIGGER_TERMINATOR_REGEX = /[ \t\n()]/;
 const TRIGGER_PRECEDERS = new Set([" ", "\t", "\n", "("]);

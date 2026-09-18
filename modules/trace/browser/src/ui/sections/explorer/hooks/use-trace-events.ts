@@ -19,7 +19,7 @@ export function useTraceEvents(): TraceEventsResult {
   const shared = useSharedTrace();
   const { isReady, queryArgs } = useTraceQueryArgs();
 
-  const query = api.tracesV2.traceEvents.useQuery(queryArgs, {
+  const query = api.traces.traceEvents.useQuery(queryArgs, {
     enabled: isReady && !shared,
     staleTime: 30_000,
     refetchOnWindowFocus: false,

@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const { queryImpls, utils } = vi.hoisted(() => ({
   queryImpls: {} as Record<string, (input: unknown) => unknown>,
   utils: {
-    tracesV2: {
+    traces: {
       conversationContext: { fetch: vi.fn(), prefetch: vi.fn() },
     },
   },
@@ -172,7 +172,7 @@ const turn = (over: Record<string, unknown> = {}) => ({
 });
 
 function pinTurns(turns: unknown[]) {
-  utils.tracesV2.conversationContext.fetch.mockResolvedValue({
+  utils.traces.conversationContext.fetch.mockResolvedValue({
     conversationId: "session-1",
     total: turns.length,
     turns,
@@ -549,7 +549,7 @@ describe("the personal Sessions table", () => {
           },
         ]),
       );
-      expect(utils.tracesV2.conversationContext.fetch).toHaveBeenCalledWith({
+      expect(utils.traces.conversationContext.fetch).toHaveBeenCalledWith({
         projectId: "proj-personal",
         conversationId: "session-1",
       });
@@ -559,7 +559,7 @@ describe("the personal Sessions table", () => {
 
     it("marks the row as busy while the session's turns are being looked up", async () => {
       let resolveTurns: (value: unknown) => void = () => undefined;
-      utils.tracesV2.conversationContext.fetch.mockReturnValue(
+      utils.traces.conversationContext.fetch.mockReturnValue(
         new Promise((resolve) => {
           resolveTurns = resolve;
         }),
@@ -582,7 +582,7 @@ describe("the personal Sessions table", () => {
 
       await user.hover(screen.getByText("Link sessions to pull requests"));
 
-      expect(utils.tracesV2.conversationContext.prefetch).toHaveBeenCalledWith({
+      expect(utils.traces.conversationContext.prefetch).toHaveBeenCalledWith({
         projectId: "proj-personal",
         conversationId: "session-1",
       });
@@ -606,7 +606,7 @@ describe("the personal Sessions table", () => {
     });
 
     it("reports a failed lookup rather than opening an empty replay", async () => {
-      utils.tracesV2.conversationContext.fetch.mockRejectedValue(new Error("clickhouse is down"));
+      utils.traces.conversationContext.fetch.mockRejectedValue(new Error("clickhouse is down"));
       const user = userEvent.setup();
       renderTable();
 

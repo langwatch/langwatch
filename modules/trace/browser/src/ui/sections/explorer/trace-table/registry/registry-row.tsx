@@ -1,5 +1,7 @@
-import { useLangyContextTarget } from "@langwatch/langy-browser/surfaces/langy-context";
-import type { LangyContextTargetDescriptor } from "@langwatch/langy-browser/surfaces/langy-context";
+import {
+  useLangyContextTarget,
+  type LangyContextTargetDescriptor,
+} from "@langwatch/langy-browser-kit";
 import type { Row } from "@tanstack/react-table";
 import React, { useMemo } from "react";
 

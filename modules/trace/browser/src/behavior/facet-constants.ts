@@ -1,4 +1,5 @@
 import type { Tokens } from "@chakra-ui/react";
+import { ORIGIN_DISPLAY } from "@langwatch/trace-browser-kit";
 import { FIELD_VALUES } from "@langwatch/trace-contract";
 import {
   Activity,
@@ -35,7 +36,6 @@ import {
 } from "lucide-react";
 
 import { STATUS_COLORS } from "../model/display-formatters.ts";
-import { ORIGIN_DISPLAY } from "../model/origin-display.ts";
 
 // Section key for the trace-level Attributes block (reads `Attributes`
 // map on `trace_summaries`).

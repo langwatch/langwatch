@@ -1,6 +1,6 @@
+import { useFilterStore } from "@langwatch/trace-browser-kit";
 import { keepPreviousData } from "@tanstack/react-query";
 
-import { useFilterStore } from "../../../../behavior/filter.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 
@@ -32,7 +32,7 @@ export function useFacetSearch({
   const { project } = useOrganizationTeamProject();
   const timeRange = useFilterStore((s) => s.debouncedTimeRange);
 
-  const query = api.tracesV2.facetValues.useQuery(
+  const query = api.traces.facetValues.useQuery(
     {
       projectId: project?.id ?? "",
       timeRange: {

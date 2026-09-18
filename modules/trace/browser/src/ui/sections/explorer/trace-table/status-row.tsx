@@ -1,5 +1,5 @@
 import { Box, HStack, type SystemStyleObject, Text } from "@chakra-ui/react";
-import type { LangyContextTargetProps } from "@langwatch/langy-browser/surfaces/langy-context";
+import type { LangyContextTargetProps } from "@langwatch/langy-browser-kit";
 import type React from "react";
 
 import { Tbody } from "../../../elements/explorer/trace-table/table-primitives.tsx";
@@ -135,9 +135,9 @@ export const StatusRowGroup: React.FC<StatusRowGroupProps> = ({
       ...(isNew && {
         "& > tr > td": {
           transition: "none",
-          animation: "tracesV2RowNew 3s ease-out",
+          animation: "tracesRowNew 3s ease-out",
         },
-        "@keyframes tracesV2RowNew": {
+        "@keyframes tracesRowNew": {
           "0%": { backgroundColor: "rgba(59, 130, 246, 0.22)" },
           "18%": { backgroundColor: "rgba(59, 130, 246, 0.06)" },
           "36%": { backgroundColor: "rgba(59, 130, 246, 0.18)" },
@@ -154,9 +154,9 @@ export const StatusRowGroup: React.FC<StatusRowGroupProps> = ({
           // strobing.
           "& > tr > td": {
             transition: "none",
-            animation: "tracesV2RowPulse 1.2s ease-out",
+            animation: "tracesRowPulse 1.2s ease-out",
           },
-          "@keyframes tracesV2RowPulse": {
+          "@keyframes tracesRowPulse": {
             "0%": { backgroundColor: "rgba(59, 130, 246, 0.14)" },
             "40%": { backgroundColor: "rgba(59, 130, 246, 0.06)" },
             "100%": { backgroundColor: "transparent" },

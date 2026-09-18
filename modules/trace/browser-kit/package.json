@@ -8,25 +8,10 @@
   ],
   "type": "module",
   "exports": {
-    "./trace-drawer-chip": {
-      "langwatch-declaration-source": "./src/trace-drawer-chip.tsx",
-      "types": "./dist/trace-drawer-chip.d.ts",
-      "default": "./src/trace-drawer-chip.tsx"
-    },
-    "./page-visibility": {
-      "langwatch-declaration-source": "./src/page-visibility.ts",
-      "types": "./dist/page-visibility.d.ts",
-      "default": "./src/page-visibility.ts"
-    },
-    "./trace-query-config": {
-      "langwatch-declaration-source": "./src/trace-query-config.ts",
-      "types": "./dist/trace-query-config.d.ts",
-      "default": "./src/trace-query-config.ts"
-    },
-    "./sse-subscription": {
-      "langwatch-declaration-source": "./src/sse-subscription.ts",
-      "types": "./dist/sse-subscription.d.ts",
-      "default": "./src/sse-subscription.ts"
+    ".": {
+      "langwatch-declaration-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
     }
   },
   "scripts": {
@@ -35,14 +20,22 @@
   },
   "dependencies": {
     "@chakra-ui/react": "catalog:",
+    "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "liqe": "catalog:",
     "react-icons": "catalog:",
-    "@langwatch/observability": "workspace:*"
+    "zustand": "catalog:"
   },
   "devDependencies": {
     "@langwatch/test-harness": "workspace:*",
+    "@testing-library/react": "catalog:",
     "@types/react": "catalog:",
+    "jsdom": "catalog:",
     "react": "catalog:",
+    "react-dom": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },

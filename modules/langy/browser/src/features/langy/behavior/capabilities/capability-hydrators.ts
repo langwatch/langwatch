@@ -84,7 +84,7 @@ const DEFAULT_SEARCH_WINDOW_MS = 24 * 60 * 60 * 1000;
 // ── traces ──────────────────────────────────────────────────────────────────
 
 /**
- * One trace header per id, in id order, via the same `tracesV2.header` read the trace drawer uses,
+ * One trace header per id, in id order, via the same `traces.header` read the trace drawer uses,
  * minus full IO resolution — each result is truncated to `ROW_TEXT_MAX` anyway.
  */
 async function traceByIds({
@@ -97,7 +97,7 @@ async function traceByIds({
   ids: string[];
 }): Promise<CapabilityHydration> {
   const settled = await Promise.allSettled(
-    ids.map((traceId) => utils.tracesV2.header.fetch({ projectId, traceId, full: false })),
+    ids.map((traceId) => utils.traces.header.fetch({ projectId, traceId, full: false })),
   );
   const rows: CapabilityHydratedRow[] = [];
   settled.forEach((result, index) => {
@@ -122,7 +122,7 @@ async function traceByIds({
 }
 
 /**
- * Re-run the agent's trace search through `tracesV2.list` — the Trace Explorer's own
+ * Re-run the agent's trace search through `traces.list` — the Trace Explorer's own
  * read.
  */
 async function traceByQuery({
@@ -140,7 +140,7 @@ async function traceByQuery({
   const from = queryEpochMs(query, ["start-date", "startDate"]) ?? to - DEFAULT_SEARCH_WINDOW_MS;
   const text = queryText(query, ["q", "query"]);
 
-  const page = await utils.tracesV2.list.fetch({
+  const page = await utils.traces.list.fetch({
     projectId,
     timeRange: { from, to },
     sort: { columnId: "time", direction: "desc" },

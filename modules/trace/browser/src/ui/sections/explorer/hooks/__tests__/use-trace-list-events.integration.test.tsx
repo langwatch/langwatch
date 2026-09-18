@@ -13,7 +13,7 @@ const harness = vi.hoisted(() => ({
 }));
 
 vi.mock("../../../../../behavior/trace-api.ts", () => ({
-  api: { tracesV2: { listEvents: { useQuery: harness.useQuery } } },
+  api: { traces: { listEvents: { useQuery: harness.useQuery } } },
 }));
 
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
@@ -22,12 +22,9 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   }),
 }));
 
-vi.mock("../../../../../behavior/filter.store.ts", () => ({
+vi.mock("@langwatch/trace-browser-kit", () => ({
   useFilterStore: (selector: (s: unknown) => unknown) =>
     selector({ debouncedTimeRange: { from: 1_000, to: 2_000 } }),
-}));
-
-vi.mock("../../../../../behavior/view.store.ts", () => ({
   useViewStore: (selector: (s: unknown) => unknown) => selector(harness.view),
 }));
 

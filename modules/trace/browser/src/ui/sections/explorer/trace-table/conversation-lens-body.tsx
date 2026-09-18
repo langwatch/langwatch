@@ -1,4 +1,5 @@
 import { Flex, Text } from "@chakra-ui/react";
+import { useFilterStore, type LensConfig } from "@langwatch/trace-browser-kit";
 import {
   getCoreRowModel,
   getSortedRowModel,
@@ -9,9 +10,7 @@ import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
-import { useFilterStore } from "../../../../behavior/filter.store.ts";
 import { useDrawer } from "../../../../behavior/use-drawer.ts";
-import type { LensConfig } from "../../../../behavior/view.store.ts";
 import {
   EXPANDED_BG,
   EXPANDED_BG_CSS,

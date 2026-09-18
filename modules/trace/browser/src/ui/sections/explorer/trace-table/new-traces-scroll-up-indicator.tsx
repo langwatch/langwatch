@@ -13,7 +13,7 @@ const SCROLL_THRESHOLD_PX = 80;
 // attention" on busy projects — now the pill arrives, settles, and then
 // stays put until clicked.
 const ARRIVE_KEYFRAMES = {
-  "@keyframes tracesV2NewPillArrive": {
+  "@keyframes tracesNewPillArrive": {
     "0%": {
       transform: "translateX(-50%) translateY(-8px) scale(0.92)",
       opacity: 0,
@@ -90,7 +90,7 @@ export const NewTracesScrollUpIndicator: React.FC<NewTracesScrollUpIndicatorProp
       pointerEvents="none"
       key={animKeyRef.current}
       css={{
-        animation: "tracesV2NewPillArrive 320ms cubic-bezier(0.22, 1, 0.36, 1)",
+        animation: "tracesNewPillArrive 320ms cubic-bezier(0.22, 1, 0.36, 1)",
         ...ARRIVE_KEYFRAMES,
       }}
     >

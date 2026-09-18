@@ -1,7 +1,10 @@
+import {
+  type PageCursor,
+  rowKindForGrouping,
+  useEffectiveLens,
+} from "@langwatch/trace-browser-kit";
 import type React from "react";
 
-import type { PageCursor } from "../../../../behavior/filter.store.ts";
-import { rowKindForGrouping, useEffectiveLens } from "../../../../behavior/view.store.ts";
 import { HandledErrorState } from "../../errors/index.ts";
 import {
   SESSIONS_MAX_PAGE_SIZE,

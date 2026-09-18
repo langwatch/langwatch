@@ -3,9 +3,9 @@ import { Box, chakra } from "@chakra-ui/react";
 const ChakraButton = chakra("button");
 
 import { Checkbox } from "@langwatch/design-system/checkbox";
+import { useSelectionStore } from "@langwatch/trace-browser-kit";
 import type React from "react";
 
-import { useSelectionStore } from "../../../../../../behavior/selection.store.ts";
 import { ariaCheckedFor, checkboxStateFor } from "../../../../../../model/tri-state-checkbox.ts";
 import type { TraceListItem } from "../../../types/trace.ts";
 import type { ConversationGroup } from "../../conversation-groups.ts";

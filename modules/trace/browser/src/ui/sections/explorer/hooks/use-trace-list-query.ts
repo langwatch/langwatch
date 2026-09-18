@@ -1,11 +1,14 @@
+import {
+  type TraceListCursor,
+  useFilterStore,
+  DEFAULT_SORT,
+  useViewStore,
+} from "@langwatch/trace-browser-kit";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 
-import type { TraceListCursor } from "../../../../behavior/filter.store.ts";
-import { useFilterStore } from "../../../../behavior/filter.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { DEFAULT_SORT, useViewStore } from "../../../../behavior/view.store.ts";
 import { useSamplePreview } from "../onboarding/index.ts";
 import type { TraceListItem } from "../types/trace.ts";
 import { mapTraceListPayload } from "../utils/map-trace-list-payload.ts";
@@ -87,7 +90,7 @@ export function useTraceListQuery(): TraceListQueryResult {
   // active because FindBar reads its rows, so it asks for its own default
   // order rather than the session's.
   const listSort = ownsPagination ? sort : DEFAULT_SORT;
-  // `tracesV2.list` reads by position when no cursor comes with the page, so a
+  // `traces.list` reads by position when no cursor comes with the page, so a
   // page nobody has walked to (a jump straight to page 12, a reloaded
   // `#?page=N` link, or a page number the sessions lens left behind with a
   // string cursor this lens cannot read) is answered by offset rather than
@@ -98,7 +101,7 @@ export function useTraceListQuery(): TraceListQueryResult {
   // Skip the tRPC request entirely while sample preview is active —
   // saves a roundtrip per page nav for users who're going to see
   // fixtures anyway.
-  const query = api.tracesV2.list.useQuery(
+  const query = api.traces.list.useQuery(
     traceListQueryInput({
       projectId: project?.id ?? "",
       timeRange,

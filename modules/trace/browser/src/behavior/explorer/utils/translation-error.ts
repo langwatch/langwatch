@@ -2,7 +2,7 @@ import {
   extractAiCallFailedInfo,
   extractMissingModelInfo,
   extractProviderDisabledInfo,
-} from "@langwatch/model-provider-browser/surfaces/model-error";
+} from "@langwatch/model-provider-browser-kit";
 
 /**
  * Whether the inline-translation failure handler should raise its own generic fallback

@@ -101,8 +101,8 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
     // Cancel any in-flight per-trace queries so closing during a slow load doesn't leave the
     // request running, racing a future re-open and burning bandwidth/CH cycles for nothing.
     if (traceId) {
-      void trpcUtils.tracesV2.header.cancel();
-      void trpcUtils.tracesV2.spanTree.cancel();
+      void trpcUtils.traces.header.cancel();
+      void trpcUtils.traces.spanTree.cancel();
     }
     setMaximized(false);
     // Clear the store first — the page-level mount in `TracesPage`

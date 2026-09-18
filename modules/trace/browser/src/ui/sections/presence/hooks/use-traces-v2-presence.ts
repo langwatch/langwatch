@@ -10,7 +10,7 @@ import { usePresence } from "./use-presence.ts";
 /**
  * Drives the multiplayer presence channel from traces-v2 page state.
  */
-export function useTracesV2Presence(): void {
+export function useTracesPresence(): void {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? null;
   const { enabled: featureEnabled } = usePresenceFeatureEnabled();

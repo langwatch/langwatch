@@ -1,8 +1,8 @@
 import { Badge, Box, HStack, Text } from "@chakra-ui/react";
+import { useFilterStore } from "@langwatch/trace-browser-kit";
 import type React from "react";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 
-import { useFilterStore } from "../../../../../../../behavior/filter.store.ts";
 import { useDrawer } from "../../../../../../../behavior/use-drawer.ts";
 import type { TraceEvalResult, TraceListItem } from "../../../../types/trace.ts";
 import { ioPreviewWillRenderFor } from "../../addons/trace/io-preview-addon.tsx";

@@ -4,7 +4,7 @@ import {
   useTabSessionId,
 } from "@langwatch/presence-browser";
 import type { PresenceEvent, PresenceLocation } from "@langwatch/presence-contract";
-import { useSSESubscription } from "@langwatch/trace-browser-kit/sse-subscription";
+import { useSSESubscription } from "@langwatch/trace-browser-kit";
 import { useEffect, useRef } from "react";
 
 import { api } from "../../../../behavior/trace-api.ts";

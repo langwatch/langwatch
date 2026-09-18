@@ -1,10 +1,10 @@
 import { Box, chakra, Flex, HStack, Icon, Text } from "@chakra-ui/react";
+import type { DisplayRoleVisuals } from "@langwatch/trace-browser-kit";
 import { useMemo, useState } from "react";
 import { LuBot } from "react-icons/lu";
 
 import type { ChatMessage, ContentBlock } from "../../../model/transcript/types.ts";
 import { getRolePalette } from "../../blocks/transcript/role-chip.tsx";
-import type { DisplayRoleVisuals } from "../../elements/scenario-role.tsx";
 import { TurnCollapseChevron } from "../../elements/transcript/turn-collapse-chevron.tsx";
 import { BlockStack } from "./block-stack.tsx";
 

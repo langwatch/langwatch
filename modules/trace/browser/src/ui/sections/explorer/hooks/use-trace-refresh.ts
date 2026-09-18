@@ -16,14 +16,14 @@ export function useTraceRefresh(traceId: string) {
     setIsRefreshing(true);
     try {
       await Promise.all([
-        trpcUtils.tracesV2.header.invalidate({ traceId }),
-        trpcUtils.tracesV2.spanTree.invalidate({ traceId }),
-        trpcUtils.tracesV2.evals.invalidate({ traceId }),
+        trpcUtils.traces.header.invalidate({ traceId }),
+        trpcUtils.traces.spanTree.invalidate({ traceId }),
+        trpcUtils.traces.evals.invalidate({ traceId }),
         // Refreshing inside the drawer should also bring the row in the
         // underlying table back in sync — without this, fields like
         // duration / cost / status that the projection just refreshed
         // stay stale on the table while the drawer shows the latest.
-        trpcUtils.tracesV2.list.invalidate(),
+        trpcUtils.traces.list.invalidate(),
       ]);
     } finally {
       setIsRefreshing(false);

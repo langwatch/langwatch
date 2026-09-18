@@ -4,13 +4,12 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { useFilterStore, useViewStore } from "@langwatch/trace-browser-kit";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import "@testing-library/jest-dom/vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { useFilterStore } from "../../../../../behavior/filter.store.ts";
-import { useViewStore } from "../../../../../behavior/view.store.ts";
 import { Pagination } from "../pagination.tsx";
 
 const CURSOR_TO_PAGE_2 = { sortValue: 1_700_000_002_000, traceId: "trace-b" };

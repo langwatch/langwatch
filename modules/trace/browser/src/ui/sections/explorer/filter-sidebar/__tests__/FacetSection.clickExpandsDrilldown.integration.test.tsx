@@ -15,7 +15,7 @@ import "@testing-library/jest-dom/vitest";
 // FacetSection calls useFacetSearch (server-side value search) at the top
 // level. This suite renders it without a tRPC provider, so stub the hook out —
 // server search has its own suite (FacetSection.serverSearch.integration.test.tsx).
-vi.mock("../../../hooks/useFacetSearch", () => ({
+vi.mock("../../hooks/use-facet-search.ts", () => ({
   useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
 }));
 

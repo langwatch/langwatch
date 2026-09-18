@@ -108,7 +108,7 @@ const CURTAINS: Curtain[] = [
   },
 ];
 
-const gradientId = (index: number, suffix: string) => `tracesV2Aurora${suffix}${index}`;
+const gradientId = (index: number, suffix: string) => `tracesAurora${suffix}${index}`;
 
 interface AuroraSvgProps {
   /** Suffix appended to gradient IDs so multiple instances on a page don't collide. */
@@ -152,7 +152,7 @@ export const AuroraSvg: React.FC<AuroraSvgProps> = ({ idSuffix = "" }) => (
     ))}
 
     <style>{`
-      @keyframes tracesV2AuroraDrift {
+      @keyframes tracesAuroraDrift {
         0%   { transform: translate(-80px, 16px)  skewX(-12deg) scaleY(0.65); opacity: 0.35; }
         22%  { transform: translate(-28px, -10px) skewX(-4deg)  scaleY(1.05); opacity: 0.85; }
         50%  { transform: translate(30px, -28px)  skewX(6deg)   scaleY(1.32); opacity: 1.0;  }
@@ -168,8 +168,8 @@ export const AuroraSvg: React.FC<AuroraSvgProps> = ({ idSuffix = "" }) => (
        * color-mode toggle). Keeps the same curtain definitions usable in
        * both themes without a separate palette per mode.
        */
-      .tracesV2-aurora-curtain { mix-blend-mode: multiply; }
-      html.dark .tracesV2-aurora-curtain { mix-blend-mode: screen; }
+      .traces-aurora-curtain { mix-blend-mode: multiply; }
+      html.dark .traces-aurora-curtain { mix-blend-mode: screen; }
     `}</style>
   </svg>
 );
@@ -182,7 +182,7 @@ const CurtainEllipse: React.FC<{ curtain: Curtain; gradientId: string }> = ({
 
   return (
     <ellipse
-      className="tracesV2-aurora-curtain"
+      className="traces-aurora-curtain"
       cx={curtain.cx}
       cy={CURTAIN_CY}
       rx={curtain.rx}
@@ -193,7 +193,7 @@ const CurtainEllipse: React.FC<{ curtain: Curtain; gradientId: string }> = ({
         transformOrigin: "center",
         // mix-blend-mode lives in the stylesheet so it can switch between
         // "multiply" (light mode) and "screen" (dark mode).
-        animation: `tracesV2AuroraDrift ${curtain.durationMs}ms ease-in-out ${curtain.delayMs}ms infinite ${direction}`,
+        animation: `tracesAuroraDrift ${curtain.durationMs}ms ease-in-out ${curtain.delayMs}ms infinite ${direction}`,
         willChange: "transform, opacity",
       }}
     />

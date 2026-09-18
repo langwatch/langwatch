@@ -50,7 +50,7 @@ export const TurnSteps = memo(function TurnSteps({
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
 
-  const query = api.tracesV2.spansFull.useQuery(
+  const query = api.traces.spansFull.useQuery(
     { projectId, traceId, occurredAtMs },
     {
       enabled: isOpen && projectId !== "",

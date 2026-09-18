@@ -1,4 +1,5 @@
 import { Box, Circle, Flex, HStack, Icon, Spacer, Text, VStack } from "@chakra-ui/react";
+import { useConversationExpand } from "@langwatch/trace-browser-kit";
 import { AlertTriangle, Lightbulb, MessageSquare } from "lucide-react";
 import { Fragment, memo, useCallback, useEffect, useMemo, useState } from "react";
 
@@ -6,7 +7,6 @@ import {
   isSessionMarked,
   useAnnotationQueueSessionStore,
 } from "../../../../../behavior/annotation-queue-session.store.ts";
-import { useConversationExpand } from "../../../../../behavior/explorer/trace-drawer/conversation-view/expand-context.ts";
 import type { MediaPartData } from "../../../../../behavior/shared/traces/media-parts.ts";
 import type { RouterOutputs } from "../../../../../behavior/trace-api.ts";
 import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../../model/constants.ts";

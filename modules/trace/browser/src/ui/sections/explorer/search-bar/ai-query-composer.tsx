@@ -1,7 +1,7 @@
+import { useFilterStore } from "@langwatch/trace-browser-kit";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 
-import { useFilterStore } from "../../../../behavior/filter.store.ts";
 import { AiPromptInput } from "../ai/ai-prompt-input.tsx";
 import { useAiTraceAction } from "../ai/use-ai-trace-action.ts";
 

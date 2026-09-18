@@ -1,6 +1,6 @@
 import { Badge, HStack, Text } from "@chakra-ui/react";
+import { useFilterStore } from "@langwatch/trace-browser-kit";
 
-import { useFilterStore } from "../../../../../../../behavior/filter.store.ts";
 import { getColorPaletteForString } from "../../../../../../../model/rotating-colors.ts";
 import { FilterChip } from "../../../../../../blocks/explorer/trace-table/registry/cells/filter-chip.tsx";
 import type { TraceListItem } from "../../../../types/trace.ts";

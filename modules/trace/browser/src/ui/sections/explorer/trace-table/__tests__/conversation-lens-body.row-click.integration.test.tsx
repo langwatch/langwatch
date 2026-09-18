@@ -3,14 +3,14 @@
 // @vitest-environment jsdom
 // @see specs/traces-v2/sessions-lens.feature
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { LensConfig } from "@langwatch/trace-browser-kit";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
 import { setTraceTableScrollElement } from "../../../../../behavior/explorer/trace-table/scroll-context.ts";
-import type { LensConfig } from "../../../../../behavior/view.store.ts";
 import type { SessionGroupPayloadItem } from "../../../../../model/explorer/session-group-payload.ts";
 import { mapSessionGroupToConversationGroup } from "../../utils/map-session-groups-payload.ts";
 import type { ConversationGroup } from "../conversation-groups.ts";

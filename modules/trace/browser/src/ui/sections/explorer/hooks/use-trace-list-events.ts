@@ -1,11 +1,10 @@
+import { useFilterStore, useViewStore } from "@langwatch/trace-browser-kit";
 import type { TraceEventRollup } from "@langwatch/trace-contract";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 
-import { useFilterStore } from "../../../../behavior/filter.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { useViewStore } from "../../../../behavior/view.store.ts";
 import type { TraceListItem } from "../types/trace.ts";
 import { NO_TRACE_EVENTS } from "../types/trace.ts";
 
@@ -37,7 +36,7 @@ export function useTraceListEvents({
   const traceIds = useMemo(() => (traceIdsKey === "" ? [] : traceIdsKey.split(",")), [traceIdsKey]);
 
   const enabled = !!project?.id && !isSamplePreview && needsEvents && traceIds.length > 0;
-  const query = api.tracesV2.listEvents.useQuery(
+  const query = api.traces.listEvents.useQuery(
     {
       projectId: project?.id ?? "",
       traceIds,

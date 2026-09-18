@@ -296,6 +296,18 @@ export interface TraceApi extends TraceOtlpIngestApi {
   }): Promise<Record<string, unknown> | null>;
   readTopicCounts(input: TraceLegacyListInput): Promise<unknown>;
   readCustomersAndLabels(input: TraceLegacyListInput): Promise<unknown>;
+  /**
+   * The trace query language's free-text filter, compiled to a parameterized
+   * ClickHouse WHERE fragment. Null for an empty query; throws `FilterParseError`
+   * on invalid syntax.
+   */
+  translateTraceFilter(input: {
+    query: string;
+    tenantId: string;
+    timeRange: { from: number; to: number };
+  }): { sql: string; params: Record<string, unknown> } | null;
+  /** The query's positive bare-word terms, for a content (log-body) search. */
+  extractTraceFreeTextTerms(query: string): string[];
   readFieldNames(input: {
     projectId: string;
     startDate: number;

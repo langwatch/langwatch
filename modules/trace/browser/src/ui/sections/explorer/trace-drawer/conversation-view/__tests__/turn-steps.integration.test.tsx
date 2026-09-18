@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { mockUseQuery } = vi.hoisted(() => ({ mockUseQuery: vi.fn() }));
 
 vi.mock("../../../../../../behavior/trace-api.ts", () => ({
-  api: { tracesV2: { spansFull: { useQuery: mockUseQuery } } },
+  api: { traces: { spansFull: { useQuery: mockUseQuery } } },
 }));
 
 vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({

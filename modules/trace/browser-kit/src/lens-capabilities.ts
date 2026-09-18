@@ -1,4 +1,4 @@
-import { isEvalColumnId } from "../model/lens-eval-column-id.ts";
+import { isEvalColumnId } from "./lens-eval-column-id.ts";
 import type { GroupingMode, SortConfig } from "./view.store.ts";
 
 /**

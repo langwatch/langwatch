@@ -14,9 +14,9 @@ import {
 
 vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
-    tracesV2: {
+    traces: {
       // `getQueryKey` resolves the procedure path via the proxy's `_def()`.
-      spanTree: { _def: () => ({ path: ["tracesV2", "spanTree"] }) },
+      spanTree: { _def: () => ({ path: ["traces", "spanTree"] }) },
     },
   },
 }));
@@ -66,7 +66,7 @@ function makeUtils(pages: Page[]) {
   return { utils, query };
 }
 
-const PAGED_PATH = "tracesV2.spanTreePaginated";
+const PAGED_PATH = "traces.spanTreePaginated";
 
 describe("fetchSpanTreePages", () => {
   describe("when the trace fits in a single page", () => {

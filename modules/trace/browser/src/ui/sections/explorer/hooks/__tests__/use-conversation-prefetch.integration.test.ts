@@ -13,7 +13,7 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
 vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
     useUtils: () => ({
-      tracesV2: { header: { prefetch: prefetchMock } },
+      traces: { header: { prefetch: prefetchMock } },
     }),
   },
 }));

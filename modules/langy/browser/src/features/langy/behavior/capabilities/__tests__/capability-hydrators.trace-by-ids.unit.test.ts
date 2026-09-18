@@ -16,7 +16,7 @@ describe("CAPABILITY_HYDRATORS.trace.byIds", () => {
           output: null,
         });
         const utils = {
-          tracesV2: { header: { fetch: fetchMock } },
+          traces: { header: { fetch: fetchMock } },
         } as unknown as Parameters<
           NonNullable<(typeof CAPABILITY_HYDRATORS)["trace"]["byIds"]>
         >[0]["utils"];

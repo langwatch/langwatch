@@ -8,11 +8,11 @@ import type { TraceEvalResult, TraceListItem } from "../../types/trace.ts";
 import { NO_TRACE_EVENTS } from "../../types/trace.ts";
 
 /**
- * Conversation turn exactly as the `tracesV2.conversationContext` procedure returns it
+ * Conversation turn exactly as the `traces.conversationContext` procedure returns it
  * (including the redaction flags), so the preview fixtures stay assignable to
- * `utils.tracesV2.conversationContext.setData`.
+ * `utils.traces.conversationContext.setData`.
  */
-type PreviewConversationTurn = RouterOutputs["tracesV2"]["conversationContext"]["turns"][number];
+type PreviewConversationTurn = RouterOutputs["traces"]["conversationContext"]["turns"][number];
 
 /** The not-redacted flag defaults every preview turn carries. */
 const NOT_REDACTED: Pick<
@@ -946,7 +946,7 @@ const RICH_ARRIVAL_SPAN_TREE: SpanTreeNode[] = [
 /**
  * Full span detail (with input/output payloads, params, and per-LLM token
  * usage) for the LLM panel + per-span accordion. Keys mirror what the real
- * `tracesV2.spanDetail` and `tracesV2.spansFull` procedures return.
+ * `traces.spanDetail` and `traces.spansFull` procedures return.
  */
 const RICH_ARRIVAL_SPAN_DETAILS: SpanDetail[] = [
   {
@@ -1366,7 +1366,7 @@ function buildRichArrivalHeader(): TraceHeader {
 /**
  * Conversation context for the rich preview trace — three sibling turns
  * (a check-in before, the active funnel question, the follow-up fix).
- * The shape matches the `tracesV2.conversationContext` procedure return.
+ * The shape matches the `traces.conversationContext` procedure return.
  */
 interface RichArrivalConversationContext {
   conversationId: string;

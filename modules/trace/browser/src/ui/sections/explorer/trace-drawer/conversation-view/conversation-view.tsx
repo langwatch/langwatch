@@ -1,5 +1,6 @@
 import { Box, Button, Flex, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { hasRedactionMarker } from "@langwatch/redaction";
+import { ConversationExpandContext } from "@langwatch/trace-browser-kit";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Check, ChevronsDownUp, ChevronsUpDown, Copy } from "lucide-react";
 import {
@@ -13,7 +14,6 @@ import {
   useState,
 } from "react";
 
-import { ConversationExpandContext } from "../../../../../behavior/explorer/trace-drawer/conversation-view/expand-context.ts";
 import {
   isTurnRailDraft,
   RenderedMarkdown,

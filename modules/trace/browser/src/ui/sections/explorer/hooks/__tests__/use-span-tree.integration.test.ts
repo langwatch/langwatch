@@ -68,9 +68,9 @@ vi.mock("@tanstack/react-query", () => ({
 vi.mock("../../../../../behavior/trace-api.ts", () => ({
   api: {
     useUtils: () => ({
-      tracesV2: { spanTreeDelta: { invalidate: deltaInvalidate } },
+      traces: { spanTreeDelta: { invalidate: deltaInvalidate } },
     }),
-    tracesV2: {
+    traces: {
       spanTreeDelta: {
         useQuery: (input: DeltaQueryCall["input"], options: DeltaQueryCall["options"]) => {
           capturedDeltaCalls.push({ input, options });

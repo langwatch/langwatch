@@ -1,12 +1,11 @@
 import { nowInstant } from "@langwatch/time";
+import { usePageVisibility, useFilterStore } from "@langwatch/trace-browser-kit";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { useFilterStore } from "../../../../behavior/filter.store.ts";
 import { useRefreshUIStore } from "../../../../behavior/refresh-ui.store.ts";
 import { useSseStatusStore } from "../../../../behavior/sse-status.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { usePageVisibility } from "../../../../behavior/use-page-visibility.ts";
 import { useTraceListRefresh } from "./use-trace-list-refresh.ts";
 
 const FAST_MS = 5_000;
@@ -71,7 +70,7 @@ export function useTraceNewCount(): TraceNewCountResult {
       if (mode === "live") {
         refresh();
       } else if (mode === "ask") {
-        void trpcUtils.tracesV2.newCount.invalidate();
+        void trpcUtils.traces.newCount.invalidate();
       }
     }
     prevVisibleRef.current = isVisible;
@@ -95,7 +94,7 @@ export function useTraceNewCount(): TraceNewCountResult {
     prevCountRef.current = null;
   }, [project?.id, timeRange.from, timeRange.to, timeRange.label, since, queryText]);
 
-  const query = api.tracesV2.newCount.useQuery(
+  const query = api.traces.newCount.useQuery(
     {
       projectId: project?.id ?? "",
       timeRange: {

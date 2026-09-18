@@ -39,7 +39,7 @@ vi.mock("../../../../../../behavior/explorer/onboarding/use-onboarding-active.ts
 vi.mock("../../../../../../behavior/trace-api.ts", () => ({
   api: {
     useUtils: () => ({
-      tracesV2: {
+      traces: {
         list: {
           reset: mockListReset,
           invalidate: mockListInvalidate,
@@ -50,7 +50,7 @@ vi.mock("../../../../../../behavior/trace-api.ts", () => ({
 }));
 
 // Stub store getState calls made in onLaunchTour
-vi.mock("../../../../../../behavior/view.store.ts", () => ({
+vi.mock("@langwatch/trace-browser-kit", () => ({
   useViewStore: Object.assign(
     (selector: (s: unknown) => unknown) =>
       selector({
@@ -59,9 +59,6 @@ vi.mock("../../../../../../behavior/view.store.ts", () => ({
       }),
     { getState: () => ({ selectLens: vi.fn() }) },
   ),
-}));
-
-vi.mock("../../../../../../behavior/filter.store.ts", () => ({
   useFilterStore: Object.assign(
     (selector: (s: unknown) => unknown) =>
       selector({

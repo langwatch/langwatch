@@ -13,7 +13,7 @@ const harness = vi.hoisted(() => ({
 }));
 
 vi.mock("../../../../../behavior/trace-api.ts", () => ({
-  api: { tracesV2: { listEvents: { useQuery: harness.useQuery } } },
+  api: { traces: { listEvents: { useQuery: harness.useQuery } } },
 }));
 
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({

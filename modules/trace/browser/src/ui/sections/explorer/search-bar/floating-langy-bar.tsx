@@ -1,11 +1,11 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
+import { useFilterStore } from "@langwatch/trace-browser-kit";
 import { Sparkles } from "lucide-react";
 import { motion } from "motion/react";
 import type React from "react";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 
-import { useFilterStore } from "../../../../behavior/filter.store.ts";
 import type { FloatRect } from "../../../../behavior/use-float-rect.ts";
 import { filterContextChip } from "../../langy/hooks/use-langy-filter-context.ts";
 import { AiPromptInput } from "../ai/ai-prompt-input.tsx";

@@ -3,13 +3,13 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { useSelectionStore } from "@langwatch/trace-browser-kit";
 import { flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import "@testing-library/jest-dom/vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { useSelectionStore } from "../../../../../behavior/selection.store.ts";
 import type { TraceListItem } from "../../types/trace.ts";
 import { traceSelectColumnDef } from "../select-column.tsx";
 import { buildTracePlaceholderRows } from "../skeleton-placeholders.ts";

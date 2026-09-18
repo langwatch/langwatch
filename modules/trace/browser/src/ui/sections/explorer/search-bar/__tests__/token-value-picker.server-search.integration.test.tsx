@@ -11,7 +11,7 @@ import "@testing-library/jest-dom/vitest";
 const apiMock = vi.hoisted(() => ({ useQuery: vi.fn() }));
 
 vi.mock("../../../../../behavior/trace-api.ts", () => ({
-  api: { tracesV2: { facetValues: { useQuery: apiMock.useQuery } } },
+  api: { traces: { facetValues: { useQuery: apiMock.useQuery } } },
 }));
 
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
@@ -41,7 +41,7 @@ vi.mock("../../hooks/use-trace-facets.ts", () => ({
   }),
 }));
 
-vi.mock("../../../../../behavior/filter.store.ts", () => ({
+vi.mock("@langwatch/trace-browser-kit", () => ({
   useFilterStore: (selector: (s: unknown) => unknown) =>
     selector({
       setFacetValueAt: vi.fn(),

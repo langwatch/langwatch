@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-/** Exact output shape of the existing `tracesV2.spanTreePaginated` route. */
+/** Exact output shape of the existing `traces.spanTreePaginated` route. */
 export const spanTreeNodeSchema = z.object({
   spanId: z.string(),
   parentSpanId: z.string().nullable(),

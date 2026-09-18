@@ -1,7 +1,7 @@
+import { useFilterStore } from "@langwatch/trace-browser-kit";
 import { useEffect } from "react";
 
 import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
-import { useFilterStore } from "../../../../behavior/filter.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 
 const BASE_TITLE = "LangWatch";

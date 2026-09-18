@@ -33,7 +33,7 @@ export function useTraceHeaderCanonical() {
   // Treat the URL hint as our liveness signal. When the trace started within the last 3
   // min and SSE is OFF, set a 10s refetch interval so newly arrived spans show up
   // without a manual refresh.
-  const query = api.tracesV2.header.useQuery(
+  const query = api.traces.header.useQuery(
     { ...queryArgs, full: true },
     {
       enabled: isReady && !shared,

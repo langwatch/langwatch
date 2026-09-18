@@ -1,5 +1,6 @@
 import { Box, Button, Flex, Icon, IconButton } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { useFilterStore, useViewStore } from "@langwatch/trace-browser-kit";
 import { Bookmark, Compass, Download, Map, Tent } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -7,8 +8,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
 import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
 import { useProjectHasTraces } from "../../../../behavior/explorer/use-project-has-traces.ts";
-import { useFilterStore } from "../../../../behavior/filter.store.ts";
-import { useViewStore } from "../../../../behavior/view.store.ts";
 import { TRACE_EXPLORER_SPOTLIGHTS } from "../../../../model/explorer/onboarding/spotlights/spotlights.ts";
 import { LensNamePopover } from "../../../elements/explorer/toolbar/lens-name-popover.tsx";
 import { useIsNewAccount } from "../hooks/use-is-new-account.ts";

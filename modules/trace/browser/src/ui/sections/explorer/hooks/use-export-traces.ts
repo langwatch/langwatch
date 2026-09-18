@@ -1,14 +1,14 @@
 import { toaster } from "@langwatch/design-system/toaster";
 import { nowInstant } from "@langwatch/time";
-import { useCallback, useRef, useState } from "react";
-
-import { api } from "../../../../behavior/trace-api.ts";
 import type {
   ExportProgressEvent,
   ExportFormat,
   ExportMode,
   ExportProgress,
-} from "../../../../model/export-types.ts";
+} from "@langwatch/trace-browser-kit";
+import { useCallback, useRef, useState } from "react";
+
+import { api } from "../../../../behavior/trace-api.ts";
 import { readHandledError, showErrorToast } from "../../errors/index.ts";
 
 interface ExportConfig {

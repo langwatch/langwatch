@@ -1,8 +1,7 @@
 import { HStack, Icon, Text } from "@chakra-ui/react";
+import { getDisplayRoleVisuals, useIsScenarioRole } from "@langwatch/trace-browser-kit";
 import type { IconType } from "react-icons";
 import { LuBot, LuCode, LuSettings, LuUser, LuWrench } from "react-icons/lu";
-
-import { getDisplayRoleVisuals, useIsScenarioRole } from "../../elements/scenario-role.tsx";
 
 export const ROLE_LABELS: Record<string, string> = {
   system: "SYSTEM",

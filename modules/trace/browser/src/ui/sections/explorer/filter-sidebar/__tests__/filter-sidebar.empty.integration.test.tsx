@@ -62,24 +62,25 @@ vi.mock("../../../../../behavior/ui.store.ts", async (importOriginal) => ({
     }),
 }));
 
-vi.mock("../../../../../behavior/filter.store.ts", () => ({
-  useFilterStore: (selector: (s: unknown) => unknown) =>
-    selector({
-      ast: { type: "group", combinator: "and", filters: [] },
-      queryText: "",
-      clearAll: vi.fn(),
-    }),
-}));
-
-vi.mock("../../../../../behavior/view.store.ts", () => ({
-  useViewStore: (selector: (s: unknown) => unknown) =>
-    selector({
-      activeLensId: "all-traces",
-      isDraft: () => false,
-      revertLens: vi.fn(),
-      allLenses: [{ id: "all-traces", name: "All" }],
-    }),
-}));
+vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@langwatch/trace-browser-kit")>();
+  return {
+    ...actual,
+    useFilterStore: (selector: (s: unknown) => unknown) =>
+      selector({
+        ast: { type: "group", combinator: "and", filters: [] },
+        queryText: "",
+        clearAll: vi.fn(),
+      }),
+    useViewStore: (selector: (s: unknown) => unknown) =>
+      selector({
+        activeLensId: "all-traces",
+        isDraft: () => false,
+        revertLens: vi.fn(),
+        allLenses: [{ id: "all-traces", name: "All" }],
+      }),
+  };
+});
 
 vi.mock("../../../../../behavior/facet-lens.store.ts", () => ({
   useFacetLensStore: (selector: (s: unknown) => unknown) =>

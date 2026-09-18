@@ -42,7 +42,7 @@ type BorrowedProcedures = {
     };
   };
 
-  tracesV2: {
+  traces: {
     conversationContext: {
       query: {
         input: { projectId: string; conversationId: string };

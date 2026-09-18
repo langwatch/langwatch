@@ -20,7 +20,7 @@ vi.mock("../../../../../behavior/langy/use-can-ask-langy.ts", () => ({
 vi.mock("../../../langy/hooks/use-show-langy.ts", () => ({
   useShowLangy: () => langyMock.showLangy,
 }));
-vi.mock("@langwatch/langy-browser/surfaces/langy-store", async (importOriginal) => ({
+vi.mock("@langwatch/langy-browser-kit", async (importOriginal) => ({
   ...((await importOriginal()) as object),
   useLangyStore: (
     selector: (s: {
@@ -48,7 +48,8 @@ vi.mock("../../add-to-annotation-queue-dialog.tsx", () => ({
   AddToAnnotationQueueDialog: () => null,
 }));
 
-import { useSelectionStore } from "../../../../../behavior/selection.store.ts";
+import { useSelectionStore } from "@langwatch/trace-browser-kit";
+
 import { BulkActionBar } from "../bulk-action-bar.tsx";
 
 const renderBar = (namesById: Record<string, string | undefined> = {}) =>

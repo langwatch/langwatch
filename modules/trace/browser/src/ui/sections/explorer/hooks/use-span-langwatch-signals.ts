@@ -21,7 +21,7 @@ export function useSpanLangwatchSignals() {
   // fresh via invalidations.
   const sseConnected = useSseStatusStore((s) => s.sseConnectionState === "connected");
 
-  const query = api.tracesV2.spanLangwatchSignals.useQuery(queryArgs, {
+  const query = api.traces.spanLangwatchSignals.useQuery(queryArgs, {
     enabled: isReady && !shared,
     staleTime: 300_000,
     gcTime: 1_800_000,

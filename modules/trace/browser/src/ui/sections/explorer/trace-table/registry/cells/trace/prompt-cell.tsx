@@ -1,7 +1,7 @@
 import { Badge, Text } from "@chakra-ui/react";
+import { useFilterStore } from "@langwatch/trace-browser-kit";
 import type React from "react";
 
-import { useFilterStore } from "../../../../../../../behavior/filter.store.ts";
 import { api } from "../../../../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../../../../behavior/use-organization-team-project.ts";
 import { FilterChip } from "../../../../../../blocks/explorer/trace-table/registry/cells/filter-chip.tsx";

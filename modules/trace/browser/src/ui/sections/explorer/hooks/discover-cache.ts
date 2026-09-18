@@ -1,14 +1,14 @@
 import { nowInstant } from "@langwatch/time";
 
 /**
- * Per-project cache of the last successful `tracesV2.discover` response.
+ * Per-project cache of the last successful `traces.discover` response.
  */
 import type { RouterOutputs } from "../../../../behavior/trace-api.ts";
 
 const STORAGE_KEY = "langwatch:traces-v2:discoverCache";
 const TTL_MS = 24 * 60 * 60 * 1000;
 
-export type DiscoverDescriptors = RouterOutputs["tracesV2"]["discover"]["facets"];
+export type DiscoverDescriptors = RouterOutputs["traces"]["discover"]["facets"];
 
 interface Entry {
   facets: DiscoverDescriptors;

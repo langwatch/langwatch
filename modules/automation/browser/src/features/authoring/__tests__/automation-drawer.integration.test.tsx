@@ -82,8 +82,8 @@ vi.mock("../../../behavior/automation-api.ts", () => ({
     dashboards: {
       getAll: { useQuery: () => ({ data: [], isLoading: false }) },
     },
-    // The trace-subject query editor previews matches via tracesV2.list.
-    tracesV2: {
+    // The trace-subject query editor previews matches via traces.list.
+    traces: {
       list: {
         useQuery: () => ({ data: undefined, isFetching: false, error: null }),
       },

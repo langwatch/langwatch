@@ -1,9 +1,8 @@
 import { Box, Circle, chakra, HStack, Icon, Text } from "@chakra-ui/react";
+import { useFilterStore, useViewStore } from "@langwatch/trace-browser-kit";
 import { AlertTriangle, ChevronDown, ChevronRight, Zap } from "lucide-react";
 import type React from "react";
 
-import { useFilterStore } from "../../../../../../../behavior/filter.store.ts";
-import { useViewStore } from "../../../../../../../behavior/view.store.ts";
 import { truncateId } from "../../../../../../../model/display-formatters.ts";
 import type { ConversationGroup } from "../../../conversation-groups.ts";
 import { IOPreview } from "../../../io-preview.tsx";

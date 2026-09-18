@@ -20,7 +20,7 @@ import {
  * schema's type parameters on purpose: threading generics through just to
  * discard them would force the REST caller to name types it doesn't have.
  */
-export type TracesV2ReadMembers = Readonly<{
+export type TracesReadMembers = Readonly<{
   /** The plan's visibility window for one project, or null when unbounded. */
   getVisibilityCutoffMs(projectId: string): Promise<number | null>;
   /** The mapping and redaction ports the shared read mappers take. */
@@ -43,7 +43,7 @@ async function loadSpansFullWithProtections({
   protections,
 }: {
   app: TraceApp;
-  ports: TracesV2ReadMembers;
+  ports: TracesReadMembers;
   projectId: string;
   traceId: string;
   occurredAtMs?: number;
@@ -79,7 +79,7 @@ async function loadTraceLogsWithProtections({
   protections,
 }: {
   app: TraceApp;
-  ports: TracesV2ReadMembers;
+  ports: TracesReadMembers;
   projectId: string;
   traceId: string;
   occurredAtMs?: number;
@@ -134,7 +134,7 @@ export class TraceTranscriptReadService {
     protections,
   }: {
     app: TraceApp;
-    ports: TracesV2ReadMembers;
+    ports: TracesReadMembers;
     projectId: string;
     traceId: string;
     occurredAtMs?: number;

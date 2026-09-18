@@ -8,7 +8,7 @@ import { TRACE_NAME_MIN_LENGTH } from "./trace.constants.ts";
  */
 
 /**
- * `tracesV2.header`, as the browser sends it. `full` is optional here and
+ * `traces.header`, as the browser sends it. `full` is optional here and
  * defaulted to `true` by the procedure, so the client input is `z.input`,
  * not `z.output` — declaring it required would break a correct call site.
  */
@@ -26,7 +26,7 @@ export const traceHeaderReadInputSchema = z.object({
 
 export type TraceHeaderReadInput = z.input<typeof traceHeaderReadInputSchema>;
 
-/** `tracesV2.changeName`, as the browser sends it. */
+/** `traces.changeName`, as the browser sends it. */
 export const changeTraceNameCommandSchema = z.object({
   projectId: z.string(),
   traceId: z.string(),
@@ -35,7 +35,7 @@ export const changeTraceNameCommandSchema = z.object({
 
 export type ChangeTraceNameCommand = z.infer<typeof changeTraceNameCommandSchema>;
 
-/** What `tracesV2.changeName` returns: the canonical name the trace now has. */
+/** What `traces.changeName` returns: the canonical name the trace now has. */
 export const changeTraceNameResultSchema = z.object({
   traceId: z.string(),
   newName: z.string(),

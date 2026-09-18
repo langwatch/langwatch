@@ -34,13 +34,13 @@ export function useRenameTrace(): UseRenameTraceResult {
   const utils = traceApi.useUtils();
   const invalidateProcedure = useInvalidateProcedure();
 
-  const mutation = traceApi.tracesV2.changeName.useMutation({
+  const mutation = traceApi.traces.changeName.useMutation({
     onSuccess: async ({ traceId }, variables) => {
       // Everything that paints this trace's name: the drawer title (header) and the
       // table cells and tooltips (list).
       await Promise.all([
-        utils.tracesV2.header.invalidate({ projectId: variables.projectId, traceId }),
-        invalidateProcedure("tracesV2.list"),
+        utils.traces.header.invalidate({ projectId: variables.projectId, traceId }),
+        invalidateProcedure("traces.list"),
       ]);
     },
   });

@@ -103,7 +103,7 @@ type BorrowedProcedures = {
     };
   };
 
-  tracesV2: {
+  traces: {
     /**
      * Facet value frequencies in a window. Error message shapes compared to
      * the prior period; `totalDistinct` tells whether we see the whole set.

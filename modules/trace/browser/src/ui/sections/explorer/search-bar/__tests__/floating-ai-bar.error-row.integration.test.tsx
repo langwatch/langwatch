@@ -24,9 +24,9 @@ vi.mock("../../ai/use-ai-trace-action.ts", () => ({
   }),
 }));
 
+import { useFilterStore } from "@langwatch/trace-browser-kit";
 import type { AiActionError } from "@langwatch/trace-contract";
 
-import { useFilterStore } from "../../../../../behavior/filter.store.ts";
 import { explainAnyError } from "../../../errors/index.ts";
 import { FloatingAiBar } from "../floating-ai-bar.tsx";
 

@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const { queryImpls, utils, mockOnClose } = vi.hoisted(() => ({
   queryImpls: {} as Record<string, (input: unknown) => unknown>,
   utils: {
-    tracesV2: {
+    traces: {
       conversationContext: { fetch: vi.fn(), prefetch: vi.fn() },
     },
   },
@@ -205,8 +205,8 @@ function renderDrawer() {
 
 beforeEach(() => {
   for (const key of Object.keys(queryImpls)) delete queryImpls[key];
-  utils.tracesV2.conversationContext.fetch.mockReset();
-  utils.tracesV2.conversationContext.prefetch.mockReset();
+  utils.traces.conversationContext.fetch.mockReset();
+  utils.traces.conversationContext.prefetch.mockReset();
   mockOnClose.mockClear();
 });
 
@@ -583,7 +583,7 @@ describe("the pull request detail drawer", () => {
     describe("when the reader chooses one of those session rows", () => {
       /** @scenario "Choosing a session from the pull request drawer opens its replay" */
       it("opens that session's terminal replay in the workspace it was read in", async () => {
-        utils.tracesV2.conversationContext.fetch.mockResolvedValue({
+        utils.traces.conversationContext.fetch.mockResolvedValue({
           turns: [
             { traceId: "trace-early", timestamp: 1_000 },
             { traceId: "trace-last", timestamp: 2_000 },
@@ -597,7 +597,7 @@ describe("the pull request detail drawer", () => {
         // The turns of that session, and the last of them is what a replay
         // opens on.
         await waitFor(() =>
-          expect(utils.tracesV2.conversationContext.fetch).toHaveBeenCalledWith({
+          expect(utils.traces.conversationContext.fetch).toHaveBeenCalledWith({
             projectId: "proj-personal",
             conversationId: "session-a",
           }),
@@ -620,7 +620,7 @@ describe("the pull request detail drawer", () => {
 
       /** @scenario "Leaving the replay returns to the pull request it was opened from" */
       it("leaves the pull request drawer standing underneath rather than closing it", async () => {
-        utils.tracesV2.conversationContext.fetch.mockResolvedValue({
+        utils.traces.conversationContext.fetch.mockResolvedValue({
           turns: [{ traceId: "trace-last", timestamp: 2_000 }],
         });
         const user = userEvent.setup();
@@ -639,7 +639,7 @@ describe("the pull request detail drawer", () => {
 
       it("marks the row busy and shows nothing else opening while the turn resolves", async () => {
         let releaseTurns: (value: unknown) => void = () => undefined;
-        utils.tracesV2.conversationContext.fetch.mockReturnValue(
+        utils.traces.conversationContext.fetch.mockReturnValue(
           new Promise((resolve) => {
             releaseTurns = resolve;
           }),
@@ -665,7 +665,7 @@ describe("the pull request detail drawer", () => {
       // gives Enter/Space meaning for free; a row that went back to only
       // being clickable has no button to find.
       it("exposes the replay as a focusable control, not just a clickable row", async () => {
-        utils.tracesV2.conversationContext.fetch.mockResolvedValue({
+        utils.traces.conversationContext.fetch.mockResolvedValue({
           turns: [{ traceId: "trace-last", timestamp: 2_000 }],
         });
         const user = userEvent.setup();
@@ -687,7 +687,7 @@ describe("the pull request detail drawer", () => {
     describe("when the reader double-clicks the same session", () => {
       it("looks it up once rather than opening two replays", async () => {
         let releaseTurns: (value: unknown) => void = () => undefined;
-        utils.tracesV2.conversationContext.fetch.mockReturnValue(
+        utils.traces.conversationContext.fetch.mockReturnValue(
           new Promise((resolve) => {
             releaseTurns = resolve;
           }),
@@ -701,7 +701,7 @@ describe("the pull request detail drawer", () => {
 
         // The second click lands while the first lookup is still in flight,
         // and is the same request, so it is dropped rather than answered.
-        expect(utils.tracesV2.conversationContext.fetch).toHaveBeenCalledTimes(1);
+        expect(utils.traces.conversationContext.fetch).toHaveBeenCalledTimes(1);
 
         releaseTurns({ turns: [{ traceId: "trace-last", timestamp: 2_000 }] });
         await waitFor(() => expect(host.recording.queries.length).toBe(1));
@@ -715,7 +715,7 @@ describe("the pull request detail drawer", () => {
 
         await user.hover(screen.getByText("Teach the fold about branches"));
 
-        expect(utils.tracesV2.conversationContext.prefetch).toHaveBeenCalledWith({
+        expect(utils.traces.conversationContext.prefetch).toHaveBeenCalledWith({
           projectId: "proj-personal",
           conversationId: "session-a",
         });
@@ -735,7 +735,7 @@ describe("the pull request detail drawer", () => {
     describe("when the reader chooses it", () => {
       /** @scenario "A session with nothing stored says so instead of opening an empty replay" */
       it("says the session stored none of its turns and opens no replay", async () => {
-        utils.tracesV2.conversationContext.fetch.mockResolvedValue({
+        utils.traces.conversationContext.fetch.mockResolvedValue({
           turns: [],
         });
         const user = userEvent.setup();
@@ -754,7 +754,7 @@ describe("the pull request detail drawer", () => {
       });
 
       it("reports a failed lookup through the shared error toast", async () => {
-        utils.tracesV2.conversationContext.fetch.mockRejectedValue(new Error("clickhouse said no"));
+        utils.traces.conversationContext.fetch.mockRejectedValue(new Error("clickhouse said no"));
         const user = userEvent.setup();
         renderDrawer();
 

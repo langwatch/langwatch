@@ -1,15 +1,15 @@
 import { Button, chakra, HStack, Input, Stack, Text } from "@chakra-ui/react";
 import { toaster } from "@langwatch/design-system/toaster";
-import { BadgeCheck, Gauge, type LucideIcon, Tag, X } from "lucide-react";
-import type React from "react";
-import { useMemo, useState } from "react";
-
 import {
   EVAL_COLUMN_FIELDS,
   EVAL_FIELD_LABELS,
   type EvalColumnField,
   formatEvalColumnId,
-} from "../../../../../model/lens-eval-column-id.ts";
+} from "@langwatch/trace-browser-kit";
+import { BadgeCheck, Gauge, type LucideIcon, Tag, X } from "lucide-react";
+import type React from "react";
+import { useMemo, useState } from "react";
+
 import type { EvaluatorOption } from "../../hooks/use-evaluator-options.ts";
 import { evalColumnLabel } from "../../trace-table/eval-columns.ts";
 

@@ -84,7 +84,7 @@ export const promptStudioSpanSchema = z
   .strict();
 
 // ---------------------------------------------------------------------------
-// The trace explorer (`tracesV2.*`)
+// The trace explorer (`traces.*`)
 // ---------------------------------------------------------------------------
 
 /**
@@ -100,13 +100,13 @@ const redactionFlagsShape = {
 } as const;
 
 /** `list`: one page of the grid, redacted for the viewer. */
-export const tracesV2ListPageSchema = z.object({
+export const tracesListPageSchema = z.object({
   ...traceListPageSchema.shape,
   items: z.array(z.object({ ...traceListViewItemSchema.shape, ...redactionFlagsShape })),
 });
 
 /** `sessions`: one page of the Sessions lens, cost- and title-gated. */
-export const tracesV2SessionsPageSchema = z.object({
+export const tracesSessionsPageSchema = z.object({
   ...sessionGroupsResultSchema.shape,
   sessions: z.array(
     z.object({
@@ -123,16 +123,16 @@ export const tracesV2SessionsPageSchema = z.object({
 });
 
 /** `listEvents`: the events column's rollups, keyed by trace id. */
-export const tracesV2ListEventsSchema = z.record(z.string(), traceEventRollupSchema);
+export const tracesListEventsSchema = z.record(z.string(), traceEventRollupSchema);
 
 /** `newCount`: how many traces arrived since the grid last painted. */
-export const tracesV2NewCountSchema = z.object({ count: z.number() });
+export const tracesNewCountSchema = z.object({ count: z.number() });
 
 /** `suggest`: the typeahead's values for one field. */
-export const tracesV2SuggestSchema = z.object({ values: z.array(z.string()) });
+export const tracesSuggestSchema = z.object({ values: z.array(z.string()) });
 
 /** `conversationContext`: the turns either side of the open trace. */
-export const tracesV2ConversationContextSchema = z.object({
+export const tracesConversationContextSchema = z.object({
   conversationId: z.string(),
   turns: z.array(
     z.object({
@@ -152,37 +152,37 @@ export const tracesV2ConversationContextSchema = z.object({
 });
 
 /** `changeName`: the trace and the name it now carries. */
-export const tracesV2ChangedNameSchema = z.object({ traceId: z.string(), newName: z.string() });
+export const tracesChangedNameSchema = z.object({ traceId: z.string(), newName: z.string() });
 
 /** `changeMetadata`: the trace whose reserved metadata was written. */
-export const tracesV2ChangedMetadataSchema = z.object({ traceId: z.string() });
+export const tracesChangedMetadataSchema = z.object({ traceId: z.string() });
 
 /** `spansPaginated`: one page of a trace's full spans, protections applied. */
-export const tracesV2SpansPageSchema = z.object({
+export const tracesSpansPageSchema = z.object({
   spans: z.array(langWatchSpanSchema),
   total: z.number(),
 });
 
 /** `spansDelta`: the spans of a live trace newer than a start-time mark. */
-export const tracesV2SpansDeltaSchema = z.array(langWatchSpanSchema);
+export const tracesSpansDeltaSchema = z.array(langWatchSpanSchema);
 
 /** `evals`: the evaluation runs recorded against one trace. */
-export const tracesV2EvaluationRunsSchema = z.array(evaluationRunDataSchema);
+export const tracesEvaluationRunsSchema = z.array(evaluationRunDataSchema);
 
 /** `onDiscoverUpdate`: one `discover_updated` signal, as the browser reads it. */
-export const tracesV2DiscoverUpdateSchema = z.unknown();
+export const tracesDiscoverUpdateSchema = z.unknown();
 
 /** `spanTree` / `spanTreeDelta`: waterfall nodes, per-span spend gated. */
-export const tracesV2SpanTreeNodesSchema = z.array(spanTreeNodeSchema);
+export const tracesSpanTreeNodesSchema = z.array(spanTreeNodeSchema);
 
 /** `spanLangwatchSignals`: the instrumentation badges, per span. */
-export const tracesV2SpanLangwatchSignalsSchema = z.array(spanLangwatchSignalsSchema);
+export const tracesSpanLangwatchSignalsSchema = z.array(spanLangwatchSignalsSchema);
 
 /** `spansFull`: every span of a trace, mapped and redacted. */
-export const tracesV2SpanDetailsSchema = z.array(spanDetailSchema);
+export const tracesSpanDetailsSchema = z.array(spanDetailSchema);
 
 /** `traceEvents`: the drawer's timeline, protections applied. */
-export const tracesV2TraceEventsSchema = z.array(derivedTraceEventSchema);
+export const tracesTraceEventsSchema = z.array(derivedTraceEventSchema);
 
 /** `traceLogs`: the trace's correlated log records, visibility-gated. */
-export const tracesV2TraceLogsSchema = z.array(traceLogRecordDtoSchema);
+export const tracesTraceLogsSchema = z.array(traceLogRecordDtoSchema);

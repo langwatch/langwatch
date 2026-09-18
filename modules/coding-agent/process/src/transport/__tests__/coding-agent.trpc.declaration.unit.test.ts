@@ -63,7 +63,7 @@ describe("the codingAgents tRPC surface", () => {
   });
 
   describe("given the binding a process mounts", () => {
-    it("asks traces:view of every procedure, the cut tracesV2 asks", () => {
+    it("asks traces:view of every procedure, the cut traces asks", () => {
       expect(boundProcedures()).toEqual([
         { procedure: "codingAgents.usageTotals", permission: "traces:view" },
         { procedure: "codingAgents.recentSessions", permission: "traces:view" },

@@ -95,6 +95,9 @@
       "path": "../../../packages/plans/tsconfig.build.json"
     },
     {
+      "path": "../../presence/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/prisma-client/tsconfig.build.json"
     },
     {
@@ -135,9 +138,6 @@
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"
-    },
-    {
-      "path": "../../presence/contract/tsconfig.build.json"
     }
   ]
 }

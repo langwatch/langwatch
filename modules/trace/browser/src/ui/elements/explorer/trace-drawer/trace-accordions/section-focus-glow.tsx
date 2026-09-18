@@ -43,7 +43,7 @@ export function SectionFocusGlow({
   return (
     <Portal>
       <style>{`
-        @keyframes tracesV2SectionFocusGlow {
+        @keyframes tracesSectionFocusGlow {
           0% {
             box-shadow:
               0 0 0 0 rgba(59, 130, 246, 0),
@@ -63,7 +63,7 @@ export function SectionFocusGlow({
             border-color: rgba(59, 130, 246, 0);
           }
         }
-        @keyframes tracesV2SectionFocusGlowDark {
+        @keyframes tracesSectionFocusGlowDark {
           0% {
             box-shadow:
               0 0 0 0 rgba(125, 211, 252, 0),
@@ -83,16 +83,16 @@ export function SectionFocusGlow({
             border-color: rgba(125, 211, 252, 0);
           }
         }
-        .tracesV2-section-focus-glow {
-          animation: tracesV2SectionFocusGlow ${GLOW_DURATION_MS}ms ease-out 1;
+        .traces-section-focus-glow {
+          animation: tracesSectionFocusGlow ${GLOW_DURATION_MS}ms ease-out 1;
         }
-        html.dark .tracesV2-section-focus-glow {
-          animation-name: tracesV2SectionFocusGlowDark;
+        html.dark .traces-section-focus-glow {
+          animation-name: tracesSectionFocusGlowDark;
         }
       `}</style>
       <Box
         key={nonce}
-        className="tracesV2-section-focus-glow"
+        className="traces-section-focus-glow"
         position="fixed"
         pointerEvents="none"
         zIndex={1600}

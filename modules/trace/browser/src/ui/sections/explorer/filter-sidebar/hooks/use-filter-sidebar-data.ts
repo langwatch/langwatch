@@ -1,3 +1,4 @@
+import { useFilterStore } from "@langwatch/trace-browser-kit";
 import { analyzeOrGroups, buildFacetStateLookup, getFacetValues } from "@langwatch/trace-contract";
 import { useCallback, useEffect, useMemo } from "react";
 
@@ -30,7 +31,6 @@ import {
   selectVisibilityFor,
   useFacetVisibilityStore,
 } from "../../../../../behavior/facet-visibility.store.ts";
-import { useFilterStore } from "../../../../../behavior/filter.store.ts";
 import type { NumericMode } from "../../../../../behavior/numeric-mode.store.ts";
 import {
   selectNumericModesFor,

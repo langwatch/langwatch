@@ -1,12 +1,11 @@
+import { INITIAL_TIME_RANGE, useFilterStore, useViewStore } from "@langwatch/trace-browser-kit";
 import { useCallback } from "react";
 
 import { useOnboardingStore } from "../../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
 import { useOnboardingActive } from "../../../../../behavior/explorer/onboarding/use-onboarding-active.ts";
 import { useProjectHasTraces } from "../../../../../behavior/explorer/use-project-has-traces.ts";
-import { INITIAL_TIME_RANGE, useFilterStore } from "../../../../../behavior/filter.store.ts";
 import { api } from "../../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
-import { useViewStore } from "../../../../../behavior/view.store.ts";
 
 export interface OnboardingEntryState {
   /**
@@ -97,7 +96,7 @@ export function useTourEntryPoints(): OnboardingEntryState {
     // Use reset (not invalidate) so the cache is purged immediately — the next
     // useTraceListQuery flows through isLoading=true → skeleton instead of keeping the
     // stale sample rows visible until the real fetch lands.
-    void utils.tracesV2.list.reset();
+    void utils.traces.list.reset();
   }, [projectId, setSetupDismissedForProject, setTourActive, utils]);
 
   return {

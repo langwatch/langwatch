@@ -1,4 +1,5 @@
 import { Flex, Text } from "@chakra-ui/react";
+import { useFilterStore, type LensConfig, groupByForGrouping } from "@langwatch/trace-browser-kit";
 import {
   getCoreRowModel,
   getSortedRowModel,
@@ -8,9 +9,6 @@ import {
 import type React from "react";
 import { useMemo, useState } from "react";
 
-import { useFilterStore } from "../../../../behavior/filter.store.ts";
-import type { LensConfig } from "../../../../behavior/view.store.ts";
-import { groupByForGrouping } from "../../../../behavior/view.store.ts";
 import { VirtualSpacer } from "../../../blocks/explorer/trace-table/virtual-spacer.tsx";
 import type { TraceListItem } from "../types/trace.ts";
 import { buildGroupColumns } from "./columns.ts";

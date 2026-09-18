@@ -31,7 +31,7 @@ vi.mock("../../../langy/hooks/use-show-langy.ts", () => ({
 vi.mock("../../../../../behavior/langy/use-can-ask-langy.ts", () => ({
   useCanAskLangy: () => langyMock.enabled,
 }));
-vi.mock("@langwatch/langy-browser/surfaces/langy-store", async (importOriginal) => {
+vi.mock("@langwatch/langy-browser-kit", async (importOriginal) => {
   const actual = (await importOriginal()) as object;
   const state = () => ({
     isOpen: langyMock.panelOpen,
@@ -88,7 +88,8 @@ vi.mock("@paper-design/shaders-react", () => ({
   MeshGradient: () => null,
 }));
 
-import { useFilterStore } from "../../../../../behavior/filter.store.ts";
+import { useFilterStore } from "@langwatch/trace-browser-kit";
+
 import { SearchBar } from "../search-bar.tsx";
 import { SEARCH_HANDOFF_DRAFT } from "../search-langy-handoff.ts";
 

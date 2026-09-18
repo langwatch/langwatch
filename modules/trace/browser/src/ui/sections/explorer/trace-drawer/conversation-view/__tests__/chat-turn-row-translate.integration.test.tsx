@@ -15,9 +15,12 @@ vi.mock("../../scenario-roles.tsx", async () => {
   return { ...actual, useIsScenarioRole: () => false };
 });
 
-vi.mock(
-  "../../../../../../behavior/explorer/trace-drawer/conversation-view/expand-context.ts",
-  () => ({
+vi.mock("@langwatch/trace-browser-kit", async () => {
+  const actual = await vi.importActual<typeof import("@langwatch/trace-browser-kit")>(
+    "@langwatch/trace-browser-kit",
+  );
+  return {
+    ...actual,
     useConversationExpand: () => ({
       isExpandable: false,
       shouldExpandAll: false,
@@ -25,8 +28,8 @@ vi.mock(
     ConversationExpandContext: {
       Provider: ({ children }: { children: unknown }) => children,
     },
-  }),
-);
+  };
+});
 
 vi.mock("../../../../markdown.tsx", () => ({
   Markdown: ({ children }: { children: string }) => <span>{children}</span>,

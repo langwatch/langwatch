@@ -49,7 +49,7 @@ export interface TraceListEventGroup {
 
 /**
  * A trace's events as the list renders them. Read from `stored_spans` by
- * `tracesV2.listEvents` once per visible page, not carried on the trace summary — the
+ * `traces.listEvents` once per visible page, not carried on the trace summary — the
  * fold stopped hoisting events so that folding stays O(1) per span (migration 00025).
  */
 export interface TraceListEvents {

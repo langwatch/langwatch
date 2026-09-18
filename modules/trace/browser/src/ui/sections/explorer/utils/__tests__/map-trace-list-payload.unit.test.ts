@@ -72,7 +72,7 @@ describe("mapTraceListPayload", () => {
     describe("when mapping the payload", () => {
       it("leaves rows eventless for the separate events read to fill in", () => {
         // Events are not on the trace summary — `useTraceListEvents` merges
-        // them in from `tracesV2.listEvents`, so the list payload never
+        // them in from `traces.listEvents`, so the list payload never
         // carries any.
         const rows = mapTraceListPayload({ items: [{ traceId: "t1" }] });
         expect(rows[0]?.events).toEqual(NO_TRACE_EVENTS);

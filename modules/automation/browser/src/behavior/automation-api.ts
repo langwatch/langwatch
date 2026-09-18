@@ -83,7 +83,7 @@ type BorrowedProcedures = {
     getAll: { query: { input: ProjectScope; output: AutomationDataset[] } };
   };
 
-  tracesV2: {
+  traces: {
     list: {
       query: {
         input: ProjectScope & {

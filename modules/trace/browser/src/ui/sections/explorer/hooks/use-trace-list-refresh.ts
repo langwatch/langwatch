@@ -41,7 +41,7 @@ export function useTraceListRefresh(): UseTraceListRefreshResult {
   const lastClickRef = useRef(0);
 
   // Count any in-flight trace-explorer queries. tRPC's query keys are
-  // arrays like `[["tracesV2", "list"], ...]`; checking the JSON form
+  // arrays like `[["traces", "list"], ...]`; checking the JSON form
   // catches every (list, discover, newCount) variant without needing
   // to enumerate them one by one.
   const fetchingCount = useIsFetching({
@@ -68,12 +68,12 @@ export function useTraceListRefresh(): UseTraceListRefreshResult {
     requestRefresh();
     // Cancel before invalidate so a slow previous round-trip can't
     // race the fresh one and overwrite the view with stale data.
-    void trpcUtils.tracesV2.list.cancel();
-    void trpcUtils.tracesV2.discover.cancel();
-    void trpcUtils.tracesV2.newCount.cancel();
-    void trpcUtils.tracesV2.list.invalidate();
-    void trpcUtils.tracesV2.discover.invalidate();
-    void trpcUtils.tracesV2.newCount.invalidate();
+    void trpcUtils.traces.list.cancel();
+    void trpcUtils.traces.discover.cancel();
+    void trpcUtils.traces.newCount.cancel();
+    void trpcUtils.traces.list.invalidate();
+    void trpcUtils.traces.discover.invalidate();
+    void trpcUtils.traces.newCount.invalidate();
   }, [trpcUtils, requestRefresh]);
 
   return {
@@ -98,7 +98,7 @@ function isTraceExplorerQuery(key: unknown): boolean {
   const head = queryKeyHead(key);
   if (head === null) return false;
   return (
-    head.includes('"tracesV2"') &&
+    head.includes('"traces"') &&
     (head.includes('"list"') || head.includes('"discover"') || head.includes('"newCount"'))
   );
 }
@@ -107,5 +107,5 @@ function isTraceExplorerQuery(key: unknown): boolean {
 function isTraceListQuery(key: unknown): boolean {
   const head = queryKeyHead(key);
   if (head === null) return false;
-  return head.includes('"tracesV2"') && head.includes('"list"');
+  return head.includes('"traces"') && head.includes('"list"');
 }

@@ -37,7 +37,7 @@ export function useConversationTurnEvents(turns: TraceListItem[]): TraceListItem
   }, [turns]);
 
   const enabled = !!projectId && !isReadOnly && traceIds.length > 0;
-  const query = api.tracesV2.listEvents.useQuery(
+  const query = api.traces.listEvents.useQuery(
     {
       projectId,
       traceIds,

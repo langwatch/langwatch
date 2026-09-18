@@ -1,4 +1,5 @@
 import { Box, chakra, Flex, Icon, Text } from "@chakra-ui/react";
+import { getDisplayRoleVisuals, useIsScenarioRole } from "@langwatch/trace-browser-kit";
 import { LuBot, LuChevronUp, LuUser } from "react-icons/lu";
 
 import type { ContentBlock, ConversationTurn } from "../../../model/transcript/types.ts";
@@ -8,7 +9,6 @@ import {
   ROLE_LABELS,
   type RolePalette,
 } from "../../blocks/transcript/role-chip.tsx";
-import { getDisplayRoleVisuals, useIsScenarioRole } from "../../elements/scenario-role.tsx";
 import { BlockStack } from "./block-stack.tsx";
 
 /**

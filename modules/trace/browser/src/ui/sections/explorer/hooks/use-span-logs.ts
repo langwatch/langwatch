@@ -14,7 +14,7 @@ export function useSpanLogs() {
   // always runs the real header query, this just follows its cache entry.
   // full: true matches useTraceHeader's own query key, or this would watch
   // a cache slot the scaffold's query never populates.
-  const header = api.tracesV2.header.useQuery({ ...queryArgs, full: true }, { enabled: false });
+  const header = api.traces.header.useQuery({ ...queryArgs, full: true }, { enabled: false });
   const logRecordCount = Number(
     header.data?.attributes["langwatch.reserved.log_record_count"] ?? "0",
   );
@@ -23,7 +23,7 @@ export function useSpanLogs() {
   // transcript and tool activity, so failing open for them is the right bias.
   const mayHaveLogs = logRecordCount > 0 || header.data?.origin === "coding_agent";
 
-  const query = api.tracesV2.traceLogs.useQuery(queryArgs, {
+  const query = api.traces.traceLogs.useQuery(queryArgs, {
     enabled: isReady && mayHaveLogs,
     staleTime: 60_000,
     refetchOnWindowFocus: false,

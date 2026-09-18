@@ -1,7 +1,7 @@
 import { Box, Image, Text, VStack } from "@chakra-ui/react";
+import { getDisplayRoleVisuals } from "@langwatch/trace-browser-kit";
 import type { ReactNode } from "react";
 
-import { getDisplayRoleVisuals } from "../../elements/scenario-role.tsx";
 import { Bubble } from "../explorer/trace-table/registry/addons/conversation/bubble.tsx";
 import { RenderInputOutput } from "../traces/render-input-output.tsx";
 import { ToolPairCard } from "../transcript/tool-blocks.tsx";

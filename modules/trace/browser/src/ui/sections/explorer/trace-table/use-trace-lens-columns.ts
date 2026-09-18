@@ -1,8 +1,8 @@
+import { parseEvalColumnId } from "@langwatch/trace-browser-kit";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useMemo } from "react";
 
 import { timeColumnSizing, useTimeFormatStore } from "../../../../behavior/time-format.store.ts";
-import { parseEvalColumnId } from "../../../../model/lens-eval-column-id.ts";
 import type { TraceListItem } from "../types/trace.ts";
 import { addColumnColumnDef } from "./add-column-header.tsx";
 import { getTraceColumnDef } from "./columns.ts";

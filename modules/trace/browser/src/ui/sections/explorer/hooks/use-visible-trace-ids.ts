@@ -1,9 +1,8 @@
 import { toEpochMs } from "@langwatch/time";
+import { useFilterStore, useViewStore } from "@langwatch/trace-browser-kit";
 
-import { useFilterStore } from "../../../../behavior/filter.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { useViewStore } from "../../../../behavior/view.store.ts";
 
 export interface VisibleTraceIds {
   /** Set of traceIds currently rendered in the list. */
@@ -18,7 +17,7 @@ export interface VisibleTraceIds {
 }
 
 /**
- * Reads the current `tracesV2.list` cache entry and returns the set of visible traceIds
+ * Reads the current `traces.list` cache entry and returns the set of visible traceIds
  * plus the top-of-page timestamp and current page number.
  */
 export function useVisibleTraceIds(): VisibleTraceIds {
@@ -39,7 +38,7 @@ export function useVisibleTraceIds(): VisibleTraceIds {
   const traceCursor = pageCursor && typeof pageCursor === "object" ? pageCursor : undefined;
   const effectivePage = grouping !== "by-conversation" ? page : 1;
 
-  const cached = trpcUtils.tracesV2.list.getData({
+  const cached = trpcUtils.traces.list.getData({
     projectId: project?.id ?? "",
     timeRange: {
       from: timeRange.from,

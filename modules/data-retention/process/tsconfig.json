@@ -48,13 +48,13 @@
       "path": "../../project/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/secrets/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
       "path": "../../user/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/secrets/tsconfig.build.json"
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"

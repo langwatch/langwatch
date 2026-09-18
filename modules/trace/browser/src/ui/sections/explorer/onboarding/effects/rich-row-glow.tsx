@@ -32,7 +32,7 @@ export const RichRowGlow: React.FC = () => {
 
   return (
     <style>{`
-      @keyframes tracesV2RichRowGlow {
+      @keyframes tracesRichRowGlow {
         0%, 100% {
           filter:
             drop-shadow(0 0 6px rgba(59, 130, 246, 0.45))
@@ -44,7 +44,7 @@ export const RichRowGlow: React.FC = () => {
             drop-shadow(0 0 26px rgba(99, 102, 241, 0.36));
         }
       }
-      @keyframes tracesV2RichRowGlowDark {
+      @keyframes tracesRichRowGlowDark {
         0%, 100% {
           filter:
             drop-shadow(0 0 8px rgba(125, 211, 252, 0.32))
@@ -64,7 +64,7 @@ export const RichRowGlow: React.FC = () => {
         position: relative;
         z-index: 10;
         cursor: pointer;
-        animation: tracesV2RichRowGlow 2.2s ease-in-out infinite;
+        animation: tracesRichRowGlow 2.2s ease-in-out infinite;
         transition: filter 220ms ease;
       }
       ${each("", { dark: true })} {
@@ -72,7 +72,7 @@ export const RichRowGlow: React.FC = () => {
         --rich-ring-hover: rgba(125, 211, 252, 0.62);
         --rich-bg: rgba(125, 211, 252, 0.1);
         --rich-bg-hover: rgba(125, 211, 252, 0.2);
-        animation: tracesV2RichRowGlowDark 2.2s ease-in-out infinite;
+        animation: tracesRichRowGlowDark 2.2s ease-in-out infinite;
       }
       ${each(" > tr > td")} {
         background-color: var(--rich-bg);

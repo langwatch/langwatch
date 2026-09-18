@@ -1,5 +1,5 @@
 /**
- * One session row as returned by `tracesV2.sessions`, the server-side rollup over every
+ * One session row as returned by `traces.sessions`, the server-side rollup over every
  * trace sharing a `gen_ai.conversation.id` in range
  * (specs/traces-v2/sessions-lens.feature).
  */

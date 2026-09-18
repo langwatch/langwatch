@@ -1,9 +1,9 @@
 import { Box, Circle, Flex, HStack, Icon, Spacer, Text } from "@chakra-ui/react";
+import { useConversationExpand } from "@langwatch/trace-browser-kit";
 import { Lightbulb, MessageSquare } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 
-import { useConversationExpand } from "../../../../../../../behavior/explorer/trace-drawer/conversation-view/expand-context.ts";
 import { MessageExpandToggle } from "../../../../../../elements/explorer/trace-drawer/conversation-view/message-expand-toggle.tsx";
 import { Markdown } from "../../../../../markdown.tsx";
 import {

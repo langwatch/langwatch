@@ -40,23 +40,23 @@ export function TerminalTab({
   sessionName,
   conversationId,
 }: TerminalTabProps) {
-  const transcriptQuery = api.tracesV2.codingAgentTranscript.useQuery(
+  const transcriptQuery = api.traces.codingAgentTranscript.useQuery(
     { projectId, traceId, occurredAtMs },
     { refetchOnWindowFocus: false, staleTime: 60_000 },
   );
 
-  const spansQuery = api.tracesV2.spansFull.useQuery(
+  const spansQuery = api.traces.spansFull.useQuery(
     { projectId, traceId, occurredAtMs },
     { refetchOnWindowFocus: false, staleTime: 60_000 },
   );
-  const eventsQuery = api.tracesV2.traceEvents.useQuery(
+  const eventsQuery = api.traces.traceEvents.useQuery(
     { projectId, traceId, occurredAtMs },
     { refetchOnWindowFocus: false, staleTime: 60_000 },
   );
   // The version/model/repo Claude Code itself would print above the prompt,
   // off the resource attributes (the session fold deliberately carries no
   // identity strings, ADR-041).
-  const resourceQuery = api.tracesV2.resourceInfo.useQuery(
+  const resourceQuery = api.traces.resourceInfo.useQuery(
     { projectId, traceId, occurredAtMs },
     { refetchOnWindowFocus: false, staleTime: 60_000 },
   );
@@ -143,7 +143,7 @@ function useSessionCostUsd({
   projectId: string;
   traceId: string;
 }): number | null {
-  const sessionQuery = api.tracesV2.codingAgentSession.useQuery(
+  const sessionQuery = api.traces.codingAgentSession.useQuery(
     { projectId, traceId },
     { refetchOnWindowFocus: false, staleTime: 60_000 },
   );
