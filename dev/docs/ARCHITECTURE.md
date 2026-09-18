@@ -202,6 +202,24 @@ shell implements from `browser-host` capabilities. The half is declared with
 `defineBrowserModule` — screens, drawers, publications, mounts, flags — and
 exported at `./declaration`; the generated `browserModules` list installs it.
 
+**One layout, nested** (ruled 2026-09-18). Those layers are the whole
+vocabulary. A package that outgrows a single `ui/sections/` folder does not
+invent a layer, it nests: `features/<name>/` repeats `model/ behavior/ ui/`
+inside itself and holds everything that feature owns. The module-level
+`behavior/` then keeps only what genuinely crosses features — behaviour
+belongs to the feature that owns it, never to a package-wide bucket every
+feature reaches into. A feature that is one component is a section.
+
+**A browser package exports `./declaration` and nothing else** (ruled
+2026-09-18). Rule 4 below stops a KIT being a subpath; nothing stopped an
+OWNER growing subpaths, and that is the hole the tree fell through — 23
+packages opened `./surfaces/*` entries and 626 cross-module import lines
+walked in, none of them a dependency-graph edge any baseline could hold. The
+exports map IS the enforcement: what is not exported cannot be reached, so
+closure is structural rather than a lint the next refactor forgets. This is
+why rule 1 needed no new rule, only a door that shuts. `surfaces/` and
+`screens/` are deleted spellings (§15).
+
 **The kit law** — each rule earned by a measured failure:
 
 1. **`trace-browser` is closed.** Nothing else imports it, ever. The moment
@@ -222,7 +240,14 @@ exported at `./declaration`; the generated `browserModules` list installs it.
 5. **A kit exists only where sharing is real** — three or more consumers. One
    consumer is not enough to MINT a kit: that is bilateral coupling, and the
    answer is to inline or duplicate it. The published tier is shrink-only.
-   (What an already-existing kit may hold is rule 6.)
+   (What an already-existing kit may hold is rule 6.) **Amended 2026-09-18:**
+   three is the default, and two consumers mint a kit where the alternative is
+   duplicating a large surface. The case that forced it: `suite` is reached
+   for by two consumers across 56 import lines — run cards, dialogs,
+   formatters, history store, form and pickers. Dissolving that copies six
+   surfaces twice to honour a number. The floor exists to stop premature kits,
+   not to force copy-paste where sharing is plainly already real. One consumer
+   is still never enough, and two with a thin surface still dissolves.
 6. **The floor gates a kit's EXISTENCE, not its contents** (ruled 2026-09-18).
    Once a kit is warranted and exists, it may hold a symbol with one consumer;
    creating a NEW kit still needs three. The case that forced the ruling: all
@@ -925,12 +950,13 @@ mountShell(ui); // shell/: providers + router over declarations
 `createUi` reads the injected public config from the DOM meta tag by default
 (`withInjectedConfig` is a test-only override) and validates it against every
 installed browser module's declaration **before a component renders**. Browser
-modules register everything — screens, drawers, api bindings, surfaces — via
+modules register everything — screens, drawers, api bindings — via
 their declarations; the app contributes only the shell chrome
 (`src/{main.tsx, shell/, styles/}`).
 
 **The declaration is the module's one browser export that matters** (landed
-2026-09-18): a browser package's `exports` map lists `./declaration` first,
+2026-09-18): a browser package's `exports` map lists `./declaration` only
+(§3.4 — every sibling entry is a side door, and 23 packages grew one),
 and the declaration file (`<name>.web.ts`, colocated test beside it)
 declares screens, drawers and api bindings with the same loader shape —
 `{ load }` — for each. The kernel (`@langwatch/ui-kernel`) stays React-free
@@ -1137,7 +1163,10 @@ transports · re-exports for backwards compatibility · `refusing*` twins ·
 `try*`/`require*` method names · `T | null` returns in new code (`find*` =
 array; `get*` = one or throws) · `static readonly configSchema` and its
 `*AppConfigSchema`/`*ServerConfigSchema` consts · a module declaring an env
-var another owner already declares (`BASE_HOST` outside the process owner).
+var another owner already declares (`BASE_HOST` outside the process owner) ·
+`surfaces/` and `screens/` browser folders · any `exports` entry on a browser
+package other than `./declaration` · any `exports` entry on a kit other than
+`.` · a kit importing another kit.
 
 ---
 
