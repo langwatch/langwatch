@@ -69,6 +69,7 @@ export class InstantEvalQueryInvalidError extends HandledError {
   constructor({
     reason,
     parameters,
+    fields,
     violations,
     reasons,
   }: {
@@ -76,6 +77,14 @@ export class InstantEvalQueryInvalidError extends HandledError {
     readonly reason: string;
     /** The parameter names at fault, when that is what it is. */
     readonly parameters?: readonly string[];
+    /**
+     * The request fields at fault, when the request was a shorthand.
+     *
+     * Named consumer: a form or an agent that has to say which of `target`,
+     * `filter` and `questions` it has to rewrite, which is not derivable from
+     * the sentence.
+     */
+    readonly fields?: readonly string[];
     /** The policy's own violations, when the policy is what refused it. */
     readonly violations?: unknown;
     readonly reasons?: readonly Error[];
@@ -88,6 +97,7 @@ export class InstantEvalQueryInvalidError extends HandledError {
       // which clause it has to change.
       meta: {
         ...(parameters && parameters.length > 0 ? { parameters } : {}),
+        ...(fields && fields.length > 0 ? { fields } : {}),
         ...(violations === undefined ? {} : { violations }),
       },
       ...remediation("instant_eval_query_invalid"),

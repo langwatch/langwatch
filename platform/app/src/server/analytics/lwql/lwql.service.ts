@@ -406,6 +406,18 @@ export class LangWatchQLService {
   private cachedInstantEvals?: LangWatchQLInstantEvalSupport;
 
   /**
+   * The database the views live in, and what an unqualified name resolves to.
+   *
+   * Published because a caller that WRITES a statement has to qualify its
+   * tables the way the schema publishes them, and the deployment is what
+   * decides the name. Reading it off the service is what keeps a generated
+   * statement and the schema document naming the same thing.
+   */
+  get database(): string {
+    return this.deps.database;
+  }
+
+  /**
    * Releases the transport the executor holds, where it holds one.
    *
    * The service does not own the executor's construction, but it is the only

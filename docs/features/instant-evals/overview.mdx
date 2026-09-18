@@ -1,0 +1,84 @@
+---
+title: Instant Evals
+sidebarTitle: Overview
+description: Search your entire production history with on-demand evals. Ask one question of every trace, conversation or model call you have and get the matches back in minutes.
+---
+
+## What an Instant Eval is
+
+An Instant Eval run asks one question of many rows at once. You write the
+question in your own words, pick what a row is, and the platform judges every
+matching row and records the answer.
+
+Offline evals score a dataset before you ship. Online evals score traffic as it
+arrives. An Instant Eval is the third kind: a question you thought of today,
+answered across six months of production.
+
+## What it costs
+
+Judging is done by a small classifier that answers typed questions over text,
+so a run is cheap and fast rather than a model call per row. Ten thousand
+conversations costs about a quarter of a dollar and finishes in under two
+minutes. A hundred thousand takes about seventeen.
+
+Every run is priced before it starts. `--estimate` gives you the price without
+starting anything, and a run over a thousand rows prints its price first.
+
+## The loop
+
+The feature is built around one loop, and the loop is what makes the answers
+good:
+
+1. Price the run, so you know what the question costs before you ask it.
+2. Run a hundred rows.
+3. Read five of them in full with `sample`, and see the text the judge saw.
+4. Change the words, or narrow the filter.
+5. Run the whole window.
+
+<Tip>
+  A question that reads well to you often reads differently to a judge. Reading
+  five sampled rows before you expand is the single largest improvement you can
+  make to a run's accuracy.
+</Tip>
+
+## What one row is
+
+A target settles what gets judged:
+
+| Target | One row is | What is judged |
+|---|---|---|
+| `traces` | one trace | the trace as the evaluators read it, cut to a token budget |
+| `threads` | one conversation | the whole thread as a transcript, cut to a token budget |
+| `llm-spans` | one model call | the chat messages of that call |
+
+## What a question can ask
+
+Three kinds, and one run may ask up to ten of them at once. Asking several
+questions of the same text costs about what asking one does, because one
+classification answers them all.
+
+| Kind | Answer | Written as |
+|---|---|---|
+| Yes or no | a calibrated probability, or a pass against your threshold | `--ask "the customer sounds annoyed"` |
+| Rating | a weighted mean on the scale you name | `--score 1..5` |
+| Choice | the most likely of the options you list | `--category refund=wants money back` |
+
+## Where the answers go
+
+Every judgement is stored against its trace: whether it passed, the probability
+behind it, the score or the label, and the full distribution for a choice. Read
+a page of them with `instant-eval results`, or query them as data with
+[LangWatchQL](/api-reference/query/overview).
+
+## Getting started
+
+Start with the [CLI reference](/features/instant-evals/cli), which is the
+fastest way to ask a first question. If you already write LangWatchQL, the
+[target shorthand](/features/instant-evals/shorthand) page shows the statement
+each shorthand expands into, which is the statement you edit when the shorthand
+stops being enough.
+
+<Note>
+  Instant Evals are behind a release flag. Ask LangWatch to turn them on for
+  your project.
+</Note>

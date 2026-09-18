@@ -1,0 +1,173 @@
+---
+title: Instant Evals CLI
+sidebarTitle: CLI reference
+description: Every langwatch instant-eval subcommand and flag, with the lines that start a run, follow it, read its matches and sample the text that was judged.
+---
+
+## Asking a first question
+
+```bash
+langwatch instant-eval run "the customer sounds annoyed" \
+  --target threads --last 7d --limit 100 --wait
+```
+
+That judges the last seven days of conversations, a hundred of them, and waits
+for the answer. In table mode it also prints the LangWatchQL statement it ran,
+which is the statement you edit when you want more than the shorthand gives
+you.
+
+## Pricing a run before you ask
+
+```bash
+langwatch instant-eval estimate "the customer sounds annoyed" \
+  --target threads --last 30d --limit 10000
+```
+
+The estimate counts the rows, measures a sample of their texts, and prices the
+run from that. No row is judged and no charge is made. `run --estimate` does
+the same and exits; a plain `run` over a thousand rows prints the price first,
+then starts.
+
+## Reading what came back
+
+```bash
+langwatch instant-eval sample <id> -n 5
+langwatch instant-eval results <id> --matched -o json
+```
+
+`sample` re-reads a few rows with the text that was judged beside the verdict it
+received, which is how you see what the judge saw. `results` reads a page of
+judgements, narrowed by question, by whether they matched, and by whether the
+judge answered at all.
+
+## run
+
+Starts a run. Takes a question, or a statement of your own.
+
+| Flag | What it does |
+|---|---|
+| `[question]` | The question, as the first argument |
+| `--ask <question>` | The same, as a flag. Repeat it to ask several questions of the same text |
+| `--criteria <text>` | For a yes or no question: what counts as yes, then what counts as no. Write it twice |
+| `--score <min..max>` | Ask for a rating on that whole-numbered scale instead of a yes or no |
+| `--category <name=meaning>` | Ask which option fits. Repeat it for each option |
+| `--threshold <probability>` | Where a yes or no question's probability becomes a pass |
+| `--id <name>` | What to call the question before it, which becomes its column |
+| `--questions-file <path>` | Read the questions from a JSON or YAML file |
+| `--target <target>` | What one row is: `traces`, `threads` or `llm-spans` (default `traces`) |
+| `--filter <filter>` | Narrow the rows with a trace filter |
+| `--last <window>` | How far back to look: `7d`, `24h`, `30m`, `2w` (default `7d`) |
+| `--start <instant>` `--end <instant>` | The window, exactly |
+| `--sql <statement>` `--sql-file <path>` | Run a LangWatchQL statement of your own |
+| `--param <key=value>` | Bind one of your statement's parameters |
+| `--limit <n>` | Rows the run may judge (default 1000) |
+| `--name <name>` | What to call the run |
+| `--estimate` | Price the run and exit |
+| `--wait [minutes]` | Follow the run, up to 45 minutes or the minutes given |
+
+A modifier flag describes the question before it, so a line may ask two
+questions that each carry their own criteria:
+
+```bash
+langwatch instant-eval run \
+  --ask "the customer sounds annoyed" \
+    --criteria "sarcasm, repetition or a raised voice count" \
+    --criteria "a calm complaint does not count" \
+  --ask "the agent apologised" --threshold 0.8 \
+  --target threads --last 7d
+```
+
+### Several questions from a file
+
+```json
+[
+  { "id": "annoyed", "kind": "boolean", "instructions": "the customer sounds annoyed" },
+  { "id": "intent", "kind": "category", "instructions": "what is being asked for",
+    "options": [
+      { "name": "refund", "description": "wants money back" },
+      { "name": "bug", "description": "reports something broken" }
+    ] }
+]
+```
+
+```bash
+langwatch instant-eval run --questions-file questions.json --target threads --last 7d
+```
+
+A file is also how a question gets a name of its own. Without one, questions
+are called `q1`, `q2` and so on, and that name is the column the answer lands
+in and the name every judgement is filed under.
+
+### Waiting
+
+`--wait` polls every three seconds and reports one line:
+
+```
+Judging... 3,200/10,000 (412 matched)
+```
+
+It exits non-zero when the run failed and when the wait ran out, so a script
+can tell a red run from a green one. A run that outlives the wait keeps going;
+follow it later with `status`.
+
+## status
+
+```bash
+langwatch instant-eval status <id> --wait
+```
+
+Reads one run: where it is, how many rows it found and judged, how many
+matched in total and per question, what the judge could not answer, and the
+tokens and price the judging came to. Prints the statement too.
+
+## list
+
+```bash
+langwatch instant-eval list -o json
+```
+
+The project's runs, newest first. Page with `--before` and `--before-id`, which
+take the created time and the id of the oldest run on the previous page.
+
+## results
+
+```bash
+langwatch instant-eval results <id> --question annoyed --matched --limit 200
+```
+
+| Flag | What it does |
+|---|---|
+| `--question <id>` | Only that question's judgements |
+| `--matched` / `--unmatched` | Only the ones that matched, or only the ones that did not |
+| `--status <status>` | Only `judged`, `skipped` or `failed` judgements |
+| `--limit <n>` | Judgements per page, at most 1000 (default 100) |
+| `--cursor <cursor>` | The cursor the previous page answered with |
+
+The cursor is the only way to read the page after a page: no judgement is ever
+carried by two pages, and none is skipped while the run is still writing.
+
+## sample
+
+```bash
+langwatch instant-eval sample <id> -n 5
+```
+
+A few of the run's rows with the judged text beside the verdict. The text is
+re-read through the statement's own extraction functions, so sampling judges no
+row again and costs no money.
+
+## cancel
+
+```bash
+langwatch instant-eval cancel <id>
+```
+
+Asks the run to stop before its next page. The pages it already judged keep
+their judgements and stay readable. A run that already finished answers 409.
+
+## Output
+
+Every subcommand honours the shared output contract: `-o table|json|agents|yaml`,
+`--json <fields>` and `--jq <path>`. In a machine format the statement is a
+field of the run rather than a printed block, and the progress line stays on
+standard error so the document a script reads holds one object.

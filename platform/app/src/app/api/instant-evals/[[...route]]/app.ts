@@ -52,6 +52,7 @@ import {
   instantEvalResultsQuerySchema,
   instantEvalRunInputSchema,
   instantEvalSampleQuerySchema,
+  toInstantEvalRunInput,
 } from "./schemas";
 import {
   instantEvalEstimateSchema,
@@ -126,7 +127,7 @@ const registerCollectionEndpoints = (v: InstantEvalsVersion): void => {
         await app.runs.create({
           projectId: app.project.id,
           protections: await protectionsFor(app),
-          input,
+          input: toInstantEvalRunInput(input),
         }),
       ),
   );
@@ -151,7 +152,7 @@ const registerCollectionEndpoints = (v: InstantEvalsVersion): void => {
       await app.runs.estimate({
         projectId: app.project.id,
         protections: await protectionsFor(app),
-        input,
+        input: toInstantEvalRunInput(input),
       }),
   );
 

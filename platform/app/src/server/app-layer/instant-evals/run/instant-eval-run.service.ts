@@ -28,6 +28,7 @@ import { createLogger } from "@langwatch/observability";
 import type { LangWatchQLService } from "~/server/analytics/lwql";
 import type { Protections } from "~/server/traces/protections";
 import type { InstantEvalClassifier } from "../classifier/classifier";
+import type { InstantEvalShorthandInput } from "../shorthand";
 import type { InstantEvalCancellations } from "./cancellation";
 import { instantEvalRowLimitOrRefuse } from "./caps";
 import {
@@ -35,6 +36,7 @@ import {
   InstantEvalNotEnabledError,
   InstantEvalRunNotFoundError,
 } from "./errors";
+import { instantEvalStatementFor } from "./input";
 import { createInstantEvalRun } from "./instant-eval-create";
 import {
   estimateInstantEvalRun,
@@ -58,10 +60,19 @@ import {
 
 const logger = createLogger("langwatch:instant-evals:run-service");
 
-/** What a caller sends to start or price a run. */
+/**
+ * What a caller sends to start or price a run.
+ *
+ * Either a statement or a shorthand, never both and never neither. The
+ * shorthand is expanded into a statement before anything else happens, so
+ * every field below `shorthand` describes the run that the expansion produced
+ * just as much as one a caller wrote by hand.
+ */
 export interface InstantEvalRunInput {
-  readonly sql: string;
+  readonly sql?: string;
   readonly parameters?: Readonly<Record<string, unknown>>;
+  /** A target, a trace filter and the questions, in place of a statement. */
+  readonly shorthand?: InstantEvalShorthandInput;
   readonly name?: string;
   /**
    * Rows the run may judge.
@@ -159,13 +170,17 @@ export class InstantEvalRunService {
     protections: Protections;
     input: InstantEvalRunInput;
   }): Promise<AcceptedInstantEvalStatement> {
+    const statement = instantEvalStatementFor({
+      input,
+      database: this.deps.query.database,
+    });
     return await acceptInstantEvalStatement({
       query: this.deps.query,
       rowSource: this.deps.rowSource,
       caller,
       protections,
-      sql: input.sql,
-      ...(input.parameters ? { parameters: input.parameters } : {}),
+      sql: statement.sql,
+      ...(statement.parameters ? { parameters: statement.parameters } : {}),
     });
   }
 
