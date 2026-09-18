@@ -25,7 +25,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - uses: langwatch/langwatch-pr-review-bot@4bb3022896af5025953a78c6638b9ce516580e27 # chore/pin-nested-actions (PR #5) — bump to main after merge
+      - uses: langwatch/langwatch-pr-review-bot@996c74262e7210d46ccb46efe5661ccf0757119f # chore/pin-nested-actions (PR #5) — bump to main after merge
         with:
           slack_notify: "false"
           claude_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
