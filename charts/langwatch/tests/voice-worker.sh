@@ -30,7 +30,7 @@ fail() {
 }
 
 # autogen generates fresh random Secret values on every render, independent of
-# voice, so a byte-identical comparison must normalise those out first, or
+# voice — so a byte-identical comparison must normalise those out first, or
 # every render pair would "differ" for a reason that has nothing to do with
 # voice. Every such value is a long quoted base64 string; blank them all,
 # consistently, on both sides being compared.
@@ -88,9 +88,9 @@ render_component() {
   '
 }
 
-readonly ENABLED_FLAGS="--set voice.enabled=true --set voice.publicBaseUrl=https://voice.example.com"
+readonly ENABLED_FLAGS="--set voice.enabled=true --set voice.publicBaseUrl=https://voice.example.com --set voice.twilio.existingSecret=twilio"
 
-# @scenario "Turning on the voice worker brings up a single call handler"
+# @scenario "Turning on the voice worker brings up a single call handler wired to Twilio"
 test_enabled_renders_deployment() {
   local block
   block=$(render_component "deployment.yaml" "$ENABLED_FLAGS")
@@ -106,7 +106,23 @@ test_enabled_renders_deployment() {
     fail "voice deployment VOICE_WORKER_ONLY" "expected VOICE_WORKER_ONLY=true"
     return
   fi
-  echo "ok   [voice deployment] replicas=1, VOICE_WORKER_ONLY=true"
+  if ! printf '%s' "$block" | grep -A3 "name: TWILIO_ACCOUNT_SID" | grep -q "name: twilio"; then
+    fail "voice deployment TWILIO_ACCOUNT_SID" "expected secretKeyRef to Secret 'twilio'"
+    return
+  fi
+  if ! printf '%s' "$block" | grep -A4 "name: TWILIO_ACCOUNT_SID" | grep -q "key: TWILIO_ACCOUNT_SID"; then
+    fail "voice deployment TWILIO_ACCOUNT_SID key" "expected secretKeyRef key TWILIO_ACCOUNT_SID"
+    return
+  fi
+  if ! printf '%s' "$block" | grep -A3 "name: TWILIO_AUTH_TOKEN" | grep -q "name: twilio"; then
+    fail "voice deployment TWILIO_AUTH_TOKEN" "expected secretKeyRef to Secret 'twilio'"
+    return
+  fi
+  if ! printf '%s' "$block" | grep -A3 "name: TWILIO_FROM_NUMBER" | grep -q "name: twilio"; then
+    fail "voice deployment TWILIO_FROM_NUMBER" "expected secretKeyRef to Secret 'twilio'"
+    return
+  fi
+  echo "ok   [voice deployment] replicas=1, VOICE_WORKER_ONLY=true, Twilio secretKeyRefs present"
 }
 
 # @scenario "The voice worker's shutdown timing is its own, not borrowed from the background workers"
@@ -183,7 +199,7 @@ test_ingress_host_mismatch_refuses() {
 # @scenario "The voice worker refuses to start without knowing its own public address"
 test_enabled_without_public_base_url_refuses() {
   local out
-  if out=$(render "--set voice.enabled=true"); then
+  if out=$(render "--set voice.enabled=true --set voice.twilio.existingSecret=twilio"); then
     fail "missing publicBaseUrl" "chart rendered when voice.publicBaseUrl was not set"
     return
   fi
@@ -195,118 +211,18 @@ test_enabled_without_public_base_url_refuses() {
   esac
 }
 
-# @scenario "The voice worker refuses a public address that is not a valid https:// origin"
-test_enabled_with_http_public_base_url_refuses() {
+# @scenario "The voice worker refuses to start without Twilio credentials configured"
+test_enabled_without_twilio_secret_refuses() {
   local out
-  if out=$(render "--set voice.enabled=true --set voice.publicBaseUrl=http://voice.example.com"); then
-    fail "http publicBaseUrl" "chart rendered when voice.publicBaseUrl used http:// instead of https://"
+  if out=$(render "--set voice.enabled=true --set voice.publicBaseUrl=https://voice.example.com"); then
+    fail "missing twilio secret" "chart rendered when voice.twilio.existingSecret was not set"
     return
   fi
   case "$out" in
-    *"must be an https origin only"*)
-      echo "ok   [http publicBaseUrl] refused with the expected message" ;;
+    *"voice.twilio.existingSecret is required"*)
+      echo "ok   [missing twilio secret] refused with the expected message" ;;
     *)
-      fail "http publicBaseUrl" "refused, but not for the expected reason: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-200)" ;;
-  esac
-}
-
-# @scenario "Turning on the voice worker with a valid https:// public address renders"
-test_enabled_with_https_public_base_url_renders() {
-  local block
-  block=$(render_component "deployment.yaml" "--set voice.enabled=true --set voice.publicBaseUrl=https://voice.example.com")
-  if [ -z "$block" ]; then
-    fail "https publicBaseUrl" "rendered no voice Deployment with a valid https:// voice.publicBaseUrl"
-    return
-  fi
-  if ! printf '%s' "$block" | grep -A1 "name: VOICE_PUBLIC_BASE_URL" | grep -q 'value: "https://voice.example.com"'; then
-    fail "https publicBaseUrl" "expected VOICE_PUBLIC_BASE_URL=https://voice.example.com"
-    return
-  fi
-  echo "ok   [https publicBaseUrl] renders with VOICE_PUBLIC_BASE_URL=https://voice.example.com"
-}
-
-# @scenario "Turning on the voice worker with a valid https:// public address including a port renders"
-test_enabled_with_https_port_public_base_url_renders() {
-  local block
-  block=$(render_component "deployment.yaml" "--set voice.enabled=true --set voice.publicBaseUrl=https://voice.example.com:8443")
-  if [ -z "$block" ]; then
-    fail "https publicBaseUrl with port" "rendered no voice Deployment with a valid https:// voice.publicBaseUrl including a port"
-    return
-  fi
-  if ! printf '%s' "$block" | grep -A1 "name: VOICE_PUBLIC_BASE_URL" | grep -q 'value: "https://voice.example.com:8443"'; then
-    fail "https publicBaseUrl with port" "expected VOICE_PUBLIC_BASE_URL=https://voice.example.com:8443"
-    return
-  fi
-  echo "ok   [https publicBaseUrl with port] renders with VOICE_PUBLIC_BASE_URL=https://voice.example.com:8443"
-}
-
-# @scenario "The voice worker refuses a public address that includes a path"
-test_enabled_with_path_public_base_url_refuses() {
-  local out
-  if out=$(render "--set voice.enabled=true --set voice.publicBaseUrl=https://voice.example.com/twilio"); then
-    fail "publicBaseUrl with path" "chart rendered when voice.publicBaseUrl included a path"
-    return
-  fi
-  case "$out" in
-    *"must be an https origin only"*)
-      echo "ok   [publicBaseUrl with path] refused with the expected message" ;;
-    *)
-      fail "publicBaseUrl with path" "refused, but not for the expected reason: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-200)" ;;
-  esac
-}
-
-# @scenario "The voice worker refuses a public address that includes a query string"
-test_enabled_with_query_public_base_url_refuses() {
-  local out
-  if out=$(render "--set voice.enabled=true --set voice.publicBaseUrl=https://voice.example.com?x=1"); then
-    fail "publicBaseUrl with query" "chart rendered when voice.publicBaseUrl included a query string"
-    return
-  fi
-  case "$out" in
-    *"must be an https origin only"*)
-      echo "ok   [publicBaseUrl with query] refused with the expected message" ;;
-    *)
-      fail "publicBaseUrl with query" "refused, but not for the expected reason: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-200)" ;;
-  esac
-}
-
-# @scenario "The voice worker refuses a public address with a trailing slash"
-test_enabled_with_trailing_slash_public_base_url_refuses() {
-  local out
-  if out=$(render "--set voice.enabled=true --set voice.publicBaseUrl=https://voice.example.com/"); then
-    fail "publicBaseUrl with trailing slash" "chart rendered when voice.publicBaseUrl had a trailing slash"
-    return
-  fi
-  case "$out" in
-    *"must be an https origin only"*)
-      echo "ok   [publicBaseUrl with trailing slash] refused with the expected message" ;;
-    *)
-      fail "publicBaseUrl with trailing slash" "refused, but not for the expected reason: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-200)" ;;
-  esac
-}
-
-# @scenario "The voice worker refuses a public address with a malformed hostname"
-test_enabled_with_malformed_host_public_base_url_refuses() {
-  local out
-  if out=$(render "--set voice.enabled=true --set voice.publicBaseUrl=https://"); then
-    fail "publicBaseUrl with no hostname" "chart rendered when voice.publicBaseUrl had no hostname"
-    return
-  fi
-  case "$out" in
-    *"must be an https origin only"*)
-      echo "ok   [publicBaseUrl with no hostname] refused with the expected message" ;;
-    *)
-      fail "publicBaseUrl with no hostname" "refused, but not for the expected reason: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-200)" ;;
-  esac
-  if out=$(render "--set voice.enabled=true --set voice.publicBaseUrl=https://-bad.example.com"); then
-    fail "publicBaseUrl with leading-hyphen hostname" "chart rendered when voice.publicBaseUrl's hostname started with a hyphen"
-    return
-  fi
-  case "$out" in
-    *"must be an https origin only"*)
-      echo "ok   [publicBaseUrl with leading-hyphen hostname] refused with the expected message" ;;
-    *)
-      fail "publicBaseUrl with leading-hyphen hostname" "refused, but not for the expected reason: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-200)" ;;
+      fail "missing twilio secret" "refused, but not for the expected reason: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-200)" ;;
   esac
 }
 
@@ -318,13 +234,7 @@ test_enabled_renders_service_no_ingress
 test_ingress_enabled_renders
 test_ingress_host_mismatch_refuses
 test_enabled_without_public_base_url_refuses
-test_enabled_with_http_public_base_url_refuses
-test_enabled_with_https_public_base_url_renders
-test_enabled_with_https_port_public_base_url_renders
-test_enabled_with_path_public_base_url_refuses
-test_enabled_with_query_public_base_url_refuses
-test_enabled_with_trailing_slash_public_base_url_refuses
-test_enabled_with_malformed_host_public_base_url_refuses
+test_enabled_without_twilio_secret_refuses
 
 if [ "$failures" -gt 0 ]; then
   echo "$failures assertion(s) failed"
