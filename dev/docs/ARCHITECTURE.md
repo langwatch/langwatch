@@ -276,16 +276,31 @@ is unwritable, not merely unwise. Inside `expose`, the members are typed
 from the installed tuple: install the first namespace-declaring module and
 `.trpc()` becomes required (boot() refuses to compile, naming
 `surface.trpc`); uninstall the last one and the `.trpc()` line goes red in
-place. A bare member means config and declarations decide everything;
-**each member's callback holds only what is surface-generic** — the
-generic auth definition (`rest((r) => r.withAuth(SessionAuth.create(...)))`,
-a named CLASS from its own package, never inline data), header overlays,
-general security. Family-specific credentials are NOT surface policy: the
-cron, langy-internal and instance-admin bearers each bind **at the module
-that declares the family**, from that module's own config slice — no
-internal-family credential appears in a main, a surface block, or any
-process-global bag. An override beats config exactly where it applies and
-nowhere else.
+place. **All routing is the framework's.** Every request flows through
+`@langwatch/api` — middleware, family and namespace placement, per-route
+auth binding, all driven by the modules' declarations. No application code
+routes anything. **Each expose member sets up only the base**: headers and
+general security, as named CLASSES from `@langwatch/api`, never inline
+data — `HeaderPolicy.strict()` (the floor no surface drops below; `.with`/
+`.merge` overlay, `.without` is the loud exception), `ContentSecurityPolicy
+.app()` (the browser bundle's composed overlay — connect-src rides config),
+`TrustedProxies.fromConfig(...)` (Server-level — client-address truth is
+one answer for every surface). The chaining is pre-done in importable
+defaults — `trpcSurfaceDefaults()`, `restSurfaceDefaults()`,
+`browserBundleDefaults()` — and a bare member call IS its default; a
+deviating deployment imports the default and chains on it, never rebuilds
+from parts.
+
+**Surface auth is structural, not policy** (ruled 2026-09-18). tRPC IS
+session-authenticated; REST IS API-key-authenticated; neither default is
+settable in the expose block, because it is what the surface means. The
+only written auth is the per-endpoint exception, declared on the route in
+the owning module's transport declaration: `.withAuth(BearerTokenAuth
+.fromConfig("cronBearerToken"))` — the workflow module binds ITS bearer
+from ITS slice; langy likewise — or `.public()`, which stays guarded by
+the no-scope-input check. No internal-family credential appears in a main,
+a surface block, or any process-global bag. Tests construct a surface with
+a fake session or credential — the one override, never a deployment.
 
 **`Server.create` ordering is the point:** fatal handlers first (raw stderr
 until a logger exists) → secrets resolve → config parses **under** telemetry,
