@@ -77,7 +77,8 @@ export interface LangWatchQLPolicy {
   readonly allowedTables: readonly string[];
   /**
    * Fields the caller's permissions withhold, matched case-insensitively
-   * against the last segment of a column reference (`t.body` matches `body`).
+   * against every dotted segment of a column reference — not only the last —
+   * so `gated.sub` and `t.gated.sub` are refused along with `t.gated`.
    *
    * When this is non-empty the walk also refuses wildcard column sets, because
    * it cannot prove `*` excludes a withheld field without the table's columns.

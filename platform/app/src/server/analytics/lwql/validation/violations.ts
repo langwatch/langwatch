@@ -51,7 +51,7 @@ export const LWQL_VIOLATION_CODES = [
   "FUNCTION_NOT_ALLOWED",
   /** A restricted field was referenced. */
   "GATED_COLUMN",
-  /** A wildcard column set was selected while restricted fields exist. */
+  /** A wildcard column set was referenced, in any position, while restricted fields exist. */
   "WILDCARD_NOT_ALLOWED",
   /**
    * The statement's own top-level `LIMIT` asks for more rows than one request

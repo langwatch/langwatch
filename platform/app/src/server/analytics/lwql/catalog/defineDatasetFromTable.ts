@@ -580,7 +580,7 @@ const DEFAULT_FRESHNESS = "seconds behind ingestion";
  * name) and `Label` (a categorical outcome) are labels too, matching how the
  * hand-written `evaluations`/`model_usage_by_minute` views expose them. A missed
  * identifier is not merely a cosmetic mislabel: the validator gates by
- * lowercased leaf name across the whole catalog, so a bare `id` wrongly gated on
+ * lowercased name segment across the whole catalog, so a bare `id` wrongly gated on
  * one view withholds `Id` on every other — which is exactly the collision
  * this widening removes.
  */

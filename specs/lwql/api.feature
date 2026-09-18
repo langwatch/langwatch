@@ -635,9 +635,10 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   @integration
   Scenario: Content-gated fields are refused in every expression position
     Given an authenticated API client without content permissions
-    When it references a content-gated field in projection, filter, group, order, having, join, window, or subquery position
+    When it references a content-gated field in projection, filter, group, order, having, join, window, or subquery position, or uses a wildcard or COLUMNS() matcher that would resolve to one, in any of those positions or inside a function
     Then the query is rejected with error code lwql_not_permitted at HTTP 400
-    And every refusal names the GATED_COLUMN rule, so the caller learns which field to drop
+    And a named-field refusal names the GATED_COLUMN rule, so the caller learns which field to drop
+    And a column-set refusal names the WILDCARD_NOT_ALLOWED rule
     And the fault is the caller's, and the remediation points them at the fields the schema endpoint lists for their key
     And the gated-field set matches the canonical visibility policy
 

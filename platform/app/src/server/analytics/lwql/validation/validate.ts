@@ -257,10 +257,21 @@ const METADATA_FIELDS: ReadonlySet<string> = new Set([
 /**
  * Column-set constructs whose members the walk cannot enumerate.
  *
- * Refused in a projection when the caller has restricted fields, because there
- * is no way to prove the expansion excludes them without the table's columns —
- * which this layer deliberately does not have. `COLUMNS(a, b)` is absent on
- * purpose: it names its columns, so they are checked like any other reference.
+ * Refused *wherever they appear* when the caller has restricted fields — not
+ * only as a direct projection element — because there is no way to prove the
+ * expansion excludes a withheld field without the table's columns, which this
+ * layer deliberately does not have. Wrapping one in a function or burying it in
+ * a clause (`toString(COLUMNS('…'))`, `tuple(*)`, `WHERE COLUMNS('…') = 1`)
+ * changes nothing about that, so the refusal is attached to the node kind (see
+ * {@link enterColumnSet}) rather than to the projection list. `COLUMNS(a, b)`
+ * is absent on purpose: it names its columns, so they are checked like any other
+ * reference — but only when every member parses as an identifier; a member
+ * written as a string literal names nothing the walk can check, so
+ * {@link enterColumnListMatcher} refuses that shape the same way. The one
+ * exemption is a bare `count(*)`, resolved in
+ * {@link walkFunctionArguments}, where the star is a row count and names no
+ * column — and only for that call's own `arguments`, never its window
+ * definition.
  */
 const UNRESOLVABLE_COLUMN_SETS: ReadonlySet<string> = new Set([
   "Asterisk",
@@ -296,6 +307,18 @@ interface Frame {
   readonly ctes: ReadonlySet<string>;
   /** The `SELECT` block this node sits in. Absent above the outermost one. */
   readonly block?: BlockAccumulator;
+  /**
+   * Set on the frame a bare `count(*)` walks its `arguments` field in — via
+   * {@link walkFunctionArguments} — and only that frame, so the one exempt
+   * `Asterisk` (a row count, not a column set) passes while every other star
+   * is refused. It does not reach the same call's `window_definition` or
+   * `parameters`, which are walked under the frame {@link enterFunction}
+   * returns instead, so `count(*) OVER (PARTITION BY COLUMNS('…'))` still
+   * refuses the matcher in the window definition. {@link enterFunction} also
+   * resets it `false` on every call, so it can never leak into a nested one
+   * such as `count(tuple(*))`.
+   */
+  readonly isBareCountStarArgument?: boolean;
 }
 
 /** What a top-level `SELECT` declared about how many rows it returns. */
@@ -676,100 +699,87 @@ function walkChildNodes({
  * Which view a gated reference's columns should be listed against, when the
  * walk can tell.
  *
- * A qualified reference (`t.body`) resolves through the block's alias/table
- * list; an unqualified one resolves only when the block reads exactly one
- * table — with two tables in scope an unqualified name is ambiguous between
- * them, and guessing would risk naming the wrong view's columns.
+ * The qualifier is the segment just before the gated one — `t` in `t.body`,
+ * `traces` in `traces.body.null` — and resolves through the block's
+ * alias/table list. With no qualifier (`body`, `body.null`), or one that names
+ * nothing in scope, the view resolves only when the block reads exactly one
+ * table — with two tables in scope the name is ambiguous between them, and
+ * guessing would risk naming the wrong view's columns.
+ *
+ * The columns listed are the ones the caller may actually use: the gated
+ * names are subtracted, so a refusal never echoes a withheld field back as a
+ * suggestion.
  */
 function resolveGatedColumnView({
-  name,
+  segments,
+  gatedIndex,
   frame,
   ctx,
 }: {
-  name: string;
+  segments: readonly string[];
+  gatedIndex: number;
   frame: Frame;
   ctx: WalkContext;
 }): ViolationExtra {
   const tables = frame.block?.tables ?? [];
-  const parts = name.split(".");
   const qualifier =
-    parts.length > 1 ? parts.at(-2)?.trim().toLowerCase() : undefined;
-  const matched = qualifier
+    gatedIndex > 0 ? segments[gatedIndex - 1]?.trim().toLowerCase() : undefined;
+  const byQualifier = qualifier
     ? tables.find(
         (entry) =>
           entry.alias === qualifier ||
           entry.table.split(".").at(-1) === qualifier,
       )
-    : tables.length === 1
-      ? tables[0]
-      : undefined;
+    : undefined;
+  const matched = byQualifier ?? (tables.length === 1 ? tables[0] : undefined);
   if (!matched) return {};
-  const availableColumns = ctx.policy.viewColumns.get(matched.table);
+  const availableColumns = ctx.policy.viewColumns
+    .get(matched.table)
+    ?.filter(
+      (column) => !ctx.policy.gatedColumns.has(column.trim().toLowerCase()),
+    );
   return {
     view: matched.table,
     ...(availableColumns ? { availableColumns } : {}),
   };
 }
 
-/** The columns a caller may not reference, matched on the reference's last segment. */
+/**
+ * The columns a caller may not reference, matched against *every* segment of a
+ * dotted name.
+ *
+ * A qualified path can reach a gated field through a segment that is not the
+ * last one: `body.null` and `traces.body.null` both read the withheld `body`
+ * and then a subfield of it, so matching only the leaf would wave them through.
+ * The segments come from `name_parts` when the parse split them out, and from
+ * splitting `name` on `.` otherwise.
+ */
 function gateColumnReference({
   name,
+  nameParts,
   ctx,
   frame,
   node,
 }: {
   name: string;
+  nameParts?: readonly string[];
   ctx: WalkContext;
   frame: Frame;
   node: SqlAstNode;
 }): void {
-  const leaf = name.split(".").at(-1)?.trim().toLowerCase() ?? "";
-  if (!ctx.policy.gatedColumns.has(leaf)) return;
+  const segments = nameParts ?? name.split(".");
+  const gatedIndex = segments.findIndex((segment) =>
+    ctx.policy.gatedColumns.has(segment.trim().toLowerCase()),
+  );
+  if (gatedIndex === -1) return;
   report({
     ctx,
     frame,
     code: "GATED_COLUMN",
     message: `The field "${echoIdentifier(name)}" is not available to you. Remove it from the query.`,
     node,
-    extra: resolveGatedColumnView({ name, frame, ctx }),
+    extra: resolveGatedColumnView({ segments, gatedIndex, frame, ctx }),
   });
-}
-
-/**
- * A projection list. Each direct element is checked for an unresolvable column
- * set before it is walked.
- *
- * The check is on the *direct* elements on purpose: `count(*)` puts an
- * `Asterisk` inside a function's arguments, where it names a row count rather
- * than a column set and reveals nothing.
- */
-function walkProjection({ value, node, frame, ctx }: FieldArgs): void {
-  if (!Array.isArray(value)) {
-    refuseUnrecognised({ node, frame, ctx });
-    return;
-  }
-  const projection: Frame = { ...frame, clause: "projection" };
-  for (const element of value) {
-    if (!isNode(element)) {
-      refuseUnrecognised({ node, frame: projection, ctx });
-      continue;
-    }
-    if (
-      ctx.policy.gatedColumns.size > 0 &&
-      UNRESOLVABLE_COLUMN_SETS.has(element.type)
-    ) {
-      report({
-        ctx,
-        frame: projection,
-        code: "WILDCARD_NOT_ALLOWED",
-        message:
-          "List the fields you need by name — a wildcard cannot be used here, because some fields are not available to you.",
-        node: element,
-      });
-      continue;
-    }
-    walkNode(element, projection, ctx);
-  }
 }
 
 /**
@@ -1131,18 +1141,119 @@ function enterFunction({ node, frame, ctx }: NodeArgs): Frame | null {
     refuseUnrecognised({ node, frame, ctx });
     return null;
   }
+  // Reset on every call so an outer isBareCountStarArgument can never leak into this
+  // one's fields. The exemption itself is set back on, narrowly, only for the
+  // `arguments` field by {@link walkFunctionArguments} — never here, and never
+  // for `window_definition` or `parameters`.
+  const childFrame: Frame = { ...frame, isBareCountStarArgument: false };
   if (!isAllowedLangWatchQLFunction(name)) {
     reportRefusedFunction({ name, node, frame, ctx });
-    return frame;
+    return childFrame;
   }
   if (
-    frame.block &&
+    childFrame.block &&
     isLangWatchQLAggregateFunction(name) &&
     !isWindowCall(node)
   ) {
-    frame.block.isAggregated = true;
+    childFrame.block.isAggregated = true;
   }
-  return frame;
+  return childFrame;
+}
+
+/**
+ * A `Function` node's `arguments` field, walked with the bare-`count(*)`
+ * exemption scoped to exactly this field.
+ *
+ * The exemption cannot live on the frame {@link enterFunction} returns for the
+ * whole node, because that same frame also reaches `window_definition` and
+ * `parameters` — and `count(*) OVER (PARTITION BY COLUMNS('…'))` must still
+ * refuse the matcher in the window definition. Computing it here, from the
+ * `Function` node passed in as `node`, keeps it off every other field.
+ */
+function walkFunctionArguments({ value, node, frame, ctx }: FieldArgs): void {
+  walkChildNodes({
+    value,
+    node,
+    frame: { ...frame, isBareCountStarArgument: isBareCountStar(node) },
+    ctx,
+  });
+}
+
+/**
+ * Whether this call is a bare `count(*)`: the one place a star is a row count
+ * rather than a column set, and so stays exempt from {@link enterColumnSet}.
+ *
+ * `count(DISTINCT *)` is deliberately excluded — the parser gives it a distinct
+ * function name (`countDistinct`) — as is `count(t.*)` (a `QualifiedAsterisk`),
+ * `count(* EXCEPT (…))` (an `Asterisk` carrying transformers), `count(*, x)`
+ * (two arguments) and any other aggregate over a star.
+ */
+function isBareCountStar(node: SqlAstNode): boolean {
+  const { name, arguments: args } = node;
+  if (typeof name !== "string" || name.toLowerCase() !== "count") return false;
+  if (!Array.isArray(args) || args.length !== 1) return false;
+  const arg = args[0];
+  return (
+    isNode(arg) &&
+    arg.type === "Asterisk" &&
+    arg.transformers === undefined &&
+    arg.expression === undefined
+  );
+}
+
+const WILDCARD_NOT_ALLOWED_MESSAGE =
+  "List the fields you need by name — a wildcard cannot be used here, because some fields are not available to you.";
+
+/**
+ * Refuses an unresolvable column set — a wildcard or a regexp `COLUMNS()`
+ * matcher — for a caller with restricted fields, and returns `null` so the
+ * subtree is not walked.
+ *
+ * Attached to each of the four {@link UNRESOLVABLE_COLUMN_SETS} node kinds, so
+ * the refusal holds in every position rather than only the projection. With no
+ * restricted fields there is nothing to withhold and the node is walked
+ * normally; the sole exemption is the `Asterisk` of a bare `count(*)`, which
+ * {@link walkFunctionArguments} marks on the frame.
+ */
+function enterColumnSet({ node, frame, ctx }: NodeArgs): Frame | null {
+  if (!UNRESOLVABLE_COLUMN_SETS.has(node.type)) return frame;
+  if (ctx.policy.gatedColumns.size === 0) return frame;
+  if (frame.isBareCountStarArgument === true) return frame;
+  report({
+    ctx,
+    frame,
+    code: "WILDCARD_NOT_ALLOWED",
+    message: WILDCARD_NOT_ALLOWED_MESSAGE,
+    node,
+  });
+  return null;
+}
+
+/**
+ * A `COLUMNS(a, b)` / `t.COLUMNS(a, b)` list matcher: walked normally when
+ * every member is an identifier, so each is gated like any other reference;
+ * refused like a wildcard when any member is not.
+ *
+ * The parser accepts `COLUMNS('a', 'b')` and emits the members as literals,
+ * which {@link gateColumnReference} never sees. ClickHouse itself rejects that
+ * spelling today, but the gate does not lean on that: a member the walk cannot
+ * check is treated as a column set it cannot enumerate.
+ */
+function enterColumnListMatcher({ node, frame, ctx }: NodeArgs): Frame | null {
+  if (ctx.policy.gatedColumns.size === 0) return frame;
+  const members = node.columns;
+  const isEveryMemberNamed =
+    Array.isArray(members) &&
+    members.every((member) => isNode(member) && member.type === "Identifier");
+  if (isEveryMemberNamed) return frame;
+  report({
+    ctx,
+    frame,
+    code: "WILDCARD_NOT_ALLOWED",
+    message: WILDCARD_NOT_ALLOWED_MESSAGE,
+    node,
+  });
+  return null;
 }
 
 /** Whether this call is a window function rather than a row-collapsing aggregate. */
@@ -1218,7 +1329,7 @@ function enterIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
       return null;
     }
   }
-  gateColumnReference({ name, ctx, frame, node });
+  gateColumnReference({ name, nameParts, ctx, frame, node });
   noteColumnPosition({ name, frame });
   return frame;
 }
@@ -1340,7 +1451,7 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
       with: { kind: "nodes", clause: "with" },
       recursive_with: SCALAR,
       distinct: SCALAR,
-      select: { kind: "custom", walk: walkProjection },
+      select: { kind: "nodes", clause: "projection" },
       from: { kind: "node", clause: "from" },
       prewhere: { kind: "node", clause: "filter" },
       where: { kind: "node", clause: "filter" },
@@ -1489,7 +1600,7 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
     enter: enterFunction,
     fields: {
       name: SCALAR,
-      arguments: { kind: "nodes" },
+      arguments: { kind: "custom", walk: walkFunctionArguments },
       parameters: { kind: "nodes" },
       is_operator: SCALAR,
       is_lambda_function: SCALAR,
@@ -1519,12 +1630,14 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
 
   // ---- column sets ----
   Asterisk: {
+    enter: enterColumnSet,
     fields: {
       transformers: { kind: "nodes" },
       expression: { kind: "node" },
     },
   },
   QualifiedAsterisk: {
+    enter: enterColumnSet,
     fields: {
       qualifier: { kind: "identifierRef" },
       columns: { kind: "nodes" },
@@ -1532,12 +1645,15 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
     },
   },
   ColumnsRegexpMatcher: {
+    enter: enterColumnSet,
     fields: { pattern: SCALAR, transformers: { kind: "nodes" } },
   },
   ColumnsListMatcher: {
+    enter: enterColumnListMatcher,
     fields: { columns: { kind: "nodes" }, transformers: { kind: "nodes" } },
   },
   QualifiedColumnsRegexpMatcher: {
+    enter: enterColumnSet,
     fields: {
       pattern: SCALAR,
       qualifier: { kind: "identifierRef" },
@@ -1545,6 +1661,7 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
     },
   },
   QualifiedColumnsListMatcher: {
+    enter: enterColumnListMatcher,
     fields: {
       qualifier: { kind: "identifierRef" },
       columns: { kind: "nodes" },
