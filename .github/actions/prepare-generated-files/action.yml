@@ -38,8 +38,8 @@ runs:
         path: |
           packages/prisma-client/src/generated
           modules/evaluator/contract/src/evaluators.generated.ts
-          modules/langy/web/src/model/shared/langy/langySkills.generated.json
-          modules/langy/server/src/rules/setup-skill-bodies.rules.ts
+          modules/langy/browser/src/model/shared/langy/langySkills.generated.json
+          modules/langy/process/src/rules/setup-skill-bodies.rules.ts
           sdks/typescript/dist
           mcp/typescript/dist
         key: >-
@@ -49,8 +49,8 @@ runs:
             'packages/prisma-client/prisma/schema/**',
             'packages/prisma-client/package.json',
             'package.json',
-            'modules/langy/web/scripts/generate-langy-skills.ts',
-            'modules/langy/server/scripts/generate-setup-skill-bodies.ts',
+            'modules/langy/browser/scripts/generate-langy-skills.ts',
+            'modules/langy/process/scripts/generate-setup-skill-bodies.ts',
             'services/langevals/ts-integration/evaluators.generated.ts',
             'sdks/typescript/src/**',
             'sdks/typescript/package.json',

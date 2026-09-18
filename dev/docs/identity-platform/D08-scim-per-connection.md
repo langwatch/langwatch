@@ -5,7 +5,7 @@ Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wa
 > **Amendment 2026-09-03:** `platform/app` is deleted. SCIM now lives in
 > `enterprise/modules/scim/{contract,server,web}`; the service this
 > note refers to is
-> `enterprise/modules/scim/server/src/services/scim.service.ts`.
+> `enterprise/modules/scim/process/src/services/scim.service.ts`.
 > Verify current shape against that tree before treating paths below as live.
 
 # Overview

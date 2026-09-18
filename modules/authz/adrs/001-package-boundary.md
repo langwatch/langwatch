@@ -73,7 +73,7 @@ modules/authz/
 │   │   ├── authz-grants.service.ts  # abstract mutation capability
 │   │   └── <pure domain files>
 │   └── tests/
-├── server/                           # @langwatch/authz-server
+├── server/                           # @langwatch/authz-process
 │   ├── src/
 │   │   ├── index.ts
 │   │   ├── testing.ts
@@ -215,14 +215,14 @@ than running a second server implementation.
 ### Dependencies
 
 `@langwatch/authz-contract` depends only on portable packages and Zod 4.
-`@langwatch/authz-server` depends on its contract plus server-safe Eventing,
+`@langwatch/authz-process` depends on its contract plus server-safe Eventing,
 observability, actor, KSUID and system-migration packages. It does not depend
 on application source.
 
 Other features, `@langwatch/api`, browser code and ordinary app services depend
 only on `@langwatch/authz-contract`. Only modules below
 `platform/app/src/runtime/app` and `platform/app/src/runtime/worker` may import
-`@langwatch/authz-server`.
+`@langwatch/authz-process`.
 
 ### Runtime and registration
 

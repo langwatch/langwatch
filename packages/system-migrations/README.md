@@ -44,7 +44,7 @@ Storage-engine-free: the app implements `SystemMigrationStateRepository`
 (Prisma), `MigrationLeaseRepository` (Redis) and `TenantSource`
 (Organization table). Riders live beside the domain they migrate — the
 first is the ADR-092 stage-B authorization backfill in
-`@langwatch/authz-server`; the identity program's D01 Account backfill is
+`@langwatch/authz-process`; the identity program's D01 Account backfill is
 the expected second.
 
 Spec: `specs/migration/system-migrations-runner.feature`. Delivery plan:

@@ -222,7 +222,7 @@ in-flight `_retention_days` mutation matches the tenant + target tables.
 stores the command string and closes a CodeQL incomplete-encoding flag for
 project ids containing `'` or `\`.
 
-### Storage metering (`modules/data-retention/server`)
+### Storage metering (`modules/data-retention/process`)
 
 Per-tenant total is computed as per-table `sum(_size_bytes)` scalars
 union-summed:
@@ -350,7 +350,7 @@ lingers as a stale reference. Acceptable given expected pin volume.
 - Migration: `platform/app/src/server/clickhouse/migrations/00032_add_retention_and_size_columns.sql`
 - Code: `platform/app/src/server/data-retention/`,
   `platform/app/src/server/clickhouse/ttlReconciler.ts`,
-  `modules/data-retention/server/src/api/app-trpc/data-retention.api.ts`,
+  `modules/data-retention/process/src/api/app-trpc/data-retention.api.ts`,
   `platform/app/src/runtime/app/internal-api/data-retention.router.ts`,
   `platform/app/src/pages/settings/data-retention.tsx`
 - Specs: `specs/data-retention/`

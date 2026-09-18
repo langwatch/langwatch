@@ -1,0 +1,71 @@
+{
+  "name": "@langwatch/dataset-process",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical server-side Dataset feature.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "imports": {
+    "#*": {
+      "types": "./dist/*.d.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./composition/dataset-content": {
+      "types": "./dist/repositories/prisma/prisma.dataset-content.repository.d.ts",
+      "default": "./src/repositories/prisma/prisma.dataset-content.repository.ts"
+    },
+    "./composition/dataset-migration": {
+      "types": "./dist/repositories/prisma/prisma.dataset-migration.repository.d.ts",
+      "default": "./src/repositories/prisma/prisma.dataset-migration.repository.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run --exclude \"**/*.integration.test.ts\" --exclude \"**/*.contract.test.ts\"",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "catalog:",
+    "@aws-sdk/s3-request-presigner": "catalog:",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/aws-client": "workspace:*",
+    "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/experiment-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/plans": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/task": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@trpc/server": "catalog:",
+    "ai": "catalog:",
+    "hono": "catalog:",
+    "hono-openapi": "catalog:",
+    "nanoid": "catalog:",
+    "papaparse": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/papaparse": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

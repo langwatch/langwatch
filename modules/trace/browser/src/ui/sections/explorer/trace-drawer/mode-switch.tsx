@@ -1,0 +1,280 @@
+import { Box, Flex, HStack, Text } from "@chakra-ui/react";
+import { Kbd } from "@langwatch/design-system/kbd";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { PresenceMarker, selectPeersMatching, usePresenceStore } from "@langwatch/presence-browser";
+import type { ReactNode } from "react";
+import { useShallow } from "zustand/react/shallow";
+
+import type { DrawerViewMode } from "../../../../behavior/drawer.store.ts";
+
+interface ModeSwitchProps {
+  viewMode: DrawerViewMode;
+  onViewModeChange: (mode: DrawerViewMode) => void;
+  turnLabel?: string;
+  hasConversation?: boolean;
+  /**
+   * True while the conversation context (turns) is still being fetched for a trace that
+   * declares a conversationId.
+   */
+  isConversationLoading?: boolean;
+  /**
+   * Removes the Conversation tab entirely. Used by the read-only share view,
+   * where conversation mode is suppressed (its backing queries need a
+   * session) — a disabled tab would imply it could ever become available.
+   */
+  isConversationHidden?: boolean;
+  /** Trace id used to scope the per-mode peer presence dots. */
+  traceId?: string;
+  /**
+   * True for coding-agent traces (Claude Code and friends), which carry a
+   * terminal session worth replaying. Gates the Terminal tab's existence.
+   */
+  showTerminal?: boolean;
+  /**
+   * True while the reviewer is annotating the trace. Usage and Terminal replay an agent
+   * run rather than showing the trace's own spans, so there is nothing in them to
+   * correct or comment on and they stay unavailable until the reviewer finishes.
+   */
+  isEditing?: boolean;
+  /**
+   * Right-aligned trailing content for this row — typically the trace ID
+   * + relative timestamp. Sits in the same horizontal band as the tabs so
+   * the meta tucks neatly into the corner.
+   */
+  endSlot?: ReactNode;
+}
+
+/** Shown on every tab annotation mode makes unavailable. */
+const EDITING_DISABLED_REASON = "Finish annotating to switch views";
+
+interface TabProps {
+  label: string;
+  shortcut: string;
+  active: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  presence?: ReactNode;
+  disabledReason?: string;
+}
+
+function ModePresenceDot({ traceId, mode }: { traceId: string; mode: DrawerViewMode }) {
+  const peers = usePresenceStore(
+    useShallow((s) =>
+      selectPeersMatching(
+        s,
+        (session) =>
+          session.location.route.traceId === traceId && session.location.view?.mode === mode,
+      ),
+    ),
+  );
+  if (peers.length === 0) return null;
+  return <PresenceMarker peers={peers} size={16} tooltipSuffix={`${mode} view`} />;
+}
+
+function ModeTab({
+  label,
+  shortcut,
+  active,
+  disabled,
+  onClick,
+  presence,
+  disabledReason,
+}: TabProps) {
+  const inactiveColor = disabled ? "fg.subtle" : "fg.muted";
+  const tab = (
+    <Flex
+      as={disabled ? "div" : "button"}
+      align="center"
+      gap={1}
+      paddingX={0.5}
+      paddingY={2}
+      cursor={disabled ? "not-allowed" : "pointer"}
+      color={active ? "fg" : inactiveColor}
+      fontWeight={active ? "semibold" : "medium"}
+      transition="color 0.12s ease"
+      _hover={active || disabled ? undefined : { color: "fg" }}
+      onClick={disabled ? undefined : onClick}
+      position="relative"
+      opacity={disabled ? 0.5 : 1}
+    >
+      <Text textStyle="sm">{label}</Text>
+      {/* Tiny spacer wrapping the Kbd — without it the shortcut chip
+          ran into the label and read as "SummaryO" instead of the
+          intended "Summary [O]". Kbd is a closed component (no style
+          override props), so the separation lives on a wrapper box. */}
+      <Box marginLeft={0.5}>
+        <Kbd>{shortcut}</Kbd>
+      </Box>
+      {presence}
+      {/* Active indicator — a 2px underline that aligns with the row's
+          bottom border. Only the active tab paints it. */}
+      <Box
+        position="absolute"
+        left={0}
+        right={0}
+        bottom="-1px"
+        height="2px"
+        bg={active ? "blue.solid" : "transparent"}
+        borderTopRadius="full"
+        transition="background 0.12s ease"
+      />
+    </Flex>
+  );
+
+  if (disabled && disabledReason) {
+    return (
+      <Tooltip content={disabledReason} positioning={{ placement: "bottom" }}>
+        {tab}
+      </Tooltip>
+    );
+  }
+
+  return tab;
+}
+
+/**
+ * Tristate gate on the Conversation tab: no conversation id → permanently disabled; has
+ * an id but its turns are still in flight → disabled with loading copy; id plus turns →
+ * enabled.
+ */
+function conversationTabState({
+  hasConversation,
+  isConversationLoading,
+}: {
+  hasConversation: boolean;
+  isConversationLoading: boolean;
+}): { disabled: boolean; reason?: string } {
+  if (!hasConversation) {
+    return {
+      disabled: true,
+      reason: "This trace is not part of a conversation",
+    };
+  }
+  if (isConversationLoading) {
+    return { disabled: true, reason: "Loading conversation…" };
+  }
+  return { disabled: false };
+}
+
+/**
+ * Usage and Terminal, the two tabs only a coding-agent trace has.
+ */
+function CodingAgentTabs({
+  viewMode,
+  onViewModeChange,
+  isEditing,
+  presenceFor,
+}: {
+  viewMode: DrawerViewMode;
+  onViewModeChange: (mode: DrawerViewMode) => void;
+  isEditing: boolean;
+  presenceFor: (mode: DrawerViewMode) => ReactNode;
+}) {
+  const disabledReason = isEditing ? EDITING_DISABLED_REASON : undefined;
+
+  return (
+    <>
+      <ModeTab
+        label="Usage"
+        shortcut="U"
+        active={viewMode === "session"}
+        disabled={isEditing}
+        disabledReason={disabledReason}
+        onClick={() => onViewModeChange("session")}
+        presence={presenceFor("session")}
+      />
+      <ModeTab
+        label="Terminal"
+        // NOT M: that's Maximize. The tab advertised a shortcut that did
+        // something else entirely, which is worse than having none.
+        shortcut="E"
+        active={viewMode === "terminal"}
+        disabled={isEditing}
+        disabledReason={disabledReason}
+        onClick={() => onViewModeChange("terminal")}
+        presence={presenceFor("terminal")}
+      />
+    </>
+  );
+}
+
+/**
+ * Inline tab strip below the header chips.
+ */
+export function ModeSwitch({
+  viewMode,
+  onViewModeChange,
+  turnLabel,
+  hasConversation = true,
+  isConversationLoading = false,
+  isConversationHidden = false,
+  traceId,
+  showTerminal = false,
+  isEditing = false,
+  endSlot,
+}: ModeSwitchProps) {
+  const conversationTab = conversationTabState({
+    hasConversation,
+    isConversationLoading,
+  });
+  const presenceFor = (mode: DrawerViewMode) =>
+    traceId ? <ModePresenceDot traceId={traceId} mode={mode} /> : null;
+
+  return (
+    <HStack paddingX={4} gap={4} align="center">
+      {/* Tab order: Summary | Trace | [Session | Terminal] | Conversation. Summary leads as the
+        friendlier default; Session/Terminal come before Conversation since they're what you open
+        a coding-agent trace for, leaving the raw transcript as the fallback view. */}
+      <ModeTab
+        label="Summary"
+        shortcut="O"
+        active={viewMode === "summary"}
+        onClick={() => onViewModeChange("summary")}
+        presence={presenceFor("summary")}
+      />
+      <ModeTab
+        label="Trace"
+        shortcut="T"
+        active={viewMode === "trace"}
+        onClick={() => onViewModeChange("trace")}
+        presence={presenceFor("trace")}
+      />
+      {/*
+        Terminal only exists for coding-agent traces (Claude Code and friends):
+        it replays the turn the way the CLI drew it. A normal LLM trace has no
+        terminal session to show, so the tab isn't rendered at all rather than
+        being shown disabled — an always-greyed tab on every other trace would
+        be noise.
+      */}
+      {showTerminal && (
+        <CodingAgentTabs
+          viewMode={viewMode}
+          onViewModeChange={onViewModeChange}
+          isEditing={isEditing}
+          presenceFor={presenceFor}
+        />
+      )}
+      {!isConversationHidden && (
+        <ModeTab
+          label="Conversation"
+          shortcut="C"
+          active={viewMode === "conversation"}
+          disabled={conversationTab.disabled}
+          disabledReason={conversationTab.reason}
+          onClick={() => onViewModeChange("conversation")}
+          presence={presenceFor("conversation")}
+        />
+      )}
+      {turnLabel && viewMode === "trace" && (
+        <Text textStyle="xs" color="fg.muted" marginLeft="auto">
+          {turnLabel}
+        </Text>
+      )}
+      {endSlot && (
+        <HStack marginLeft={turnLabel && viewMode === "trace" ? undefined : "auto"} flexShrink={0}>
+          {endSlot}
+        </HStack>
+      )}
+    </HStack>
+  );
+}

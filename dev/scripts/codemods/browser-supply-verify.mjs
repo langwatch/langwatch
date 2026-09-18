@@ -106,7 +106,7 @@ try {
   const refused = generateModuleLists({ root: directory });
   assert.ok(
     !refused["modules/web-modules.generated.ts"].includes(
-      'from "@langwatch/annotation-web/declaration"',
+      'from "@langwatch/annotation-browser/declaration"',
     ),
   );
   console.log(

@@ -1,0 +1,81 @@
+{
+  "name": "@langwatch/organization-browser",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe organization settings screens: the audit trail an admin or compliance reviewer reads.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    "./organization-client": {
+      "langwatch-declaration-source": "./src/organization-client.ts",
+      "types": "./dist/organization-client.d.ts",
+      "default": "./src/organization-client.ts"
+    },
+    "./surfaces/personal-workspace-features": {
+      "types": "./dist/behavior/personal-workspace-features-api.d.ts",
+      "default": "./src/behavior/personal-workspace-features-api.ts"
+    },
+    "./surfaces/department-picker": {
+      "types": "./dist/department-picker.d.ts",
+      "default": "./src/department-picker.ts"
+    },
+    "./drawers": {
+      "types": "./dist/drawers.d.ts",
+      "default": "./src/drawers.ts"
+    },
+    "./drawers/project": {
+      "types": "./dist/ui/sections/project-drawers.d.ts",
+      "default": "./src/ui/sections/project-drawers.ts"
+    },
+    "./organization": {
+      "types": "./dist/organization.d.ts",
+      "default": "./src/organization.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/csv": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/enterprise-licensing-browser": "workspace:*",
+    "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/identity-contract": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
+    "lodash-es": "catalog:",
+    "lucide-react": "catalog:",
+    "papaparse": "catalog:",
+    "react-contextual-analytics": "catalog:",
+    "react-hook-form": "catalog:",
+    "use-debounce": "catalog:"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@emotion/react": "catalog:",
+    "@langwatch/test-harness": "workspace:*",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/lodash-es": "catalog:",
+    "@types/papaparse": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

@@ -623,7 +623,7 @@ Five commits, smallest risk first, each leaving the suite green.
    `utils/model-provider-catalog-rules.ts`; the ten classes → six `*.port.ts`
    files named for what they are; delete `ModelProviderCredentialPolicy` and let
    `ModelProviderCredentialService` stand alone. Add
-   `modules/model-provider/server/src/ports/*.port.ts` entries as they
+   `modules/model-provider/process/src/ports/*.port.ts` entries as they
    land — the baseline may only shrink, so each new file must already comply.
    _(P7, P8)_
 4. **Collapse the layer.** Delete `services/model-provider.service.ts`, move its
@@ -644,7 +644,7 @@ internal or additive.
 
 ## 6. Blast radius
 
-**22 files outside the feature import `@langwatch/model-provider-server`**
+**22 files outside the feature import `@langwatch/model-provider-process`**
 (15 source, 7 test). By symbol:
 
 | Symbol                                                                                                                                                                                                | Files                                                                                                                                         |

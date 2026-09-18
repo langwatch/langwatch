@@ -7,7 +7,7 @@ import {
   ProjectSwitcherCombobox,
   useOptionalNavigationHost,
   useProjectPickGroups,
-} from "@langwatch/navigation-web/chrome";
+} from "@langwatch/navigation-browser/chrome";
 
 export function UiProjectSwitcher() {
   const host = useOptionalNavigationHost();

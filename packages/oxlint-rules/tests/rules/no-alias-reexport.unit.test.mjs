@@ -18,7 +18,7 @@ describe("given a barrel file", () => {
     it("reports aliasReexport", () => {
       const found = report(
         "export { AgentApi as Agent } from './agent.api';",
-        "modules/agent/server/src/index.ts",
+        "modules/agent/process/src/index.ts",
       );
 
       expect(found).toHaveLength(1);
@@ -33,7 +33,7 @@ describe("given a barrel file", () => {
     it("reports aliasReexport", () => {
       const found = report(
         "const AgentApi = 1;\nexport { AgentApi as Agent };",
-        "modules/agent/server/src/index.ts",
+        "modules/agent/process/src/index.ts",
       );
 
       expect(found).toHaveLength(1);
@@ -45,7 +45,7 @@ describe("given a barrel file", () => {
     /** @scenario "An export under its own name is allowed" */
     it("reports nothing", () => {
       expect(
-        report("export { AgentApi } from './agent.api';", "modules/agent/server/src/index.ts"),
+        report("export { AgentApi } from './agent.api';", "modules/agent/process/src/index.ts"),
       ).toEqual([]);
     });
   });
@@ -56,7 +56,7 @@ describe("given a barrel file", () => {
       expect(
         report(
           "export { AgentApi as Agent } from './agent.api';",
-          "modules/agent/server/src/services/agent.service.ts",
+          "modules/agent/process/src/services/agent.service.ts",
         ),
       ).toEqual([]);
     });

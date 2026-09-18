@@ -15,7 +15,7 @@ afterAll(() => {
 function moduleTree(app: string): string {
   const root = mkdtempSync(join(tmpdir(), "installed-modules-"));
   scratch.push(root);
-  const server = join(root, "modules/annotation/server/src/app");
+  const server = join(root, "modules/annotation/process/src/app");
   mkdirSync(server, { recursive: true });
   mkdirSync(join(root, "modules"), { recursive: true });
   writeFileSync(
@@ -31,7 +31,7 @@ function moduleTree(app: string): string {
     join(root, "modules/package.json"),
     '{"name":"@langwatch/installed-modules","dependencies":{}}',
   );
-  writeFileSync(join(root, "modules/annotation/server/package.json"), '{"name":"x"}');
+  writeFileSync(join(root, "modules/annotation/process/package.json"), '{"name":"x"}');
   writeFileSync(join(server, "annotation.app.ts"), app);
   return root;
 }

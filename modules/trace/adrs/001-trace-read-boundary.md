@@ -143,8 +143,8 @@ compose services or reshape Trace responses.
 ## Public surfaces and transports
 
 The server root exposes process composition and services. REST and tRPC
-transports are imported through explicit `@langwatch/trace-server/api-rest/*`
-and `@langwatch/trace-server/api-trpc/*` exports, so a worker naming the
+transports are imported through explicit `@langwatch/trace-process/api-rest/*`
+and `@langwatch/trace-process/api-trpc/*` exports, so a worker naming the
 server root does not also load those handlers. The subpaths resolve to the
 same implementation files used by the API process.
 

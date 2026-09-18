@@ -250,7 +250,7 @@ instanceof Error ? e.message : "…"` taints `message`, and so does a second
 
 The reader, the code list and the registry live in `@langwatch/handled-error`
 (`/read-handled-error`, `/app-codes`, `/presentation`); `apps/ui` composes them
-into the surfaces below, and `@langwatch/trace-web` exports its own from
+into the surfaces below, and `@langwatch/trace-browser` exports its own from
 `ui/sections/errors`:
 
 | export                                          | use it for                                                                                                                                                                                                                                                  |

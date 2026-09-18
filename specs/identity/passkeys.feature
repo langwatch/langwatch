@@ -183,7 +183,7 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
     And "sam" is told to try again or use another way in
 
   # The three below are the settings section's own behaviour, bound in
-  # `@langwatch/user-web`'s passkeys suite since the settings S7 move. The
+  # `@langwatch/user-browser`'s passkeys suite since the settings S7 move. The
   # section shipped with no render test at all, so none of this was stated.
 
   @integration

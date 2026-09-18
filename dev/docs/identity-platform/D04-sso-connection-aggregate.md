@@ -5,7 +5,7 @@ Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wa
 > **Amendment 2026-09-03:** `platform/app` is deleted. Enterprise SSO now
 > lives in `enterprise/modules/sso/{contract,server,web}`; the
 > BetterAuth provider adapter is
-> `enterprise/modules/sso/server/src/adapters/better-auth.better-auth.adapter.ts`.
+> `enterprise/modules/sso/process/src/adapters/better-auth.better-auth.adapter.ts`.
 > Verify current shape against that tree before treating paths below as live.
 
 # Overview

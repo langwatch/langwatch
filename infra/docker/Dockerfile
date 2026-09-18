@@ -24,7 +24,7 @@ RUN ARCH=$(uname -m) && \
 WORKDIR /app
 
 # mcp/typescript is a workspace member — copy it early so pnpm install can
-# link it. `@langwatch/hosted-mcp-server` depends on it, so its build runs as
+# link it. `@langwatch/hosted-mcp-process` depends on it, so its build runs as
 # part of the API's dependency build below.
 COPY mcp/typescript ./mcp/typescript
 COPY services/langevals/ts-integration/evaluators.generated.ts ./services/langevals/ts-integration/evaluators.generated.ts
@@ -99,7 +99,7 @@ COPY apps/tasks ./apps/tasks
 # workspace DEPENDENCIES first, in topological order, and pnpm skips the
 # members that declare no `build`. That order is load-bearing twice over: the
 # packages import `langwatch` from the SDK working copy, so the SDK's dist has
-# to exist before vite resolves it, and `@langwatch/hosted-mcp-server` imports
+# to exist before vite resolves it, and `@langwatch/hosted-mcp-process` imports
 # `@langwatch/mcp-server`, whose dist the API needs at boot. Both are reached
 # through the api/worker filters, not the ui one. apps/api declares no `build`
 # of its own and runs from source through tsx; apps/worker declares none either
@@ -176,7 +176,7 @@ WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
 # mcp/typescript must be copied alongside the applications because pnpm
 # workspace-symlinks @langwatch/mcp-server into
-# modules/hosted-mcp/server/node_modules, which apps/api mounts. langy
+# modules/hosted-mcp/process/node_modules, which apps/api mounts. langy
 # and handled-error are other root workspace packages linked the same way —
 # handled-error is imported for side effects by the API and worker entry points,
 # so omitting it fails the boot outright.

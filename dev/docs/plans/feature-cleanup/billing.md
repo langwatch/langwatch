@@ -731,7 +731,7 @@ Six commits, smallest risk first. Commits 1-4 touch no arithmetic at all.
 
 ## 6. Blast radius
 
-**13 files outside the feature name `@langwatch/enterprise-billing-server`** —
+**13 files outside the feature name `@langwatch/enterprise-billing-process`** —
 10 source, 3 test or lint fixture. One of the ten,
 `platform/app/src/features/langy/components/LangyPlanLimitCard.tsx:32`, only
 mentions it in a comment, so there are **9 real importers**. A tenth entry,
@@ -761,7 +761,7 @@ production composition root), `platform/app/src/server/app-layer/billing/enterpr
 `BillableEventRecord` and `EventingBillingReportingAdapter` — untouched by every
 commit above).
 
-**`@langwatch/enterprise-billing-web`** is named by **16 files** — 12 source, 4
+**`@langwatch/enterprise-billing-browser`** is named by **16 files** — 12 source, 4
 test or fixture. Eleven of the twelve are application UI under
 `platform/app/src/components/subscription/`, `components/plans/` and
 `pages/settings/`; the twelfth is the enterprise feature catalogue. Only commit 1

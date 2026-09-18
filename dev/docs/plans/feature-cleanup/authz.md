@@ -32,7 +32,7 @@ is 19 and 19 (`contract/src/authz-grants.service.ts:39-93`,
    authz.queries.ts          41 Zod schemas — 0 used outside the file
    authz.commands.ts         45 Zod schemas — 26 used by Eventing, 19 not
         │
- @langwatch/authz-server            51 files · 13,531 lines · 8 files import it
+ @langwatch/authz-process            51 files · 13,531 lines · 8 files import it
    transport/api-trpc/authz.api.ts   AuthzTrpcApi           1 procedure
         │                              transport/api-rest/role-binding.api.ts
    app/authz.app.ts        AuthzApp   1 method                createRoleBindingsRestApp()
@@ -120,15 +120,15 @@ and the declaration. The comment is the bug (R7).
 Because `AuthzService` is an abstract class, **every** test double must
 implement all 32. Six files do:
 
-- `modules/api-key/server/src/transport/api-rest/__tests__/support/test-authz-service.ts`
+- `modules/api-key/process/src/transport/api-rest/__tests__/support/test-authz-service.ts`
   — a 42-line file that is _nothing but_ 32 `unsupported<…>()` assignments
-- `modules/model-provider/server/src/ports/__tests__/model-provider.service.test.ts:132-275`
+- `modules/model-provider/process/src/ports/__tests__/model-provider.service.test.ts:132-275`
   — a 144-line `class Authorization extends AuthzService` with 31
   `return this.notUsed()` bodies for 1 real method
 - `apps/api/src/app/__tests__/api-key-rest-security.adapter.unit.test.ts:317-415`
   — 31 `this.unavailable()` bodies for 1 real method (`hasApiKeyPermission`)
-- plus `modules/langy/server/src/repositories/__tests__/langy-session-key.service.unit.test.ts`,
-  `modules/api-key/server/src/transport/api-rest/__tests__/api-key.transport.unit.test.ts`,
+- plus `modules/langy/process/src/repositories/__tests__/langy-session-key.service.unit.test.ts`,
+  `modules/api-key/process/src/transport/api-rest/__tests__/api-key.transport.unit.test.ts`,
   `platform/app/src/server/api/__tests__/langy-session-key.integration.test.ts`
 
 Two of those six files each want exactly **one** method.
@@ -257,7 +257,7 @@ async isOnEngine({ organizationId }: { organizationId: string }): Promise<boolea
 `isOnEngine` selects which head answers a permission read, and seven production
 call sites branch on it — `platform/app/src/server/api/rbac.ts:1199,1266,1384,1440,2046`,
 `platform/app/src/server/rbac/role-binding-resolver.ts:330,677`,
-`modules/share/server/src/repositories/ledger/ledger.share.repository.ts:462`.
+`modules/share/process/src/repositories/ledger/ledger.share.repository.ts:462`.
 An `AuthzService` composed without it reports every organization as migrated.
 Production always supplies it, so this is unreachable today — but the default
 for a rollout gate whose safe answer is "legacy" should not be "engine", and
@@ -623,7 +623,7 @@ Commits 1–4 are independent. 5 depends on 2. 6 is independent of all of them.
 
 ## 6. Blast radius
 
-**`@langwatch/authz-server` — 8 non-test files import it:**
+**`@langwatch/authz-process` — 8 non-test files import it:**
 
 | File                                                                              | Symbols                                                                                                                                                                                                                                                                         |
 | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -642,8 +642,8 @@ at least one external consumer. That surface is already the right size.
 **`@langwatch/authz-contract` — 220 non-test files import it.** Densest
 consumers: `platform/app/src/runtime/app/internal-api` (16),
 `platform/app/src/runtime/app/features` (6),
-`modules/gateway/server/src/transport/api-trpc` (6),
-`packages/api/src/trpc` (5), `modules/organization/server/src/transport/api-trpc` (5).
+`modules/gateway/process/src/transport/api-trpc` (6),
+`packages/api/src/trpc` (5), `modules/organization/process/src/transport/api-trpc` (5).
 
 This is why commits 2 and 5 are the expensive ones and everything else is
 cheap: the server package has eight importers, the contract has two hundred and

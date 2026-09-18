@@ -173,11 +173,11 @@ for (const key of codingAgents?.contentAttrKeys(eventName) ?? contentAttrKeys(ev
 
 They are provably the same value, so the optional `codingAgents` parameter
 (`:77`) decides nothing. Two more consumers hold a whole eleven-method service to
-reach one pure function — `modules/trace/server/src/services/trace-ingestion.service.ts:306`
+reach one pure function — `modules/trace/process/src/services/trace-ingestion.service.ts:306`
 (`shouldFilterSpan` only) and `.../transport/api-trpc/trace-read-mappers.api.ts:812`
 (`logContentKeys` only) — and two test doubles restate all eleven abstract
 methods to satisfy it: `platform/app/src/test-utils/test-coding-agent.service.ts`
-(107 lines) and `modules/trace/server/src/services/__tests__/support/coding-agent.service.fake.ts`
+(107 lines) and `modules/trace/process/src/services/__tests__/support/coding-agent.service.fake.ts`
 (51 lines).
 
 ### P5 — A private copy of a registry-driven normaliser will silently drop the next agent (breaks R8) — **defect**
@@ -267,7 +267,7 @@ CodingAgentProjectionPersistenceAdapter as CodingAgentProjectionPersistence,
 
 so `CodingAgentProjectionPersistence` means the abstract class when imported from
 `@langwatch/coding-agent-contract` and the concrete adapter when imported from
-`@langwatch/coding-agent-server`. Nothing imports the alias.
+`@langwatch/coding-agent-process`. Nothing imports the alias.
 
 ### P8 — Two stateless classes threaded through four constructors (breaks R2's converse)
 
@@ -524,10 +524,10 @@ Five commits, smallest risk first, each leaving the suite green:
 
 ## 6. Blast radius
 
-**11 files outside the feature import `@langwatch/coding-agent-server`:**
+**11 files outside the feature import `@langwatch/coding-agent-process`:**
 `apps/api/src/index.ts`, `apps/api/src/app-rest/app-rest.features.ts`,
 `apps/api/src/features/coding-agent/coding-agent-trpc.mount.ts`,
-`modules/trace/server/src/repositories/clickhouse/stored-span-row.codec.ts`,
+`modules/trace/process/src/repositories/clickhouse/stored-span-row.codec.ts`,
 `platform/app/src/runtime/app/features/coding-agent.ts`,
 `platform/app/src/runtime/app/features/coding-agent-trace-processing.adapter.ts`,
 `platform/app/src/runtime/app/__tests__/subscriber-throttle-policy.unit.test.ts`,
@@ -555,4 +555,4 @@ four call sites (`trace-ingestion.service.ts:306`,
 `CodingAgentProjectionPersistence`, removed in commit 5, is referenced outside the
 feature only by `pipelineRegistry.ts:406`.
 
-**18 files import `@langwatch/coding-agent-web`** — untouched by every commit above.
+**18 files import `@langwatch/coding-agent-browser`** — untouched by every commit above.

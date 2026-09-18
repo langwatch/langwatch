@@ -834,7 +834,7 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
           to: "/ops/event-sourcing/projections",
           // The replay wizard is a drawer the projections screen addresses with
           // its OWN query key now — the application drawer registry is a
-          // composition `@langwatch/ops-web` may not carry — so the retired
+          // composition `@langwatch/ops-browser` may not carry — so the retired
           // address pins that key instead. Same page, same drawer open.
           pinParams: { replay: "open" },
         },

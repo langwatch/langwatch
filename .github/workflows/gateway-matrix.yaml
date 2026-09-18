@@ -18,7 +18,7 @@ name: gateway-matrix
 #   - services/aigateway/**          (gateway data plane)
 #   - pkg/**                         (shared HTTP/health helpers)
 #   - modules/gateway/  (control plane)
-#   - enterprise/modules/governance/server/src/processes/gateway-debit.process.ts
+#   - enterprise/modules/governance/process/src/processes/gateway-debit.process.ts
 #     (the sole writer of gateway budget debits)
 # Triggers:
 #   - PR push (path-filtered to gateway-relevant files only — doc-only
@@ -54,7 +54,7 @@ on:
       - "go.mod"
       - "go.sum"
       - "modules/gateway/**"
-      - "enterprise/modules/governance/server/src/processes/gateway-debit.process.ts"
+      - "enterprise/modules/governance/process/src/processes/gateway-debit.process.ts"
       - "apps/api/src/app/api-gateway*.composition.ts"
       - "charts/gateway/**"
       - ".github/workflows/gateway-matrix.yaml"

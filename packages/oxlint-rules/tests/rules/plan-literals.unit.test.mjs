@@ -8,7 +8,7 @@ const workspace = createFixtureWorkspace({
 
 afterAll(() => workspace.cleanup());
 
-const SERVICE = "modules/agent/server/src/services/agent.service.ts";
+const SERVICE = "modules/agent/process/src/services/agent.service.ts";
 
 function report(code, filename = SERVICE) {
   return runRule(planLiteralsRule, { code, cwd: workspace.cwd, filename });
@@ -92,7 +92,7 @@ describe("given a file the rule does not govern", () => {
       expect(
         ids(
           "const plan = { maxMembers: 2, canPublish: true };",
-          "modules/agent/server/src/__tests__/agent.unit.test.ts",
+          "modules/agent/process/src/__tests__/agent.unit.test.ts",
         ),
       ).toEqual([]);
     });

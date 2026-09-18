@@ -11,7 +11,7 @@ function report(code, filename) {
 }
 
 describe("given a governed file", () => {
-  const filename = "modules/agent/server/src/services/agent.service.ts";
+  const filename = "modules/agent/process/src/services/agent.service.ts";
 
   describe("when it uses an inline import() expression", () => {
     /** @scenario "An inline dynamic import in governed source is a failure" */
@@ -57,7 +57,7 @@ describe("given a governed file", () => {
       expect(
         report(
           'const mod = () => import("./ui/sections/agent-drawers");',
-          "modules/agent/web/src/agent-management.ts",
+          "modules/agent/browser/src/agent-management.ts",
         ),
       ).toEqual([]);
     });
@@ -68,7 +68,7 @@ describe("given a governed file", () => {
     it("reports inlineDynamicImport", () => {
       const found = report(
         'const mod = () => import("./chart");',
-        "modules/agent/web/src/ui/sections/lazy-chart.tsx",
+        "modules/agent/browser/src/ui/sections/lazy-chart.tsx",
       );
 
       expect(found).toHaveLength(1);

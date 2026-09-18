@@ -8,7 +8,7 @@ const workspace = createFixtureWorkspace({
 
 afterAll(() => workspace.cleanup());
 
-const API = "modules/agent/server/src/transport/api-rest/agent.api.ts";
+const API = "modules/agent/process/src/transport/api-rest/agent.api.ts";
 
 function report(code) {
   return runRule(apiContextServicesRule, { code, cwd: workspace.cwd, filename: API });

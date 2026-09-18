@@ -14,7 +14,7 @@ the finished work out of the snapshot:
     git checkout feat/strict-feature-layout-v0
     git merge origin/main
     git checkout FETCH_HEAD -- modules/analytics modules/scenario sdks docs \
-        enterprise/modules/governance/web/src/ui/sections/governance/governance-anomaly-rules.screen.tsx \
+        enterprise/modules/governance/browser/src/ui/sections/governance/governance-anomaly-rules.screen.tsx \
         infra/docker/Dockerfile
     git checkout FETCH_HEAD -- dev/docs/plans .claude/handoffs .claude/manifests
 
@@ -56,7 +56,7 @@ Rules that are not negotiable here:
 Two decisions are Alex's, not yours. Ask, do not guess:
 
 1. `chartGrid.ts` placement — it sits in `analytics/server/src/repositories/`
-   but is imported by five `analytics/web` files and by `modules/trace/server`.
+   but is imported by five `analytics/web` files and by `modules/trace/process`.
    Only `@langwatch/analytics-contract` is reachable from all three. The
    ChartGrid port cannot finish without this.
 2. Issue #6635, main's `LWQL_SELF_PROVISION` capability, is dead code on this
@@ -65,8 +65,8 @@ Two decisions are Alex's, not yours. Ask, do not guess:
 
 Two chores carried over: `pnpm install` at the repo root (the analytics-port
 lane added `@langwatch/prisma-client` and `nanoid` to
-`modules/analytics/server/package.json`), and delete the dead barrel
-`modules/analytics/server/src/langwatch-ql/provisioning/index.ts` — nothing
+`modules/analytics/process/package.json`), and delete the dead barrel
+`modules/analytics/process/src/langwatch-ql/provisioning/index.ts` — nothing
 imports it and three of its re-export targets are now service methods.
 
 Report counters honestly every time you report: unmerged, marker files, lanes

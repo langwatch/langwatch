@@ -31,8 +31,8 @@ implements never happens.
 | Where | What |
 | --- | --- |
 | `modules/annotation/.../prisma.annotation-queue-item.repository.ts` | still pages the review queue with plain `skip`/`take`. Main replaced that with seek-based walking (`queueWalkOrder`, `queueWalkNeighbourhood`) **because offset paging skipped and duplicated items** as the queue mutated under the reviewer. There is no next-item walk method here at all |
-| `modules/navigation/web/src/ui/sections/shell-page-body.tsx` | alert banners render straight into a plain `VStack`. Main wrapped them in a positioned `zIndex="docked"` layer because page content - a z-indexed container, the home hero's bloom - was washing the banner text out |
-| `modules/analytics/web/src/ui/sections/graph-card-header.tsx` | no add-alert or edit-alert bell wired to the automations drawer, plus no inline widget rename. **This branch's own code comment says so**: "THE ALERT BELL DID NOT TRAVEL" |
+| `modules/navigation/browser/src/ui/sections/shell-page-body.tsx` | alert banners render straight into a plain `VStack`. Main wrapped them in a positioned `zIndex="docked"` layer because page content - a z-indexed container, the home hero's bloom - was washing the banner text out |
+| `modules/analytics/browser/src/ui/sections/graph-card-header.tsx` | no add-alert or edit-alert bell wired to the automations drawer, plus no inline widget rename. **This branch's own code comment says so**: "THE ALERT BELL DID NOT TRAVEL" |
 
 That comment is worth dwelling on. Someone noticed the loss, wrote it down in the
 code, and it still shipped that way - which is the argument for this whole

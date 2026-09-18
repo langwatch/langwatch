@@ -15,7 +15,7 @@ Feature: AuthZ package boundary
   Scenario: AuthZ has one versioned feature root
     Given the AuthZ feature declares layoutVersion 0
     Then @langwatch/authz-contract contains its portable vocabulary, schemas, errors and service capabilities
-    And @langwatch/authz-server contains its concrete services, repositories, adapters, projections and migration
+    And @langwatch/authz-process contains its concrete services, repositories, adapters, projections and migration
     And packages/authz and packages/authz-server do not exist
     And no compatibility package or forwarding export preserves the old package name
 
@@ -62,7 +62,7 @@ Feature: AuthZ package boundary
     Then its repository ports are abstract classes
     And Prisma-compatible implementations live only below repositories/prisma
     And generated Prisma types never cross a package export
-    And ordinary app modules import neither an AuthZ repository nor @langwatch/authz-server
+    And ordinary app modules import neither an AuthZ repository nor @langwatch/authz-process
 
   @architecture @persistence
   Scenario: The move changes no durable model
@@ -125,7 +125,7 @@ Feature: AuthZ package boundary
   Scenario: Each process installs only its AuthZ responsibilities
     Given the app and worker need AuthZ
     When the application preset composes the AuthZ feature
-    Then only the AuthZ application composition root imports @langwatch/authz-server
+    Then only the AuthZ application composition root imports @langwatch/authz-process
     And RequestApp exposes contract-typed AuthzService and AuthzGrantsService capabilities
     And a web-only process installs command producers without running subscriber or projection consumers
     And a worker-capable process installs the same Eventing pipeline with its projection and audit subscriber consumers

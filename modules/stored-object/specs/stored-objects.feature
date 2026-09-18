@@ -12,7 +12,7 @@ Feature: Stored Objects service and API
   Scenario: Stored Objects lives in one feature package
     Given Stored Objects is installed
     Then @langwatch/stored-object-contract contains portable schemas, errors and RPC contracts
-    And @langwatch/stored-object-server contains the concrete store, service, migration and API registration
+    And @langwatch/stored-object-process contains the concrete store, service, migration and API registration
     And the feature has no web package or separate object-storage package
     And neither package imports the application
 

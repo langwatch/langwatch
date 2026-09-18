@@ -22,7 +22,7 @@
     "@elevenlabs/elevenlabs-js": "catalog:",
     "@langwatch/egress": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
-    "@langwatch/scenario-server": "workspace:*",
+    "@langwatch/scenario-process": "workspace:*",
     "@opentelemetry/api": "catalog:",
     "@opentelemetry/api-logs": "catalog:",
     "@opentelemetry/context-async-hooks": "catalog:",

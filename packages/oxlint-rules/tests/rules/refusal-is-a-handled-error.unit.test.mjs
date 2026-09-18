@@ -8,7 +8,7 @@ const workspace = createFixtureWorkspace({
 
 afterAll(() => workspace.cleanup());
 
-const TRANSPORT = "modules/agent/server/src/transport/agent.rest.ts";
+const TRANSPORT = "modules/agent/process/src/transport/agent.rest.ts";
 
 function report(code, filename = TRANSPORT) {
   return runRule(refusalIsAHandledErrorRule, { code, cwd: workspace.cwd, filename });

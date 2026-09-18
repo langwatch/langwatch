@@ -101,7 +101,7 @@ another does not.
 
 - **The enterprise-tier generator works.** Sep 14 could not confirm whether
   `LANGWATCH_BUILD_TIER=enterprise node dev/scripts/generate-modules.mjs` still
-  failed on `Cannot find package '@langwatch/enterprise-licensing-server'`
+  failed on `Cannot find package '@langwatch/enterprise-licensing-process'`
   (reported Sep 12). Re-run today on a clean worktree: it succeeds and emits
   `scimServer` into `modules/server-modules.generated.ts` (48 modules against
   the core build's 46). **SCIM's 18 operations are a build-tier artefact of
@@ -218,7 +218,7 @@ Classes as defined in the Sep-14 document.
 | governance | 7 | B | `governance.server.ts` exists but exports worker factories, not a `defineServerModule` installer, so the generator skips it at every tier. Its package also carries 3 unresolved imports (`@ee/event-sourcing/…` ×2, `~/generated/prisma/client`). Module conversion. |
 | dataset direct-upload | 5 | D | recipe at `b383462d96^`. The branch adds `/api/stored-objects/storedObjects.*`; confirm whether the upload flow moved there deliberately before porting. |
 | langy control | 4 | B/C | needs `withTransportFacts` bindings the process refuses to boot without; the branch adds `/api/langy/conversations`, so confirm this is not a deliberate redesign before porting. |
-| scenario-events | 3 | C | **Blocked on the same decision as `/api/simulation-runs`** — see the section above. `createScenarioEventsRest` is a factory taking `simulations`, `scenarioTabs` and `broadcast`, the same infrastructure-bag members no process can supply, so `extractInlineMedia` is not the only thing holding it. Original note: Closer than Sep 14 recorded: `ScenarioApp` **already holds** `simulations`, `scenarioTabs` and `broadcast` (scenario.app.ts:105-127, wired from `setup.members`), and `platformUrl` is already `ScenarioApi`'s. Only `extractInlineMedia` is unaccounted for — and the walk it names lives in `modules/trace/server/src/services/content/trace-content-extraction.service.ts`, inside **trace**, while the transport's comment says it is "the stored-objects vertical's". Scenario depends on neither. Blocked on where that walk belongs, not on wiring. |
+| scenario-events | 3 | C | **Blocked on the same decision as `/api/simulation-runs`** — see the section above. `createScenarioEventsRest` is a factory taking `simulations`, `scenarioTabs` and `broadcast`, the same infrastructure-bag members no process can supply, so `extractInlineMedia` is not the only thing holding it. Original note: Closer than Sep 14 recorded: `ScenarioApp` **already holds** `simulations`, `scenarioTabs` and `broadcast` (scenario.app.ts:105-127, wired from `setup.members`), and `platformUrl` is already `ScenarioApi`'s. Only `extractInlineMedia` is unaccounted for — and the walk it names lives in `modules/trace/process/src/services/content/trace-content-extraction.service.ts`, inside **trace**, while the transport's comment says it is "the stored-objects vertical's". Scenario depends on neither. Blocked on where that walk belongs, not on wiring. |
 | gateway providers | 4 | — | **closed** (`60708e784f`). Main's four were tombstones: 410 `gateway_provider_bindings_gone` naming the model-provider address that replaced them. The code and its customer copy were already ported and thrown by nobody; the branch now declares the four routes and throws it. |
 | `/api/track_event` | 1 | — | **closed** (`f0aa34828c`). Not blocked after all: the alias was shaped to forward through a member nobody implemented, but the monolith shared a service between the two addresses rather than forwarding. Both routes now declare over one handler body. |
 | teams | — | C | listed Sep 14 (9 operations); **not** among today's probed-and-absent set. Re-measure before acting. |
@@ -254,7 +254,7 @@ There is no seam that can supply it:
   and `createProcessMembers` accepts overrides only for those. `withMembers()`
   takes arbitrary strings but resolves through the same source. A feature
   service can never be a member, and `packages/infrastructure` importing
-  `@langwatch/scenario-server` would invert the layering.
+  `@langwatch/scenario-process` would invert the layering.
 - **Repositories can carry the reads.** A bundle declares `requires` and is
   handed those members, so `requires = ["prisma", "clickhouse"]` builds the
   ClickHouse read repository. `SimulationRepository` is read-only —

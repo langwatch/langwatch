@@ -3,7 +3,7 @@ import type { TenantMigrationOutcome, TenantMigrationRecord } from "./types.ts";
 /**
  * One in-place migration, written against the tenant it is given. Implementations
  * live beside the domain they migrate (ADR-092's stage-B backfill lives in
- * `@langwatch/authz-server`); this package only drives them.
+ * `@langwatch/authz-process`); this package only drives them.
  */
 export interface SystemMigration {
   /** Boot execution policy; omitted migrations retain the background default. */

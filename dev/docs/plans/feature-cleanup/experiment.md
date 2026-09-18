@@ -295,7 +295,7 @@ Four files, 122 lines, none of which is a process:
   export const IdUtils = { generateDeterministicResultId } as const;
   ```
   The name collides with `IdUtils` in
-  `modules/trace/server/src/services/span-record-identity.rules.ts:105`,
+  `modules/trace/process/src/services/span-record-identity.rules.ts:105`,
   which `trace/server/src/index.ts:88` exports. Two different `IdUtils` in one
   repo, neither namespaced by feature.
 - `processes/experiment-run-event-guards.process.ts` — five type guards that
@@ -624,9 +624,9 @@ Six commits, each leaving the suite green.
 
 ## 6. Blast radius
 
-**12 files outside the feature import `@langwatch/experiment-server`** (3 in
+**12 files outside the feature import `@langwatch/experiment-process`** (3 in
 `apps/api`, 9 in `platform/app`). **33 import `@langwatch/experiment-contract`.
-13 import `@langwatch/experiment-web`.**
+13 import `@langwatch/experiment-browser`.**
 
 Symbols taken from `experiment-server`:
 

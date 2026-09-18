@@ -16,7 +16,7 @@ Supersedes the package LOCATION in ADR-115; its boundaries are unchanged.
 ## Context
 
 ADR-115 split identity into `@langwatch/identity` (pure vocabulary),
-`@langwatch/identity-server` (guards, services, ports) and, later,
+`@langwatch/identity-process` (guards, services, ports) and, later,
 `@langwatch/identity-eventing` (envelopes, commands, folds, pipelines). All
 three landed at the `packages/` root, mirroring `packages/authz` and
 `packages/authz-server`, which is where those two lived at the time.
@@ -34,12 +34,12 @@ Identity is a feature.
 | Was                        | Is now                                |
 | -------------------------- | ------------------------------------- |
 | `packages/identity`        | `modules/identity/contract` |
-| `packages/identity-server` | `modules/identity/server`   |
+| `packages/identity-server` | `modules/identity/process`   |
 
 `@langwatch/identity` is renamed `@langwatch/identity-contract`, because the
 feature layout derives a package's name from its role: a package at
 `modules/<feature>/<role>` must be called
-`@langwatch/<feature>-<role>`. `@langwatch/identity-server` already matched and
+`@langwatch/<feature>-<role>`. `@langwatch/identity-process` already matched and
 keeps its name. The dependency direction ADR-115 set — contract knows nothing of
 the server, the server owns the guards — is untouched.
 
@@ -81,10 +81,10 @@ move does not touch a single one.
 
 ### Public surfaces and transports
 
-Not applicable to this decision. `@langwatch/identity-server` keeps both entry
+Not applicable to this decision. `@langwatch/identity-process` keeps both entry
 points it had, `.` and `./better-auth`, at the same specifiers. No route, no
 procedure and no HTTP surface changes; a consumer that imported
-`@langwatch/identity-server` before imports exactly that afterwards.
+`@langwatch/identity-process` before imports exactly that afterwards.
 
 ### Dependencies
 

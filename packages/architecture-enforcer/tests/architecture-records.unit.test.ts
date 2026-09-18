@@ -31,8 +31,8 @@ function write(path: string, contents: string): void {
 function serverPackage(): ClassifiedPackage {
   return {
     name: "example-server",
-    root: join(root, "modules/example/server"),
-    manifestPath: join(root, "modules/example/server/package.json"),
+    root: join(root, "modules/example/process"),
+    manifestPath: join(root, "modules/example/process/package.json"),
     manifest: {},
     kind: "server",
     feature: "example",
@@ -92,7 +92,7 @@ describe("architecture-records", () => {
   describe("given an ownership root with no boundary ADR at all", () => {
     it("reports both the missing index and the missing record", () => {
       root = mkdtempSync(join(tmpdir(), "architecture-records-"));
-      mkdirSync(join(root, "modules/example/server"), { recursive: true });
+      mkdirSync(join(root, "modules/example/process"), { recursive: true });
 
       expect(violations()).toEqual([
         expect.objectContaining({

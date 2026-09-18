@@ -4,10 +4,10 @@
 #   [gone] src/server/traces/edit-overlay/traceEditOverlay.schemas.ts    (patch contract, version 1)
 #   [gone] src/server/traces/edit-overlay/applyTraceEditOverlay.ts       (pure appliers)
 #   [gone] src/server/traces/edit-overlay/traceEditOverlay.repository.ts (one row per project + trace)
-#   modules/trace/server/src/services/trace-edit-overlay.service.ts    (read, upsert, merge, delete)
+#   modules/trace/process/src/services/trace-edit-overlay.service.ts    (read, upsert, merge, delete)
 #   packages/prisma-client/src/generated/models/TraceEditOverlay.ts                    (tRPC surface)
-#   modules/trace/server/src/services/trace-legacy-read.service.ts                            (withEditOverlay read seam)
-#   modules/annotation/server/src/transport/annotation.trpc.ts                                  (suggestion dual-write, queue marks)
+#   modules/trace/process/src/services/trace-legacy-read.service.ts                            (withEditOverlay read seam)
+#   modules/annotation/process/src/transport/annotation.trpc.ts                                  (suggestion dual-write, queue marks)
 #
 # Motivation: the curation loop is production traces, then correction, then an
 # evaluation dataset. Today the only correctable thing is the final expected

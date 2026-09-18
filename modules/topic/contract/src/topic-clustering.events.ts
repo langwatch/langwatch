@@ -10,7 +10,7 @@ import {
 /**
  * Event DATA schemas for the topic-clustering-processing pipeline (ADR-051)
  * — the portable payload every boundary parses against. Event ENVELOPES live
- * in `@langwatch/topic-server`, where the eventing dependency belongs.
+ * in `@langwatch/topic-process`, where the eventing dependency belongs.
  */
 
 /**

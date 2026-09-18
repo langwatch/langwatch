@@ -19,7 +19,7 @@ the complete feature importable everywhere.
 
 ## Decision
 
-`@langwatch/prompt-web` exposes these exact roles:
+`@langwatch/prompt-browser` exposes these exact roles:
 
 ```text
 screens/prompt-studio       # owner-only complete experience

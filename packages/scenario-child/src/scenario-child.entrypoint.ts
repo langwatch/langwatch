@@ -17,7 +17,7 @@ import {
   SCENARIO_EGRESS_POLICY_ENV,
   type ScenarioHttp,
   type ScenarioHttpResponse,
-} from "@langwatch/scenario-server/child";
+} from "@langwatch/scenario-process/child";
 
 const logger = createChildProcessLogger("langwatch:scenarios:child", process.env);
 

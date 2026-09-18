@@ -18,7 +18,7 @@ describe("given a production .tsx file", () => {
     it("reports hookReturnsJsx", () => {
       const found = report(
         "function useThing() { return <div/>; }",
-        "modules/agent/web/src/use-thing.tsx",
+        "modules/agent/browser/src/use-thing.tsx",
       );
 
       expect(found).toHaveLength(1);
@@ -32,7 +32,7 @@ describe("given a production .tsx file", () => {
     it("reports hookReturnsJsx", () => {
       const found = report(
         "function useThing(open) { return open ? <div/> : null; }",
-        "modules/agent/web/src/use-thing.tsx",
+        "modules/agent/browser/src/use-thing.tsx",
       );
 
       expect(found).toHaveLength(1);
@@ -46,7 +46,7 @@ describe("given a production .tsx file", () => {
       expect(
         report(
           "function useThing() { const open = true; const onOpen = () => {}; return { open, onOpen }; }",
-          "modules/agent/web/src/use-thing.tsx",
+          "modules/agent/browser/src/use-thing.tsx",
         ),
       ).toEqual([]);
     });
@@ -58,7 +58,7 @@ describe("given a production .tsx file", () => {
       expect(
         report(
           "function useThing() { return () => <div/>; }",
-          "modules/agent/web/src/use-thing.tsx",
+          "modules/agent/browser/src/use-thing.tsx",
         ),
       ).toEqual([]);
     });
@@ -69,7 +69,7 @@ describe("given a production .tsx file", () => {
       expect(
         report(
           "function renderThing() { return <div/>; }",
-          "modules/agent/web/src/render-thing.tsx",
+          "modules/agent/browser/src/render-thing.tsx",
         ),
       ).toEqual([]);
     });
@@ -80,7 +80,7 @@ describe("given a production .tsx file", () => {
     it("reports hookReturnsJsx", () => {
       const found = report(
         "const useThing = () => { return <div/>; };",
-        "modules/agent/web/src/use-thing.tsx",
+        "modules/agent/browser/src/use-thing.tsx",
       );
 
       expect(found).toHaveLength(1);
@@ -94,7 +94,7 @@ describe("given a production .tsx file", () => {
       expect(
         report(
           "function useThing() { useEffect(() => { return cleanup(); }); return {}; }",
-          "modules/agent/web/src/use-thing.tsx",
+          "modules/agent/browser/src/use-thing.tsx",
         ),
       ).toEqual([]);
     });
@@ -106,7 +106,7 @@ describe("given the file is a test", () => {
     expect(
       report(
         "function useThing() { return <div/>; }",
-        "modules/agent/web/src/__tests__/use-thing.unit.test.tsx",
+        "modules/agent/browser/src/__tests__/use-thing.unit.test.tsx",
       ),
     ).toEqual([]);
   });

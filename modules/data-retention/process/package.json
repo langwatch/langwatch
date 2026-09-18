@@ -1,0 +1,45 @@
+{
+  "name": "@langwatch/data-retention-process",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical server-side Data Retention service and private persistence.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@clickhouse/client": "catalog:",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/clickhouse-client": "workspace:*",
+    "@langwatch/data-retention-contract": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

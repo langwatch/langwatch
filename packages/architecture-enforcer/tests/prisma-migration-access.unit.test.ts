@@ -29,7 +29,7 @@ function fixture() {
   write(
     "package.json",
     JSON.stringify({
-      name: "@langwatch/enterprise-audit-log-server",
+      name: "@langwatch/enterprise-audit-log-process",
       exports: { ".": "./src/index.ts" },
       imports: { "#migration-repository": `./src/${repository}` },
     }),
@@ -101,7 +101,7 @@ describe("scoped migration Prisma access", () => {
     world.write(
       "package.json",
       JSON.stringify({
-        name: "@langwatch/enterprise-audit-log-server",
+        name: "@langwatch/enterprise-audit-log-process",
         exports: { "./repository": `./src/${repository}` },
       }),
     );

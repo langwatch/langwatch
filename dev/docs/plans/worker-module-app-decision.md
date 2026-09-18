@@ -68,7 +68,7 @@ The fix the rule asks for is: call the operation on the module's contract instea
 of importing its server internals. To call an operation on `TraceApi`, the worker
 must **install the trace module**. Installing it is what it costs.
 
-`TraceApp` (`modules/trace/server/src/app/trace.app.ts:509-517`) declares:
+`TraceApp` (`modules/trace/process/src/app/trace.app.ts:509-517`) declares:
 
 ```ts
 static readonly contract     = TraceApiToken;
@@ -77,7 +77,7 @@ static readonly reads        = reads("clickhouse", "eventing", "logger", "redis"
 ```
 
 The five members are fine — the worker already holds all of them. The problem is
-`traceDependencies` (`modules/trace/server/src/app/trace-composition.types.ts:22`),
+`traceDependencies` (`modules/trace/process/src/app/trace-composition.types.ts:22`),
 which names **thirteen peer modules by contract token**:
 
 ```

@@ -11,7 +11,7 @@ Self-hosted auth, per-org SSO, MFA, passkeys, SCIM, join-requests — built on t
 > Enterprise SSO now lives in `enterprise/modules/sso/{contract,server,web}`,
 > SCIM in `enterprise/modules/scim/{contract,server,web}`, and the
 > event-sourcing framework this epic builds on is `packages/eventing`, with the
-> identity pipeline itself under `modules/identity/server/src/`. See
+> identity pipeline itself under `modules/identity/process/src/`. See
 > those trees for current shape before treating paths below as live.
 
 # Overview

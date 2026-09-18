@@ -35,10 +35,10 @@ Feature: Admin trace access — bird's-eye drill-in with persistent 'viewing as'
 
   Implementation lives at:
     - the governance bird's-eye home route in apps/ui                     (bird's-eye home)
-    - modules/ops/web/src/surfaces/impersonation/impersonation-banner.tsx (persistent banner)
-    - modules/ops/server/src/services/impersonation.service.ts
+    - modules/ops/browser/src/surfaces/impersonation/impersonation-banner.tsx (persistent banner)
+    - modules/ops/process/src/services/impersonation.service.ts
                                                                        (server-side context)
-    - enterprise/modules/governance/server/src/ (governance audit)                            (OCSF emission)
+    - enterprise/modules/governance/process/src/ (governance audit)                            (OCSF emission)
     - the personal settings screen                                        (user-visible disclosure)
 
   Background:

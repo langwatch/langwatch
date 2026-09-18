@@ -8,8 +8,8 @@ const workspace = createFixtureWorkspace({
 
 afterAll(() => workspace.cleanup());
 
-const BEHAVIOR = "modules/agent/web/src/behavior/use-run-agent.ts";
-const TEST = "modules/agent/web/src/behavior/__tests__/use-run-agent.unit.test.ts";
+const BEHAVIOR = "modules/agent/browser/src/behavior/use-run-agent.ts";
+const TEST = "modules/agent/browser/src/behavior/__tests__/use-run-agent.unit.test.ts";
 
 function report(code, filename = BEHAVIOR) {
   return runRule(idempotencyKeyIsStableRule, { code, cwd: workspace.cwd, filename });

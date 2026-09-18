@@ -18,7 +18,7 @@ const SCHEMA_NAMES = readFileSync(join(CONTRACT_SRC, "scenario-execution-data.ts
 
 const ALLOWED_ROOTS = [
   join(CONTRACT_SRC), // the definition itself
-  join(REPO_ROOT, "modules/scenario/server/src"),
+  join(REPO_ROOT, "modules/scenario/process/src"),
   join(REPO_ROOT, "packages/scenario-child/src/scenario-child.entrypoint.ts"),
 ];
 

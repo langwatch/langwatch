@@ -674,7 +674,7 @@ function guardCustomPattern(pattern: string): string {
 const ORDINARY_TEXT_PROBES = [
   "the user asked the agent to summarise the meeting notes",
   "<task-notification>",
-  "modules/trace/server/src/services/trace-legacy-read.service.ts",
+  "modules/trace/process/src/services/trace-legacy-read.service.ts",
   "2026-08-10T14:32:11.482Z",
   "claude-opus-5",
   // The identifiers a tracing product is made of. Without these a pattern like

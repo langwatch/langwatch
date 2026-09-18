@@ -519,7 +519,7 @@ merge blocker. Where 09-08 changed an item, the note is at the end of its text.
 | 20 | The extracted full-read path trusts a stale storage-anchor hint. It was never verified against the legacy mapper characterisation | M | no | U | | trace |
 | 21 | Exit-ledger remainders. `modelProvider.getAllForProjectForFrontend` no longer returns `modelMetadata`, so the settings page may render none. `MODERN_API_METHODS` still lists `register` (`api-transport-boundaries.ts:23`). Of the five unwired pipelines, `identity` and `join-request` installers are now imported by the worker composition; `sso-connections`, `scim-sync` and `agent_sandbox_maintenance` are unverified | M | no | U/H | | api |
 | 22 | Run the seam review. Fable reads seams 1a to 1d once. Sample the `trace` and `governance` packages. Sonnet lanes write findings per package to `seam-review-2026-09-06/<pkg>.md`. Turn on "Require review from Code Owners" for `main` | L | no | H | | review |
-| 23 | Product ruling on the web host. `@langwatch/workflow-web/studio-host/api` has 79 importers from other features' screens. The studio drawer and dialog supersets move to the design system. `model/prisma-types` moves to `workflow-contract`. `member-seat-usage.tsx:7` still imports the enterprise `resource-limits` surface directly | L | no | H | | ui |
+| 23 | Product ruling on the web host. `@langwatch/workflow-browser/studio-host/api` has 79 importers from other features' screens. The studio drawer and dialog supersets move to the design system. `model/prisma-types` moves to `workflow-contract`. `member-seat-usage.tsx:7` still imports the enterprise `resource-limits` surface directly | L | no | H | | ui |
 | 24 | Fourteen narratives cut from comments need their ADR homes written: the idempotency ledger ADR, the tRPC chain ADR, five ADR-129 appendices, an ADR-127 appendix, an ADR-060 appendix, an error-handling security note, and the trace storage-anchor history. The full table is in section 10a | M | no | H | | adr |
 | 25 | Memory repositories for every service unit test, and a chdb spike for repository tests (2 days, go or no-go) | L | no | H | | test |
 | 26 | `caseFiling.integration.test.tsx` is skipped. Run-plan folder grouping lives in `PlanScopeField.CaseChoices`, which has no test | S | no | H | | test |
@@ -545,18 +545,18 @@ too long for a comment and too valuable to lose. Recover the original text with
 | `packages/clickhouse-client/src/tenancy.ts` | Fail-closed tenant routing. The cache never expires, it only evicts | ADR-127 appendix |
 | `apps/api/src/features/experiment/experiment-v3-rest.mount.ts` | The two named absences pattern (no analytics sink, no progress store), also in evaluations-legacy | Best practice: composition roots |
 | `apps/api/src/features/*/*.composition.types.ts` | Why the type lives apart from its composition (37 copies collapsed to one line) | `best_practices/service-repository-adapter-port.md` |
-| `modules/langy/server/src/repositories/prisma/prisma.langy-turn-admission.repository.ts` | The `COMMITTED_ABANDON_MS` backstop, and the deploy-boundary window where pre-hash receipt ids 409 a byte-identical retry | ADR-129 appendix |
-| `modules/langy/server/src/services/langy-local-session.service.ts` | Split-brain fencing through the presence instance id. GONE is not supersession | ADR-129 appendix |
-| `modules/langy/server/src/adapters/redis.langy-local-presence.adapter.ts` | The heartbeat against TTL race. Replaced against restored semantics | ADR-129 appendix |
-| `modules/langy/server/src/transport/api-trpc/langy-egress.api.ts` | The demo project leaked its egress allowlist because `project:view` is demo-granted. Gate on `langy:*` plus an explicit demo refusal | ADR-129 appendix, security note |
-| `modules/langy/server/src/transport/api-rest/langy.local-control-http.ts` | The CLI, worker and panel route table for local control | ADR-129 appendix |
+| `modules/langy/process/src/repositories/prisma/prisma.langy-turn-admission.repository.ts` | The `COMMITTED_ABANDON_MS` backstop, and the deploy-boundary window where pre-hash receipt ids 409 a byte-identical retry | ADR-129 appendix |
+| `modules/langy/process/src/services/langy-local-session.service.ts` | Split-brain fencing through the presence instance id. GONE is not supersession | ADR-129 appendix |
+| `modules/langy/process/src/adapters/redis.langy-local-presence.adapter.ts` | The heartbeat against TTL race. Replaced against restored semantics | ADR-129 appendix |
+| `modules/langy/process/src/transport/api-trpc/langy-egress.api.ts` | The demo project leaked its egress allowlist because `project:view` is demo-granted. Gate on `langy:*` plus an explicit demo refusal | ADR-129 appendix, security note |
+| `modules/langy/process/src/transport/api-rest/langy.local-control-http.ts` | The CLI, worker and panel route table for local control | ADR-129 appendix |
 | `modules/langy/contract/src/cards/derived-safe.ts` | Three compile-time gates against the DERIVED-SAFE allowlist widening, plus the runtime pin test | ADR-060 appendix |
 | `modules/trace/contract/src/trace-ai-query.ts` | `AiActionErrorDetails.reason` never carries raw provider text. A 401 body once leaked a managed-provider key | Security note in `best_practices/error-handling.md` |
-| `modules/trace/server/src/projections/trace-derived.projection.ts` | Storage-anchor split history, the always-write-row fix for the store-miss ambiguity, and the accumulator keys coupled to `FOLD_ACCUMULATOR_KEYS` | ADR-066 and ADR-071 appendices |
+| `modules/trace/process/src/projections/trace-derived.projection.ts` | Storage-anchor split history, the always-write-row fix for the store-miss ambiguity, and the accumulator keys coupled to `FOLD_ACCUMULATOR_KEYS` | ADR-066 and ADR-071 appendices |
 | `packages/observability/src/logger.ts` | The logger factory cache keyed by name and `disableContext`. A fresh `pino()` measured 2.3 percent of production wall time. Per-request fields arrive through the mixin, so sharing is safe | New ADR: observability logger factory caching |
 | `packages/observability/src/logger.ts` | Pretty-console transport options must survive `structuredClone`, because they cross a worker-thread boundary. Building the pretty stream on this thread kills the OTel log transport silently | Appendix to the same ADR |
 | `apps/api/src/features/enterprise/webhook.composition.ts` | The webhook entitlement gate is a plan read, not an enterprise capability, so a deployment with no governance app answers a 403 instead of a 503 | Best practice: composition roots |
-| `modules/webhook/server/src/app/webhook.app.ts` | Why `WebhookApp` is a holder rather than a restatement of endpoint-store operations | `best_practices/service-repository-adapter-port.md` |
+| `modules/webhook/process/src/app/webhook.app.ts` | Why `WebhookApp` is a holder rather than a restatement of endpoint-store operations | `best_practices/service-repository-adapter-port.md` |
 | `apps/api/src/features/trace/trace-rest.mount.ts` | Named absence: the coding-agent transcript join is not supplied, because `composeApiTraceReadStack` refuses `LogService.getLogsByTraceId` by name | Best practice: composition roots |
 | `apps/ui/e2e/langy/local-control-fixture.ts` | The CLI API key mint is read back before use. `apiKey.create` answering 200 has left the binding unwritten under load | ADR-129 appendix |
 
@@ -595,7 +595,7 @@ order. Report the counters only after them.
    spare port slot or haven. Each lane is told which files another lane holds.
 7. **Seams are read once by Fable**, one fresh session per seam. The seams are
    `packages/api/src/rest` and `src/trpc`; the two production compositions;
-   `apps/api/src/api-rest.security.ts` with `modules/authz/server`;
+   `apps/api/src/api-rest.security.ts` with `modules/authz/process`;
    and the architecture-enforcer rules with `.oxlintrc.jsonc`.
 8. **Code Owners review is required on `main`.** `.github/CODEOWNERS` names an
    owner for every seam, so a function cannot join a complexity register

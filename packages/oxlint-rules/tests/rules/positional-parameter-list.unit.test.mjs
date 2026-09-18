@@ -10,7 +10,7 @@ function report(code, options = []) {
   return runRule(positionalParameterListRule, {
     code,
     cwd: workspace.cwd,
-    filename: "modules/agent/server/src/services/agent.service.ts",
+    filename: "modules/agent/process/src/services/agent.service.ts",
     options,
   });
 }

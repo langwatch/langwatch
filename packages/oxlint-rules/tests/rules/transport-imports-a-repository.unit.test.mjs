@@ -8,7 +8,7 @@ const workspace = createFixtureWorkspace({
 
 afterAll(() => workspace.cleanup());
 
-const TRANSPORT = "modules/agent/server/src/transport/agent.rest.ts";
+const TRANSPORT = "modules/agent/process/src/transport/agent.rest.ts";
 
 function report(code, filename = TRANSPORT) {
   return runRule(transportImportsARepositoryRule, { code, cwd: workspace.cwd, filename });
@@ -81,7 +81,7 @@ describe("given a service file", () => {
       expect(
         report(
           "import { findAll } from '../repositories/agent.repository';",
-          "modules/agent/server/src/services/agent.service.ts",
+          "modules/agent/process/src/services/agent.service.ts",
         ),
       ).toEqual([]);
     });
@@ -95,7 +95,7 @@ describe("given a transport test file", () => {
       expect(
         report(
           "import { InMemoryAgentRepository } from '../../repositories/memory/memory.agent.repository';",
-          "modules/agent/server/src/transport/__tests__/agent-rest.integration.test.ts",
+          "modules/agent/process/src/transport/__tests__/agent-rest.integration.test.ts",
         ),
       ).toEqual([]);
     });

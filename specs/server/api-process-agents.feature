@@ -11,7 +11,7 @@ Feature: The standalone API process composes its own agent service
   # the Agents package's; what was missing was any implementation of them
   # outside the legacy application.
   #
-  # `@langwatch/agent-server` has them now — `PostgresAgentAdapter` builds the
+  # `@langwatch/agent-process` has them now — `PostgresAgentAdapter` builds the
   # repository, the linked-workflow reads and the audit-history read from ONE
   # guarded Prisma client, which is the client this process already composes.
   #

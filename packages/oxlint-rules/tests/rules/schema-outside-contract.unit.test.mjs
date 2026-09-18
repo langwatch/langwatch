@@ -18,14 +18,14 @@ describe("given a transport file", () => {
     it("reports schema and names the contract package", () => {
       const found = report(
         'import { z } from "zod"; const CreateAgentSchema = z.object({ name: z.string() });',
-        "modules/agent/server/src/transport/agent.rest.ts",
+        "modules/agent/process/src/transport/agent.rest.ts",
       );
 
       expect(found).toHaveLength(1);
       expect(found[0].messageId).toBe("schema");
       expect(found[0].message).toBe(
         "`CreateAgentSchema` is a Zod schema declared in" +
-          " `modules/agent/server/src/transport/agent.rest.ts`." +
+          " `modules/agent/process/src/transport/agent.rest.ts`." +
           " Move it to `modules/agent/contract/src` and import it here.",
       );
     });
@@ -36,7 +36,7 @@ describe("given a transport file", () => {
     it("reports schema", () => {
       const found = report(
         'import { z } from "zod"; export const CreateAgent = z.object({ name: z.string() });',
-        "modules/agent/server/src/transport/agent.rest.ts",
+        "modules/agent/process/src/transport/agent.rest.ts",
       );
 
       expect(found.map((e) => e.messageId)).toEqual(["schema"]);
@@ -49,7 +49,7 @@ describe("given a transport file", () => {
       const found = report(
         'import { AgentBaseSchema } from "@langwatch/agent-contract"; ' +
           "const CreateAgentSchema = AgentBaseSchema.extend({ name: 1 });",
-        "modules/agent/server/src/transport/agent.rest.ts",
+        "modules/agent/process/src/transport/agent.rest.ts",
       );
 
       expect(found).toEqual([]);
@@ -63,7 +63,7 @@ describe("given a transport file", () => {
         'import { z } from "zod"; ' +
           "const pageQuerySchema = z.object({ page: z.number() }); " +
           "const budgetListQuerySchema = pageQuerySchema.extend({ budget: z.number() });",
-        "modules/agent/server/src/transport/agent.rest.ts",
+        "modules/agent/process/src/transport/agent.rest.ts",
       );
 
       expect(found.map((e) => e.data.name).toSorted()).toEqual([
@@ -78,7 +78,7 @@ describe("given a transport file", () => {
     it("reports nothing", () => {
       const found = report(
         'import { z } from "zod"; const agentShape = z.object({ name: z.string() });',
-        "modules/agent/server/src/transport/agent.rest.ts",
+        "modules/agent/process/src/transport/agent.rest.ts",
       );
 
       expect(found).toEqual([]);
@@ -92,7 +92,7 @@ describe("given a server file outside transport", () => {
     it("reports nothing", () => {
       const found = report(
         'import { z } from "zod"; const InternalSchema = z.object({ id: z.string() });',
-        "modules/agent/server/src/services/agent.service.ts",
+        "modules/agent/process/src/services/agent.service.ts",
       );
 
       expect(found).toEqual([]);

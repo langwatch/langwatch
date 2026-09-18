@@ -62,7 +62,7 @@ web half at all, and nothing says so.
 Four contributions are not contributions. Navigation, the command bar, the
 settings menu and the product catalogue are hand-listed inside one module's
 `model/` folder - roughly **1,600 lines across 7 files** in
-`@langwatch/navigation-web` - naming addresses owned by about twenty other
+`@langwatch/navigation-browser` - naming addresses owned by about twenty other
 modules: `command-catalogue.ts` (715 lines, 60 commands: 41 navigation,
 19 actions), `settings-menu.ts` (360 lines, 7 group builders, ~31 entries),
 `section-nav-items.ts` (166 lines), `products.ts` (132 lines, 4 products) and
@@ -312,9 +312,9 @@ Open questions, none of them papered over.
    `navigation-web` or move to the modules that own the actions is not measured.
 7. **Whether a module may declare another module's api binding.** Two of the 37
    bindings are exactly that - `annotation` mounts
-   `@langwatch/organization-web/surfaces/personal-workspace-features`, and
-   `personal-workspace` mounts `@langwatch/coding-agent-web` - and
-   `@langwatch/project-web` appears twice under two host ports. This is the
+   `@langwatch/organization-browser/surfaces/personal-workspace-features`, and
+   `personal-workspace` mounts `@langwatch/coding-agent-browser` - and
+   `@langwatch/project-browser` appears twice under two host ports. This is the
    browser's `ActivatedLicenseSource`: one id must mean one API before `provide`
    by id is sound. It has to be resolved before the pairing assertion in
    decision 6 can be trusted.
@@ -349,13 +349,13 @@ valid; the provider set is deduplicated by address and retains the existing
 installation order. Generated entries also assert the owning catalogue id.
 
 - Organization publishes
-  `@langwatch/organization-web/surfaces/personal-workspace-features`; annotation
+  `@langwatch/organization-browser/surfaces/personal-workspace-features`; annotation
   mounts it. Its existing provider and public exports remain.
-- Coding-agent publishes `@langwatch/coding-agent-web/surfaces/activity`; user,
+- Coding-agent publishes `@langwatch/coding-agent-browser/surfaces/activity`; user,
   whose application adapter is named personal-workspace, mounts it. The codemod
   follows the existing forwarding export to its publisher without deleting it.
-- The claim that `@langwatch/project-web` appears twice as a binding name was
-  false. It appears once; `@langwatch/project-web/project-settings` is a different
+- The claim that `@langwatch/project-browser` appears twice as a binding name was
+  false. It appears once; `@langwatch/project-browser/project-settings` is a different
   name. Project publishes its existing `/home` and `/project-settings` surfaces
   under its one id. Their two host contracts and hook maps remain separate.
 

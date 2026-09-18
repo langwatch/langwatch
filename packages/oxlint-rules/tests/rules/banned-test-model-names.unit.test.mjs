@@ -6,7 +6,7 @@ const workspace = createFixtureWorkspace({});
 
 afterAll(() => workspace.cleanup());
 
-const filename = "modules/agent/server/src/__tests__/agent.unit.test.ts";
+const filename = "modules/agent/process/src/__tests__/agent.unit.test.ts";
 
 function report(code, file = filename) {
   return runRule(bannedTestModelNamesRule, { code, cwd: workspace.cwd, filename: file });
@@ -43,7 +43,7 @@ describe("given a test file", () => {
     it("reports bannedModelName", () => {
       const found = report(
         'export const fixture = { model: "gpt-3.5-turbo" };',
-        "modules/agent/server/src/__tests__/agent.fixture.ts",
+        "modules/agent/process/src/__tests__/agent.fixture.ts",
       );
 
       expect(found).toHaveLength(1);
@@ -62,7 +62,7 @@ describe("given a test file", () => {
     /** @scenario "A provider catalogue in production source is not governed" */
     it("reports nothing", () => {
       expect(
-        report('const model = "gpt-4o";', "modules/model-provider/server/src/model-catalog.ts"),
+        report('const model = "gpt-4o";', "modules/model-provider/process/src/model-catalog.ts"),
       ).toEqual([]);
     });
   });
@@ -163,7 +163,7 @@ describe("given a test inside modules/model-provider", () => {
   describe("when the same literal sits in any other module", () => {
     /** @scenario "The exemption is the catalogue's alone" */
     it("still reports it", () => {
-      const elsewhere = "modules/agent/server/src/__tests__/agent.unit.test.ts";
+      const elsewhere = "modules/agent/process/src/__tests__/agent.unit.test.ts";
 
       expect(report('const model = "openai/gpt-4o";', elsewhere)).toHaveLength(1);
     });

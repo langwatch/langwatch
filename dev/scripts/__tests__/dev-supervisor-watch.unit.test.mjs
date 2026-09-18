@@ -54,7 +54,7 @@ void describe("shouldIgnoreWatchPath", () => {
 
   void it("ignores a *.test.ts file outside __tests__", () => {
     assert.equal(
-      shouldIgnoreWatchPath("../../modules/trace/server/src/foo.test.ts"),
+      shouldIgnoreWatchPath("../../modules/trace/process/src/foo.test.ts"),
       true,
     );
   });
@@ -65,10 +65,10 @@ void describe("shouldIgnoreWatchPath", () => {
 
   void it("ignores an editor temp file written beside its target", () => {
     assert.equal(
-      shouldIgnoreWatchPath("../../modules/trace/web/src/a.tsx.tmp.17938.dfd323429215"),
+      shouldIgnoreWatchPath("../../modules/trace/browser/src/a.tsx.tmp.17938.dfd323429215"),
       true,
     );
-    assert.equal(shouldIgnoreWatchPath("../../modules/trace/web/src/a.tsx"), false);
+    assert.equal(shouldIgnoreWatchPath("../../modules/trace/browser/src/a.tsx"), false);
   });
 
   void it("ignores a test suite's scratch directory beside the package", () => {
@@ -78,7 +78,7 @@ void describe("shouldIgnoreWatchPath", () => {
   });
 
   void it("ignores dist and generated churn", () => {
-    assert.equal(shouldIgnoreWatchPath("../../modules/trace/server/dist/index.js"), true);
+    assert.equal(shouldIgnoreWatchPath("../../modules/trace/process/dist/index.js"), true);
     assert.equal(shouldIgnoreWatchPath("src/generated/types.ts"), true);
   });
 
@@ -90,7 +90,7 @@ void describe("shouldIgnoreWatchPath", () => {
   void it("does not ignore an ordinary source file", () => {
     assert.equal(shouldIgnoreWatchPath("src/api.entrypoint.ts"), false);
     assert.equal(
-      shouldIgnoreWatchPath("../../modules/trace/server/src/trace.service.ts"),
+      shouldIgnoreWatchPath("../../modules/trace/process/src/trace.service.ts"),
       false,
     );
   });

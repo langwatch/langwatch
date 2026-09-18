@@ -5,8 +5,8 @@
  */
 
 import { readLiveWorkbench } from "@langwatch/experiment-contract";
-import { startAndIdentifyRun } from "@langwatch/experiment-web/workbench-run-identification";
-import { useEvaluationsV3Store } from "@langwatch/experiment-web/workbench-store";
+import { startAndIdentifyRun } from "@langwatch/experiment-browser/workbench-run-identification";
+import { useEvaluationsV3Store } from "@langwatch/experiment-browser/workbench-store";
 import type { ExecutionScope } from "@langwatch/experiment-contract";
 import { createFakeTabDocument } from "./fake-tab-document";
 import { buildFakeTabHandlers } from "./fake-tab-handlers";

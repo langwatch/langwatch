@@ -1,4 +1,4 @@
-import { LwqlProvisionTask } from "@langwatch/analytics-server";
+import { LwqlProvisionTask } from "@langwatch/analytics-process";
 import { createLogger } from "@langwatch/observability";
 
 import type { TaskInput } from "./config.ts";

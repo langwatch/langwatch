@@ -19,7 +19,7 @@ The first draft of this ADR adapted `Account` in place — one table holding bot
 
 ## Revision (2026-08-24)
 
-The code shape moved under ADR-115: the vocabulary, facts, reducer and errors are `@langwatch/identity`; the guards, the five verbs, the ceremonies and the better-auth facade are `@langwatch/identity-server`; the app keeps the Prisma repositories, the ledger writer (this ADR's §2 dispatch order), the write gate, and one composition root, `platform/app/src/server/app-layer/identity/runtime.ts`. Every decision below stands; the paths it names are where each piece now lives.
+The code shape moved under ADR-115: the vocabulary, facts, reducer and errors are `@langwatch/identity`; the guards, the five verbs, the ceremonies and the better-auth facade are `@langwatch/identity-process`; the app keeps the Prisma repositories, the ledger writer (this ADR's §2 dispatch order), the write gate, and one composition root, `platform/app/src/server/app-layer/identity/runtime.ts`. Every decision below stands; the paths it names are where each piece now lives.
 
 ## Revision (2026-08-23)
 

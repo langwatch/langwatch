@@ -133,8 +133,8 @@ describe("the real-browser test lane", () => {
       // declaring the script IS being in CI. This asserts the two pilot
       // packages are visible to that rule rather than to a list.
       expect(BROWSER_LANE.map((m) => m.dir)).toEqual([
-        "modules/analytics/web",
-        "modules/experiment/web",
+        "modules/analytics/browser",
+        "modules/experiment/browser",
       ]);
     });
 

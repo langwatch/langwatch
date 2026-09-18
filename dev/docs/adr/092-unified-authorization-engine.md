@@ -21,7 +21,7 @@ superseded by the
 [AuthZ feature boundary](../../../modules/authz/adrs/001-package-boundary.md).
 The portable contract is now `@langwatch/authz-contract`; concrete services,
 Prisma-compatible repositories, Redis and Eventing adapters, projections and
-the domain migration live in `@langwatch/authz-server`; the application
+the domain migration live in `@langwatch/authz-process`; the application
 runtime root and process-role-aware preset retain composition and transport
 ownership. Authorization semantics in this ADR are unchanged.
 
@@ -29,7 +29,7 @@ ownership. Authorization semantics in this ADR are unchanged.
 
 We will collapse LangWatch authorization into one feature: the browser-safe
 `@langwatch/authz-contract` vocabulary and pure `AuthzEngine`, concrete
-services and private infrastructure in `@langwatch/authz-server`, and a thin
+services and private infrastructure in `@langwatch/authz-process`, and a thin
 application runtime or transport adapter. Built from three nouns -
 **permission** (a verb on a
 resource), **role** (a named set of permissions), **role binding** (who holds
@@ -1255,7 +1255,7 @@ while the seat is off, and it is waiting for them when it comes back on.
   packages) and the
   [AuthZ feature boundary](../../../modules/authz/adrs/001-package-boundary.md).
   `@langwatch/authz-contract` is the Prisma-free, env-free, browser-safe
-  vocabulary and decision core. `@langwatch/authz-server` owns concrete
+  vocabulary and decision core. `@langwatch/authz-process` owns concrete
   services and private infrastructure; the application runtime root composes
   them and the process-role-aware preset selects consumers without exposing
   repositories to ordinary callers.

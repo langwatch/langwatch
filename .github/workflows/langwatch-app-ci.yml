@@ -448,7 +448,7 @@ jobs:
         run: pnpm --filter @langwatch/redaction run test
 
       # @langwatch/authz is the pure authorization engine (ADR-092) and
-      # @langwatch/authz-server its storage-port runtime — raw TypeScript the
+      # @langwatch/authz-process its storage-port runtime — raw TypeScript the
       # app inlines the same way, same shard-1 arrangement.
       - name: Run @langwatch/authz unit tests
         if: matrix.app == 'platform-api'
@@ -460,12 +460,12 @@ jobs:
         if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/actor run test
 
-      - name: Run @langwatch/authz-server unit tests
+      - name: Run @langwatch/authz-process unit tests
         if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/authz-server run test
+        run: pnpm --filter @langwatch/authz-process run test
 
       # @langwatch/identity-contract is the pure identity core (ADR-115) and
-      # @langwatch/identity-server its storage-port runtime — same raw
+      # @langwatch/identity-process its storage-port runtime — same raw
       # TypeScript, same shard-1 arrangement as authz. Both get the typecheck
       # step the authz pair lacks: sources and tests are only compiled here.
       #
@@ -478,9 +478,9 @@ jobs:
         if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/identity-contract run test
 
-      - name: Run @langwatch/identity-server unit tests
+      - name: Run @langwatch/identity-process unit tests
         if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/identity-server run test
+        run: pnpm --filter @langwatch/identity-process run test
 
       # @langwatch/system-migrations is the in-place data-migration runner
       # (ADR-092 stage B) — same raw-TypeScript, shard-1 arrangement.
@@ -501,17 +501,17 @@ jobs:
         if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/platform-api-client run test
 
-      # @langwatch/trace-web is the first feature web package, and the largest
+      # @langwatch/trace-browser is the first feature web package, and the largest
       # body of browser code that left the monolith — 406 tests over 42 files,
       # none of which CI ran for a long time: a package suite is unreachable
       # from an application's vitest root.
-      - name: Run @langwatch/trace-web unit tests
+      - name: Run @langwatch/trace-browser unit tests
         if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/trace-web run test
+        run: pnpm --filter @langwatch/trace-browser run test
 
       # Eleven more suites that ran nowhere. Between them they hold ~4,550
       # tests and cost about a minute: `@langwatch/eventing` and
-      # `@langwatch/trace-server` alone are 963 and 1,390. Every one of them
+      # `@langwatch/trace-process` alone are 963 and 1,390. Every one of them
       # was red when first run, and none of the failures was a bug in the code
       # under test — they were fixtures, doubles and assertions that had drifted
       # from the interfaces around them, which is exactly what a suite nobody
@@ -521,45 +521,45 @@ jobs:
         if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/eventing run test
       # the largest feature package, including the ingestion subscribers.
-      - name: Run @langwatch/trace-server tests
+      - name: Run @langwatch/trace-process tests
         if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/trace-server run test
+        run: pnpm --filter @langwatch/trace-process run test
       # simulation execution and the child-process spawn policy.
-      - name: Run @langwatch/scenario-server tests
+      - name: Run @langwatch/scenario-process tests
         if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/scenario-server run test
+        run: pnpm --filter @langwatch/scenario-process run test
       # the suite and run-plan forms.
-      - name: Run @langwatch/suite-web tests
+      - name: Run @langwatch/suite-browser tests
         if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/suite-web run test
+        run: pnpm --filter @langwatch/suite-browser run test
       # the assistant's browser behaviour.
-      - name: Run @langwatch/langy-web tests
+      - name: Run @langwatch/langy-browser tests
         if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/langy-web run test
+        run: pnpm --filter @langwatch/langy-browser run test
       # the studio's pickers and flows.
-      - name: Run @langwatch/workflow-web tests
+      - name: Run @langwatch/workflow-browser tests
         if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/workflow-web run test
+        run: pnpm --filter @langwatch/workflow-browser run test
       # the grants vocabulary every authorization path validates against.
       - name: Run @langwatch/authz-contract tests
         if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/authz-contract run test
       # usage reporting and the Stripe error masking.
-      - name: Run @langwatch/enterprise-billing-server tests
+      - name: Run @langwatch/enterprise-billing-process tests
         if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/enterprise-billing-server run test
+        run: pnpm --filter @langwatch/enterprise-billing-process run test
       # the back-office single sign-on surface and its hidden-surface denials.
-      - name: Run @langwatch/enterprise-sso-server tests
+      - name: Run @langwatch/enterprise-sso-process tests
         if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/enterprise-sso-server run test
+        run: pnpm --filter @langwatch/enterprise-sso-process run test
       # the resource-limit rows.
-      - name: Run @langwatch/enterprise-licensing-web tests
+      - name: Run @langwatch/enterprise-licensing-browser tests
         if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/enterprise-licensing-web run test
+        run: pnpm --filter @langwatch/enterprise-licensing-browser run test
       # endpoint validation and delivery.
-      - name: Run @langwatch/webhook-server tests
+      - name: Run @langwatch/webhook-process tests
         if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/webhook-server run test
+        run: pnpm --filter @langwatch/webhook-process run test
 
       # The six enterprise contract packages whose suites `vitest` could not
       # even discover until `enterprise/vitest.config.ts` learned the
@@ -610,13 +610,13 @@ jobs:
       # step runs the unit coverage and stays green on a runner with no
       # database — it does not silently drop the integration file, which runs
       # wherever a database is present.
-      - name: Run @langwatch/share-server unit tests
+      - name: Run @langwatch/share-process unit tests
         if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/share-server run test
+        run: pnpm --filter @langwatch/share-process run test
 
-      - name: Run @langwatch/share-web unit tests
+      - name: Run @langwatch/share-browser unit tests
         if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/share-web run test
+        run: pnpm --filter @langwatch/share-browser run test
 
       - name: Run @langwatch/${{ matrix.app }} tests
         id: unit-tests
@@ -1179,7 +1179,7 @@ jobs:
           echo "npm_config_node_gyp=$gyp" >> "$GITHUB_ENV"
 
       # One install covering the three deployables. mcp-server is a workspace
-      # dependency of the API through @langwatch/hosted-mcp-server, so the
+      # dependency of the API through @langwatch/hosted-mcp-process, so the
       # trailing `...` pulls it in — it used to be installed separately here
       # from its own lockfile, i.e. twice per run. See ADR-076.
       - name: Install dependencies

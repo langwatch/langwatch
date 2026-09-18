@@ -12,11 +12,11 @@ Feature: A package's integration suite runs in CI when it declares one
   # forks against one shared datastore instead of a concurrent pool — has to
   # exclude them from the first script and name a second. Discovery never asked
   # for the second one, so the exclusion landed and the lane did not:
-  # `@langwatch/trace-server` ran `vitest run --exclude '**/*.integration.test.ts'`
+  # `@langwatch/trace-process` ran `vitest run --exclude '**/*.integration.test.ts'`
   # under both of its script names, and its four integration suites ran in no job
   # at all. Nothing went red, because a suite CI never starts cannot fail.
   #
-  # `@langwatch/coding-agent-server` shows the second shape of the same silence:
+  # `@langwatch/coding-agent-process` shows the second shape of the same silence:
   # it DID declare `test:integration`, and the config behind it named one literal
   # file path that had since moved. Nothing ran that script either, so the rot
   # was invisible — and the moment discovery asks for it, vitest exits 1 with

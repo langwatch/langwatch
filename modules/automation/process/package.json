@@ -1,0 +1,68 @@
+{
+  "name": "@langwatch/automation-process",
+  "version": "0.1.0",
+  "private": true,
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "imports": {
+    "#*": {
+      "types": "./dist/*.d.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./src/testing.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/analytics-contract": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/audit-log-contract": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/automation-contract": "workspace:*",
+    "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/evaluation-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/monitor-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/plans": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/redis-client": "workspace:*",
+    "@langwatch/task": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@slack/webhook": "catalog:",
+    "@trpc/server": "catalog:",
+    "croner": "catalog:",
+    "hono": "catalog:",
+    "hono-openapi": "catalog:",
+    "nanoid": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

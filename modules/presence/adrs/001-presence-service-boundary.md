@@ -18,8 +18,8 @@ locations, sessions, deltas, cursors, and the abstract `PresenceService`.
 
 ## Public surfaces and transports
 
-`@langwatch/presence-contract`, `@langwatch/presence-server`, and
-`@langwatch/presence-web` are the public feature surfaces. Existing tRPC
+`@langwatch/presence-contract`, `@langwatch/presence-process`, and
+`@langwatch/presence-browser` are the public feature surfaces. Existing tRPC
 procedures remain compatibility transports; application hooks compose those
 procedures with the reusable web state and components.
 
@@ -60,7 +60,7 @@ and cursors at transport and persistence boundaries.
 Presence has one service implementation, Project policy has one owner, and a
 request neither constructs persistence nor reaches a global Prisma client.
 
-`@langwatch/presence-web` now owns the reusable, browser-only half of that
+`@langwatch/presence-browser` now owns the reusable, browser-only half of that
 extraction: the peer/self session store, the section-visibility store, the
 ghost-mode preference store, the presence colour/display-name helpers, the
 stable per-tab session id hook, and the presentational components built on
@@ -77,7 +77,7 @@ Moving those hooks would make the package depend on the app's tRPC client and
 cross-feature stores.
 
 Application composition imports the reusable presentation and browser state
-from `@langwatch/presence-web`; no duplicate implementation remains in the app.
+from `@langwatch/presence-browser`; no duplicate implementation remains in the app.
 
 `PresenceApp` names the portable `ProjectApi` and `UserApi` peers in its
 `static dependencies` and is installed by `presenceServer`; the API composition

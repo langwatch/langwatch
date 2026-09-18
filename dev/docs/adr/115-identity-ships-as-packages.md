@@ -1,4 +1,4 @@
-# ADR-115: Identity ships as `@langwatch/identity` and `@langwatch/identity-server`
+# ADR-115: Identity ships as `@langwatch/identity` and `@langwatch/identity-process`
 
 **Date:** 2026-08-24
 
@@ -27,7 +27,7 @@ composition root:
 ```text
 @langwatch/authz            pure, isomorphic: vocabulary + decide(). types: [] — a
                             node:* import does not compile. No Prisma, no env.
-@langwatch/authz-server     service CLASSES over repository INTERFACES. No storage
+@langwatch/authz-process     service CLASSES over repository INTERFACES. No storage
                             engine, no env read: every knob is a closure the app hands in.
 platform/app
   app-layer/authz/runtime.ts   THE composition root: the one place Prisma, redis,
@@ -116,7 +116,7 @@ either.
  └───────────────────────────────────────────────────────────────────────────┘
                                       ▲
  ┌────────────────────────────────────┴──────────────────────────────────────┐
- │ @langwatch/identity-server     services over ports · no Prisma · no env    │
+ │ @langwatch/identity-process     services over ports · no Prisma · no env    │
  │                                                                            │
  │  ports        IdentityHeadsRepository        (find*: hash key, heads,      │
  │                                               active-by-value, by account)│
@@ -162,7 +162,7 @@ either.
 Dependency direction, enforced by resolution rather than convention:
 
 ```text
-  browser ──▶ @langwatch/identity  ◀── @langwatch/identity-server ◀── platform/app
+  browser ──▶ @langwatch/identity  ◀── @langwatch/identity-process ◀── platform/app
                     ▲                          ▲                          │
                     └── zod, handled-error     └── actor, observability,  │
                                                    ksuid                  │
@@ -193,9 +193,9 @@ What moves in, and from where:
 
 `index.ts` opens with the same boundary statement `@langwatch/authz` carries.
 
-### 3. `@langwatch/identity-server` — services over ports
+### 3. `@langwatch/identity-process` — services over ports
 
-The mirror of `@langwatch/authz-server`. Dependencies: `@langwatch/identity`,
+The mirror of `@langwatch/authz-process`. Dependencies: `@langwatch/identity`,
 `@langwatch/actor`, `@langwatch/handled-error`, `@langwatch/observability`,
 `@langwatch/ksuid`; `better-auth` as a **peer** for the adapter's types.
 No Prisma, no env, no `~/`, no `@langwatch/system-migrations` (the authz
@@ -312,7 +312,7 @@ dep is omitted, which is the app's gate leaking into a service. The
 package has no default to fall back to, so the wiring is visible in one
 place.
 
-**`./better-auth`** (`@langwatch/identity-server/better-auth`): one class,
+**`./better-auth`** (`@langwatch/identity-process/better-auth`): one class,
 `IdentityCeremonies`, holding the three methods the app binds to
 better-auth's own `databaseHooks` — attach, detach, erase.
 Its collaborators are the package's own ports and service plus two closures
@@ -452,7 +452,7 @@ the suite green. Six commits, in this order, each reviewable alone:
    backfill policy — moved with their tests; the app pipeline re-composes
    its schemas from the package. `decide.ts` lands here with the five
    guards and the commands become thin.
-3. **`@langwatch/identity-server`:** skeleton (from `packages/authz-server`),
+3. **`@langwatch/identity-process`:** skeleton (from `packages/authz-server`),
    ports, `IdentityGuards`, `IdentityService`, `VerificationCeremonyService`,
    `IdentityBackfillService`, crypto, and the better-auth facade under
    `./better-auth` — self-contained and tested before the app touches it.
@@ -553,12 +553,12 @@ skipped it.
 | ADR-115 said               | Now                                   |
 | -------------------------- | ------------------------------------- |
 | `packages/identity`        | `modules/identity/contract` |
-| `packages/identity-server` | `modules/identity/server`   |
+| `packages/identity-server` | `modules/identity/process`   |
 
 `@langwatch/identity` is therefore `@langwatch/identity-contract`: the layout
 derives a package's name from its role, so a package at
 `modules/<feature>/<role>` must be `@langwatch/<feature>-<role>`.
-`@langwatch/identity-server` already matched. Everything this ADR decided about
+`@langwatch/identity-process` already matched. Everything this ADR decided about
 what each package may import, and in which direction, is unchanged — the rename
 touched 855 module specifiers and nothing else.
 

@@ -1,0 +1,412 @@
+/**
+ * Integration test for issue #3363: Quick Run no-navigation invariant.
+ * @vitest-environment jsdom
+ * @see specs/features/suites/quick-run-stay-in-place.feature
+ */
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+// The empty states carry the Setup via Agent menu, whose langy hooks need
+// app context these tests do not build; the control has its own tests.
+vi.mock("posthog-js", () => ({
+  default: { capture: vi.fn() },
+}));
+
+vi.mock("@langwatch/trace-browser/surfaces/setup-with-agent-button", () => ({
+  SetupWithAgentButton: () => null,
+}));
+
+import type { UseRunSuiteOptions } from "../use-run-suite.ts";
+
+// ---------------------------------------------------------------------------
+// Hoisted mocks — must be declared before any import that touches the module
+// ---------------------------------------------------------------------------
+
+const mockRouterPush = vi.hoisted(() => vi.fn());
+const mockRouterReplace = vi.hoisted(() => vi.fn());
+
+/**
+ * Capture the onRunScheduled callback passed by SimulationsPage to useRunSuite
+ * so individual tests can trigger it directly without simulating a full
+ * API mutation cycle.
+ */
+const capturedOnRunScheduled = vi.hoisted(
+  () =>
+    ({
+      current: null,
+    }) as { current: ((suiteId: string, batchRunId: string) => void) | null },
+);
+
+/**
+ * Capture the onViewRun callback passed by SimulationsPage to useRunSuite.
+ * Pins AC8 page-wiring: invoking it must navigate to the run plan detail page
+ * (the opt-in counterpart to the no-auto-nav invariant).
+ */
+const capturedOnViewRun = vi.hoisted(
+  () =>
+    ({
+      current: null,
+    }) as { current: ((suiteId: string) => void) | null },
+);
+
+/**
+ * Capture the flow callbacks registered by SimulationsPage via setFlowCallbacks("suiteEditor", …)
+ * so AC6 tests can directly invoke onRunRequested and assert navigation fires.
+ */
+const capturedFlowCallbacks = vi.hoisted(() => ({
+  current: null as {
+    onRunRequested?: (suite: any) => void;
+    onSaved?: (suite: any) => void;
+  } | null,
+}));
+
+// Router mock — path is overridden per describe block via routerQueryPath
+const routerQueryPath = vi.hoisted(() => ({
+  current: undefined as string[] | undefined,
+}));
+
+/**
+ * Hoisted spy on the suites.getSummaries cache invalidator.
+ */
+const mockGetSummariesInvalidate = vi.hoisted(() => vi.fn());
+
+vi.mock("@langwatch/browser-host/use-router", () => ({
+  useRouter: () => ({
+    push: mockRouterPush,
+    replace: mockRouterReplace,
+    query: {
+      project: "test-project",
+      ...(routerQueryPath.current !== undefined ? { path: routerQueryPath.current } : {}),
+    },
+    pathname: "/[project]/simulations/[[...path]]",
+    asPath: routerQueryPath.current?.length
+      ? `/test-project/simulations/${routerQueryPath.current.join("/")}`
+      : "/test-project/simulations",
+    isReady: true,
+    events: { on: vi.fn(), off: vi.fn(), emit: vi.fn() },
+  }),
+}));
+
+// Capture onRunScheduled from useRunSuite — do NOT mock useSuiteRouting so
+// navigateToSuite runs for real and calls router.push (that is what we observe).
+vi.mock("../use-run-suite.ts", () => ({
+  useRunSuite: (opts: UseRunSuiteOptions) => {
+    capturedOnRunScheduled.current = opts.onRunScheduled ?? null;
+    capturedOnViewRun.current = opts.onViewRun ?? null;
+    return {
+      requestRun: vi.fn(),
+      confirmRun: vi.fn(),
+      cancelRun: vi.fn(),
+      isPending: false,
+      pendingBatchRunId: null,
+      dialogProps: {
+        open: false,
+        onClose: vi.fn(),
+        onConfirm: vi.fn(),
+        suiteName: "",
+        scenarioCount: 0,
+        targetCount: 0,
+        repeatCount: 1,
+        isLoading: false,
+      },
+    };
+  },
+}));
+
+vi.mock("../../use-organization-team-project.ts", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "project_1", slug: "test-project" },
+    hasAnyPermission: () => true,
+    isLoading: false,
+  }),
+}));
+
+vi.mock("@langwatch/browser-host/drawer", () => ({
+  useDrawer: () => ({
+    openDrawer: vi.fn(),
+    setFlowCallbacks: (_flow: string, callbacks: any) => {
+      capturedFlowCallbacks.current = callbacks;
+    },
+  }),
+}));
+
+vi.mock("../../use-simulation-update-listener.ts", () => ({
+  useSimulationUpdateListener: () => undefined,
+}));
+
+vi.mock("../../../ui/sections/dashboard-layout.tsx", () => ({
+  DashboardLayout: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="dashboard-layout">{children}</div>
+  ),
+}));
+
+vi.mock("../../../ui/sections/suites/run-history-panel.tsx", () => ({
+  RunHistoryPanel: () => <div data-testid="all-runs-panel">All Runs Panel</div>,
+}));
+
+vi.mock("../../scenario-api.ts", () => ({
+  api: {
+    featureFlag: {
+      isEnabled: {
+        useQuery: () => ({ data: { enabled: false }, isLoading: false }),
+      },
+    },
+    useUtils: () => ({
+      suites: {
+        getAll: { invalidate: vi.fn() },
+        getSummaries: { invalidate: mockGetSummariesInvalidate },
+      },
+      scenarios: {
+        getSuiteRunData: { invalidate: vi.fn() },
+        getExternalSetSummaries: { invalidate: vi.fn() },
+      },
+    }),
+    suites: {
+      getAll: {
+        useQuery: () => ({
+          data: [
+            {
+              id: "suite_target",
+              projectId: "project_1",
+              name: "Target Suite",
+              slug: "target-suite-slug",
+              description: null,
+              scenarioIds: [],
+              targets: [],
+              repeatCount: 1,
+              labels: [],
+              archivedAt: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          ],
+          isLoading: false,
+          error: null,
+        }),
+      },
+      getSummaries: {
+        useQuery: () => ({ data: {}, isLoading: false }),
+      },
+      archive: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+      duplicate: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+      run: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+    },
+    scenarios: {
+      getSuiteRunData: {
+        useQuery: () => ({
+          data: { runs: [], scenarioSetIds: {}, hasMore: false },
+          isLoading: false,
+          error: null,
+        }),
+      },
+      getExternalSetSummaries: {
+        useQuery: () => ({ data: [], isLoading: false, error: null }),
+      },
+      getAll: {
+        useQuery: () => ({ data: [], isLoading: false, error: null }),
+      },
+      cancelJob: {
+        useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+      },
+      cancelBatchRun: {
+        useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+      },
+    },
+    agents: {
+      getAll: {
+        useQuery: () => ({ data: [] }),
+      },
+    },
+    prompts: {
+      getAllPromptsForProject: {
+        useQuery: () => ({ data: [] }),
+      },
+    },
+  },
+}));
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const Wrapper = ({ children }: { children: React.ReactNode }) => (
+  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+);
+
+let SimulationsPage: React.ComponentType;
+
+function renderSimulationsPage() {
+  render(<SimulationsPage />, { wrapper: Wrapper });
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
+  // The page drags the whole suites graph behind it, and a cold transform of it
+  // costs more than a test's own budget, so it is imported once for the file.
+  // The import is dynamic so the mocks above are applied before it evaluates.
+  beforeAll(async () => {
+    SimulationsPage = (await import("../../../ui/sections/suites/simulations-page.tsx")).default;
+  }, 60_000);
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    capturedOnRunScheduled.current = null;
+    capturedOnViewRun.current = null;
+    capturedFlowCallbacks.current = null;
+    routerQueryPath.current = undefined;
+  });
+
+  describe("given a suite with id 'suite_target' and slug 'target-suite-slug'", () => {
+    describe("when the user is on All Runs", () => {
+      beforeEach(async () => {
+        routerQueryPath.current = undefined;
+        await renderSimulationsPage();
+        expect(capturedOnRunScheduled.current).not.toBeNull();
+      });
+
+      /** @scenario Quick run from the All Runs page keeps the user on All Runs */
+      it("does not call the router push API when a run is scheduled", async () => {
+        // Simulate a run being scheduled for the target suite
+        capturedOnRunScheduled.current!("suite_target", "batch_001");
+
+        expect(mockRouterPush).not.toHaveBeenCalled();
+      });
+
+      it("still invalidates the suites.getSummaries cache so the sidebar row refreshes", async () => {
+        capturedOnRunScheduled.current!("suite_target", "batch_004");
+
+        expect(mockGetSummariesInvalidate).toHaveBeenCalled();
+      });
+    });
+
+    describe("when the user is on a different suite's detail page", () => {
+      beforeEach(async () => {
+        routerQueryPath.current = ["run-plans", "other-suite-slug"];
+        await renderSimulationsPage();
+        expect(capturedOnRunScheduled.current).not.toBeNull();
+        capturedOnRunScheduled.current!("suite_target", "batch_002");
+      });
+
+      /** @scenario Quick run on a different run plan from a run plan detail page keeps the user on the original detail page */
+      it("does not call the router push API when a run is scheduled", async () => {
+        expect(mockRouterPush).not.toHaveBeenCalled();
+      });
+
+      it("still invalidates the suites.getSummaries cache so the sidebar row refreshes", async () => {
+        expect(mockGetSummariesInvalidate).toHaveBeenCalled();
+      });
+    });
+
+    describe("when the user is on the same suite's detail page", () => {
+      beforeEach(async () => {
+        routerQueryPath.current = ["run-plans", "target-suite-slug"];
+        await renderSimulationsPage();
+        expect(capturedOnRunScheduled.current).not.toBeNull();
+        capturedOnRunScheduled.current!("suite_target", "batch_003");
+      });
+
+      /** @scenario Quick run on the same run plan the user is viewing keeps the user on that detail page */
+      it("does not call the router push API when a run is scheduled", async () => {
+        expect(mockRouterPush).not.toHaveBeenCalled();
+      });
+
+      it("still invalidates the suites.getSummaries cache so the sidebar row refreshes", async () => {
+        expect(mockGetSummariesInvalidate).toHaveBeenCalled();
+      });
+    });
+  });
+
+  /**
+   * AC6 regression guard — positive invariant.
+   */
+  describe("given the suite editor drawer is open", () => {
+    describe("when Save and Run fires for a saved suite (AC6 regression guard)", () => {
+      /** @scenario Save and Run from the suite editor drawer still navigates to the suite detail page */
+      it("calls router push toward the suite detail page", async () => {
+        const user = userEvent.setup();
+        routerQueryPath.current = undefined; // Start on All Runs
+
+        await renderSimulationsPage();
+
+        // Open the suite editor drawer — this causes SimulationsPage to call
+        // setFlowCallbacks("suiteEditor", { onSaved, onRunRequested }) which
+        // populates capturedFlowCallbacks.current.
+        const newSuiteButton = await screen.findByRole("button", {
+          name: /New Run Plan/i,
+        });
+        await user.click(newSuiteButton);
+
+        expect(capturedFlowCallbacks.current).not.toBeNull();
+        expect(capturedFlowCallbacks.current!.onRunRequested).toBeDefined();
+
+        // Simulate the Save-and-Run callback firing with a newly saved suite
+        const testSuite = {
+          id: "suite_saved",
+          projectId: "project_1",
+          name: "Newly Saved Suite",
+          slug: "newly-saved-slug",
+          description: null,
+          scenarioIds: [],
+          targets: [],
+          repeatCount: 1,
+          labels: [],
+          archivedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        capturedFlowCallbacks.current!.onRunRequested!(testSuite);
+
+        // navigateToSuite must fire — router.push called with the run-plans path
+        expect(mockRouterPush).toHaveBeenCalled();
+        const pushCall = mockRouterPush.mock.calls[0]!;
+        const [routeArg] = pushCall;
+        expect(routeArg).toMatchObject({
+          query: expect.objectContaining({
+            path: expect.arrayContaining(["run-plans", "newly-saved-slug"]),
+          }),
+        });
+      });
+    });
+  });
+
+  /**
+   * AC8 — opt-in "View run" navigation.
+   */
+  describe("given a scheduled run for the suite with slug 'target-suite-slug'", () => {
+    describe("when the View run toast action fires for a scheduled run", () => {
+      /** @scenario The run-scheduled success toast offers a View run action that navigates to the run plan detail page */
+      it("calls router push toward the run plan detail page", async () => {
+        routerQueryPath.current = undefined; // Start on All Runs
+
+        await renderSimulationsPage();
+
+        expect(capturedOnViewRun.current).not.toBeNull();
+
+        // Simulate the user clicking "View run" on the success toast for the
+        // suite that was just scheduled.
+        capturedOnViewRun.current!("suite_target");
+
+        expect(mockRouterPush).toHaveBeenCalled();
+        const pushCall = mockRouterPush.mock.calls[0]!;
+        const [routeArg] = pushCall;
+        expect(routeArg).toMatchObject({
+          query: expect.objectContaining({
+            path: expect.arrayContaining(["run-plans", "target-suite-slug"]),
+          }),
+        });
+      });
+    });
+  });
+});

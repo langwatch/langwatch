@@ -1,0 +1,60 @@
+{
+  "name": "@langwatch/agent-process",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Agents services, private persistence, and transport-neutral API handlers.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "imports": {
+    "#*": {
+      "types": "./dist/*.d.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/api-key-contract": "workspace:*",
+    "@langwatch/audit-log-contract": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/redis-client": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/actor": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
+    "@trpc/server": "catalog:",
+    "@types/ws": "catalog:",
+    "hono": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "ws": "catalog:"
+  }
+}

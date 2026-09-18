@@ -1,16 +1,16 @@
 # Trace edit mode: correcting a trace inside the drawer
 #
 # Implementation:
-#   modules/trace/web/src/trace-edit.store.ts                                (draft state)
-#   modules/trace/web/src/ui/sections/explorer/hooks/use-trace-edit-overlay.ts                            (correction read + appliers)
-#   modules/trace/web/src/ui/sections/explorer/trace-drawer/edit-mode/edit-mode-bar.tsx         (bar, save, discard)
-#   modules/trace/web/src/ui/sections/explorer/trace-drawer/edit-mode/editable-io-field.tsx     (input/output editor)
-#   modules/trace/web/src/ui/sections/explorer/trace-drawer/edit-mode/span-name-type-editor.tsx  (name + type editor)
-#   modules/trace/web/src/ui/sections/explorer/trace-drawer/edit-mode/edited-original-toggle.tsx (edited vs original)
-#   modules/trace/web/src/ui/sections/explorer/trace-drawer/trace-edit-diff-dialog.tsx          (unified diff)
-#   modules/trace/web/src/ui/sections/explorer/trace-drawer/attribute-table.tsx               (editable span params)
-#   modules/trace/web/src/ui/sections/explorer/trace-drawer/edit-mode/trace-editable-input.tsx  (trace input editor)
-#   modules/trace/web/src/ui/sections/explorer/trace-drawer/edit-mode/use-trace-metadata-editing.ts (trace metadata editor)
+#   modules/trace/browser/src/trace-edit.store.ts                                (draft state)
+#   modules/trace/browser/src/ui/sections/explorer/hooks/use-trace-edit-overlay.ts                            (correction read + appliers)
+#   modules/trace/browser/src/ui/sections/explorer/trace-drawer/edit-mode/edit-mode-bar.tsx         (bar, save, discard)
+#   modules/trace/browser/src/ui/sections/explorer/trace-drawer/edit-mode/editable-io-field.tsx     (input/output editor)
+#   modules/trace/browser/src/ui/sections/explorer/trace-drawer/edit-mode/span-name-type-editor.tsx  (name + type editor)
+#   modules/trace/browser/src/ui/sections/explorer/trace-drawer/edit-mode/edited-original-toggle.tsx (edited vs original)
+#   modules/trace/browser/src/ui/sections/explorer/trace-drawer/trace-edit-diff-dialog.tsx          (unified diff)
+#   modules/trace/browser/src/ui/sections/explorer/trace-drawer/attribute-table.tsx               (editable span params)
+#   modules/trace/browser/src/ui/sections/explorer/trace-drawer/edit-mode/trace-editable-input.tsx  (trace input editor)
+#   modules/trace/browser/src/ui/sections/explorer/trace-drawer/edit-mode/use-trace-metadata-editing.ts (trace metadata editor)
 #   modules/trace/contract/src/trace-metadata-editable-keys.ts                    (which metadata keys are editable)
 #
 # Motivation: a reviewer curating production traces into an evaluation dataset

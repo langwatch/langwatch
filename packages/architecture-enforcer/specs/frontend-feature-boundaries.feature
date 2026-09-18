@@ -7,7 +7,7 @@ Feature: Frontend feature boundary lint
 
   @unit @architecture
   Scenario: A web package can be governed before its screen migration completes
-    Given apps/ui/src/features/catalogue.json opts @langwatch/prompt-web into governance
+    Given apps/ui/src/features/catalogue.json opts @langwatch/prompt-browser into governance
     And no frontend feature claims its Prompt Studio screen yet
     When architecture lint checks the package exports and dependency closures
     Then broad Prompt web exports fail
@@ -19,12 +19,12 @@ Feature: Frontend feature boundary lint
     And prompt-studio owns its exact route root and Prompt screen export
     When architecture lint checks the workspace
     Then it does not require prompt-studio to match a modules catalogue name
-    And it accepts the declared @langwatch/prompt-web/screens/prompt-studio import
+    And it accepts the declared @langwatch/prompt-browser/screens/prompt-studio import
 
   @unit @architecture
   Scenario: A frontend feature imports only its declared contributions
     Given trace-explorer declares a Prompt reference surface in the frontend catalogue
-    When it imports @langwatch/prompt-web/surfaces/prompt-reference
+    When it imports @langwatch/prompt-browser/surfaces/prompt-reference
     Then architecture lint accepts the import
     And an undeclared feature-web screen or surface import fails with the owning catalogue entry
 
@@ -58,14 +58,14 @@ Feature: Frontend feature boundary lint
 
   @unit @architecture
   Scenario: Owner-only screens cannot be imported by another frontend feature
-    Given prompt-studio owns @langwatch/prompt-web/screens/prompt-studio
+    Given prompt-studio owns @langwatch/prompt-browser/screens/prompt-studio
     When trace-explorer imports that screen
     Then architecture lint reports an owner-screen violation
     And it directs trace-explorer to a declared Prompt surface
 
   @unit @architecture
   Scenario: A surface is the public door onto its package implementation
-    Given @langwatch/prompt-web/surfaces/prompt-reference re-exports Prompt model, behavior and ui modules
+    Given @langwatch/prompt-browser/surfaces/prompt-reference re-exports Prompt model, behavior and ui modules
     When architecture lint resolves the surface's production dependency closure
     Then it accepts the package's own model, behavior and ui layers as the surface implementation
     And a shareable component needs no copy hoisted into another layer to be exposed
@@ -86,14 +86,14 @@ Feature: Frontend feature boundary lint
 
   @unit @architecture
   Scenario: A surface cannot pull in its feature's complete implementation
-    Given @langwatch/prompt-web/surfaces/prompt-reference imports a Prompt table through a module outside those layers
+    Given @langwatch/prompt-browser/surfaces/prompt-reference imports a Prompt table through a module outside those layers
     When architecture lint resolves the surface's production dependency closure
     Then it reports the full import path to the escaping or forbidden screen, internal, store, transport, query or route module
     And the surface is not importable until its closure is narrow
 
   @unit @architecture
   Scenario: An owner-only screen remains browser-safe
-    Given @langwatch/prompt-web/screens/prompt-studio reaches private Prompt presentation
+    Given @langwatch/prompt-browser/screens/prompt-studio reaches private Prompt presentation
     When it directly imports transport, router, session, server, environment or Node.js implementation
     Then architecture lint rejects the screen dependency closure
     And it directs browser data and actions to the owning frontend feature and platform

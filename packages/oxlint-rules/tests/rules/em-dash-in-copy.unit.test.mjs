@@ -60,7 +60,7 @@ describe("given a module's web package", () => {
     it("reports emDashInCopy", () => {
       const found = report(
         'export const helpText = { tooltip: "Detects emails, phones — and more" };',
-        "modules/widget/web/src/components/widget-help.tsx",
+        "modules/widget/browser/src/components/widget-help.tsx",
       );
 
       expect(found).toHaveLength(1);
@@ -81,7 +81,7 @@ describe("given the same em-dash copy outside customer-facing tsx", () => {
   describe("when the file is in a module's server package", () => {
     /** @scenario "Server code is outside the rule" */
     it("reports nothing", () => {
-      expect(report(code, "modules/widget/server/src/widget-help.tsx")).toEqual([]);
+      expect(report(code, "modules/widget/process/src/widget-help.tsx")).toEqual([]);
     });
   });
 });

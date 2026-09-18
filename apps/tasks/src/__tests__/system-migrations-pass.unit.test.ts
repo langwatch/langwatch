@@ -54,7 +54,7 @@ vi.mock("@langwatch/eventing", () => ({
 vi.mock("@langwatch/group-queue", () => ({
   GroupQueueDependenciesAdapter: { create: () => ({ dependencies: () => ({}) }) },
 }));
-vi.mock("@langwatch/authz-server", () => ({
+vi.mock("@langwatch/authz-process", () => ({
   EventingAuthzCommandDispatcherAdapter: {
     create: () => ({ connect: dependencies.connectDispatcher }),
     sendersFrom: (commands: unknown) => commands,
@@ -64,12 +64,12 @@ vi.mock("@langwatch/authz-server", () => ({
     create: () => ({ build: () => ({ pipeline: "authz", migration: "authz-migration" }) }),
   },
 }));
-vi.mock("@langwatch/identity-server", () => ({
+vi.mock("@langwatch/identity-process", () => ({
   IdentityProducerPipelinesAdapter: { create: () => ({ identityPipeline: () => "identity" }) },
   PostgresIdentityUserMigrationsAdapter: { create: dependencies.userMigrations },
   PostgresIdentityNewbornSweepAdapter: { create: dependencies.newbornSweep },
 }));
-vi.mock("@langwatch/ops-server", () => ({
+vi.mock("@langwatch/ops-process", () => ({
   OpsSystemMigrations: { create: dependencies.createRunner },
   RoutingTableOrganizationDataplaneAdapter: { create: (options: unknown) => options },
   SystemMigrationsPassTask: {

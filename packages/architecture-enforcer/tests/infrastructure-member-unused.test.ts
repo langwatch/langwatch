@@ -15,7 +15,7 @@ let root = "";
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "infrastructure-member-"));
-  write("modules/widget/server/package.json", JSON.stringify({ name: "@langwatch/widget-server" }));
+  write("modules/widget/process/package.json", JSON.stringify({ name: "@langwatch/widget-server" }));
 });
 
 afterEach(() => {
@@ -28,9 +28,9 @@ function write(path: string, content: string): void {
   writeFileSync(absolute, content, "utf8");
 }
 
-const SERVER = "modules/widget/server/src";
+const SERVER = "modules/widget/process/src";
 
-const PACKAGE = "modules/widget/server";
+const PACKAGE = "modules/widget/process";
 
 const BASELINE = "packages/architecture-enforcer/src/infrastructure-member-unused-baseline.json";
 

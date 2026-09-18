@@ -427,7 +427,7 @@ describe("redactSecretsInText, given text that only looks like secrets", () => {
     ["ISO timestamps", "started 2026-08-10T14:32:11.482Z ended 14:32:19.005Z"],
     [
       "a source path",
-      "see modules/metric/server/src/services/metric-request-collection.service.ts",
+      "see modules/metric/process/src/services/metric-request-collection.service.ts",
     ],
     ["a path with a line number", "packages/redaction/src/secrets.ts:142"],
     [
@@ -511,7 +511,7 @@ describe("redactSecretsInText, given text that only looks like secrets", () => {
       "risk-based scoring, disk-usage report, ask-me-anything, mask-sensitive-fields",
     ],
     ["a transcript tag", "<task-notification> and <task-progress>"],
-    ["package versions", "@langwatch/gateway-server@3.12.0 and pnpm@10.4.1"],
+    ["package versions", "@langwatch/gateway-process@3.12.0 and pnpm@10.4.1"],
     // A PostHog project key ships inside published web bundles by design,
     // so blanking it hides telemetry configuration and protects nothing.
     ["a public PostHog project key", `phc_${BODY.slice(0, 43)}`],
@@ -589,7 +589,7 @@ describe("redactSecretsInText, given a payload the size of the scan budget", () 
   /** @scenario "A large payload is scanned within the ingestion budget" */
   it("completes well inside the ingestion budget", () => {
     const chunk =
-      "The agent read modules/trace/server/src/services/trace-legacy-read.service.ts at " +
+      "The agent read modules/trace/process/src/services/trace-legacy-read.service.ts at " +
       "2026-08-10T14:32:11.482Z, commit 51d07b547d0a8f3e2c1b9d4a6e7f8091a2b3c4d5, " +
       'model claude-opus-5, {"input_tokens":15234,"cost_usd":0.0412}\n';
     const payload = chunk.repeat(Math.ceil(200_000 / chunk.length));

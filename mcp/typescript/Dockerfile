@@ -21,9 +21,9 @@ COPY packages/redaction/package.json ./packages/redaction/
 COPY packages/ssrf/package.json ./packages/ssrf/
 COPY packages/api/package.json ./packages/api/
 COPY modules/authz/contract/package.json ./modules/authz/contract/
-COPY modules/authz/server/package.json ./modules/authz/server/
+COPY modules/authz/process/package.json ./modules/authz/process/
 COPY modules/automation/contract/package.json ./modules/automation/contract/
-COPY modules/automation/server/package.json ./modules/automation/server/
+COPY modules/automation/process/package.json ./modules/automation/process/
 COPY packages/system-migrations/package.json ./packages/system-migrations/
 COPY packages/observability/package.json ./packages/observability/
 COPY packages/react-rum/package.json ./packages/react-rum/

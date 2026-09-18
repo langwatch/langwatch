@@ -1,5 +1,5 @@
 // Claims a signed voice session token carries between mint and finish: only ids and project scope.
-// Signing/verification server-side (@langwatch/scenario-server). Short-lived (call budget + grace).
+// Signing/verification server-side (@langwatch/scenario-process). Short-lived (call budget + grace).
 
 import { z } from "zod";
 import { VOICE_TRANSPORTS, type VoiceTransport } from "./voice-transport.ts";

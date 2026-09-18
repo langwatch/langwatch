@@ -29,7 +29,7 @@ const MISSING_EXPORT_DUMP =
   `${path.join(REPO_ROOT, "apps/api/src/index.ts")}:180\n` +
   "  createExperimentsRestApp,\n" +
   "  ^\n\n" +
-  "SyntaxError: The requested module '@langwatch/experiment-server' does not provide an export named 'createExperimentsRestApp'\n" +
+  "SyntaxError: The requested module '@langwatch/experiment-process' does not provide an export named 'createExperimentsRestApp'\n" +
   "    at #asyncInstantiate (node:internal/modules/esm/module_job:302:21)\n";
 
 const MISSING_PACKAGE_DUMP =
@@ -66,10 +66,10 @@ void describe("firstAppFrame", () => {
     const stack =
       "TypeError: boom\n" +
       `    at Object.<anonymous> (${path.join(REPO_ROOT, "node_modules/some-lib/index.js")}:10:3)\n` +
-      `    at PromptApp.create (${path.join(REPO_ROOT, "modules/prompt/server/src/app/prompt.app.ts")}:193:31)\n` +
+      `    at PromptApp.create (${path.join(REPO_ROOT, "modules/prompt/process/src/app/prompt.app.ts")}:193:31)\n` +
       "    at node:internal/modules/esm/module_job:302:21";
     assert.deepEqual(firstAppFrame(stack), {
-      file: "modules/prompt/server/src/app/prompt.app.ts",
+      file: "modules/prompt/process/src/app/prompt.app.ts",
       line: "193",
     });
   });
@@ -98,7 +98,7 @@ void describe("collapseStackRecord", () => {
       error: { type: "TypeError", message: "x" },
       stack:
         "TypeError: Cannot read properties of undefined (reading 'prompts')\n" +
-        `    at PromptApp.create (${path.join(REPO_ROOT, "modules/prompt/server/src/app/prompt.app.ts")}:193:31)\n` +
+        `    at PromptApp.create (${path.join(REPO_ROOT, "modules/prompt/process/src/app/prompt.app.ts")}:193:31)\n` +
         "    at node:internal/process/task_queues:95:5",
     });
 
@@ -107,7 +107,7 @@ void describe("collapseStackRecord", () => {
     const parsed = JSON.parse(collapsed.collapsed);
     assert.equal(
       parsed.msg,
-      "fatal boot failure: Cannot read properties of undefined (reading 'prompts') — at modules/prompt/server/src/app/prompt.app.ts:193",
+      "fatal boot failure: Cannot read properties of undefined (reading 'prompts') — at modules/prompt/process/src/app/prompt.app.ts:193",
     );
     assert.equal(parsed.stack, undefined);
     assert.equal(parsed.level, "fatal");
@@ -129,14 +129,14 @@ void describe("classifyMissingExport", () => {
     const classified = classifyMissingExport(MISSING_EXPORT_DUMP);
     assert.deepEqual(classified, {
       kind: "missing-export",
-      specifier: "@langwatch/experiment-server",
+      specifier: "@langwatch/experiment-process",
       exportName: "createExperimentsRestApp",
       file: "apps/api/src/index.ts",
       line: "180",
     });
     assert.equal(
       crashMessage(classified),
-      "missing export: module '@langwatch/experiment-server' does not export 'createExperimentsRestApp' (imported at apps/api/src/index.ts:180)",
+      "missing export: module '@langwatch/experiment-process' does not export 'createExperimentsRestApp' (imported at apps/api/src/index.ts:180)",
     );
   });
 
@@ -170,13 +170,13 @@ void describe("classifyBootException", () => {
       "            ^\n\n" +
       "TypeError: Cannot read properties of undefined (reading 'x')\n" +
       "    at Object.<anonymous> (/repo/node_modules/some-lib/index.js:10:3)\n" +
-      `    at Object.create (${path.join(REPO_ROOT, "modules/prompt/server/src/app/prompt.app.ts")}:193:31)\n` +
+      `    at Object.create (${path.join(REPO_ROOT, "modules/prompt/process/src/app/prompt.app.ts")}:193:31)\n` +
       "    at node:internal/modules/esm/module_job:302:21\n";
 
     const classified = classifyBootException(dump);
     assert.equal(classified.errorType, "TypeError");
     assert.equal(classified.message, "Cannot read properties of undefined (reading 'x')");
-    assert.deepEqual(classified.frame, { file: "modules/prompt/server/src/app/prompt.app.ts", line: "193" });
+    assert.deepEqual(classified.frame, { file: "modules/prompt/process/src/app/prompt.app.ts", line: "193" });
   });
 
   void it("is null for text with no Error banner", () => {

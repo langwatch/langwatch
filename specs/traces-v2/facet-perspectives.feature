@@ -3,11 +3,11 @@
 # Design: dev/docs/adr/028-trace-facet-sidebar-presentation-and-perspectives.md
 #
 # Implementation:
-#   modules/trace/web/src/facet-constants.ts       (FACET_GROUPS refined into finer sub-groups)
-#   modules/trace/web/src/ui/sections/explorer/filter-sidebar/facet-manager-popover.tsx  (perspective switcher + grouped checklist)
-#   modules/trace/web/src/facet-lens.store.ts                    (built-in perspectives + activePerspectiveId)
-#   modules/trace/web/src/ui/sections/explorer/filter-sidebar/hooks/use-filter-sidebar-data.ts  (consumes groupOrder/sectionOrder)
-#   modules/trace/web/src/ui/sections/__tests__/facet-groups.unit.test.ts  (pinned taxonomy)
+#   modules/trace/browser/src/facet-constants.ts       (FACET_GROUPS refined into finer sub-groups)
+#   modules/trace/browser/src/ui/sections/explorer/filter-sidebar/facet-manager-popover.tsx  (perspective switcher + grouped checklist)
+#   modules/trace/browser/src/facet-lens.store.ts                    (built-in perspectives + activePerspectiveId)
+#   modules/trace/browser/src/ui/sections/explorer/filter-sidebar/hooks/use-filter-sidebar-data.ts  (consumes groupOrder/sectionOrder)
+#   modules/trace/browser/src/ui/sections/__tests__/facet-groups.unit.test.ts  (pinned taxonomy)
 #
 # Related specs:
 #   specs/traces-v2/lens-preset-groups.feature — the SEPARATE trace-list lens system (toolbar LensTabs); different control

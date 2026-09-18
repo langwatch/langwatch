@@ -1,0 +1,115 @@
+{
+  "name": "@langwatch/scenario-process",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical server-side Scenario service and private persistence.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "imports": {
+    "#*": {
+      "types": "./dist/*.d.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./child": {
+      "types": "./dist/child.d.ts",
+      "default": "./src/child.ts"
+    },
+    "./composition/scenario-failure-handler": {
+      "types": "./dist/services/scenario-failure-handler.service.d.ts",
+      "default": "./src/services/scenario-failure-handler.service.ts"
+    },
+    "./composition/simulation-clickhouse": {
+      "types": "./dist/repositories/clickhouse/simulation-clickhouse.repository.d.ts",
+      "default": "./src/repositories/clickhouse/simulation-clickhouse.repository.ts"
+    },
+    "./composition/simulation-eventing": {
+      "types": "./dist/repositories/clickhouse/clickhouse.simulation-eventing.repository.d.ts",
+      "default": "./src/repositories/clickhouse/clickhouse.simulation-eventing.repository.ts"
+    },
+    "./composition/simulation-execution": {
+      "types": "./dist/repositories/simulation-execution.repository.d.ts",
+      "default": "./src/repositories/simulation-execution.repository.ts"
+    },
+    "./composition/simulation-processing-producer": {
+      "types": "./dist/repositories/clickhouse/clickhouse.simulation-processing-producer.repository.d.ts",
+      "default": "./src/repositories/clickhouse/clickhouse.simulation-processing-producer.repository.ts"
+    },
+    "./composition/stalled-runs-backfill": {
+      "types": "./dist/tasks/stalled-runs-backfill.task.d.ts",
+      "default": "./src/tasks/stalled-runs-backfill.task.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/openai-compatible": "catalog:",
+    "@ai-sdk/provider": "^3.0.13",
+    "@clickhouse/client": "catalog:",
+    "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/automation-contract": "workspace:*",
+    "@langwatch/clickhouse-client": "workspace:*",
+    "@langwatch/csv": "workspace:*",
+    "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/plans": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/scenario": "catalog:",
+    "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/secret-contract": "workspace:*",
+    "@langwatch/suite-contract": "workspace:*",
+    "@langwatch/task": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
+    "@opentelemetry/api": "catalog:",
+    "@trpc/server": "catalog:",
+    "@xyflow/react": "catalog:",
+    "ai": "catalog:",
+    "hono": "catalog:",
+    "hono-openapi": "catalog:",
+    "jsonpath-plus": "catalog:",
+    "langwatch": "workspace:*",
+    "liquidjs": "catalog:",
+    "nanoid": "catalog:",
+    "papaparse": "catalog:",
+    "undici": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/actor": "workspace:*",
+    "@langwatch/model-provider-process": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/redis-client": "workspace:*",
+    "@langwatch/suite-process": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
+    "@opentelemetry/sdk-trace-base": "catalog:",
+    "@opentelemetry/sdk-trace-node": "catalog:",
+    "@types/papaparse": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

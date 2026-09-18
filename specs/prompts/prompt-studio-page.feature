@@ -5,7 +5,7 @@ Feature: Prompt Studio page
 
   # The address is `/:project/prompts`. It is one page key, one screen, and one
   # grant: the platform page was `withPermissionGuard("prompts:view")` and only
-  # the grant travelled when the screen moved into `@langwatch/prompt-web` —
+  # the grant travelled when the screen moved into `@langwatch/prompt-browser` —
   # the dashboard chrome around it belongs to the route tree.
 
   @integration

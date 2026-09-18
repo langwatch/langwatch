@@ -28,10 +28,10 @@ Feature: Personal-workspace progressive feature unlock — minimal-by-default, c
   Implementation lives at:
     - packages/prisma-client/prisma/schema.prisma `Project.personalFeatures` JSON
     - modules/organization/contract/src/personal-workspace.ts (contract) and its tRPC transport
-    - modules/navigation/web/src/ui/sections/personal-sidebar.tsx (nav predicate)
+    - modules/navigation/browser/src/ui/sections/personal-sidebar.tsx (nav predicate)
     - the personal settings screen's 'Workspace features' card
     - the advanced-features opt-in modal on the traces screen
-    - enterprise/modules/governance/server/src/ (governance audit)personalWorkspaceFeatures.audit.ts
+    - enterprise/modules/governance/process/src/ (governance audit)personalWorkspaceFeatures.audit.ts
 
   Background:
     Given a user "ariana@acme.com" who is a member of the personal-only

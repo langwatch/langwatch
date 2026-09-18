@@ -13,7 +13,7 @@ and transports constructed the definition service per request.
 ## Decision
 
 `@langwatch/suite-contract` owns the portable Zod 4 Suite vocabulary and one
-abstract `SuiteService`. `@langwatch/suite-server` owns its private Prisma
+abstract `SuiteService`. `@langwatch/suite-process` owns its private Prisma
 repository and concrete service.
 
 The service receives the canonical Agent, Prompt and Scenario services for

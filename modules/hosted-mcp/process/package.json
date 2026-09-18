@@ -1,0 +1,43 @@
+{
+  "name": "@langwatch/hosted-mcp-process",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Model Context Protocol endpoint LangWatch hosts: Streamable HTTP and SSE transports, OAuth token issue and exchange, and session recovery.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/hosted-mcp-contract": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/mcp-server": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/plans": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@modelcontextprotocol/sdk": "catalog:",
+    "hono": "catalog:",
+    "ioredis": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

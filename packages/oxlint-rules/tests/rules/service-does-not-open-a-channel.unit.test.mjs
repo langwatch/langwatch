@@ -8,8 +8,8 @@ const workspace = createFixtureWorkspace({
 
 afterAll(() => workspace.cleanup());
 
-const SERVICE = "modules/agent/server/src/services/agent.service.ts";
-const CHANNEL = "modules/agent/server/src/channels/eventing/eventing.agent.channel.ts";
+const SERVICE = "modules/agent/process/src/services/agent.service.ts";
+const CHANNEL = "modules/agent/process/src/channels/eventing/eventing.agent.channel.ts";
 
 function report(code, filename = SERVICE) {
   return runRule(serviceDoesNotOpenAChannelRule, { code, cwd: workspace.cwd, filename });

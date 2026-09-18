@@ -17,19 +17,19 @@ const workspace = createFixtureWorkspace({
       "export function CopyIcon() { return null; }",
     "packages/design-system/src/format-money.ts":
       "export function formatMoney() { return '$0.00'; }",
-    "modules/agent/web/package.json": JSON.stringify({
-      name: "@langwatch/agent-web",
+    "modules/agent/browser/package.json": JSON.stringify({
+      name: "@langwatch/agent-browser",
       exports: {
         "./copy-icon": { default: "./src/copy-icon.ts" },
         "./format-money": { default: "./src/format-money.ts" },
         "./agent-card": { default: "./src/agent-card.ts" },
       },
     }),
-    "modules/agent/web/src/copy-icon.ts": "export * from './ui/copy-icon.tsx';",
-    "modules/agent/web/src/ui/copy-icon.tsx": "export function CopyIcon() { return null; }",
-    "modules/agent/web/src/format-money.ts": "export function FormatMoney() { return null; }",
-    "modules/agent/web/src/agent-card.ts": "export function AgentCard() { return null; }",
-    "modules/agent/web/src/ui/internal-copy-icon.tsx":
+    "modules/agent/browser/src/copy-icon.ts": "export * from './ui/copy-icon.tsx';",
+    "modules/agent/browser/src/ui/copy-icon.tsx": "export function CopyIcon() { return null; }",
+    "modules/agent/browser/src/format-money.ts": "export function FormatMoney() { return null; }",
+    "modules/agent/browser/src/agent-card.ts": "export function AgentCard() { return null; }",
+    "modules/agent/browser/src/ui/internal-copy-icon.tsx":
       "export function CopyIcon() { return null; }",
   },
 });
@@ -46,18 +46,18 @@ describe("given a feature web package", () => {
     it("reports the duplicate component and its canonical import", () => {
       const found = report(
         "export * from './ui/copy-icon.tsx';",
-        "modules/agent/web/src/copy-icon.ts",
+        "modules/agent/browser/src/copy-icon.ts",
       );
 
       expect(found).toHaveLength(1);
       expect(found[0].messageId).toBe("duplicateComponent");
       expect(found[0].data).toEqual({
         designSystemImport: "@langwatch/design-system/copy-icon",
-        featurePackage: "@langwatch/agent-web",
+        featurePackage: "@langwatch/agent-browser",
         name: "CopyIcon",
       });
       expect(found[0].message).toBe(
-        "`CopyIcon` is exported by both `@langwatch/agent-web` and" +
+        "`CopyIcon` is exported by both `@langwatch/agent-browser` and" +
           " `@langwatch/design-system/copy-icon`. Import `CopyIcon` from" +
           " `@langwatch/design-system/copy-icon`, repoint every consumer, and delete this" +
           " feature-package export.",
@@ -70,7 +70,7 @@ describe("given a feature web package", () => {
       expect(
         report(
           "export function FormatMoney() { return null; }",
-          "modules/agent/web/src/format-money.ts",
+          "modules/agent/browser/src/format-money.ts",
         ),
       ).toEqual([]);
     });
@@ -81,7 +81,7 @@ describe("given a feature web package", () => {
       expect(
         report(
           "export function CopyIcon() { return null; }",
-          "modules/agent/web/src/ui/internal-copy-icon.tsx",
+          "modules/agent/browser/src/ui/internal-copy-icon.tsx",
         ),
       ).toEqual([]);
     });
@@ -92,7 +92,7 @@ describe("given a feature web package", () => {
       expect(
         report(
           "export function AgentCard() { return null; }",
-          "modules/agent/web/src/agent-card.ts",
+          "modules/agent/browser/src/agent-card.ts",
         ),
       ).toEqual([]);
     });

@@ -134,14 +134,14 @@ controlled-host boundary without inventing a second hand-maintained install map.
    The three named cases become:
 
    - `annotation` mounts organization's existing
-     `@langwatch/organization-web/surfaces/personal-workspace-features`.
+     `@langwatch/organization-browser/surfaces/personal-workspace-features`.
      Organization publishes it once with `personalWorkspaceFeaturesApi.Provider`.
    - `personal-workspace` belongs to `user`. It mounts coding-agent's existing
-     `@langwatch/coding-agent-web/surfaces/activity`, which coding-agent publishes
+     `@langwatch/coding-agent-browser/surfaces/activity`, which coding-agent publishes
      with `codingAgentApi.Provider`. The script follows the existing user
      forwarding export to its publisher. That export need not be removed.
-   - `@langwatch/project-web` is present **once** as a binding name, alongside
-     the distinct `@langwatch/project-web/project-settings`. The declaration
+   - `@langwatch/project-browser` is present **once** as a binding name, alongside
+     the distinct `@langwatch/project-browser/project-settings`. The declaration
      publishes the existing `/home` and `/project-settings` surface addresses
      under the **one project id**. Both host contracts and procedure maps remain.
 
@@ -153,13 +153,13 @@ For example, the declaration vocabulary is:
 
 ```ts
 const organizationWeb = defineWebModule("organization").publishSurfaces({
-  "@langwatch/organization-web/surfaces/personal-workspace-features": {
+  "@langwatch/organization-browser/surfaces/personal-workspace-features": {
     provider: personalWorkspaceFeaturesApi.Provider,
     load: () => import("./behavior/personal-workspace-features-api.ts"),
   },
 });
 const annotationWeb = defineWebModule("annotation").mountSurfaces([
-  "@langwatch/organization-web/surfaces/personal-workspace-features",
+  "@langwatch/organization-browser/surfaces/personal-workspace-features",
 ] as const);
 ```
 
@@ -201,11 +201,11 @@ current checked-out generated files were not changed.
 
 C1's nine existing files are:
 
-- `modules/navigation/web/src/model/command-catalogue.ts`
-- `modules/navigation/web/src/model/project-nav-items.ts`
-- `modules/navigation/web/src/model/section-nav-items.ts`
-- `modules/navigation/web/src/model/settings-menu.ts`
-- `modules/navigation/web/src/model/products.ts`
+- `modules/navigation/browser/src/model/command-catalogue.ts`
+- `modules/navigation/browser/src/model/project-nav-items.ts`
+- `modules/navigation/browser/src/model/section-nav-items.ts`
+- `modules/navigation/browser/src/model/settings-menu.ts`
+- `modules/navigation/browser/src/model/products.ts`
 - `apps/ui/src/model/ui-route-table.ts`
 - `apps/ui/src/behavior/ui-feature-config.ts`
 - `apps/ui/src/behavior/ui-feature.ts`
@@ -263,7 +263,7 @@ callbacks retain their existing lifetime; these tests must exercise those paths.
 They establish the React root, supplies, matching/layout semantics and the build
 gate. Replace the two environment reads with the injected `mode` here.
 
-**D4, 14 files under `modules/navigation/web/src/`:**
+**D4, 14 files under `modules/navigation/browser/src/`:**
 `model/navigation-host.ts`, `behavior/use-command-feature-flags.ts`,
 `behavior/use-filtered-commands.ts`, `behavior/use-navigation-shell-state.ts`,
 `behavior/use-navigation-tracking.ts`, `behavior/use-settings-menu.ts`,
@@ -462,13 +462,13 @@ duplicate-id.ts(4,32): error TS2349: This expression is not callable.
   Type '{ readonly "duplicate module id \"project\"": never; }' has no call signatures.
 duplicate-publication: exit 1; 219 ms
 duplicate-publication.ts(4,32): error TS2349: This expression is not callable.
-  Type '{ readonly "duplicate surface publication \"@langwatch/organization-web/surfaces/personal-workspace-features\"": never; }' has no call signatures.
+  Type '{ readonly "duplicate surface publication \"@langwatch/organization-browser/surfaces/personal-workspace-features\"": never; }' has no call signatures.
 foreign-publisher: exit 1; 231 ms
 foreign-publisher.ts(4,32): error TS2349: This expression is not callable.
-  Type '{ readonly "module \"user\" cannot publish \"@langwatch/project-web/pretend\"": never; }' has no call signatures.
+  Type '{ readonly "module \"user\" cannot publish \"@langwatch/project-browser/pretend\"": never; }' has no call signatures.
 unpublished-mount: exit 1; 227 ms
 unpublished-mount.ts(4,32): error TS2349: This expression is not callable.
-  Type '{ readonly "unpublished surface \"@langwatch/organization-web/not-published\"": never; }' has no call signatures.
+  Type '{ readonly "unpublished surface \"@langwatch/organization-browser/not-published\"": never; }' has no call signatures.
 PASS: 2 positive compilations; 6 named compile-time refusals; no application executed
 ```
 

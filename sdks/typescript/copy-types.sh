@@ -17,7 +17,7 @@ cp ../../modules/trace/contract/src/trace-format.schemas.ts src/internal/generat
 # `src/internal/generated/types/evaluations.ts` — were imported by NOTHING in
 # this SDK, and both sources are gone. They are not repointed at their new
 # package homes (`@langwatch/analytics-contract`'s `analytics.filter-field.ts`
-# and `@langwatch/evaluator-web`'s `model/evaluations/types.ts`); a generator
+# and `@langwatch/evaluator-browser`'s `model/evaluations/types.ts`); a generator
 # whose output no consumer reads is a build step that can only break. Restore
 # from those two files if the CLI ever needs them.
 

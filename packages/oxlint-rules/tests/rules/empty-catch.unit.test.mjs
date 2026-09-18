@@ -8,7 +8,7 @@ const workspace = createFixtureWorkspace({
 
 afterAll(() => workspace.cleanup());
 
-const SOURCE = "modules/agent/server/src/services/agent.service.ts";
+const SOURCE = "modules/agent/process/src/services/agent.service.ts";
 
 function report(code, filename = SOURCE) {
   return runRule(emptyCatchRule, { code, cwd: workspace.cwd, filename });

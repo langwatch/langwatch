@@ -256,12 +256,12 @@ jobs:
           # job exists precisely so these suites cannot quietly not run.
           REQUIRE_HELM_TESTS: "1"
         run: |
-          pnpm --filter @langwatch/stored-object-server exec vitest run \
+          pnpm --filter @langwatch/stored-object-process exec vitest run \
             src/__tests__/stored-object-helm-and-docs-shape.unit.test.ts \
             src/__tests__/stored-object-helm-azure-identity.integration.test.ts
-          pnpm --filter @langwatch/evaluation-server exec vitest run \
+          pnpm --filter @langwatch/evaluation-process exec vitest run \
             src/__tests__/helm-langevals-memory.unit.test.ts
-          pnpm --filter @langwatch/auth-server exec vitest run \
+          pnpm --filter @langwatch/auth-process exec vitest run \
             src/transport/better-auth/__tests__/helm-auth-base-url.unit.test.ts
 
   e2e:

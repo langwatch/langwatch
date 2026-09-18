@@ -1,0 +1,143 @@
+{
+  "name": "@langwatch/onboarding-browser",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe onboarding screens: the welcome flow, the product flavour flow, project creation and the project setup guide.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    "./hooks/useAttributionCapture": {
+      "langwatch-declaration-source": "./src/behavior/use-attribution-capture.ts",
+      "types": "./dist/behavior/use-attribution-capture.d.ts",
+      "default": "./src/behavior/use-attribution-capture.ts"
+    },
+    "./onboarding": {
+      "langwatch-declaration-source": "./src/onboarding.ts",
+      "types": "./dist/onboarding.d.ts",
+      "default": "./src/onboarding.ts"
+    },
+    "./surfaces/onboarding-mesh-background": {
+      "langwatch-declaration-source": "./src/ui/elements/onboarding-mesh-background.tsx",
+      "types": "./dist/ui/elements/onboarding-mesh-background.d.ts",
+      "default": "./src/ui/elements/onboarding-mesh-background.tsx"
+    },
+    "./surfaces/via-claude-code-screen": {
+      "langwatch-declaration-source": "./src/ui/sections/via-claude-code-screen.tsx",
+      "types": "./dist/ui/sections/via-claude-code-screen.d.ts",
+      "default": "./src/ui/sections/via-claude-code-screen.tsx"
+    },
+    "./surfaces/via-claude-desktop-screen": {
+      "langwatch-declaration-source": "./src/ui/sections/via-claude-desktop-screen.tsx",
+      "types": "./dist/ui/sections/via-claude-desktop-screen.d.ts",
+      "default": "./src/ui/sections/via-claude-desktop-screen.tsx"
+    },
+    "./surfaces/code-preview": {
+      "langwatch-declaration-source": "./src/ui/sections/observability/code-preview.tsx",
+      "types": "./dist/ui/sections/observability/code-preview.d.ts",
+      "default": "./src/ui/sections/observability/code-preview.tsx"
+    },
+    "./surfaces/docs-links": {
+      "langwatch-declaration-source": "./src/ui/blocks/observability/docs-links.tsx",
+      "types": "./dist/ui/blocks/observability/docs-links.d.ts",
+      "default": "./src/ui/blocks/observability/docs-links.tsx"
+    },
+    "./surfaces/framework-grid": {
+      "langwatch-declaration-source": "./src/ui/sections/observability/framework-grid.tsx",
+      "types": "./dist/ui/sections/observability/framework-grid.d.ts",
+      "default": "./src/ui/sections/observability/framework-grid.tsx"
+    },
+    "./surfaces/framework-integration-code": {
+      "langwatch-declaration-source": "./src/ui/sections/observability/framework-integration-code.tsx",
+      "types": "./dist/ui/sections/observability/framework-integration-code.d.ts",
+      "default": "./src/ui/sections/observability/framework-integration-code.tsx"
+    },
+    "./surfaces/install-preview": {
+      "langwatch-declaration-source": "./src/ui/sections/observability/install-preview.tsx",
+      "types": "./dist/ui/sections/observability/install-preview.d.ts",
+      "default": "./src/ui/sections/observability/install-preview.tsx"
+    },
+    "./surfaces/platform-grid": {
+      "langwatch-declaration-source": "./src/ui/sections/observability/platform-grid.tsx",
+      "types": "./dist/ui/sections/observability/platform-grid.d.ts",
+      "default": "./src/ui/sections/observability/platform-grid.tsx"
+    },
+    "./surfaces/inline-copy-button": {
+      "langwatch-declaration-source": "./src/ui/sections/shared/inline-copy-button.tsx",
+      "types": "./dist/ui/sections/shared/inline-copy-button.d.ts",
+      "default": "./src/ui/sections/shared/inline-copy-button.tsx"
+    },
+    "./surfaces/build-mcp-config": {
+      "langwatch-declaration-source": "./src/model/shared/build-mcp-config.ts",
+      "types": "./dist/model/shared/build-mcp-config.d.ts",
+      "default": "./src/model/shared/build-mcp-config.ts"
+    },
+    "./surfaces/active-project-context": {
+      "langwatch-declaration-source": "./src/ui/sections/active-project-context.tsx",
+      "types": "./dist/ui/sections/active-project-context.d.ts",
+      "default": "./src/ui/sections/active-project-context.tsx"
+    },
+    "./surfaces/observability-codegen": {
+      "langwatch-declaration-source": "./src/ui/sections/observability/codegen/registry.tsx",
+      "types": "./dist/ui/sections/observability/codegen/registry.d.ts",
+      "default": "./src/ui/sections/observability/codegen/registry.tsx"
+    },
+    "./surfaces/observability-types": {
+      "langwatch-declaration-source": "./src/model/observability/types.ts",
+      "types": "./dist/model/observability/types.d.ts",
+      "default": "./src/model/observability/types.ts"
+    },
+    "./surfaces/observability-options": {
+      "langwatch-declaration-source": "./src/ui/sections/observability/ui-options.ts",
+      "types": "./dist/ui/sections/observability/ui-options.d.ts",
+      "default": "./src/ui/sections/observability/ui-options.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/model-provider-browser": "workspace:*",
+    "@langwatch/model-provider-browser-kit": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/project-browser": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
+    "libphonenumber-js": "catalog:",
+    "lucide-react": "catalog:",
+    "motion": "catalog:",
+    "react-contextual-analytics": "catalog:",
+    "react-feather": "catalog:",
+    "react-hook-form": "catalog:",
+    "react-icons": "catalog:",
+    "shiki": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@emotion/react": "catalog:",
+    "@langwatch/test-harness": "workspace:*",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

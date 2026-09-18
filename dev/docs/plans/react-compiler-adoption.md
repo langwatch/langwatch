@@ -168,22 +168,22 @@ module-scope cases. The lint rule surfaces the candidates:
 
 - `Globals` (6) — reassigning variables declared outside the component. All 6
   are in `__tests__` files, so nothing shipped.
-- `Purity` (5) — `modules/langy/web/src/ui/sections/langy-empty-state.tsx`,
-  `modules/ops/web/src/features/foundry/ui/sections/preset-picker.tsx`.
-- `StaticComponents` (10) — `modules/project/web/src/ui/blocks/tech-stack.tsx`,
-  `modules/user/web/src/ui/sections/devices-panel.tsx`,
-  `modules/evaluator/web/src/ui/sections/checks/evaluation-manual-integration.tsx`,
-  `modules/trace/web/src/ui/sections/explorer/search-bar/suggestion-dropdown.tsx`.
-- `Immutability` (19) — `modules/presence/web/src/use-tab-session-id.ts`,
-  `modules/auth/web/src/ui/elements/password-input.tsx`,
-  `modules/scenario/web/src/ui/sections/agent-testing/run/use-run-dialog-form.ts`,
-  `modules/prompt/web/src/ui/elements/outputs/outputs-section.tsx`.
+- `Purity` (5) — `modules/langy/browser/src/ui/sections/langy-empty-state.tsx`,
+  `modules/ops/browser/src/features/foundry/ui/sections/preset-picker.tsx`.
+- `StaticComponents` (10) — `modules/project/browser/src/ui/blocks/tech-stack.tsx`,
+  `modules/user/browser/src/ui/sections/devices-panel.tsx`,
+  `modules/evaluator/browser/src/ui/sections/checks/evaluation-manual-integration.tsx`,
+  `modules/trace/browser/src/ui/sections/explorer/search-bar/suggestion-dropdown.tsx`.
+- `Immutability` (19) — `modules/presence/browser/src/use-tab-session-id.ts`,
+  `modules/auth/browser/src/ui/elements/password-input.tsx`,
+  `modules/scenario/browser/src/ui/sections/agent-testing/run/use-run-dialog-form.ts`,
+  `modules/prompt/browser/src/ui/elements/outputs/outputs-section.tsx`.
 - `ErrorBoundaries` (1) — `apps/ui/src/features/licensing/ui/sections/licensing-slots.tsx`.
 
 Densest files overall:
-`modules/trace/web/src/behavior/explorer/trace-drawer/drawer-header/use-retained-trace-header.ts` (15),
-`modules/trace/web/src/ui/sections/explorer/hooks/use-trace-facets.ts` (15),
-`modules/prompt/web/src/ui/sections/prompts/prompt-editor-drawer.tsx` (14).
+`modules/trace/browser/src/behavior/explorer/trace-drawer/drawer-header/use-retained-trace-header.ts` (15),
+`modules/trace/browser/src/ui/sections/explorer/hooks/use-trace-facets.ts` (15),
+`modules/prompt/browser/src/ui/sections/prompts/prompt-editor-drawer.tsx` (14).
 
 ## 4. The lint rule: oxlint already has it
 
@@ -237,11 +237,11 @@ The riskiest compiled surfaces, and the suites that already cover them:
 
 | surface | suite |
 | --- | --- |
-| trace explorer facets and retained header (densest lint findings) | `pnpm --filter @langwatch/trace-web test` |
-| prompt editor drawer (14 findings, drawer navigation stack) | `pnpm --filter @langwatch/prompt-web test` |
-| react-hook-form screens (38 incompatible-library files) | `pnpm --filter @langwatch/annotation-web test`, `pnpm --filter @langwatch/authz-web test`, `pnpm --filter @langwatch/dataset-web test` |
+| trace explorer facets and retained header (densest lint findings) | `pnpm --filter @langwatch/trace-browser test` |
+| prompt editor drawer (14 findings, drawer navigation stack) | `pnpm --filter @langwatch/prompt-browser test` |
+| react-hook-form screens (38 incompatible-library files) | `pnpm --filter @langwatch/annotation-browser test`, `pnpm --filter @langwatch/authz-browser test`, `pnpm --filter @langwatch/dataset-browser test` |
 | drawer singletons / `*-host.tsx` (66 preserved-memo sites) | `pnpm --filter @langwatch/ui test` |
-| virtualized tables (identity-sensitive rows) | `pnpm --filter @langwatch/dataset-web test` |
+| virtualized tables (identity-sensitive rows) | `pnpm --filter @langwatch/dataset-browser test` |
 | end to end | `pnpm --filter @langwatch/ui test:e2e` |
 
 Add one build-time assertion to whatever guards build duration, so a later

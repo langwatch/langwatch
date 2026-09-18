@@ -97,7 +97,7 @@ missing `payment_status` check, tenant-free `linkStripeId` and absent event de-d
 **Traced path**
 
 1. `POST /api/mcp/authorize` gates on `ports.probeProjectPermission`
-   (`modules/hosted-mcp/server/src/transport/api-rest/mcp-authorize.api.ts:231`), wired at
+   (`modules/hosted-mcp/process/src/transport/api-rest/mcp-authorize.api.ts:231`), wired at
    `api-production.composition.ts:1832-1840` to `authoringSession.permitted({ …, permission: "project:view" })`.
 2. On success the handler stores the project's **legacy** API key in the authorization code:
    `mcp-authorize.api.ts:257` — `encryptedApiKey: ports.encrypt(project.apiKey)`, where `project.apiKey`
@@ -108,7 +108,7 @@ missing `payment_status` check, tenant-free `linkStripeId` and absent event de-d
 **Why the grant is not what was checked.** A legacy project key resolves to
 `{ type: "legacyProjectKey", project }` with no `apiKeyId`, no `userId` and no bindings
 (`modules/api-key/contract/src/api-key.tokens.ts:58-70`;
-`modules/api-key/server/src/services/api-key-token-resolution.service.ts:126-133`). The
+`modules/api-key/process/src/services/api-key-token-resolution.service.ts:126-133`). The
 REST RBAC middleware then skips every check for it:
 
 ```ts
@@ -154,7 +154,7 @@ be viewer-reachable, mint a _scoped_ key bound to the caller's own grants instea
 
 ### H1 — SCIM webhook intake: weak compare, no replay protection, payload-chosen organization
 
-`enterprise/modules/scim/server/src/transport/api-rest/scim-webhook-intake.api.ts:49`
+`enterprise/modules/scim/process/src/transport/api-rest/scim-webhook-intake.api.ts:49`
 
 ```ts
 if (c.req.header("authorization") !== secret)
@@ -297,7 +297,7 @@ org admin cannot pass these either, so the routes are also broken for their inte
 
 ### H5 — MCP access token outlives the grant it was minted from
 
-`modules/hosted-mcp/server/src/transport/api-mcp/hosted-mcp.api.ts:66`
+`modules/hosted-mcp/process/src/transport/api-mcp/hosted-mcp.api.ts:66`
 (`TOKEN_TTL_SECONDS`, 30 days) and `:505-549` (`resolveSessionContext`).
 
 `resolveSessionContext` resolves a token from the in-memory map or Redis and returns the decrypted
@@ -315,7 +315,7 @@ permission in `resolveSessionContext` before returning the `apiKey`, refusing wh
 
 ### H6 — Legacy project key reads any organization's OTTL rules by id
 
-`enterprise/modules/governance/server/src/transport/api-rest/governance.api.ts:299`
+`enterprise/modules/governance/process/src/transport/api-rest/governance.api.ts:299`
 
 `apiKeyPermission("aiTools:view")` gates nothing for a legacy project key (see M1/C1). The bulk route
 `/ingestion-templates/admin` (`:291`) additionally carries `requireUserBoundCaller`; the by-id route
@@ -336,7 +336,7 @@ obtainable by any member holding `project:update` via `POST /api/auth/cli/projec
 
 ### H7 — Prompt tag assignment writes into the prompt's owning project
 
-`modules/prompt/server/src/transport/api-rest/prompt.api.ts:455`
+`modules/prompt/process/src/transport/api-rest/prompt.api.ts:455`
 
 `requires("prompts:manage")` is checked on the API key's project. The lookup at `:437` deliberately
 also matches org-scoped prompts owned by _sibling_ projects

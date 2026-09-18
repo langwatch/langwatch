@@ -19,9 +19,9 @@ sites naming files that no longer exist, and one genuinely dead module.
 
 | Package                     | Files |  Lines |       External importers |
 | --------------------------- | ----: | -----: | -----------------------: |
-| `@langwatch/trace-server`   |   181 | 29,990 |                       50 |
+| `@langwatch/trace-process`   |   181 | 29,990 |                       50 |
 | `@langwatch/trace-contract` |    60 |  8,427 |                      237 |
-| `@langwatch/trace-web`      |   135 | 17,626 | 235 (all `platform/app`) |
+| `@langwatch/trace-browser`      |   135 | 17,626 | 235 (all `platform/app`) |
 
 Plus 90 test files in the server package.
 
@@ -343,7 +343,7 @@ Every production construction passes it — `presets.ts:1346`, `presets.ts:1838`
 
 385 lines, no `export *` (good discipline), 188 value exports and 98 type-only
 exports. Measured against all 50 external non-test importers of
-`@langwatch/trace-server`:
+`@langwatch/trace-process`:
 
 - **147 names are imported externally.**
 - **128 are not — 78 of them values.**
@@ -413,7 +413,7 @@ one look like an oversight rather than a decision.
 ### P11 — `ports/trace.port.ts` exports `TraceRepository`, not a `*Port` (R4, policy)
 
 `packages/architecture-enforcer/src/port-module-baseline.json:32` carries
-`"modules/trace/server/src/ports/trace.port.ts"` as a standing exception
+`"modules/trace/process/src/ports/trace.port.ts"` as a standing exception
 to `strict-port-module`, because its exported abstract class is named
 `TraceRepository` (`ports/trace.port.ts:27`) and the rule requires the name to end
 in `Port`. Per R4 the file and the class are one rename or neither: it is a
@@ -696,7 +696,7 @@ copy already sitting in `presentation.ts:256` starts reaching customers.
   access in the feature is here, below a repository. R1 is clean and should stay
   clean — no service, projection, subscriber or app file in this package holds a
   `PrismaClient`, a `Prisma.TransactionClient` or a ClickHouse client.
-- **`@langwatch/trace-web` (135 files, 17,626 lines).** Flat, no layering to
+- **`@langwatch/trace-browser` (135 files, 17,626 lines).** Flat, no layering to
   unwind, and 100% consumed by `platform/app` — 205 of its 235 importers live under
   `platform/app/src/features/traces-v2/`. Out of scope for this pass.
 
@@ -747,9 +747,9 @@ already written.
 
 | Package                     | External non-test importers | Where they live                                                              |
 | --------------------------- | --------------------------: | ---------------------------------------------------------------------------- |
-| `@langwatch/trace-server`   |                      **50** | `platform/app` 43 · `apps/api` 5 · `apps/worker` 2 — **zero** in `packages/` |
+| `@langwatch/trace-process`   |                      **50** | `platform/app` 43 · `apps/api` 5 · `apps/worker` 2 — **zero** in `packages/` |
 | `@langwatch/trace-contract` |                     **237** | `platform/app` 184 · 53 across 13 other feature packages                     |
-| `@langwatch/trace-web`      |                     **235** | `platform/app` only (205 under `features/traces-v2/`)                        |
+| `@langwatch/trace-browser`      |                     **235** | `platform/app` only (205 under `features/traces-v2/`)                        |
 
 **Server package: 150 distinct symbols across 61 import statements; only 26 are used
 by more than one file.** `Protections` leads at 16 files, then `RecordSpanCommand`,
@@ -771,15 +771,15 @@ The other 36 importers pull one to three symbols each.
 
 **No deep imports anywhere.** Every specifier resolves through a declared `exports`
 map — no `dist/` reaches, no relative paths into the package. The only subpath
-exports in use are `@langwatch/trace-server/testing` (7 occurrences, all in test
-files) and the seven `@langwatch/trace-web/*.store` entries (all inside
+exports in use are `@langwatch/trace-process/testing` (7 occurrences, all in test
+files) and the seven `@langwatch/trace-browser/*.store` entries (all inside
 `platform/app`, overwhelmingly as `vi.mock` targets).
 
 Two stale workspace dependencies worth clearing while nearby:
 
-- `modules/gateway/web/package.json:31-32` declares `@langwatch/trace-server`
-  and `@langwatch/trace-web`; its only production import is `escapeValue` from
+- `modules/gateway/browser/package.json:31-32` declares `@langwatch/trace-process`
+  and `@langwatch/trace-browser`; its only production import is `escapeValue` from
   `@langwatch/trace-contract`. Both are used solely in
   `src/__tests__/traces-href-for-key.unit.test.ts`.
-- `modules/coding-agent/server/package.json:49` declares
-  `@langwatch/trace-server`; all five usages are in `__tests__`.
+- `modules/coding-agent/process/package.json:49` declares
+  `@langwatch/trace-process`; all five usages are in `__tests__`.

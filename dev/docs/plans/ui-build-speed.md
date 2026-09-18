@@ -116,8 +116,8 @@ production browser source. See the proposed hunk below.
 
 ### A real duplicate, worth fixing for size — not for speed
 
-`modules/gateway/web/package.json:48` pins `"shiki": "^3.15.0"` where
-`packages/design-system` and `modules/onboarding/web` use `catalog:` (`^4.3.0`).
+`modules/gateway/browser/package.json:48` pins `"shiki": "^3.15.0"` where
+`packages/design-system` and `modules/onboarding/browser` use `catalog:` (`^4.3.0`).
 The browser graph therefore carries **two complete copies of shiki** —
 `@shikijs/langs@3.23.0` *and* `@shikijs/langs@4.3.0`, plus two
 `@shikijs/engine-oniguruma` each with its own 608 KB inlined wasm. Measured
@@ -189,7 +189,7 @@ status and output completeness before its number is believed.
    `output.sourcemapExcludeSources: true`: −0.73 CPU-s, keeps line mapping,
    drops the embedded sources that make up most of the 109 MB.
 3. **Fix the shiki duplicate for size, not for speed.** One line in
-   `modules/gateway/web/package.json`. Note it requires a lockfile update, so it
+   `modules/gateway/browser/package.json`. Note it requires a lockfile update, so it
    cannot land without an install.
 
 And the thing with the largest effect on how long a build *feels*: it is
@@ -234,7 +234,7 @@ or (4.8 %, keeps maps, drops the embedded sources):
            manualChunks(id: string) {
 ```
 
-### 3. `modules/gateway/web/package.json:48` — bundle size, not speed
+### 3. `modules/gateway/browser/package.json:48` — bundle size, not speed
 
 ```diff
 -    "shiki": "^3.15.0",

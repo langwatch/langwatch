@@ -14,7 +14,7 @@ Two recent PRs surfaced an architectural tension around resolving project defaul
 Both PRs touched the same files with different conventions, so the codebase needed a written rule for where this kind of logic lives.
 
 The Project feature now provides the canonical service-and-repository split in
-`modules/project/server/`: `services/project.service.ts` holds the
+`modules/project/process/`: `services/project.service.ts` holds the
 business layer and `repositories/prisma/prisma.project.repository.ts` is its
 private persistence adapter. The old application-local implementation was
 removed once its compatibility callers migrated.
@@ -45,5 +45,5 @@ Concretely:
 
 - PR #1174 — initial proposal to centralize via a resolution-aware repository
 - PR #3537 — service-layer `resolveDefaultModel` (canonical)
-- `modules/project/server/` — canonical service/repository example
+- `modules/project/process/` — canonical service/repository example
 - `dev/docs/adr/TEMPLATE.md` — template used for this file

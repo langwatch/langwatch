@@ -17,7 +17,7 @@
       "path": "../../modules/scenario/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/scenario/server/tsconfig.build.json"
+      "path": "../../modules/scenario/process/tsconfig.build.json"
     },
     {
       "path": "../test-harness/tsconfig.build.json"

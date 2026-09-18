@@ -85,11 +85,11 @@ footer.
 
 ## Canonical examples
 
-- `@langwatch/enterprise-governance-web`'s `screens/governance/governance-people.screen.tsx`
+- `@langwatch/enterprise-governance-browser`'s `screens/governance/governance-people.screen.tsx`
   (departments row)
-- `@langwatch/model-provider-web`'s
+- `@langwatch/model-provider-browser`'s
   `screens/model-provider/model-providers.screen.tsx` (provider row, with a
   permission tooltip on the trigger)
-- `@langwatch/enterprise-governance-web`'s
+- `@langwatch/enterprise-governance-browser`'s
   `features/ai-tools/ui/sections/tool-catalog-editor.tsx` (AI tool catalog
   tile row: Edit / Enable-Disable / Delete-archive)

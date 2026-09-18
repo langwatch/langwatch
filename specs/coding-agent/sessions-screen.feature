@@ -1,10 +1,10 @@
 # The Sessions screen, every coding-agent session I ran and what it cost me
 #
 # Implementation:
-#   modules/coding-agent/server/src/services/coding-agent.service.ts (the canonical read service)
+#   modules/coding-agent/process/src/services/coding-agent.service.ts (the canonical read service)
 #   modules/coding-agent/contract/src/coding-agent.ts                        (codingAgents.sessionsList)
-#   modules/coding-agent/server/src/transport/api-trpc/coding-agent.gates.ts                  (the title and cost gates)
-#   modules/trace/server/src/services/trace-viewer-protections.service.ts (the shared content-visibility rule)
+#   modules/coding-agent/process/src/transport/api-trpc/coding-agent.gates.ts                  (the title and cost gates)
+#   modules/trace/process/src/services/trace-viewer-protections.service.ts (the shared content-visibility rule)
 #   The page and its table live under [gone] src/pages/me/ and
 #   [gone] src/components/me/.
 #

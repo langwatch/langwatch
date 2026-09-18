@@ -18,7 +18,7 @@ describe("given a governed module source file", () => {
     it("reports proxy", () => {
       const found = report(
         "export const handle = new Proxy({}, {});",
-        "modules/agent/server/src/services/agent.service.ts",
+        "modules/agent/process/src/services/agent.service.ts",
       );
 
       expect(found).toHaveLength(1);
@@ -31,7 +31,7 @@ describe("given a governed module source file", () => {
     it("reports reflect", () => {
       const found = report(
         "export const value = Reflect.get(target, key);",
-        "modules/agent/server/src/services/agent.service.ts",
+        "modules/agent/process/src/services/agent.service.ts",
       );
 
       expect(found).toHaveLength(1);
@@ -45,7 +45,7 @@ describe("given a governed module source file", () => {
     it("reports defineProperty", () => {
       const found = report(
         "Object.defineProperty(target, 'x', { value: 1 });",
-        "modules/agent/server/src/services/agent.service.ts",
+        "modules/agent/process/src/services/agent.service.ts",
       );
 
       expect(found).toHaveLength(1);
@@ -59,7 +59,7 @@ describe("given a governed module source file", () => {
       expect(
         report(
           "Object.defineProperty(Agent.prototype, 'x', { value: 1 });",
-          "modules/agent/server/src/services/agent.service.ts",
+          "modules/agent/process/src/services/agent.service.ts",
         ),
       ).toEqual([]);
     });
@@ -71,7 +71,7 @@ describe("given a governed module source file", () => {
       expect(
         report(
           "export const handle = new Proxy({}, {});",
-          "modules/agent/server/src/__tests__/agent.fixture.ts",
+          "modules/agent/process/src/__tests__/agent.fixture.ts",
         ),
       ).toEqual([]);
     });

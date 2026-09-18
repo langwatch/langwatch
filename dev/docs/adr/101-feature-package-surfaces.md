@@ -146,7 +146,7 @@ packages/
 │       │       └── evaluation-contract.unit.test.ts
 │       │
 │       ├── server/                          # physical workspace package
-│       │   ├── package.json                 # @langwatch/evaluation-server
+│       │   ├── package.json                 # @langwatch/evaluation-process
 │       │   ├── tsconfig.json
 │       │   ├── src/
 │       │   │   ├── services/
@@ -287,7 +287,7 @@ process, and connects them. Hono and tRPC read that graph from their request
 context; they do not construct it per request.
 
 ```text
-@langwatch/evaluation-server
+@langwatch/evaluation-process
           │
           │ depends on interface and values
           ▼
@@ -295,8 +295,8 @@ context; they do not construct it per request.
 
 app or worker composition root
           │ creates and connects concrete implementations
-          ├── @langwatch/evaluation-server
-          └── @langwatch/agent-server
+          ├── @langwatch/evaluation-process
+          └── @langwatch/agent-process
 ```
 
 A feature never imports another feature's server package, repository,

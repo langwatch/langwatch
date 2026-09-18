@@ -222,7 +222,7 @@ describe("browser-only UI never reaches backend code", () => {
     it("still reports a chain, proving the walker resolves imports", () => {
       const component = join(
         REPO_ROOT,
-        "modules/agent/web/src/features/management/ui/blocks/agent-card.tsx",
+        "modules/agent/browser/src/features/management/ui/blocks/agent-card.tsx",
       );
       expect(existsSync(component)).toBe(true);
 
@@ -235,7 +235,7 @@ describe("browser-only UI never reaches backend code", () => {
   // statement whatsoever, so without this rule it is a dead end in the walk
   // rather than the React leaf it actually is.
   describe("given a component whose only React edge is the JSX runtime", () => {
-    const icon = join(REPO_ROOT, "modules/auth/web/src/ui/elements/logo-icon.tsx");
+    const icon = join(REPO_ROOT, "modules/auth/browser/src/ui/elements/logo-icon.tsx");
 
     it("reports a chain, even with no import statement in the file", () => {
       expect(existsSync(icon)).toBe(true);
@@ -245,7 +245,7 @@ describe("browser-only UI never reaches backend code", () => {
     });
 
     it("leaves a .tsx that renders nothing alone, so the rule is not the extension", () => {
-      const noJsx = join(REPO_ROOT, "modules/trace/web/src/ui/elements/close-button.tsx");
+      const noJsx = join(REPO_ROOT, "modules/trace/browser/src/ui/elements/close-button.tsx");
       expect(existsSync(noJsx)).toBe(true);
 
       expect(rendersJsx({ file: noJsx })).toBe(false);
@@ -260,7 +260,7 @@ describe("browser-only UI never reaches backend code", () => {
   describe("given a type-only import of a browser package", () => {
     const module = join(
       REPO_ROOT,
-      "modules/annotation/web/src/model/annotation-form-types.ts",
+      "modules/annotation/browser/src/model/annotation-form-types.ts",
     );
     const specifier = "react";
 
@@ -324,7 +324,7 @@ describe("browser-only UI never reaches backend code", () => {
     it("ignores one in type position, because the annotation is erased", () => {
       const adapter = join(
         REPO_ROOT,
-        "modules/analytics/server/src/adapters/analytics.adapter.ts",
+        "modules/analytics/process/src/adapters/analytics.adapter.ts",
       );
 
       // Both halves, so the case cannot pass by losing its subject: the file
@@ -343,14 +343,14 @@ describe("browser-only UI never reaches backend code", () => {
     it("resolves it through the owning manifest's imports map", () => {
       const transport = join(
         REPO_ROOT,
-        "modules/dashboard/server/src/transport/api-rest/dashboard.api.ts",
+        "modules/dashboard/process/src/transport/api-rest/dashboard.api.ts",
       );
       expect(valueImports({ file: transport }).map((entry) => entry.specifier)).toContain(
         "#app/dashboard.app",
       );
 
       expect(resolver.resolve({ specifier: "#app/dashboard.app", file: transport })).toBe(
-        join(REPO_ROOT, "modules/dashboard/server/src/app/dashboard.app.ts"),
+        join(REPO_ROOT, "modules/dashboard/process/src/app/dashboard.app.ts"),
       );
     });
   });
@@ -379,7 +379,7 @@ describe("browser-only UI never reaches backend code", () => {
       // a terminal widened to "anything that renders mail" would take the guard's teeth with it.
       const outside = join(
         REPO_ROOT,
-        "modules/agent/web/src/features/management/ui/blocks/agent-card.tsx",
+        "modules/agent/browser/src/features/management/ui/blocks/agent-card.tsx",
       );
       expect(existsSync(outside)).toBe(true);
 

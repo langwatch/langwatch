@@ -56,11 +56,11 @@ func TestCrashDedupRendersInFullAfterADifferentFailure(t *testing.T) {
 	d.observe("missing package: cannot find '@langwatch/api'")
 	d.observe("missing package: cannot find '@langwatch/api'")
 
-	msg, repeat := d.observe("missing export: module '@langwatch/experiment-server' does not export 'createExperimentsRestApp'")
+	msg, repeat := d.observe("missing export: module '@langwatch/experiment-process' does not export 'createExperimentsRestApp'")
 	if repeat {
 		t.Fatal("a different failure must not be folded into the previous counter")
 	}
-	if msg != "missing export: module '@langwatch/experiment-server' does not export 'createExperimentsRestApp'" {
+	if msg != "missing export: module '@langwatch/experiment-process' does not export 'createExperimentsRestApp'" {
 		t.Fatalf("expected the new message unchanged, got %q", msg)
 	}
 }
@@ -79,7 +79,7 @@ func TestDedupeFatalRewritesARepeatedFatalLineButLeavesTheFirstAlone(t *testing.
 		}
 		return string(encoded)
 	}
-	crashLine := fatal("missing export: module '@langwatch/experiment-server' does not export 'createExperimentsRestApp' (imported at apps/api/src/index.ts:180)")
+	crashLine := fatal("missing export: module '@langwatch/experiment-process' does not export 'createExperimentsRestApp' (imported at apps/api/src/index.ts:180)")
 
 	first := c.dedupeFatal(crashLine)
 	if first != crashLine {

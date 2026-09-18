@@ -24,7 +24,7 @@ describe("given a strict feature source file claiming another feature's subject"
   describe("when the claimed subject belongs to a different singular feature", () => {
     /** @scenario "A foreign subject claim is reported with its owning feature and a move fix" */
     it("reports foreignSubject naming the owner and the move fix", () => {
-      const found = report("modules/agent/server/src/services/project.service.ts");
+      const found = report("modules/agent/process/src/services/project.service.ts");
 
       expect(found).toHaveLength(1);
       expect(found[0].messageId).toBe("foreignSubject");
@@ -34,7 +34,7 @@ describe("given a strict feature source file claiming another feature's subject"
         owner: "project",
         role: "server",
       });
-      expect(found[0].message).toContain("modules/project/server/src/services/project.service.ts");
+      expect(found[0].message).toContain("modules/project/process/src/services/project.service.ts");
       expect(found[0].message).toContain("feature-move");
     });
   });
@@ -42,7 +42,7 @@ describe("given a strict feature source file claiming another feature's subject"
   describe("when the claimed subject belongs to the file's own feature", () => {
     /** @scenario "A file claiming its own subject is left alone" */
     it("reports nothing", () => {
-      expect(report("modules/agent/server/src/services/agent.service.ts")).toEqual([]);
+      expect(report("modules/agent/process/src/services/agent.service.ts")).toEqual([]);
     });
   });
 });

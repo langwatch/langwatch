@@ -4,8 +4,8 @@
  * which needs an origin the browser supplies.
  */
 import { buildExecutionRequest } from "@langwatch/experiment-contract";
-import { foldEvaluationEvent } from "@langwatch/experiment-web/workbench-results-fold";
-import { useEvaluationsV3Store } from "@langwatch/experiment-web/workbench-store";
+import { foldEvaluationEvent } from "@langwatch/experiment-browser/workbench-results-fold";
+import { useEvaluationsV3Store } from "@langwatch/experiment-browser/workbench-store";
 import type {
   EvaluationV3Event,
   ExecutionRequest,

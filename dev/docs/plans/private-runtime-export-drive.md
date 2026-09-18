@@ -53,11 +53,11 @@ A violation with `specifier = <module specifier>` is emitted when
 - `export *` / `export * as ns` from a **non**-private file that transitively
   exposes a private runtime value (`fileExposesPrivateValue`,
   `feature-layout.ts:613`) — this is how
-  `modules/gateway/server/src/index.ts|./adapters/clickhouse.gateway-open-admissions.adapter.ts`
+  `modules/gateway/process/src/index.ts|./adapters/clickhouse.gateway-open-admissions.adapter.ts`
   fired even though `adapters/` is not in the regex;
 - a named list whose elements resolve to private origins — with
   `specifier = the export name` for local `export { X }` lists (the one such
-  row: `modules/automation/server/src/testing.ts|AutomationPersistCapService`).
+  row: `modules/automation/process/src/testing.ts|AutomationPersistCapService`).
 
 **Therefore a row clears when, on that entry file, no non-type-only export
 declaration with that specifier (or that name) resolves — directly or
@@ -117,20 +117,20 @@ importer files in total.[^importers]
 
 ## 3. The fix pattern, worked on real packages
 
-### 3a. Pure deletion — `modules/auth/server` (8 rows, verified end to end)
+### 3a. Pure deletion — `modules/auth/process` (8 rows, verified end to end)
 
 `src/index.ts` exports `AuthApp`, `SignUpVerificationService`,
 `CliDeviceSessionService`, `Auth0PasswordService`, four repository classes and
 more from `app/`, `services/`, `repositories/`. Grepping each runtime name
 across `apps modules enterprise packages` finds **zero references outside
-`modules/auth/server`**[^authgrep] — the module's own installer wires them
+`modules/auth/process`**[^authgrep] — the module's own installer wires them
 internally through relative imports. Fix: remove the runtime names from those
 export lines; where a line mixes types (`export { AuthApp, type
 AuthInfrastructure } from "./app/auth.app.ts"`), the surviving form is
 `export type { AuthInfrastructure } from "./app/auth.app.ts"`. Eight rows
 clear; nothing else in the repo changes.
 
-### 3b. Single seam — `modules/user/server` + `apps/tasks` (1 row)
+### 3b. Single seam — `modules/user/process` + `apps/tasks` (1 row)
 
 `GdprUserDataEraseRepository` (from `repositories/prisma/…`) is imported by
 `apps/tasks/src/tasks.catalogue.ts:26` and constructed at `:92` as
@@ -143,7 +143,7 @@ internally — the catalogue calls it, and the repository export is deleted. The
 private class never crosses the boundary again; the composition root names no
 repository class (the standing house rule).
 
-### 3c. Type-only — `enterprise/modules/billing/server` (1 of 5 such rows)
+### 3c. Type-only — `enterprise/modules/billing/process` (1 of 5 such rows)
 
 `BillingSubscription` (a class in `repositories/subscription.repository.ts`)
 is only ever used in type position outside billing. `export type {
@@ -186,7 +186,7 @@ importers switch to `import type`.
   automation 1). Fix per row: export the memory/fake double instead, or give
   the consuming test what it actually needs through the factory, or move the
   test into the owning package. Judgement, not sweep.
-- **Cross-drive overlap, named**: `modules/auth/server/src/app/better-auth.build.ts`
+- **Cross-drive overlap, named**: `modules/auth/process/src/app/better-auth.build.ts`
   imports identity's `SignInMethodPolicyService`, and `auth → identity-server`
   is one of the 18 server `cross-feature` rows owned by the other drive. That
   drive closing the edge behind a port removes the import; our identity row
@@ -201,7 +201,7 @@ importers switch to `import type`.
 1. **No new `exports`-map subpaths into private directories.** The rule only
    reads export declarations, so a package.json key like
    `"./composition/x": "./src/repositories/prisma/x.repository.ts"` silences
-   it — `modules/gateway/server` already carries several such keys and
+   it — `modules/gateway/process` already carries several such keys and
    `worker-gateway-spend.composition.ts` deep-imports one. That precedent is
    grandfathered, not license; a lane adding one has failed the lane.
 2. No re-export shims "for backwards compatibility"; importers are updated
@@ -246,8 +246,8 @@ designed.
 | Lane | Model | Packages (owned globs) | Rows | D/T/V | Blockers |
 |---|---|---|---|---|---|
 | pre-1 identity-organization-auth | sonnet | modules/{identity,organization,auth}/server | 92 | 89/0/3 | identity's auth-row: coordinate with server cross-feature drive (§3d) |
-| pre-2 langy | sonnet | modules/langy/server | 58 | 51/0/7 | — |
-| pre-3 ops-authz-log-metric | sonnet | modules/{ops,authz,log,metric}/server + modules/share/server (rewire-only) | 67 | 53/0/14 | log/metric V-rows are consumed only by worker-production (pre-18 gates their deletion); share's test rewire gates on this lane's own authz seam; log's trace-importing test waits on pre-14 |
+| pre-2 langy | sonnet | modules/langy/process | 58 | 51/0/7 | — |
+| pre-3 ops-authz-log-metric | sonnet | modules/{ops,authz,log,metric}/server + modules/share/process (rewire-only) | 67 | 53/0/14 | log/metric V-rows are consumed only by worker-production (pre-18 gates their deletion); share's test rewire gates on this lane's own authz seam; log's trace-importing test waits on pre-14 |
 | pre-4 experiment-cluster | sonnet | modules/{experiment,prompt,topic,coding-agent,github,presence,agent}/server | 58 | 45/0/13 | experiment/coding-agent phase-2 rewires wait on pre-8 (workflow) and pre-14 (trace) seams |
 | pre-5 evaluation-model-provider | opus | modules/{evaluation,model-provider,evaluator}/server | 46 | 19/1/26 | evaluation's workflow-importing service waits on pre-8 |
 | pre-6 automation-notification | opus | modules/{automation,notification}/server | 44 | 17/0/27 | — |
@@ -256,9 +256,9 @@ designed.
 | pre-9 dataset-stored-object | sonnet | modules/{dataset,stored-object}/server | 36 | 21/0/15 | — |
 | pre-10 small-tails | sonnet | modules/{api-key,entitlement,data-privacy,platform-health,user,role,hosted-mcp,feature-flag,data-retention}/server | 35 | 23/0/12 | — |
 | pre-11 enterprise | opus | enterprise/modules/{governance,billing,licensing,sso,scim,managed-provider,audit-log}/server + enterprise/packages/composition/** | 120 | 71/1/48 | composition rewires of webhook names wait on pre-7 |
-| pre-12 project | sonnet | modules/project/server | 10 | 4/0/6 | **BLOCKED**: uncommitted work in this checkout under modules/project/server |
+| pre-12 project | sonnet | modules/project/process | 10 | 4/0/6 | **BLOCKED**: uncommitted work in this checkout under modules/project/process |
 | pre-13 scenario-suite | opus | modules/{scenario,suite}/server | 41 | 25/0/16 | **BLOCKED**: live idempotency lanes own both trees |
-| pre-14 trace | opus | modules/trace/server | 136 | 89/3/44 | **BLOCKED**: a different human's session owns modules/trace |
+| pre-14 trace | opus | modules/trace/process | 136 | 89/3/44 | **BLOCKED**: a different human's session owns modules/trace |
 | pre-15 rewire-tasks-api | sonnet | apps/tasks importer files, 3 apps/api files, prisma seed | 0 | rewires only | seams: pre-1,3,5,8,9,10,11,12,13 |
 | pre-16 rewire-worker-trace | sonnet | the ~28 apps/worker files that import trace/scenario/suite | 0 | rewires only | seams: pre-4,5,6,8,9,13,**14** |
 | pre-17 rewire-worker-platform | sonnet | every other apps/worker importer file except worker-production* | 0 | rewires only | seams: pre-1..pre-11 as each lands |
@@ -278,52 +278,52 @@ The per-package totals (D/T/V/G as measured today[^classify]):
 
 | Package | Rows | D | T | V | G | Lane |
 |---|---|---|---|---|---|---|
-| modules/trace/server | 136 | 89 | 3 | 44 | 0 | pre-14 |
-| modules/identity/server | 64 | 61 | 0 | 2 | 1 | pre-1 (G→coord) |
-| enterprise/modules/governance/server | 60 | 25 | 0 | 35 | 0 | pre-11 |
-| modules/langy/server | 58 | 51 | 0 | 7 | 0 | pre-2 |
-| modules/ops/server | 52 | 45 | 0 | 7 | 0 | pre-3 |
-| enterprise/modules/billing/server | 44 | 34 | 1 | 9 | 0 | pre-11 |
-| modules/automation/server | 34 | 12 | 0 | 22 | 0 | pre-6 |
-| modules/scenario/server | 30 | 18 | 0 | 12 | 0 | pre-13 |
-| modules/experiment/server | 27 | 25 | 0 | 2 | 0 | pre-4 |
-| modules/model-provider/server | 27 | 9 | 1 | 16 | 1 | pre-5 (G→coord) |
-| modules/analytics/server | 24 | 18 | 0 | 6 | 0 | pre-8 |
-| modules/gateway/server | 22 | 16 | 0 | 6 | 0 | pre-7 |
-| modules/organization/server | 22 | 20 | 0 | 1 | 1 | pre-1 (G→coord) |
-| modules/stored-object/server | 22 | 13 | 0 | 8 | 1 | pre-9 (G→coord) |
-| modules/workflow/server | 21 | 14 | 0 | 7 | 0 | pre-8 |
-| modules/webhook/server | 20 | 14 | 0 | 6 | 0 | pre-7 |
-| modules/evaluation/server | 17 | 8 | 0 | 9 | 0 | pre-5 |
-| modules/dataset/server | 15 | 8 | 0 | 7 | 0 | pre-9 |
-| modules/suite/server | 12 | 7 | 0 | 4 | 1 | pre-13 (G→coord) |
-| modules/api-key/server | 11 | 7 | 0 | 4 | 0 | pre-10 |
-| modules/notification/server | 10 | 5 | 0 | 5 | 0 | pre-6 |
-| modules/project/server | 10 | 4 | 0 | 6 | 0 | pre-12 |
-| enterprise/modules/licensing/server | 9 | 5 | 0 | 3 | 1 | pre-11 (G→coord) |
-| modules/coding-agent/server | 9 | 8 | 0 | 1 | 0 | pre-4 |
-| modules/topic/server | 9 | 7 | 0 | 2 | 0 | pre-4 |
-| modules/auth/server | 8 | 8 | 0 | 0 | 0 | pre-1 |
-| modules/entitlement/server | 8 | 4 | 0 | 4 | 0 | pre-10 |
-| modules/authz/server | 7 | 4 | 0 | 3 | 0 | pre-3 |
-| modules/github/server | 7 | 2 | 0 | 5 | 0 | pre-4 |
-| modules/data-privacy/server | 6 | 3 | 0 | 3 | 0 | pre-10 |
-| modules/log/server | 5 | 3 | 0 | 2 | 0 | pre-3 |
-| modules/platform-health/server | 5 | 5 | 0 | 0 | 0 | pre-10 |
-| enterprise/modules/scim/server | 3 | 3 | 0 | 0 | 0 | pre-11 |
-| enterprise/modules/sso/server | 3 | 2 | 0 | 0 | 1 | pre-11 (G→coord) |
-| modules/evaluator/server | 3 | 2 | 0 | 1 | 0 | pre-5 |
-| modules/metric/server | 3 | 1 | 0 | 2 | 0 | pre-3 |
-| enterprise/modules/managed-provider/server | 2 | 1 | 0 | 1 | 0 | pre-11 |
-| modules/agent/server | 2 | 2 | 0 | 0 | 0 | pre-4 |
-| modules/presence/server | 2 | 1 | 0 | 1 | 0 | pre-4 |
-| modules/prompt/server | 2 | 0 | 0 | 2 | 0 | pre-4 |
-| enterprise/modules/audit-log/server | 1 | 1 | 0 | 0 | 0 | pre-11 |
-| modules/data-retention/server | 1 | 1 | 0 | 0 | 0 | pre-10 |
-| modules/feature-flag/server | 1 | 1 | 0 | 0 | 0 | pre-10 |
-| modules/hosted-mcp/server | 1 | 1 | 0 | 0 | 0 | pre-10 |
-| modules/role/server | 1 | 1 | 0 | 0 | 0 | pre-10 |
-| modules/user/server | 1 | 0 | 0 | 1 | 0 | pre-10 |
+| modules/trace/process | 136 | 89 | 3 | 44 | 0 | pre-14 |
+| modules/identity/process | 64 | 61 | 0 | 2 | 1 | pre-1 (G→coord) |
+| enterprise/modules/governance/process | 60 | 25 | 0 | 35 | 0 | pre-11 |
+| modules/langy/process | 58 | 51 | 0 | 7 | 0 | pre-2 |
+| modules/ops/process | 52 | 45 | 0 | 7 | 0 | pre-3 |
+| enterprise/modules/billing/process | 44 | 34 | 1 | 9 | 0 | pre-11 |
+| modules/automation/process | 34 | 12 | 0 | 22 | 0 | pre-6 |
+| modules/scenario/process | 30 | 18 | 0 | 12 | 0 | pre-13 |
+| modules/experiment/process | 27 | 25 | 0 | 2 | 0 | pre-4 |
+| modules/model-provider/process | 27 | 9 | 1 | 16 | 1 | pre-5 (G→coord) |
+| modules/analytics/process | 24 | 18 | 0 | 6 | 0 | pre-8 |
+| modules/gateway/process | 22 | 16 | 0 | 6 | 0 | pre-7 |
+| modules/organization/process | 22 | 20 | 0 | 1 | 1 | pre-1 (G→coord) |
+| modules/stored-object/process | 22 | 13 | 0 | 8 | 1 | pre-9 (G→coord) |
+| modules/workflow/process | 21 | 14 | 0 | 7 | 0 | pre-8 |
+| modules/webhook/process | 20 | 14 | 0 | 6 | 0 | pre-7 |
+| modules/evaluation/process | 17 | 8 | 0 | 9 | 0 | pre-5 |
+| modules/dataset/process | 15 | 8 | 0 | 7 | 0 | pre-9 |
+| modules/suite/process | 12 | 7 | 0 | 4 | 1 | pre-13 (G→coord) |
+| modules/api-key/process | 11 | 7 | 0 | 4 | 0 | pre-10 |
+| modules/notification/process | 10 | 5 | 0 | 5 | 0 | pre-6 |
+| modules/project/process | 10 | 4 | 0 | 6 | 0 | pre-12 |
+| enterprise/modules/licensing/process | 9 | 5 | 0 | 3 | 1 | pre-11 (G→coord) |
+| modules/coding-agent/process | 9 | 8 | 0 | 1 | 0 | pre-4 |
+| modules/topic/process | 9 | 7 | 0 | 2 | 0 | pre-4 |
+| modules/auth/process | 8 | 8 | 0 | 0 | 0 | pre-1 |
+| modules/entitlement/process | 8 | 4 | 0 | 4 | 0 | pre-10 |
+| modules/authz/process | 7 | 4 | 0 | 3 | 0 | pre-3 |
+| modules/github/process | 7 | 2 | 0 | 5 | 0 | pre-4 |
+| modules/data-privacy/process | 6 | 3 | 0 | 3 | 0 | pre-10 |
+| modules/log/process | 5 | 3 | 0 | 2 | 0 | pre-3 |
+| modules/platform-health/process | 5 | 5 | 0 | 0 | 0 | pre-10 |
+| enterprise/modules/scim/process | 3 | 3 | 0 | 0 | 0 | pre-11 |
+| enterprise/modules/sso/process | 3 | 2 | 0 | 0 | 1 | pre-11 (G→coord) |
+| modules/evaluator/process | 3 | 2 | 0 | 1 | 0 | pre-5 |
+| modules/metric/process | 3 | 1 | 0 | 2 | 0 | pre-3 |
+| enterprise/modules/managed-provider/process | 2 | 1 | 0 | 1 | 0 | pre-11 |
+| modules/agent/process | 2 | 2 | 0 | 0 | 0 | pre-4 |
+| modules/presence/process | 2 | 1 | 0 | 1 | 0 | pre-4 |
+| modules/prompt/process | 2 | 0 | 0 | 2 | 0 | pre-4 |
+| enterprise/modules/audit-log/process | 1 | 1 | 0 | 0 | 0 | pre-11 |
+| modules/data-retention/process | 1 | 1 | 0 | 0 | 0 | pre-10 |
+| modules/feature-flag/process | 1 | 1 | 0 | 0 | 0 | pre-10 |
+| modules/hosted-mcp/process | 1 | 1 | 0 | 0 | 0 | pre-10 |
+| modules/role/process | 1 | 1 | 0 | 0 | 0 | pre-10 |
+| modules/user/process | 1 | 0 | 0 | 1 | 0 | pre-10 |
 | **Total** | **837** | **569** | **5** | **256** | **7** | |
 
 A lane regenerates its exact row list from the baseline with the one-liner in
@@ -342,7 +342,7 @@ in the manifests of the lanes whose packages they name.
   declaration-seam lane. Nobody here edits either; all baseline deletions go
   through the coordinator, sequenced against web-1's own edits to the same
   directory.
-- `modules/project/server/**` — uncommitted work sits in this checkout (also
+- `modules/project/process/**` — uncommitted work sits in this checkout (also
   flagged by the web plan §8). pre-12 starts only after the coordinator
   collects or clears it.
 - The `pnpm build` greening lane — unknown paths; the coordinator sequences
@@ -409,4 +409,4 @@ outcome.
 
 [^importers]: Importer-file census over the VALUE-USED rows: 145 files — 63 `apps/` production files (worker compositions dominate; `worker-production.composition.ts` alone imports private names from 17 packages), 17 `apps/` test files, 12 `enterprise/packages/composition/` files, 4 other-feature server production files, ~49 module test files. The full file→packages table is in the coordinator handoff and each manifest carries its slice.
 
-[^authgrep]: `for n in AuthApp AuthUnavailableError SignUpVerificationService PrismaAuthDirectoryRepository CliDeviceSessionService Auth0PasswordService; do grep -rln --include='*.ts' --include='*.tsx' "\b$n\b" apps modules enterprise packages | grep -v '^modules/auth/server'; done` → empty.
+[^authgrep]: `for n in AuthApp AuthUnavailableError SignUpVerificationService PrismaAuthDirectoryRepository CliDeviceSessionService Auth0PasswordService; do grep -rln --include='*.ts' --include='*.tsx' "\b$n\b" apps modules enterprise packages | grep -v '^modules/auth/process'; done` → empty.

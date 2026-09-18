@@ -48,11 +48,11 @@ dashboard, credential })` in `dashboard-rest.mount.ts` returns both REST familie
 `saved-view.composition.ts`/`.types.ts` and the refusing twin are gone; `createDashboardsRestApp`, `createGraphsRestApp`,
 `PostgresDashboardAdapter`, `WorkbenchAwareGraphVisibilityAdapter`, `AnalyticsSavedWorkbenchChartPolicyAdapter`,
 `SavedWorkbenchChartErrorsAdapter`, `DashboardGraphAlertLookup`, `GraphTrpcPorts`, `SavedWorkbenchChartTrpcPorts`,
-`createGraphTrpcRouter`, `createSavedWorkbenchChartTrpcRouter` no longer exist in `@langwatch/dashboard-server`.
+`createGraphTrpcRouter`, `createSavedWorkbenchChartTrpcRouter` no longer exist in `@langwatch/dashboard-process`.
 
 - `apps/api/src/index.ts`: replace the `composeSavedViewFeature`/`refusingSavedViewFeature`/`ComposedSavedViewFeature`
   exports with `installApiDashboard`, `ComposedDashboardFeature`, `DashboardPeers`, `DashboardProcessPorts`; replace
-  the two `@langwatch/dashboard-server` REST factory exports with `mountDashboardRest`.
+  the two `@langwatch/dashboard-process` REST factory exports with `mountDashboardRest`.
 - `apps/api/src/app/api-production.composition.ts`: import `installApiDashboard`; `ComposedDashboardFeature | undefined`
   field; where `refusingSavedViewFeature()` sat, install or leave undefined (no twin); `dashboard: this.composedAnalytics.dashboard`
   and `dashboard: () => analyticsFeature.dashboard` read the dashboard feature's `app` instead; join the
@@ -104,7 +104,7 @@ this.resolvePlanProvider(options) })` (async, not optional; the enclosing block 
   `createTeamTrpcRouter` (old body at `git show 7c2e9ec87e:apps/api/src/features/role/role.composition.ts` lines 174–214)
   beside the identical plan gate in `apps/api/src/features/organization/organization.composition.ts:341`.
 - `apps/api/src/app-trpc/app-trpc.composed.ts:85-89`: drop the doc sentence about `ctx.app.authzApp` and the role service.
-- `apps/api/src/index.ts:274`: delete `export { createRolesRestApp } from "@langwatch/role-server";`.
+- `apps/api/src/index.ts:274`: delete `export { createRolesRestApp } from "@langwatch/role-process";`.
 - `apps/api/src/app-rest/app-rest.packaged-families.ts:65-66,581-593`: the `roles` family entry and `RoleService` import go;
   the family returns now that the organization door has landed (`5080220f88`, `strict-feature-layout.md` section 5) as
   `apps/api/src/features/role/role-rest.mount.ts` binding `roleRestFacts`.
@@ -132,7 +132,7 @@ errors } })` returns `{ app, routers(mount) → { suites }, rest: MountableRestA
   `resolveClickHouseClient`, `defaultRetentionDays`, `generateId`, optional `connectedPresence`; `database` gone);
   `scenario.composition.types.ts` `suites: SuiteApp` → `SuiteApi`; `refuse<SuiteApp>` → `refuse<SuiteApi>`.
 - `apps/api/src/app-trpc/app-trpc.context.ts`: `SuiteApp` → `SuiteApi` (`@langwatch/suite-contract`).
-- `apps/api/src/app-rest/app-rest.packaged-families.ts`: delete the `@langwatch/suite-server` import block (`SuiteApp`,
+- `apps/api/src/app-rest/app-rest.packaged-families.ts`: delete the `@langwatch/suite-process` import block (`SuiteApp`,
   `createRunPlansV1RestApp`, `createSuiteRestApp`, `createTestSuitesV1RestApp`), `suites?: (() => SuiteApp)` in
   `ApiPackagedRestServices`, the three family-name union members `"run-plans" | "suites" | "test-suites"`, and the three
   `mount(...)` calls.
@@ -147,7 +147,7 @@ errors } })` returns `{ app, routers(mount) → { suites }, rest: MountableRestA
 ## authz (transports landed `7540100bd5`; contract service, adapter, registry still open)
 
 - `apps/api/src/app-trpc/app-trpc.features.ts:182`: `authz: createAuthzTrpcRouter(mount)` → `createAuthzTrpcRouter(mount.runtime)`.
-- `apps/api/src/index.ts:273`: delete `export { createRoleBindingsRestApp } from "@langwatch/authz-server";`.
+- `apps/api/src/index.ts:273`: delete `export { createRoleBindingsRestApp } from "@langwatch/authz-process";`.
 - `apps/api/src/app-rest/app-rest.packaged-families.ts:25,566-578`: the import and the `mount("role-bindings", …)` block go; the
   family returns as `apps/api/src/features/authz/authz-rest.mount.ts` binding `roleBindingRestFacts` once the organization
   door lands (the old check was `authz.hasApiKeyPermission` — an API-key-ceiling check the door must offer or the mount
@@ -160,7 +160,7 @@ worker and tasks compositions, four harnesses). One lane with TS-LSP rename, run
 every feature). Blockers to decide first: `@langwatch/api` depends on `@langwatch/authz-contract` for the permission
 vocabulary, so authz's contract cannot import `defineTrpcContract` without a package cycle (`authzTrpc` sits in the
 server transport for now) — split the vocabulary out of authz-contract; `AuthzApi` has 54 operations (several
-features wearing one door). `@langwatch/authz-web/surfaces/scope-picker` → `./scope-picker` has ~40 importers across
+features wearing one door). `@langwatch/authz-browser/surfaces/scope-picker` → `./scope-picker` has ~40 importers across
 five feature webs plus tsconfig/vitest aliases (gateway, governance) — same lane.
 
 ## role REST mount (door landed `5080220f88`; declaration `cccfe396b0`)
@@ -229,8 +229,8 @@ tables (tasks catalogue) and is not a user repository.
   mounts nothing. `api-experiment-run.composition.integration.test.ts:321` and
   `workflow/__tests__/execution-features.composition.integration.test.ts:366`: `await installApiEvaluation(...)`.
 - `EvaluationService` → `EvaluationApi` (type position, verbatim) in `apps/api/src/app/{api-trace-read-stack,api-evaluation-read}.composition.ts`,
-  `apps/worker/src/app/worker-report-schedule.composition.ts`, `modules/monitor/server/src/app/monitor.app.ts`,
-  `modules/trace/server/src/services/{trace-list-read,trace-legacy-read}.service.ts` and their tests;
+  `apps/worker/src/app/worker-report-schedule.composition.ts`, `modules/monitor/process/src/app/monitor.app.ts`,
+  `modules/trace/process/src/services/{trace-list-read,trace-legacy-read}.service.ts` and their tests;
   `automation-settlement-match-confirmation.service.unit.test.ts` `extends` it → `implements EvaluationApi`. That unblocks
   `contract-service` and the `tryGetRunByEvaluationId` → `findRunByEvaluationId`, `tryGetInputs` → `findInputs` renames
   (`trace-legacy-read.service.ts:338` calls the latter).
@@ -255,13 +255,13 @@ tables (tasks catalogue) and is not a user repository.
   `apps/api/src/app-trpc/__tests__/support/app-trpc-features.ts:188`,
   `apps/api/src/features/gateway/__tests__/gateway.composition.integration.test.ts:43,222` → a booted memory installation
   (`installation().boot({ role: "api" })` over `withPersistence("memory", {})`, as
-  `modules/stored-object/server/src/app/__tests__/stored-object-installation.unit.test.ts` does).
+  `modules/stored-object/process/src/app/__tests__/stored-object-installation.unit.test.ts` does).
 - New binding: `mountStoredObjectRest({ storedObjects: () => this.composedStoredObject.restServices.storedObjects(), credential })`
   from `apps/api/src/features/stored-object/stored-object-rest.mount.ts`. It publishes
   `/api/stored-objects/2026-08-22/storedObjects.{confirmUpload,get,delete}` and the dated twins; the deleted family was
   mounted nowhere, so an unmounted door regresses nothing, but mount it.
 - `apps/tasks/src/platform/object-storage-migrate.composition.ts:4,59-63`: `PostgresObjectStorageMigrationInventoryAdapter` is
-  deleted; the tasks process implements `ObjectStorageMigrationInventoryPort` (from `@langwatch/stored-object-server`) itself.
+  deleted; the tasks process implements `ObjectStorageMigrationInventoryPort` (from `@langwatch/stored-object-process`) itself.
   The stored-object lane's report (`/Users/afr/.claude/jobs/eeb488e6/tmp` task a7de211afcf583b9e) carries the verbatim
   Prisma paging code for `listProjectsPage`, `listStoredObjectsPage`, `listDatasetsPage`. This file is in the 09-07 pile.
 - `apps/api/src/app-rest/app-rest.packaged-families.ts:82,465-479` still builds the `/api/files` family from
@@ -296,11 +296,11 @@ tables (tasks catalogue) and is not a user repository.
   `getEnabledOnMessageMonitors` only). `worker-trace-capability-services.composition.ts:8-11,93,108,115`:
   `PostgresMonitorCatalogAdapter`, `MonitorCatalogDatabase`, `MonitorCatalogService` no longer exist; the worker's one
   `MonitorApi` fills `monitors`. Both files are in the 09-07 pile (the first is untracked on disk).
-- Type swaps `MonitorService` → `MonitorApi` (`@langwatch/monitor-contract`), verbatim: `modules/gateway/server/src/adapters/prisma.gateway.adapter.ts:2,38`,
+- Type swaps `MonitorService` → `MonitorApi` (`@langwatch/monitor-contract`), verbatim: `modules/gateway/process/src/adapters/prisma.gateway.adapter.ts:2,38`,
   `services/gateway-guardrail.service.ts:16,26,42`, `services/gateway-guardrail-evaluation.service.ts:8,71,77`,
   `__tests__/gateway.service.unit.test.ts:13,207,272,308` and `__tests__/gateway-guardrail-evaluation.integration.test.ts:13,43`
   (the `class … extends MonitorService` doubles become object literals: `MonitorApi` is an interface).
-  `modules/automation/server/src/app/__tests__/automation-app.fixture.ts:138` stubs `tryGetById`; it is `findById`.
+  `modules/automation/process/src/app/__tests__/automation-app.fixture.ts:138` stubs `tryGetById`; it is `findById`.
 - `packages/handled-error/src/remediation.ts`: entries for `monitor_check_settings_invalid`, `monitor_check_type_unknown`,
   `monitor_evaluator_required`, `monitor_not_found`, `monitor_source_project_forbidden` (codes and presentation landed).
 - Published documents regenerate once apps/api compiles: monitor operation ids become `listMonitors`, `getMonitor`,
@@ -335,9 +335,9 @@ tables (tasks catalogue) and is not a user repository.
   a worker-side boot in `apps/worker/src/features/dataset/` (`withPersistence("postgres", { prisma }).withFeature(datasetServer,
   { infrastructure }).boot({ role: "worker" })`) yielding one `DatasetApi`; `worker-dataset-normalization.composition.ts:45`
   `PrismaDatasetContentRepository.create(options.database)` → `.create({ prisma: options.database })`.
-- Surface key: `modules/dataset/web/package.json` export `./surfaces/dataset-table` → `./dataset-table`;
-  `apps/ui/src/features/catalogue.json` `experiments.uses.surfaces` gains `@langwatch/dataset-web/dataset-table`; five
-  imports in `modules/experiment/web/src/{behavior/experiments-v3/use-dataset-sync.ts,
+- Surface key: `modules/dataset/browser/package.json` export `./surfaces/dataset-table` → `./dataset-table`;
+  `apps/ui/src/features/catalogue.json` `experiments.uses.surfaces` gains `@langwatch/dataset-browser/dataset-table`; five
+  imports in `modules/experiment/browser/src/{behavior/experiments-v3/use-dataset-sync.ts,
   ui/sections/experiments-v3/evaluations-v3-dataset-table-provider.tsx, ui/sections/experiments-v3/table-settings-menu.tsx,
   ui/sections/experiments-v3/evaluations-v3-table.tsx, ui/elements/experiments-v3/autosave-status.tsx}` repoint. One commit.
 - `specs/errors/handled-error-surfaces.feature:22,29,35,42` describe the deleted per-feature tRPC translation middleware;

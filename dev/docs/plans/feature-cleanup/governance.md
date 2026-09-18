@@ -328,7 +328,7 @@ does not exist anywhere.
 2. **A broken import that nothing typechecks.**
    `platform/app/src/app/api/governance/__tests__/governance-ocsf-export.integration.test.ts:39`
    imports `PostgresGovernanceOcsfExportAdapter` from
-   `@langwatch/enterprise-governance-server`. `server/package.json` exports only
+   `@langwatch/enterprise-governance-process`. `server/package.json` exports only
    `./src/index.ts`, and `index.ts` does not export that symbol. It survives
    because `tsconfig.tsgo.json` excludes tests.
 3. **A shared utility filed as an adapter.**
@@ -565,7 +565,7 @@ follow the layer collapse, not lead it.
 
 ## 6. Blast radius
 
-**`@langwatch/enterprise-governance-server`** — 49 files import it, 31 outside
+**`@langwatch/enterprise-governance-process`** — 49 files import it, 31 outside
 tests. Nineteen of those are
 `enterprise/packages/composition/api/src/governance/*`, the adapter package that
 implements the ports. The rest: `platform/app/src/server/app-layer/` (3),
@@ -600,5 +600,5 @@ Nine hold `GovernanceService` itself: `composition/api/src/governance/runtime.ts
 `platform/app/src/server/routes/otel.ts`. These are what commit 6 (error codes)
 and the deferred interface split have to move.
 
-**`@langwatch/enterprise-governance-web`** — 20 files, all UI. Untouched by
+**`@langwatch/enterprise-governance-browser`** — 20 files, all UI. Untouched by
 everything above.

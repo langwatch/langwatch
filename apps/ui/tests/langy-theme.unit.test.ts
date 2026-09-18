@@ -74,11 +74,11 @@ describe("langyTheme token emission", () => {
   describe("given the panel's ambient textures in langy-theme.css", () => {
     const css = readFileSync(
       /**
-       * The sheet is `@langwatch/langy-web`'s now, and this test reads it as a FILE
+       * The sheet is `@langwatch/langy-browser`'s now, and this test reads it as a FILE
        * rather than importing it: the assertions are about the CSS text, and a bundler
        * would hand back a module.
        */
-      join(process.cwd(), "../../modules/langy/web/src/ui/elements/langy-theme.css"),
+      join(process.cwd(), "../../modules/langy/browser/src/ui/elements/langy-theme.css"),
       "utf8",
     );
     // One rule per selector in the sheet, so anchoring on the selector and

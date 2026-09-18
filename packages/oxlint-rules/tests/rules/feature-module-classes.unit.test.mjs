@@ -12,11 +12,11 @@ function report(code, filename) {
   return runRule(featureModuleClassesRule, { code, cwd: workspace.cwd, filename });
 }
 
-const PORT = "modules/agent/server/src/ports/agent.port.ts";
-const ADAPTER = "modules/agent/server/src/adapters/agent.adapter.ts";
-const REPOSITORY = "modules/agent/server/src/repositories/agent.repository.ts";
+const PORT = "modules/agent/process/src/ports/agent.port.ts";
+const ADAPTER = "modules/agent/process/src/adapters/agent.adapter.ts";
+const REPOSITORY = "modules/agent/process/src/repositories/agent.repository.ts";
 const PRISMA_REPOSITORY =
-  "modules/agent/server/src/repositories/prisma/prisma.agent.repository.ts";
+  "modules/agent/process/src/repositories/prisma/prisma.agent.repository.ts";
 
 describe("given a strict feature port module", () => {
   describe("when it exports a concrete class named *Port", () => {
@@ -96,7 +96,7 @@ describe("feature apps", () => {
   });
 
   it("requires a concrete app factory", () => {
-    const file = "modules/agent/server/src/app/agent.app.ts";
+    const file = "modules/agent/process/src/app/agent.app.ts";
     expect(
       report("export class ComposedAgentApp {}", file).map((entry) => entry.messageId),
     ).toEqual(["create"]);

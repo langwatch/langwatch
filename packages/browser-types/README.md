@@ -7,7 +7,7 @@ files here, so the checker reads this contract instead of the package's own
 
 It is a bare directory rather than a workspace package on purpose — nothing
 imports it by name, and the only consumers are `paths` entries in
-`apps/ui/tsconfig.json` and `modules/auth/web/tsconfig.json`.
+`apps/ui/tsconfig.json` and `modules/auth/browser/tsconfig.json`.
 
 `packages/oxlint-rules/src/rules/web-imports-server-shaped-value.rule.mjs` is the
 rule that makes the two better-auth client entrypoints an allowed exception,

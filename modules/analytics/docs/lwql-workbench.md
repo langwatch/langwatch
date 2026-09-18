@@ -1,6 +1,6 @@
 # LangWatchQL workbench + LangWatchQL chart surface
 
-Patterns to follow when extending `modules/analytics/web/` and its
+Patterns to follow when extending `modules/analytics/browser/` and its
 application composition adapters under `platform/app/src/features/analytics-query/`.
 See [ADR-002](../adrs/002-lwql-chart-runtime-without-eval.md) for why the
 chart runtime avoids `eval`, and
@@ -14,7 +14,7 @@ and narrow toolbar, error, and lazy-chart render ports; it does not import app
 hooks, tRPC, or router code. The app adapter owns those ports and no workbench
 behaviour.
 
-`@langwatch/analytics-web/visualization` is browser-chunk-safe policy and
+`@langwatch/analytics-browser/visualization` is browser-chunk-safe policy and
 theme support. The generated-schema save admission path is deliberately the
 separate `@langwatch/analytics-contract/visualization/validation` export, so server-side chart
 saves cannot make ordinary visualization imports eager.

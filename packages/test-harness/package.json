@@ -43,7 +43,7 @@
     "typescript": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/workflow-server": "workspace:*",
+    "@langwatch/workflow-process": "workspace:*",
     "@types/node": "catalog:",
     "@types/picomatch": "^4.0.2",
     "@vitest/browser-playwright": "catalog:",

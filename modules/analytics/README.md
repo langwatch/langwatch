@@ -21,7 +21,7 @@ change the timeseries service or the separate trace analytics, trace summaries,
 or timeseries rollup boundaries.
 
 Server-side LangWatchQL execution lives under
-`modules/analytics/server/src/langwatch-ql/`; `apps/api` composes and
+`modules/analytics/process/src/langwatch-ql/`; `apps/api` composes and
 mounts it (`analytics.lwql` on the tRPC router) but does not own its behaviour.
 
 The LangWatchQL behaviour contract is [the web spec](./specs/analytics-lwql-workbench.feature);

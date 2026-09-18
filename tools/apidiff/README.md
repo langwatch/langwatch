@@ -284,7 +284,7 @@ every request (branch:
 BOTH instances' databases, with the same pre-signed ENTERPRISE license the
 local-dev seed itself writes
 (`LOCAL_DEV_ENTERPRISE_LICENSE_KEY`, read at runtime from
-`enterprise/modules/licensing/server/src/seeding.ts` in the branch checkout —
+`enterprise/modules/licensing/process/src/seeding.ts` in the branch checkout —
 never copied into Go source, so a rotation is caught by a failing read
 instead of silently entitling nothing). No restart, and nothing is skipped on
 the unentitled pass to make room for it: the original gate refusal stays its

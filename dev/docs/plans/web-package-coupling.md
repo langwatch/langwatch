@@ -57,7 +57,7 @@ in every kind of export:
   that is a real defect rather than an untidiness.
 
 And the second kind is already travelling under the first kind's name:
-`experiment` imports `@langwatch/langy-web/surfaces/langy-store` and
+`experiment` imports `@langwatch/langy-browser/surfaces/langy-store` and
 `/surfaces/langy-context`. A store and a context are published as "surfaces",
 so the existing vocabulary cannot tell the safe case from the dangerous one.
 

@@ -18,7 +18,7 @@ describe("given any source file", () => {
     it("reports bannedLegacyName", () => {
       const found = report(
         "import { createServiceApp } from '@langwatch/api';",
-        "modules/agent/server/src/services/agent.service.ts",
+        "modules/agent/process/src/services/agent.service.ts",
       );
 
       expect(found).toHaveLength(1);
@@ -32,7 +32,7 @@ describe("given any source file", () => {
     it("reports bannedLegacyName", () => {
       const found = report(
         "function mountProjectTransport() {}",
-        "modules/agent/server/src/services/agent.service.ts",
+        "modules/agent/process/src/services/agent.service.ts",
       );
 
       expect(found).toHaveLength(1);
@@ -46,7 +46,7 @@ describe("given any source file", () => {
     it("reports bannedLegacyName", () => {
       const found = report(
         "class SecuredApp {}",
-        "modules/agent/server/src/services/agent.service.ts",
+        "modules/agent/process/src/services/agent.service.ts",
       );
 
       expect(found).toHaveLength(1);
@@ -61,7 +61,7 @@ describe("given any source file", () => {
       expect(
         report(
           "import { defineRestRouter } from '@langwatch/api';",
-          "modules/agent/server/src/services/agent.service.ts",
+          "modules/agent/process/src/services/agent.service.ts",
         ),
       ).toEqual([]);
     });

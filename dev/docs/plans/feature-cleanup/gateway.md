@@ -673,7 +673,7 @@ Seven commits, smallest risk first, each leaving the suite green.
 
 ## 6. Blast radius
 
-**79 files outside the feature import `@langwatch/gateway-server`**, and they
+**79 files outside the feature import `@langwatch/gateway-process`**, and they
 name **123 distinct symbols** from the main entry. That is far broader than
 dataset's 15 files / 11 symbols, and it is the single biggest constraint on this
 cleanup.
@@ -682,7 +682,7 @@ By entry point:
 
 | Entry                                   |  Importing files |
 | --------------------------------------- | ---------------: |
-| `@langwatch/gateway-server` (main)      | 151 import sites |
+| `@langwatch/gateway-process` (main)      | 151 import sites |
 | `./composition/gateway-audit`           |                5 |
 | `./composition/gateway-provider-labels` |                3 |
 | `./composition/gateway-change-events`   |                3 |

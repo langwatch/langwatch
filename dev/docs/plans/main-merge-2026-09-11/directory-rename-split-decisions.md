@@ -32,7 +32,7 @@ fork. The split conflict is git saying "I do not know where this goes", never
 | 3 | `platform/app/ee/governance/dashboard/logic` | 5 | governance port - see below |
 | 4 | `platform/app/ee/governance/__tests__` | 4 | governance port - see below |
 | 5 | `platform/app/ee/governance/dashboard/logic/__tests__` | 2 | (inside #3) |
-| 6 | `platform/app/src/server/app-layer/traces` | 4 | `modules/trace/server/src/**` |
+| 6 | `platform/app/src/server/app-layer/traces` | 4 | `modules/trace/process/src/**` |
 | 7 | `platform/app/src/server/app-layer/traces/__tests__` | 1 | (inside #6) |
 | 8 | `platform/app/src/tasks/__tests__` | 1 | `apps/tasks/src/**/__tests__` |
 | 9 | `platform/app/src/utils/__tests__` | 1 | `apps/ui/src/features/personal-workspace/**` - verify first |
@@ -50,9 +50,9 @@ work behind them.
 
 | File main added | Where it goes |
 | --- | --- |
-| `traces/span-ingestion-tally.ts` + its test | `modules/trace/server/src/services/` |
-| `traces/trace-ingestion.metrics.ts` | `modules/trace/server/src/services/` - the branch already has `modules/trace/specs/trace-ingestion-metrics.feature`, so the spec is here and the implementation is what is arriving |
-| `traces/repositories/__tests__/trace-list.clickhouse.repository.unit.test.ts` | `modules/trace/server/src/repositories/clickhouse/__tests__/` |
+| `traces/span-ingestion-tally.ts` + its test | `modules/trace/process/src/services/` |
+| `traces/trace-ingestion.metrics.ts` | `modules/trace/process/src/services/` - the branch already has `modules/trace/specs/trace-ingestion-metrics.feature`, so the spec is here and the implementation is what is arriving |
+| `traces/repositories/__tests__/trace-list.clickhouse.repository.unit.test.ts` | `modules/trace/process/src/repositories/clickhouse/__tests__/` |
 | `tasks/__tests__/provisionLwql.redaction.unit.test.ts` | `apps/tasks/src/**/__tests__/` - `provisionLwql` has one content hit on the branch, a ClickHouse migration, so confirm the task still exists before placing its test |
 | `utils/__tests__/personalProject.unit.test.ts` | `personalProject` has 53 content hits; the concept lives as `personal-workspace`. Read the test and place it with whatever it actually asserts |
 
@@ -73,7 +73,7 @@ costs 22   agents 15   people 13   __tests__ 10   filters 7
 summary 5  sync 4      sample 4    platform 4     home 4     empty 3
 ```
 
-The branch's `enterprise/modules/governance/web/src/features` holds:
+The branch's `enterprise/modules/governance/browser/src/features` holds:
 
 ```
 ai-tools   departments   ingestion-sources   ottl   overview   source-events

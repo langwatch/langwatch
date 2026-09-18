@@ -22,7 +22,7 @@
  *
  * One entry is SCREAMING_CASE rather than the usual snake_case. `LAST_WAY_IN`
  * is better-auth's own `APIError` code, thrown by the passkey-removal guard in
- * `modules/identity/server/src/services/better-auth-identity-storage.service.ts`
+ * `modules/identity/process/src/services/better-auth-identity-storage.service.ts`
  * on the mounted `/passkey/delete-passkey` route. That route is not translated
  * into one of our own `HandledError` subclasses, so the code reaches the client
  * exactly as better-auth wrote it. It is listed here, spelled the way the wire

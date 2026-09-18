@@ -11,7 +11,7 @@ function report(code, filename) {
 }
 
 describe("given a .unit.test.tsx file", () => {
-  const filename = "modules/agent/web/src/ui/blocks/__tests__/agent-card.unit.test.tsx";
+  const filename = "modules/agent/browser/src/ui/blocks/__tests__/agent-card.unit.test.tsx";
 
   describe("when it imports from @testing-library/react", () => {
     /** @scenario "A unit test importing testing-library is reported once" */
@@ -65,7 +65,7 @@ describe("given a .integration.test.tsx file", () => {
   it("reports nothing for the same testing-library import", () => {
     const found = report(
       'import { render } from "@testing-library/react";\ntest("x", () => {});',
-      "modules/agent/web/src/ui/blocks/__tests__/agent-card.integration.test.tsx",
+      "modules/agent/browser/src/ui/blocks/__tests__/agent-card.integration.test.tsx",
     );
 
     expect(found).toEqual([]);

@@ -6,7 +6,7 @@ const workspace = createFixtureWorkspace({});
 
 afterAll(() => workspace.cleanup());
 
-const TEST_FILE = "modules/agent/server/src/__tests__/agent.unit.test.ts";
+const TEST_FILE = "modules/agent/process/src/__tests__/agent.unit.test.ts";
 
 function report(code, filename = TEST_FILE) {
   return runRule(sharedSetupIsAHookRule, { code, cwd: workspace.cwd, filename });
@@ -195,7 +195,7 @@ describe("given a describe with sibling it blocks", () => {
         });
       `;
 
-      expect(report(code, "modules/agent/server/src/agent.service.ts")).toEqual([]);
+      expect(report(code, "modules/agent/process/src/agent.service.ts")).toEqual([]);
     });
   });
 });

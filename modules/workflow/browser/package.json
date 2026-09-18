@@ -1,0 +1,270 @@
+{
+  "name": "@langwatch/workflow-browser",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe Workflow DSL, graph state, and workflow UI primitives.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "./workflow-code-editor": {
+      "langwatch-declaration-source": "./src/workflow-code-editor.ts",
+      "types": "./dist/workflow-code-editor.d.ts",
+      "default": "./src/workflow-code-editor.ts"
+    },
+    ".": {
+      "langwatch-declaration-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./surfaces/copy-button": {
+      "langwatch-declaration-source": "./src/ui/sections/copy-button.tsx",
+      "types": "./dist/ui/sections/copy-button.d.ts",
+      "default": "./src/ui/sections/copy-button.tsx"
+    },
+    "./generate-api-snippet-dialog": {
+      "langwatch-declaration-source": "./src/generate-api-snippet-dialog.ts",
+      "types": "./dist/generate-api-snippet-dialog.d.ts",
+      "default": "./src/generate-api-snippet-dialog.ts"
+    },
+    "./hoverable-big-text": {
+      "langwatch-declaration-source": "./src/hoverable-big-text.ts",
+      "types": "./dist/hoverable-big-text.d.ts",
+      "default": "./src/hoverable-big-text.ts"
+    },
+    "./code-block-editor": {
+      "langwatch-declaration-source": "./src/code-block-editor.ts",
+      "types": "./dist/code-block-editor.d.ts",
+      "default": "./src/code-block-editor.ts"
+    },
+    "./render-code": {
+      "langwatch-declaration-source": "./src/render-code.ts",
+      "types": "./dist/render-code.d.ts",
+      "default": "./src/render-code.ts"
+    },
+    "./run-via-api-data-source-picker": {
+      "langwatch-declaration-source": "./src/run-via-api-data-source-picker.ts",
+      "types": "./dist/run-via-api-data-source-picker.d.ts",
+      "default": "./src/run-via-api-data-source-picker.ts"
+    },
+    "./run-snippets": {
+      "langwatch-declaration-source": "./src/run-snippets.ts",
+      "types": "./dist/run-snippets.d.ts",
+      "default": "./src/run-snippets.ts"
+    },
+    "./run-via-api-tabs": {
+      "langwatch-declaration-source": "./src/run-via-api-tabs.ts",
+      "types": "./dist/run-via-api-tabs.d.ts",
+      "default": "./src/run-via-api-tabs.ts"
+    },
+    "./redacted-field": {
+      "langwatch-declaration-source": "./src/redacted-field.ts",
+      "types": "./dist/redacted-field.d.ts",
+      "default": "./src/redacted-field.ts"
+    },
+    "./surfaces/deja-view-link": {
+      "langwatch-declaration-source": "./src/behavior/use-deja-view-link.ts",
+      "types": "./dist/behavior/use-deja-view-link.d.ts",
+      "default": "./src/behavior/use-deja-view-link.ts"
+    },
+    "./feature-flag": {
+      "langwatch-declaration-source": "./src/feature-flag.ts",
+      "types": "./dist/feature-flag.d.ts",
+      "default": "./src/feature-flag.ts"
+    },
+    "./surfaces/workflow-host": {
+      "langwatch-declaration-source": "./src/model/workflow-host.ts",
+      "types": "./dist/model/workflow-host.d.ts",
+      "default": "./src/model/workflow-host.ts"
+    },
+    "./add-model-provider-key": {
+      "langwatch-declaration-source": "./src/add-model-provider-key.ts",
+      "types": "./dist/add-model-provider-key.d.ts",
+      "default": "./src/add-model-provider-key.ts"
+    },
+    "./format-money": {
+      "langwatch-declaration-source": "./src/format-money.ts",
+      "types": "./dist/format-money.d.ts",
+      "default": "./src/format-money.ts"
+    },
+    "./version-history": {
+      "langwatch-declaration-source": "./src/version-history.ts",
+      "types": "./dist/version-history.d.ts",
+      "default": "./src/version-history.ts"
+    },
+    "./surfaces/code-editor-transport": {
+      "langwatch-declaration-source": "./src/ui/sections/optimization_studio/code/workflow-code-editor.transport.tsx",
+      "types": "./dist/ui/sections/optimization_studio/code/workflow-code-editor.transport.d.ts",
+      "default": "./src/ui/sections/optimization_studio/code/workflow-code-editor.transport.tsx"
+    },
+    "./emoji-picker-modal": {
+      "langwatch-declaration-source": "./src/emoji-picker-modal.ts",
+      "types": "./dist/emoji-picker-modal.d.ts",
+      "default": "./src/emoji-picker-modal.ts"
+    },
+    "./execution-state-error": {
+      "langwatch-declaration-source": "./src/execution-state-error.ts",
+      "types": "./dist/execution-state-error.d.ts",
+      "default": "./src/execution-state-error.ts"
+    },
+    "./workflows": {
+      "types": "./dist/workflows.d.ts",
+      "default": "./src/workflows.ts"
+    },
+    "./handled-error-views": {
+      "langwatch-declaration-source": "./src/handled-error-views.ts",
+      "types": "./dist/handled-error-views.d.ts",
+      "default": "./src/handled-error-views.ts"
+    },
+    "./studio-scope": {
+      "langwatch-declaration-source": "./src/studio-scope.ts",
+      "types": "./dist/studio-scope.d.ts",
+      "default": "./src/studio-scope.ts"
+    },
+    "./component-types": {
+      "langwatch-declaration-source": "./src/component-types.ts",
+      "types": "./dist/component-types.d.ts",
+      "default": "./src/component-types.ts"
+    },
+    "./next-link": {
+      "langwatch-declaration-source": "./src/next-link.ts",
+      "types": "./dist/next-link.d.ts",
+      "default": "./src/next-link.ts"
+    },
+    "./platform-defaults": {
+      "langwatch-declaration-source": "./src/platform-defaults.ts",
+      "types": "./dist/platform-defaults.d.ts",
+      "default": "./src/platform-defaults.ts"
+    },
+    "./crisp-bubble-policy": {
+      "langwatch-declaration-source": "./src/crisp-bubble-policy.ts",
+      "types": "./dist/crisp-bubble-policy.d.ts",
+      "default": "./src/crisp-bubble-policy.ts"
+    },
+    "./surfaces/workflow-routes": {
+      "langwatch-declaration-source": "./src/model/routes.ts",
+      "types": "./dist/model/routes.d.ts",
+      "default": "./src/model/routes.ts"
+    },
+    "./fetch-sse": {
+      "langwatch-declaration-source": "./src/fetch-sse.ts",
+      "types": "./dist/fetch-sse.d.ts",
+      "default": "./src/fetch-sse.ts"
+    },
+    "./workflow-card": {
+      "langwatch-declaration-source": "./src/workflow-card.ts",
+      "types": "./dist/workflow-card.d.ts",
+      "default": "./src/workflow-card.ts"
+    },
+    "./code-agent": {
+      "langwatch-declaration-source": "./src/code-agent.ts",
+      "types": "./dist/code-agent.d.ts",
+      "default": "./src/code-agent.ts"
+    },
+    "./workflow-templates": {
+      "langwatch-declaration-source": "./src/workflow-templates.ts",
+      "types": "./dist/workflow-templates.d.ts",
+      "default": "./src/workflow-templates.ts"
+    },
+    "./studio-dataset-columns": {
+      "langwatch-declaration-source": "./src/studio-dataset-columns.ts",
+      "types": "./dist/studio-dataset-columns.d.ts",
+      "default": "./src/studio-dataset-columns.ts"
+    },
+    "./studio-drawer-footer": {
+      "langwatch-declaration-source": "./src/studio-drawer-footer.ts",
+      "types": "./dist/studio-drawer-footer.d.ts",
+      "default": "./src/studio-drawer-footer.ts"
+    },
+    "./evaluate-api-snippet": {
+      "langwatch-declaration-source": "./src/evaluate-api-snippet.ts",
+      "types": "./dist/evaluate-api-snippet.d.ts",
+      "default": "./src/evaluate-api-snippet.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/agent-browser": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/browser-trpc": "workspace:*",
+    "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/dataset-browser": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/evaluator-contract": "workspace:*",
+    "@langwatch/evaluator-browser": "workspace:*",
+    "@langwatch/experiment-contract": "workspace:*",
+    "@langwatch/experiment-browser": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/model-provider-browser": "workspace:*",
+    "@langwatch/model-provider-browser-kit": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/prompt-browser": "workspace:*",
+    "@langwatch/prompt-browser-kit": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/trace-browser": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
+    "@langwatch/workflow-browser-kit": "workspace:*",
+    "@microsoft/fetch-event-source": "^2.0.1",
+    "@monaco-editor/react": "catalog:",
+    "@tanstack/react-query": "catalog:",
+    "@trpc/client": "catalog:",
+    "@trpc/react-query": "catalog:",
+    "@xyflow/react": "catalog:",
+    "emoji-picker-react": "^4.19.1",
+    "fast-deep-equal": "catalog:",
+    "langwatch": "workspace:*",
+    "liquidjs": "catalog:",
+    "lodash-es": "catalog:",
+    "lucide-react": "catalog:",
+    "monaco-editor": "catalog:",
+    "monacopilot": "catalog:",
+    "motion": "catalog:",
+    "numeral": "catalog:",
+    "react-dnd": "^16.0.1",
+    "react-dnd-html5-backend": "^16.0.1",
+    "react-error-boundary": "catalog:",
+    "react-feather": "catalog:",
+    "react-hook-form": "catalog:",
+    "react-icons": "catalog:",
+    "react-markdown": "catalog:",
+    "react-resizable-panels": "catalog:",
+    "react-spinners": "^0.17.0",
+    "remark-gfm": "catalog:",
+    "use-debounce": "catalog:",
+    "usehooks-ts": "catalog:",
+    "zod": "catalog:",
+    "zundo": "catalog:",
+    "zustand": "catalog:"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/lodash-es": "catalog:",
+    "@types/numeral": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

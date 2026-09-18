@@ -25,8 +25,8 @@ modules except X", never a regex, never "all dirty files". A lane resolves this
 list literally.
 
   modules/trace/contract/src/**
-  modules/trace/server/src/transport/**
-  modules/trace/server/src/__tests__/**
+  modules/trace/process/src/transport/**
+  modules/trace/process/src/__tests__/**
 
 If two lanes will run at once, check by eye that their lists cannot intersect.
 That check is the coordinator's single most valuable minute.>
@@ -50,7 +50,7 @@ carries on with whatever else it can do.>
 copying, the origin/main router it must stay wire-compatible with.
 
   modules/annotation/**                     the reference shape - copy this
-  modules/organization/server/src/transport/**   the transport exemplar
+  modules/organization/process/src/transport/**   the transport exemplar
 
 Naming these is worth many turns: a lane with no exemplar greps for one.>
 
@@ -80,8 +80,8 @@ skill reference and this section should link to it.>
 <Exactly what this lane runs, and nothing wider. These are the checks the handoff
 reports against.
 
-  pnpm --filter @langwatch/trace-server test src/transport
-  pnpm typecheck:one modules/trace/server        (once, at the end)
+  pnpm --filter @langwatch/trace-process test src/transport
+  pnpm typecheck:one modules/trace/process        (once, at the end)
 
 Follows `.claude/skills/core/testing-rules.md`. Never a whole-tree check.>
 
@@ -104,7 +104,7 @@ Add any task-specific ones here.>
   - the transport mount test passes
   - baseline rows trace|nested-transport and trace|legacy-transport-runtime can
     be dropped
-  - typecheck:one is clean for modules/trace/server
+  - typecheck:one is clean for modules/trace/process
 
 If a criterion is not checkable, rewrite it until it is.>
 ```

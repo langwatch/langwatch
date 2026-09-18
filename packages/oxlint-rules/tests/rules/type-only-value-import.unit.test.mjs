@@ -5,8 +5,8 @@ import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 const workspace = createFixtureWorkspace({
   features: { agent: { layoutVersion: 0, roles: { server: {} } } },
   files: {
-    "modules/agent/server/src/services/agent.types.ts": "export interface AgentConfig {}\n",
-    "modules/agent/server/src/services/agent.mixed.ts":
+    "modules/agent/process/src/services/agent.types.ts": "export interface AgentConfig {}\n",
+    "modules/agent/process/src/services/agent.mixed.ts":
       "export type AgentMode = 'a';\nexport class AgentRunner {}\n",
   },
 });
@@ -23,7 +23,7 @@ describe("given a relative import of a sibling module", () => {
     it("reports valueImportOfType", () => {
       const found = report(
         "import { AgentConfig } from './agent.types';",
-        "modules/agent/server/src/services/agent.service.ts",
+        "modules/agent/process/src/services/agent.service.ts",
       );
 
       expect(found).toHaveLength(1);
@@ -38,7 +38,7 @@ describe("given a relative import of a sibling module", () => {
       expect(
         report(
           "import type { AgentConfig } from './agent.types';",
-          "modules/agent/server/src/services/agent.service.ts",
+          "modules/agent/process/src/services/agent.service.ts",
         ),
       ).toEqual([]);
     });
@@ -50,7 +50,7 @@ describe("given a relative import of a sibling module", () => {
       expect(
         report(
           "import { AgentRunner } from './agent.mixed';",
-          "modules/agent/server/src/services/agent.service.ts",
+          "modules/agent/process/src/services/agent.service.ts",
         ),
       ).toEqual([]);
     });
@@ -62,7 +62,7 @@ describe("given a relative import of a sibling module", () => {
       expect(
         report(
           "import { Missing } from './does-not-exist';",
-          "modules/agent/server/src/services/agent.service.ts",
+          "modules/agent/process/src/services/agent.service.ts",
         ),
       ).toEqual([]);
     });

@@ -1,0 +1,61 @@
+{
+  "name": "@langwatch/prompt-process",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Prompt feature service and private persistence port.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "imports": {
+    "#*": {
+      "types": "./dist/*.d.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./testing": {
+      "types": "./dist/__tests__/testing.d.ts",
+      "default": "./src/__tests__/testing.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/plans": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
+    "@trpc/server": "catalog:",
+    "hono": "catalog:",
+    "hono-openapi": "catalog:",
+    "nanoid": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/actor": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

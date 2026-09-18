@@ -6,8 +6,8 @@ const workspace = createFixtureWorkspace({});
 
 afterAll(() => workspace.cleanup());
 
-const REPOSITORY = "modules/agent/server/src/repositories/prisma/agent.repository.ts";
-const SERVICE = "modules/agent/server/src/services/agent.service.ts";
+const REPOSITORY = "modules/agent/process/src/repositories/prisma/agent.repository.ts";
+const SERVICE = "modules/agent/process/src/services/agent.service.ts";
 
 function report(code, filename = REPOSITORY) {
   return runRule(prismaCountInListQueryRule, { code, cwd: workspace.cwd, filename });

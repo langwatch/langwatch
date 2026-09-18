@@ -185,7 +185,7 @@ packages) set `environment: "jsdom"` globally** — which directly contradicts `
 own claim that "neither config declares a global `environment`." For those 16 packages the
 per-file docblock is redundant, not load-bearing; the per-file convention is real only for
 the remaining packages that mix jsdom and node tests in one config (e.g.
-`modules/analytics/web`, which explicitly comments "every file that renders
+`modules/analytics/browser`, which explicitly comments "every file that renders
 declares `@vitest-environment jsdom`" and sets `environment: "node"` as the default). **The
 `CLAUDE.md` line describing the per-file convention as universal should be corrected to
 name the exception** — it's accurate for mixed-environment packages, not for the 16 that
@@ -209,13 +209,13 @@ does exist — a script limitation (didn't try stripping `.js` before checking `
 real gap. **One confirmed real stale mock:**
 
 ```ts
-// modules/scenario/web/src/ui/sections/agent-testing/run/__tests__/run-dialog.integration.test.tsx:105
+// modules/scenario/browser/src/ui/sections/agent-testing/run/__tests__/run-dialog.integration.test.tsx:105
 vi.mock("../../use-run-scenario", () => ({
   useRunScenario: () => ({ runScenario: mockRunScenario, isRunning: false }),
 }));
 ```
 
-The real hook lives at `modules/scenario/web/src/ui/sections/use-run-scenario.ts`
+The real hook lives at `modules/scenario/browser/src/ui/sections/use-run-scenario.ts`
 — three directory levels up from the test file (`__tests__/../../../`), not two
 (`__tests__/../../`) as the mock path resolves. The mock is silently a no-op: it never
 intercepts the real import, so this test may be exercising the unmocked hook and passing for
@@ -231,7 +231,7 @@ caught the real hit above at zero false-positive rate. Recommend
 
 #### 11. Value-echo tests — **~4 likely-real hits out of 15 raw matches**
 
-`modules/organization/web/src/screens/organization/__tests__/members.unit.test.tsx`
+`modules/organization/browser/src/screens/organization/__tests__/members.unit.test.tsx`
 has three real hits: `expect(true).toBe(true)` (lines 59, 66, 72) — proves nothing. One hit
 in `apps/api/.../api-database.infrastructure.unit.test.ts` (`expect(infrastructure.
 connection).toBe(infrastructure.connection)`) needs a manual look — could be a legitimate
@@ -476,8 +476,8 @@ as Parts 1-2 — every claim below is grep/filesystem-verified against the insta
 
 Almost every package.json pins `"vitest": "^5.0.0"`, and `node_modules/.pnpm` confirms
 `vitest@5.0.0` is the resolved version nearly everywhere. **Two packages still pin
-`^4.1.9`**: `modules/langy/server/package.json` and
-`modules/model-provider/server/package.json`. This is why `pnpm-lock.yaml`
+`^4.1.9`**: `modules/langy/process/package.json` and
+`modules/model-provider/process/package.json`. This is why `pnpm-lock.yaml`
 resolves both `vitest@5.0.0` and `vitest@4.1.10` in the same workspace — two full copies of
 Vitest on disk, and those two packages' test scripts run under v4's behavior (different pool
 defaults, different CLI) while every sibling package runs v5. **First step of "optimal

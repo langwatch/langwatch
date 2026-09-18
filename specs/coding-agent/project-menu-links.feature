@@ -2,12 +2,12 @@
 #
 # Implementation:
 #   packages/prisma-client/prisma/schema.prisma                                                                    (Project.lastCodingAgentSessionAt / lastCodingAgentPullRequestAt)
-#   modules/project/server/src/services/project.service.ts                                               (the throttled touch methods)
-#   modules/project/server/src/repositories/prisma/prisma.project.repository.ts                         (the staleness-guarded write)
-#   modules/coding-agent/server/src/services/coding-agent-session-seen.service.ts (the fold-commit stamp)
-#   modules/github/server/src/services/github-pull-request-mapping.service.ts                          (the pull-request trigger)
-#   modules/navigation/web/src/model/coding-agent-activity.ts                                                     (the recency rule)
-#   modules/navigation/web/src/ui/sections/main-menu.tsx                                                                       (the two destinations)
+#   modules/project/process/src/services/project.service.ts                                               (the throttled touch methods)
+#   modules/project/process/src/repositories/prisma/prisma.project.repository.ts                         (the staleness-guarded write)
+#   modules/coding-agent/process/src/services/coding-agent-session-seen.service.ts (the fold-commit stamp)
+#   modules/github/process/src/services/github-pull-request-mapping.service.ts                          (the pull-request trigger)
+#   modules/navigation/browser/src/model/coding-agent-activity.ts                                                     (the recency rule)
+#   modules/navigation/browser/src/ui/sections/main-menu.tsx                                                                       (the two destinations)
 #   [gone] src/pages/[project]/sessions.tsx                                                                  (the project Sessions page)
 #   [gone] src/pages/[project]/pull-requests.tsx                                                             (the project Pull Requests page)
 #

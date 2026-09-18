@@ -9,7 +9,7 @@ const workspace = createFixtureWorkspace({
 
 afterAll(() => workspace.cleanup());
 
-function report(code, filename = "modules/agent/server/src/transport/agent.rest.ts") {
+function report(code, filename = "modules/agent/process/src/transport/agent.rest.ts") {
   return runRule(restDeclaresInputOutputRule, { code, cwd: workspace.cwd, filename });
 }
 

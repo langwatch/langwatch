@@ -145,7 +145,7 @@ typechecks perfectly.
   `z.object({ apiKeyProjectId: z.string().nullable(), userId: z.string().nullable() })`
   while `modules/user/contract/src/user-rest.schemas.ts:98` declares the same
   shape as `userAvatarCallerSchema`. The module's exported token
-  (`modules/user/server/src/index.ts:3`) is never imported by the host. It works
+  (`modules/user/process/src/index.ts:3`) is never imported by the host. It works
   only because both objects carry the same string. This is
   `rest-schema-from-own-contract`'s exact violation, in a file that rule does
   not lint.
@@ -359,7 +359,7 @@ not mechanical. It is also the part that pays for the redesign.
 ### 3.3 Typed facts: the token is the identity
 
 ```ts
-// modules/user/server/src/transport/user-avatar.rest.ts
+// modules/user/process/src/transport/user-avatar.rest.ts
 export const avatarCaller = restFact(userAvatarCallerSchema);   // no string, anywhere
 ```
 
@@ -370,7 +370,7 @@ already uses (`withTransportFacts`, `factBindings`, *"declares the fact"*) and
 `.withMiddleware` is the odd one out. A supply is minted **from the token**:
 
 ```ts
-// modules/user/server/src/user.server.ts
+// modules/user/process/src/user.server.ts
 .withTransportFacts(() => [
   avatarCaller.suppliedBy((request) => dualCredentialOf(request)),
 ])
@@ -648,7 +648,7 @@ about that field, not a rename.
 
 ## 4. The same routes, current and proposed
 
-### 4.1 The avatar byte door — `modules/user/server/src/transport/user-avatar.rest.ts`
+### 4.1 The avatar byte door — `modules/user/process/src/transport/user-avatar.rest.ts`
 
 **Current** (declares `deferredScope`; its own prose describes `anyAuthenticated`):
 
@@ -769,7 +769,7 @@ answer is *no, and here is why*. A binary with only a *yes* would have forced th
 route to invent a scope check it does not need; a *no* with a written reason gets
 the argument onto the page, where review can see it. (§9, question 1.)
 
-### 4.2 A CRUD family — `modules/annotation/server/src/transport/annotation.rest.ts`
+### 4.2 A CRUD family — `modules/annotation/process/src/transport/annotation.rest.ts`
 
 **Current** (one of six routes; the file is 107 lines):
 
@@ -827,7 +827,7 @@ annotation this file currently carries also goes: it exists because the inferred
 type was unreadable, and a single `RouteShape` parameter (§3.4) makes it
 readable. 34 of the 92 families carry that annotation today.
 
-### 4.3 A tRPC family — `modules/annotation/server/src/transport/annotation.trpc.ts`
+### 4.3 A tRPC family — `modules/annotation/process/src/transport/annotation.trpc.ts`
 
 **Current:**
 

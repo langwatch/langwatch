@@ -20,9 +20,9 @@ act: you add a `surfaces/` entry, and that shows up in review.
 ## The package
 
 ```jsonc
-// modules/trace/web/package.json
+// modules/trace/browser/package.json
 {
-  "name": "@langwatch/trace-web",
+  "name": "@langwatch/trace-browser",
   "exports": {
     // the declaration: what apps/ui installs. Never imported by a peer.
     ".": "./src/trace.web.ts",
@@ -45,7 +45,7 @@ act: you add a `surfaces/` entry, and that shows up in review.
 Three rules hold that file, and all three are mechanical:
 
 1. **A peer may import `./surfaces/*` and nothing else.** Importing
-   `@langwatch/trace-web/trace-host` from another module is an error; from
+   `@langwatch/trace-browser/trace-host` from another module is an error; from
    `apps/ui` it is fine. This is `private-runtime-export` pointed at the browser.
 2. **The published set is shrink-only.** A counter carries today's number, and a
    check refuses a commit that raises it. Growing the API is then a conversation,
@@ -59,7 +59,7 @@ Three rules hold that file, and all three are mechanical:
 ## The declaration
 
 ```ts
-// modules/trace/web/src/trace.web.ts
+// modules/trace/browser/src/trace.web.ts
 import { defineWebModule } from "@langwatch/ui-composition";
 
 import { traceApi } from "./model/trace-api.ts";
@@ -86,7 +86,7 @@ So a surface that needs state does not export the state. The **module's own
 declaration** mounts the provider at installation, and the surface reads it:
 
 ```tsx
-// modules/trace/web/src/surfaces/trace-id-peek.tsx
+// modules/trace/browser/src/surfaces/trace-id-peek.tsx
 import { useTraceStream } from "../model/trace-stream.provider.tsx";   // private
 
 export function TraceIdPeek({ traceId }: { traceId: string }) {
@@ -96,8 +96,8 @@ export function TraceIdPeek({ traceId }: { traceId: string }) {
 ```
 
 ```tsx
-// modules/experiment/web/src/ui/sections/experiment-run-row.tsx
-import { TraceIdPeek } from "@langwatch/trace-web/surfaces/trace-id-peek";
+// modules/experiment/browser/src/ui/sections/experiment-run-row.tsx
+import { TraceIdPeek } from "@langwatch/trace-browser/surfaces/trace-id-peek";
 
 export function ExperimentRunRow({ run }: { run: Run }) {
   return <TraceIdPeek traceId={run.traceId} />;   // one import line, no wiring
@@ -121,8 +121,8 @@ several and is imported for them by `evaluator`, `experiment` and `langy`; none
 of those imports is about workflows.
 
 ```diff
-- import { Markdown } from "@langwatch/workflow-web/markdown";
-- import { CopyIcon } from "@langwatch/model-provider-web/copy-icon";
+- import { Markdown } from "@langwatch/workflow-browser/markdown";
+- import { CopyIcon } from "@langwatch/model-provider-browser/copy-icon";
 + import { Markdown } from "@langwatch/design-system/markdown";
 + import { CopyIcon } from "@langwatch/design-system/copy-icon";
 ```
@@ -152,7 +152,7 @@ web package, so extracting them drags no feature along.
 
 ### Where it lives: `modules/<name>/web-kit`, and it is not a module
 
-`@langwatch/trace-web-kit`, beside `contract`, `server` and `web`. The obvious
+`@langwatch/trace-browser-kit`, beside `contract`, `server` and `web`. The obvious
 objection is that a kit is not installed, so it is not a module - and that is
 true, and it is already true of half the directory. `modules/<name>/` holds
 `adrs/`, `contract/`, `feature.json`, `specs/`, `server/` and `web/`, and only

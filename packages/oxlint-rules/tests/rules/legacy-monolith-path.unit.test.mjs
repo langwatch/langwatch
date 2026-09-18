@@ -8,7 +8,7 @@ const workspace = createFixtureWorkspace({
 
 afterAll(() => workspace.cleanup());
 
-const FILE = "modules/agent/server/src/services/agent.service.ts";
+const FILE = "modules/agent/process/src/services/agent.service.ts";
 
 function report(code, filename = FILE) {
   return runRule(legacyMonolithPathRule, { code, cwd: workspace.cwd, filename });
@@ -49,7 +49,7 @@ describe("given a source file", () => {
   describe("when it imports from a module package", () => {
     /** @scenario "An import from a module package is allowed" */
     it("reports nothing", () => {
-      const found = report('import { api } from "@langwatch/agent-web/agent-client";');
+      const found = report('import { api } from "@langwatch/agent-browser/agent-client";');
 
       expect(found).toHaveLength(0);
     });
@@ -88,7 +88,7 @@ describe("given the rule tells the reader to re-point a specifier", () => {
     it("leaves a platform path in a test's data alone, and reports it in production", () => {
       const data = 'const wasFiles = ["platform/app/src/server/db.ts"];';
 
-      expect(report(data, "modules/agent/server/src/__tests__/paths.unit.test.ts")).toEqual([]);
+      expect(report(data, "modules/agent/process/src/__tests__/paths.unit.test.ts")).toEqual([]);
       expect(report(data).map((e) => e.messageId)).toEqual(["legacyMonolithPath"]);
     });
 
@@ -96,7 +96,7 @@ describe("given the rule tells the reader to re-point a specifier", () => {
     it("still reports an import naming platform/app from inside a test", () => {
       const found = report(
         'import { a } from "../../platform/app/src/db.ts";',
-        "modules/agent/server/src/__tests__/paths.unit.test.ts",
+        "modules/agent/process/src/__tests__/paths.unit.test.ts",
       );
 
       expect(found.map((entry) => entry.messageId)).toEqual(["legacyMonolithPath"]);

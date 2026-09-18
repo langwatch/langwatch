@@ -1,0 +1,57 @@
+{
+  "name": "@langwatch/annotation-process",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Annotation feature service and private PostgreSQL adapter.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "imports": {
+    "#*": {
+      "types": "./dist/*.d.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@langwatch/actor": "workspace:*",
+    "@langwatch/annotation-contract": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/plans": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
+    "@trpc/server": "catalog:",
+    "hono": "catalog:",
+    "hono-openapi": "catalog:",
+    "nanoid": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

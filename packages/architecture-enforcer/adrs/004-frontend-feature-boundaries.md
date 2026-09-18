@@ -58,7 +58,7 @@ a deliberately public feature-web contribution.
 Feature web packages distinguish complete experiences from reusable pieces:
 
 ```text
-modules/prompt/web/src/
+modules/prompt/browser/src/
 ├── screens/prompt-studio/       # owner-only Prompt Studio experiences
 ├── surfaces/prompt-reference/   # narrow controlled cross-feature contribution
 ├── surfaces/prompt-version/
@@ -160,7 +160,7 @@ lint increment before a cross-feature overlay lands.
 
 ### Prompt pilot
 
-Prompt is the first governed feature-web package. `@langwatch/prompt-web`
+Prompt is the first governed feature-web package. `@langwatch/prompt-browser`
 replaces its root export with an owner-only `screens/prompt-studio` entry and
 narrowly scoped surface exports. The initial screen entry contains migrated tab
 presentation and browser behavior; it is an export-boundary pilot, not a claim
@@ -285,7 +285,7 @@ web surfaces its own web package consumes:
 ```json
 {
   "layoutVersion": 0,
-  "web": { "uses": { "surfaces": ["@langwatch/suite-web/surfaces/run-formatters"] } }
+  "web": { "uses": { "surfaces": ["@langwatch/suite-browser/surfaces/run-formatters"] } }
 }
 ```
 

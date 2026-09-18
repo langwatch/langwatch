@@ -33,7 +33,7 @@ import (
 const entitledCaseName = "entitled"
 
 // enterprisePlanRequiredCode is the handled-error code both layouts' plan
-// gate answers with (modules/organization/server's use of isEnterpriseTier
+// gate answers with (modules/organization/process's use of isEnterpriseTier
 // on the branch; the equivalent self-hosted/SaaS gate on main).
 const enterprisePlanRequiredCode = "enterprise_plan_required"
 
@@ -162,7 +162,7 @@ func (engine *probeEngine) entitledProbe(operation Operation) []Finding {
 //
 // Both layouts read the entitled organization's license off the same
 // column, per request, with no cache in front of it:
-//   - branch: enterprise/modules/licensing/server/src's
+//   - branch: enterprise/modules/licensing/process/src's
 //     PrismaOrganizationLicenseRepository.tryReadLicense reads
 //     Organization.license by id.
 //   - main: platform/app/ee/licensing/licenseHandler.ts's readStoredLicense
@@ -178,7 +178,7 @@ func (engine *probeEngine) entitledProbe(operation Operation) []Finding {
 // mirror (platform/app/scripts/localDevLicense.ts) carries the identical
 // string — verified byte-for-byte when this pass was written — so reading it
 // once from the branch checkout is enough to activate BOTH sides' databases.
-const localDevLicenseSeedPath = "enterprise/modules/licensing/server/src/seeding.ts"
+const localDevLicenseSeedPath = "enterprise/modules/licensing/process/src/seeding.ts"
 
 // localDevLicenseKeyPattern extracts LOCAL_DEV_ENTERPRISE_LICENSE_KEY's
 // quoted value. Copying the constant's VALUE into Go would silently go

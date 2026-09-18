@@ -13,7 +13,7 @@ Feature: Identity ships as two packages with one composition root
   #                                 reducer, errors, parity policy, and the
   #                                 four pipelines' framework identity (name,
   #                                 aggregate type)
-  #   @langwatch/identity-server    services over ports — guards, the five
+  #   @langwatch/identity-process    services over ports — guards, the five
   #                                 verbs, the ceremonies better-auth's own
   #                                 databaseHooks call, and the full
   #                                 event-sourcing layer: the envelope, the
@@ -41,7 +41,7 @@ Feature: Identity ships as two packages with one composition root
 
   @unit
   Scenario: The identity server runtime reads no storage engine and no environment
-    Given the @langwatch/identity-server package
+    Given the @langwatch/identity-process package
     When its sources are scanned for imports and environment reads
     Then none of them import Prisma or the app
     And none of them read process.env

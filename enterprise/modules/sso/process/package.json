@@ -1,0 +1,45 @@
+{
+  "name": "@langwatch/enterprise-sso-process",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Enterprise SSO gate and Better Auth provider adapters.",
+  "license": "SEE LICENSE IN ../../../LICENSE.md",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/audit-log-contract": "workspace:*",
+    "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/enterprise-sso-contract": "workspace:*",
+    "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/identity-contract": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/ops-contract": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
+    "@trpc/server": "catalog:",
+    "better-auth": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/auth-contract": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -42,7 +42,7 @@ describe("boundary signature mirrors", () => {
   it("rejects ReturnType and ConstructorParameters in an Enterprise server app", () => {
     root = mkdtempSync(join(tmpdir(), "boundary-signatures-"));
     write(
-      "enterprise/modules/billing/server/src/app/billing.app.ts",
+      "enterprise/modules/billing/process/src/app/billing.app.ts",
       "type Output = ReturnType<typeof build>;\ntype Args = ConstructorParameters<typeof Billing>;\n",
     );
 
@@ -82,7 +82,7 @@ describe("boundary signature mirrors", () => {
   it("allows technical Parameters usage outside a boundary", () => {
     root = mkdtempSync(join(tmpdir(), "boundary-signatures-"));
     write(
-      "modules/trace/server/src/services/trace.service.ts",
+      "modules/trace/process/src/services/trace.service.ts",
       "type Input = Parameters<typeof create>[0];\n",
     );
 

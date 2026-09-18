@@ -677,7 +677,7 @@ scenario first — it should, since it is a behaviour fix, not a refactor.
 
 ## 6. Blast radius
 
-**27 files outside the feature import `@langwatch/automation-server`** — 17 in
+**27 files outside the feature import `@langwatch/automation-process`** — 17 in
 `platform/app/src/runtime/app/features/`, 4 in `platform/app/src/server/`, 3 in
 `apps/api/`, 1 in `apps/worker/`, plus tests. They use **74 symbols**, of which
 `index.ts` exports 119; **47 exported symbols have no importer outside the
@@ -695,7 +695,7 @@ The heaviest external consumers, by what they name:
 | `apps/worker/src/features/automation/automation-worker-feature.installer.ts`        | `AutomationTriggerMatchRecorderPort`, `AutomationIntentRetentionPort`                                                                                                                |
 
 **71 files import `@langwatch/automation-contract`** and **28 import
-`@langwatch/automation-web`** — neither is touched by commits 1–8. Commit 5 is
+`@langwatch/automation-browser`** — neither is touched by commits 1–8. Commit 5 is
 the only one that reaches the contract package, and it changes two error base
 classes plus one deletion.
 

@@ -156,7 +156,7 @@ make down                    # stop all services
 
 ```bash
 pnpm typecheck                                  # every workspace package. What CI runs
-pnpm --filter @langwatch/trace-server typecheck # one package, seconds not minutes
+pnpm --filter @langwatch/trace-process typecheck # one package, seconds not minutes
 pnpm lint                                       # oxlint + architecture-enforcer
 pnpm format                                     # oxfmt
 pnpm --filter @langwatch/platform-api test      # one package's suite

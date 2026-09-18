@@ -19,7 +19,7 @@ import (
 )
 
 // gatewaySignatureWindowSeconds matches `GATEWAY_SIGNATURE_WINDOW_SECONDS`
-// in `modules/gateway/server/src/transport/api-rest/gateway-internal.api.ts`. Both ends must
+// in `modules/gateway/process/src/transport/api-rest/gateway-internal.api.ts`. Both ends must
 // use the same value or replay protection becomes asymmetric.
 const gatewaySignatureWindowSeconds = 300
 

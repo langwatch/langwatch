@@ -12,10 +12,10 @@
   "exclude": ["src/**/__tests__/**"],
   "references": [
     {
-      "path": "../../modules/analytics/server/tsconfig.build.json"
+      "path": "../../modules/analytics/process/tsconfig.build.json"
     },
     {
-      "path": "../../modules/authz/server/tsconfig.build.json"
+      "path": "../../modules/authz/process/tsconfig.build.json"
     },
     {
       "path": "../../packages/clickhouse-client/tsconfig.build.json"
@@ -36,13 +36,13 @@
       "path": "../../modules/identity/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/identity/server/tsconfig.build.json"
+      "path": "../../modules/identity/process/tsconfig.build.json"
     },
     {
       "path": "../../packages/observability/tsconfig.build.json"
     },
     {
-      "path": "../../modules/ops/server/tsconfig.build.json"
+      "path": "../../modules/ops/process/tsconfig.build.json"
     },
     {
       "path": "../../packages/prisma-client/tsconfig.build.json"

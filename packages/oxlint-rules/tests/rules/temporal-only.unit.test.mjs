@@ -8,7 +8,7 @@ const workspace = createFixtureWorkspace({
 
 afterAll(() => workspace.cleanup());
 
-const SERVICE = "modules/agent/server/src/services/agent.service.ts";
+const SERVICE = "modules/agent/process/src/services/agent.service.ts";
 
 function report(code, filename = SERVICE) {
   return runRule(temporalOnlyRule, { code, cwd: workspace.cwd, filename });
@@ -97,7 +97,7 @@ describe("given a file outside the governed source", () => {
       expect(
         ids(
           "const at: Date = new Date();",
-          "modules/agent/server/src/repositories/prisma/agent.repository.ts",
+          "modules/agent/process/src/repositories/prisma/agent.repository.ts",
         ),
       ).toEqual([]);
     });
@@ -109,7 +109,7 @@ describe("given a file outside the governed source", () => {
       expect(
         ids(
           "const at = new Date();",
-          "modules/agent/server/src/adapters/postgres.agent.adapter.ts",
+          "modules/agent/process/src/adapters/postgres.agent.adapter.ts",
         ),
       ).toEqual([]);
     });
@@ -121,7 +121,7 @@ describe("given a file outside the governed source", () => {
       expect(
         ids(
           "const at = new Date();",
-          "modules/agent/server/src/repositories/clickhouse/clickhouse.agent.repository.ts",
+          "modules/agent/process/src/repositories/clickhouse/clickhouse.agent.repository.ts",
         ),
       ).toEqual([]);
     });
@@ -145,7 +145,7 @@ describe("given a file outside the governed source", () => {
       expect(
         ids(
           "const at = new Date();",
-          "modules/agent/server/src/services/clickhouse-health.service.ts",
+          "modules/agent/process/src/services/clickhouse-health.service.ts",
         ),
       ).toEqual(["mintNow"]);
     });
@@ -157,7 +157,7 @@ describe("given a file outside the governed source", () => {
       expect(
         ids(
           "const at = new Date('2026-06-15T10:30:00Z');",
-          "modules/agent/server/src/__tests__/agent.unit.test.ts",
+          "modules/agent/process/src/__tests__/agent.unit.test.ts",
         ),
       ).toEqual([]);
     });

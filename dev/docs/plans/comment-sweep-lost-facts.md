@@ -37,7 +37,7 @@ written, the text here is the only copy outside git history.
 ### ADR candidates (three, all in the spend pipeline)
 
 1. **The pricing and PII invariant** —
-   `modules/gateway/server/src/eventing/gateway-spend-commands.process.ts`,
+   `modules/gateway/process/src/eventing/gateway-spend-commands.process.ts`,
    file header. Spend is priced once at ingest and the event *carries* that
    cost, so no two readers can disagree about it; the event holds no prompt or
    response content and no PII. A financial and security invariant, worth a
@@ -45,7 +45,7 @@ written, the text here is the only copy outside git history.
    same claim as "no prompt/response content".
 
 2. **The status lattice and the attribution-ordering rule** —
-   `modules/gateway/server/src/eventing/gateway-spend.projection.ts`, the
+   `modules/gateway/process/src/eventing/gateway-spend.projection.ts`, the
    aggregate block. The lost sentence, verbatim:
 
    > Attribution: admission is the authority, but if the outcome folds first
@@ -59,7 +59,7 @@ written, the text here is the only copy outside git history.
    "nano-USD + rate identity" so ledger, debits and webhook agree.
 
 3. **The spend-summary accounting and pagination argument** —
-   `modules/gateway/server/src/repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts`,
+   `modules/gateway/process/src/repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts`,
    `readSpendSummaries`. Settled is counted separately from confirmed/failed,
    and paging is by GROUP KEY rather than by cost for a correctness reason
    (a race the cost ordering does not survive). Both are subtle enough that a
@@ -217,7 +217,7 @@ sweep so far where a lane changed meaning rather than length.
 
 ---
 
-## modules/analytics/web — lane `comments-analytics-2b`
+## modules/analytics/browser — lane `comments-analytics-2b`
 
 Three candidates, and **all three are really about web package boundaries**,
 which makes them worth reading alongside
@@ -225,9 +225,9 @@ which makes them worth reading alongside
 
 1. **The handled-error reader is a fifth copy** —
    `web/src/model/handled-error.ts` (was 19 lines). The file recorded that
-   these nine lines are duplicated verbatim in `@langwatch/gateway-web`,
-   `@langwatch/annotation-web`, `@langwatch/automation-web` and
-   `@langwatch/enterprise-governance-web`, with a stated plan to converge on
+   these nine lines are duplicated verbatim in `@langwatch/gateway-browser`,
+   `@langwatch/annotation-browser`, `@langwatch/automation-browser` and
+   `@langwatch/enterprise-governance-browser`, with a stated plan to converge on
    one shared reader once the presentation registry leaves `platform/app`.
    Survived the cut: "trusts nothing from the wire", "pending one shared
    registry". Lost: that there are five copies and what unblocks the merge.
@@ -480,7 +480,7 @@ One candidate. The lane judged its other two recoverable from the code and was
 right: both keep the technical cause and drop only forensic detail.
 
 19. **What the `/api/teams` family's silent 404 actually cost.**
-    `modules/organization/server/src/transport/team.rest.ts` and its
+    `modules/organization/process/src/transport/team.rest.ts` and its
     `__tests__/team.rest.composition.unit.test.ts`. Both now say only that the
     prior version lost its only caller silently and every operation 404'd.
     Gone: the scale, which is the part that makes the story a warning rather
@@ -517,7 +517,7 @@ only one in the whole drive to drop a *named security property*.
     adjusting the total.
 
 21. **A named security property is now unnamed.**
-    `modules/langy/server/src/rules/__tests__/langy-frame-auth.rules.unit.test.ts`.
+    `modules/langy/process/src/rules/__tests__/langy-frame-auth.rules.unit.test.ts`.
     The original named three guaranteed properties: tamper-evidence,
     **field-boundary integrity**, and constant-time reject of garbage. The
     compressed version keeps the first and third. Field-boundary integrity is
@@ -551,7 +551,7 @@ the recurring shape in execution-engine code: the effect is easy to restate
 short, the mechanism is what someone actually needed.
 
 23. **How the Lambda SSE prelude breaks the stream.**
-    `modules/workflow/server/src/adapters/lambda.workflow-studio-stream.adapter.ts`,
+    `modules/workflow/process/src/adapters/lambda.workflow-studio-stream.adapter.ts`,
     and the near-identical `channels/http/http.workflow-studio-stream.channel.ts`
     and `adapters/workflow-studio-stream.adapter.ts`. Now says only that it
     "drops the engine's first event". Gone: AWS Lambda response streaming can
@@ -591,7 +591,7 @@ JSDoc form is what 1,292 files in this tree already use, 746 of them for
 ## Wave 5 — `modules/api-key` and `modules/dataset`
 
 26. **`extendLoginKeyExpiry` also scopes by name prefix.**
-    `modules/api-key/server/src/repositories/api-key.repository.ts` and its
+    `modules/api-key/process/src/repositories/api-key.repository.ts` and its
     `prisma.` sibling. The doc dropped "scoped by name prefix as well as
     id/organization/user". This one is not recoverable from the type: the
     interface signature has **no `name` parameter**, so nothing tells a reader
@@ -600,7 +600,7 @@ JSDoc form is what 1,292 files in this tree already use, 746 of them for
     they get.
 
 27. **Why the empty-grid message sits inside the border rather than below it.**
-    `modules/dataset/web/src/ui/sections/datasets/editor/dataset-editor-table.tsx`.
+    `modules/dataset/browser/src/ui/sections/datasets/editor/dataset-editor-table.tsx`.
     The placement survived; its reason did not. Gone: it sits **inside** the
     grid's border, where the missing rows would have been, because below it the
     reader gets a blank box with an unattached sentence underneath. That is a
@@ -608,7 +608,7 @@ JSDoc form is what 1,292 files in this tree already use, 746 of them for
 
 ### A pre-existing defect found by the sweep, not caused by it
 
-`modules/dataset/web/src/model/dataset-editor-copy.ts` carries a docblock whose
+`modules/dataset/browser/src/model/dataset-editor-copy.ts` carries a docblock whose
 prose describes `noSearchMatchesMessage` ("Shown in place of the grid when a
 search matched nothing…") while physically sitting above `plainRecordCount`,
 which has a doc of its own directly beneath it. `noSearchMatchesMessage` itself
@@ -706,9 +706,9 @@ These files carry a comment pointing at `.claude/handoffs/…` or
 `.claude/manifests/…`:
 
 ```
-modules/analytics/server/src/repositories/dashboard-widgets/access.ts
-modules/project/server/src/app/project.app.ts
-modules/project/server/src/transport/__tests__/project.trpc.composition.unit.test.ts
+modules/analytics/process/src/repositories/dashboard-widgets/access.ts
+modules/project/process/src/app/project.app.ts
+modules/project/process/src/transport/__tests__/project.trpc.composition.unit.test.ts
 modules/trace/contract/src/traces-v2.trpc.ts
 packages/architecture-enforcer/tests/agent-workflow-protocol.unit.test.ts
 skills/_tests/agent-workflow-protocol.scenario.test.ts
@@ -744,7 +744,7 @@ keep.
     refused but not that an in-flight action is not exempt.
 
 34. **Which settings address redirects, and which are sections of the rail.**
-    `modules/navigation/web/src/model/settings-menu.ts`, the Event Sourcing
+    `modules/navigation/browser/src/model/settings-menu.ts`, the Event Sourcing
     `alsoActiveAt` entry. The general reason survives ("these addresses have an
     owner"); the mapping does not — the scheduler address redirects onto the
     schedules section, while the payload store and Deja View are pages of the
@@ -753,7 +753,7 @@ keep.
     example of it.
 
 35. **Why the legacy pill opens on hover, focus and click.**
-    `modules/navigation/web/src/ui/elements/legacy-pill.tsx`. Kept: why it is a
+    `modules/navigation/browser/src/ui/elements/legacy-pill.tsx`. Kept: why it is a
     popover rather than a tooltip. Cut: that the open-on-hover/focus/click
     behaviour is what keeps it reachable by pointer *and* keyboard. That is an
     accessibility requirement, and an accessibility requirement with no
@@ -776,13 +776,13 @@ the budget rather than evading it.
     have warned them is gone.
 
 37. **Only one of the three consumers actually renders.**
-    `modules/evaluator/web/src/model/evaluation-status.ts`. The merged block
+    `modules/evaluator/browser/src/model/evaluation-status.ts`. The merged block
     still names all three consumers — the count, the trace tag, the status icon
     — but no longer says that **only the status icon renders visually**. That
     distinction is what tells a reader which consumer a visual change affects.
 
 38. **The page is split across packages.**
-    `modules/evaluator/web/src/behavior/evaluator-api.ts`, the `checkLimit` doc.
+    `modules/evaluator/browser/src/behavior/evaluator-api.ts`, the `checkLimit` doc.
     The reason two separate calls exist was softened away. The calls are not
     redundant; they exist because the page spans more than one package, which is
     precisely the condition this whole web-boundaries migration is changing.
@@ -790,11 +790,11 @@ the budget rather than evading it.
     redundant, and nothing in the file will say so.
 
 39. **A JSDoc left behind by a move, documenting a method that is not in the
-    file.** `modules/evaluation/server/src/services/evaluation-execution.service.ts`.
+    file.** `modules/evaluation/process/src/services/evaluation-execution.service.ts`.
     The block "Server-only mapping sources need data this service alone can
     produce (e.g. a formatted transcript from the span digest) — fills those
     fields into `mappedData` in place" documented `fillServerOnlyTraceSources`,
-    which now lives at `modules/evaluation/server/src/services/evaluation-data.service.ts:46`
+    which now lives at `modules/evaluation/process/src/services/evaluation-data.service.ts:46`
     and is **undocumented there**. The comment stayed behind between two section
     dividers, attached to nothing; the stale `dist/.d.ts` shows it had re-attached
     to `runEvaluation`, so the build output documented that method with a
@@ -830,11 +830,11 @@ the budget rather than evading it.
     re-derivable; none is a constraint. Named here because a handoff is
     gitignored and this register is not.
 
-    - `modules/github/server/src/eventing/github-branch-recheck.process.ts`: the
+    - `modules/github/process/src/eventing/github-branch-recheck.process.ts`: the
       prune schedule mirrors the automations pipeline's webhook prune.
-    - `modules/annotation/web/src/ui/elements/period-picker.tsx`: the component
+    - `modules/annotation/browser/src/ui/elements/period-picker.tsx`: the component
       takes no size, variant or placement prop.
-    - `modules/data-retention/server/src/repositories/clickhouse/clickhouse.retroactive-retention.repository.ts`
+    - `modules/data-retention/process/src/repositories/clickhouse/clickhouse.retroactive-retention.repository.ts`
       and `.../services/data-retention.service.ts`: sibling function names the
       calling code already names a few lines away.
     - `enterprise/modules/licensing/.../__tests__/licensing-entitlement-source.service.unit.test.ts`:

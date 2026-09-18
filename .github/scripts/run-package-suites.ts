@@ -36,7 +36,7 @@ export interface SuiteOutcome {
 /**
  * `test:unit` wins over `test` — the same suite under two names. The other two
  * are additional lanes, not alternatives: preferring one and stopping is how
- * four of `@langwatch/trace-server`'s suites ran in no job at all, reading green.
+ * four of `@langwatch/trace-process`'s suites ran in no job at all, reading green.
  */
 export const scriptsFor = (scripts: PackageManifestScripts): string[] => {
   const chosen: string[] = [];

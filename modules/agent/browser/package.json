@@ -1,0 +1,79 @@
+{
+  "name": "@langwatch/agent-browser",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe Agents UI and client contracts.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    "./agent-editors": {
+      "langwatch-declaration-source": "./src/agent-editors.ts",
+      "types": "./dist/agent-editors.d.ts",
+      "default": "./src/agent-editors.ts"
+    },
+    "./agent-management": {
+      "langwatch-declaration-source": "./src/agent-management.ts",
+      "types": "./dist/agent-management.d.ts",
+      "default": "./src/agent-management.ts"
+    },
+    "./connected-agents": {
+      "langwatch-declaration-source": "./src/connected-agents.ts",
+      "types": "./dist/connected-agents.d.ts",
+      "default": "./src/connected-agents.ts"
+    },
+    "./agent-http-editor": {
+      "langwatch-declaration-source": "./src/agent-http-editor.ts",
+      "types": "./dist/agent-http-editor.d.ts",
+      "default": "./src/agent-http-editor.ts"
+    },
+    "./agent-client": {
+      "langwatch-declaration-source": "./src/agent-client.ts",
+      "types": "./dist/agent-client.d.ts",
+      "default": "./src/agent-client.ts"
+    },
+    "./surfaces/http-config-editor": {
+      "langwatch-declaration-source": "./src/ui/sections/http-config-editor.tsx",
+      "types": "./dist/ui/sections/http-config-editor.d.ts",
+      "default": "./src/ui/sections/http-config-editor.tsx"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/scenario-browser": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
+    "lucide-react": "catalog:",
+    "react-hook-form": "catalog:"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@emotion/react": "catalog:",
+    "@langwatch/test-harness": "workspace:*",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

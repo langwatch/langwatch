@@ -10,7 +10,7 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
   # append that differs from it, and the identity pipeline's is user_identity,
   # tenanted by the user. The vocabulary is still identity's - the events are
   # lw.identity.connection_*, the facts live in @langwatch/identity and the
-  # guards in @langwatch/identity-server. Only the storage partition is
+  # guards in @langwatch/identity-process. Only the storage partition is
   # separate.
   #
   #   DRAFT → CLAIMED → APPROVED → VERIFICATION_PENDING → VERIFIED → ACTIVE

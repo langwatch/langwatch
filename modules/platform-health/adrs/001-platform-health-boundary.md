@@ -17,11 +17,11 @@ Two things were tangled: what a probe does, and who may ask for it.
 ## Decision
 
 `platform-health` is a singular core feature. The probes themselves move into
-`@langwatch/platform-health-server`, and neither door owns a copy of them.
+`@langwatch/platform-health-process`, and neither door owns a copy of them.
 
 ## Public surfaces and transports
 
-`@langwatch/platform-health-contract` and `@langwatch/platform-health-server`
+`@langwatch/platform-health-contract` and `@langwatch/platform-health-process`
 are the public feature surfaces. There is no web package: nothing in the
 browser reads a platform health report.
 

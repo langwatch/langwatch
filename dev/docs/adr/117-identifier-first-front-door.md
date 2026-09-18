@@ -249,7 +249,7 @@ The aggregate, its guards, the projection, the grandfather migration and
   event whose type differs from it (#7406); identity's is `user_identity`,
   tenanted by the user, and a connection is neither. The vocabulary stays
   identity's — the events are `lw.identity.connection_*`, the facts live in
-  `@langwatch/identity`, the guards in `@langwatch/identity-server`. Only
+  `@langwatch/identity`, the guards in `@langwatch/identity-process`. Only
   the storage partition is separate.
 - **Grandfathering states history rather than commanding a change.** One
   command emits the whole lifecycle a legacy organization would have had,

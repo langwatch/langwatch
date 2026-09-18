@@ -18,14 +18,14 @@ describe("given a service", () => {
     it("reports configFunction with the function name", () => {
       const found = report(
         "function loadConfig() { return {}; }",
-        "modules/auth/server/src/services/auth0-password.service.ts",
+        "modules/auth/process/src/services/auth0-password.service.ts",
       );
 
       expect(found).toHaveLength(1);
       expect(found[0].messageId).toBe("configFunction");
       expect(found[0].data).toEqual({
         name: "loadConfig",
-        path: "modules/auth/server/src/services/auth0-password.service.ts",
+        path: "modules/auth/process/src/services/auth0-password.service.ts",
       });
     });
   });
@@ -35,7 +35,7 @@ describe("given a service", () => {
     it("reports configFunction", () => {
       const found = report(
         "const resolveConfig = () => ({ domain: 1 });",
-        "modules/auth/server/src/services/auth0-password.service.ts",
+        "modules/auth/process/src/services/auth0-password.service.ts",
       );
 
       expect(found.map((e) => e.messageId)).toEqual(["configFunction"]);
@@ -47,7 +47,7 @@ describe("given a service", () => {
     it("reports configFunction", () => {
       const found = report(
         "class Auth0PasswordService { readConfig() { return {}; } }",
-        "modules/auth/server/src/services/auth0-password.service.ts",
+        "modules/auth/process/src/services/auth0-password.service.ts",
       );
 
       expect(found.map((e) => e.messageId)).toEqual(["configFunction"]);
@@ -59,13 +59,13 @@ describe("given a service", () => {
     it("reports environmentRead naming the key", () => {
       const found = report(
         "export const domain = process.env.AUTH0_DOMAIN;",
-        "modules/auth/server/src/services/auth0-password.service.ts",
+        "modules/auth/process/src/services/auth0-password.service.ts",
       );
 
       expect(found).toHaveLength(1);
       expect(found[0].messageId).toBe("environmentRead");
       expect(found[0].message).toBe(
-        "`modules/auth/server/src/services/auth0-password.service.ts`" +
+        "`modules/auth/process/src/services/auth0-password.service.ts`" +
           " reads `process.env.AUTH0_DOMAIN` directly instead of taking config as an argument." +
           " Add a named member to the argument object `create` takes and resolve it once at the composition root.",
       );
@@ -79,7 +79,7 @@ describe("given a service", () => {
         "class Auth0PasswordService {" +
           " static create({ config }) { return new Auth0PasswordService(config); }" +
           " constructor(config) { this.config = config; } }",
-        "modules/auth/server/src/services/auth0-password.service.ts",
+        "modules/auth/process/src/services/auth0-password.service.ts",
       );
 
       expect(found).toEqual([]);
@@ -93,7 +93,7 @@ describe("given a transport file", () => {
     it("reports nothing", () => {
       const found = report(
         "export const domain = process.env.AUTH0_DOMAIN;",
-        "modules/auth/server/src/transport/auth.rest.ts",
+        "modules/auth/process/src/transport/auth.rest.ts",
       );
 
       expect(found).toEqual([]);

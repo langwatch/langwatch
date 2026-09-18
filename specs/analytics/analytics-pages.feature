@@ -1,6 +1,6 @@
 Feature: The analytics pages
 
-  The nine analytics addresses are served from `@langwatch/analytics-web`
+  The nine analytics addresses are served from `@langwatch/analytics-browser`
   rather than from the retired platform application. What a reader can reach, which screen each
   address is, and what the charts draw from what the server returned are the
   properties this file states — the ones a move can break silently, where a

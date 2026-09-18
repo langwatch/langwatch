@@ -503,7 +503,7 @@ export {
 /**
  * The four pipelines' framework identity (ADR-101, ADR-115, ADR-117): the
  * pipeline name and aggregate type every event stamps. Wire schemas that
- * extend these with the eventing envelope stay in `@langwatch/identity-server`.
+ * extend these with the eventing envelope stay in `@langwatch/identity-process`.
  */
 export { IDENTITY_PIPELINE_NAME, USER_IDENTITY_AGGREGATE_TYPE } from "./identity-events.ts";
 export { JOIN_REQUEST_AGGREGATE_TYPE, JOIN_REQUEST_PIPELINE_NAME } from "./join-request-events.ts";

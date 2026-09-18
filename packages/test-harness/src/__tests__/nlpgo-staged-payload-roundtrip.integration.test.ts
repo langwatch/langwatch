@@ -11,7 +11,7 @@ import {
   type NlpLambdaInvoke,
   type NlpPayloadStaging,
   type StagedNlpPayload,
-} from "@langwatch/workflow-server";
+} from "@langwatch/workflow-process";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { hasGo, type NlpgoSubprocess, startNlpgoSubprocess } from "../nlpgo-subprocess.ts";

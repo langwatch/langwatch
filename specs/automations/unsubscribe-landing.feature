@@ -1,9 +1,9 @@
 # The page a notification's footer link opens
 #
 # Implementation:
-#   modules/automation/web/src/screens/unsubscribe/  (the screen)
+#   modules/automation/browser/src/screens/unsubscribe/  (the screen)
 #   apps/ui/src/features/automations/ui/sections/unsubscribe-routes.tsx (its key and the token read)
-#   modules/automation/server/src/transport/api-trpc/email-suppression.api.ts (the two public procedures)
+#   modules/automation/process/src/transport/api-trpc/email-suppression.api.ts (the two public procedures)
 #
 # Related specs:
 #   specs/automations/spam-prevention.feature , why every trigger email carries one

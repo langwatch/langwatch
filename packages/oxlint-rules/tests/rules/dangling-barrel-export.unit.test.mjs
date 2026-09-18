@@ -5,16 +5,16 @@ import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 const workspace = createFixtureWorkspace({
   features: { agent: { layoutVersion: 0, roles: { server: {}, web: {} } } },
   files: {
-    "modules/agent/server/src/index.ts": "export const barrel = 1;\n",
-    "modules/agent/server/src/services/agent.service.ts": "export const agent = 1;\n",
-    "modules/agent/web/src/agent.styles.css": ".agent {}\n",
+    "modules/agent/process/src/index.ts": "export const barrel = 1;\n",
+    "modules/agent/process/src/services/agent.service.ts": "export const agent = 1;\n",
+    "modules/agent/browser/src/agent.styles.css": ".agent {}\n",
   },
 });
 
 afterAll(() => workspace.cleanup());
 
-const BARREL = "modules/agent/server/src/index.ts";
-const SERVICE = "modules/agent/server/src/services/agent.service.ts";
+const BARREL = "modules/agent/process/src/index.ts";
+const SERVICE = "modules/agent/process/src/services/agent.service.ts";
 
 function report(code, filename = BARREL) {
   resetDanglingResolutionCache();
@@ -80,7 +80,7 @@ describe("given a source file", () => {
   describe("when it imports an asset by its exact path", () => {
     /** @scenario "An import of a non-source file that exists is allowed" */
     it("reports nothing", () => {
-      expect(report("import './agent.styles.css';", "modules/agent/web/src/index.ts")).toEqual([]);
+      expect(report("import './agent.styles.css';", "modules/agent/browser/src/index.ts")).toEqual([]);
     });
   });
 

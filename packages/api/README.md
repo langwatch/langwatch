@@ -243,7 +243,7 @@ document includes the optional path, registered dates and `latest`.
 A service is one file exporting a built Hono app. An endpoint is one `registerRoute` call carrying its method, its path, its version, its handler and its definition chain:
 
 ```ts
-// modules/things/server/src/transport/api-rest/things.api.ts
+// modules/things/process/src/transport/api-rest/things.api.ts
 import { z } from "zod";
 import type { AppRestSecurity } from "@langwatch/api/rest";
 

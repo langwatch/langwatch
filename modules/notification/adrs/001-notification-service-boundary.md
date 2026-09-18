@@ -79,6 +79,6 @@ package.
 The old unreferenced core notification implementation is removed. Enterprise
 Billing now consumes `@langwatch/notification-contract` for its durable record
 queries and composes the canonical PostgreSQL-backed service through
-`@langwatch/notification-server`; it does not copy the repository or construct
+`@langwatch/notification-process`; it does not copy the repository or construct
 it per request. The contract exposes only operations with real callers; it does
 not keep the old repository's unused identifier lookup.

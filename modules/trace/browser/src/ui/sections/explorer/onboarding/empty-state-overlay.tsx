@@ -1,0 +1,125 @@
+import { Box, Flex } from "@chakra-ui/react";
+import { OnboardingMeshBackground } from "@langwatch/onboarding-browser/surfaces/onboarding-mesh-background";
+import {
+  findStageDef,
+  type HeroLayout,
+} from "../../../../model/explorer/onboarding/chapters/onboarding-journey-config.ts";
+import { useEdgeGripAnchor } from "../../../../behavior/explorer/onboarding/use-edge-grip-anchor.ts";
+import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
+import { TracesEmptyOnboarding } from "./traces-empty-onboarding.tsx";
+
+/**
+ * Onboarding overlay rendered above the populated trace preview when the project hasn't
+ * received real traces yet.
+ */
+export const EmptyStateOverlay = () => {
+  const stage = useOnboardingStore((s) => s.stage);
+  const stageDef = findStageDef(stage);
+  const heroLayout: HeroLayout = stageDef.heroLayout ?? "centre";
+  // While the drawer is open (left layout) we anchor the hero
+  // halfway between the dashboard's left edge and the drawer's
+  // left edge — `useEdgeGripAnchor` returns the drawer's left
+  // X-coord live, so the hero stays centred in the *visible*
+  // canvas regardless of drawer width or resize.
+  const drawerLeftX = useEdgeGripAnchor(heroLayout === "left");
+  const heroFlexProps = layoutFlexProps(heroLayout, drawerLeftX);
+
+  // The drawer/sidebar glow `<style>` and the body data attribute
+  // that drives it both used to live in this component. They're now
+  // mounted by `OnboardingHost` so they're applied once per visit
+  // (rather than per overlay render) and don't ship to users who
+  // aren't in the journey at all.
+  return (
+    <>
+      {/* Settle: no mesh, no mask. The user sees the spans and the
+          surrounding chrome as-is for ~1.4s, so the page reads as a
+          real product they're looking at — not a marketing
+          sequence. Mesh + hero band fade in only when the welcome
+          typewriter starts. The outro chapter also drops the mesh
+          so the live table reads as the user's space, with only the
+          thin top banner left as onboarding chrome. */}
+      {stage !== "settle" && heroLayout !== "topBanner" && <OnboardingMeshBackground />}
+      {/* Hero band: full-width fade eased in over the settle → welcome transition, suppressed for
+          the topBanner layout so the live table stays visible behind the wrap-up strip. */}
+      <Flex
+        position="absolute"
+        inset={0}
+        align="center"
+        justify="center"
+        zIndex={1}
+        pointerEvents="none"
+        opacity={stage === "settle" || heroLayout === "topBanner" ? 0 : 1}
+        transition="opacity 0.7s ease-out"
+      >
+        <Box
+          width="full"
+          // `clamp` keeps the band tall enough to mask the hero + CTAs on short viewports without
+          // ballooning to half a metre of grey on very tall ones.
+          height={{
+            base: "clamp(420px, 62vh, 680px)",
+            md: "clamp(420px, 58vh, 680px)",
+          }}
+          css={{
+            background:
+              "linear-gradient(to bottom, transparent 0%, var(--chakra-colors-bg-muted) 22%, var(--chakra-colors-bg-muted) 78%, transparent 100%)",
+          }}
+        />
+      </Flex>
+      {/* Hero composition. The Flex container's align/justify shift
+          based on `heroLayout` so the hero re-anchors as the journey
+          enters the drawer-tour stages (left column) and the facets
+          stage (bottom-centre). The inner Box keeps pointer events
+          live just on the hero content; the rest of the overlay
+          passes clicks through to the table behind. */}
+      <Flex
+        position="absolute"
+        inset={0}
+        zIndex={2}
+        padding={4}
+        overflow="auto"
+        pointerEvents="none"
+        {...heroFlexProps}
+        transition="all 320ms cubic-bezier(0.16, 1, 0.3, 1)"
+      >
+        <Box pointerEvents="auto">
+          <TracesEmptyOnboarding />
+        </Box>
+      </Flex>
+    </>
+  );
+};
+
+function layoutFlexProps(layout: HeroLayout, drawerLeftX: number | null) {
+  if (layout === "left") {
+    // When the drawer is mounted we know its left X-coordinate.
+    if (drawerLeftX != null && typeof window !== "undefined") {
+      const viewportRight = window.innerWidth;
+      const paddingRightPx = Math.max(0, viewportRight - drawerLeftX);
+      return {
+        align: "center" as const,
+        justify: "center" as const,
+        paddingRight: `${paddingRightPx}px`,
+      };
+    }
+    return {
+      align: "center" as const,
+      justify: "flex-start" as const,
+      paddingLeft: { base: 4, md: 8, lg: 12 },
+    };
+  }
+  if (layout === "bottomCentre") {
+    return {
+      align: "flex-end" as const,
+      justify: "center" as const,
+      paddingBottom: { base: 8, md: 12 },
+    };
+  }
+  if (layout === "topBanner") {
+    return {
+      align: "flex-start" as const,
+      justify: "center" as const,
+      paddingTop: { base: 2, md: 3 },
+    };
+  }
+  return { align: "center" as const, justify: "center" as const };
+}

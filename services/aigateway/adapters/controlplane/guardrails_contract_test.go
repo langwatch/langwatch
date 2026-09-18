@@ -201,7 +201,7 @@ func controlPlaneRootFor(root string) string {
 // produce, so these are a named repo-root manifest and a package identity.
 const (
 	workspaceManifest   = "pnpm-workspace.yaml"
-	controlPlanePackage = "@langwatch/gateway-server"
+	controlPlanePackage = "@langwatch/gateway-process"
 )
 
 // readControlPlaneSource reads one control plane source file, or ends the test.

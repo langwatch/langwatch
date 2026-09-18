@@ -33,13 +33,13 @@ is canonical; the residual implementation does not define another owner.
 ## Public surfaces and transports
 
 The server root exposes process composition and services. REST and tRPC
-transports are imported through explicit `@langwatch/analytics-server/api-rest/*`
-and `@langwatch/analytics-server/api-trpc/*` exports, so a worker naming the
+transports are imported through explicit `@langwatch/analytics-process/api-rest/*`
+and `@langwatch/analytics-process/api-trpc/*` exports, so a worker naming the
 server root does not also load those handlers. The subpaths resolve to the
 same implementation files used by the API process.
 
 `@langwatch/analytics-contract` publishes Zod contracts. The server service is
-called from composed application transports. `@langwatch/analytics-web` accepts
+called from composed application transports. `@langwatch/analytics-browser` accepts
 controlled query, schema, toolbar, error, and chart render ports; it imports no
 application hooks or router clients.
 

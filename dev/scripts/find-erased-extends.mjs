@@ -61,11 +61,11 @@ export const findInSource = (src) => {
  */
 const FIXTURES = [
   { want: true, name: "inline type specifier in a value import",
-    src: `import { createTask, type StoredObjectsClickHouse } from "@langwatch/stored-object-server";\nclass TasksStoredObjectsClickHouse extends StoredObjectsClickHouse {\n  constructor() { super(); }\n}` },
+    src: `import { createTask, type StoredObjectsClickHouse } from "@langwatch/stored-object-process";\nclass TasksStoredObjectsClickHouse extends StoredObjectsClickHouse {\n  constructor() { super(); }\n}` },
   { want: true, name: "whole-clause type import",
-    src: `import type { IdentityEventing } from "@langwatch/identity-server";\nclass TasksIdentityEventing extends IdentityEventing {}` },
+    src: `import type { IdentityEventing } from "@langwatch/identity-process";\nclass TasksIdentityEventing extends IdentityEventing {}` },
   { want: false, name: "value import of the same name",
-    src: `import { IdentityEventing } from "@langwatch/identity-server";\nclass StubIdentityEventing extends IdentityEventing {}` },
+    src: `import { IdentityEventing } from "@langwatch/identity-process";\nclass StubIdentityEventing extends IdentityEventing {}` },
   { want: false, name: "generic constraint, not a heritage clause",
     src: `import type { Event } from "./events.ts";\nclass Pipeline<T extends Event> {\n  run(_e: T) {}\n}` },
 ];

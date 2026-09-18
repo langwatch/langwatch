@@ -553,7 +553,7 @@ door must be on `ApiKeyApp` before the service type splits under it).
 
 ## 6. Blast radius
 
-**`@langwatch/api-key-server`** — 9 source files and 1 test outside the feature:
+**`@langwatch/api-key-process`** — 9 source files and 1 test outside the feature:
 
 | File                                                                          | Symbols                                                                                          |
 | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
@@ -572,8 +572,8 @@ the `ApiKeyService` type and are what commit 5 touches, most notably
 `platform/app/src/server/api-key/auth-middleware.ts`,
 `platform/app/src/server/routes/auth-cli.ts`,
 `platform/app/src/server/app-layer/dependencies.ts`,
-`modules/langy/server/src/services/langy-session-key.service.ts`,
-`modules/project/server/src/app/project.app.ts`,
+`modules/langy/process/src/services/langy-session-key.service.ts`,
+`modules/project/process/src/app/project.app.ts`,
 `enterprise/packages/composition/api/src/governance/ingestion-key.adapter.ts` and
 `apps/api/src/app/api-key-rest-security.adapter.ts`. The remaining ~38 import only
 types, errors and the token/permission helpers, and are unaffected by every commit

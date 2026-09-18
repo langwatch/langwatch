@@ -31,7 +31,7 @@ and `/api/user-avatar/:projectId/:id` remain compatibility transports.
 ## Public surfaces and transports
 
 `@langwatch/user-contract` exports portable Zod 4 values, concrete errors, and
-the abstract `UserService`. `@langwatch/user-server` exports the composition
+the abstract `UserService`. `@langwatch/user-process` exports the composition
 adapter and service ports. The application retains the user tRPC router and
 avatar REST compatibility route as root-owned transports.
 

@@ -75,11 +75,11 @@ describe("ClickHouse table ownership", () => {
     it("reports a second module that reads it", () => {
       const workspace = fixture();
       workspace.write(
-        "modules/trace/server/src/repositories/clickhouse/trace-summary.repository.ts",
+        "modules/trace/process/src/repositories/clickhouse/trace-summary.repository.ts",
         writer("trace_summaries"),
       );
       workspace.write(
-        "modules/analytics/server/src/repositories/clickhouse/summary.mapper.ts",
+        "modules/analytics/process/src/repositories/clickhouse/summary.mapper.ts",
         reader("trace_summaries"),
       );
 
@@ -91,7 +91,7 @@ describe("ClickHouse table ownership", () => {
     it("accepts the owner reading its own table", () => {
       const workspace = fixture();
       workspace.write(
-        "modules/trace/server/src/repositories/clickhouse/trace-summary.repository.ts",
+        "modules/trace/process/src/repositories/clickhouse/trace-summary.repository.ts",
         `${writer("trace_summaries")}${reader("trace_summaries")}`,
       );
 
@@ -102,11 +102,11 @@ describe("ClickHouse table ownership", () => {
     it("ignores a table another module only names in its tests", () => {
       const workspace = fixture();
       workspace.write(
-        "modules/trace/server/src/repositories/clickhouse/trace-summary.repository.ts",
+        "modules/trace/process/src/repositories/clickhouse/trace-summary.repository.ts",
         writer("trace_summaries"),
       );
       workspace.write(
-        "modules/analytics/server/src/__tests__/summary.unit.test.ts",
+        "modules/analytics/process/src/__tests__/summary.unit.test.ts",
         reader("trace_summaries"),
       );
 
@@ -117,11 +117,11 @@ describe("ClickHouse table ownership", () => {
     it("resolves a table named by a file-level constant", () => {
       const workspace = fixture();
       workspace.write(
-        "modules/trace/server/src/repositories/clickhouse/trace-summary.repository.ts",
+        "modules/trace/process/src/repositories/clickhouse/trace-summary.repository.ts",
         writer("trace_summaries"),
       );
       workspace.write(
-        "modules/analytics/server/src/repositories/clickhouse/summary.mapper.ts",
+        "modules/analytics/process/src/repositories/clickhouse/summary.mapper.ts",
         `const TABLE_NAME = "trace_summaries" as const;
 export function query(): string {
   return \`SELECT TenantId FROM \${TABLE_NAME}\`;
@@ -138,16 +138,16 @@ export function query(): string {
     it("names both writers and the file the first claims it from", () => {
       const workspace = fixture();
       workspace.write(
-        "modules/analytics/server/src/repositories/clickhouse/summary.repository.ts",
+        "modules/analytics/process/src/repositories/clickhouse/summary.repository.ts",
         writer("trace_summaries"),
       );
       workspace.write(
-        "modules/trace/server/src/repositories/clickhouse/trace-summary.repository.ts",
+        "modules/trace/process/src/repositories/clickhouse/trace-summary.repository.ts",
         writer("trace_summaries"),
       );
 
       expect(workspace.messages()).toEqual([
-        "Table trace_summaries is written by trace and analytics (modules/analytics/server/src/repositories/clickhouse/summary.repository.ts). Keep a single module owner.",
+        "Table trace_summaries is written by trace and analytics (modules/analytics/process/src/repositories/clickhouse/summary.repository.ts). Keep a single module owner.",
       ]);
     });
   });
@@ -222,7 +222,7 @@ CREATE TABLE IF NOT EXISTS \${CLICKHOUSE_DATABASE}.trace_summaries_rebuild (Tena
     it("reports the row as stale and says to delete it", () => {
       const workspace = fixture();
       workspace.write(
-        "modules/trace/server/src/repositories/clickhouse/trace-summary.repository.ts",
+        "modules/trace/process/src/repositories/clickhouse/trace-summary.repository.ts",
         writer("trace_summaries"),
       );
       workspace.write(

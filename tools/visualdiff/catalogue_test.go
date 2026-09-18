@@ -12,8 +12,8 @@ import (
 const testCatalogue = `{
   "version": 0,
   "features": [
-    {"id": "analytics", "root": "analytics", "uses": {"screens": ["@langwatch/analytics-web/screens/analytics"], "surfaces": []}},
-    {"id": "annotations", "root": "annotation", "uses": {"screens": ["@langwatch/annotation-web/annotations"], "surfaces": []}}
+    {"id": "analytics", "root": "analytics", "uses": {"screens": ["@langwatch/analytics-browser/screens/analytics"], "surfaces": []}},
+    {"id": "annotations", "root": "annotation", "uses": {"screens": ["@langwatch/annotation-browser/annotations"], "surfaces": []}}
   ]
 }`
 

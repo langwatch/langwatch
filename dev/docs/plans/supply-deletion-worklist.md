@@ -29,9 +29,9 @@ and already in `BANNED_METHODS`
 call sites, 4 broken callers, all throwing `TypeError:
 createApp(...).withInfrastructure is not a function` (ran 3, confirmed; 4th
 needs Postgres, confirmed by source absence instead):
-`modules/presence/server/src/app/__tests__/presence-installation.unit.test.ts:23`,
-`modules/evaluation/server/src/app/__tests__/evaluation-installation.unit.test.ts:20`,
-`modules/stored-object/server/src/app/__tests__/stored-object-installation.unit.test.ts:14`,
+`modules/presence/process/src/app/__tests__/presence-installation.unit.test.ts:23`,
+`modules/evaluation/process/src/app/__tests__/evaluation-installation.unit.test.ts:20`,
+`modules/stored-object/process/src/app/__tests__/stored-object-installation.unit.test.ts:14`,
 `apps/worker/src/__tests__/codex-coding-defaults.integration.test.ts:121`.
 
 **`withPersistence`** - also already in `BANNED_METHODS` (rule line 37). 0
@@ -39,7 +39,7 @@ working call sites, 1 real broken caller:
 `apps/worker/src/__tests__/codex-coding-defaults.integration.test.ts:120`
 (same file, chained before `.withInfrastructure({})`). Two more textual hits
 are not calls: a stale comment
-(`enterprise/modules/governance/server/.../governance-repositories.registry.unit.test.ts:4`)
+(`enterprise/modules/governance/process/.../governance-repositories.registry.unit.test.ts:4`)
 and the pattern string inside a lint error message
 (`packages/architecture-enforcer/src/policies/feature-shape.ts:83`).
 

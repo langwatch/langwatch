@@ -13,8 +13,8 @@ Feature: Scenario judge reasoning and tool compatibility
   # playground, and workflow runtimes are not part of this failure.
   #
   # Bindings:
-  #   modules/scenario/server/src/adapters/litellm-model.adapter.ts
-  #   modules/scenario/server/tests/model.factory.unit.test.ts
+  #   modules/scenario/process/src/adapters/litellm-model.adapter.ts
+  #   modules/scenario/process/tests/model.factory.unit.test.ts
   #   modules/scenario/contract/src/scenario-infra-error.ts
 
   @unit

@@ -15,7 +15,7 @@ let root = "";
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "memory-twin-drift-"));
-  write("modules/widget/server/package.json", JSON.stringify({ name: "@langwatch/widget-server" }));
+  write("modules/widget/process/package.json", JSON.stringify({ name: "@langwatch/widget-server" }));
 });
 
 afterEach(() => {
@@ -28,9 +28,9 @@ function write(path: string, content: string): void {
   writeFileSync(absolute, content, "utf8");
 }
 
-const REPOSITORIES = "modules/widget/server/src/repositories";
+const REPOSITORIES = "modules/widget/process/src/repositories";
 
-const PACKAGE = "modules/widget/server";
+const PACKAGE = "modules/widget/process";
 
 const BASELINE = "packages/architecture-enforcer/src/memory-twin-drift-baseline.json";
 

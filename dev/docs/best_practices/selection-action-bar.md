@@ -48,7 +48,7 @@ Rules:
 
 ## Canonical examples
 
-- `@langwatch/trace-web`'s `ui/sections/explorer/toolbar/bulk-action-bar.tsx`
+- `@langwatch/trace-browser`'s `ui/sections/explorer/toolbar/bulk-action-bar.tsx`
   (traces: export + add-to-dataset, with select-all-matching)
-- `@langwatch/dataset-web`'s `ui/sections/datasets/editor/dataset-editor-table.tsx`
+- `@langwatch/dataset-browser`'s `ui/sections/datasets/editor/dataset-editor-table.tsx`
   (dataset detail page: delete selected rows, behind `floatingSelectionBar`)

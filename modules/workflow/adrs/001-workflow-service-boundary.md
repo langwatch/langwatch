@@ -68,7 +68,7 @@ Existing tRPC names and REST paths remain compatibility transports. The
 `/workflows/:id/evaluate` route remains an app-owned composition over Workflow
 version selection and Evaluation execution.
 
-The browser surface is `@langwatch/workflow-web`. It owns graph, field-edge,
+The browser surface is `@langwatch/workflow-browser`. It owns graph, field-edge,
 and Studio dataset transforms; templates; the node palette and default-edge
 registries; agent-node transforms; prompt, evaluator, and agent selection
 state transitions; the workflow Zustand store; browser LLM-node and code-agent

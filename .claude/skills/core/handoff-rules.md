@@ -47,7 +47,7 @@ Good:
 
 ```text
 Change the export route declaration back to `/api/trace-export` in
-modules/trace/server/src/transport/trace-export.rest.ts:41, then rerun only the
+modules/trace/process/src/transport/trace-export.rest.ts:41, then rerun only the
 trace REST integration test. Do not update the test to accept the new route -
 the route is the thing that regressed, not the test.
 ```

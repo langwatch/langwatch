@@ -48,7 +48,7 @@ export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps
     const marginTopProp =
       rest.marginTop ?? (contextMarginTop ? `${contextMarginTop}px` : undefined);
 
-    // THE LANGY CHOREOGRAPHY DID NOT TRAVEL: `@langwatch/langy-web` is
+    // THE LANGY CHOREOGRAPHY DID NOT TRAVEL: `@langwatch/langy-browser` is
     // ungoverned and needs a stylesheet this package won't adopt globally.
     // Without it a drawer opened in the studio slides under a docked panel
     // rather than beside it.

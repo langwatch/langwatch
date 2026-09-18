@@ -15,7 +15,7 @@ Feature: Governance visibility rides a single feature flag
   operators control it. The default lives in
   `modules/feature-flag/contract/src/feature-flag-registry.ts`; frontend exposure in
   `modules/feature-flag/contract/src/frontend-feature-flags.ts`; the CLI
-  device-login gate in `modules/auth/server/src/transport/api-rest/auth-cli-device-flow.api.ts`
+  device-login gate in `modules/auth/process/src/transport/api-rest/auth-cli-device-flow.api.ts`
   (ADR-038 Decision 7 pins the registry default and the gate fallback as
   a pair that moves together).
 

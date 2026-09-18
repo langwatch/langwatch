@@ -70,7 +70,7 @@ const workspacePackages = () => {
   return names;
 };
 
-/** `@langwatch/trace-server/composition/x` -> `@langwatch/trace-server`. */
+/** `@langwatch/trace-process/composition/x` -> `@langwatch/trace-process`. */
 const packageOf = (specifier) => specifier.split("/").slice(0, 2).join("/");
 
 /**
@@ -228,22 +228,22 @@ const FIXTURES = [
   { want: "TYPE-ONLY", name: "an interface imported in value position",
     sources: new Map([
       ["pkg.ts", "export interface GovernanceEncryptor { encrypt(v: string): string }"],
-      ["use.ts", 'import { GovernanceEncryptor } from "@langwatch/enterprise-governance-server";'],
+      ["use.ts", 'import { GovernanceEncryptor } from "@langwatch/enterprise-governance-process";'],
     ]) },
   { want: "ABSENT", name: "a name nothing declares",
     sources: new Map([
       ["pkg.ts", "export interface GovernanceDiagnosticsSink { warn(m: string): void }"],
-      ["use.ts", 'import { GovernanceDiagnostics } from "@langwatch/enterprise-governance-server";'],
+      ["use.ts", 'import { GovernanceDiagnostics } from "@langwatch/enterprise-governance-process";'],
     ]) },
   { want: null, name: "a real class import",
     sources: new Map([
       ["pkg.ts", "export class IngestionPullWorkerService {}"],
-      ["use.ts", 'import { IngestionPullWorkerService } from "@langwatch/enterprise-governance-server";'],
+      ["use.ts", 'import { IngestionPullWorkerService } from "@langwatch/enterprise-governance-process";'],
     ]) },
   { want: null, name: "an already type-only specifier",
     sources: new Map([
       ["pkg.ts", "export interface IngestionPullSource { id: string }"],
-      ["use.ts", 'import { type IngestionPullSource } from "@langwatch/enterprise-governance-server";'],
+      ["use.ts", 'import { type IngestionPullSource } from "@langwatch/enterprise-governance-process";'],
     ]) },
   // A published catalog dependency in the @langwatch scope. Its exports live in
   // node_modules, so a scan of tracked sources cannot see them — reporting it
@@ -251,26 +251,26 @@ const FIXTURES = [
   // here because the first version did exactly that, for every `generate` import
   // from @langwatch/ksuid in the tree.
   { want: null, name: "an import from a published (non-workspace) @langwatch package",
-    workspace: new Set(["@langwatch/enterprise-governance-server"]),
+    workspace: new Set(["@langwatch/enterprise-governance-process"]),
     sources: new Map([["use.ts", 'import { generate } from "@langwatch/ksuid";']]) },
   // Declared, exported from its own file, and omitted from the package entry's
   // re-export list. `CodexAccountService` was exactly this and no declaration
   // scan could see it.
   { want: "NOT-EXPORTED", name: "a class the package's entry does not re-export",
-    workspace: new Set(["@langwatch/model-provider-server"]),
-    surfaces: new Map([["@langwatch/model-provider-server", new Set(["SomethingElse"])]]),
+    workspace: new Set(["@langwatch/model-provider-process"]),
+    surfaces: new Map([["@langwatch/model-provider-process", new Set(["SomethingElse"])]]),
     sources: new Map([
       ["svc.ts", "export class CodexAccountService {}"],
-      ["use.ts", 'import { CodexAccountService } from "@langwatch/model-provider-server";'],
+      ["use.ts", 'import { CodexAccountService } from "@langwatch/model-provider-process";'],
     ]) },
   // The same package with the name on its surface must stay silent — the guard
   // against a surface that comes back empty and condemns the whole tree.
   { want: null, name: "a class the package's entry does re-export",
-    workspace: new Set(["@langwatch/model-provider-server"]),
-    surfaces: new Map([["@langwatch/model-provider-server", new Set(["CodexAccountService"])]]),
+    workspace: new Set(["@langwatch/model-provider-process"]),
+    surfaces: new Map([["@langwatch/model-provider-process", new Set(["CodexAccountService"])]]),
     sources: new Map([
       ["svc.ts", "export class CodexAccountService {}"],
-      ["use.ts", 'import { CodexAccountService } from "@langwatch/model-provider-server";'],
+      ["use.ts", 'import { CodexAccountService } from "@langwatch/model-provider-process";'],
     ]) },
 ];
 

@@ -31,7 +31,7 @@ export type BatchEvaluationRESTParams = z.infer<typeof batchEvaluationInputSchem
 
 /**
  * The body an evaluate door parses.
- * Schema declared here, not imported from @langwatch/evaluator-web, per value-import boundary.
+ * Schema declared here, not imported from @langwatch/evaluator-browser, per value-import boundary.
  */
 export const evaluationInputSchema = z.object({
   trace_id: z.string().optional().nullable(),

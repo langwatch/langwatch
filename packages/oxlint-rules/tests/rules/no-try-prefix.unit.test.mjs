@@ -8,8 +8,8 @@ const workspace = createFixtureWorkspace({
 
 afterAll(() => workspace.cleanup());
 
-const PORT = "modules/agent/server/src/ports/agent.port.ts";
-const SERVICE = "modules/agent/server/src/services/agent.service.ts";
+const PORT = "modules/agent/process/src/ports/agent.port.ts";
+const SERVICE = "modules/agent/process/src/services/agent.service.ts";
 const API = "modules/agent/contract/src/agent.api.ts";
 
 function report(code, filename = PORT) {

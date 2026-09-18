@@ -59,21 +59,21 @@ Keeping a Date-compatible public facade would leave a partial conversion.
 
 ## Confirmed changes required outside this lane
 
-- `modules/scenario/web/src/behavior/agent-testing/use-scenario-period.ts:10`
+- `modules/scenario/browser/src/behavior/agent-testing/use-scenario-period.ts:10`
   converts instants to Date before calling analytics `setPeriod`.
-- `modules/scenario/web/src/ui/elements/agent-testing/shared/period-picker.tsx:64`
+- `modules/scenario/browser/src/ui/elements/agent-testing/shared/period-picker.tsx:64`
   calls `fromDate` on analytics picker callback values.
-- `modules/scenario/web/src/behavior/agent-testing/results/use-run-plans.ts:27`
+- `modules/scenario/browser/src/behavior/agent-testing/results/use-run-plans.ts:27`
   and `:28` call `.getTime()` on analytics period fields.
-- `modules/scenario/web/src/behavior/agent-testing/results/use-run-plan-batches.ts:35`
+- `modules/scenario/browser/src/behavior/agent-testing/results/use-run-plan-batches.ts:35`
   and `use-widen-window-for-plan.ts:29` do the same.
-- `modules/scenario/web/src/ui/sections/agent-testing/cases/__tests__/suites-rail.integration.test.tsx:66`
+- `modules/scenario/browser/src/ui/sections/agent-testing/cases/__tests__/suites-rail.integration.test.tsx:66`
   passes `new Date()` to exported `computeRelativeWindow`.
-- `modules/dashboard/server/src/services/__tests__/saved-workbench-chart-run.unit.test.ts`
+- `modules/dashboard/process/src/services/__tests__/saved-workbench-chart-run.unit.test.ts`
   defines `WEEK` with Dates and supplies it to saved-chart execution.
 - `modules/dashboard/contract/src/saved-workbench-chart.trpc.ts:76` consumes the
   LWQL schema; its app and transport carry the same window through to Analytics.
-- `modules/evaluation/server/src/eventing/evaluation-analytics-rollup.projection.ts`
+- `modules/evaluation/process/src/eventing/evaluation-analytics-rollup.projection.ts`
   owns rollup bucket production; its `ClickHouseMoment` must be checked against
   the converted Analytics rollup schema in the same slice.
 
@@ -195,34 +195,34 @@ vocabulary and display labels in this inventory are not conversion targets.
 
 - `modules/dashboard/contract/src/dashboard.api.ts`
 - `modules/dashboard/contract/src/saved-workbench-chart.trpc.ts`
-- `modules/dashboard/server/src/app/dashboard.app.ts`
-- `modules/evaluator/web/src/ui/sections/checks/try-it-out.tsx`
-- `modules/project/web/src/ui/sections/home/components/__tests__/traces-overview.integration.test.tsx`
-- `modules/project/web/src/ui/sections/home/components/traces-overview.tsx`
-- `modules/scenario/web/src/behavior/agent-testing/results/use-run-plan-batches.ts`
-- `modules/scenario/web/src/behavior/agent-testing/results/use-run-plans.ts`
-- `modules/scenario/web/src/behavior/agent-testing/results/use-widen-window-for-plan.ts`
-- `modules/scenario/web/src/behavior/agent-testing/use-scenario-period.ts`
-- `modules/scenario/web/src/ui/elements/agent-testing/shared/period-picker.tsx`
-- `modules/scenario/web/src/ui/sections/agent-testing/cases/__tests__/case-filing.integration.test.tsx`
-- `modules/scenario/web/src/ui/sections/agent-testing/cases/__tests__/case-modal.integration.test.tsx`
-- `modules/scenario/web/src/ui/sections/agent-testing/cases/__tests__/suites-rail.integration.test.tsx`
-- `modules/scenario/web/src/ui/sections/agent-testing/cases/case-recent-runs-button.tsx`
-- `modules/scenario/web/src/ui/sections/agent-testing/cases/cases-panel.tsx`
-- `modules/scenario/web/src/ui/sections/agent-testing/cases/cases-table.tsx`
-- `modules/scenario/web/src/ui/sections/agent-testing/cases/recent-runs-menu.tsx`
-- `modules/scenario/web/src/ui/sections/agent-testing/cases/suite-rail-menu.tsx`
-- `modules/scenario/web/src/ui/sections/agent-testing/cases/suite-rail.tsx`
-- `modules/scenario/web/src/ui/sections/agent-testing/cases/use-suite-recent-runs.ts`
-- `modules/scenario/web/src/ui/sections/agent-testing/cases/use-test-cases-data.ts`
-- `modules/scenario/web/src/ui/sections/agent-testing/cases/use-test-cases-tab.ts`
-- `modules/scenario/web/src/ui/sections/agent-testing/cases/use-test-cases-view.ts`
-- `modules/scenario/web/src/ui/sections/agent-testing/results/results-filter-row.tsx`
-- `modules/scenario/web/src/ui/sections/agent-testing/results/results-list.tsx`
-- `modules/scenario/web/src/ui/sections/agent-testing/results/run-plan-detail.tsx`
-- `modules/scenario/web/src/ui/sections/agent-testing/results/run-plan-results-states.tsx`
-- `modules/scenario/web/src/ui/sections/agent-testing/results/use-result-groups.ts`
-- `modules/scenario/web/src/ui/sections/suites/external-set-detail-panel.tsx`
-- `modules/scenario/web/src/ui/sections/suites/run-history-panel.tsx`
-- `modules/scenario/web/src/ui/sections/suites/simulations-page.tsx`
-- `modules/scenario/web/src/ui/sections/suites/suite-detail-panel.tsx`
+- `modules/dashboard/process/src/app/dashboard.app.ts`
+- `modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx`
+- `modules/project/browser/src/ui/sections/home/components/__tests__/traces-overview.integration.test.tsx`
+- `modules/project/browser/src/ui/sections/home/components/traces-overview.tsx`
+- `modules/scenario/browser/src/behavior/agent-testing/results/use-run-plan-batches.ts`
+- `modules/scenario/browser/src/behavior/agent-testing/results/use-run-plans.ts`
+- `modules/scenario/browser/src/behavior/agent-testing/results/use-widen-window-for-plan.ts`
+- `modules/scenario/browser/src/behavior/agent-testing/use-scenario-period.ts`
+- `modules/scenario/browser/src/ui/elements/agent-testing/shared/period-picker.tsx`
+- `modules/scenario/browser/src/ui/sections/agent-testing/cases/__tests__/case-filing.integration.test.tsx`
+- `modules/scenario/browser/src/ui/sections/agent-testing/cases/__tests__/case-modal.integration.test.tsx`
+- `modules/scenario/browser/src/ui/sections/agent-testing/cases/__tests__/suites-rail.integration.test.tsx`
+- `modules/scenario/browser/src/ui/sections/agent-testing/cases/case-recent-runs-button.tsx`
+- `modules/scenario/browser/src/ui/sections/agent-testing/cases/cases-panel.tsx`
+- `modules/scenario/browser/src/ui/sections/agent-testing/cases/cases-table.tsx`
+- `modules/scenario/browser/src/ui/sections/agent-testing/cases/recent-runs-menu.tsx`
+- `modules/scenario/browser/src/ui/sections/agent-testing/cases/suite-rail-menu.tsx`
+- `modules/scenario/browser/src/ui/sections/agent-testing/cases/suite-rail.tsx`
+- `modules/scenario/browser/src/ui/sections/agent-testing/cases/use-suite-recent-runs.ts`
+- `modules/scenario/browser/src/ui/sections/agent-testing/cases/use-test-cases-data.ts`
+- `modules/scenario/browser/src/ui/sections/agent-testing/cases/use-test-cases-tab.ts`
+- `modules/scenario/browser/src/ui/sections/agent-testing/cases/use-test-cases-view.ts`
+- `modules/scenario/browser/src/ui/sections/agent-testing/results/results-filter-row.tsx`
+- `modules/scenario/browser/src/ui/sections/agent-testing/results/results-list.tsx`
+- `modules/scenario/browser/src/ui/sections/agent-testing/results/run-plan-detail.tsx`
+- `modules/scenario/browser/src/ui/sections/agent-testing/results/run-plan-results-states.tsx`
+- `modules/scenario/browser/src/ui/sections/agent-testing/results/use-result-groups.ts`
+- `modules/scenario/browser/src/ui/sections/suites/external-set-detail-panel.tsx`
+- `modules/scenario/browser/src/ui/sections/suites/run-history-panel.tsx`
+- `modules/scenario/browser/src/ui/sections/suites/simulations-page.tsx`
+- `modules/scenario/browser/src/ui/sections/suites/suite-detail-panel.tsx`

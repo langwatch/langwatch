@@ -8,7 +8,7 @@ const workspace = createFixtureWorkspace({
 
 afterAll(() => workspace.cleanup());
 
-const SERVICE = "modules/agent/server/src/services/agent.service.ts";
+const SERVICE = "modules/agent/process/src/services/agent.service.ts";
 
 /** A deep chain that also combines, which is what the rule reports. */
 const DEEP_AND_COMBINING =
@@ -119,7 +119,7 @@ describe("given a strict feature service module", () => {
       const found = runRule(conditionShapeRule, {
         code: DEEP_AND_COMBINING,
         cwd: workspace.cwd,
-        filename: "modules/agent/server/src/services/invented.service.ts",
+        filename: "modules/agent/process/src/services/invented.service.ts",
         options: [],
       });
 

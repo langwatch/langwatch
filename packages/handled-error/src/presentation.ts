@@ -2487,7 +2487,7 @@ const presentations = {
       "This is your last way in, or the last one we could reach you at. Add a verified email address first, then remove this one.",
   },
   // better-auth's own code, raised by the passkey-removal guard in
-  // `modules/identity/server/src/services/better-auth-identity-storage.service.ts`
+  // `modules/identity/process/src/services/better-auth-identity-storage.service.ts`
   // on the mounted `/passkey/delete-passkey` route, which is not translated
   // into one of our own subclasses. See `app-codes.ts` for why it is spelled
   // SCREAMING_CASE rather than our usual snake_case.

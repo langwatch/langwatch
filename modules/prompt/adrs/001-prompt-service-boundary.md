@@ -18,10 +18,10 @@ behaviour, not independent features.
 - `@langwatch/prompt-contract` owns portable Zod 4 schemas, values, errors,
   shorthand parsing, trace-attribute parsing, and the abstract Prompt service
   capability. It has no app, Prisma, tRPC, Hono, React, or environment imports.
-- `@langwatch/prompt-server` owns the implementation, private repository port,
+- `@langwatch/prompt-process` owns the implementation, private repository port,
   and persistence adapters. Generated Prisma records remain inside those
   adapters.
-- `@langwatch/prompt-web` owns browser-safe Prompt presentation helpers and
+- `@langwatch/prompt-browser` owns browser-safe Prompt presentation helpers and
   components. It receives data and callbacks from app composition.
 
 The app constructs one Prompt service. Existing tRPC procedures and

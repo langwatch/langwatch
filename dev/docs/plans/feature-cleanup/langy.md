@@ -356,7 +356,7 @@ fixed in the same pass.
 
 `web/src/index.ts:1` re-exports the entire contract package; lines 2-77 re-export
 every behaviour, component, hook and store module. Every one of the 173
-importers outside the package imports the bare specifier `@langwatch/langy-web`
+importers outside the package imports the bare specifier `@langwatch/langy-browser`
 — not one uses a subpath — so the barrel is load-bearing today, but nothing
 records which of its several hundred symbols anyone actually needs.
 
@@ -787,7 +787,7 @@ async ensureWorkerCredentials(args: {
   file path" rot, and it should be corrected in commit 6.
 
   `CLAUDE.md`'s frontend-boundary note still lists
-  `modules/langy/server/src/streaming/langy-turn-relay.ts` among the
+  `modules/langy/process/src/streaming/langy-turn-relay.ts` among the
   imports that predate the guard. That entry is stale and should be dropped —
   the enforcing test, `platform/app/src/server/__tests__/frontend-boundary.unit.test.ts`,
   walks the real graph, so nothing has regressed; only the prose is out of date.
@@ -855,9 +855,9 @@ Non-test files outside `modules/langy/` that import each package:
 
 | package                     | importers |
 | --------------------------- | --------- |
-| `@langwatch/langy-web`      | 93        |
+| `@langwatch/langy-browser`      | 93        |
 | `@langwatch/langy-contract` | 49        |
-| `@langwatch/langy-server`   | 17        |
+| `@langwatch/langy-process`   | 17        |
 
 The 17 server importers:
 

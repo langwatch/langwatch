@@ -27,7 +27,7 @@ describe("given a REST transport file", () => {
           '  .post("/agents", "createAgent")\n' +
           "  .withInput(z.object({ name: z.string() }))\n" +
           "  .handle(() => {});",
-        "modules/agent/server/src/transport/agent.rest.ts",
+        "modules/agent/process/src/transport/agent.rest.ts",
       );
 
       expect(found.map((entry) => entry.messageId)).toEqual(["inlineSchema"]);
@@ -40,7 +40,7 @@ describe("given a REST transport file", () => {
     it("reports inlineSchema", () => {
       const found = report(
         'import { z } from "zod";\nconst kinds = z.enum(["a", "b"]);',
-        "modules/agent/server/src/transport/agent.rest.ts",
+        "modules/agent/process/src/transport/agent.rest.ts",
       );
 
       expect(found.map((entry) => entry.messageId)).toEqual(["inlineSchema"]);
@@ -52,7 +52,7 @@ describe("given a REST transport file", () => {
     it("reports nothing", () => {
       const found = report(
         'import { z } from "./local-zod-lookalike.ts";\nconst shape = z.object({});',
-        "modules/agent/server/src/transport/agent.rest.ts",
+        "modules/agent/process/src/transport/agent.rest.ts",
       );
 
       expect(found).toEqual([]);
@@ -68,7 +68,7 @@ describe("given a REST transport file", () => {
           "  const shape = z.object({ name: z.string() });\n" +
           "  return shape;\n" +
           "});",
-        "modules/agent/server/src/transport/agent.rest.ts",
+        "modules/agent/process/src/transport/agent.rest.ts",
       );
 
       expect(found).toEqual([]);
@@ -80,7 +80,7 @@ describe("given a REST transport file", () => {
     it("reports nothing", () => {
       const found = report(
         'import { createAgentSchema } from "@langwatch/agent-contract";',
-        "modules/agent/server/src/transport/agent.rest.ts",
+        "modules/agent/process/src/transport/agent.rest.ts",
       );
 
       expect(found).toEqual([]);
@@ -92,7 +92,7 @@ describe("given a REST transport file", () => {
     it("reports foreignContract", () => {
       const found = report(
         'import { experimentSummarySchema } from "@langwatch/experiment-contract";',
-        "modules/agent/server/src/transport/agent.rest.ts",
+        "modules/agent/process/src/transport/agent.rest.ts",
       );
 
       expect(found.map((entry) => entry.messageId)).toEqual(["foreignContract"]);
@@ -105,7 +105,7 @@ describe("given a REST transport file", () => {
     it("reports foreignContract", () => {
       const found = report(
         'import { x } from "@langwatch/experiment-contract/experiment-schemas";',
-        "modules/agent/server/src/transport/agent.rest.ts",
+        "modules/agent/process/src/transport/agent.rest.ts",
       );
 
       expect(found.map((entry) => entry.messageId)).toEqual(["foreignContract"]);
@@ -115,7 +115,7 @@ describe("given a REST transport file", () => {
   describe("when it imports from an unrelated non-contract package", () => {
     /** @scenario "Importing an unrelated non-contract package is not this rule's business" */
     it("reports nothing", () => {
-      const found = report('import { z } from "zod";', "modules/agent/server/src/transport/agent.rest.ts");
+      const found = report('import { z } from "zod";', "modules/agent/process/src/transport/agent.rest.ts");
 
       expect(found).toEqual([]);
     });
@@ -128,7 +128,7 @@ describe("given a server file outside transport", () => {
     it("reports nothing", () => {
       const found = report(
         'import { z } from "zod"; const shape = z.object({ id: z.string() });',
-        "modules/agent/server/src/services/agent.service.ts",
+        "modules/agent/process/src/services/agent.service.ts",
       );
 
       expect(found).toEqual([]);

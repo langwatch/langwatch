@@ -31,10 +31,10 @@ const declarations = (native) => {
     drawers: tree.drawers.filter((drawer) => drawer.owner === id).map((drawer) => drawer.name),
     publishes:
       id === "organization"
-        ? ["@langwatch/organization-web/surfaces/personal-workspace-features"]
+        ? ["@langwatch/organization-browser/surfaces/personal-workspace-features"]
         : [],
     mounts: ["annotation", "user"].includes(id)
-      ? ["@langwatch/organization-web/surfaces/personal-workspace-features"]
+      ? ["@langwatch/organization-browser/surfaces/personal-workspace-features"]
       : [],
   }));
 };
@@ -75,23 +75,23 @@ const cases = [
         ? { ...entry, publishes: [...entry.publishes, ...entry.publishes] }
         : entry,
     ),
-    'duplicate surface publication "@langwatch/organization-web/surfaces/personal-workspace-features"',
+    'duplicate surface publication "@langwatch/organization-browser/surfaces/personal-workspace-features"',
   ],
   [
     "foreign-publisher",
     base.map((entry) =>
-      entry.id === "user" ? { ...entry, publishes: ["@langwatch/project-web/pretend"] } : entry,
+      entry.id === "user" ? { ...entry, publishes: ["@langwatch/project-browser/pretend"] } : entry,
     ),
-    'module "user" cannot publish "@langwatch/project-web/pretend"',
+    'module "user" cannot publish "@langwatch/project-browser/pretend"',
   ],
   [
     "unpublished-mount",
     base.map((entry) =>
       entry.id === "user"
-        ? { ...entry, mounts: ["@langwatch/organization-web/not-published"] }
+        ? { ...entry, mounts: ["@langwatch/organization-browser/not-published"] }
         : entry,
     ),
-    'unpublished surface "@langwatch/organization-web/not-published"',
+    'unpublished surface "@langwatch/organization-browser/not-published"',
   ],
 ];
 try {

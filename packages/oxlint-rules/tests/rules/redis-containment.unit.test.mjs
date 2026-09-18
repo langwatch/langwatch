@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { redisContainmentRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
-const SERVICE = "modules/agent/server/src/services/agent.service.ts";
+const SERVICE = "modules/agent/process/src/services/agent.service.ts";
 
 const workspace = createFixtureWorkspace({
   features: { agent: { layoutVersion: 0, roles: { server: {} } } },
@@ -66,7 +66,7 @@ describe("given a feature package file", () => {
       expect(
         ids(
           'import Redis from "ioredis";',
-          "modules/agent/server/src/repositories/redis/redis.agent.repository.ts",
+          "modules/agent/process/src/repositories/redis/redis.agent.repository.ts",
         ),
       ).toEqual([]);
     });
@@ -78,7 +78,7 @@ describe("given a feature package file", () => {
       expect(
         ids(
           'import Redis from "ioredis";',
-          "modules/agent/server/src/adapters/redis.agent.adapter.ts",
+          "modules/agent/process/src/adapters/redis.agent.adapter.ts",
         ),
       ).toEqual([]);
     });
@@ -90,7 +90,7 @@ describe("given a feature package file", () => {
       expect(
         ids(
           'import Redis from "ioredis";',
-          "modules/agent/server/src/adapters/postgres.agent.adapter.ts",
+          "modules/agent/process/src/adapters/postgres.agent.adapter.ts",
         ),
       ).toEqual(["redisClient"]);
     });
@@ -116,7 +116,7 @@ describe("given a composition root", () => {
       expect(
         ids(
           'import Redis from "ioredis";',
-          "modules/agent/server/src/app/agent-composition.build.ts",
+          "modules/agent/process/src/app/agent-composition.build.ts",
         ),
       ).toEqual([]);
     });
@@ -221,7 +221,7 @@ describe("given a file outside the governed source", () => {
       expect(
         ids(
           'import Redis from "ioredis";',
-          "modules/agent/server/src/__tests__/agent.unit.test.ts",
+          "modules/agent/process/src/__tests__/agent.unit.test.ts",
         ),
       ).toEqual([]);
     });

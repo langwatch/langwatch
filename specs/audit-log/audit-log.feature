@@ -99,7 +99,7 @@ Feature: Unified Audit Log
   # Read path — /settings/audit-log shows merged stream
   # ──────────────────────────────────────────────────────────────────────────
   #
-  # The page is `@langwatch/organization-web`'s `audit-log.screen.tsx`, and
+  # The page is `@langwatch/organization-browser`'s `audit-log.screen.tsx`, and
   # since the settings S7 move it has a render suite: the scenarios below
   # without `@unimplemented` are bound there. The ones that keep the tag need a
   # seeded multi-row history the screen suite does not build.

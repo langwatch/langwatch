@@ -30,7 +30,7 @@ Create a core Entitlements feature with two physical packages:
 ```text
 modules/entitlement/
 ├── contract/                 # @langwatch/entitlement-contract
-├── server/                   # @langwatch/entitlement-server
+├── server/                   # @langwatch/entitlement-process
 ├── adrs/
 └── specs/
 ```

@@ -2,7 +2,7 @@ import {
   EventingAuthzCommandDispatcherAdapter,
   KsuidAuthzBindingIdAdapter,
   PostgresAuthzAdapter,
-} from "@langwatch/authz-server";
+} from "@langwatch/authz-process";
 import { parseRoutingTable } from "@langwatch/clickhouse-client";
 import {
   createEventingGroupQueueFactory,
@@ -16,12 +16,12 @@ import {
   IdentityProducerPipelinesAdapter,
   PostgresIdentityNewbornSweepAdapter,
   PostgresIdentityUserMigrationsAdapter,
-} from "@langwatch/identity-server";
+} from "@langwatch/identity-process";
 import {
   OpsSystemMigrations,
   RoutingTableOrganizationDataplaneAdapter,
   SystemMigrationsPassTask,
-} from "@langwatch/ops-server";
+} from "@langwatch/ops-process";
 import { RedisConnectionService, RedisShutdownService } from "@langwatch/redis-client";
 import type { SystemMigration } from "@langwatch/system-migrations";
 

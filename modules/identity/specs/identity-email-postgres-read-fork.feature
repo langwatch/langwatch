@@ -5,7 +5,7 @@ Feature: The identifier email read fork composes from a Prisma client alone
 
   # WHY THIS EXISTS
   #
-  # `IdentityEmailService` has lived in `@langwatch/identity-server` since
+  # `IdentityEmailService` has lived in `@langwatch/identity-process` since
   # ADR-101 §5, but nothing outside the platform application could construct
   # one: its two collaborators — the `Identifier` projection reads and the
   # per-user latch — had exactly one implementation each, and both were the

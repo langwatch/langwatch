@@ -17,7 +17,7 @@ describe("given a module source file", () => {
     it("reports portVocabulary", () => {
       const found = report(
         "export interface AgentNormalizePort { normalize(): void; }",
-        "modules/agent/server/src/app/agent.app.ts",
+        "modules/agent/process/src/app/agent.app.ts",
       );
 
       expect(found).toHaveLength(1);
@@ -30,7 +30,7 @@ describe("given a module source file", () => {
     it("reports portVocabulary", () => {
       const found = report(
         "export class AgentSpendPort {}",
-        "modules/agent/server/src/services/agent-spend.service.ts",
+        "modules/agent/process/src/services/agent-spend.service.ts",
       );
 
       expect(found).toHaveLength(1);
@@ -42,7 +42,7 @@ describe("given a module source file", () => {
     it("reports portVocabulary", () => {
       const found = report(
         "import type { UiRpcPort } from './ui-rpc.ts';",
-        "modules/agent/server/src/services/agent.service.ts",
+        "modules/agent/process/src/services/agent.service.ts",
       );
 
       expect(found.some((finding) => finding.data.name === "UiRpcPort")).toBe(true);
@@ -53,7 +53,7 @@ describe("given a module source file", () => {
     it("reports portVocabulary", () => {
       const found = report(
         "export { AgentClock } from './ports/agent-clock.port.ts';",
-        "modules/agent/server/src/index.ts",
+        "modules/agent/process/src/index.ts",
       );
 
       expect(found.some((finding) => finding.messageId === "portVocabulary")).toBe(true);
@@ -64,7 +64,7 @@ describe("given a module source file", () => {
     it("reports portFile", () => {
       const found = report(
         "export const nothing = 1;",
-        "modules/agent/server/src/ports/agent.port.ts",
+        "modules/agent/process/src/ports/agent.port.ts",
       );
 
       expect(found.some((finding) => finding.messageId === "portFile")).toBe(true);
@@ -77,7 +77,7 @@ describe("given source that names a network port or a word containing port", () 
     it("reports nothing", () => {
       const found = report(
         "const freePort = 5560; export const chosenPort = freePort;",
-        "modules/agent/server/src/services/agent.service.ts",
+        "modules/agent/process/src/services/agent.service.ts",
       );
 
       expect(found).toHaveLength(0);
@@ -88,7 +88,7 @@ describe("given source that names a network port or a word containing port", () 
     it("reports nothing", () => {
       const found = report(
         "import { RestTransportRoute } from '@langwatch/api';\nexport function reportSupport() { return RestTransportRoute; }",
-        "modules/agent/server/src/services/agent.service.ts",
+        "modules/agent/process/src/services/agent.service.ts",
       );
 
       expect(found).toHaveLength(0);

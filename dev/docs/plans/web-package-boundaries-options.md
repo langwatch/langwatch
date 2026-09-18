@@ -206,7 +206,7 @@ Two supporting observations:
   suite-web entries (and agent-web's `agent-editors`/`agent-client`/
   `agent-http-editor`) under `uses.surfaces`. The findings exist because both
   allowlist mechanisms key on the *frontend feature root* (`simulations`), and
-  no catalogue feature has root `scenario` — so `modules/scenario/web` can
+  no catalogue feature has root `scenario` — so `modules/scenario/browser` can
   never be allowlisted for the same imports as the mechanism stands. The
   module-level sibling of an already-approved host-level dependency is what is
   red.

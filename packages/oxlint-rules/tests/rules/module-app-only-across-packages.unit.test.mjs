@@ -20,8 +20,8 @@ describe("given a file outside a module's server package", () => {
     /** @scenario "Importing a repository and a service across packages is banned" */
     it("reports reachThroughApi for each disallowed identifier", () => {
       const found = report(
-        'import { PrismaDepartmentRepository, DepartmentService } from "@langwatch/enterprise-governance-server";',
-        "modules/department/server/src/app/department.app.ts",
+        'import { PrismaDepartmentRepository, DepartmentService } from "@langwatch/enterprise-governance-process";',
+        "modules/department/process/src/app/department.app.ts",
       );
 
       expect(found).toHaveLength(2);
@@ -38,8 +38,8 @@ describe("given a file outside a module's server package", () => {
     /** @scenario "Importing the installer across packages is allowed" */
     it("reports nothing", () => {
       const found = report(
-        'import { GovernanceServer } from "@langwatch/enterprise-governance-server";',
-        "modules/department/server/src/app/department.app.ts",
+        'import { GovernanceServer } from "@langwatch/enterprise-governance-process";',
+        "modules/department/process/src/app/department.app.ts",
       );
 
       expect(found).toEqual([]);
@@ -50,8 +50,8 @@ describe("given a file outside a module's server package", () => {
     /** @scenario "Importing a transport declaration across packages is allowed" */
     it("reports nothing", () => {
       const found = report(
-        'import { governanceTrpc } from "@langwatch/enterprise-governance-server";',
-        "modules/department/server/src/app/department.app.ts",
+        'import { governanceTrpc } from "@langwatch/enterprise-governance-process";',
+        "modules/department/process/src/app/department.app.ts",
       );
 
       expect(found).toEqual([]);
@@ -62,8 +62,8 @@ describe("given a file outside a module's server package", () => {
     /** @scenario "A type-only Infrastructure import across packages is allowed" */
     it("reports nothing", () => {
       const found = report(
-        'import type { GovernanceInfrastructure } from "@langwatch/enterprise-governance-server";',
-        "modules/department/server/src/app/department.app.ts",
+        'import type { GovernanceInfrastructure } from "@langwatch/enterprise-governance-process";',
+        "modules/department/process/src/app/department.app.ts",
       );
 
       expect(found).toEqual([]);
@@ -74,8 +74,8 @@ describe("given a file outside a module's server package", () => {
     /** @scenario "A fixture import outside a test file is banned" */
     it("reports reachThroughApi", () => {
       const found = report(
-        'import { GovernanceFixture } from "@langwatch/enterprise-governance-server";',
-        "modules/department/server/src/app/department.app.ts",
+        'import { GovernanceFixture } from "@langwatch/enterprise-governance-process";',
+        "modules/department/process/src/app/department.app.ts",
       );
 
       expect(found.map((entry) => entry.data.name)).toEqual(["GovernanceFixture"]);
@@ -86,8 +86,8 @@ describe("given a file outside a module's server package", () => {
     /** @scenario "A fixture import inside a test file is allowed" */
     it("reports nothing", () => {
       const found = report(
-        'import { GovernanceFixture } from "@langwatch/enterprise-governance-server";',
-        "modules/department/server/src/app/__tests__/department.integration.test.ts",
+        'import { GovernanceFixture } from "@langwatch/enterprise-governance-process";',
+        "modules/department/process/src/app/__tests__/department.integration.test.ts",
       );
 
       expect(found).toEqual([]);
@@ -99,7 +99,7 @@ describe("given a file outside a module's server package", () => {
     it("reports reachThroughApi", () => {
       const found = report(
         'import { DepartmentService } from "../../../../governance/server/src/app/department.service.ts";',
-        "modules/department/server/src/app/department.app.ts",
+        "modules/department/process/src/app/department.app.ts",
       );
 
       expect(found.map((entry) => entry.data.name)).toEqual(["DepartmentService"]);
@@ -113,7 +113,7 @@ describe("given a file inside the module's own server package", () => {
     it("reports nothing", () => {
       const found = report(
         'import { PrismaDepartmentRepository } from "@langwatch/department-server";',
-        "modules/department/server/src/app/department.app.ts",
+        "modules/department/process/src/app/department.app.ts",
       );
 
       expect(found).toEqual([]);
@@ -126,7 +126,7 @@ describe("given a file that imports an unrelated package", () => {
     /** @scenario "An unrelated import is allowed" */
     it("reports nothing", () => {
       expect(
-        report('import { z } from "zod";', "modules/department/server/src/app/department.app.ts"),
+        report('import { z } from "zod";', "modules/department/process/src/app/department.app.ts"),
       ).toEqual([]);
     });
   });

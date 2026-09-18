@@ -1,0 +1,69 @@
+{
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "src",
+    "outDir": "dist",
+
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "jsx": "react-jsx",
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+    "paths": {
+      "@langwatch/enterprise-governance-contract": ["../contract/src/index.ts"],
+      "@langwatch/authz-contract": ["../../../../modules/authz/contract/src/index.ts"],
+      "@langwatch/authz-browser-kit/scope-picker": [
+        "../../../../modules/authz/browser-kit/src/scope-picker/index.ts"
+      ],
+      "@langwatch/coding-agent-browser": ["../../../../modules/coding-agent/browser/src/index.ts"]
+    },
+
+    "rewriteRelativeImportExtensions": false
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/authz/browser-kit/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/browser-host/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../dev/tsconfig.web-declarations.json"
+    },
+    {
+      "path": "../../../../packages/config/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/model-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/navigation/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/user/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/test-harness/tsconfig.build.json"
+    }
+  ]
+}

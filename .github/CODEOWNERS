@@ -14,8 +14,8 @@
 
 # Authorisation and the request security chain.
 /apps/api/src/api-rest.security.ts                   @0xdeafcafe
-/modules/authz/server/                     @0xdeafcafe
-/modules/identity/server/                  @0xdeafcafe
+/modules/authz/process/                     @0xdeafcafe
+/modules/identity/process/                  @0xdeafcafe
 
 # The rules encode the design; a wrong rule blesses a wrong pattern everywhere.
 /packages/architecture-enforcer/                         @0xdeafcafe

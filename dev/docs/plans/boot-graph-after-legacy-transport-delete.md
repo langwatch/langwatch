@@ -59,7 +59,7 @@ lane's work, not this one's.
 - `apps/tasks` is fully green, so `pnpm start:prepare:db` works again. The fix
   there was real, not a cut: `dataset-content-backfill.composition.ts` now
   builds `PrismaDatasetMigrationRepository` itself through a new
-  `@langwatch/dataset-server/composition/dataset-migration` subpath, exactly the
+  `@langwatch/dataset-process/composition/dataset-migration` subpath, exactly the
   way `object-storage-migrate.composition.ts` builds its ClickHouse repository.
 
 ## Bad — leftovers I created, deliberately
@@ -100,7 +100,7 @@ lane's work, not this one's.
     api.entrypoint.ts -> install(featureServers)     <- ONE install, no composition
 ```
 
-The install model already exists in the tree — `modules/coding-agent/server/src/coding-agent.server.ts`
+The install model already exists in the tree — `modules/coding-agent/process/src/coding-agent.server.ts`
 is written in it — and it is blocked only on `@langwatch/api` publishing
 `createRestRouter` and `createTrpcRouter`. **That is the target, and
 `api-production.composition.ts` is not on the way to it.**
@@ -124,10 +124,10 @@ Two edges remain, both owned by other lanes, both untracked files, and neither i
 about the legacy transports:
 
 - `apps/api/src/features/monitor/monitor.composition.ts:13` —
-  `@langwatch/evaluator-server` does not export `EvaluatorReplicationApi`.
+  `@langwatch/evaluator-process` does not export `EvaluatorReplicationApi`.
   (Blocks `apps/api` and `apps/api/src/api.entrypoint.ts`.)
 - `apps/worker/src/app/worker-evaluation-app.composition.ts:20` (untracked) —
-  `@langwatch/dataset-server` does not export `PostgresDatasetAdapter`.
+  `@langwatch/dataset-process` does not export `PostgresDatasetAdapter`.
   (Blocks `apps/worker`.)
 
 Both are a renamed or not-yet-exported symbol in a module the feature-conversion

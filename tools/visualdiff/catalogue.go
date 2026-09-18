@@ -19,7 +19,7 @@ type ModuleIndex map[string]string
 
 // LoadModuleIndex reads catalogue.json under root and derives, for each
 // feature, the module owning its first listed screen
-// ("@langwatch/analytics-web/screens/analytics" -> "analytics"), indexed by
+// ("@langwatch/analytics-browser/screens/analytics" -> "analytics"), indexed by
 // the feature's own route segment.
 func LoadModuleIndex(root string) (ModuleIndex, error) {
 	data, err := os.ReadFile(filepath.Join(root, CatalogueFile)) // #nosec G304 -- root is the tool's own -root flag; the joined path is a fixed repository file.
@@ -49,8 +49,8 @@ func LoadModuleIndex(root string) (ModuleIndex, error) {
 }
 
 // screenModule derives the owning module from a screen package reference
-// like "@langwatch/analytics-web/screens/analytics" -> "analytics", matching
-// modules/analytics/web's own directory name.
+// like "@langwatch/analytics-browser/screens/analytics" -> "analytics", matching
+// modules/analytics/browser's own directory name.
 func screenModule(screens []string) string {
 	if len(screens) == 0 {
 		return ""

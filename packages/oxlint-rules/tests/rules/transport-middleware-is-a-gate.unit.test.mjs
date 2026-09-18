@@ -18,7 +18,7 @@ describe("given a module transport file", () => {
     it("reports reservedName", () => {
       const found = report(
         "export const agentRestEffects = defineRestMiddleware('agentRestEffects', z.object({}));",
-        "modules/agent/server/src/transport/agent.rest.ts",
+        "modules/agent/process/src/transport/agent.rest.ts",
       );
 
       expect(found).toHaveLength(1);
@@ -32,7 +32,7 @@ describe("given a module transport file", () => {
     it("reports functionMember", () => {
       const found = report(
         "export const agentRestCredential = defineRestMiddleware('agentRestCredential', z.object({ reportError: z.custom<(error: Error) => void>() }));",
-        "modules/agent/server/src/transport/agent.rest.ts",
+        "modules/agent/process/src/transport/agent.rest.ts",
       );
 
       expect(found).toHaveLength(1);
@@ -47,7 +47,7 @@ describe("given a module transport file", () => {
       expect(
         report(
           "export const agentRestCredential = defineRestMiddleware('agentRestCredential', z.object({ apiKey: z.string() }));",
-          "modules/agent/server/src/transport/agent.rest.ts",
+          "modules/agent/process/src/transport/agent.rest.ts",
         ),
       ).toEqual([]);
     });
@@ -59,7 +59,7 @@ describe("given a module transport file", () => {
       expect(
         report(
           "export const agentRestEffects = defineRestMiddleware('agentRestEffects', z.object({}));",
-          "modules/agent/server/src/services/agent.service.ts",
+          "modules/agent/process/src/services/agent.service.ts",
         ),
       ).toEqual([]);
     });

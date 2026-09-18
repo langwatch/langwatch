@@ -4,7 +4,7 @@ Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wa
 
 > **Amendment 2026-09-03:** `platform/app` is deleted. The event-sourcing
 > framework this deliverable targeted now lives in `packages/eventing`; the
-> identity pipeline it describes lives under `modules/identity/server/src/`
+> identity pipeline it describes lives under `modules/identity/process/src/`
 > (`eventing/`, which absorbed `processes/` and `projections/` on 2026-09-15;
 > `adapters/` and `ports/` are inventoried-and-going). Verify current shape
 > against that tree before treating paths below as live.

@@ -13,7 +13,7 @@ was recorded, and no process could answer "which audit log is this".
 ## Decision
 
 `AuditLogApi` stays a portable contract in this package. The implementation is
-Enterprise and lives in `enterprise/modules/audit-log/server`. An
+Enterprise and lives in `enterprise/modules/audit-log/process`. An
 installation without it installs `@langwatch/audit-log-null` under the same
 token. A process installs exactly one of the two.
 

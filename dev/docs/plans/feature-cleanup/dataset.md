@@ -300,7 +300,7 @@ Five commits, each leaving the suite green:
 
 ## 6. Blast radius
 
-15 files outside the feature import `@langwatch/dataset-server`. They use `DatasetApp`,
+15 files outside the feature import `@langwatch/dataset-process`. They use `DatasetApp`,
 `DatasetTrpcApi`, `DatasetRecordTrpcApi`, `BatchRecordTrpcApi`, `S3DatasetStorageAdapter`,
 `AzureDatasetStorage`, `DatasetS3ClientResolver`, `DatasetS3ClientLease`,
 `PostgresDatasetMigrationAdapter`, `UploadTooLargeError`, `DatasetNotFoundError`.

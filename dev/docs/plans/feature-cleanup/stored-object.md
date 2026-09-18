@@ -515,7 +515,7 @@ Six commits, each leaving the suite green.
    `contract/src/stored-object.queries.ts`, `storedObjectsPublicRpc`, and — if
    the ClickHouse cut-over is not imminent — the migration and its four legacy
    ports. Shrink `index.ts` to the 25 imported symbols and delete `storage.ts`
-   after repointing `@langwatch/stored-object-server/storage` at `index.ts`.
+   after repointing `@langwatch/stored-object-process/storage` at `index.ts`.
    −366 lines minimum, −610 with the migration.
 3. **Fix the app's dependency shape** (P1). Rename `files.getById` → `readFile`,
    make `storedObjects` honest about the composition. Touches
@@ -539,7 +539,7 @@ Six commits, each leaving the suite green.
 
 ## 6. Blast radius
 
-**11 files outside the package import `@langwatch/stored-object-server`; 22
+**11 files outside the package import `@langwatch/stored-object-process`; 22
 import `@langwatch/stored-object-contract`.**
 
 From the server package (25 symbols with an importer):

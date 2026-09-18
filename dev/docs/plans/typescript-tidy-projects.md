@@ -90,7 +90,7 @@ to read, on a clean clone) the prebuilt declaration.
 The manifest's suggested pilot (`@langwatch/ksuid` or `@langwatch/handled-error`
 + one consumer + one web package) was dirty in this shared checkout at pilot
 time (`packages/ksuid`, `packages/handled-error`, `packages/eventing`,
-`modules/user/web/tsconfig.json`, and — not incidentally — `dev/scripts/ensure-built.mjs`
+`modules/user/browser/tsconfig.json`, and — not incidentally — `dev/scripts/ensure-built.mjs`
 and `packages/architecture-enforcer/src/workspace/tsconfig-references.ts`
 themselves were all mid-edit by another session). Per the shared-checkout rule,
 none of those were touched. A clean, equally representative substitute was used
@@ -100,8 +100,8 @@ instead:
 |---|---|---|
 | Internal package, plain `.ts`, multiple subpath exports | `@langwatch/config` | Clean; `private: true`; 4 export subpaths, exactly the shape ksuid/handled-error have |
 | Consumer (typecheck only, no edit) | `@langwatch/ui-kernel` | Clean; depends on `@langwatch/config` |
-| Internal package, jsx, one subpath, **already carrying the `langwatch-declaration-source` workaround** | `@langwatch/authz-web-kit` | Clean; its `./scope-picker` export already has the custom condition this plan expects to retire — a direct test of that theory |
-| Consumer (typecheck + test, no edit) | `@langwatch/api-key-web` | Clean config files; imports `@langwatch/authz-web-kit/scope-picker` |
+| Internal package, jsx, one subpath, **already carrying the `langwatch-declaration-source` workaround** | `@langwatch/authz-browser-kit` | Clean; its `./scope-picker` export already has the custom condition this plan expects to retire — a direct test of that theory |
+| Consumer (typecheck + test, no edit) | `@langwatch/api-key-browser` | Clean config files; imports `@langwatch/authz-browser-kit/scope-picker` |
 
 ### What was proven
 
@@ -109,14 +109,14 @@ instead:
   typecheck`: green before and after the flip, warm ~1-2s each (no measurable
   regression; these are `tsc -b` incremental builds, dominated by the
   `tsbuildinfo` cache, not by the manifest).
-- `pnpm --filter @langwatch/authz-web-kit typecheck` and `@langwatch/api-key-web
+- `pnpm --filter @langwatch/authz-browser-kit typecheck` and `@langwatch/api-key-browser
   typecheck`: green before and after, in both the original state and the
   flipped state (`types`→src, `langwatch-declaration-source` condition
   removed).
-- `pnpm --filter @langwatch/authz-web-kit test` (41 tests) and
+- `pnpm --filter @langwatch/authz-browser-kit test` (41 tests) and
   `@langwatch/ui-kernel test` (9 tests): green after the flip — vite/vitest
   resolution unaffected, as expected (`default` never changed).
-- Moving `packages/config/dist` and `modules/authz/web-kit/dist` aside
+- Moving `packages/config/dist` and `modules/authz/browser-kit/dist` aside
   entirely and re-running the consumers' `tsc -b`: green (rebuilds the
   dependency from source, same as always).
 - File-targeted, config-less `tsc --noEmit --ignoreConfig` on a consumer file:
@@ -141,15 +141,15 @@ itself, on a quiet tree, immediately before and after the repo-wide flip.
 ## 4. A real, but pre-existing, breakage found and exonerated
 
 `pnpm typecheck` (and the narrower `pnpm exec tsc -b
-enterprise/modules/governance/web/tsconfig.build.json`) reports:
+enterprise/modules/governance/browser/tsconfig.build.json`) reports:
 
 ```
-enterprise/modules/governance/web/src/features/ai-tools/ui/sections/ai-tool-entry-drawer.tsx
-  error TS6305: Output file '.../dev/.cache/web-declarations/modules/authz/web-kit/src/scope-picker/index.d.ts'
-  has not been built from source file '.../modules/authz/web-kit/src/scope-picker/index.ts'.
+enterprise/modules/governance/browser/src/features/ai-tools/ui/sections/ai-tool-entry-drawer.tsx
+  error TS6305: Output file '.../dev/.cache/web-declarations/modules/authz/browser-kit/src/scope-picker/index.d.ts'
+  has not been built from source file '.../modules/authz/browser-kit/src/scope-picker/index.ts'.
 ```
 
-(3 occurrences, all in `enterprise/modules/governance/web`, all naming
+(3 occurrences, all in `enterprise/modules/governance/browser`, all naming
 `authz-web-kit/scope-picker`.) This looked at first like a regression from the
 pilot's own flip. It is not: reverting **both** pilot packages to their
 original, on-disk (already-dirty) state reproduces the identical 3 errors.
@@ -320,12 +320,12 @@ decision — §11.4 states it with the evidence.
 ```bash
 pnpm --filter @langwatch/config typecheck
 pnpm --filter @langwatch/ui-kernel typecheck
-pnpm --filter @langwatch/authz-web-kit typecheck
-pnpm --filter @langwatch/authz-web-kit test
-pnpm --filter @langwatch/api-key-web typecheck
+pnpm --filter @langwatch/authz-browser-kit typecheck
+pnpm --filter @langwatch/authz-browser-kit test
+pnpm --filter @langwatch/api-key-browser typecheck
 pnpm --filter @langwatch/ui-kernel test
-pnpm exec tsc --noEmit --ignoreConfig modules/api-key/web/src/ui/elements/scope-picker.tsx
-pnpm exec tsc -b enterprise/modules/governance/web/tsconfig.build.json
+pnpm exec tsc --noEmit --ignoreConfig modules/api-key/browser/src/ui/elements/scope-picker.tsx
+pnpm exec tsc -b enterprise/modules/governance/browser/tsconfig.build.json
 ```
 
 ---
@@ -444,7 +444,7 @@ The patch (apply to `tsconfig.base.json`'s `compilerOptions`, after
 ```
 
 Cost to land: the two `TS1484`s found (in `packages/config` and
-`modules/scenario/server`) plus whatever the ~35 unprobed non-stating packages
+`modules/scenario/process`) plus whatever the ~35 unprobed non-stating packages
 carry at the same rate — single digits, each a one-word `type` keyword.
 
 **And what the three flags cost the compiler, measured** — because "three more
@@ -457,7 +457,7 @@ state none of the three today):
 |---|---|---|---|---|---|
 | `packages/observability` | base | 20,362 | 47,246 | 119,218K | 0.163s |
 | | +3 flags | 20,387 | 47,274 | 119,108K | 0.169s |
-| `modules/monitor/server` | base | 168,225 | 629,812 | 720,491K | 2.267s |
+| `modules/monitor/process` | base | 168,225 | 629,812 | 720,491K | 2.267s |
 | | +3 flags | 168,241 | 629,812 | 717,992K | 2.464s |
 
 Types move by 0.01-0.12%, instantiations on the larger package do not move at
@@ -567,7 +567,7 @@ Forced onto real build configs (`tsc -p <pkg>/tsconfig.build.json
 | `packages/design-system` | 139 | 238 |
 | `packages/eventing` | 255 | 126 |
 | `packages/config` | 30 | 123 |
-| `modules/annotation/server` | 43 | 54 |
+| `modules/annotation/process` | 43 | 54 |
 | `packages/ksuid` (published, tiny) | 16 | **4** |
 
 The distribution in `trace/contract` is the whole story: `TS9013` 1,546,

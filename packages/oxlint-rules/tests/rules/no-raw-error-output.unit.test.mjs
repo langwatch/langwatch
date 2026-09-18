@@ -18,7 +18,7 @@ describe("given governed server code", () => {
     it("reports rawErrorOutput", () => {
       const found = report(
         "try {} catch (err) { console.error(err); }",
-        "modules/agent/server/src/services/agent.service.ts",
+        "modules/agent/process/src/services/agent.service.ts",
       );
 
       expect(found).toHaveLength(1);
@@ -32,7 +32,7 @@ describe("given governed server code", () => {
     it("reports rawErrorOutput", () => {
       const found = report(
         "try {} catch (error) { console.log(error.stack); }",
-        "modules/agent/server/src/services/agent.service.ts",
+        "modules/agent/process/src/services/agent.service.ts",
       );
 
       expect(found).toHaveLength(1);
@@ -45,7 +45,7 @@ describe("given governed server code", () => {
     it("reports rawErrorOutput", () => {
       const found = report(
         "try {} catch (e) { process.stderr.write(e.stack); }",
-        "modules/agent/server/src/services/agent.service.ts",
+        "modules/agent/process/src/services/agent.service.ts",
       );
 
       expect(found).toHaveLength(1);
@@ -60,7 +60,7 @@ describe("given governed server code", () => {
       expect(
         report(
           "console.log(result);",
-          "modules/agent/server/src/services/agent.service.ts",
+          "modules/agent/process/src/services/agent.service.ts",
         ),
       ).toEqual([]);
     });
@@ -72,7 +72,7 @@ describe("given governed server code", () => {
       expect(
         report(
           "try {} catch (err) { console.error(err); }",
-          "modules/agent/server/src/__tests__/agent.unit.test.ts",
+          "modules/agent/process/src/__tests__/agent.unit.test.ts",
         ),
       ).toEqual([]);
     });

@@ -1,0 +1,77 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+
+    "jsx": "react-jsx",
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "types": ["node", "react", "react-dom"],
+    "noUncheckedIndexedAccess": true,
+    "noImplicitReturns": true,
+    "verbatimModuleSyntax": true,
+    "paths": {
+      "@langwatch/authz-contract": ["../../authz/contract/src/index.ts"],
+      "@langwatch/coding-agent-contract": ["../../coding-agent/contract/src/index.ts"],
+      "@langwatch/coding-agent-browser": ["../../coding-agent/web/src/index.ts"],
+      "@langwatch/coding-agent-browser/surfaces/activity": ["../../coding-agent/web/src/activity.ts"],
+      "@langwatch/enterprise-governance-contract": [
+        "../../../enterprise/modules/governance/contract/src/index.ts"
+      ],
+      "@langwatch/gateway-browser/surfaces/budget-overview": [
+        "../../gateway/web/src/ui/sections/budget-overview/index.ts"
+      ],
+      "@langwatch/model-provider-contract": ["../../model-provider/contract/src/index.ts"],
+      "@langwatch/user-contract": ["../contract/src/index.ts"]
+    },
+
+    "rewriteRelativeImportExtensions": false
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.setup.ts"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../../dev/tsconfig.web-declarations.json"
+    },
+    {
+      "path": "../../coding-agent/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/config/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../../gateway/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../identity/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../model-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/test-harness/tsconfig.build.json"
+    }
+  ]
+}

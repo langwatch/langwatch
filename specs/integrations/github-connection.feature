@@ -1,13 +1,13 @@
 # The organization GitHub connection, one GitHub App installation per org
 #
 # Implementation:
-#   modules/github/server/src/services/github-installations.service.ts (record/list/mint, webhook handling)
-#   modules/github/server/src/adapters/github-app-token.adapter.ts     (app JWT, installation tokens, GitHub API client)
+#   modules/github/process/src/services/github-installations.service.ts (record/list/mint, webhook handling)
+#   modules/github/process/src/adapters/github-app-token.adapter.ts     (app JWT, installation tokens, GitHub API client)
 #   modules/github/contract/src/github.ts                                 (install / setup / webhook routes + legacy aliases)
-#   modules/github/server/src/services/github-connection.service.ts    (connection status, uninstall + install links, disconnect)
-#   modules/github/server/src/api/app-trpc/github.api.ts              (connection status, repos, disconnect, live PR status)
+#   modules/github/process/src/services/github-connection.service.ts    (connection status, uninstall + install links, disconnect)
+#   modules/github/process/src/api/app-trpc/github.api.ts              (connection status, repos, disconnect, live PR status)
 #   [gone] src/runtime/app/internal-api/github.router.ts                  (process transport mount)
-#   modules/github/web/src/screens/integrations/                      (the settings surface)
+#   modules/github/browser/src/screens/integrations/                      (the settings surface)
 #   apps/ui/src/features/github/                                                 (its key, guard, chrome and host)
 #
 # Related specs:

@@ -4,7 +4,7 @@
 
 ## Why
 
-`modules/agent/server/src/services/` holds eighteen files, eighteen classes and
+`modules/agent/process/src/services/` holds eighteen files, eighteen classes and
 3,912 lines. Five of the classes are a namespace with two or three static functions in it.
 Three more hold one real method and a `create`. Three `for (;;)` loops carry the dispatch
 and long-poll state machines in their bodies. Seventeen call sites reach through
@@ -84,7 +84,7 @@ things and should be two methods.
 ## What does not change
 
 - The wire. `modules/agent/specs/*.feature` and every integration test under
-  `apps/api/src/features/agent/__tests__` and `modules/agent/server/src/**/__tests__`
+  `apps/api/src/features/agent/__tests__` and `modules/agent/process/src/**/__tests__`
   pass unedited except for `@scenario` annotations and imports that follow a moved symbol.
   A test that asserts on the old class names is rewritten to assert on behaviour through the
   new service; a test that only existed to construct a deleted class is deleted with it.
@@ -96,7 +96,7 @@ things and should be two methods.
 
 ## Guardrails
 
-- Only `modules/agent/server/**` and `modules/agent/contract/**`. If
+- Only `modules/agent/process/**` and `modules/agent/contract/**`. If
   `apps/api` needs an import path change because a symbol moved, list the file and the line
   in the report; do not edit it.
 - Never run `git add`, `git commit`, `git stash`, `git checkout` or any git write. Never
@@ -111,14 +111,14 @@ things and should be two methods.
 ## Exit checks
 
 ```
-pnpm typecheck:one modules/agent/server
+pnpm typecheck:one modules/agent/process
 pnpm typecheck:one modules/agent/contract
-pnpm --filter @langwatch/agent-server test:unit
+pnpm --filter @langwatch/agent-process test:unit
 pnpm --filter @langwatch/agent-contract test:unit
 pnpm --filter @langwatch/platform-api test:unit src/features/agent
-grep -rnE "for \(;;\)|while \(true\)|\btry[A-Z][A-Za-z]*\(|nanoid|randomUUID|_count|ok: true" modules/agent/server/src modules/agent/contract/src
-ls modules/agent/server/src/services
-pnpm exec oxlint --config .oxlintrc.jsonc modules/agent/server/src modules/agent/contract/src
+grep -rnE "for \(;;\)|while \(true\)|\btry[A-Z][A-Za-z]*\(|nanoid|randomUUID|_count|ok: true" modules/agent/process/src modules/agent/contract/src
+ls modules/agent/process/src/services
+pnpm exec oxlint --config .oxlintrc.jsonc modules/agent/process/src modules/agent/contract/src
 ```
 
 The grep prints nothing. The `ls` prints five files. oxlint reports no new findings.

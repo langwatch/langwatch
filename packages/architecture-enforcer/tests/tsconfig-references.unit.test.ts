@@ -93,13 +93,13 @@ describe("given a workspace whose packages declare their dependencies", () => {
 
   describe("when an enterprise module depends on a shared package", () => {
     beforeEach(() => {
-      packageFixture("enterprise/modules/sso/server", "@langwatch/sso-server", {
+      packageFixture("enterprise/modules/sso/process", "@langwatch/sso-server", {
         dependencies: { "@langwatch/time": "workspace:*" },
       });
     });
 
     it("derives the reference relative to the module's own directory", () => {
-      expect(referencesOf("enterprise/modules/sso/server/tsconfig.build.json")).toEqual([
+      expect(referencesOf("enterprise/modules/sso/process/tsconfig.build.json")).toEqual([
         "../../../../packages/time/tsconfig.build.json",
       ]);
     });
@@ -166,25 +166,25 @@ describe("given a workspace whose packages declare their dependencies", () => {
 describe("given the cyclic web group", () => {
   beforeEach(() => {
     write("dev/tsconfig.web-declarations.json", {
-      langwatchDeclarationGroup: { members: [{ directory: "../modules/annotation/web" }] },
+      langwatchDeclarationGroup: { members: [{ directory: "../modules/annotation/browser" }] },
     });
-    packageFixture("modules/annotation/web", "@langwatch/annotation-web", {
+    packageFixture("modules/annotation/browser", "@langwatch/annotation-browser", {
       dependencies: { "@langwatch/design-system": "workspace:*" },
     });
-    packageFixture("modules/trace/web", "@langwatch/trace-web", {
-      dependencies: { "@langwatch/annotation-web": "workspace:*" },
+    packageFixture("modules/trace/browser", "@langwatch/trace-browser", {
+      dependencies: { "@langwatch/annotation-browser": "workspace:*" },
     });
   });
 
   describe("when the package is a member of the group", () => {
     it("produces through the group solution alone", () => {
-      expect(referencesOf("modules/annotation/web/tsconfig.build.json")).toEqual([
+      expect(referencesOf("modules/annotation/browser/tsconfig.build.json")).toEqual([
         "../../../dev/tsconfig.web-declarations.json",
       ]);
     });
 
     it("references the group first and then its own dependencies", () => {
-      expect(referencesOf("modules/annotation/web/tsconfig.json")).toEqual([
+      expect(referencesOf("modules/annotation/browser/tsconfig.json")).toEqual([
         "../../../dev/tsconfig.web-declarations.json",
         "../../../packages/design-system/tsconfig.build.json",
       ]);
@@ -196,7 +196,7 @@ describe("given the cyclic web group", () => {
     // is composite and `tsc -b` refuses any reference to one. Every consumer
     // produces through the solution, inside the group or outside it.
     it("produces through the group solution as well", () => {
-      expect(referencesOf("modules/trace/web/tsconfig.build.json")).toEqual([
+      expect(referencesOf("modules/trace/browser/tsconfig.build.json")).toEqual([
         "../../../dev/tsconfig.web-declarations.json",
       ]);
     });

@@ -196,8 +196,8 @@ narrower threat. Decide whether that threat is in scope before paying for (b).
 ## Verification state at `8b88052559`
 
 - `pnpm typecheck` (app) clean; `@langwatch/identity` and
-  `@langwatch/identity-server` typecheck clean, source and tests.
-- `@langwatch/identity-server`: 283 tests passing.
+  `@langwatch/identity-process` typecheck clean, source and tests.
+- `@langwatch/identity-process`: 283 tests passing.
 - App: 1244 passing / 8 skipped across 88 files in the identity, api,
   better-auth and errors suites.
 - `pnpm check:feature-parity` exits 0.

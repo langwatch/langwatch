@@ -8,7 +8,7 @@ const workspace = createFixtureWorkspace({
 
 afterAll(() => workspace.cleanup());
 
-const SOURCE = "modules/agent/server/src/services/agent.service.ts";
+const SOURCE = "modules/agent/process/src/services/agent.service.ts";
 
 function report(code, filename = SOURCE) {
   return runRule(standInCastRule, { code, cwd: workspace.cwd, filename });
@@ -81,7 +81,7 @@ describe("given a governed source file", () => {
 });
 
 describe("given a test file", () => {
-  const TEST_SOURCE = "modules/agent/server/src/services/__tests__/agent.service.unit.test.ts";
+  const TEST_SOURCE = "modules/agent/process/src/services/__tests__/agent.service.unit.test.ts";
 
   describe("when it casts through unknown to build a double", () => {
     /** @scenario "A double cast inside a test reports the test message" */

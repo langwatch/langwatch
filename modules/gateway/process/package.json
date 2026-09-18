@@ -1,0 +1,138 @@
+{
+  "name": "@langwatch/gateway-process",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical server-side Gateway service.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "imports": {
+    "#*": {
+      "types": "./dist/*.d.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./src/testing.ts"
+    },
+    "./realtime-session-reconciliation": {
+      "types": "./dist/services/gateway-realtime-session-reconciliation.service.d.ts",
+      "default": "./src/services/gateway-realtime-session-reconciliation.service.ts"
+    },
+    "./composition/gateway-change-events": {
+      "types": "./dist/repositories/prisma/prisma.gateway-change-event.repository.d.ts",
+      "default": "./src/repositories/prisma/prisma.gateway-change-event.repository.ts"
+    },
+    "./composition/gateway-audit": {
+      "types": "./dist/repositories/prisma/prisma.gateway-audit.repository.d.ts",
+      "default": "./src/repositories/prisma/prisma.gateway-audit.repository.ts"
+    },
+    "./composition/gateway-virtual-keys": {
+      "types": "./dist/repositories/prisma/prisma.virtual-key.repository.d.ts",
+      "default": "./src/repositories/prisma/prisma.virtual-key.repository.ts"
+    },
+    "./composition/gateway-elevenlabs-credentials": {
+      "types": "./dist/repositories/prisma/prisma.gateway-elevenlabs-credential.repository.d.ts",
+      "default": "./src/repositories/prisma/prisma.gateway-elevenlabs-credential.repository.ts"
+    },
+    "./composition/gateway-guardrails": {
+      "types": "./dist/repositories/prisma/prisma.gateway-guardrail.repository.d.ts",
+      "default": "./src/repositories/prisma/prisma.gateway-guardrail.repository.ts"
+    },
+    "./composition/gateway-scope-resolution": {
+      "types": "./dist/repositories/prisma/prisma.gateway-scope-resolution.repository.d.ts",
+      "default": "./src/repositories/prisma/prisma.gateway-scope-resolution.repository.ts"
+    },
+    "./composition/gateway-key-budgets": {
+      "types": "./dist/repositories/prisma/prisma.gateway-key-budget.repository.d.ts",
+      "default": "./src/repositories/prisma/prisma.gateway-key-budget.repository.ts"
+    },
+    "./composition/gateway-transactions": {
+      "types": "./dist/adapters/postgres.gateway-transaction.adapter.d.ts",
+      "default": "./src/adapters/postgres.gateway-transaction.adapter.ts"
+    },
+    "./composition/gateway-virtual-key-direct-budgets": {
+      "types": "./dist/repositories/prisma/prisma.gateway-virtual-key-direct-budget.repository.d.ts",
+      "default": "./src/repositories/prisma/prisma.gateway-virtual-key-direct-budget.repository.ts"
+    },
+    "./composition/gateway-realtime-sessions": {
+      "types": "./dist/repositories/prisma/prisma.gateway-realtime-session.repository.d.ts",
+      "default": "./src/repositories/prisma/prisma.gateway-realtime-session.repository.ts"
+    },
+    "./composition/gateway-virtual-key-authorization": {
+      "types": "./dist/repositories/prisma/prisma.virtual-key-authorization.repository.d.ts",
+      "default": "./src/repositories/prisma/prisma.virtual-key-authorization.repository.ts"
+    },
+    "./composition/gateway-provider-labels": {
+      "types": "./dist/repositories/prisma/prisma.gateway-provider-label.repository.d.ts",
+      "default": "./src/repositories/prisma/prisma.gateway-provider-label.repository.ts"
+    },
+    "./composition/gateway-spend-fold": {
+      "types": "./dist/projections/gateway-spend.projection.d.ts",
+      "default": "./src/projections/gateway-spend.projection.ts"
+    },
+    "./composition/gateway-agent-cache-store": {
+      "types": "./dist/stores/gateway-agent-cache/gateway-agent-cache.store.d.ts",
+      "default": "./src/stores/gateway-agent-cache/gateway-agent-cache.store.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@langwatch/analytics-process": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/api-key-contract": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/evaluator-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/gateway-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/langy-contract": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/monitor-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/plans": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/redis-client": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/task": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/webhook-contract": "workspace:*",
+    "@langwatch/webhook-process": "workspace:*",
+    "@trpc/server": "catalog:",
+    "hono": "catalog:",
+    "hono-openapi": "catalog:",
+    "ioredis": "catalog:",
+    "jsonwebtoken": "catalog:",
+    "nanoid": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@clickhouse/client": "catalog:",
+    "@langwatch/clickhouse-client": "workspace:*",
+    "@langwatch/clickhouse-migrations": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
+    "@types/jsonwebtoken": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

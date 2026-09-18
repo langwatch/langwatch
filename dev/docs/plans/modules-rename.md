@@ -49,7 +49,7 @@ Machinery that hardcodes the layout:
 - `dev/lint/ast-grep` rules naming `packages/enterprise`.
 - `patches/` (pnpm patches) — check none names a path.
 - Every feature package's own `tsconfig.json` / `tsconfig.build.json` / `vitest.config.ts`: the
-  depth changes (`packages/features/x/server` is four deep, `modules/x/server` three), so every
+  depth changes (`packages/features/x/server` is four deep, `modules/x/process` three), so every
   `../../../..` that reaches the repo root loses one segment, and `extends` paths to
   `packages/config` change. Enterprise packages move one deeper for `packages/` and stay level for
   `modules/`. This is the trap; do not pattern-replace, open each file.
@@ -102,7 +102,7 @@ every "feature" that means a feature flag or a `.feature` spec file.
 
 ```
 grep -rn "packages/features\|packages/enterprise" --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git --exclude=pnpm-lock.yaml . | grep -v baseline.json | grep -v "dev/docs/plans/modules-rename.md"
-pnpm typecheck:one modules/annotation/server && pnpm typecheck:one modules/annotation/web && pnpm typecheck:one enterprise/modules/audit-log/server && pnpm typecheck:one packages/api
+pnpm typecheck:one modules/annotation/process && pnpm typecheck:one modules/annotation/browser && pnpm typecheck:one enterprise/modules/audit-log/process && pnpm typecheck:one packages/api
 pnpm --filter @langwatch/architecture-enforcer test
 pnpm --filter @langwatch/oxlint-rules test
 node dev/scripts/check-feature-parity.ts 2>&1 | tail -3

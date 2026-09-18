@@ -27,7 +27,7 @@ function write(path: string, content: string): void {
   writeFileSync(absolute, content, "utf8");
 }
 
-const SERVER = "modules/widget/server/src";
+const SERVER = "modules/widget/process/src";
 
 const BASELINE = "packages/architecture-enforcer/src/unused-module-export-baseline.json";
 
@@ -114,7 +114,7 @@ describe("unused module exports", () => {
 
     it("follows a private subpath import the package declares", () => {
       write(
-        "modules/widget/server/package.json",
+        "modules/widget/process/package.json",
         JSON.stringify({
           name: "@langwatch/widget-server",
           exports: { ".": "./src/index.ts" },

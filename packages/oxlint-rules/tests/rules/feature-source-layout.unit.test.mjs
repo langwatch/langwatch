@@ -39,19 +39,19 @@ describe("given a strict feature server module", () => {
     'import { AgentBusyError } from "@langwatch/agent-contract"; export function check() { throw new AgentBusyError({}); }',
     'import { AgentBusyError as Busy } from "@langwatch/agent-contract"; export function check() { throw new Busy({}); }',
   ])("allows deterministic thrown contract errors: %s", (code) => {
-    expect(report("modules/agent/server/src/rules/agent.rules.ts", code)).toEqual([]);
+    expect(report("modules/agent/process/src/rules/agent.rules.ts", code)).toEqual([]);
   });
 
   it.each([
     "export function check(Error) { throw new Error(); }",
     'import { AgentBusyError } from "@langwatch/agent-contract"; export function check(AgentBusyError) { throw new AgentBusyError(); }',
-    'import { AgentBusyError } from "@langwatch/agent-server"; export function check() { throw new AgentBusyError(); }',
+    'import { AgentBusyError } from "@langwatch/agent-process"; export function check() { throw new AgentBusyError(); }',
     'import { Effect as FakeError } from "@langwatch/agent-contract"; export function check() { throw new FakeError(); }',
     'import { AgentBusyError } from "@langwatch/agent-contract"; export const error = new AgentBusyError();',
     "export function check() { throw new Error(new NetworkClient()); }",
   ])("keeps effectful or indirect construction out of rules: %s", (code) => {
     expect(
-      report("modules/agent/server/src/rules/agent.rules.ts", code).map(
+      report("modules/agent/process/src/rules/agent.rules.ts", code).map(
         (finding) => finding.messageId,
       ),
     ).toEqual(["rulesImpurity"]);
@@ -60,7 +60,7 @@ describe("given a strict feature server module", () => {
   describe("when a service filename ends in -process.service.ts", () => {
     /** @scenario "A process manager named as a service is reported" */
     it("reports processManagerService", () => {
-      const found = report("modules/agent/server/src/services/agent-process.service.ts");
+      const found = report("modules/agent/process/src/services/agent-process.service.ts");
 
       expect(found.map((e) => e.messageId)).toEqual(["processManagerService"]);
     });
@@ -70,7 +70,7 @@ describe("given a strict feature server module", () => {
     /** @scenario "A rules module constructing a class is reported" */
     it("reports rulesImpurity naming the class", () => {
       const found = report(
-        "modules/agent/server/src/rules/agent.rules.ts",
+        "modules/agent/process/src/rules/agent.rules.ts",
         "export class Helper {} export const x = new Helper();",
       );
 
@@ -82,7 +82,7 @@ describe("given a strict feature server module", () => {
   describe("when a source path has no home in layout v0", () => {
     /** @scenario "A path with no strict layout home is reported with the allowed homes" */
     it("reports serverPath listing the allowed directories", () => {
-      const found = report("modules/agent/server/src/misc/agent.helper.ts");
+      const found = report("modules/agent/process/src/misc/agent.helper.ts");
 
       expect(found.map((e) => e.messageId)).toEqual(["serverPath"]);
       expect(found[0].message).toContain("Only this shape is allowed");
@@ -94,17 +94,17 @@ describe("given a strict feature server module", () => {
   describe("when the path matches a recognized server pattern", () => {
     /** @scenario "A recognized strict server path is left alone" */
     it("reports nothing", () => {
-      expect(report("modules/agent/server/src/services/agent.service.ts")).toEqual([]);
+      expect(report("modules/agent/process/src/services/agent.service.ts")).toEqual([]);
     });
 
     it("accepts direct API declarations and WebSocket protocol integrations", () => {
-      expect(report("modules/agent/server/src/transport/agent.rest.ts")).toEqual([]);
-      expect(report("modules/agent/server/src/transport/agent.trpc.ts")).toEqual([]);
-      expect(report("modules/agent/server/src/transport/agent-connect.ws.ts")).toEqual(
+      expect(report("modules/agent/process/src/transport/agent.rest.ts")).toEqual([]);
+      expect(report("modules/agent/process/src/transport/agent.trpc.ts")).toEqual([]);
+      expect(report("modules/agent/process/src/transport/agent-connect.ws.ts")).toEqual(
         [],
       );
       expect(
-        report("modules/agent/server/src/transport/agent.handler.ts").map(
+        report("modules/agent/process/src/transport/agent.handler.ts").map(
           (finding) => finding.messageId,
         ),
       ).toEqual(["serverPath"]);
@@ -112,19 +112,19 @@ describe("given a strict feature server module", () => {
 
     it("accepts repository provider bundles, registries, and local stores", () => {
       expect(
-        report("modules/agent/server/src/repositories/agent-repositories.registry.ts"),
+        report("modules/agent/process/src/repositories/agent-repositories.registry.ts"),
       ).toEqual([]);
       expect(
-        report("modules/agent/server/src/repositories/agent.repositories.ts"),
+        report("modules/agent/process/src/repositories/agent.repositories.ts"),
       ).toEqual([]);
       expect(
         report(
-          "modules/agent/server/src/repositories/prisma/prisma.agent.repositories.ts",
+          "modules/agent/process/src/repositories/prisma/prisma.agent.repositories.ts",
         ),
       ).toEqual([]);
       expect(
         report(
-          "modules/agent/server/src/repositories/memory/memory.agent-session.database.ts",
+          "modules/agent/process/src/repositories/memory/memory.agent-session.database.ts",
         ),
       ).toEqual([]);
     });
@@ -133,8 +133,8 @@ describe("given a strict feature server module", () => {
 
 it.each([
   "modules/agent/contract/src/agent.app.ts",
-  "modules/agent/server/src/agent.server.ts",
-  "modules/agent/server/src/app/agent.app.ts",
+  "modules/agent/process/src/agent.server.ts",
+  "modules/agent/process/src/app/agent.app.ts",
 ])("accepts the app composition home %s", (file) => {
   expect(report(file)).toEqual([]);
 });
@@ -160,25 +160,25 @@ describe("given a channel in a strict feature server module", () => {
   describe("when the interface sits at channels/<subject>.channel.ts", () => {
     /** @scenario "A channel interface lives at channels/<subject>.channel.ts" */
     it("reports nothing", () => {
-      expect(report("modules/agent/server/src/channels/webhook.channel.ts")).toEqual([]);
+      expect(report("modules/agent/process/src/channels/webhook.channel.ts")).toEqual([]);
     });
   });
 
   describe("when an implementation is named for its tier folder", () => {
     /** @scenario "A channel implementation is named for its tier folder" */
     it("reports nothing", () => {
-      expect(report("modules/agent/server/src/channels/http/http.webhook.channel.ts")).toEqual([]);
+      expect(report("modules/agent/process/src/channels/http/http.webhook.channel.ts")).toEqual([]);
       expect(
-        report("modules/agent/server/src/channels/memory/memory.webhook.channel.ts"),
+        report("modules/agent/process/src/channels/memory/memory.webhook.channel.ts"),
       ).toEqual([]);
-      expect(report("modules/agent/server/src/channels/agent-channels.registry.ts")).toEqual([]);
+      expect(report("modules/agent/process/src/channels/agent-channels.registry.ts")).toEqual([]);
     });
   });
 
   describe("when an implementation claims a tier it does not sit in", () => {
     /** @scenario "A channel implementation in the wrong tier folder is refused" */
     it("reports serverPath", () => {
-      const found = report("modules/agent/server/src/channels/http/redis.webhook.channel.ts");
+      const found = report("modules/agent/process/src/channels/http/redis.webhook.channel.ts");
 
       expect(found.map((e) => e.messageId)).toEqual(["serverPath"]);
     });

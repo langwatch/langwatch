@@ -298,7 +298,7 @@ Tests are per package now — each application and each feature package owns its
 pnpm --filter @langwatch/platform-api test      # apps/api
 pnpm --filter @langwatch/worker test            # apps/worker
 pnpm --filter @langwatch/ui test                # apps/ui
-pnpm --filter @langwatch/trace-server test      # one feature package
+pnpm --filter @langwatch/trace-process test      # one feature package
 pnpm --filter @langwatch/ui test:e2e            # Playwright
 ```
 

@@ -8,13 +8,13 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 
 import { API_KEY_PREFIX, INGEST_KEY_PREFIX } from "@langwatch/api-key-contract";
-import { ApiKeyTokenAdapter } from "@langwatch/api-key-server";
+import { ApiKeyTokenAdapter } from "@langwatch/api-key-process";
 import { DEFAULT_LICENSE_PUBLIC_KEY as PUBLIC_KEY } from "@langwatch/enterprise-licensing-contract";
 import {
   LOCAL_DEV_ENTERPRISE_LICENSE_KEY,
   resolveSeedLicense,
-} from "@langwatch/enterprise-licensing-server/seeding";
-import { ENTERPRISE_LICENSE_KEY as TEST_SUITE_ENTERPRISE_LICENSE_KEY } from "@langwatch/enterprise-licensing-server/testing";
+} from "@langwatch/enterprise-licensing-process/seeding";
+import { ENTERPRISE_LICENSE_KEY as TEST_SUITE_ENTERPRISE_LICENSE_KEY } from "@langwatch/enterprise-licensing-process/testing";
 import { modelProviders } from "@langwatch/model-provider-contract";
 import { runScript, writeScriptWarning } from "@langwatch/observability";
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
@@ -24,7 +24,7 @@ import {
   TeamUserRole,
 } from "@langwatch/prisma-client/generated";
 import { ROLE_KIND } from "@langwatch/role-contract";
-import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
+import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-process";
 import { hash as hashPassword } from "bcrypt";
 import { parse as parseDotenv } from "dotenv";
 
@@ -460,7 +460,7 @@ const MODEL_PROVIDER_ID_PREFIX = "local-dev-model-provider-";
 /**
  * The at-rest format for ModelProvider.customKeys: AES-256-GCM under the
  * deployment's own 32-byte hex pepper, written `iv:ciphertext:authTag` —
- * `@langwatch/secret-server` owns the format; the key comes from the boot seam.
+ * `@langwatch/secret-process` owns the format; the key comes from the boot seam.
  */
 function encryptCredentials(value: string, key: string): string {
   return AesGcmSecretEncryptionAdapter.create({ key }).encrypt(value);

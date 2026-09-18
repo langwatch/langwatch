@@ -12,7 +12,7 @@ Feature: The task runner compiles the modules it composes, not whole feature pac
   work it actually does.
 
   Server packages expose those modules as `./composition/<name>` subpaths, the
-  same shape `@langwatch/trace-server` already used for its trace-edit-overlay
+  same shape `@langwatch/trace-process` already used for its trace-edit-overlay
   repository.
 
   ADR: dev/docs/adr/130-the-api-router-type-is-declared.md

@@ -3,39 +3,39 @@
   "policy": "memory-twin-drift",
   "entries": [
     {
-      "key": "enterprise/modules/governance/server|AdminWorkspaceViewAuditRepository|memory|seedTarget",
+      "key": "enterprise/modules/governance/process|AdminWorkspaceViewAuditRepository|memory|seedTarget",
       "measured": "2026-09-10"
     },
     {
-      "key": "enterprise/modules/governance/server|GovernanceSetupStateRepository|memory|record",
+      "key": "enterprise/modules/governance/process|GovernanceSetupStateRepository|memory|record",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/auth/server|AuthSessionRepository|memory|put",
+      "key": "modules/auth/process|AuthSessionRepository|memory|put",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/monitor/server|MonitorRepository|memory|seed",
+      "key": "modules/monitor/process|MonitorRepository|memory|seed",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/organization/server|PersonalTeamScopeRepository|prisma|findSharedTeamIds",
+      "key": "modules/organization/process|PersonalTeamScopeRepository|prisma|findSharedTeamIds",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/organization/server|TenantDirectoryRepository|memory|organizationForTenant",
+      "key": "modules/organization/process|TenantDirectoryRepository|memory|organizationForTenant",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/role/server|RoleRepository|memory|assign",
+      "key": "modules/role/process|RoleRepository|memory|assign",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/role/server|RoleRepository|memory|forget",
+      "key": "modules/role/process|RoleRepository|memory|forget",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/role/server|RoleRepository|memory|save",
+      "key": "modules/role/process|RoleRepository|memory|save",
       "measured": "2026-09-10"
     }
   ]

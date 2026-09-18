@@ -6,7 +6,7 @@ const workspace = createFixtureWorkspace({});
 
 afterAll(() => workspace.cleanup());
 
-function report(code, filename = "modules/agent/server/src/__tests__/agent.unit.test.ts") {
+function report(code, filename = "modules/agent/process/src/__tests__/agent.unit.test.ts") {
   return runRule(testDescriptionIsAnActionRule, { code, cwd: workspace.cwd, filename });
 }
 
@@ -153,7 +153,7 @@ describe("given a test file", () => {
     /** @scenario "A should-prefixed title outside a test file is not governed" */
     it("reports nothing", () => {
       expect(
-        report('it("should check local first", () => {});', "modules/agent/server/src/agent.service.ts"),
+        report('it("should check local first", () => {});', "modules/agent/process/src/agent.service.ts"),
       ).toEqual([]);
     });
   });

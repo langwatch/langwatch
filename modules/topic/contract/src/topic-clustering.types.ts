@@ -1,7 +1,7 @@
 /**
  * Wire values for the topic-clustering langevals calls (contract.md §11) —
  * the request params the runner posts and the response it reads back.
- * Portable shapes only; the runner lives in `@langwatch/topic-server`.
+ * Portable shapes only; the runner lives in `@langwatch/topic-process`.
  */
 
 export type ModelOption = {

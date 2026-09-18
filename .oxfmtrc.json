@@ -19,7 +19,7 @@
     "**/generated/**",
     "modules/analytics/contract/src/visualization/vega-lite-schema-validator.generated.js",
     "modules/analytics/contract/src/visualization/vega-lite-schema-validator.generated.d.ts",
-    "modules/langy/server/src/services/setup-skill-bodies.generated.ts",
+    "modules/langy/process/src/services/setup-skill-bodies.generated.ts",
     "specs/webhooks/signature-vectors.json",
     "**/*.min.*",
     "**/testdata/**",

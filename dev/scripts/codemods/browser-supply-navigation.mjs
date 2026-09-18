@@ -22,7 +22,7 @@ export function navigationPlan() {
   const output = new Map();
   const entries = [];
   const sources = new Map();
-  const base = "modules/navigation/web/src/model";
+  const base = "modules/navigation/browser/src/model";
   const literal = (node, source) => {
     if (ts.isStringLiteral(node)) return node.text;
     if (ts.isIdentifier(node)) {

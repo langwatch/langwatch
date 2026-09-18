@@ -19,7 +19,7 @@ The run lifecycle remains a separate internal collaborator because it uses a
 durable process manager and ClickHouse projections rather than Scenario's
 authoring repository.
 
-`@langwatch/scenario-server` owns one private ClickHouse repository, an
+`@langwatch/scenario-process` owns one private ClickHouse repository, an
 injected windowed-read policy, an execution port and the concrete service. Boot
 binds the execution port to the already registered Eventing commands and places
 that service directly at `app.simulations`. A disabled analytical store uses the

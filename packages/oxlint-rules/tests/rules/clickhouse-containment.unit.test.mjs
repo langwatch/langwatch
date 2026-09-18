@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { clickhouseContainmentRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
-const SERVICE = "modules/agent/server/src/services/agent.service.ts";
+const SERVICE = "modules/agent/process/src/services/agent.service.ts";
 
 const workspace = createFixtureWorkspace({
   features: { agent: { layoutVersion: 0, roles: { server: {} } } },
@@ -55,7 +55,7 @@ describe("given a feature package file", () => {
       expect(
         ids(
           'import { createClient } from "@clickhouse/client";',
-          "modules/agent/server/src/repositories/clickhouse/clickhouse.agent.repository.ts",
+          "modules/agent/process/src/repositories/clickhouse/clickhouse.agent.repository.ts",
         ),
       ).toEqual([]);
     });
@@ -67,7 +67,7 @@ describe("given a feature package file", () => {
       expect(
         ids(
           'import { ClickHouseQueryClient } from "@langwatch/clickhouse-client";',
-          "modules/agent/server/src/adapters/clickhouse.agent.adapter.ts",
+          "modules/agent/process/src/adapters/clickhouse.agent.adapter.ts",
         ),
       ).toEqual([]);
     });
@@ -79,7 +79,7 @@ describe("given a feature package file", () => {
       expect(
         ids(
           'import { PLATFORM_TENANT } from "@langwatch/clickhouse-client";',
-          "modules/agent/server/src/adapters/postgres.agent.adapter.ts",
+          "modules/agent/process/src/adapters/postgres.agent.adapter.ts",
         ),
       ).toEqual(["clickhouseClient"]);
     });
@@ -91,7 +91,7 @@ describe("given a feature package file", () => {
       expect(
         ids(
           'import { TupleParam } from "@clickhouse/client";',
-          "modules/agent/server/src/app/agent-composition.build.ts",
+          "modules/agent/process/src/app/agent-composition.build.ts",
         ),
       ).toEqual([]);
     });
@@ -224,7 +224,7 @@ describe("given a file outside the governed source", () => {
       expect(
         ids(
           'import { PLATFORM_TENANT } from "@langwatch/clickhouse-client";',
-          "modules/agent/server/src/__tests__/agent.unit.test.ts",
+          "modules/agent/process/src/__tests__/agent.unit.test.ts",
         ),
       ).toEqual([]);
     });

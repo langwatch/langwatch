@@ -8,8 +8,8 @@ const workspace = createFixtureWorkspace({
 
 afterAll(() => workspace.cleanup());
 
-const REPOSITORY = "modules/agent/server/src/repositories/prisma/prisma.agent.repository.ts";
-const CHANNEL = "modules/agent/server/src/channels/slack/slack.agent.channel.ts";
+const REPOSITORY = "modules/agent/process/src/repositories/prisma/prisma.agent.repository.ts";
+const CHANNEL = "modules/agent/process/src/channels/slack/slack.agent.channel.ts";
 
 function fromRepository(code) {
   return runRule(repositoryTakesOnlyItsStoreRule, {
@@ -50,7 +50,7 @@ describe("given a repository", () => {
   describe("when it imports another module's server package", () => {
     /** @scenario "Outside its package a module is its App" */
     it("reports the crossing as another module", () => {
-      const found = fromRepository('import { traceServer } from "@langwatch/trace-server";');
+      const found = fromRepository('import { traceServer } from "@langwatch/trace-process";');
 
       expect(found[0].data.crossed).toBe("another module");
     });

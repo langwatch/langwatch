@@ -35,7 +35,7 @@ const logger = createLogger("langwatch:scenarios:evaluations");
 
 /**
  * What the evaluator dispatch is handed, in the runner's own terms. Mirrors
- * `@langwatch/evaluation-server`'s internal `DataForEvaluation` shape, which
+ * `@langwatch/evaluation-process`'s internal `DataForEvaluation` shape, which
  * is not part of that package's public contract.
  */
 export type DataForEvaluation =

@@ -18,14 +18,14 @@ describe("given a core module server package", () => {
     it("reports handledError and names the contract errors file", () => {
       const found = report(
         "class AgentBusyError extends HandledError {}",
-        "modules/agent/server/src/services/agent.service.ts",
+        "modules/agent/process/src/services/agent.service.ts",
       );
 
       expect(found).toHaveLength(1);
       expect(found[0].messageId).toBe("handledError");
       expect(found[0].message).toBe(
         "`AgentBusyError` extends `HandledError` in" +
-          " `modules/agent/server/src/services/agent.service.ts`." +
+          " `modules/agent/process/src/services/agent.service.ts`." +
           " Move it to `modules/agent/contract/src/agent.errors.ts`.",
       );
     });
@@ -36,7 +36,7 @@ describe("given a core module server package", () => {
     it("reports nothing", () => {
       const found = report(
         "class AgentBusyError extends Error {}",
-        "modules/agent/server/src/services/agent.service.ts",
+        "modules/agent/process/src/services/agent.service.ts",
       );
 
       expect(found).toEqual([]);
@@ -50,7 +50,7 @@ describe("given an enterprise module server package", () => {
     it("names the enterprise contract errors file", () => {
       const found = report(
         "class SsoConfigError extends HandledError {}",
-        "enterprise/modules/sso/server/src/services/sso.service.ts",
+        "enterprise/modules/sso/process/src/services/sso.service.ts",
       );
 
       expect(found[0].message).toContain("enterprise/modules/sso/contract/src/sso.errors.ts");

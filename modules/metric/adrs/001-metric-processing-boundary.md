@@ -21,7 +21,7 @@ this feature.
 correlation extraction, durable eventing, and the existing-table projections
 for canonical OTLP metric points. `@langwatch/metric-contract` owns portable Zod 4
 values, schemas, commands, events, and the single ordinary-caller
-`MetricService`; `@langwatch/metric-server` owns the concrete service,
+`MetricService`; `@langwatch/metric-process` owns the concrete service,
 processing pipeline, private stores, rollup logic, and adapters.
 
 The pipeline records each canonical point with the existing

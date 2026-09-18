@@ -24,19 +24,19 @@
       "path": "../../modules/agent/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/agent/server/tsconfig.build.json"
+      "path": "../../modules/agent/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/analytics/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/analytics/server/tsconfig.build.json"
+      "path": "../../modules/analytics/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/annotation/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/annotation/server/tsconfig.build.json"
+      "path": "../../modules/annotation/process/tsconfig.build.json"
     },
     {
       "path": "../../packages/api/tsconfig.build.json"
@@ -45,7 +45,7 @@
       "path": "../../modules/api-key/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/api-key/server/tsconfig.build.json"
+      "path": "../../modules/api-key/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/audit-log/contract/tsconfig.build.json"
@@ -57,19 +57,19 @@
       "path": "../../modules/auth/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/auth/server/tsconfig.build.json"
+      "path": "../../modules/auth/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/authz/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/authz/server/tsconfig.build.json"
+      "path": "../../modules/authz/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/automation/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/automation/server/tsconfig.build.json"
+      "path": "../../modules/automation/process/tsconfig.build.json"
     },
     {
       "path": "../../packages/aws-client/tsconfig.build.json"
@@ -81,7 +81,7 @@
       "path": "../../modules/coding-agent/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/coding-agent/server/tsconfig.build.json"
+      "path": "../../modules/coding-agent/process/tsconfig.build.json"
     },
     {
       "path": "../../packages/config/tsconfig.build.json"
@@ -90,25 +90,25 @@
       "path": "../../modules/dashboard/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/dashboard/server/tsconfig.build.json"
+      "path": "../../modules/dashboard/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/data-privacy/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/data-privacy/server/tsconfig.build.json"
+      "path": "../../modules/data-privacy/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/data-retention/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/data-retention/server/tsconfig.build.json"
+      "path": "../../modules/data-retention/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/dataset/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/dataset/server/tsconfig.build.json"
+      "path": "../../modules/dataset/process/tsconfig.build.json"
     },
     {
       "path": "../../packages/egress/tsconfig.build.json"
@@ -117,25 +117,25 @@
       "path": "../../enterprise/modules/billing/contract/tsconfig.build.json"
     },
     {
-      "path": "../../enterprise/modules/billing/server/tsconfig.build.json"
+      "path": "../../enterprise/modules/billing/process/tsconfig.build.json"
     },
     {
       "path": "../../enterprise/modules/governance/contract/tsconfig.build.json"
     },
     {
-      "path": "../../enterprise/modules/governance/server/tsconfig.build.json"
+      "path": "../../enterprise/modules/governance/process/tsconfig.build.json"
     },
     {
       "path": "../../enterprise/modules/licensing/contract/tsconfig.build.json"
     },
     {
-      "path": "../../enterprise/modules/licensing/server/tsconfig.build.json"
+      "path": "../../enterprise/modules/licensing/process/tsconfig.build.json"
     },
     {
       "path": "../../enterprise/modules/managed-provider/contract/tsconfig.build.json"
     },
     {
-      "path": "../../enterprise/modules/managed-provider/server/tsconfig.build.json"
+      "path": "../../enterprise/modules/managed-provider/process/tsconfig.build.json"
     },
     {
       "path": "../../enterprise/modules/saas/contract/tsconfig.build.json"
@@ -147,19 +147,19 @@
       "path": "../../modules/entitlement/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/entitlement/server/tsconfig.build.json"
+      "path": "../../modules/entitlement/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/evaluation/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/evaluation/server/tsconfig.build.json"
+      "path": "../../modules/evaluation/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/evaluator/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/evaluator/server/tsconfig.build.json"
+      "path": "../../modules/evaluator/process/tsconfig.build.json"
     },
     {
       "path": "../../packages/eventing/tsconfig.build.json"
@@ -168,25 +168,25 @@
       "path": "../../modules/experiment/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/experiment/server/tsconfig.build.json"
+      "path": "../../modules/experiment/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/feature-flag/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/feature-flag/server/tsconfig.build.json"
+      "path": "../../modules/feature-flag/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/gateway/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/gateway/server/tsconfig.build.json"
+      "path": "../../modules/gateway/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/github/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/github/server/tsconfig.build.json"
+      "path": "../../modules/github/process/tsconfig.build.json"
     },
     {
       "path": "../../packages/group-queue/tsconfig.build.json"
@@ -195,13 +195,13 @@
       "path": "../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../modules/hosted-mcp/server/tsconfig.build.json"
+      "path": "../../modules/hosted-mcp/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/identity/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/identity/server/tsconfig.build.json"
+      "path": "../../modules/identity/process/tsconfig.build.json"
     },
     {
       "path": "../../packages/kernel/tsconfig.build.json"
@@ -213,7 +213,7 @@
       "path": "../../modules/langy/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/langy/server/tsconfig.build.json"
+      "path": "../../modules/langy/process/tsconfig.build.json"
     },
     {
       "path": "../../packages/mail/tsconfig.declarations.json"
@@ -222,19 +222,19 @@
       "path": "../../modules/model-provider/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/model-provider/server/tsconfig.build.json"
+      "path": "../../modules/model-provider/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/monitor/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/monitor/server/tsconfig.build.json"
+      "path": "../../modules/monitor/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/notification/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/notification/server/tsconfig.build.json"
+      "path": "../../modules/notification/process/tsconfig.build.json"
     },
     {
       "path": "../../packages/observability/tsconfig.build.json"
@@ -243,13 +243,13 @@
       "path": "../../modules/ops/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/ops/server/tsconfig.build.json"
+      "path": "../../modules/ops/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/organization/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/organization/server/tsconfig.build.json"
+      "path": "../../modules/organization/process/tsconfig.build.json"
     },
     {
       "path": "../../packages/otlp/tsconfig.build.json"
@@ -261,13 +261,13 @@
       "path": "../../modules/platform-health/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/platform-health/server/tsconfig.build.json"
+      "path": "../../modules/platform-health/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/presence/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/presence/server/tsconfig.build.json"
+      "path": "../../modules/presence/process/tsconfig.build.json"
     },
     {
       "path": "../../packages/prisma-client/tsconfig.build.json"
@@ -282,13 +282,13 @@
       "path": "../../modules/project/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/project/server/tsconfig.build.json"
+      "path": "../../modules/project/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/prompt/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/prompt/server/tsconfig.build.json"
+      "path": "../../modules/prompt/process/tsconfig.build.json"
     },
     {
       "path": "../../packages/react-rum/tsconfig.build.json"
@@ -300,19 +300,19 @@
       "path": "../../modules/role/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/role/server/tsconfig.build.json"
+      "path": "../../modules/role/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/scenario/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/scenario/server/tsconfig.build.json"
+      "path": "../../modules/scenario/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/secret/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/secret/server/tsconfig.build.json"
+      "path": "../../modules/secret/process/tsconfig.build.json"
     },
     {
       "path": "../../packages/secrets/tsconfig.build.json"
@@ -321,19 +321,19 @@
       "path": "../../modules/share/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/share/server/tsconfig.build.json"
+      "path": "../../modules/share/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/stored-object/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/stored-object/server/tsconfig.build.json"
+      "path": "../../modules/stored-object/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/suite/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/suite/server/tsconfig.build.json"
+      "path": "../../modules/suite/process/tsconfig.build.json"
     },
     {
       "path": "../../packages/task/tsconfig.build.json"
@@ -345,31 +345,31 @@
       "path": "../../modules/topic/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/topic/server/tsconfig.build.json"
+      "path": "../../modules/topic/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/trace/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/trace/server/tsconfig.build.json"
+      "path": "../../modules/trace/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/user/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/user/server/tsconfig.build.json"
+      "path": "../../modules/user/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/webhook/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/webhook/server/tsconfig.build.json"
+      "path": "../../modules/webhook/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/workflow/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/workflow/server/tsconfig.build.json"
+      "path": "../../modules/workflow/process/tsconfig.build.json"
     },
     {
       "path": "../../packages/test-harness/tsconfig.build.json"

@@ -149,20 +149,20 @@ later edit from reading `input.projectId` instead of the credential.
 
 | Site | Route | Key | Declared access | Why it is safe |
 | --- | --- | --- | --- | --- |
-| `modules/analytics/server/src/transport/dashboard-widget.rest.ts:147` | `GET /api/v1/projects/:projectId/analytics/dashboard-widgets` | `projectId` (path) | `withPermission("analytics:view")`, no target | handler reads `projectFor({ app, scope })` at `:168`, never `input.projectId` |
+| `modules/analytics/process/src/transport/dashboard-widget.rest.ts:147` | `GET /api/v1/projects/:projectId/analytics/dashboard-widgets` | `projectId` (path) | `withPermission("analytics:view")`, no target | handler reads `projectFor({ app, scope })` at `:168`, never `input.projectId` |
 | same file `:172, :204, :230, :264, :295` | POST / GET / PATCH / POST dashboard / DELETE | `projectId` (path) | `analytics:create|view|update|delete`, no target | same `projectFor(... scope)` call in each handler |
-| `modules/dashboard/server/src/transport/saved-workbench-chart.rest.ts:108` | `GET /api/v1/projects/:projectId/analytics/charts` | `projectId` (path) | `withPermission("analytics:view")`, no target | `projectFor` returns `input.scope.id` at `saved-workbench-chart.rest.ts:66` |
+| `modules/dashboard/process/src/transport/saved-workbench-chart.rest.ts:108` | `GET /api/v1/projects/:projectId/analytics/charts` | `projectId` (path) | `withPermission("analytics:view")`, no target | `projectFor` returns `input.scope.id` at `saved-workbench-chart.rest.ts:66` |
 | same file `:133, :168, :197, :233, :256, :287` | the other six chart routes | `projectId` (path) | `analytics:*`, no target | same, `:127/:157/:191/:221/...` |
-| `modules/secret/server/src/transport/secret.rest.ts:67` | `GET /` | `projectId` (query) | `withPermission("secrets:view")` | `app.list({ projectId: scope.id })` at `:77`; the file says so at `:6-8` |
-| `modules/secret/server/src/transport/secret.rest.ts:82` | `GET /:id` | `projectId` (query) | `withPermission("secrets:view")` | `app.get({ projectId: scope.id, id })` at `:87` |
-| `modules/secret/server/src/transport/secret.rest.ts:130` | `DELETE /:id` | `projectId` (input) | `withPermission("secrets:manage")` | `app.delete({ projectId: scope.id, id })` at `:135` |
-| `modules/stored-object/server/src/transport/stored-object.rest.ts:23` | `POST /:uploadToken/confirmation` | `projectId` (input) | `withPermission("project:update")` | handler passes `input` through (`:30`); safe **only** because `assertInputScope` refuses `input.projectId !== caller.scope.id` at `access.ts:518-526`, the project door having set `caller.scope` |
-| `modules/stored-object/server/src/transport/stored-object.rest.ts:31` | `GET /:id` | `projectId` (query) | `withPermission("project:view")` | same guard; handler is `app.resolveDelivery(input)` at `:37` |
-| `modules/stored-object/server/src/transport/stored-object.rest.ts:39` | `DELETE /:id` | `projectId` (input) | `withPermission("project:manage")` | same guard; handler is `app.delete(input)` at `:45` |
-| `modules/project/server/src/transport/project.rest.ts:247` | `GET /:projectId/api-key` | `projectId` (path) | `withAccess(anyAuthenticated(...))` — no permission at all | handler is `async () => refuseBaseKeyToApiToken()` at `:251`; the route refuses unconditionally |
-| `modules/project/server/src/transport/project.rest.ts:254` | `POST /:projectId/regenerate-api-key` | `projectId` (path) | `withAccess(anyAuthenticated(...))` | same unconditional refusal at `:259` |
-| `modules/authz/server/src/transport/authz-role-binding.rest.ts:96` | `GET /` | `userId` (query) | `withPermission("organization:manage")` | rows come from `organization.organizationId` at `:107`; `input.userId` is only a post-filter at `:109` |
-| `modules/workflow/server/src/transport/workflow-studio.rest.ts:103` | `POST /api/workflows/code-completion` | `projectId` (query) | `withAccess({ kind: "public", ... })` | **does not reach runtime**: see §3.4 |
+| `modules/secret/process/src/transport/secret.rest.ts:67` | `GET /` | `projectId` (query) | `withPermission("secrets:view")` | `app.list({ projectId: scope.id })` at `:77`; the file says so at `:6-8` |
+| `modules/secret/process/src/transport/secret.rest.ts:82` | `GET /:id` | `projectId` (query) | `withPermission("secrets:view")` | `app.get({ projectId: scope.id, id })` at `:87` |
+| `modules/secret/process/src/transport/secret.rest.ts:130` | `DELETE /:id` | `projectId` (input) | `withPermission("secrets:manage")` | `app.delete({ projectId: scope.id, id })` at `:135` |
+| `modules/stored-object/process/src/transport/stored-object.rest.ts:23` | `POST /:uploadToken/confirmation` | `projectId` (input) | `withPermission("project:update")` | handler passes `input` through (`:30`); safe **only** because `assertInputScope` refuses `input.projectId !== caller.scope.id` at `access.ts:518-526`, the project door having set `caller.scope` |
+| `modules/stored-object/process/src/transport/stored-object.rest.ts:31` | `GET /:id` | `projectId` (query) | `withPermission("project:view")` | same guard; handler is `app.resolveDelivery(input)` at `:37` |
+| `modules/stored-object/process/src/transport/stored-object.rest.ts:39` | `DELETE /:id` | `projectId` (input) | `withPermission("project:manage")` | same guard; handler is `app.delete(input)` at `:45` |
+| `modules/project/process/src/transport/project.rest.ts:247` | `GET /:projectId/api-key` | `projectId` (path) | `withAccess(anyAuthenticated(...))` — no permission at all | handler is `async () => refuseBaseKeyToApiToken()` at `:251`; the route refuses unconditionally |
+| `modules/project/process/src/transport/project.rest.ts:254` | `POST /:projectId/regenerate-api-key` | `projectId` (path) | `withAccess(anyAuthenticated(...))` | same unconditional refusal at `:259` |
+| `modules/authz/process/src/transport/authz-role-binding.rest.ts:96` | `GET /` | `userId` (query) | `withPermission("organization:manage")` | rows come from `organization.organizationId` at `:107`; `input.userId` is only a post-filter at `:109` |
+| `modules/workflow/process/src/transport/workflow-studio.rest.ts:103` | `POST /api/workflows/code-completion` | `projectId` (query) | `withAccess({ kind: "public", ... })` | **does not reach runtime**: see §3.4 |
 
 The three `ops-process` procedures that take a `projectId` they never read
 (`ops-process.trpc.ts:86, :115, :124`) sit behind `admitOperator` and are
@@ -195,36 +195,36 @@ shared constant.
 
 | Site | What discharges it |
 | --- | --- |
-| `modules/stored-object/server/src/transport/stored-object-file.rest.ts:150` | the reference deferral; owner authorization at `:200-216` (astra finding 4 confirms) |
-| `modules/experiment/server/src/transport/experiment-workbench-run.rest.ts:88` | `permittedPerson({ app, userId: caller.userId, projectId })` at `:100` before any read |
-| `modules/experiment/server/src/transport/experiment-workbench-run.rest.ts:195` | `app.abortWorkbenchRun({ ...input, userId: caller.userId })` at `:201` — abort ownership checked in the app |
-| `modules/gateway/server/src/transport/virtual-key.trpc.ts:39` and 10 siblings | every handler co-keys `input.organizationId` with `actor.id`; `listVisibleVirtualKeys` intersects against the caller's membership |
-| `modules/gateway/server/src/transport/gateway-usage.trpc.ts:29, :48` | same membership intersection before any total is summed |
-| `modules/model-provider/server/src/transport/model-provider.trpc.ts:75, :117, :127, :145` | `model-provider-command.service.ts:82` `authorizeWrite(actorId, existing?.scopes, scopes)`; delete authorizes at `:124` |
-| `modules/model-provider/server/src/transport/llm-model-cost.trpc.ts:59` | scope derived from the stored row, not the input; `manage` authorized on it |
-| `modules/user/server/src/transport/user.trpc.ts:141` | `user.app.ts:801-803` — `userId !== caller.id && !isOperator(...)` throws `UserAccountAccessDeniedError` |
-| `modules/user/server/src/transport/user.trpc.ts:149` | `user.app.ts:813-815` — operator only |
-| `modules/feature-flag/server/src/transport/feature-flag.trpc.ts:21` | `feature-flag.app.ts:187` `authorizeLooseTarget(input)` |
-| `modules/authz/server/src/transport/authz.trpc.ts:22` | answers the caller's own standing; a non-member resolves to the empty set |
-| `modules/project/server/src/transport/project.trpc.ts:95` | `createStanding({ app, input, actor })` asks the named team/organization before the write |
+| `modules/stored-object/process/src/transport/stored-object-file.rest.ts:150` | the reference deferral; owner authorization at `:200-216` (astra finding 4 confirms) |
+| `modules/experiment/process/src/transport/experiment-workbench-run.rest.ts:88` | `permittedPerson({ app, userId: caller.userId, projectId })` at `:100` before any read |
+| `modules/experiment/process/src/transport/experiment-workbench-run.rest.ts:195` | `app.abortWorkbenchRun({ ...input, userId: caller.userId })` at `:201` — abort ownership checked in the app |
+| `modules/gateway/process/src/transport/virtual-key.trpc.ts:39` and 10 siblings | every handler co-keys `input.organizationId` with `actor.id`; `listVisibleVirtualKeys` intersects against the caller's membership |
+| `modules/gateway/process/src/transport/gateway-usage.trpc.ts:29, :48` | same membership intersection before any total is summed |
+| `modules/model-provider/process/src/transport/model-provider.trpc.ts:75, :117, :127, :145` | `model-provider-command.service.ts:82` `authorizeWrite(actorId, existing?.scopes, scopes)`; delete authorizes at `:124` |
+| `modules/model-provider/process/src/transport/llm-model-cost.trpc.ts:59` | scope derived from the stored row, not the input; `manage` authorized on it |
+| `modules/user/process/src/transport/user.trpc.ts:141` | `user.app.ts:801-803` — `userId !== caller.id && !isOperator(...)` throws `UserAccountAccessDeniedError` |
+| `modules/user/process/src/transport/user.trpc.ts:149` | `user.app.ts:813-815` — operator only |
+| `modules/feature-flag/process/src/transport/feature-flag.trpc.ts:21` | `feature-flag.app.ts:187` `authorizeLooseTarget(input)` |
+| `modules/authz/process/src/transport/authz.trpc.ts:22` | answers the caller's own standing; a non-member resolves to the empty set |
+| `modules/project/process/src/transport/project.trpc.ts:95` | `createStanding({ app, input, actor })` asks the named team/organization before the write |
 | `modules/ops/.../ops-platform.trpc.ts`, `ops-process.trpc.ts` | `app.admitOperator(operator, "ops:view")` first line of every handler |
 
 **(iv) The credential bounds the id in the handler.**
 
 | Site | What discharges it |
 | --- | --- |
-| `modules/gateway/server/src/transport/gateway-spend.rest.ts:552, :638` | `resolveSpendScope` starts from the credential organization's own projects and **intersects** the supplied ids — `prisma.gateway-spend-scope.repository.ts:86-96`. A foreign `project_id` drops out of the set. |
+| `modules/gateway/process/src/transport/gateway-spend.rest.ts:552, :638` | `resolveSpendScope` starts from the credential organization's own projects and **intersects** the supplied ids — `prisma.gateway-spend-scope.repository.ts:86-96`. A foreign `project_id` drops out of the set. |
 | `modules/organization/.../organization-management.rest.ts:190, :212, :236, :279` | every `:userId` is passed with `organizationId: scope.id` in the same call (`:201, :226, :268, :287`) |
 | `modules/organization/.../team.rest.ts:244, :271` and `group.rest.ts:199, :217` | same co-keying with `scope.id` |
-| `modules/project/server/src/transport/project.rest.ts:169` (`teamId`) | `project.service.ts:268-272` `assertTeamCanHoldANewProject({ teamId, organizationId })` |
-| `modules/project/server/src/transport/project.rest.ts:209` / `project.trpc.ts:170` (`teamId`) | `project.service.ts:334-343` `findActiveTeamInOrganization` refuses a destination team outside the credential's organization |
-| `modules/langy/server/src/transport/langy-internal.rest.ts:79` | the handler cross-checks the `(projectId, conversationId, turnId)` triple at `:94` and 404s a forged one; the door is the deployment's own bearer, which **fails closed** when unconfigured (`api-rest.host.ts:479-481`) |
-| `modules/langy/server/src/transport/langy-internal.rest.ts:136` | `revokeWorkerSessionKey({ apiKeyId, projectId })` refuses any key that is not a Langy session key |
+| `modules/project/process/src/transport/project.rest.ts:169` (`teamId`) | `project.service.ts:268-272` `assertTeamCanHoldANewProject({ teamId, organizationId })` |
+| `modules/project/process/src/transport/project.rest.ts:209` / `project.trpc.ts:170` (`teamId`) | `project.service.ts:334-343` `findActiveTeamInOrganization` refuses a destination team outside the credential's organization |
+| `modules/langy/process/src/transport/langy-internal.rest.ts:79` | the handler cross-checks the `(projectId, conversationId, turnId)` triple at `:94` and 404s a forged one; the door is the deployment's own bearer, which **fails closed** when unconfigured (`api-rest.host.ts:479-481`) |
+| `modules/langy/process/src/transport/langy-internal.rest.ts:136` | `revokeWorkerSessionKey({ apiKeyId, projectId })` refuses any key that is not a Langy session key |
 | `modules/organization/.../join-request.trpc.ts:40` | `fileJoinRequest({ userId: actor.id, organizationId })` — the offer list is the gate |
 
 ### 3.4 One site that is neither: a declaration that cannot load
 
-`modules/workflow/server/src/transport/workflow-studio.rest.ts:103` declares
+`modules/workflow/process/src/transport/workflow-studio.rest.ts:103` declares
 `withAccess({ kind: "public", ... })` **and** `withQuery(workflowCodeCompletionQuerySchema)`,
 which is `z.object({ projectId: z.string().min(1) })`
 (`modules/workflow/contract/src/workflow-rest.schemas.ts:129`). `assertRouteReady`

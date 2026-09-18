@@ -34,7 +34,7 @@ durable read model exists.
 - `suite/web` owns the controlled scenario/target pickers, run dialogs, and
   run-history presentation, transforms, polling, expansion, and store state.
   As of this writing it is not composed into `apps/ui` — there is no page,
-  routing, or drawer host wiring `@langwatch/suite-web` there yet; see
+  routing, or drawer host wiring `@langwatch/suite-browser` there yet; see
   `dev/docs/plans/strict-feature-layout.md` for what is still open. The suite
   restore itself closed on 2026-09-06.
 - The REST `/api/suites` family (`createSuiteRestApp`, mounted from

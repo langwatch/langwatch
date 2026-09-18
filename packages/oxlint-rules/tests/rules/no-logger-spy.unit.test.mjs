@@ -18,7 +18,7 @@ describe("given a test file", () => {
     it("reports spyOnLogger", () => {
       const found = report(
         "vi.spyOn(createLogger('agent'), 'error');",
-        "modules/agent/server/src/__tests__/agent.unit.test.ts",
+        "modules/agent/process/src/__tests__/agent.unit.test.ts",
       );
 
       expect(found).toHaveLength(1);
@@ -31,7 +31,7 @@ describe("given a test file", () => {
     it("reports spyOnLogger", () => {
       const found = report(
         "const logger = createLogger('agent');\nvi.spyOn(logger, 'warn');",
-        "modules/agent/server/src/__tests__/agent.unit.test.ts",
+        "modules/agent/process/src/__tests__/agent.unit.test.ts",
       );
 
       expect(found).toHaveLength(1);
@@ -45,7 +45,7 @@ describe("given a test file", () => {
       expect(
         report(
           "const client = createClient();\nvi.spyOn(client, 'send');",
-          "modules/agent/server/src/__tests__/agent.unit.test.ts",
+          "modules/agent/process/src/__tests__/agent.unit.test.ts",
         ),
       ).toEqual([]);
     });
@@ -57,7 +57,7 @@ describe("given a test file", () => {
       expect(
         report(
           "vi.spyOn(createLogger('agent'), 'error');",
-          "modules/agent/server/src/services/agent.service.ts",
+          "modules/agent/process/src/services/agent.service.ts",
         ),
       ).toEqual([]);
     });

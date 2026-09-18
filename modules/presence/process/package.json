@@ -1,0 +1,43 @@
+{
+  "name": "@langwatch/presence-process",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical server-side collaborative presence service.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/presence-contract": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/redis-client": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
+    "@trpc/server": "catalog:",
+    "ioredis": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

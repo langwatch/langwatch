@@ -210,7 +210,7 @@ spec:
 
             # AI Gateway virtual-key pepper (control-plane only).
             # The gateway pod must NEVER receive this value — it is used here
-            # by @langwatch/gateway-server to hash incoming virtual-key
+            # by @langwatch/gateway-process to hash incoming virtual-key
             # plaintext against the stored digest.
             {{- if .Values.app.virtualKeyPepper.secretKeyRef.name }}
             - name: LW_VIRTUAL_KEY_PEPPER

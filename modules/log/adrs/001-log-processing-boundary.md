@@ -20,7 +20,7 @@ as migration context; ownership of log behaviour is specific to this feature.
 correlation-id derivation, durable eventing, and the existing-table
 projections for canonical OTLP log records. `@langwatch/log-contract` owns portable Zod 4
 values, schemas, commands, events, and the single ordinary-caller
-`LogService`; `@langwatch/log-server` owns the concrete service, processing
+`LogService`; `@langwatch/log-process` owns the concrete service, processing
 pipeline, private stores, and adapters.
 
 The pipeline records each canonical record with the existing

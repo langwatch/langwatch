@@ -3,63 +3,63 @@
   "policy": "ports-and-adapters-folders",
   "entries": [
     {
-      "key": "modules/gateway/server/src/adapters/clickhouse.gateway-open-admissions.adapter.ts",
+      "key": "modules/gateway/process/src/adapters/clickhouse.gateway-open-admissions.adapter.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/gateway/server/src/adapters/eventing.gateway-spend.adapter.ts",
+      "key": "modules/gateway/process/src/adapters/eventing.gateway-spend.adapter.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/gateway/server/src/adapters/gateway-end-user-caps.adapter.ts",
+      "key": "modules/gateway/process/src/adapters/gateway-end-user-caps.adapter.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/gateway/server/src/adapters/gateway-spend-cursor.adapter.ts",
+      "key": "modules/gateway/process/src/adapters/gateway-spend-cursor.adapter.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/gateway/server/src/adapters/gateway-spend-filters.adapter.ts",
+      "key": "modules/gateway/process/src/adapters/gateway-spend-filters.adapter.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/gateway/server/src/adapters/gateway-spend-grouping.adapter.ts",
+      "key": "modules/gateway/process/src/adapters/gateway-spend-grouping.adapter.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/gateway/server/src/adapters/gateway-spend-producer.adapter.ts",
+      "key": "modules/gateway/process/src/adapters/gateway-spend-producer.adapter.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/gateway/server/src/adapters/postgres.gateway-budget-resolution.adapter.ts",
+      "key": "modules/gateway/process/src/adapters/postgres.gateway-budget-resolution.adapter.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/gateway/server/src/adapters/postgres.gateway-config-assembly.adapter.ts",
+      "key": "modules/gateway/process/src/adapters/postgres.gateway-config-assembly.adapter.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/gateway/server/src/adapters/postgres.gateway-transaction.adapter.ts",
+      "key": "modules/gateway/process/src/adapters/postgres.gateway-transaction.adapter.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/gateway/server/src/adapters/postgres.virtual-key.adapter.ts",
+      "key": "modules/gateway/process/src/adapters/postgres.virtual-key.adapter.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/gateway/server/src/adapters/prisma.gateway.adapter.ts",
+      "key": "modules/gateway/process/src/adapters/prisma.gateway.adapter.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/workflow/server/src/adapters/aws.nlp-lambda-arn-resolver.adapter.ts",
+      "key": "modules/workflow/process/src/adapters/aws.nlp-lambda-arn-resolver.adapter.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/workflow/server/src/adapters/aws.nlp-lambda-stream-invoke.adapter.ts",
+      "key": "modules/workflow/process/src/adapters/aws.nlp-lambda-stream-invoke.adapter.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/workflow/server/src/adapters/lambda.workflow-studio-stream.adapter.ts",
+      "key": "modules/workflow/process/src/adapters/lambda.workflow-studio-stream.adapter.ts",
       "measured": "2026-09-10"
     }
   ]

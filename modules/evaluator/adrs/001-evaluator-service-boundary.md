@@ -21,7 +21,7 @@ and the abstract `EvaluatorService`. The server keeps its concrete service,
 repository and Postgres persistence private; only the composition adapter is
 public. It depends on the full Workflow service and an audit capability.
 
-`@langwatch/evaluator-web` owns browser-safe evaluator pickers, cards,
+`@langwatch/evaluator-browser` owns browser-safe evaluator pickers, cards,
 code-evaluator authoring and editor chrome. The host supplies navigation,
 availability, Monaco and field-mapping presentation. The web package never
 imports app aliases, tRPC or server code.

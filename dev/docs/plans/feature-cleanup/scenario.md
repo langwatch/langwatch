@@ -167,7 +167,7 @@ Adding one simulation read means editing six files before a query exists.
 
 `server/src/index.ts` is 97 lines: **37 `export *` lines** publishing ≥110 symbols,
 plus 36 named. Across the 24 files outside the feature that import
-`@langwatch/scenario-server`, **46 distinct symbols** are used. Published and never
+`@langwatch/scenario-process`, **46 distinct symbols** are used. Published and never
 imported outside: `AUTH_STRATEGIES`, `CANCELLATION_CHANNEL`, `ChildLoggerAdapter`,
 `ChildProcessSpawnAdapter`, `ChildTlsEnvAdapter`, `ExecutionJobData`,
 `FencedTemplate`, `HttpAuthAdapter`, `LitellmModelAdapter`, `PromptTemplateAdapter`,
@@ -265,7 +265,7 @@ and `ScenarioTabStorePort` earns its second implementation (P7).
 `AppScenarioRuntime.create({ database, simulations, ids, folderIds, clock, secretCipher })`.
 `AppScenarioRuntime.build()` (`platform/app/src/runtime/app/features/scenario.ts:36-45`)
 re-passes all six to `PrismaScenarioAdapter.create`, which
-(`modules/scenario/server/src/adapters/prisma.scenario.adapter.ts:19-26`)
+(`modules/scenario/process/src/adapters/prisma.scenario.adapter.ts:19-26`)
 re-passes all six to `ScenarioService.create`. Three classes, 74 lines, six fields
 spelled three times, no behaviour. The simulation side is the same shape —
 `presets.ts:1411` → `AppSimulationRuntime.build()` (`simulation.ts:88-98`) →
@@ -577,7 +577,7 @@ transports. 7 last, because it is the one that breaks external imports.
 
 ## 6. Blast radius
 
-**24 files outside the feature import `@langwatch/scenario-server`** (15 non-test),
+**24 files outside the feature import `@langwatch/scenario-process`** (15 non-test),
 concentrated in three places: `platform/app/src/runtime/` (5 files),
 `platform/app/src/server/` (7), and `apps/api/src/` (3).
 
@@ -614,6 +614,6 @@ in `apps/api/` is touched by any commit: it imports only `ScenarioTrpcApi`,
 signatures do not change.
 
 `@langwatch/scenario-contract` is imported by **84 non-test files outside the
-feature** — 17 in `modules/suite/web/`, the rest across
+feature** — 17 in `modules/suite/browser/`, the rest across
 `platform/app/src/components/agent-testing/`, `components/suites/`, `hooks/` and
 `server/`. No commit above changes a contract signature.

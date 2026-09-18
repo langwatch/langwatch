@@ -106,11 +106,11 @@ describe("given a feature package's typed hooks", () => {
       }) => children;
 
       const feature = uiFeature<PromptApiMap, Record<string, never>>({
-        name: "@langwatch/prompt-web",
+        name: "@langwatch/prompt-browser",
         api: { Provider },
       });
 
-      expect(feature.api?.name).toBe("@langwatch/prompt-web");
+      expect(feature.api?.name).toBe("@langwatch/prompt-browser");
       expect(feature.api?.Provider).toBe(Provider);
     });
   });

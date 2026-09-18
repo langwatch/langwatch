@@ -294,7 +294,7 @@ and the README sections "Versioned HTTP services", "Compatibility registration m
 - **No git writes.** No `add`, `commit`, `stash`, `checkout`, `restore`, `reset`, `clean`.
 - **No whole-tree checks.** Never root `pnpm typecheck`/`lint`/`format`/`test`, never
   `npx vitest`, never `pnpm dev`. Use `pnpm typecheck:one packages/api`,
-  `pnpm --filter @langwatch/api test:unit`, `pnpm --filter @langwatch/annotation-server test:unit`,
+  `pnpm --filter @langwatch/api test:unit`, `pnpm --filter @langwatch/annotation-process test:unit`,
   `pnpm --filter @langwatch/platform-api test:unit src/features/annotation`,
   `pnpm exec oxlint --config .oxlintrc.jsonc <files>`,
   `pnpm exec oxfmt --write --disable-nested-config <files>`.

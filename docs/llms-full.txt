@@ -11164,7 +11164,7 @@ sidebarTitle: REST API
   call into the same services. There is exactly one place each governance verb is implemented.
 </Info>
 
-<Note>**Service-layer-shared, repository-pattern-backed.** Per `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, every Hono route delegates to a shared service-layer function (`IngestionTemplateService.updateOttlRules`, `IngestionKeyService.install`, etc.). Services use repositories for persistence; services never import `prisma` directly. The umbrella spec also locks the no-bypass invariant, no UI page, route handler, CLI command, or MCP tool may call `prisma.<governanceModel>.*` directly. The governance repositories hold that boundary: see `enterprise/modules/governance/server/src/repositories/prisma/prisma.ingestion-template.repository.ts` and `modules/audit-log/server/src/repositories/prisma/prisma.audit-log.repository.ts` (the latter wraps every `AuditLog` write so audit emission also goes through the repository boundary). Repo methods accept `Prisma.TransactionClient | PrismaClient` so they work inside service `$transaction` blocks and against the top-level client transparently.</Note>
+<Note>**Service-layer-shared, repository-pattern-backed.** Per `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`, every Hono route delegates to a shared service-layer function (`IngestionTemplateService.updateOttlRules`, `IngestionKeyService.install`, etc.). Services use repositories for persistence; services never import `prisma` directly. The umbrella spec also locks the no-bypass invariant, no UI page, route handler, CLI command, or MCP tool may call `prisma.<governanceModel>.*` directly. The governance repositories hold that boundary: see `enterprise/modules/governance/process/src/repositories/prisma/prisma.ingestion-template.repository.ts` and `modules/audit-log/process/src/repositories/prisma/prisma.audit-log.repository.ts` (the latter wraps every `AuditLog` write so audit emission also goes through the repository boundary). Repo methods accept `Prisma.TransactionClient | PrismaClient` so they work inside service `$transaction` blocks and against the top-level client transparently.</Note>
 
 ## Why a separate REST API alongside tRPC
 
@@ -11299,15 +11299,15 @@ The mutating verbs across the two shipped resources (`createOrgTemplate`, `updat
 
 The wire shape, request bodies, response envelopes, status-code mapping, and surface attribution, is locked by the governance transport and application suites, which drive the real Hono pipeline and the real application over stubbed services:
 
-**Ingestion-templates wire shape**: `enterprise/modules/governance/server/src/app/__tests__/governance.transport.unit.test.ts`. 20 cases covering the full ingestion-templates verb set, the 401, 400, 403 and 404 envelopes in this family's nested `{ error: { type, code, message } }` body, and the audit-uniform assertion that a state-changing call is attributed with `surface: "hono"`. It is the successor to the monolith's `governance-rest-api.integration.test.ts`: what that suite proved about the DOOR moved here, and what it proved about the DOMAIN moved to the service tests beside it.
+**Ingestion-templates wire shape**: `enterprise/modules/governance/process/src/app/__tests__/governance.transport.unit.test.ts`. 20 cases covering the full ingestion-templates verb set, the 401, 400, 403 and 404 envelopes in this family's nested `{ error: { type, code, message } }` body, and the audit-uniform assertion that a state-changing call is attributed with `surface: "hono"`. It is the successor to the monolith's `governance-rest-api.integration.test.ts`: what that suite proved about the DOOR moved here, and what it proved about the DOMAIN moved to the service tests beside it.
 
-**Surface-spoof rejection**: same file. Fires Hono POSTs with `X-LangWatch-Surface` set to `cli` and to in-process values, and asserts only `cli` is honoured while everything else falls back to `"hono"`. `resolveSurfaceFromRequest` in `enterprise/modules/governance/server/src/transport/governance.rest.ts` filters the header against the `GovernanceCallSurface` vocabulary, which is what stops an external HTTP caller forging an in-process surface tag: `cli` is the only value the Hono surface accepts on inbound, and `trpc` and `mcp` are reachable only in-process.
+**Surface-spoof rejection**: same file. Fires Hono POSTs with `X-LangWatch-Surface` set to `cli` and to in-process values, and asserts only `cli` is honoured while everything else falls back to `"hono"`. `resolveSurfaceFromRequest` in `enterprise/modules/governance/process/src/transport/governance.rest.ts` filters the header against the `GovernanceCallSurface` vocabulary, which is what stops an external HTTP caller forging an in-process surface tag: `cli` is the only value the Hono surface accepts on inbound, and `trpc` and `mcp` are reachable only in-process.
 
-**Cross-surface audit uniformity**: `enterprise/modules/governance/server/src/app/__tests__/governance.app.unit.test.ts`, scenario "audit rows are identical apart from metadata.surface". Creates the same organization template over all four surfaces, tRPC, Hono REST, CLI and MCP, and asserts the four writes are field-for-field identical apart from `surface`. Surface attribution therefore cannot drift into a second opinion about what a write means, and there is no separate MCP-transport regression because the MCP tool reaches this same application call.
+**Cross-surface audit uniformity**: `enterprise/modules/governance/process/src/app/__tests__/governance.app.unit.test.ts`, scenario "audit rows are identical apart from metadata.surface". Creates the same organization template over all four surfaces, tRPC, Hono REST, CLI and MCP, and asserts the four writes are field-for-field identical apart from `surface`. Surface attribution therefore cannot drift into a second opinion about what a write means, and there is no separate MCP-transport regression because the MCP tool reaches this same application call.
 
 **No-bypass invariant (CI-enforced)**: the `prisma-containment` policy in `packages/architecture-enforcer/src/prisma-boundaries.ts`, run by `pnpm lint:architecture`. It rejects any file importing generated Prisma outside a repository under `server/src/repositories/prisma/` or the Postgres composition adapter `server/src/adapters/postgres.<subject>.adapter.ts`. That is the umbrella spec's `@no-bypass` invariant enforced repo-wide rather than for governance alone, so the repository-pattern boundary cannot silently drift.
 
-**Ingestion-key flows**: `enterprise/modules/governance/server/src/services/__tests__/ingestion-key.service.unit.test.ts` pins the service-level ordering, that a replacement key is minted only after the prior one is hard-revoked, and that an additive issue leaves another machine's key alone. The wire-level guarantees below are contract rather than covered ground, they carry no test of their own today:
+**Ingestion-key flows**: `enterprise/modules/governance/process/src/services/__tests__/ingestion-key.service.unit.test.ts` pins the service-level ordering, that a replacement key is minted only after the prior one is hard-revoked, and that an additive issue leaves another machine's key alone. The wire-level guarantees below are contract rather than covered ground, they carry no test of their own today:
 
 - the mint route answers 201 with an `ik-lw-…` token, its prefix and the OTLP endpoint, and a second mint for the same source returns a different token rather than replacing the first
 - a mint from a CLI session stores that session's login key as `parentApiKeyId` and the session's device label, and a mint from a session whose login key was revoked answers 401
@@ -11332,7 +11332,7 @@ That locks the `GovernanceCallSurface` enum filter at `resolveSurfaceFromRequest
 To run locally:
 
 ```bash
-pnpm --filter @langwatch/enterprise-governance-server test:unit
+pnpm --filter @langwatch/enterprise-governance-process test:unit
 pnpm lint:architecture
 ```
 
@@ -11347,7 +11347,7 @@ Use these files as the authoritative reference when implementing a CLI command o
 - [Compliance architecture](/ai-governance/compliance-architecture): how the OCSF v1.1 export consumes the same audit stream
 - Spec, `specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature`
 - v1 scope-fence audit, `specs/ai-gateway/governance/agentic-first-parity-v1-status.md` (12-resource × 4-surface matrix on shipped SHAs; scoring 2/12 full parity, 8/12 tRPC-only deferred to follow-on)
-- Wire-shape lock, `enterprise/modules/governance/server/src/app/__tests__/governance.transport.unit.test.ts`
+- Wire-shape lock, `enterprise/modules/governance/process/src/app/__tests__/governance.transport.unit.test.ts`
 
 ---
 
@@ -13967,7 +13967,7 @@ Governance MCP tools register inside LangWatch's existing MCP server (served on 
 }
 ```
 
-The 9 governance tools register via `registerGovernanceMcpTools(server, ctx)` from `enterprise/modules/governance/server/src/transport/api-mcp/governance-tools.api.ts`. The registrar is installed once, as the session-tool port that `apps/api/src/features/mcp/hosted-mcp.mount.ts` binds, and it runs for every session the endpoint opens, so the tools are available regardless of which MCP transport the client chose.
+The 9 governance tools register via `registerGovernanceMcpTools(server, ctx)` from `enterprise/modules/governance/process/src/transport/api-mcp/governance-tools.api.ts`. The registrar is installed once, as the session-tool port that `apps/api/src/features/mcp/hosted-mcp.mount.ts` binds, and it runs for every session the endpoint opens, so the tools are available regardless of which MCP transport the client chose.
 
 <Note>
   **Dev-environment port routing**: in production, LangWatch listens on a single port and the `/mcp`
@@ -13982,7 +13982,7 @@ The 9 governance tools register via `registerGovernanceMcpTools(server, ctx)` fr
 
 ## RBAC enforcement
 
-Governance tools enforce two distinct gates at the tool layer (`enterprise/modules/governance/server/src/transport/api-mcp/governance-tools.api.ts`), BEFORE the service call:
+Governance tools enforce two distinct gates at the tool layer (`enterprise/modules/governance/process/src/transport/api-mcp/governance-tools.api.ts`), BEFORE the service call:
 
 **`AUTH_REQUIRED:`**, write tools (e.g. `governance_ingestion_templates_create`, `governance_ingestion_keys_mint`) called from a project-apiKey-only session without OAuth. Read tools are NOT subject to this gate; they work with project-apiKey-only sessions.
 
@@ -14033,7 +14033,7 @@ Every state-changing tool call emits an audit row with `AuditLog.metadata.surfac
 
 Payload shapes are identical to the REST API's audit rows apart from `metadata.surface`, every other field (actorUserId, apiKeyId, target, error) follows the same shape. This lets incident response queries answer "what did the agent do?" without changing the audit-row event-kind taxonomy.
 
-The contract is asserted at the application layer by `enterprise/modules/governance/server/src/app/__tests__/governance.app.unit.test.ts`, in the scenario "audit rows are identical apart from metadata.surface": the same template creation is driven over all four surfaces, tRPC, Hono REST, CLI and MCP, and the four writes come out field-for-field identical apart from `surface`. No wire-level MCP test is needed (per the Path B architecture there is no MCP-over-HTTP wire to assert at). The `AUTH_REQUIRED:` negative path, a write tool with no `callerUserId` failing before any audit row is written, is contract rather than covered ground: it carries no test of its own today.
+The contract is asserted at the application layer by `enterprise/modules/governance/process/src/app/__tests__/governance.app.unit.test.ts`, in the scenario "audit rows are identical apart from metadata.surface": the same template creation is driven over all four surfaces, tRPC, Hono REST, CLI and MCP, and the four writes come out field-for-field identical apart from `surface`. No wire-level MCP test is needed (per the Path B architecture there is no MCP-over-HTTP wire to assert at). The `AUTH_REQUIRED:` negative path, a write tool with no `callerUserId` failing before any audit row is written, is contract rather than covered ground: it carries no test of its own today.
 
 ## Agent setup from scratch
 
@@ -15229,7 +15229,7 @@ If neither `http_polling` nor `s3_polling` fits your source, you can
 ship a custom adapter:
 
 ```ts
-// enterprise/modules/governance/server/src/adapters/my-custom-puller.adapter.ts
+// enterprise/modules/governance/process/src/adapters/my-custom-puller.adapter.ts
 import { PullerAdapter, PullResult } from "./PullerAdapter";
 import { z } from "zod";
 

@@ -22,7 +22,7 @@ the process. See [dev/docs/ARCHITECTURE.md §11](../dev/docs/ARCHITECTURE.md)
 for the shape ruling.
 
 Billing's Stripe subscription lifecycle, usage-limit notifications, and
-license-purchase workflow live in `modules/billing/server`; the application
+license-purchase workflow live in `modules/billing/process`; the application
 keeps only injected provider/mail/notification adapters and route mounting.
 
 These modules ship in every LangWatch distribution and you may run them in
