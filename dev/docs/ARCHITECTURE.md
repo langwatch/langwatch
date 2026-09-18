@@ -297,7 +297,17 @@ runs before routing on every request; `/` is a route, not a fallback,
 because longest prefix wins; `.use`/`.route` are internal (boot() writes
 the composition, prefixes stay library constants, no app code ever holds
 the mux). `SinglePageApp` serves the bundle side. There is no public
-Router class, no mount API, no scoped router object anywhere. **The code's
+Router class, no mount API, no scoped router object anywhere. **The mux
+carries the last-resort error boundary, and error presentation follows the
+path prefix** (ruled 2026-09-18): an error anywhere in the chain on an
+`/api` request answers the canonical JSON envelope (generic "unknown" +
+trace id for the unnamed — an API client never receives HTML, even for a
+middleware crash before routing); on any other request it answers the
+standard error page — minimal self-contained HTML with the trace id, never
+a re-attempt of the SPA shell, because the bundle machinery may be what
+failed. Inside `/api` the framework's canonical-error middleware remains
+the handler for everything it reaches; the mux boundary catches only what
+escapes or precedes it, answering in the same envelope shape. **The code's
 physical shape matches**: concept-named directories — `hosting/` (HttpMux,
 SinglePageApp), `policy/` (SecurityHeaders, ContentSecurityPolicy,
 ClientAddress) — at most three classes each, composition by constructor,
