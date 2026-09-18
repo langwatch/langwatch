@@ -1498,11 +1498,11 @@ func setMetaHeaders(w http.ResponseWriter, meta app.DispatchMeta) {
 // Pre-allocated SSE framing bytes — three w.Write calls instead of one
 // fmt.Fprintf avoids allocating a format buffer per chunk.
 var (
-	sseDataPrefix  = []byte("data: ")
-	sseDoubleNL    = []byte("\n\n")
-	sseErrorPrefix = []byte("event: error\ndata: ")
-	sseWarnPrefix  = []byte("event: warning\ndata: ")
-	sseDone        = []byte("data: [DONE]\n\n")
+	sseDataPrefix   = []byte("data: ")
+	sseDoubleNL     = []byte("\n\n")
+	sseErrorPrefix  = []byte("event: error\ndata: ")
+	sseUsageComment = []byte(": provider_did_not_report_usage_on_stream\n\n")
+	sseDone         = []byte("data: [DONE]\n\n")
 )
 
 // streamErrorFrame builds the data payload for a terminal `event: error`.
@@ -1597,11 +1597,16 @@ func writeSSE(ctx context.Context, w http.ResponseWriter, iter domain.StreamIter
 		}
 	}
 
+	// The zero-usage notice rides an SSE COMMENT line, never an event frame
+	// with a JSON data payload: strict openai-compatible SDKs (Vercel AI SDK's
+	// @ai-sdk/openai-compatible, as bundled by opencode) zod-validate every
+	// data payload against a chunk|error union regardless of the event: type,
+	// so any custom payload crashes the client process mid-stream
+	// (langwatch/langwatch#7421). Comments are the only spec-safe
+	// out-of-band channel — every client ignores them, while an operator
+	// tailing the raw stream over curl still sees the notice.
 	if !raw && iter.Usage().TotalTokens == 0 {
-		warnJSON, _ := sonic.Marshal(map[string]string{"warning": "provider_did_not_report_usage_on_stream"})
-		_, _ = w.Write(sseWarnPrefix)
-		_, _ = w.Write(warnJSON)
-		_, _ = w.Write(sseDoubleNL)
+		_, _ = w.Write(sseUsageComment)
 	}
 
 	if !raw {

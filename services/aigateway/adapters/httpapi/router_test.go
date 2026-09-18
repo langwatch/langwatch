@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -924,4 +926,129 @@ func TestRouter_ModelsEndpoint_KeepsTheFamilyInOwnedBy(t *testing.T) {
 	require.Len(t, parsed.Data, 1)
 	assert.Equal(t, "eu/claude-sonnet-5", parsed.Data[0].ID)
 	assert.Equal(t, "anthropic", parsed.Data[0].OwnedBy)
+}
+
+// --- writeSSE framing tests ---
+
+// fakeStreamIter replays pre-baked chunks then reports a terminal usage/error.
+type fakeStreamIter struct {
+	chunks [][]byte
+	usage  domain.Usage
+	err    error
+	idx    int
+}
+
+func (f *fakeStreamIter) Next(_ context.Context) bool {
+	if f.idx < len(f.chunks) {
+		f.idx++
+		return true
+	}
+	return false
+}
+
+func (f *fakeStreamIter) Chunk() []byte {
+	if f.idx == 0 || f.idx > len(f.chunks) {
+		return nil
+	}
+	return f.chunks[f.idx-1]
+}
+
+func (f *fakeStreamIter) Usage() domain.Usage { return f.usage }
+func (f *fakeStreamIter) Err() error          { return f.err }
+func (f *fakeStreamIter) Close() error        { return nil }
+
+// fakeRawStreamIter is a passthrough iterator: chunks are already-framed SSE bytes.
+type fakeRawStreamIter struct {
+	fakeStreamIter
+}
+
+func (*fakeRawStreamIter) RawFraming() bool { return true }
+
+// Regression for langwatch/langwatch#7421: opencode (bundling
+// @ai-sdk/openai-compatible) zod-validates every SSE data payload against a
+// union of chunk | error objects regardless of the event: type, so the old
+// `event: warning` + `data: {"warning":...}` frame crashed the client process
+// whenever a provider stream omitted usage. The notice must ride an SSE
+// COMMENT line, which every client ignores but raw curl still shows.
+func TestWriteSSE_ZeroUsage_EmitsCommentNotWarningEvent(t *testing.T) {
+	chunk := []byte(`{"choices":[{"delta":{"content":"hi"}}]}`)
+	iter := &fakeStreamIter{chunks: [][]byte{chunk}}
+	rec := httptest.NewRecorder()
+	writeSSE(context.Background(), rec, iter)
+
+	body := rec.Body.String()
+	assert.NotContains(t, body, "event: warning")
+	assert.NotContains(t, body, `data: {"warning`)
+	assert.Contains(t, body, ": provider_did_not_report_usage_on_stream")
+	assert.True(t, strings.HasSuffix(body, "data: [DONE]\n\n"),
+		"stream must still terminate with the [DONE] trailer, got %q", body)
+	assert.Contains(t, body, "data: "+string(chunk)+"\n\n",
+		"valid chunk must keep its standard data-frame envelope")
+}
+
+func TestWriteSSE_UsageReported_NoWarningNoComment(t *testing.T) {
+	iter := &fakeStreamIter{
+		chunks: [][]byte{[]byte(`{"choices":[{"delta":{"content":"ok"}}]}`)},
+		usage:  domain.Usage{PromptTokens: 1, CompletionTokens: 1, TotalTokens: 2},
+	}
+	rec := httptest.NewRecorder()
+	writeSSE(context.Background(), rec, iter)
+
+	body := rec.Body.String()
+	assert.NotContains(t, body, "warning")
+	assert.NotContains(t, body, ": provider_did_not_report_usage_on_stream")
+}
+
+// Strict openai-compatible SDKs validate the terminal error event's data
+// payload too: the error arm of their union requires `error` to be an OBJECT,
+// so a bare string under the key crashes the client instead of surfacing the
+// failure.
+func TestWriteSSE_MidStreamError_DataPayloadIsErrorObject(t *testing.T) {
+	iter := &fakeStreamIter{
+		chunks: [][]byte{[]byte(`{"choices":[{"delta":{"content":"par"}}]}`)},
+		err:    errors.New("upstream connection reset"),
+	}
+	rec := httptest.NewRecorder()
+	writeSSE(context.Background(), rec, iter)
+
+	body := rec.Body.String()
+	var errBlock string
+	for _, block := range strings.Split(body, "\n\n") {
+		if strings.HasPrefix(block, "event: error") {
+			errBlock = block
+		}
+	}
+	require.NotEmpty(t, errBlock, "no event: error block in %q", body)
+
+	var dataPayload string
+	for _, line := range strings.Split(errBlock, "\n") {
+		if strings.HasPrefix(line, "data: ") {
+			dataPayload = strings.TrimPrefix(line, "data: ")
+		}
+	}
+	require.NotEmpty(t, dataPayload, "error event carries no data line")
+
+	var decoded map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal([]byte(dataPayload), &decoded))
+	errObj := map[string]any{}
+	require.NoError(t, json.Unmarshal(decoded["error"], &errObj),
+		"error must be a JSON object, got %s", decoded["error"])
+	assert.IsType(t, "", errObj["message"], "error.message must be a string")
+	assert.IsType(t, "", errObj["type"], "error.type must be a string")
+	assert.NotEmpty(t, errObj["message"])
+}
+
+// Passthrough streams carry fully-framed upstream bytes: forward verbatim,
+// inject nothing (no usage comment even on zero usage, no [DONE] trailer —
+// Google doesn't use one).
+func TestWriteSSE_RawFramedPassthrough_ForwardsBytesVerbatim(t *testing.T) {
+	upstream := "data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"a\"}]}}]}\n\n" +
+		"data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"b\"}]}}]}\n\n"
+	iter := &fakeRawStreamIter{fakeStreamIter: fakeStreamIter{
+		chunks: [][]byte{[]byte(upstream[:len(upstream)/2]), []byte(upstream[len(upstream)/2:])},
+	}}
+	rec := httptest.NewRecorder()
+	writeSSE(context.Background(), rec, iter)
+
+	assert.Equal(t, upstream, rec.Body.String())
 }
