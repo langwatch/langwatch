@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 import type { PublicEnvironment } from "../src/model/public-environment";
-import { createUiInnerProvider } from "../src/ui/sections/ui-inner-providers";
+import { createUiInnerProvider } from "../src/shell/ui-inner-providers";
 
 let root: Root | undefined;
 

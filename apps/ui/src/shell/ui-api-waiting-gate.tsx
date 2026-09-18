@@ -6,8 +6,8 @@
 
 import { hashKey, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useSyncExternalStore, type ReactNode } from "react";
-import { useUiApiWait, UI_API_HEALTH_PATH } from "../../behavior/ui-api-reachability";
-import { UI_SESSION_QUERY_KEY, type UiSessionReading } from "../../behavior/ui-session-client";
+import { useUiApiWait, UI_API_HEALTH_PATH } from "../behavior/ui-api-reachability";
+import { UI_SESSION_QUERY_KEY, type UiSessionReading } from "../behavior/ui-session-client";
 import { UiApiWaitingScreen } from "./ui-api-waiting-screen";
 
 /** The address the wait is on, said in full so a developer can paste it. */

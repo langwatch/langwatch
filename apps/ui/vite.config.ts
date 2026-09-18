@@ -1,9 +1,6 @@
-import react from "@vitejs/plugin-react";
-import dotenv from "dotenv";
 import { readFileSync } from "fs";
 import path from "path";
-import { defineConfig, type Plugin, type UserConfig } from "vite";
-import { shikiManualChunk } from "@langwatch/design-system/shiki-chunking";
+
 import {
   injectPublicAppConfigIntoHtml,
   type PublicAppConfig,
@@ -11,12 +8,17 @@ import {
 // The resolver reads the server environment, so it deliberately lives on the
 // projection module rather than being re-exported to browser code.
 import { resolveUiPublicBootstrap } from "@langwatch/config/public-app-config/projection";
+import { shikiManualChunk } from "@langwatch/design-system/shiki-chunking";
+import react from "@vitejs/plugin-react";
+import dotenv from "dotenv";
+import { defineConfig, type Plugin, type UserConfig } from "vite";
+
 import { UI_ASSET_URL_GLOBAL } from "./src/model/ui-asset-base";
-import { createDevLogger } from "./vite/dev-logging";
-import { SHIKI_PREBUNDLE_INCLUDE } from "./vite/shiki-prebundle";
-import { havenHmrGate } from "./vite/havenHmrGate";
 import { designSystemStorybook } from "./vite/design-system-storybook";
+import { createDevLogger } from "./vite/dev-logging";
+import { havenHmrGate } from "./vite/havenHmrGate";
 import { rootDiscoveryProxyPattern } from "./vite/root-discovery-proxy";
+import { SHIKI_PREBUNDLE_INCLUDE } from "./vite/shiki-prebundle";
 
 // This package declares `"type": "module"`, so Vite bundles the config as ESM
 // and `__dirname` does not exist. `import.meta.dirname` is the same directory.
@@ -182,7 +184,7 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
         // nothing -- the module stays in the importer's chunk. Rolldown always
         // detected this and we only logged it, which is how 468 kB of screens
         // ended up eager across 22 modules.
-        onwarn(warning: { code?: string; message: string }, defaultHandler: (w: unknown) => void) {
+        onwarn(warning, defaultHandler) {
           if (warning.code === "INEFFECTIVE_DYNAMIC_IMPORT") {
             throw new Error(
               `${warning.message}\nMove the value the entry imports statically out of the screen — into the module's model/*-host.ts, which the entry already re-exports — so the screen is reached only through its loader.`,

@@ -3,7 +3,7 @@
  */
 
 import type { ComponentType, ReactNode } from "react";
-import { uiDesignSystem } from "../../behavior/design-system";
+import { uiDesignSystem } from "../behavior/design-system";
 import { UiDesignSystemShell } from "./ui-design-system-shell";
 
 /** Anything the application installs at a provider position. */

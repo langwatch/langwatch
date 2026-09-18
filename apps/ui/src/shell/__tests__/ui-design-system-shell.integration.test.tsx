@@ -5,7 +5,7 @@
 import { useChakraContext } from "@chakra-ui/react";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { uiDesignSystem } from "../../../behavior/design-system";
+import { uiDesignSystem } from "../../behavior/design-system";
 import { UiDesignSystemShell } from "../ui-design-system-shell";
 
 // jsdom ships no matchMedia, and the colour-mode provider reads it on mount.

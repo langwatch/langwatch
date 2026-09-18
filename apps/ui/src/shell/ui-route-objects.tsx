@@ -3,11 +3,11 @@
  */
 
 import { Outlet, useMatches, type RouteObject } from "react-router";
-import { lazyRoute } from "../../behavior/lazy-route";
-import { resolveUiPageLoader, type UiPageLoaderRegistry } from "../../behavior/ui-page-loaders";
-import { uiRouteDescriptors, type UiRouteDescriptor } from "../../model/ui-route-table";
-import type { UiWebRouteParent } from "../../behavior/ui-web-installation";
-import { UiPrefixRedirect } from "../elements/ui-prefix-redirect";
+import { lazyRoute } from "../behavior/lazy-route";
+import { resolveUiPageLoader, type UiPageLoaderRegistry } from "../behavior/ui-page-loaders";
+import { uiRouteDescriptors, type UiRouteDescriptor } from "../model/ui-route-table";
+import type { UiWebRouteParent } from "../behavior/ui-web-installation";
+import { UiPrefixRedirect } from "./ui-prefix-redirect";
 
 /** What a materialised page route carries on its match. */
 export type UiRouteHandle = { page: string };

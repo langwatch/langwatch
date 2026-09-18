@@ -5,7 +5,7 @@
 
 import { uiRoutePageKeys, type UiPageLoaderRegistry } from "../src/behavior/ui-page-loaders";
 import { uiRouteTable } from "../src/model/ui-route-table";
-import { createUiRouteObjects } from "../src/ui/sections/ui-route-objects";
+import { createUiRouteObjects } from "../src/shell/ui-route-objects";
 import { act, render, waitFor } from "@testing-library/react";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";

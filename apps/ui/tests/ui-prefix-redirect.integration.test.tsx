@@ -2,7 +2,7 @@ import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { createMemoryRouter, type RouteObject, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
-import { UiPrefixRedirect } from "../src/ui/elements/ui-prefix-redirect";
+import { UiPrefixRedirect } from "../src/shell/ui-prefix-redirect";
 
 function renderAt(initialEntry: string, element: ReactElement) {
   const routes: RouteObject[] = [

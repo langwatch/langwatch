@@ -5,8 +5,8 @@
 import { Box, Center, Heading, HStack, Spinner, Stack, Text } from "@chakra-ui/react";
 import { Lock } from "lucide-react";
 
-import type { ResolvedUiFailureCopy } from "../../behavior/ui-feedback";
-import { UiErrorActions } from "../elements/ui-error-actions";
+import type { ResolvedUiFailureCopy } from "../behavior/ui-feedback";
+import { UiErrorActions } from "./ui-error-actions";
 
 /** While the flags a page is behind have not answered. */
 export function UiPageLoading() {

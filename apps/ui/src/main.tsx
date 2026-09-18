@@ -1,3 +1,6 @@
+// Temporal, before anything reads a clock. A runtime that ships it natively keeps its own.
+import "@langwatch/time/polyfill";
+
 import type { ReactNode } from "react";
 
 import { configureDocsRuntime } from "@langwatch/config/docs-url";
@@ -10,10 +13,13 @@ import { toPublicEnvironment } from "./behavior/public-environment";
 import { UiShell } from "./behavior/ui-shell";
 import { UiRuntime } from "./behavior/ui.runtime";
 import type { PublicEnvironment } from "./model/public-environment";
-import { UiErrorToaster } from "./ui/elements/ui-error-toaster";
-import { GraphicsQualityProvider } from "./ui/sections/graphics-quality-provider";
-import { createUiApplication, type UiApplication } from "./ui/sections/ui-application";
-import { UiApplicationShell } from "./ui/sections/ui-application-shell";
+import { GraphicsQualityProvider } from "./shell/graphics-quality-provider";
+import { createUiApplication, type UiApplication } from "./shell/ui-application";
+import { UiApplicationShell } from "./shell/ui-application-shell";
+import { UiErrorToaster } from "./shell/ui-error-toaster";
+
+import "nprogress/nprogress.css";
+import "./styles/globals.scss";
 
 /** A provider position no module has declared yet: an honest pass-through. */
 function UiPendingProvider({ children }: { children: ReactNode }) {
@@ -29,7 +35,7 @@ function UiNoFooter() {
 function useNoNavigationTracking() {}
 
 /**
- * Deliberately plain, like `ui/sections/ui-page-fallbacks` — the words a
+ * Deliberately plain, like `shell/ui-page-fallbacks` — the words a
  * customer reads for a named failure come from the client error
  * presentation registry, not yet harvested here. This says the true thing.
  */
@@ -105,3 +111,5 @@ export async function startUi(): Promise<void> {
     shell: BrowserUiShell.create(environment, config.mode === "development"),
   }).start();
 }
+
+void startUi();

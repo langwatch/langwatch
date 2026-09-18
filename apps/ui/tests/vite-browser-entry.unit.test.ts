@@ -30,7 +30,7 @@ describe("given the browser entry of apps/ui", () => {
     it("points at a module that exists in this package", () => {
       const entry = /<script[^>]*\stype="module"[^>]*\ssrc="([^"]+)"/.exec(indexHtml)?.[1];
 
-      expect(entry).toBe("/src/ui.entrypoint.tsx");
+      expect(entry).toBe("/src/main.tsx");
       expect(existsSync(path.join(packageRoot, entry!.slice(1)))).toBe(true);
     });
 

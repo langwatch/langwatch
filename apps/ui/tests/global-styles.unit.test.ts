@@ -9,7 +9,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const packageRoot = path.resolve(import.meta.dirname, "..");
-const entrypoint = readFileSync(path.join(packageRoot, "src/ui.entrypoint.tsx"), "utf8");
+const entrypoint = readFileSync(path.join(packageRoot, "src/main.tsx"), "utf8");
 const globalStylesheet = readFileSync(path.join(packageRoot, "src/styles/globals.scss"), "utf8");
 
 /** The display-face files the application actually ships, as the browser would ask for them. */

@@ -4,11 +4,11 @@
 
 import type { ComponentType } from "react";
 import type { FallbackProps } from "react-error-boundary";
-import { mergeUiPageLoaders, uiFeatureLoaders } from "../../behavior/ui-feature-loaders";
-import type { UiFeatureInstall } from "../../behavior/ui-feature";
-import type { UiPageLoaderRegistry } from "../../behavior/ui-page-loaders";
-import { createUiRouter, type UiRouter } from "../../behavior/ui-router";
-import { uiRouteTable } from "../../model/ui-route-table";
+import { mergeUiPageLoaders, uiFeatureLoaders } from "../behavior/ui-feature-loaders";
+import type { UiFeatureInstall } from "../behavior/ui-feature";
+import type { UiPageLoaderRegistry } from "../behavior/ui-page-loaders";
+import { createUiRouter, type UiRouter } from "../behavior/ui-router";
+import { uiRouteTable } from "../model/ui-route-table";
 import { createUiFeatureShell } from "./ui-feature-shell";
 import { createUiInnerProvider, type UiInnerProviderInstall } from "./ui-inner-providers";
 import {

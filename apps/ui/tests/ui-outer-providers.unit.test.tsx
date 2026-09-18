@@ -4,7 +4,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { uiDesignSystem } from "../src/behavior/design-system";
-import { createUiOuterProvider } from "../src/ui/sections/ui-outer-providers";
+import { createUiOuterProvider } from "../src/shell/ui-outer-providers";
 
 let installedSystem: unknown;
 

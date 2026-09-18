@@ -11,7 +11,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { BrowserUiFeedback } from "../src/behavior/ui-feedback";
-import { UiErrorToaster } from "../src/ui/elements/ui-error-toaster";
+import { UiErrorToaster } from "../src/shell/ui-error-toaster";
 
 beforeEach(() => {
   toaster.remove();

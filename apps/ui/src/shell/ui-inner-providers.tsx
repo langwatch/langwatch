@@ -7,12 +7,12 @@ import posthog from "posthog-js";
 import { PostHogProvider } from "posthog-js/react";
 import type { ComponentType, ReactNode } from "react";
 import { AnalyticsProvider } from "react-contextual-analytics";
-import { createUiAnalyticsClient } from "../../behavior/analytics-client";
-import { useBrowserTracing } from "../../behavior/browser-tracing";
-import { useIsGtagReady } from "../../behavior/gtag-readiness";
-import { useNavigationTracing } from "../../behavior/navigation-tracing";
-import { usePostHog } from "../../behavior/posthog-analytics";
-import type { PublicEnvironment } from "../../model/public-environment";
+import { createUiAnalyticsClient } from "../behavior/analytics-client";
+import { useBrowserTracing } from "../behavior/browser-tracing";
+import { useIsGtagReady } from "../behavior/gtag-readiness";
+import { useNavigationTracing } from "../behavior/navigation-tracing";
+import { usePostHog } from "../behavior/posthog-analytics";
+import type { PublicEnvironment } from "../model/public-environment";
 import type { UiProviderShell } from "./ui-outer-providers";
 
 export type UiInnerProviderInstall = {
