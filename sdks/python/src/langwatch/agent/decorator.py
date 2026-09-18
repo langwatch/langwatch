@@ -20,7 +20,12 @@ from pydantic import BaseModel
 from .client import register
 from .identity import resolve_environment
 from .protocol import AgentRegistration, CallFrame, Message
-from .schema import TURN_FIELDS, AgentSignature, analyze_signature
+from .schema import (
+    TURN_FIELDS,
+    AgentReplyInvalid,
+    AgentSignature,
+    analyze_signature,
+)
 
 DEFAULT_TIMEOUT_SECONDS = 120
 MAX_TIMEOUT_SECONDS = 300
@@ -64,7 +69,11 @@ class AgentReply:
 
 
 def coerce_reply(value: Any) -> AgentReply:
-    """A string, one message, a list of messages or an AgentReply."""
+    """A string, one message, a list of messages or an AgentReply.
+
+    Raises `AgentReplyInvalid` for a dict that is not a message or a list with
+    an item that is not one: those are the shapes the platform would refuse.
+    """
     if isinstance(value, AgentReply):
         return AgentReply(
             output=coerce_reply(value.output).output, session=value.session
@@ -76,10 +85,27 @@ def coerce_reply(value: Any) -> AgentReply:
     if isinstance(value, BaseModel):
         return coerce_reply(value.model_dump(mode="json", exclude_none=True))
     if isinstance(value, Mapping):
-        return AgentReply(output=dict(value))
+        return AgentReply(output=coerce_message(value))
     if isinstance(value, (list, tuple)):
-        return AgentReply(output=[coerce_reply(item).output for item in value])  # type: ignore[misc]
+        return AgentReply(output=[coerce_message(item) for item in value])
     return AgentReply(output=str(value))
+
+
+def coerce_message(value: Any) -> Message:
+    """One message: a mapping with a non-empty string role."""
+    if isinstance(value, BaseModel):
+        value = value.model_dump(mode="json", exclude_none=True)
+    if not isinstance(value, Mapping):
+        raise AgentReplyInvalid(
+            reason=f"a list with a {type(value).__name__} item, which is not a message"
+        )
+    role = value.get("role")
+    if not isinstance(role, str) or not role:
+        keys = ", ".join(sorted(str(key) for key in value)) or "no keys"
+        raise AgentReplyInvalid(
+            reason=f"a dict with keys {keys}, which is not a message because it has no role"
+        )
+    return dict(value)
 
 
 class ConnectedAgent:

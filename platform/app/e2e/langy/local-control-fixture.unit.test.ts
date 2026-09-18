@@ -5,15 +5,22 @@
  * so it is only ever exercised by the scenario files.
  */
 
+import * as path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   answerOfTurn,
   demoReposToPrune,
+  judgeMessages,
   listeningPids,
+  pendingWaitDispatches,
   permissionAnswerNote,
   pidsRunningIn,
   questionAnswerNote,
+  REPO_ROOT,
+  type RecordWait,
+  SCENARIO_REPO_DIR,
   type StoredMessage,
+  shareControlProfile,
   turnFailureMessage,
 } from "./local-control-fixture";
 
@@ -243,6 +250,242 @@ describe("pidsRunningIn", () => {
           root: "/tmp/scenario-repos/code-access-1",
         }),
       ).toEqual([40321]);
+    });
+  });
+});
+
+describe("judgeMessages", () => {
+  const say = (text: string, id: string) => ({
+    type: "tool-say",
+    toolCallId: id,
+    input: { text },
+    state: "output-available",
+    output: "",
+  });
+  const call = (name: string, id: string) => ({
+    type: `tool-${name}`,
+    toolCallId: id,
+    input: { command: name },
+    state: "output-available",
+    output: "done",
+  });
+  /** The reply the judge reads last: an assistant message carrying one line. */
+  const lastReply = (parts: Array<Record<string, unknown>>): string => {
+    const messages = judgeMessages({ role: "assistant", parts });
+    const last = messages[messages.length - 1];
+    return last?.role === "assistant" && typeof last.content === "string"
+      ? last.content
+      : "";
+  };
+
+  // The shape the whole llmops path ends on: the closing line, then the two
+  // `navigate open` calls that open what was made, then an empty text part.
+  describe("when the turn ends on tool calls and an empty text part", () => {
+    const parts = [
+      say("I found a FastAPI agent in app/main.py.", "c1"),
+      call("local_bash", "c2"),
+      say("All ready! Let me know if there is anything I can help with.", "c3"),
+      call("langwatch.navigate.open", "c4"),
+      call("langwatch.navigate.open", "c5"),
+      { type: "text", role: "assistant", text: "" },
+    ];
+
+    it("still ends on a reply, and that reply is the closing line", () => {
+      expect(lastReply(parts)).toBe(
+        "All ready! Let me know if there is anything I can help with.",
+      );
+    });
+
+    it("keeps the earlier passages in front of the calls they introduce", () => {
+      const messages = judgeMessages({ role: "assistant", parts });
+      const said = messages.flatMap((message) =>
+        Array.isArray(message.content)
+          ? message.content
+              .filter((piece) => piece.type === "text")
+              .map((piece) => (piece as { text: string }).text)
+          : [],
+      );
+      expect(said).toEqual([
+        "I found a FastAPI agent in app/main.py.",
+        "All ready! Let me know if there is anything I can help with.",
+      ]);
+    });
+  });
+
+  describe("when the turn ends on its passages", () => {
+    it("replies with the last line alone, not every line joined", () => {
+      expect(
+        lastReply([
+          call("local_bash", "c1"),
+          say("I found a FastAPI agent in app/main.py.", "c2"),
+          say(
+            "No pull request was opened, since the folder has no remote.",
+            "c3",
+          ),
+          say("I left branch langy/acme checked out.", "c4"),
+        ]),
+      ).toBe("I left branch langy/acme checked out.");
+    });
+  });
+
+  describe("when the turn said nothing at all", () => {
+    it("replies with empty text, which is the failure the rubric names", () => {
+      expect(lastReply([call("local_bash", "c1")])).toBe("");
+    });
+  });
+});
+
+describe("SCENARIO_REPO_DIR", () => {
+  /**
+   * The one property that matters: a folder git can walk out of is a folder
+   * Langy can make a branch in, and it made one on the lane's own checkout.
+   */
+  it("is outside this checkout, so no walk up reaches a repository of ours", () => {
+    const inside =
+      SCENARIO_REPO_DIR === REPO_ROOT ||
+      SCENARIO_REPO_DIR.startsWith(`${REPO_ROOT}${path.sep}`);
+    expect(inside).toBe(false);
+  });
+
+  it("is an absolute path, which a cd into it and a git ceiling both need", () => {
+    expect(path.isAbsolute(SCENARIO_REPO_DIR)).toBe(true);
+  });
+
+  it("is not the home directory itself, which the CLI refuses to share", () => {
+    expect(SCENARIO_REPO_DIR).not.toBe(process.env.HOME);
+  });
+});
+
+describe("shareControlProfile", () => {
+  const profile = (pathDirs?: string[]) =>
+    shareControlProfile({
+      root: "/tmp/scenario-repos/acme-notes",
+      configPath: "/tmp/scenario-repos/acme-config.json",
+      binDir: "/tmp/scenario-repos/acme-bin",
+      shimDir: "/tmp/scenario-repos/acme-shims",
+      ceiling: "/tmp/scenario-repos",
+      appBase: "http://localhost:5610",
+      cliEntry: "/checkout/cli.js",
+      ...(pathDirs ? { pathDirs } : {}),
+    });
+
+  describe("the git ceiling", () => {
+    it("stops the repository walk at the folder the scenarios live in", () => {
+      expect(profile()).toContain(
+        'export GIT_CEILING_DIRECTORIES="/tmp/scenario-repos"',
+      );
+    });
+
+    it("is exported before the command line starts, so it inherits it", () => {
+      const lines = profile().split("\n");
+      const ceiling = lines.findIndex((line) =>
+        line.startsWith("export GIT_CEILING_DIRECTORIES="),
+      );
+      const exec = lines.findIndex((line) => line.startsWith("exec node "));
+      expect(ceiling).toBeGreaterThan(-1);
+      expect(exec).toBeGreaterThan(ceiling);
+    });
+  });
+
+  describe("the PATH it builds", () => {
+    it("puts the scenario's own shims first and keeps the machine's after", () => {
+      expect(profile(["/tmp/scenario-repos/acme-python/bin"])).toContain(
+        'export PATH="/tmp/scenario-repos/acme-shims":"/tmp/scenario-repos/acme-bin":"/tmp/scenario-repos/acme-python/bin":"$PATH"',
+      );
+    });
+  });
+
+  describe("the project key", () => {
+    it("is unset, so the terminal acts as the person and not the project", () => {
+      expect(profile()).toContain("unset LANGWATCH_API_KEY");
+    });
+  });
+});
+
+describe("pendingWaitDispatches", () => {
+  const wait = (over: Partial<RecordWait> = {}): RecordWait => ({
+    waitId: "wait_1",
+    kind: "permission",
+    status: "pending",
+    turnId: TURN,
+    summary: "pip install langwatch",
+    ...over,
+  });
+
+  describe("when the turn's stream ended before the card went up", () => {
+    it("still finds the card, because the record outlives the stream", () => {
+      const dispatches = pendingWaitDispatches({
+        waits: [wait()],
+        answered: new Set<string>(),
+      });
+      expect(dispatches).toHaveLength(1);
+      expect(dispatches[0]?.entry.summary).toBe("pip install langwatch");
+      expect(dispatches[0]?.turnId).toBe(TURN);
+    });
+
+    it("sends a question card and a permission card down their own paths", () => {
+      const dispatches = pendingWaitDispatches({
+        waits: [
+          wait({ waitId: "wait_1", kind: "permission" }),
+          wait({ waitId: "wait_2", kind: "question" }),
+        ],
+        answered: new Set<string>(),
+      });
+      expect(dispatches.map((dispatch) => dispatch.kind)).toEqual([
+        "permission",
+        "question",
+      ]);
+    });
+  });
+
+  describe("when a card needs nothing", () => {
+    it("leaves an answered card alone, so one answer is sent once", () => {
+      expect(
+        pendingWaitDispatches({
+          waits: [wait()],
+          answered: new Set(["wait_1"]),
+        }),
+      ).toEqual([]);
+    });
+
+    it("leaves a card that already settled alone", () => {
+      expect(
+        pendingWaitDispatches({
+          waits: [
+            wait({ waitId: "wait_1", status: "answered" }),
+            wait({ waitId: "wait_2", status: "expired" }),
+            wait({ waitId: "wait_3", status: "cancelled" }),
+          ],
+          answered: new Set<string>(),
+        }),
+      ).toEqual([]);
+    });
+
+    it("leaves a card with no id alone rather than answering nothing", () => {
+      expect(
+        pendingWaitDispatches({
+          waits: [wait({ waitId: "" })],
+          answered: new Set<string>(),
+        }),
+      ).toEqual([]);
+    });
+  });
+
+  describe("the order it hands them over", () => {
+    it("keeps the record's order, so the first card asked is answered first", () => {
+      const dispatches = pendingWaitDispatches({
+        waits: [
+          wait({ waitId: "wait_1" }),
+          wait({ waitId: "wait_2" }),
+          wait({ waitId: "wait_3" }),
+        ],
+        answered: new Set<string>(),
+      });
+      expect(dispatches.map((dispatch) => dispatch.entry.waitId)).toEqual([
+        "wait_1",
+        "wait_2",
+        "wait_3",
+      ]);
     });
   });
 });

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
 import { AgentsApiError } from "@/client-sdk/services/agents/agents-api.service";
 
 vi.mock("@/client-sdk/services/agents/agents-api.service", async (importOriginal) => {
@@ -17,6 +17,7 @@ vi.mock("../../../utils/apiKey", () => ({
 vi.mock("ora", () => ({
   default: () => ({
     start: vi.fn().mockReturnThis(),
+    stop: vi.fn().mockReturnThis(),
     succeed: vi.fn(),
     fail: vi.fn(),
   }),
@@ -123,6 +124,82 @@ describe("listAgentsCommand()", () => {
       );
 
       await expect(listAgentsCommand()).rejects.toThrow(ProcessExitError);
+    });
+  });
+
+  describe("when asked to wait for an agent to come online", () => {
+    const offline = () => ({
+      data: [makeAgent({ name: "acme-checkout", type: "connected", status: "offline" })],
+      pagination: { page: 1, limit: 100, total: 1, totalPages: 1 },
+    });
+    const online = () => ({
+      data: [makeAgent({ name: "acme-checkout", type: "connected", status: "online" })],
+      pagination: { page: 1, limit: 100, total: 1, totalPages: 1 },
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** @scenario "The list can wait for an agent to come online" */
+    it("reads the list again until the agent reports online, then returns the list", async () => {
+      vi.useFakeTimers();
+      mockList
+        .mockResolvedValueOnce({ data: [], pagination: { page: 1, limit: 100, total: 0, totalPages: 0 } })
+        .mockResolvedValueOnce(offline())
+        .mockResolvedValue(online());
+
+      const pending = listAgentsCommand({ waitOnline: "acme-checkout" });
+      await vi.advanceTimersByTimeAsync(3000);
+      await vi.advanceTimersByTimeAsync(3000);
+      const result = await pending;
+
+      expect(mockList).toHaveBeenCalledTimes(3);
+      expect(result?.data).toEqual(online());
+    });
+
+    /** @scenario "The list can wait for an agent to come online" */
+    it("fails once the timeout passes with the agent still offline", async () => {
+      vi.useFakeTimers();
+      mockList.mockResolvedValue(offline());
+
+      const pending = listAgentsCommand({ waitOnline: "acme-checkout", timeout: 6 });
+      const outcome = pending.catch((error: unknown) => error);
+      await vi.advanceTimersByTimeAsync(3000);
+      await vi.advanceTimersByTimeAsync(3000);
+      await vi.advanceTimersByTimeAsync(3000);
+
+      expect(await outcome).toBeInstanceOf(ProcessExitError);
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining("Read the process's own output for the reason"),
+      );
+    });
+
+    /** @scenario "The wait's timeout names the agent, the wait and the credentials, never a login" */
+    it("says on stderr which agent it waited for, for how long, and which credentials read the list", async () => {
+      vi.useFakeTimers();
+      mockList.mockResolvedValue(offline());
+
+      const pending = listAgentsCommand({ waitOnline: "acme-checkout", timeout: 6 });
+      const outcome = pending.catch((error: unknown) => error);
+      await vi.advanceTimersByTimeAsync(3000);
+      await vi.advanceTimersByTimeAsync(3000);
+      await vi.advanceTimersByTimeAsync(3000);
+      await outcome;
+
+      const lines = vi
+        .mocked(console.error)
+        .mock.calls.map((call) => String(call[0]));
+      const timeoutLine = lines.find((line) => line.includes("--wait-online"));
+      expect(timeoutLine).toBe(
+        "No agent named acme-checkout reported online within 6 seconds of --wait-online. The listing was read as the API key from the environment at https://app.langwatch.ai and answered; the agent process never reported online.",
+      );
+      // The line goes through console.error, not the spinner, so it is
+      // printed under --format json as well, where the spinner is silent.
+      for (const line of lines) {
+        expect(line).not.toContain("login");
+        expect(line).not.toContain("Switch:");
+      }
     });
   });
 });

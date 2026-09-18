@@ -4,11 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
+
+	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
@@ -57,8 +65,14 @@ func (s *frameSink) waitFor(t *testing.T, want string) {
 // guarantee between them. Returns the sink and the stream outcome.
 func runTurn(t *testing.T, agent *Agent, turnID string) (*frameSink, error) {
 	t.Helper()
+	return runTurnIn(t, context.Background(), agent, turnID)
+}
+
+// runTurnIn is runTurn on the caller's context (one carrying a test logger).
+func runTurnIn(t *testing.T, base context.Context, agent *Agent, turnID string) (*frameSink, error) {
+	t.Helper()
 	sink := &frameSink{}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(base, 10*time.Second)
 	t.Cleanup(cancel)
 
 	errCh := make(chan error, 1)
@@ -123,7 +137,7 @@ func TestAgent_HappyTurn_StreamsFramesAndSettlesClean(t *testing.T) {
 		`"type":"delta"`, `"text":"Hello"`,
 		`"type":"reasoning"`, `"text":"thinking hard"`,
 		`"id":"call_1|fc_1"`, `"phase":"start"`, `"phase":"end"`,
-		`"output":"file.txt"`,
+		`"output":"file.txt"`, `"local":true`,
 		`"type":"plan"`, `"Scanning traces — 2/4"`,
 		`"type":"progress"`, `"current":2`, `"total":4`,
 	} {
@@ -141,6 +155,114 @@ func TestAgent_HappyTurn_StreamsFramesAndSettlesClean(t *testing.T) {
 	}
 	if got := strings.Count(joined, `"phase":"end"`); got != 1 {
 		t.Errorf("end frames = %d, want exactly 1", got)
+	}
+}
+
+// The wrapper's guided turn end guard reports through the protocol, since the
+// wrapper's stderr is discarded: the manager logs the event under the guard's
+// own name with the turn id and what the turn owed, and draws no frame for it.
+//
+// @scenario "The manager logs the guard's report under its name"
+func TestAgent_GuidedTurnEvent_IsLoggedNotFramed(t *testing.T) {
+	agent := spawnFake(t, "guided", 20*time.Second)
+	if err := agent.WaitReady(context.Background()); err != nil {
+		t.Fatalf("WaitReady: %v", err)
+	}
+	core, logs := observer.New(zapcore.InfoLevel)
+	// The turn's logger carries the turn id, as the transport's turnLogFields
+	// attach it to every turn request.
+	ctx := clog.With(clog.Set(context.Background(), zap.New(core)), zap.String("turn_id", "turn-1"))
+
+	sink, err := runTurnIn(t, ctx, agent, "turn-1")
+	if err != nil {
+		t.Fatalf("Stream = %v, want nil on turn_done ok", err)
+	}
+	if strings.Contains(sink.joined(), "guided") {
+		t.Errorf("guided_turn must draw no frame, got:\n%s", sink.joined())
+	}
+	entries := logs.FilterMessage("guided_turn_continued").All()
+	if len(entries) != 1 {
+		t.Fatalf("guided_turn_continued log lines = %d, want 1; all lines: %v", len(entries), logs.All())
+	}
+	fields := entries[0].ContextMap()
+	if got := fields["turn_id"]; got != "turn-1" {
+		t.Errorf("turn_id = %v, want turn-1", got)
+	}
+	if got := fields["missing"]; got != "the branch line; the first scenario card" {
+		t.Errorf("missing = %v, want the guard's two items on one string", got)
+	}
+	if got := fields["segment"]; got != int64(1) {
+		t.Errorf("segment = %v, want 1", got)
+	}
+}
+
+// ansiSequence matches the color codes the pretty console writes.
+var ansiSequence = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+// captureStdout runs fn with os.Stdout redirected into a pipe and returns
+// what was written. The pretty console core locks os.Stdout when the logger
+// is built, so the logger has to be built inside fn.
+func captureStdout(t *testing.T, fn func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	was := os.Stdout
+	os.Stdout = w
+	done := make(chan string, 1)
+	go func() {
+		b, _ := io.ReadAll(r)
+		done <- string(b)
+	}()
+	func() {
+		defer func() {
+			os.Stdout = was
+			_ = w.Close()
+		}()
+		fn()
+	}()
+	return <-done
+}
+
+// The report as the manager's console writes it: one line, found by a grep
+// for the event name, carrying the turn id once and what the turn owed. The
+// pretty console draws an array field on a continuation line and repeats a
+// key the logger already carries, which a test logger's field map does not
+// show, so this goes through the real logger setup.
+//
+// @scenario "The manager logs the guard's report under its name"
+func TestAgent_GuidedTurnEvent_PrettyConsoleLine(t *testing.T) {
+	agent := spawnFake(t, "guided", 20*time.Second)
+	if err := agent.WaitReady(context.Background()); err != nil {
+		t.Fatalf("WaitReady: %v", err)
+	}
+	out := captureStdout(t, func() {
+		logger := clog.New(context.Background(), clog.Config{Format: "pretty"})
+		ctx := clog.With(clog.Set(context.Background(), logger), zap.String("turn_id", "turn-1"))
+		if _, err := runTurnIn(t, ctx, agent, "turn-1"); err != nil {
+			t.Errorf("Stream = %v, want nil on turn_done ok", err)
+		}
+		_ = logger.Sync()
+	})
+	var line string
+	for _, candidate := range strings.Split(ansiSequence.ReplaceAllString(out, ""), "\n") {
+		if strings.Contains(candidate, "guided_turn_continued") {
+			line = candidate
+			break
+		}
+	}
+	if line == "" {
+		t.Fatalf("no guided_turn_continued line on the console; output:\n%s", out)
+	}
+	if got := strings.Count(line, "turn_id="); got != 1 {
+		t.Errorf("turn_id appears %d times on the line, want once:\n%s", got, line)
+	}
+	if !strings.Contains(line, "missing=") || !strings.Contains(line, "the branch line; the first scenario card") {
+		t.Errorf("the line must carry what the turn owed:\n%s", line)
+	}
+	if !strings.Contains(line, "segment=1") {
+		t.Errorf("the line must name the segment:\n%s", line)
 	}
 }
 

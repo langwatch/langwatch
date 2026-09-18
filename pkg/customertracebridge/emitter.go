@@ -20,6 +20,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/langwatch/langwatch/pkg/contexts"
+	"github.com/langwatch/langwatch/pkg/otelsetup"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -49,6 +50,13 @@ const (
 	mirrorTierStructural = "structural"
 	mirrorTierSkip       = "skip"
 )
+
+// OriginLangy is the langwatch.origin value the Langy relay stamps on a turn's
+// spans in the customer's project, and the one this emitter stamps on the
+// gen_ai span it retells for a Langy call, so the turn's trace reads as
+// Langy's from whichever span folds first. The gateway keeps its own origin on
+// the resource, and on every span it retells for ordinary customer traffic.
+const OriginLangy = "langy"
 
 // Emitter uses a private (non-global) OTel TracerProvider to construct spans
 // and export them to the customer's OTLP endpoint. The TP's resource carries
@@ -379,6 +387,15 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 	// from every exported copy. Only stamped for a non-skip tier (Langy VKs),
 	// so ordinary customer traffic never grows a mirror copy.
 	if tier := params.MirrorTier; tier == mirrorTierContent || tier == mirrorTierStructural {
+		// A Langy turn's model call is Langy's, not the customer's, and this
+		// span is the first piece of the turn to reach the customer's project:
+		// the worker spans and the langy.turn root only land when the turn
+		// ends, many seconds later. Stamped with the gateway's own origin, the
+		// span folded a "gateway" trace first, which marked a fresh project as
+		// integrated before the langy root could rank the trace as Langy's.
+		// Naming the origin here, on the span, settles the trace's origin from
+		// its first span. The resource keeps the gateway's identity.
+		span.SetAttributes(attribute.String(otelsetup.AttrLangWatchOrigin, OriginLangy))
 		span.SetAttributes(attrMirrorTier.String(tier))
 		if params.MirrorSourceOrgID != "" {
 			span.SetAttributes(attrMirrorSourceOrg.String(params.MirrorSourceOrgID))

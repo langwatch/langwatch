@@ -94,15 +94,46 @@ Feature: Public REST API — /api/gateway/v1/*
     And the key is reachable org-wide
 
   @integration @rest @rbac
-  Scenario: A member API key passes the route gate but not per-scope manage
-    # MEMBER holds virtualKeys:create (the route ceiling) but not
-    # virtualKeys:manage — the per-scope gate the tRPC create enforces.
-    # If REST ever stops running the shared per-scope assert, this
-    # returns 201 and the suite fails: the drift guard for #6260.
+  Scenario: A key that can create but not manage mints a key for its own project
+    # MEMBER holds virtualKeys:create but not virtualKeys:manage. Issuing a
+    # project's own keys is the day job of anyone driving the gateway from
+    # it, so the default scope, the caller's project, asks for create there
+    # and nothing more.
     Given a scoped API key whose bindings grant MEMBER at the project
-    When they send `POST /api/gateway/v1/virtual-keys`
+    When they send `POST /api/gateway/v1/virtual-keys` with no scopes
+    Then the response status is 201
+    And `virtual_key.scopes` is the caller's project alone
+
+  @integration @rest @rbac
+  Scenario: A key that can create but not manage cannot mint above its project
+    # The per-scope manage gate the tRPC create enforces still stands for
+    # every scope beyond the caller's own project. If REST ever stops
+    # running the shared per-scope assert, this returns 201 and the suite
+    # fails: the drift guard for #6260.
+    Given a scoped API key whose bindings grant MEMBER at the project
+    When they send `POST /api/gateway/v1/virtual-keys` scoped to their team
     Then the response status is 403
     And the error names `virtualKeys:manage`
+
+  @integration @rest @rbac
+  Scenario: Langy's session key mints a key for the project it speaks for
+    # The Langy session key holds virtualKeys:create and is refused
+    # virtualKeys:manage on purpose (manage implies rotate). The route has
+    # to agree with that policy: a project-scoped mint works, and manage
+    # stays the gate for a team scope, for another project's traces, and
+    # for rotation.
+    Given a Langy session key minted for a project member
+    When Langy sends `POST /api/gateway/v1/virtual-keys` with no scopes
+    Then the response status is 201
+    And `virtual_key.scopes` is the project alone
+    When Langy sends `POST /api/gateway/v1/virtual-keys` scoped to the team
+    Then the response status is 403
+    And the error names `virtualKeys:manage`
+    When Langy sends `POST /api/gateway/v1/virtual-keys` with a sibling project as `trace_project_id`
+    Then the response status is 403
+    And the error names `virtualKeys:manage`
+    When Langy sends `POST /api/gateway/v1/virtual-keys/:id/rotate` for the key it minted
+    Then the response status is 403
 
   @integration @rest
   Scenario: Org-scoped key creation without a governance project is refused

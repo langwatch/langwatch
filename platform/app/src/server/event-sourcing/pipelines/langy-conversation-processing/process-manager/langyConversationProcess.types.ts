@@ -77,7 +77,10 @@ export type LangyGenerateTitleIntent = z.infer<
 export const langyProcessEventViewSchema = z.object({
   turnId: z.string().nullable(),
   outcome: z.enum(["completed", "failed", "stopped"]).nullable(),
-  /** metadata_updated only: the user set a title (rename is sticky). */
+  /**
+   * metadata_updated: the user set a title; conversation_started: a title was
+   * chosen at creation. Both are sticky.
+   */
   titleTouched: z.boolean(),
 });
 export type LangyProcessEventView = z.infer<typeof langyProcessEventViewSchema>;

@@ -439,6 +439,8 @@ export type LangyLocalPolicyChangedEventData = z.infer<
 export const langyUserWaitQuestionOptionSchema = z.object({
   label: z.string(),
   description: z.string().optional(),
+  /** The way out rather than the way forward: drawn as a quiet link. */
+  quiet: z.boolean().optional(),
 });
 
 /** One question of a question wait. */
@@ -448,6 +450,8 @@ export const langyUserWaitQuestionSchema = z.object({
   options: z.array(langyUserWaitQuestionOptionSchema),
   multiple: z.boolean().optional(),
   allowOther: z.boolean().optional(),
+  /** The question is drawn as reply prose above the options, not as a title. */
+  bare: z.boolean().optional(),
 });
 
 /** What a permission wait shows on its card. */

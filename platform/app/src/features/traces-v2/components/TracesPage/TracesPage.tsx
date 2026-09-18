@@ -9,6 +9,7 @@ import { AnimatePresence, motion } from "motion/react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTracesV2Presence } from "~/features/presence/hooks/useTracesV2Presence";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useFirstTraceWatch } from "../../hooks/useFirstTraceWatch";
 import { useLensFilterDirtySync } from "../../hooks/useLensFilterDirtySync";
 import { useLensSync } from "../../hooks/useLensSync";
 import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
@@ -102,6 +103,9 @@ export const TracesPage: React.FC = () => {
 
   const { project } = useOrganizationTeamProject();
   const { hasAnyTraces } = useProjectHasTraces();
+  // Keeps `hasAnyTraces` fresh while it is false, so the page leaves the
+  // integrate pane when the first trace lands instead of on the next reload.
+  useFirstTraceWatch();
   const setupDismissedByProject = useOnboardingStore(
     (s) => s.setupDismissedByProject,
   );

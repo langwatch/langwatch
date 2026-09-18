@@ -18,6 +18,7 @@ Feature: Langy conversations are an event-sourced projection
   # Sending a message (the user turn)
   # ============================================================================
 
+  @integration
   Scenario: Sending the first message creates the conversation from its events
     Given no Langy conversation exists yet
     When I send the message "why are my traces failing?"
@@ -27,6 +28,7 @@ Feature: Langy conversations are an event-sourced projection
     And the message count is 1
     And the queued event stores a user message row in Postgres for that conversation
 
+  @unit
   Scenario: A message and its activity bump are one command, not two writes
     Given I am continuing an existing conversation I own
     When I send a message
@@ -35,6 +37,7 @@ Feature: Langy conversations are an event-sourced projection
       same "conversation_continued" event
     And there is no separate spine write that could desync from the message
 
+  @integration
   Scenario: Retrying the same send does not double-count
     Given a "ContinueConversation" command with a fixed idempotency key
     When the command is dispatched twice for the same message
@@ -45,30 +48,35 @@ Feature: Langy conversations are an event-sourced projection
   # The agent turn and its final answer
   # ============================================================================
 
+  @unit
   Scenario: Starting an agent response records the turn in operational state
     Given I have sent a message on a conversation I own
     When the agent response begins
     Then an "agent_response_started" event is recorded
     And the conversation status reflects an in-progress turn
 
-  Scenario: A tool call reaches exactly one terminal — succeeded or failed
+  @unit
+  Scenario: A tool call reaches exactly one terminal, succeeded or failed
     Given the agent has initiated a tool call during a response
     When the tool call returns successfully
     Then a "tool_call_succeeded" event is recorded carrying the command and duration
     And no "tool_call_failed" event is recorded for that call
 
+  @unit
   Scenario: A failing tool call is a distinct event carrying the error
     Given the agent has initiated a tool call during a response
     When the tool call returns an error
     Then a "tool_call_failed" event is recorded carrying the error text
     And no "tool_call_succeeded" event is recorded for that call
 
+  @unit
   Scenario: Streamed tokens are not events
     Given an agent turn is streaming its answer token by token
     When 500 tokens have streamed
     Then no per-token event is written to the event log
     And only meaningful transitions are recorded as durable events
 
+  @unit
   Scenario: Status and progress are ephemeral, never durable
     Given an agent turn is reporting status and progress while it runs
     When the turn ends
@@ -76,6 +84,7 @@ Feature: Langy conversations are an event-sourced projection
     And none reached the conversation projection or the message rows
     And they left no residue once the turn finished
 
+  @integration
   Scenario: The finalized response carries the whole answer as the source of truth
     Given an agent response has streamed to completion
     When the response is recorded
@@ -84,12 +93,14 @@ Feature: Langy conversations are an event-sourced projection
     And the conversation message count includes the assistant message
     And the conversation status returns to idle
 
+  @unit
   Scenario: A failed response is recorded without an assistant message loss
     Given an agent response ended in failure
     When the response is recorded with a failure outcome
     Then an "agent_responded" event records the failure
     And the conversation status reflects the failure
 
+  @unit
   Scenario: A stalled response with no answer to carry fails distinctly
     Given an agent response stalled with no answer to carry
     When the liveness sweep drains it
@@ -104,6 +115,7 @@ Feature: Langy conversations are an event-sourced projection
   # documents. Each Postgres fold commit is atomic, but it follows the canonical
   # ClickHouse event append asynchronously.
 
+  @unit
   Scenario: A turn folds into one render document keyed per turn
     Given an agent response that initiated two tool calls and then answered
     When I read the turn document for that turn
@@ -111,6 +123,7 @@ Feature: Langy conversations are an event-sourced projection
     And each tool call shows whether it succeeded or failed
     And it is keyed by conversation and turn, distinct from the conversation spine
 
+  @unit
   Scenario: Two turns of one conversation fold into two separate documents
     Given a conversation I own with two completed turns
     When I read that conversation's turn documents
@@ -119,8 +132,33 @@ Feature: Langy conversations are an event-sourced projection
 
   # ============================================================================
   # Reading conversations (projections)
+
+  # The dispatch window: a send is admitted, and its turn receipt written, in
+  # one transaction before any event is folded. The conversation projection
+  # row, and the handoff fields on it, are folded from events afterwards, so
+  # a read between the two finds no row. The receipt is the only evidence in
+  # that window that the conversation is being created. The turn projection
+  # is folded by the same pipeline, so the durable turn-result ingest, which
+  # checks the turn row before writing, races the same fold; the relay path
+  # completes the turn regardless, and that ingest is left for a follow-up.
+
+  @unit
+  Scenario: A read in the dispatch window waits for the projection row
+    Given a conversation whose first send was admitted a moment ago
+    And its projection row has not been folded yet
+    When the conversation is read by the user who sent the turn
+    Then the read waits for the row instead of answering not found
+    And it answers with the conversation once the row lands
+
+  @unit
+  Scenario: An unknown conversation id is answered quickly
+    Given a conversation id with no turn receipt for the user
+    When the conversation is read
+    Then the read answers not found after a short grace, not the whole window
+
   # ============================================================================
 
+  @unit
   Scenario: Listing conversations reads the operational projection, newest activity first
     Given I own three conversations with different last-activity times
     When I list my conversations
@@ -128,17 +166,20 @@ Feature: Langy conversations are an event-sourced projection
     And each item exposes title, message count, and last activity
     And no archived conversation is included
 
+  @integration
   Scenario: A shared conversation is visible to other project members
     Given another member shared a conversation in "demo"
     When I list my conversations
     Then the shared conversation appears in my list
     And it is marked as not owned by me
 
+  @integration
   Scenario: Every conversation read is scoped to the project
     When any conversation or message is read from Postgres
     Then the query filters on projectId
     And no row from another project can be returned
 
+  @integration
   Scenario: Restoring a conversation returns its messages in order
     Given a conversation I own with a user message and an assistant reply
     When I open that conversation
@@ -149,6 +190,7 @@ Feature: Langy conversations are an event-sourced projection
   # Deleting becomes archiving
   # ============================================================================
 
+  @unit
   Scenario: Deleting a conversation archives it rather than hard-deleting
     Given a conversation I own
     When I delete it
@@ -156,12 +198,14 @@ Feature: Langy conversations are an event-sourced projection
     And the conversation stops appearing in my list
     And the underlying Postgres rows are not hard-deleted
 
+  @unit
   Scenario: Clearing memory archives all of my conversations
     Given I own several conversations
     When I clear my Langy memory
     Then a "conversation_archived" event is recorded for each
     And the returned count matches the number archived
 
+  @unit
   Scenario: A non-owner cannot archive someone else's conversation
     Given a conversation owned by another user and not shared to me for control
     When I attempt to delete it
@@ -172,7 +216,7 @@ Feature: Langy conversations are an event-sourced projection
   # Rename and share (metadata) — beyond the prescribed vocabulary (see ADR-046)
   # ============================================================================
 
-  @review
+  @unit
   Scenario: Renaming or sharing updates metadata via one event
     Given a conversation I own
     When I rename it or toggle sharing
