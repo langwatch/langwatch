@@ -301,6 +301,16 @@ export interface LangWatchQLExecuteInput {
    * rather than quietly redraw.
    */
   readonly onBudgetOverflow?: LangWatchQLBudgetOverflowMode;
+  /**
+   * The caller's cancellation, where the surface has one.
+   *
+   * Only the judged path reads it, and it is the one path that needs it: a
+   * statement calling an eval function keeps spending money per row after the
+   * caller has gone, which no other LangWatchQL query does. The REST route
+   * passes the request's own signal, so a client that hangs up stops the
+   * judging rather than paying for the rest of it.
+   */
+  readonly signal?: AbortSignal;
 }
 
 /**
@@ -582,6 +592,7 @@ export class LangWatchQLService {
     timeWindow,
     granularitySeconds,
     onBudgetOverflow,
+    signal,
   }: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
     // Resolved before validation, because whether an eval function may be
     // called is part of what the validator decides.
@@ -628,6 +639,7 @@ export class LangWatchQLService {
       validation,
       granularity,
       instantEvals,
+      ...(signal ? { signal } : {}),
     });
   }
 
@@ -677,12 +689,14 @@ export class LangWatchQLService {
     validation,
     execution,
     instantEvals,
+    signal,
   }: {
     readonly project: LangWatchQLCaller;
     readonly protections: Protections;
     readonly validation: ValidatedLangWatchQL;
     readonly execution: Awaited<ReturnType<LangWatchQLExecutor["execute"]>>;
     readonly instantEvals: LangWatchQLInstantEvalSupport;
+    readonly signal?: AbortSignal;
   }): Promise<LangWatchQLHydrationResult> {
     const hydration = await hydrateLangWatchQLAppFunctions({
       projectId: project.id,
@@ -697,6 +711,7 @@ export class LangWatchQLService {
         maxConcurrency: instantEvals.maxConcurrency,
         queryTokenBudget: instantEvals.queryTokenBudget,
       },
+      ...(signal ? { signal } : {}),
     });
 
     await recordInstantEvalCost({
@@ -716,6 +731,7 @@ export class LangWatchQLService {
     validation,
     granularity,
     instantEvals,
+    signal,
   }: {
     readonly executor: LangWatchQLExecutor;
     readonly project: LangWatchQLCaller;
@@ -724,6 +740,7 @@ export class LangWatchQLService {
     readonly validation: ValidatedLangWatchQL;
     readonly granularity: LangWatchQLGranularityResolution;
     readonly instantEvals: LangWatchQLInstantEvalSupport;
+    readonly signal?: AbortSignal;
   }): Promise<LangWatchQLQueryResult> {
     const executionParameters = executionParametersFor({
       validation,
@@ -748,6 +765,7 @@ export class LangWatchQLService {
       validation,
       execution,
       instantEvals,
+      ...(signal ? { signal } : {}),
     });
     const truncated = execution.truncated || hydration.isTruncatedByBytes;
 

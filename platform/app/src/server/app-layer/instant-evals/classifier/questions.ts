@@ -155,6 +155,18 @@ const answerSchema = z.object({
   choice: z.string().optional(),
   score: z.number().optional(),
   probabilities: z.record(z.string(), z.number()).optional(),
+  /**
+   * For a score answer, which level each probability key stands for.
+   *
+   * Measured against the live API: the keys of a score's `probabilities` are
+   * level *positions* as strings, and `legend` maps each position to the
+   * criterion that was sent. A range of 20 to 24 came back as
+   * `probabilities: {"0":0, ..., "4":0.69}` with
+   * `legend: {"0":"20", ..., "4":"24"}`, which is what settles it. Reading the
+   * legend rather than trusting the position is what keeps this correct if the
+   * keys ever become the criteria themselves.
+   */
+  legend: z.record(z.string(), z.string()).optional(),
   confidence: z.number().optional(),
 });
 
@@ -218,12 +230,18 @@ function readVerdict({
 /**
  * The probability-weighted mean of a score question's levels.
  *
- * The classifier answers with a distribution over the level *positions* it was
- * given, and `score` is that distribution's mean position. Reading the
- * distribution ourselves rather than trusting the mean keeps the two in step
- * when one of them is missing, and both come out at the same number: a
- * distribution of 0.06, 0.63, 0.30, 0.01 over the range one to five is 2.26
- * either way.
+ * The classifier answers with a distribution and a `score` that is that
+ * distribution's mean *position*. Reading the distribution rather than
+ * trusting the mean keeps the two in step when one of them is missing, and
+ * both come out at the same number: a distribution of 0.06, 0.63, 0.30, 0.01
+ * over the range one to five is 2.26 either way.
+ *
+ * Which level a probability key names is resolved through the answer's own
+ * `legend` rather than through the key's position in the range. The two agree
+ * today, and reading the legend is what makes this survive the keys becoming
+ * the criteria themselves: a key is matched as a legend entry, then as a
+ * position, then as a level written out. A key that is none of the three is
+ * dropped rather than folded in at the wrong weight.
  */
 function weightedScore({
   question,
@@ -237,9 +255,9 @@ function weightedScore({
   if (probabilities) {
     let total = 0;
     let weight = 0;
-    for (const [position, probability] of Object.entries(probabilities)) {
-      const level = levels[Number(position)];
-      if (level === undefined) continue;
+    for (const [key, probability] of Object.entries(probabilities)) {
+      const level = levelForKey({ key, levels, legend: answer.legend });
+      if (level === null) continue;
       total += level * probability;
       weight += probability;
     }
@@ -248,6 +266,45 @@ function weightedScore({
   return typeof answer.score === "number"
     ? question.range.min + answer.score
     : null;
+}
+
+/**
+ * The level one probability key stands for, or `null` when it names none.
+ *
+ * A level is only accepted when it is one this question actually offered, so a
+ * legend entry that was never sent cannot pull the mean towards a value the
+ * caller did not ask about.
+ */
+function levelForKey({
+  key,
+  levels,
+  legend,
+}: {
+  key: string;
+  levels: readonly number[];
+  legend?: Readonly<Record<string, string>>;
+}): number | null {
+  const named = legend?.[key];
+  if (named !== undefined) {
+    const fromLegend = offeredLevel({ value: Number(named), levels });
+    if (fromLegend !== null) return fromLegend;
+  }
+  const position = Number(key);
+  if (Number.isInteger(position)) {
+    const fromPosition = offeredLevel({ value: levels[position], levels });
+    if (fromPosition !== null) return fromPosition;
+  }
+  return offeredLevel({ value: Number(key), levels });
+}
+
+function offeredLevel({
+  value,
+  levels,
+}: {
+  value: number | undefined;
+  levels: readonly number[];
+}): number | null {
+  return value !== undefined && levels.includes(value) ? value : null;
 }
 
 function readCategoryVerdict({

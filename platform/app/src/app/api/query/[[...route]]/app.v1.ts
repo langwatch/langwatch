@@ -172,6 +172,10 @@ function registerRun(secured: ReturnType<typeof createProjectApp>): void {
         project,
         protections,
         sql,
+        // The request's own cancellation. It matters for exactly one thing:
+        // a statement calling an eval function keeps paying a classifier per
+        // row after the client has hung up, and nothing else here does.
+        signal: c.req.raw.signal,
         ...(parameters ? { parameters } : {}),
         ...(timeWindow ? { timeWindow } : {}),
         ...(granularitySeconds === undefined ? {} : { granularitySeconds }),

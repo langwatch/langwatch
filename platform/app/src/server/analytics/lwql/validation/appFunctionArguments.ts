@@ -20,6 +20,7 @@
  * @see ../../../../../specs/analytics/lwql-eval-functions.feature
  */
 
+import { INSTANT_EVAL_CLASSIFIER_LIMITS } from "~/server/app-layer/instant-evals/classifier/token-budget";
 import type {
   LangWatchQLAppFunctionDefinition,
   LangWatchQLAppFunctionParameter,
@@ -36,8 +37,16 @@ export type AppFunctionArgumentsOutcome =
 /** The default bounds for a numeric option: a positive whole number. */
 const DEFAULT_NUMERIC = { min: 1, max: Number.MAX_SAFE_INTEGER, integer: true };
 
-/** Most levels a score range may ask the classifier to weigh. */
-const MAX_SCORE_LEVELS = 255;
+/**
+ * Most levels a score range may ask the classifier to weigh.
+ *
+ * The classifier's own ceiling, published by its limits rather than restated
+ * here: a range of 0 to 10 is eleven levels, which the live API refuses with
+ * `Too many score levels. Must have at most 10 levels.` Refusing it here is
+ * what turns that into one message about the statement instead of one failed
+ * request per row.
+ */
+const MAX_SCORE_LEVELS = INSTANT_EVAL_CLASSIFIER_LIMITS.maxScoreLevels;
 
 export function readAppFunctionArguments({
   definition,
@@ -273,7 +282,7 @@ function checkAcrossOptions({
     return `The scale of "${echoIdentifier(definition.name)}" must run upwards: its highest level has to be above its lowest.`;
   }
   if (max - min + 1 > MAX_SCORE_LEVELS) {
-    return `The scale of "${echoIdentifier(definition.name)}" may hold at most ${MAX_SCORE_LEVELS} levels.`;
+    return `The scale of "${echoIdentifier(definition.name)}" may hold at most ${MAX_SCORE_LEVELS} levels, so its two ends may be at most ${MAX_SCORE_LEVELS - 1} apart.`;
   }
   return null;
 }

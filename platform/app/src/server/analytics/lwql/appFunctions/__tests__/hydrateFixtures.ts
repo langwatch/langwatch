@@ -98,6 +98,7 @@ export const hydrate = (input: {
   traceSource: LangWatchQLAppFunctionTraceSource;
   limits?: LangWatchQLHydrationLimits;
   instantEvals?: InstantEvalHydrationSupport;
+  signal?: AbortSignal;
 }) =>
   hydrateLangWatchQLAppFunctions({
     projectId: "project-a",

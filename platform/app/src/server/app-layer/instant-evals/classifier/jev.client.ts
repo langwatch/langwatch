@@ -57,6 +57,14 @@ const logger = createLogger("langwatch:instant-evals:jev");
 
 export const JEV_DEFAULT_BASE_URL = "https://api.typesafe.ai";
 const JEV_PATH = "/v1/systemone";
+/**
+ * The model the API accepts, verified against it.
+ *
+ * `jev-latest` is a real name and resolves to a concrete version in the
+ * response (`jev-1.13.0`, September 2026). A version written out, such as
+ * `jev-1.13`, is refused with `Unknown model`, so this is not a placeholder to
+ * be replaced with something more specific: `JEV_MODEL` is the way to pin one.
+ */
 const JEV_DEFAULT_MODEL = "jev-latest";
 
 /** Attempts one text gets before it is given up on. */

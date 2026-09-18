@@ -331,3 +331,69 @@ describe("given a key that resolves to no text at all", () => {
     });
   });
 });
+
+describe("given a caller that cancels mid-query", () => {
+  describe("when the statement is being judged", () => {
+    /** @scenario "A cancelled query stops judging instead of paying out the rest" */
+    it("stops sending and propagates the cancellation", async () => {
+      const controller = new AbortController();
+      let asked = 0;
+      const classifier = classifierAnswering(() => {
+        asked += 1;
+        controller.abort();
+        return judged([{ questionId: "annoyed", probability: 0.5 }]);
+      });
+
+      const run = hydrate({
+        calls: [{ column: "annoyed", function: "eval", options: ["Annoyed"] }],
+        columns: [{ name: "annoyed", type: "Nullable(String)" }],
+        rows: [
+          { annoyed: "one" },
+          { annoyed: "two" },
+          { annoyed: "three" },
+          { annoyed: "four" },
+        ],
+        traceSource: sourceOf(),
+        instantEvals: {
+          classifier,
+          maxConcurrency: 1,
+          queryTokenBudget: 4_000_000,
+        },
+        signal: controller.signal,
+      });
+
+      await expect(run).rejects.toThrow();
+      // The first unit was in flight when the cancellation landed; the three
+      // behind it were never sent.
+      expect(asked).toBe(1);
+    });
+
+    it("hands the classifier the signal, so a request in flight is dropped too", async () => {
+      const controller = new AbortController();
+      const seen: (AbortSignal | undefined)[] = [];
+      const classifier: InstantEvalClassifier = {
+        limits: INSTANT_EVAL_CLASSIFIER_LIMITS,
+        pricing: INSTANT_EVAL_PRICING,
+        async classify(_request, signal) {
+          seen.push(signal);
+          return judged([{ questionId: "annoyed", probability: 0.5 }]);
+        },
+      };
+
+      await hydrate({
+        calls: [{ column: "annoyed", function: "eval", options: ["Annoyed"] }],
+        columns: [{ name: "annoyed", type: "Nullable(String)" }],
+        rows: [{ annoyed: "one" }],
+        traceSource: sourceOf(),
+        instantEvals: {
+          classifier,
+          maxConcurrency: 1,
+          queryTokenBudget: 4_000_000,
+        },
+        signal: controller.signal,
+      });
+
+      expect(seen).toEqual([controller.signal]);
+    });
+  });
+});

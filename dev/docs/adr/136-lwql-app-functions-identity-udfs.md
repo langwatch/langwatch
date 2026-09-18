@@ -346,3 +346,28 @@ answer it puts a caller in front of a query that always comes back null.
 One cost row is recorded per query, not per judged row, carrying our cost as the
 amount and the customer's price beside it. `WHERE` predicates over an eval
 function remain the later phase this ADR already describes.
+
+Three details were settled by measuring the live API rather than by reading the
+plan, and each one is pinned by a test built from the captured response:
+
+- **A score answer is keyed by level position, and `legend` says which level
+  each position means.** A range of 20 to 24 came back as
+  `probabilities: {"0":0, …, "4":0.69}` with `legend: {"0":"20", …, "4":"24"}`.
+  The weighted mean therefore resolves each key through the legend first and
+  accepts only levels the question actually offered, which is what keeps the
+  reading correct if the keys ever become the criteria themselves.
+- **A score holds at most ten levels.** Eleven is refused with `Too many score
+  levels. Must have at most 10 levels.`, so `eval_score(text, 'x', 0, 10)` is
+  refused by the validator where it was written rather than once per row at the
+  provider. The ceiling is published through the classifier's limits, so there
+  is one number rather than two that can disagree.
+- **`jev-latest` is a real model name; a version written out is not.**
+  `jev-1.13` is refused as an unknown model while `jev-latest` resolves to
+  `jev-1.13.0` in the response, so that is the default, with `JEV_MODEL` to pin
+  whatever concrete name the provider later publishes.
+
+Cancellation is threaded from the request to the classifier. A judged query is
+the one LangWatchQL shape that keeps spending after its caller has gone, so the
+REST route passes the request's own `AbortSignal`, the runner checks it between
+classifications, and an abort propagates rather than being counted as a row that
+could not be judged.

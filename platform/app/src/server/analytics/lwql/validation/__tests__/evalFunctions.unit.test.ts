@@ -217,8 +217,22 @@ describe("given arguments that do not match a signature", () => {
 
     it("accepts a range that runs upwards, including from zero", () => {
       expect(
-        codesOf(validate("eval_score(CapturedOutput, 'a', 0, 10) AS x")),
+        codesOf(validate("eval_score(CapturedOutput, 'a', 0, 9) AS x")),
       ).toEqual([]);
+    });
+  });
+
+  describe("when a score range asks for more levels than the judge weighs", () => {
+    /** @scenario "A score range holds at most ten levels" */
+    it("refuses the eleventh level here rather than once per row at the judge", () => {
+      // Measured: `eval_score(text, 'x', 0, 10)` is eleven levels, which the
+      // live API refuses with "Too many score levels. Must have at most 10
+      // levels." Refusing it in the validator turns that into one message
+      // about the statement.
+      const result = validate("eval_score(CapturedOutput, 'a', 0, 10) AS x");
+
+      expect(codesOf(result)).toContain("APP_FUNCTION_ARGUMENT");
+      expect(messagesOf(result)).toContain("at most 10 levels");
     });
   });
 

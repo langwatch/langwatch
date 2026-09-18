@@ -38,6 +38,7 @@ export const INSTANT_EVAL_CLASSIFIER_LIMITS: InstantEvalClassifierLimits = {
   stateTokens: 32_000,
   totalTokens: 64_000,
   maxCategoryOptions: 255,
+  maxScoreLevels: 10,
   reserveTokens: 768,
 };
 

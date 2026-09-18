@@ -292,6 +292,7 @@ export function createEnvConfig() {
       // which is what a self-hosted install with nothing configured gets.
       JEV_API_KEY: z.string().optional(),
       JEV_BASE_URL: z.string().url().optional(),
+      JEV_MODEL: z.string().optional(),
       INSTANT_EVAL_CLASSIFIER: z.enum(["jev", "null"]).optional(),
       INSTANT_EVAL_GLOBAL_RPS: z.coerce.number().int().positive().optional(),
       INSTANT_EVAL_QUERY_TOKEN_BUDGET: z.coerce
@@ -744,6 +745,7 @@ export function createEnvConfig() {
       LANGEVALS_ENDPOINT: process.env.LANGEVALS_ENDPOINT,
       JEV_API_KEY: process.env.JEV_API_KEY,
       JEV_BASE_URL: process.env.JEV_BASE_URL,
+      JEV_MODEL: process.env.JEV_MODEL,
       INSTANT_EVAL_CLASSIFIER: process.env.INSTANT_EVAL_CLASSIFIER,
       INSTANT_EVAL_GLOBAL_RPS: process.env.INSTANT_EVAL_GLOBAL_RPS,
       INSTANT_EVAL_QUERY_TOKEN_BUDGET:

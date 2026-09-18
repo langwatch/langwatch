@@ -61,10 +61,12 @@ export async function evaluateCalls({
   resolved,
   traces,
   support,
+  signal,
 }: {
   resolved: readonly ResolvedCall[];
   traces: FetchedTraces;
   support: InstantEvalHydrationSupport;
+  signal?: AbortSignal;
 }): Promise<EvaluationOutcome> {
   const evalCalls = resolved.filter(
     (entry) => entry.definition.kind === "eval",
@@ -87,8 +89,13 @@ export async function evaluateCalls({
   await inParallel({
     items: units,
     limit: support.maxConcurrency,
+    ...(signal ? { signal } : {}),
     run: async (unit) => {
-      const judgement = await judge({ unit, support });
+      const judgement = await judge({
+        unit,
+        support,
+        ...(signal ? { signal } : {}),
+      });
       if (judgement === null) {
         failures += 1;
         return;
@@ -247,22 +254,39 @@ function assertQueryBudget({
 // Judging
 // ---------------------------------------------------------------------------
 
-/** One unit's judgement, or `null` when the classifier could not be used. */
+/**
+ * One unit's judgement, or `null` when the classifier could not be used.
+ *
+ * A cancellation is not a row that failed to be judged, so it is rethrown
+ * rather than counted: swallowing it would turn an abandoned query into a
+ * result full of nulls and would let the remaining units keep spending.
+ */
 async function judge({
   unit,
   support,
+  signal,
 }: {
   unit: JudgementUnit;
   support: InstantEvalHydrationSupport;
+  signal?: AbortSignal;
 }): Promise<InstantEvalJudgement | null> {
   try {
-    return await support.classifier.classify({
-      text: unit.text,
-      questions: unit.questions,
-    });
-  } catch {
+    return await support.classifier.classify(
+      { text: unit.text, questions: unit.questions },
+      signal,
+    );
+  } catch (error) {
+    if (signal?.aborted || isAbortError(error)) throw error;
     return null;
   }
+}
+
+/** Whether a thrown value is a cancellation rather than a failure. */
+function isAbortError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.name === "AbortError" || error.name === "TimeoutError")
+  );
 }
 
 function record({
@@ -335,16 +359,22 @@ async function inParallel<T>({
   items,
   limit,
   run,
+  signal,
 }: {
   items: readonly T[];
   limit: number;
   run: (item: T) => Promise<void>;
+  signal?: AbortSignal;
 }): Promise<void> {
   let next = 0;
   const workers = Array.from(
     { length: Math.max(1, Math.min(limit, items.length)) },
     async () => {
       for (;;) {
+        // Checked between units as well as inside the request, so a query the
+        // caller walked away from stops before the next classification rather
+        // than after the last one.
+        signal?.throwIfAborted();
         const index = next++;
         const item = items[index];
         if (item === undefined) return;

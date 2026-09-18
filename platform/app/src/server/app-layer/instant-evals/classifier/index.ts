@@ -65,6 +65,12 @@ function createInstantEvalClassifier(): InstantEvalClassifier {
   return new JevInstantEvalClassifier({
     apiKey,
     ...(env.JEV_BASE_URL ? { baseUrl: env.JEV_BASE_URL } : {}),
+    // `jev-latest` is the name the API accepts and is what it resolves to a
+    // concrete version (`jev-1.13.0` as of September 2026); a version spelled
+    // out, such as `jev-1.13`, is refused as an unknown model. This is here so
+    // a deployment can pin whatever concrete name the provider later publishes
+    // without a release.
+    ...(env.JEV_MODEL ? { model: env.JEV_MODEL } : {}),
     limiter: new RedisInstantEvalRateLimiter({
       // Read inside the factory, never at module scope: the container is built
       // during boot and a module-scope read would capture `null` for the life

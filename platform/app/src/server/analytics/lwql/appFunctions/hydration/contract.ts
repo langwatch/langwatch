@@ -70,6 +70,16 @@ export interface LangWatchQLHydrationInput {
    * LangWatchQL query that existed before Instant Evals.
    */
   readonly instantEvals?: InstantEvalHydrationSupport;
+  /**
+   * The caller's cancellation, where the surface has one.
+   *
+   * A judged query is the one LangWatchQL shape that keeps spending after the
+   * caller has gone: a thousand classifications outlive the HTTP request that
+   * asked for them. So the signal is threaded all the way to the classifier,
+   * and an abort stops the run rather than being counted as a row that could
+   * not be judged.
+   */
+  readonly signal?: AbortSignal;
 }
 
 /** What the eval half of a hydration run is allowed to do. */

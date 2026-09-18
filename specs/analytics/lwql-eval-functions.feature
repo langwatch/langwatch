@@ -136,6 +136,13 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     Then it is refused with APP_FUNCTION_ARGUMENT
 
   @unit
+  Scenario: A score range holds at most ten levels
+    Given a statement calling eval_score with a range of zero to ten
+    When the statement is validated
+    Then it is refused with APP_FUNCTION_ARGUMENT
+    And the message names the ten-level ceiling the judge holds
+
+  @unit
   Scenario: A threshold outside zero to one is refused
     Given a statement calling eval_passed with a threshold of 2
     When the statement is validated
@@ -203,6 +210,14 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     Then that row's judged columns are null
     And the result carries the INSTANT_EVAL_SKIPPED diagnostic naming one row
     And the other four rows hold their answers
+
+  @unit
+  Scenario: A cancelled query stops judging instead of paying out the rest
+    Given a query being judged row by row
+    When the caller cancels it
+    Then no further text is sent to the classifier
+    And the cancellation reaches the request already in flight
+    And the query fails as cancelled rather than answering with null columns
 
   @unit
   Scenario: A query that judged nothing records no cost

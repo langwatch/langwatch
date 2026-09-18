@@ -108,6 +108,7 @@ describe("given a response from the classifier", () => {
         type: "score",
         score: 1.26,
         confidence: 0.68,
+        legend: { "0": "1", "1": "2", "2": "3", "3": "4", "4": "5" },
         probabilities: { "0": 0.06, "1": 0.63, "2": 0.3, "3": 0.01, "4": 0 },
       },
     },
@@ -182,6 +183,90 @@ describe("given a response from the classifier", () => {
         response: oddResponse,
       });
       expect(verdict?.label).toBe("bug");
+    });
+  });
+});
+
+describe("given a score answer captured from the live API", () => {
+  /**
+   * Verbatim from `api.typesafe.ai` on 2026-09-18 for a range of 20 to 24, the
+   * run that settled how the keys are shaped: the probability keys are level
+   * *positions*, and `legend` is what says which level each one means. A range
+   * this far from zero is the case that distinguishes the two readings, since
+   * reading "4" as a level rather than a position would answer 4 instead of
+   * 23.7.
+   */
+  const captured = classifierResponseSchema.parse({
+    model: "jev-1.13.0",
+    answers: {
+      rating: {
+        type: "score",
+        score: 3.67,
+        confidence: 0.73,
+        legend: { "0": "20", "1": "21", "2": "22", "3": "23", "4": "24" },
+        probabilities: { "0": 0, "1": 0, "2": 0.01, "3": 0.3, "4": 0.69 },
+      },
+    },
+    usage: { input_tokens: 335, output_tokens: 17 },
+  });
+
+  const rating: InstantEvalQuestion = {
+    id: "rating",
+    kind: "score",
+    instructions: "Rate the review from 20 for awful to 24 for glowing",
+    range: { min: 20, max: 24 },
+  };
+
+  describe("when the verdict is read", () => {
+    /** @scenario "A score verdict is the probability-weighted mean of its levels" */
+    it("answers inside the declared range rather than at a level index", () => {
+      const [verdict] = readClassifierVerdicts({
+        questions: [rating],
+        response: captured,
+      });
+
+      // 22*0.01 + 23*0.30 + 24*0.69 = 23.68, which is min + the answer's own
+      // mean position (20 + 3.67) to within the rounding the API publishes.
+      expect(verdict?.score).toBeCloseTo(23.68, 10);
+    });
+  });
+
+  describe("when the keys are the levels themselves rather than positions", () => {
+    it("reads them as levels, so a change of key shape keeps the same answer", () => {
+      const byLevel = classifierResponseSchema.parse({
+        answers: {
+          rating: {
+            type: "score",
+            probabilities: { "22": 0.01, "23": 0.3, "24": 0.69 },
+          },
+        },
+      });
+
+      const [verdict] = readClassifierVerdicts({
+        questions: [rating],
+        response: byLevel,
+      });
+      expect(verdict?.score).toBeCloseTo(23.68, 10);
+    });
+  });
+
+  describe("when a probability names a level that was never offered", () => {
+    it("drops it rather than weighing the mean towards it", () => {
+      const stray = classifierResponseSchema.parse({
+        answers: {
+          rating: {
+            type: "score",
+            legend: { "9": "900" },
+            probabilities: { "9": 1 },
+          },
+        },
+      });
+
+      const [verdict] = readClassifierVerdicts({
+        questions: [rating],
+        response: stray,
+      });
+      expect(verdict).toBeUndefined();
     });
   });
 });

@@ -67137,7 +67137,7 @@ LIMIT 100
 | `eval(text, instructions)` | How likely the statement is true, between 0 and 1. |
 | `eval_criteria(text, instructions, criteria)` | The same, with two entries saying what counts as yes and what does not. |
 | `eval_passed(text, instructions, threshold)` | 1 when the probability is at or above the threshold, 0 below it. |
-| `eval_score(text, instructions, min, max)` | A rating on the whole-numbered scale you name, as the probability-weighted mean of its levels. |
+| `eval_score(text, instructions, min, max)` | A rating on the whole-numbered scale you name, as the probability-weighted mean of its levels. A scale holds at most 10 levels, so the two ends may be at most 9 apart. |
 | `eval_category(text, instructions, options)` | The most likely option, as its name. Each option is written `name: what it means`, 2 to 255 of them. |
 | `eval_category_probs(text, instructions, options)` | The same judgement as a JSON object of option name to probability. |
 

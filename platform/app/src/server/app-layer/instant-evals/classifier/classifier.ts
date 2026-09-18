@@ -129,6 +129,15 @@ export interface InstantEvalClassifierLimits {
   /** Options one category question may offer. */
   readonly maxCategoryOptions: number;
   /**
+   * Levels one score question may offer.
+   *
+   * Far lower than the category ceiling, and not a guess: the live API refuses
+   * an eleven-level range with `Too many score levels. Must have at most 10
+   * levels.` Published here so the validator refuses an over-wide range where
+   * the caller wrote it, instead of every row failing at the provider.
+   */
+  readonly maxScoreLevels: number;
+  /**
    * Tokens held back from the text budget for everything that is neither the
    * text nor the questions: the envelope, and the space the answers need.
    */

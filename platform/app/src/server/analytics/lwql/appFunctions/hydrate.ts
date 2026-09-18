@@ -117,7 +117,12 @@ async function judgeCalls({
   if (!support || !hasEvalCalls) return { values: new Map() };
 
   try {
-    const outcome = await evaluateCalls({ resolved, traces, support });
+    const outcome = await evaluateCalls({
+      resolved,
+      traces,
+      support,
+      ...(input.signal ? { signal: input.signal } : {}),
+    });
     return { values: outcome.values, usage: outcome.usage };
   } catch (error) {
     if (error instanceof ClassifierAnsweredNothingError) {

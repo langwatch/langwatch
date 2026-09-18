@@ -196,7 +196,7 @@ export const LWQL_EVAL_FUNCTION_CATALOG: readonly LangWatchQLAppFunctionDefiniti
           type: "number",
           numeric: { min: -1_000, max: 1_000, integer: true },
           description:
-            "The highest level of the scale, above the lowest, with at most 255 levels between them.",
+            "The highest level of the scale, above the lowest. A scale holds at most 10 levels, so the two ends may be at most 9 apart.",
         },
       ],
       keyKind: "text",
