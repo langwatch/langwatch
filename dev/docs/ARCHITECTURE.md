@@ -374,6 +374,26 @@ chooses which), and every `create()` **arrives with its things already
 resolved**. Passing a hand-assembled composition object into anything is
 banned as a shape — nothing receives a bag it has to pick apart.
 
+**The application half extends `ModuleApp`** (ruled 2026-09-18) — the base
+class in `@langwatch/module` that carries the declaration statics, the
+setup-type inference and the graph contract. The class keeps its `<Name>App`
+name: "module" stays reserved for the whole `{contract, process, browser}`
+unit, "app" for its process-side application. Both dependency declarations
+are **string tuples** against a closed vocabulary — the process names, and
+the generated module-name map — so a typo is a compile error and `create()`
+receives exact typed picks. The graph resolves transitively (a dependency's
+dependencies are its own business — only its API travels), cycles refuse at
+boot by name, and an instance bound at create may not be invoked until
+after boot.
+
+**Registry resolution ends at `ModuleApp.create`.** Inside the module,
+`create()` is the composition root: internal services are built explicitly
+— `LicensingCapService.create({ prisma: process.prisma, graceDays:
+config.graceDays })` — each receiving the narrowest slice that answers its
+question. Internal services never declare dependencies and are never
+auto-built; a `create()` that gets painful is a module doing too much, not
+a reason for a container.
+
 The `processModules` list is generated from `modules/catalogue.json`
 (`pnpm generate:modules` → `@langwatch/installed-modules`). **Installing a
 module edits the catalogue, never a root.** The generated `createServerApp`
