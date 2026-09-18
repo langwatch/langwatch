@@ -7,6 +7,10 @@
 import { defineWebModule } from "@langwatch/ui-kernel";
 
 export const analyticsWeb = defineWebModule("analytics")
+  .withHosts({
+    requires: ["AnalyticsHostApi"],
+    mounts: { AnalyticsHostApi: { load: () => import("./behavior/analytics-host-mount.tsx") } },
+  })
   // These screens qualify for `@langwatch/dashboard-process` under the
   // transport-ownership rule, but stay here under its own type exception:
   // moving would duplicate the 1,700-line `CustomGraph` renderer they share.

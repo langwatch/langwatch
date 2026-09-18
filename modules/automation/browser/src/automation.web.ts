@@ -19,30 +19,35 @@ function automationTab(section: AutomationSection) {
   };
 }
 
-export const automationWeb = defineWebModule("automation").withScreens({
-  "pages/[project]/automations": {
-    path: "/:project/automations",
-    within: "project",
-    label: "Automations",
-    load: automationTab("overview"),
-  },
-  "pages/[project]/automations/automations": {
-    path: "/:project/automations/automations",
-    within: "project",
-    load: automationTab("automations"),
-  },
-  "pages/[project]/automations/alerts": {
-    path: "/:project/automations/alerts",
-    within: "project",
-    load: automationTab("alerts"),
-  },
-  "pages/[project]/automations/schedules": {
-    path: "/:project/automations/schedules",
-    within: "project",
-    load: automationTab("schedules"),
-  },
-  /** Reached from an email link, outside the project chrome. */
-  "pages/unsubscribe": {
-    load: () => import("./ui/sections/unsubscribe-screen.tsx"),
-  },
-});
+export const automationWeb = defineWebModule("automation")
+  .withHosts({
+    requires: ["AutomationHost"],
+    mounts: { AutomationHost: { load: () => import("./behavior/automation-host-mount.tsx") } },
+  })
+  .withScreens({
+    "pages/[project]/automations": {
+      path: "/:project/automations",
+      within: "project",
+      label: "Automations",
+      load: automationTab("overview"),
+    },
+    "pages/[project]/automations/automations": {
+      path: "/:project/automations/automations",
+      within: "project",
+      load: automationTab("automations"),
+    },
+    "pages/[project]/automations/alerts": {
+      path: "/:project/automations/alerts",
+      within: "project",
+      load: automationTab("alerts"),
+    },
+    "pages/[project]/automations/schedules": {
+      path: "/:project/automations/schedules",
+      within: "project",
+      load: automationTab("schedules"),
+    },
+    /** Reached from an email link, outside the project chrome. */
+    "pages/unsubscribe": {
+      load: () => import("./ui/sections/unsubscribe-screen.tsx"),
+    },
+  });

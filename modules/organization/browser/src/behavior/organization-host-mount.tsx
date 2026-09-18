@@ -1,0 +1,200 @@
+/**
+ * Organization's answer to the port its five settings screens declare: scope
+ * and grants project a `@langwatch/browser-host` capability plus this
+ * family's own borrowed `organization.getAll` query. ARCHITECTURE.md §10.1.
+ */
+
+import { useUiCapabilities, useUiScope } from "@langwatch/browser-host/capabilities";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useMemo, type ReactNode } from "react";
+
+import {
+  OrganizationHostApi,
+  OrganizationHostProvider,
+  type OrganizationActor,
+  type OrganizationDownload,
+  type OrganizationFailureNotice,
+  type OrganizationProjectReading,
+  type OrganizationReading,
+  type OrganizationRouteReading,
+  type OrganizationScope,
+  type OrganizationSuccessNotice,
+} from "../model/organization-host.ts";
+import { downloadInBrowser } from "./browser-download.ts";
+import { useOrganizationGraph } from "./organization-graph.ts";
+import { useUiOrganizationFacts } from "./ui-organization-facts.ts";
+
+class CapabilityOrganizationHost extends OrganizationHostApi {
+  constructor(
+    private readonly deps: {
+      scope: OrganizationScope;
+      organization: OrganizationReading | undefined;
+      hasPermission: (permission: string) => boolean;
+      hasOrganizationPermission: (permission: string) => boolean;
+      actor: OrganizationActor | undefined;
+      activeProject: OrganizationProjectReading | undefined;
+      isEnterprise: boolean;
+      isPlanLoading: boolean;
+      isFeatureEnabled: (flag: string) => boolean;
+      openOverlay: (name: string, props?: Record<string, unknown>) => void;
+      closeOverlay: () => void;
+      succeeded: (notice: OrganizationSuccessNotice) => void;
+      route: OrganizationRouteReading;
+      setQuery: (
+        next: Readonly<Record<string, string | undefined>>,
+        options?: { replace?: boolean },
+      ) => void;
+      navigate: (to: string) => void;
+      failed: (failure: OrganizationFailureNotice) => void;
+    },
+  ) {
+    super();
+  }
+
+  scope(): OrganizationScope {
+    return this.deps.scope;
+  }
+
+  organization(): OrganizationReading | undefined {
+    return this.deps.organization;
+  }
+
+  hasPermission(permission: string): boolean {
+    return this.deps.hasPermission(permission);
+  }
+
+  hasOrganizationPermission(permission: string): boolean {
+    return this.deps.hasOrganizationPermission(permission);
+  }
+
+  currentUser(): OrganizationActor | undefined {
+    return this.deps.actor;
+  }
+
+  activeProject(): OrganizationProjectReading | undefined {
+    return this.deps.activeProject;
+  }
+
+  isEnterprise(): boolean {
+    return this.deps.isEnterprise;
+  }
+
+  isPlanLoading(): boolean {
+    return this.deps.isPlanLoading;
+  }
+
+  /**
+   * No capability carries this deployment's mail configuration —
+   * `UiDeployment` has no such field. Fail-safe FALSE: the members page
+   * offers a copyable link, never claiming a message went out that did not.
+   */
+  hasEmailProvider(): boolean {
+    return false;
+  }
+
+  isFeatureEnabled(flag: string): boolean {
+    return this.deps.isFeatureEnabled(flag);
+  }
+
+  openOverlay(name: string, props?: Record<string, unknown>): void {
+    this.deps.openOverlay(name, props);
+  }
+
+  closeOverlay(): void {
+    this.deps.closeOverlay();
+  }
+
+  succeeded(notice: OrganizationSuccessNotice): void {
+    this.deps.succeeded(notice);
+  }
+
+  route(): OrganizationRouteReading {
+    return this.deps.route;
+  }
+
+  setQuery(
+    next: Readonly<Record<string, string | undefined>>,
+    options?: { replace?: boolean },
+  ): void {
+    this.deps.setQuery(next, options);
+  }
+
+  /** No switcher is mounted below the root layout; the port says null is an answer. */
+  projectSwitcher(): ReactNode | null {
+    return null;
+  }
+
+  navigate(to: string): void {
+    this.deps.navigate(to);
+  }
+
+  download(file: OrganizationDownload): void {
+    downloadInBrowser(file);
+  }
+
+  failed(failure: OrganizationFailureNotice): void {
+    this.deps.failed(failure);
+  }
+}
+
+export default function OrganizationHostMount({ children }: { children?: ReactNode }) {
+  const { session, route, feedback, navigation } = useUiCapabilities();
+  const uiScope = useUiScope();
+  const activeScope = uiScope.activeScope();
+  const scopeHost = uiScope.scopeHost();
+  const { openDrawer, closeDrawer } = useDrawer();
+  const graph = useOrganizationGraph({
+    organizationId: activeScope.organizationId ?? void 0,
+    projectId: activeScope.projectId ?? void 0,
+  });
+  const facts = useUiOrganizationFacts();
+  const sessionActor = session.currentUser();
+  const reading = route.reading();
+
+  const host = useMemo(
+    () =>
+      new CapabilityOrganizationHost({
+        scope: {
+          organizationId: activeScope.organizationId ?? void 0,
+          projectId: activeScope.projectId ?? void 0,
+          projectSlug: graph.activeProject?.project.slug,
+        },
+        organization: graph.organization,
+        hasPermission: (permission) => session.hasPermission(permission),
+        hasOrganizationPermission: (permission) =>
+          scopeHost
+            ? scopeHost.hasOrganizationPermission(permission)
+            : session.hasPermission(permission),
+        actor: sessionActor ?? void 0,
+        activeProject: graph.activeProject?.project,
+        isEnterprise: facts.isEnterprise,
+        isPlanLoading: facts.isPlanLoading,
+        isFeatureEnabled: (flag) => session.isFeatureEnabled(flag),
+        openOverlay: (name, props) => openDrawer(name, props),
+        closeOverlay: () => closeDrawer(),
+        succeeded: (notice) => feedback.succeeded(notice),
+        route: { params: reading.params, query: reading.query },
+        setQuery: (next, options) => route.setQuery(next, options),
+        navigate: (to) => navigation.navigate(to),
+        failed: (failure) => feedback.failed(failure),
+      }),
+    [
+      activeScope.organizationId,
+      activeScope.projectId,
+      graph,
+      session,
+      scopeHost,
+      sessionActor,
+      facts.isEnterprise,
+      facts.isPlanLoading,
+      openDrawer,
+      closeDrawer,
+      feedback,
+      reading,
+      route,
+      navigation,
+    ],
+  );
+
+  return <OrganizationHostProvider value={host}>{children}</OrganizationHostProvider>;
+}

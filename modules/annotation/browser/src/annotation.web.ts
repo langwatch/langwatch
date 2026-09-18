@@ -24,6 +24,15 @@ function annotationList(view: AnnotationView) {
 }
 
 export const annotationWeb = defineWebModule("annotation")
+  .withHosts({
+    requires: ["AnnotationHostApi", "AnnotationScoresHostApi"],
+    mounts: {
+      AnnotationHostApi: { load: () => import("./behavior/annotation-host-mount.tsx") },
+      AnnotationScoresHostApi: {
+        load: () => import("./behavior/annotation-scores-host-mount.tsx"),
+      },
+    },
+  })
   .withScreens({
     "pages/[project]/annotations": {
       path: "/:project/annotations",

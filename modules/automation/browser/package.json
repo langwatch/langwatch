@@ -29,6 +29,7 @@
   "dependencies": {
     "@langwatch/api": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/monitor-contract": "workspace:*",

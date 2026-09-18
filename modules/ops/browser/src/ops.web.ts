@@ -7,6 +7,10 @@
 import { defineWebModule } from "@langwatch/ui-kernel";
 
 export const opsWeb = defineWebModule("ops")
+  .withHosts({
+    requires: ["OpsHostApi"],
+    mounts: { OpsHostApi: { load: () => import("./behavior/ops-host-mount.tsx") } },
+  })
   .withScreens({
     "pages/ops/index": {
       load: () => import("./ui/sections/ops/ops-dashboard.screen.tsx"),

@@ -1,12 +1,16 @@
 /**
- * What a browser installs when it installs gateway: the drawers the address
- * bar opens (`?drawer.open=<name>`), under the names the product has always
- * used.
+ * What a browser installs when it installs gateway: the host its screens
+ * read, and the drawers the address bar opens (`?drawer.open=<name>`),
+ * under the names the product has always used.
  */
 
 import { defineWebModule } from "@langwatch/ui-kernel";
 
 export const gatewayWeb = defineWebModule("gateway")
+  .withHosts({
+    requires: ["GatewayHostApi"],
+    mounts: { GatewayHostApi: { load: () => import("./behavior/gateway-host-mount.tsx") } },
+  })
   .withScreens({
     "pages/gateway/virtual-keys": {
       load: () => import("./ui/sections/gateway/gateway-virtual-keys.screen.tsx"),

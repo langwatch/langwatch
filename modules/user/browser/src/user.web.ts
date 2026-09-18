@@ -7,6 +7,14 @@
 import { defineWebModule } from "@langwatch/ui-kernel";
 
 export const userWeb = defineWebModule("user")
+  .withHosts({
+    requires: ["PersonalWorkspaceHostApi"],
+    mounts: {
+      PersonalWorkspaceHostApi: {
+        load: () => import("./behavior/personal-workspace-host-mount.tsx"),
+      },
+    },
+  })
   .withScreens({
     "pages/me/index": {
       path: "/me",

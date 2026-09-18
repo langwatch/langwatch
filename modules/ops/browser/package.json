@@ -39,6 +39,7 @@
   "dependencies": {
     "@chakra-ui/react": "catalog:",
     "@langwatch/api": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-sso-contract": "workspace:*",
     "@langwatch/feature-flag-browser": "workspace:*",
@@ -60,6 +61,7 @@
     "langwatch": "workspace:*",
     "lucide-react": "catalog:",
     "react": "catalog:",
+    "react-router": "catalog:",
     "recharts": "catalog:",
     "use-debounce": "catalog:",
     "zustand": "catalog:"

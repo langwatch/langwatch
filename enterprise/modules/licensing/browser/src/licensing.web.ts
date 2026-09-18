@@ -7,6 +7,12 @@
 import { defineWebModule } from "@langwatch/ui-kernel";
 
 export const licensingWeb = defineWebModule("licensing")
+  .withHosts({
+    requires: ["LicensingHostApi"],
+    mounts: {
+      LicensingHostApi: { load: () => import("./behavior/licensing-host-mount.tsx") },
+    },
+  })
   .withScreens({
     // Placed by the application's settings table until a settings anchor
     // accepts declared routes; the loader is this module's either way.

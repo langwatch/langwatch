@@ -1,12 +1,18 @@
 /**
  * What a browser installs when it installs project: the home a member
- * lands on, the project settings page, and the tech-stack surface the
- * onboarding module mounts.
+ * lands on, and the project settings page.
  */
 
 import { defineWebModule } from "@langwatch/ui-kernel";
 
 export const projectWeb = defineWebModule("project")
+  .withHosts({
+    requires: ["ProjectHostApi", "ProjectHomeHost"],
+    mounts: {
+      ProjectHostApi: { load: () => import("./behavior/project-host-mount.tsx") },
+      ProjectHomeHost: { load: () => import("./behavior/project-home-host-mount.tsx") },
+    },
+  })
   .withScreens({
     "pages/[project]/index": {
       path: "/:project",
@@ -22,8 +28,4 @@ export const projectWeb = defineWebModule("project")
       label: "Project Settings",
       load: () => import("./ui/sections/project-settings/project-settings-screen.tsx"),
     },
-  })
-  /** What another module may mount. Today onboarding mounts the tech-stack picker. */
-  .publishSurfaces({
-    "surfaces/tech-stack": { load: () => import("./ui/blocks/tech-stack.tsx") },
   });

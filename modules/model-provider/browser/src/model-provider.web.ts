@@ -7,6 +7,12 @@
 import { defineWebModule } from "@langwatch/ui-kernel";
 
 export const modelProviderWeb = defineWebModule("model-provider")
+  .withHosts({
+    requires: ["ModelProviderHostApi"],
+    mounts: {
+      ModelProviderHostApi: { load: () => import("./behavior/model-provider-host-mount.tsx") },
+    },
+  })
   .withScreens({
     // Placed by the application's settings table until a settings anchor
     // accepts declared routes; the loader is this module's either way.
@@ -28,18 +34,20 @@ export const modelProviderWeb = defineWebModule("model-provider")
    * and trace pick a model or read its cost/error surface.
    */
   .publishSurfaces({
-    "ai-sparkles-loader": { load: () => import("./ai-sparkles-loader.ts") },
-    "clamp-max-tokens": { load: () => import("./clamp-max-tokens.ts") },
+    "ai-sparkles-loader": { load: () => import("@langwatch/model-provider-browser-kit") },
+    "clamp-max-tokens": { load: () => import("@langwatch/model-provider-browser-kit") },
     "edit-model-provider-form": { load: () => import("./edit-model-provider-form.ts") },
-    "history-icon": { load: () => import("./history-icon.ts") },
+    "history-icon": { load: () => import("@langwatch/model-provider-browser-kit") },
     "model-limits": { load: () => import("./model-limits.ts") },
-    "no-models-configured-callout": { load: () => import("./no-models-configured-callout.ts") },
-    "surfaces/model-error": { load: () => import("./model/model-error.ts") },
+    "no-models-configured-callout": {
+      load: () => import("@langwatch/model-provider-browser-kit"),
+    },
+    "surfaces/model-error": { load: () => import("@langwatch/model-provider-browser-kit") },
     "surfaces/model-provider-settings": {
       load: () => import("./behavior/use-model-providers-settings.ts"),
     },
     "surfaces/model-selector": { load: () => import("./ui/elements/model-selector.tsx") },
     "surfaces/provider-model-selector": {
-      load: () => import("./ui/elements/provider-model-selector.tsx"),
+      load: () => import("@langwatch/model-provider-browser-kit"),
     },
   });

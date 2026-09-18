@@ -7,6 +7,10 @@
 import { defineWebModule } from "@langwatch/ui-kernel";
 
 export const evaluatorWeb = defineWebModule("evaluator")
+  .withHosts({
+    requires: ["EvaluatorHostApi"],
+    mounts: { EvaluatorHostApi: { load: () => import("./behavior/evaluator-host-mount.tsx") } },
+  })
   .withScreens({
     "pages/[project]/evaluators": {
       load: () => import("./ui/sections/evaluators.screen.tsx"),

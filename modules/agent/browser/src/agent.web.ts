@@ -7,6 +7,14 @@
 import { defineWebModule } from "@langwatch/ui-kernel";
 
 export const agentWeb = defineWebModule("agent")
+  .withHosts({
+    requires: ["AgentManagementHostApi"],
+    mounts: {
+      AgentManagementHostApi: {
+        load: () => import("./behavior/agent-management-host-mount.tsx"),
+      },
+    },
+  })
   .withScreens({
     // The application's table still names this page by its monolith key; the
     // loader is this module's either way.

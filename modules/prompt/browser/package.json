@@ -13,11 +13,6 @@
       "types": "./dist/prompt.web.d.ts",
       "default": "./src/prompt.web.ts"
     },
-    "./llm-config-constants": {
-      "langwatch-declaration-source": "./src/llm-config-constants.ts",
-      "types": "./dist/llm-config-constants.d.ts",
-      "default": "./src/llm-config-constants.ts"
-    },
     "./llm-config-field": {
       "langwatch-declaration-source": "./src/llm-config-field.ts",
       "types": "./dist/llm-config-field.d.ts",
@@ -38,50 +33,10 @@
       "types": "./dist/ui/sections/prompts/prompt-editor-drawer.d.ts",
       "default": "./src/ui/sections/prompts/prompt-editor-drawer.tsx"
     },
-    "./drawers": {
-      "langwatch-declaration-source": "./src/ui/sections/drawers.ts",
-      "types": "./dist/ui/sections/drawers.d.ts",
-      "default": "./src/ui/sections/drawers.ts"
-    },
-    "./latest-prompt-version": {
-      "langwatch-declaration-source": "./src/latest-prompt-version.ts",
-      "types": "./dist/latest-prompt-version.d.ts",
-      "default": "./src/latest-prompt-version.ts"
-    },
     "./llm-prompt-config-utils": {
       "langwatch-declaration-source": "./src/llm-prompt-config-utils.ts",
       "types": "./dist/llm-prompt-config-utils.d.ts",
       "default": "./src/llm-prompt-config-utils.ts"
-    },
-    "./prompt-studio": {
-      "langwatch-declaration-source": "./src/prompt-studio.ts",
-      "types": "./dist/prompt-studio.d.ts",
-      "default": "./src/prompt-studio.ts"
-    },
-    "./api-snippet": {
-      "langwatch-declaration-source": "./src/api-snippet.ts",
-      "types": "./dist/api-snippet.d.ts",
-      "default": "./src/api-snippet.ts"
-    },
-    "./llm-parameters": {
-      "langwatch-declaration-source": "./src/llm-parameters.ts",
-      "types": "./dist/llm-parameters.d.ts",
-      "default": "./src/llm-parameters.ts"
-    },
-    "./prompt-form": {
-      "langwatch-declaration-source": "./src/prompt-form.ts",
-      "types": "./dist/prompt-form.d.ts",
-      "default": "./src/prompt-form.ts"
-    },
-    "./prompt-reference": {
-      "langwatch-declaration-source": "./src/prompt-reference.ts",
-      "types": "./dist/prompt-reference.d.ts",
-      "default": "./src/prompt-reference.ts"
-    },
-    "./prompt-version": {
-      "langwatch-declaration-source": "./src/prompt-version.ts",
-      "types": "./dist/prompt-version.d.ts",
-      "default": "./src/prompt-version.ts"
     }
   },
   "scripts": {
@@ -97,7 +52,7 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/browser-trpc": "workspace:*",
-    "@langwatch/dataset-browser": "workspace:*",
+    "@langwatch/dataset-browser-kit": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/experiment-browser": "workspace:*",

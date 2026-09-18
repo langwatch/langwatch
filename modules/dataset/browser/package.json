@@ -7,18 +7,11 @@
     "src"
   ],
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./dist/index.d.ts",
   "exports": {
     "./declaration": {
       "langwatch-declaration-source": "./src/dataset.web.ts",
       "types": "./dist/dataset.web.d.ts",
       "default": "./src/dataset.web.ts"
-    },
-    ".": {
-      "langwatch-declaration-source": "./src/index.ts",
-      "types": "./dist/index.d.ts",
-      "default": "./src/index.ts"
     },
     "./dataset-drawer": {
       "langwatch-declaration-source": "./src/dataset-drawer.ts",
@@ -35,11 +28,6 @@
       "types": "./dist/dataset-editor-table.d.ts",
       "default": "./src/dataset-editor-table.ts"
     },
-    "./render-dataset-image": {
-      "langwatch-declaration-source": "./src/render-dataset-image.ts",
-      "types": "./dist/render-dataset-image.d.ts",
-      "default": "./src/render-dataset-image.ts"
-    },
     "./dataset-record-sync": {
       "langwatch-declaration-source": "./src/dataset-record-sync.ts",
       "types": "./dist/dataset-record-sync.d.ts",
@@ -49,26 +37,6 @@
       "langwatch-declaration-source": "./src/upload-csv-drawer.ts",
       "types": "./dist/upload-csv-drawer.d.ts",
       "default": "./src/upload-csv-drawer.ts"
-    },
-    "./drawers": {
-      "langwatch-declaration-source": "./src/ui/sections/drawers.ts",
-      "types": "./dist/ui/sections/drawers.d.ts",
-      "default": "./src/ui/sections/drawers.ts"
-    },
-    "./datasets": {
-      "langwatch-declaration-source": "./src/datasets.ts",
-      "types": "./dist/datasets.d.ts",
-      "default": "./src/datasets.ts"
-    },
-    "./dataset-table": {
-      "langwatch-declaration-source": "./src/dataset-table.ts",
-      "types": "./dist/dataset-table.d.ts",
-      "default": "./src/dataset-table.ts"
-    },
-    "./dataset-preview-table": {
-      "langwatch-declaration-source": "./src/dataset-preview-table.ts",
-      "types": "./dist/dataset-preview-table.d.ts",
-      "default": "./src/dataset-preview-table.ts"
     },
     "./surfaces/dataset-image-preview-table": {
       "langwatch-declaration-source": "./src/ui/blocks/datasets/editor/dataset-preview-table.tsx",
@@ -91,6 +59,7 @@
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/browser-trpc": "workspace:*",
     "@langwatch/csv": "workspace:*",
+    "@langwatch/dataset-browser-kit": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/handled-error": "workspace:*",

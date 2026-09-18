@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "@langwatch/coding-agent-browser": "workspace:*",
     "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/config": "workspace:*",
@@ -33,6 +34,7 @@
     "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
+    "@langwatch/model-provider-browser-kit": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
