@@ -25,7 +25,7 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../authz/web-kit/tsconfig.build.json"
+      "path": "../../authz/browser-kit/tsconfig.build.json"
     },
     {
       "path": "../../../packages/browser-host/tsconfig.build.json"
@@ -43,10 +43,10 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../contract/tsconfig.build.json"
+      "path": "../browser-kit/tsconfig.build.json"
     },
     {
-      "path": "../web-kit/tsconfig.build.json"
+      "path": "../contract/tsconfig.build.json"
     },
     {
       "path": "../../prompt/contract/tsconfig.build.json"
@@ -56,6 +56,9 @@
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/ui-kernel/tsconfig.build.json"
     }
   ]
 }

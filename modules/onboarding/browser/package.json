@@ -8,6 +8,11 @@
   ],
   "type": "module",
   "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/onboarding.web.ts",
+      "types": "./dist/onboarding.web.d.ts",
+      "default": "./src/onboarding.web.ts"
+    },
     "./hooks/useAttributionCapture": {
       "langwatch-declaration-source": "./src/behavior/use-attribution-capture.ts",
       "types": "./dist/behavior/use-attribution-capture.d.ts",
@@ -109,6 +114,7 @@
     "@langwatch/project-browser": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
     "libphonenumber-js": "catalog:",
     "lucide-react": "catalog:",
     "motion": "catalog:",

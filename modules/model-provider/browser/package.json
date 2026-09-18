@@ -8,6 +8,11 @@
   ],
   "type": "module",
   "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/model-provider.web.ts",
+      "types": "./dist/model-provider.web.d.ts",
+      "default": "./src/model-provider.web.ts"
+    },
     "./edit-model-provider-form": {
       "langwatch-declaration-source": "./src/edit-model-provider-form.ts",
       "types": "./dist/edit-model-provider-form.d.ts",
@@ -95,6 +100,7 @@
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "lucide-react": "catalog:",
     "react-hook-form": "catalog:",

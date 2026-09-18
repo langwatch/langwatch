@@ -3073,6 +3073,9 @@ importers:
       '@langwatch/annotation-process':
         specifier: workspace:*
         version: link:annotation/process
+      '@langwatch/api-key-browser':
+        specifier: workspace:*
+        version: link:api-key/browser
       '@langwatch/api-key-process':
         specifier: workspace:*
         version: link:api-key/process
@@ -3172,6 +3175,9 @@ importers:
       '@langwatch/metric-process':
         specifier: workspace:*
         version: link:metric/process
+      '@langwatch/model-provider-browser':
+        specifier: workspace:*
+        version: link:model-provider/browser
       '@langwatch/model-provider-process':
         specifier: workspace:*
         version: link:model-provider/process
@@ -3187,9 +3193,15 @@ importers:
       '@langwatch/notification-process':
         specifier: workspace:*
         version: link:notification/process
+      '@langwatch/onboarding-browser':
+        specifier: workspace:*
+        version: link:onboarding/browser
       '@langwatch/ops-process':
         specifier: workspace:*
         version: link:ops/process
+      '@langwatch/organization-browser':
+        specifier: workspace:*
+        version: link:organization/browser
       '@langwatch/organization-process':
         specifier: workspace:*
         version: link:organization/process
@@ -3241,6 +3253,9 @@ importers:
       '@langwatch/trace-process':
         specifier: workspace:*
         version: link:trace/process
+      '@langwatch/user-browser':
+        specifier: workspace:*
+        version: link:user/browser
       '@langwatch/user-process':
         specifier: workspace:*
         version: link:user/process
@@ -4047,6 +4062,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../packages/ui-kernel
       lucide-react:
         specifier: 'catalog:'
         version: 1.22.0(react@19.2.8)
@@ -7792,6 +7810,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../packages/ui-kernel
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.101.4(react@19.2.8)
@@ -8442,6 +8463,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../packages/ui-kernel
       libphonenumber-js:
         specifier: 'catalog:'
         version: 1.13.7
@@ -8788,6 +8812,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../packages/ui-kernel
       lodash-es:
         specifier: 'catalog:'
         version: 4.18.1
@@ -11550,6 +11577,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../packages/ui-kernel
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../contract
@@ -12606,6 +12636,9 @@ importers:
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../plans
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../secrets
       zod:
         specifier: 'catalog:'
         version: 4.4.3

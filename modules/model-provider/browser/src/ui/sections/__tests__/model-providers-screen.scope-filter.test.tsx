@@ -6,7 +6,8 @@
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MODEL_PROVIDER_SCOPE_QUERY_KEY } from "../model-providers-screen.tsx";
+
+import { MODEL_PROVIDER_SCOPE_QUERY_KEY } from "../../../model/model-provider-host.ts";
 import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
 
 const { mockState } = vi.hoisted(() => ({
@@ -45,12 +46,12 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
   },
 }));
 
-// The picker itself is `@langwatch/authz-web`'s and has its own suite; what
+// The picker itself is `@langwatch/authz-browser`'s and has its own suite; what
 // this file is about is what the SCREEN does with the value it hands back, so
 // the menu is replaced by two buttons that call `onChange` directly.
-vi.mock("@langwatch/authz-web-kit/scope-picker", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/authz-web-kit/scope-picker")>(
-    "@langwatch/authz-web-kit/scope-picker",
+vi.mock("@langwatch/authz-browser-kit/scope-picker", async () => {
+  const actual = await vi.importActual<typeof import("@langwatch/authz-browser-kit/scope-picker")>(
+    "@langwatch/authz-browser-kit/scope-picker",
   );
   return {
     ...actual,

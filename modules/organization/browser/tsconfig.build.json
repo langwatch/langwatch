@@ -16,7 +16,8 @@
     "./src/department-picker.ts",
     "./src/drawers.ts",
     "./src/ui/sections/project-drawers.ts",
-    "./src/organization.ts"
+    "./src/organization.ts",
+    "./src/organization.web.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
@@ -58,6 +59,9 @@
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/ui-kernel/tsconfig.build.json"
     }
   ]
 }

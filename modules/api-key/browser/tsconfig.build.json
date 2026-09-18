@@ -11,7 +11,7 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "files": ["./src/api-keys.ts", "./src/authorize.ts"],
+  "files": ["./src/api-keys.ts", "./src/authorize.ts", "./src/api-key.web.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",
@@ -33,10 +33,10 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
-      "path": "../../authz/contract/tsconfig.build.json"
+      "path": "../../authz/browser-kit/tsconfig.build.json"
     },
     {
-      "path": "../../authz/web-kit/tsconfig.build.json"
+      "path": "../../authz/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/browser-host/tsconfig.build.json"
@@ -46,6 +46,9 @@
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/ui-kernel/tsconfig.build.json"
     }
   ]
 }

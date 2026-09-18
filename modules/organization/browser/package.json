@@ -8,6 +8,11 @@
   ],
   "type": "module",
   "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/organization.web.ts",
+      "types": "./dist/organization.web.d.ts",
+      "default": "./src/organization.web.ts"
+    },
     "./organization-client": {
       "langwatch-declaration-source": "./src/organization-client.ts",
       "types": "./dist/organization-client.d.ts",
@@ -48,6 +53,7 @@
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
     "lodash-es": "catalog:",
     "lucide-react": "catalog:",
     "papaparse": "catalog:",

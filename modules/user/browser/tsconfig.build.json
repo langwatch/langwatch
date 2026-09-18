@@ -14,7 +14,7 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "files": ["./src/index.ts", "./src/personal-workspace.ts"],
+  "files": ["./src/index.ts", "./src/personal-workspace.ts", "./src/user.web.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",
@@ -61,6 +61,9 @@
     },
     {
       "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/ui-kernel/tsconfig.build.json"
     }
   ]
 }

@@ -35,10 +35,10 @@
       "path": "../../feature-flag/contract/tsconfig.build.json"
     },
     {
-      "path": "../../model-provider/contract/tsconfig.build.json"
+      "path": "../../model-provider/browser-kit/tsconfig.build.json"
     },
     {
-      "path": "../../model-provider/web-kit/tsconfig.build.json"
+      "path": "../../model-provider/contract/tsconfig.build.json"
     },
     {
       "path": "../../organization/contract/tsconfig.build.json"
@@ -48,6 +48,9 @@
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/ui-kernel/tsconfig.build.json"
     }
   ]
 }

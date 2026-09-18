@@ -14,6 +14,11 @@
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
+    "./declaration": {
+      "langwatch-declaration-source": "./src/user.web.ts",
+      "types": "./dist/user.web.d.ts",
+      "default": "./src/user.web.ts"
+    },
     "./personal-workspace": {
       "langwatch-declaration-source": "./src/personal-workspace.ts",
       "types": "./dist/personal-workspace.d.ts",
@@ -39,6 +44,7 @@
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@paper-design/shaders-react": "catalog:",
     "lucide-react": "catalog:",

@@ -2,34 +2,44 @@
 /** Run `pnpm generate:modules` to rewrite it. */
 
 import { annotationWeb } from "@langwatch/annotation-browser/declaration";
+import { apiKeyWeb } from "@langwatch/api-key-browser/declaration";
 import { authzWeb } from "@langwatch/authz-browser/declaration";
 import { automationWeb } from "@langwatch/automation-browser/declaration";
 import { dataPrivacyWeb } from "@langwatch/data-privacy-browser/declaration";
 import { dataRetentionWeb } from "@langwatch/data-retention-browser/declaration";
 import { datasetWeb } from "@langwatch/dataset-browser/declaration";
 import { githubWeb } from "@langwatch/github-browser/declaration";
+import { modelProviderWeb } from "@langwatch/model-provider-browser/declaration";
 import { monitorWeb } from "@langwatch/monitor-browser/declaration";
 import { notificationWeb } from "@langwatch/notification-browser/declaration";
+import { onboardingWeb } from "@langwatch/onboarding-browser/declaration";
+import { organizationWeb } from "@langwatch/organization-browser/declaration";
 import { projectWeb } from "@langwatch/project-browser/declaration";
 import { promptWeb } from "@langwatch/prompt-browser/declaration";
 import { secretWeb } from "@langwatch/secret-browser/declaration";
 import { topicWeb } from "@langwatch/topic-browser/declaration";
+import { userWeb } from "@langwatch/user-browser/declaration";
 
 /** Every installed module's web declaration, in name order. */
 export const webModules = [
   annotationWeb satisfies { readonly name: "annotation" },
+  apiKeyWeb satisfies { readonly name: "api-key" },
   authzWeb satisfies { readonly name: "authz" },
   automationWeb satisfies { readonly name: "automation" },
   dataPrivacyWeb satisfies { readonly name: "data-privacy" },
   dataRetentionWeb satisfies { readonly name: "data-retention" },
   datasetWeb satisfies { readonly name: "dataset" },
   githubWeb satisfies { readonly name: "github" },
+  modelProviderWeb satisfies { readonly name: "model-provider" },
   monitorWeb satisfies { readonly name: "monitor" },
   notificationWeb satisfies { readonly name: "notification" },
+  onboardingWeb satisfies { readonly name: "onboarding" },
+  organizationWeb satisfies { readonly name: "organization" },
   projectWeb satisfies { readonly name: "project" },
   promptWeb satisfies { readonly name: "prompt" },
   secretWeb satisfies { readonly name: "secret" },
   topicWeb satisfies { readonly name: "topic" },
+  userWeb satisfies { readonly name: "user" },
 ] as const;
 import type { serverModules } from "./server-modules.generated";
 export const webModulePackages = {} as const;
