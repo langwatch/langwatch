@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { cliSessionSchema, cliTokenRecordSchema } from "../cli-sessions.ts";
 
 describe("CLI sessions contract", () => {

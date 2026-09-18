@@ -24,7 +24,4 @@ export type { ScimUserProvisioning } from "./services/scim-provisioning.service.
  * history that states what happened as facts on the connection's identity
  * aggregate (see `ScimBespokeMembers`, above).
  */
-export {
-  createScimSyncLifecycle,
-  type ScimSyncLifecycleAdapterDeps,
-} from "./scim.server.ts";
+export { createScimSyncLifecycle, type ScimSyncLifecycleAdapterDeps } from "./scim.server.ts";

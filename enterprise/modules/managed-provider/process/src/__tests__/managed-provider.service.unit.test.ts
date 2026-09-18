@@ -1,5 +1,6 @@
 import type { ManagedBedrockConfig } from "@langwatch/enterprise-managed-provider-contract";
 import { describe, expect, it } from "vitest";
+
 import {
   ManagedProviderConfigurationService,
   ManagedProviderCredentialVendor,

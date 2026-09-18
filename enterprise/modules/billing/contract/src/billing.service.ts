@@ -1,4 +1,5 @@
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
+
 import type { BillingPlanProvider } from "./billing-types.ts";
 
 export const BILLING_FEATURE_ID = "billing" as const;

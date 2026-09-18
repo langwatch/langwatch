@@ -1,23 +1,52 @@
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
+
 import type {
-  GovernanceOtlpPolicyInput,
-  GovernanceOtlpReceiverPolicies,
-} from "./otlp-receiver-policy.ts";
+  RecordWorkspaceViewInput,
+  RecordWorkspaceViewResult,
+} from "./admin-workspace-view-audit.ts";
 import type {
-  ConfigureIngestionPullCommand,
-  DisableIngestionPullCommand,
-  RecordIngestionPullRunCompletedCommand,
-  RecordIngestionPullRunFailedCommand,
-} from "./ingestion-pull.commands.ts";
-import type { GovernanceCallSurface } from "./governance-audit.ts";
-import type { RecordPulledUsageCommand } from "./pulled-usage.commands.ts";
-import type { TraceDepartmentInput,Department,DepartmentAssignments } from "./department.ts";
+  AiToolCliCatalog,
+  AiToolEntry,
+  AiToolMemberInput,
+  AiToolOrganizationInput,
+  AiToolProviderOption,
+  CreateAiToolEntryInput,
+  FindAiToolEntryInput,
+  ReorderAiToolEntriesInput,
+  SeedAiToolStarterPackInput,
+  UpdateAiToolEntryInput,
+} from "./ai-tool-catalog.ts";
 import type {
   AnomalyRule,
   CreateAnomalyRuleInput,
   UpdateAnomalyRuleInput,
 } from "./anomaly-rule.ts";
 import type { CanonicalCostEvent, OtlpLogsRequest } from "./canonical-cost.ts";
+import type { CliBootstrapInput, CliBootstrapResult } from "./cli-bootstrap.ts";
+import type { CliSession, CliUserInput, RevokeCliSessionInput } from "./cli-sessions.ts";
+import type { TraceDepartmentInput, Department, DepartmentAssignments } from "./department.ts";
+import type { GovernanceCallSurface } from "./governance-audit.ts";
+import type {
+  GovernanceCliAnswer,
+  GovernanceCliKeyLookupRequest,
+  GovernanceCliRawRequest,
+  GovernanceCliRequest,
+  GovernanceCliSourceEventsRequest,
+  GovernanceCliSourceRequest,
+  GovernanceCliSourcesRequest,
+} from "./governance-cli-rest.schemas.ts";
+import type {
+  GovernanceIngestOtlpInput,
+  GovernanceIngestResponse,
+  GovernanceIngestWebhookInput,
+} from "./governance-ingest-rest.schemas.ts";
+import type { GovernanceSetupState } from "./governance.ts";
+import type {
+  ConfigureIngestionPullCommand,
+  DisableIngestionPullCommand,
+  RecordIngestionPullRunCompletedCommand,
+  RecordIngestionPullRunFailedCommand,
+} from "./ingestion-pull.commands.ts";
 import type {
   ActivityEventDetailRow,
   ActivityMonitorPagedWindowQuery,
@@ -53,17 +82,21 @@ import type {
   UpdateIngestionTemplateOttlInput,
 } from "./ingestion-template.ts";
 import type { GovernanceOcsfExportInput, GovernanceOcsfExportPage } from "./ocsf-export.ts";
+import type {
+  GovernanceOtlpPolicyInput,
+  GovernanceOtlpReceiverPolicies,
+} from "./otlp-receiver-policy.ts";
 import type { OttlTransformInput, OttlTransformResult, OttlValidationResult } from "./ottl.ts";
+import type {
+  GovernanceBudgetOverviewForUser,
+  GovernanceBudgetOverviewInput,
+} from "./personal-budget-overview.ts";
 import type {
   PersonalUsageBreakdown,
   PersonalUsageBucket,
   PersonalUsageQueryInput,
   PersonalUsageSummary,
 } from "./personal-usage.ts";
-import type {
-  GovernanceBudgetOverviewForUser,
-  GovernanceBudgetOverviewInput,
-} from "./personal-budget-overview.ts";
 import type {
   EnsureDefaultPersonalVirtualKeyInput,
   IssuePersonalVirtualKeyInput,
@@ -73,6 +106,12 @@ import type {
   RevokeAllPersonalVirtualKeysInput,
   RevokePersonalVirtualKeyInput,
 } from "./personal-virtual-key.ts";
+import type {
+  PlatformToolPolicy,
+  PlatformToolPolicyMap,
+  PlatformToolSlug,
+} from "./platform-tool-policy.ts";
+import type { RecordPulledUsageCommand } from "./pulled-usage.commands.ts";
 import type { QuarantineFillInput, QuarantineFillStats } from "./quarantine-fill.ts";
 import type {
   CreateRoutingPolicyInput,
@@ -84,30 +123,6 @@ import type {
   SetDefaultRoutingPolicyInput,
   UpdateRoutingPolicyInput,
 } from "./routing-policy.ts";
-import type {
-  AiToolCliCatalog,
-  AiToolEntry,
-  AiToolMemberInput,
-  AiToolOrganizationInput,
-  AiToolProviderOption,
-  CreateAiToolEntryInput,
-  FindAiToolEntryInput,
-  ReorderAiToolEntriesInput,
-  SeedAiToolStarterPackInput,
-  UpdateAiToolEntryInput,
-} from "./ai-tool-catalog.ts";
-import type {
-  RecordWorkspaceViewInput,
-  RecordWorkspaceViewResult,
-} from "./admin-workspace-view-audit.ts";
-import type { CliBootstrapInput, CliBootstrapResult } from "./cli-bootstrap.ts";
-import type { CliSession, CliUserInput, RevokeCliSessionInput } from "./cli-sessions.ts";
-import type { GovernanceSetupState } from "./governance.ts";
-import type {
-  PlatformToolPolicy,
-  PlatformToolPolicyMap,
-  PlatformToolSlug,
-} from "./platform-tool-policy.ts";
 
 /**
  * The one public Governance capability, with deliberately explicit operation
@@ -129,7 +144,11 @@ export interface GovernanceApi {
     organizationId: string;
     name: string;
   }): Promise<Department>;
-  departmentRename(input: { id: string; organizationId: string; name: string }): Promise<Department>;
+  departmentRename(input: {
+    id: string;
+    organizationId: string;
+    name: string;
+  }): Promise<Department>;
   departmentArchive(input: { id: string; organizationId: string }): Promise<void>;
   departmentAssignUser(input: {
     organizationId: string;
@@ -158,10 +177,7 @@ export interface GovernanceApi {
     input: GovernanceOtlpPolicyInput,
   ): Promise<GovernanceOtlpReceiverPolicies>;
 
-  resolveSourceNonBillable(input: {
-    organizationId: string;
-    sourceType: string;
-  }): Promise<boolean>;
+  resolveSourceNonBillable(input: { organizationId: string; sourceType: string }): Promise<boolean>;
   resolveTraceDepartment(input: TraceDepartmentInput): string;
 
   activitySummary(input: ActivityMonitorWindowQuery): Promise<ActivityMonitorSummary>;
@@ -310,7 +326,9 @@ export interface GovernanceApi {
     input: SeedAiToolStarterPackInput,
   ): Promise<{ created: number; updated: number; skipped: number }>;
   aiToolListConfiguredProvidersForUser(input: AiToolMemberInput): Promise<string[]>;
-  aiToolListProviderOptionsForAdmin(input: AiToolOrganizationInput): Promise<AiToolProviderOption[]>;
+  aiToolListProviderOptionsForAdmin(
+    input: AiToolOrganizationInput,
+  ): Promise<AiToolProviderOption[]>;
   aiToolListRoutingPolicyOptionsForAdmin(
     input: AiToolOrganizationInput,
   ): Promise<{ id: string; name: string }[]>;
@@ -358,6 +376,26 @@ export interface GovernanceTemplateDraft {
 
 /** The ingestion-template operations the governance REST family calls. */
 export interface GovernanceRestApi {
+  cliBudgetStatus(input: GovernanceCliRequest): Promise<GovernanceCliAnswer>;
+  cliBootstrapRead(input: GovernanceCliRequest): Promise<GovernanceCliAnswer>;
+  cliBudgetOverview(input: GovernanceCliRequest): Promise<GovernanceCliAnswer>;
+  cliPersonalProject(input: GovernanceCliRequest): Promise<GovernanceCliAnswer>;
+  cliVirtualKey(input: GovernanceCliRawRequest): Promise<GovernanceCliAnswer>;
+  cliProjectKey(input: GovernanceCliRawRequest): Promise<GovernanceCliAnswer>;
+  cliIngestionSources(input: GovernanceCliSourcesRequest): Promise<GovernanceCliAnswer>;
+  cliIngestionSourceEvents(input: GovernanceCliSourceEventsRequest): Promise<GovernanceCliAnswer>;
+  cliIngestionSourceHealth(input: GovernanceCliSourceRequest): Promise<GovernanceCliAnswer>;
+  cliGovernanceStatus(input: GovernanceCliRequest): Promise<GovernanceCliAnswer>;
+  cliIngestionTemplates(input: GovernanceCliRequest): Promise<GovernanceCliAnswer>;
+  cliIngestionKey(input: GovernanceCliRawRequest): Promise<GovernanceCliAnswer>;
+  cliIngestionKeys(input: GovernanceCliRequest): Promise<GovernanceCliAnswer>;
+  cliIngestionKeyState(input: GovernanceCliKeyLookupRequest): Promise<GovernanceCliAnswer>;
+
+  ingestOtlpTraces(input: GovernanceIngestOtlpInput): Promise<GovernanceIngestResponse>;
+  ingestWebhook(input: GovernanceIngestWebhookInput): Promise<GovernanceIngestResponse>;
+  ingestOtlpLogs(input: GovernanceIngestOtlpInput): Promise<GovernanceIngestResponse>;
+  ingestOtlpMetrics(input: GovernanceIngestOtlpInput): Promise<GovernanceIngestResponse>;
+
   listIngestionTemplatesForMember(scope: { projectId: string }): Promise<IngestionTemplate[]>;
   listIngestionTemplatesForAdmin(scope: { projectId: string }): Promise<IngestionTemplate[]>;
   getIngestionTemplate(input: { projectId: string; id: string }): Promise<IngestionTemplate>;

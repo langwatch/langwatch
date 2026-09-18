@@ -60,6 +60,14 @@ export type GovernanceCliPlanDecision =
 /** Whether the caller still holds an active seat in the token's organization. */
 export type GovernanceCliMembershipDecision = Readonly<{ active: boolean }>;
 
+/** The complete admission result for one CLI governance request. */
+export type GovernanceCliAdmission =
+  | Readonly<{ outcome: "admitted"; caller: GovernanceCliCaller }>
+  | Readonly<{ outcome: "unauthorized" }>
+  | Readonly<{ outcome: "payment-required"; errorMessage: string; upgradeUrl: string }>
+  | Readonly<{ outcome: "forbidden"; permission: AuthzPermission }>
+  | Readonly<{ outcome: "membership-ended" }>;
+
 const ENTERPRISE_MESSAGE: Record<GovernanceCliEnterpriseFeature, string> = {
   ingestionSources: ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
   activityMonitor: ENTERPRISE_FEATURE_ERRORS.ACTIVITY_MONITOR,
@@ -81,6 +89,12 @@ export type GovernanceCliAccessMembers = Readonly<{
 
 /** What the CLI governance transport asks before it serves a route. */
 export interface GovernanceCliAccessApi {
+  admit(input: {
+    authorization: string | null;
+    feature?: GovernanceCliEnterpriseFeature;
+    permission?: AuthzPermission;
+    requireActiveMembership?: boolean;
+  }): Promise<GovernanceCliAdmission>;
   findCaller: (authHeader: string | null) => Promise<GovernanceCliCaller | null>;
   planDecision(input: {
     organizationId: string;
@@ -105,6 +119,44 @@ export class GovernanceCliAccessService implements GovernanceCliAccessApi {
 
   findCaller(authHeader: string | null): Promise<GovernanceCliCaller | null> {
     return this.members.accessTokens.resolve(authHeader);
+  }
+
+  async admit(input: {
+    authorization: string | null;
+    feature?: GovernanceCliEnterpriseFeature;
+    permission?: AuthzPermission;
+    requireActiveMembership?: boolean;
+  }): Promise<GovernanceCliAdmission> {
+    const caller = await this.findCaller(input.authorization);
+    if (!caller) return { outcome: "unauthorized" };
+
+    if (input.feature) {
+      const plan = await this.planDecision({
+        organizationId: caller.organization_id,
+        feature: input.feature,
+      });
+      if (!plan.entitled) {
+        return {
+          outcome: "payment-required",
+          errorMessage: plan.errorMessage,
+          upgradeUrl: plan.upgradeUrl,
+        };
+      }
+    }
+
+    if (
+      input.permission &&
+      !(await this.organizationPermission({ caller, permission: input.permission }))
+    ) {
+      return { outcome: "forbidden", permission: input.permission };
+    }
+
+    if (input.requireActiveMembership) {
+      const membership = await this.activeMembership({ caller, authHeader: input.authorization });
+      if (!membership.active) return { outcome: "membership-ended" };
+    }
+
+    return { outcome: "admitted", caller };
   }
 
   /**

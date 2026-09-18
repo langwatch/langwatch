@@ -1,22 +1,16 @@
-import {
-  Config,
-  compileRuntimeConfig,
-  environmentOneOrTrueSchema,
-  RuntimeConfig,
-  type ConfigValue,
-} from "@langwatch/config";
+import { Config, environmentOneOrTrueSchema, type ConfigOf } from "@langwatch/config";
 import { z } from "zod";
 
-// Which product this deployment is and who operates it; isSaas is strict (1 or true)
-// so three processes deriving one fact must agree. Unset adminEmails means no operator.
-export const saasServerConfigDefinition = RuntimeConfig.define({
-  isSaas: Config.value(environmentOneOrTrueSchema, { env: "IS_SAAS" }),
-  adminEmails: Config.value(z.string().optional(), { env: "ADMIN_EMAILS" }),
-});
+/**
+ * Which product this deployment is and who operates it. Unset `adminEmails`
+ * means no operator.
+ */
+export const saasConfig = Config.define((c) => ({
+  isSaas: c.env("IS_SAAS", environmentOneOrTrueSchema),
+  adminEmails: c.env("ADMIN_EMAILS", z.string().optional()),
+}));
 
-export type SaasServerConfig = ConfigValue<typeof saasServerConfigDefinition>;
-
-export const saasServerConfigSchema = compileRuntimeConfig(saasServerConfigDefinition);
+export type SaasServerConfig = ConfigOf<typeof saasConfig>;
 
 /** What a browser is told: which product it is looking at. */
 export const saasWebConfigSchema = z.strictObject({

@@ -2,6 +2,21 @@ import { z } from "zod";
 
 import { PULLED_USAGE_COST_BASIS, PULLED_USAGE_COST_STATUS } from "./pulled-usage.events.ts";
 
+export const copilotStudioDataversePullConfigSchema = z.object({
+  adapter: z.literal("copilot_studio_dataverse"),
+  environmentUrl: z.string().url(),
+  botIds: z.array(z.string().uuid()).default([]),
+  azureSubscriptionId: z.string().uuid().optional(),
+  azureBillingIsPrepaid: z.boolean().optional(),
+  azureBillingUsesSameApp: z.boolean().optional(),
+  readSeats: z.boolean().default(true),
+  readDirectory: z.boolean().default(true),
+});
+
+export type CopilotStudioDataversePullConfig = z.infer<
+  typeof copilotStudioDataversePullConfigSchema
+>;
+
 const COST_USD_PATTERN = /^[+-]?\d*(?:\.\d*)?(?:[eE][+-]?\d+)?$/;
 const costUsdSchema = z
   .union([z.string(), z.number()])

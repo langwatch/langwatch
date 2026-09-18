@@ -29,6 +29,7 @@
  */
 import type { AuthzPermission, AuthzService } from "@langwatch/authz-contract";
 import { AuthzApi, PermissionDeniedError } from "@langwatch/authz-contract";
+import { AuthApi, type CliAccessSession } from "@langwatch/auth-contract";
 import {
   NoEligibleProvidersError,
   NoEligibleModelProvidersError,
@@ -50,6 +51,16 @@ import {
   type FindRoutingPolicyInput,
   type GovernanceBudgetOverviewForUser,
   type GovernanceApi,
+  type GovernanceCliAnswer,
+  type GovernanceCliKeyLookupRequest,
+  type GovernanceCliRawRequest,
+  type GovernanceCliRequest,
+  type GovernanceCliSourceEventsRequest,
+  type GovernanceCliSourceRequest,
+  type GovernanceCliSourcesRequest,
+  type GovernanceIngestOtlpInput,
+  type GovernanceIngestResponse,
+  type GovernanceIngestWebhookInput,
   type GovernanceProjectCaller,
   GovernanceRestApi,
   type IngestionTemplate,
@@ -64,21 +75,17 @@ import {
   type SetDefaultRoutingPolicyInput,
   type UpdateRoutingPolicyInput,
 } from "@langwatch/enterprise-governance-contract";
-import type { PlanProvider } from "@langwatch/entitlement-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi, type OrganizationService } from "@langwatch/organization-contract";
+import { reads } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 
-import {
-  createGovernanceMemberInfrastructure,
-  type GovernanceMemberDatabase,
-} from "../governance.server.ts";
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
 import { DepartmentService } from "../services/department.service.ts";
 import {
   GovernanceCliAccessService,
   type GovernanceCliAccessApi,
-  type GovernanceCliAccessToken,
   type GovernanceCliMemberDirectory,
 } from "../services/governance-cli-access.service.ts";
 import {
@@ -91,28 +98,28 @@ import {
   type GovernanceCliCredentialApi,
   type GovernanceCliPersonDirectory,
 } from "../services/governance-cli-credentials.service.ts";
-import {
-  GovernanceIngestAccessService,
-  type GovernanceIngestAccessApi,
-} from "../services/governance-ingest-access.service.ts";
+import { GovernanceCliService } from "../services/governance-cli.service.ts";
+import { GovernanceIngestAccessService } from "../services/governance-ingest-access.service.ts";
 import type { GovernanceIngestRateLimiter } from "../services/governance-ingest-rate-limit.service.ts";
 import {
   GovernanceIngestReceiverService,
   type GovernanceIngestLogCollectionChannel,
   type GovernanceIngestMetricCollectionChannel,
   type GovernanceIngestPrincipalDirectory,
-  type GovernanceIngestReceiverApi,
   type GovernanceIngestSpend,
   type GovernanceIngestTraceCollection,
 } from "../services/governance-ingest-receiver.service.ts";
+import { GovernanceIngestService } from "../services/governance-ingest.service.ts";
 import { IngestionTemplateService } from "../services/ingestion-template.service.ts";
 import type { OrganizationSupportContactService } from "../services/organization-support-contact.service.ts";
 import {
   PersonalUsageDashboardService,
   type PersonalUsageRollup,
 } from "../services/personal-usage-dashboard.service.ts";
-import type { GovernanceCliRestApi } from "../transport/governance-cli.rest.ts";
-import type { GovernanceIngestRestApi } from "../transport/governance-ingest.rest.ts";
+import {
+  createGovernanceMemberInfrastructure,
+  type GovernanceMemberDatabase,
+} from "./governance-member-infrastructure.ts";
 import type { GovernanceProjectDirectory } from "./governance.members.ts";
 
 /**
@@ -160,12 +167,8 @@ export interface GovernanceActorUser {
  * perform.
  */
 export interface GovernanceCliMembers {
-  /** The caller behind an `Authorization` header, and the sever for it. */
-  accessTokens: GovernanceCliAccessToken;
   /** Whether a caller still holds a seat in the token's organization. */
   members: GovernanceCliMemberDirectory;
-  /** The plan every Enterprise-gated CLI route is admitted against. */
-  plans: PlanProvider;
   /** The identity and project reads the credential routes perform. */
   persons: GovernanceCliPersonDirectory;
   /** Who to point a caller at when a budget refuses the request. */
@@ -226,6 +229,10 @@ export interface GovernanceAppDependencies {
    * ingestion source's usage rows land in.
    */
   projects: Pick<ProjectApi, "getOrganizationId" | "findInternal">;
+  /** Auth owns CLI bearer validation and revocation. */
+  auth: Pick<AuthApi, "findCliAccessSession" | "revokeCliAccessToken">;
+  /** Entitlements resolve the actual caller organization, never a deployment-global plan. */
+  entitlements: Pick<EntitlementApi, "getActivePlan">;
   /**
    * The member's personal workspace: created on demand when they mint their
    * first key, read as it stands when they open their own dashboard.
@@ -290,19 +297,18 @@ export type GovernanceBespokeMembers = Omit<
  * {@link GovernanceAppDependencies.governance}) — untouched by the
  * personalVirtualKeys/actors conversion below.
  */
-type GovernanceSetup = FeatureSetup<
-  typeof GovernanceApp.dependencies,
-  Readonly<{ prisma: GovernanceMemberDatabase }> &
-    Pick<GovernanceBespokeMembers, "governance" | "cli" | "ingest">,
-  undefined,
-  GovernanceRepositories
->;
+type GovernanceSetup = Readonly<{
+  dependencies: FeatureSetup<typeof GovernanceApp.dependencies, never, undefined>["dependencies"];
+  config: undefined;
+  resources: FeatureSetup<typeof GovernanceApp.dependencies, never, undefined>["resources"];
+  members: Readonly<{ prisma: GovernanceMemberDatabase }> &
+    Pick<GovernanceBespokeMembers, "governance" | "cli" | "ingest">;
+  repositories: GovernanceRepositories;
+}>;
 
-export class GovernanceApp
-  implements GovernanceRestApi, GovernanceCliRestApi, GovernanceIngestRestApi
-{
+export class GovernanceApp implements GovernanceRestApi {
   static readonly contract: typeof GovernanceRestApi = GovernanceRestApi;
-  static readonly reads = ["prisma"] as const;
+  static readonly reads = reads("prisma");
   /**
    * The three peer modules this application reads. A peer is never a member:
    * the process resolves each token and hands the app the peer's own API, so
@@ -311,6 +317,8 @@ export class GovernanceApp
    */
   static readonly dependencies = {
     projects: ProjectApi,
+    auth: AuthApi,
+    entitlements: EntitlementApi,
     organizations: OrganizationApi,
     permissions: AuthzApi,
   };
@@ -325,6 +333,8 @@ export class GovernanceApp
         cli: members.cli,
         ingest: members.ingest,
         projects: dependencies.projects,
+        auth: dependencies.auth,
+        entitlements: dependencies.entitlements,
         organizations: dependencies.organizations,
         permissions: dependencies.permissions,
       },
@@ -354,9 +364,9 @@ export class GovernanceApp
         projects: dependencies.projects,
       });
       this.cliAccessService = GovernanceCliAccessService.create({
-        accessTokens: cli.accessTokens,
+        accessTokens: cliAccessTokens(dependencies.auth),
         directory: () => cli.members,
-        plans: () => cli.plans,
+        plans: () => dependencies.entitlements,
         permittedOnOrganization: (input) =>
           this.permittedOn("organization", input.organizationId, input),
         publicBaseUrl: cli.publicBaseUrl,
@@ -376,11 +386,17 @@ export class GovernanceApp
       this.cliActivityService = GovernanceCliActivityService.create({
         governance: () => governance,
       });
-      this.ingestAccessService = GovernanceIngestAccessService.create({
+      this.cliService = GovernanceCliService.create({
+        access: this.cliAccessService,
+        credentials: this.cliCredentialService,
+        activity: this.cliActivityService,
+        governance,
+      });
+      const ingestAccess = GovernanceIngestAccessService.create({
         governance: () => governance,
         rateLimit: ingest.rateLimit,
       });
-      this.ingestReceiverService = GovernanceIngestReceiverService.create({
+      const ingestReceiver = GovernanceIngestReceiverService.create({
         governance: () => governance,
         projects: () => ingest.projects,
         directory: () => ingest.principals,
@@ -388,6 +404,10 @@ export class GovernanceApp
         logCollection: ingest.logCollection,
         metricCollection: ingest.metricCollection,
         spend: ingest.spend,
+      });
+      this.ingestService = GovernanceIngestService.create({
+        access: ingestAccess,
+        receiver: ingestReceiver,
       });
     }
   }
@@ -398,8 +418,8 @@ export class GovernanceApp
   private readonly cliAccessService?: GovernanceCliAccessApi;
   private readonly cliCredentialService?: GovernanceCliCredentialApi;
   private readonly cliActivityService?: GovernanceCliActivityApi;
-  private readonly ingestAccessService?: GovernanceIngestAccessApi;
-  private readonly ingestReceiverService?: GovernanceIngestReceiverApi;
+  private readonly cliService?: GovernanceCliService;
+  private readonly ingestService?: GovernanceIngestService;
 
   /**
    * Every accessor below resolves to the ~100-operation governance facade
@@ -460,16 +480,78 @@ export class GovernanceApp
     return this.governanceApi;
   }
 
-  // ── The push-mode ingestion receivers ─────────────────────────────────────
-
-  /** Throttle, bearer secret and path-id check, in that order. */
-  ingestAccess(): GovernanceIngestAccessApi {
-    return this.ingestAccessService ?? this.unfinishedCapability();
+  cliBudgetStatus(input: GovernanceCliRequest): Promise<GovernanceCliAnswer> {
+    return (this.cliService ?? this.unfinishedCapability()).budgetStatus(input);
   }
 
-  /** Where a payload of each signal is folded, priced and acknowledged. */
-  ingestReceiver(): GovernanceIngestReceiverApi {
-    return this.ingestReceiverService ?? this.unfinishedCapability();
+  cliBootstrapRead(input: GovernanceCliRequest): Promise<GovernanceCliAnswer> {
+    return (this.cliService ?? this.unfinishedCapability()).bootstrap(input);
+  }
+
+  cliBudgetOverview(input: GovernanceCliRequest): Promise<GovernanceCliAnswer> {
+    return (this.cliService ?? this.unfinishedCapability()).budgetOverview(input);
+  }
+
+  cliPersonalProject(input: GovernanceCliRequest): Promise<GovernanceCliAnswer> {
+    return (this.cliService ?? this.unfinishedCapability()).personalProject(input);
+  }
+
+  cliVirtualKey(input: GovernanceCliRawRequest): Promise<GovernanceCliAnswer> {
+    return (this.cliService ?? this.unfinishedCapability()).virtualKey(input);
+  }
+
+  cliProjectKey(input: GovernanceCliRawRequest): Promise<GovernanceCliAnswer> {
+    return (this.cliService ?? this.unfinishedCapability()).projectKey(input);
+  }
+
+  cliIngestionSources(input: GovernanceCliSourcesRequest): Promise<GovernanceCliAnswer> {
+    return (this.cliService ?? this.unfinishedCapability()).ingestionSources(input);
+  }
+
+  cliIngestionSourceEvents(input: GovernanceCliSourceEventsRequest): Promise<GovernanceCliAnswer> {
+    return (this.cliService ?? this.unfinishedCapability()).ingestionSourceEvents(input);
+  }
+
+  cliIngestionSourceHealth(input: GovernanceCliSourceRequest): Promise<GovernanceCliAnswer> {
+    return (this.cliService ?? this.unfinishedCapability()).ingestionSourceHealth(input);
+  }
+
+  cliGovernanceStatus(input: GovernanceCliRequest): Promise<GovernanceCliAnswer> {
+    return (this.cliService ?? this.unfinishedCapability()).governanceStatus(input);
+  }
+
+  cliIngestionTemplates(input: GovernanceCliRequest): Promise<GovernanceCliAnswer> {
+    return (this.cliService ?? this.unfinishedCapability()).ingestionTemplates(input);
+  }
+
+  cliIngestionKey(input: GovernanceCliRawRequest): Promise<GovernanceCliAnswer> {
+    return (this.cliService ?? this.unfinishedCapability()).ingestionKey(input);
+  }
+
+  cliIngestionKeys(input: GovernanceCliRequest): Promise<GovernanceCliAnswer> {
+    return (this.cliService ?? this.unfinishedCapability()).ingestionKeys(input);
+  }
+
+  cliIngestionKeyState(input: GovernanceCliKeyLookupRequest): Promise<GovernanceCliAnswer> {
+    return (this.cliService ?? this.unfinishedCapability()).ingestionKeyState(input);
+  }
+
+  // ── The push-mode ingestion receivers ─────────────────────────────────────
+
+  ingestOtlpTraces(input: GovernanceIngestOtlpInput): Promise<GovernanceIngestResponse> {
+    return (this.ingestService ?? this.unfinishedCapability()).receiveOtlpTraces(input);
+  }
+
+  ingestWebhook(input: GovernanceIngestWebhookInput): Promise<GovernanceIngestResponse> {
+    return (this.ingestService ?? this.unfinishedCapability()).receiveWebhook(input);
+  }
+
+  ingestOtlpLogs(input: GovernanceIngestOtlpInput): Promise<GovernanceIngestResponse> {
+    return (this.ingestService ?? this.unfinishedCapability()).receiveOtlpLogs(input);
+  }
+
+  ingestOtlpMetrics(input: GovernanceIngestOtlpInput): Promise<GovernanceIngestResponse> {
+    return (this.ingestService ?? this.unfinishedCapability()).receiveOtlpMetrics(input);
   }
 
   // ── Ingestion templates ───────────────────────────────────────────────────
@@ -920,6 +1002,32 @@ export class GovernanceApp
  */
 function attributedUserId(by: GovernanceProjectCaller): string {
   return by.userId ?? `svc_${by.projectId}`;
+}
+
+function cliAccessTokens(auth: Pick<AuthApi, "findCliAccessSession" | "revokeCliAccessToken">) {
+  return {
+    async resolve(authorization: string | null | undefined) {
+      const session = await auth.findCliAccessSession({ authorization });
+      return session ? toGovernanceCliCaller(session) : null;
+    },
+    revoke: ({ authHeader, userId }: { authHeader: string | null | undefined; userId: string }) =>
+      auth.revokeCliAccessToken({ authorization: authHeader, userId }),
+  };
+}
+
+function toGovernanceCliCaller(session: CliAccessSession) {
+  return {
+    user_id: session.userId,
+    organization_id: session.organizationId,
+    ...(session.clientInfo
+      ? {
+          client_info: {
+            device_label: session.clientInfo.deviceLabel,
+            hostname: session.clientInfo.hostname,
+          },
+        }
+      : {}),
+  };
 }
 
 /**

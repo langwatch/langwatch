@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import type { PlatformToolSlug } from "./platform-tool-policy.ts";
 
 export const AI_TOOL_TYPES = ["coding_assistant", "model_provider", "external_tool"] as const;

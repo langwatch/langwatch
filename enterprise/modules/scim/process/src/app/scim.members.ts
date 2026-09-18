@@ -1,4 +1,5 @@
-export interface SCIMInfrastructure {  scimSyncLifecycle: ScimSyncLifecycle;
+export interface SCIMInfrastructure {
+  scimSyncLifecycle: ScimSyncLifecycle;
 }
 
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise

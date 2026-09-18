@@ -3,8 +3,9 @@ import {
   type ManagedProviderApi,
 } from "@langwatch/enterprise-managed-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { ManagedProviderConfiguration } from "./managed-provider-configuration.service.ts";
+
 import type { ManagedProviderCredentialVendor } from "../channels/managed-provider-credentials.channel.ts";
+import type { ManagedProviderConfiguration } from "./managed-provider-configuration.service.ts";
 
 export class ManagedProviderService implements ManagedProviderApi {
   private readonly projectOrganizations = new Map<string, string>();

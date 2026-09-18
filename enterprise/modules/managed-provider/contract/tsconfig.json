@@ -24,6 +24,9 @@
     },
     {
       "path": "../../../../packages/kernel/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/secrets/tsconfig.build.json"
     }
   ]
 }

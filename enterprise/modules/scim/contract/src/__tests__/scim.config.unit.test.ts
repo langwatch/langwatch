@@ -1,15 +1,16 @@
-import { RuntimeConfig } from "@langwatch/config";
+import { parseProcessConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
-import { scimServerConfigDefinition } from "../scim.config.ts";
 
-const read = (source: Record<string, unknown>) =>
-  RuntimeConfig.create({ name: "scim", definition: scimServerConfigDefinition, source }).value;
+import { scimConfig } from "../scim.config.ts";
+
+const read = (environment: Record<string, string | undefined>) =>
+  parseProcessConfig({ owners: [{ name: "scim", config: scimConfig }], environment }).scim;
 
 describe("scim server configuration", () => {
   describe("given a deployment wires no directory", () => {
     /** @scenario "A feature's defaults are the values a deployment already runs on" */
-    it("keeps the proven offboarding path off and the webhook unrouted", () => {
-      expect(read({})).toEqual({ auth0WebhookSecret: undefined, provenOffboarding: false });
+    it("keeps the proven offboarding path off", () => {
+      expect(read({})).toEqual({ provenOffboarding: false });
     });
   });
 

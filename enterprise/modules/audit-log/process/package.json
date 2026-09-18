@@ -1,5 +1,5 @@
 {
-  "name": "@langwatch/enterprise-audit-log-server",
+  "name": "@langwatch/enterprise-audit-log-process",
   "version": "0.1.0",
   "private": true,
   "description": "Server-side LangWatch audit logging.",
@@ -21,10 +21,10 @@
   },
   "dependencies": {
     "@langwatch/audit-log-contract": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",
     "@langwatch/time": "workspace:*",
     "zod": "catalog:"

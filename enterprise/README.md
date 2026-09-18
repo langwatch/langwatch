@@ -17,8 +17,8 @@ only modules, each mirroring the same shape a core module uses:
 
 There is no separate Enterprise composition root and no conditional mounting:
 Enterprise routes are always mounted and refuse per-organization on
-entitlement. The licence leg is the `licenseSource` supply token, provided by
-the process. See [dev/docs/ARCHITECTURE.md §11](../dev/docs/ARCHITECTURE.md)
+entitlement. Entitlement resolves licenses through the installed `LicensingApi`
+peer, which verifies each organization's stored license. See [dev/docs/ARCHITECTURE.md §11](../dev/docs/ARCHITECTURE.md)
 for the shape ruling.
 
 Billing's Stripe subscription lifecycle, usage-limit notifications, and

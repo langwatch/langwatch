@@ -12,7 +12,10 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { ScopeChipPicker, type ScopeChipPickerEntry } from "@langwatch/authz-browser-kit/scope-picker";
+import {
+  ScopeChipPicker,
+  type ScopeChipPickerEntry,
+} from "@langwatch/authz-browser-kit/scope-picker";
 import {
   ASSISTANT_KINDS,
   ASSISTANT_OPTIONS,

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { STRIPE_PRICE_NAMES } from "../index.ts";
 
 describe("stripePrices.types", () => {

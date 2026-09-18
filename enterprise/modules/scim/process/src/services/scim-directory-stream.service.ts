@@ -4,10 +4,7 @@
  * provisions once it is. Its payload is untyped at the boundary, and the replay
  * window lives here because one process remembers one set of deliveries.
  */
-import type {
-  ScimDeliveryAdmission,
-  ScimService,
-} from "@langwatch/enterprise-scim-contract";
+import type { ScimDeliveryAdmission, ScimService } from "@langwatch/enterprise-scim-contract";
 import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
@@ -219,8 +216,7 @@ function findName(event: ScimWebhookEvent): string | null {
 function findAction(event: ScimWebhookEvent): "create" | "deactivate" | null {
   const data = payloadOf(event);
   const description = data.description?.toLowerCase() ?? "";
-  const describesRemoval =
-    description.includes("delete") || description.includes("deactivat");
+  const describesRemoval = description.includes("delete") || description.includes("deactivat");
 
   if (describesRemoval) {
     return "deactivate";

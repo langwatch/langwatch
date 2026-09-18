@@ -1,10 +1,11 @@
-import { Prisma } from "@langwatch/prisma-client/generated";
-import { PrismaRepository } from "@langwatch/prisma-client";
 import {
   auditLogHistoryEntrySchema,
   type AuditLogEntry,
   type ListAuditLogEntityHistoryInput,
 } from "@langwatch/audit-log-contract";
+import { PrismaRepository } from "@langwatch/prisma-client";
+import { Prisma } from "@langwatch/prisma-client/generated";
+
 import type { AuditLogRepository } from "../audit-log.repository.ts";
 
 const historySelect = {

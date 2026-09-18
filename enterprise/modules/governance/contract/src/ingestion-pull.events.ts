@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { governanceEventEnvelopeSchema } from "./governance.ts";
 
 export const INGESTION_PULL_AGGREGATE_TYPE = "ingestion_pull" as const;

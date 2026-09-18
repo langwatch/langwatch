@@ -10,13 +10,6 @@ const read = (environment: Record<string, string | undefined>) =>
   }).licensing;
 
 describe("licensing server configuration", () => {
-  it("recognizes both deployment flag spellings without enabling an absent flag", () => {
-    expect(read({ IS_SAAS: "1" }).isSaas).toBe(true);
-    expect(read({ IS_SAAS: "true" }).isSaas).toBe(true);
-    expect(read({ IS_SAAS: "false" }).isSaas).toBe(false);
-    expect(read({}).isSaas).toBe(false);
-  });
-
   describe("given a deployment rotated the public key", () => {
     /** @scenario "A feature reads its configuration through its own schema" */
     it("reads the rotated key", () => {

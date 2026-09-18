@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { scimPatchRequestSchema } from "@langwatch/enterprise-scim-contract";
+import { Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 import type { ScimDirectoryRepository } from "../scim-directory.service.ts";
 import { ScimDirectoryService } from "../scim-directory.service.ts";
 import { ScimGrantsService } from "../scim-grants.service.ts";
-import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
-import { Temporal } from "@langwatch/time";
 
 const schema = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
 const group = {

@@ -1,9 +1,10 @@
-import { RuntimeConfig } from "@langwatch/config";
+import { parseProcessConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
-import { saasServerConfigDefinition } from "../saas.config.ts";
 
-const read = (source: Record<string, unknown>) =>
-  RuntimeConfig.create({ name: "saas", definition: saasServerConfigDefinition, source }).value;
+import { saasConfig } from "../saas.config.ts";
+
+const read = (environment: Record<string, string | undefined>) =>
+  parseProcessConfig({ owners: [{ name: "saas", config: saasConfig }], environment }).saas;
 
 describe("saas server configuration", () => {
   describe("given the deployment flag carries the spelling every tier reads", () => {

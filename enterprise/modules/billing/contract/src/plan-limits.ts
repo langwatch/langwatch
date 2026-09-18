@@ -4,6 +4,7 @@ import {
   quotedLimitsOfPlan,
   UNLIMITED_MESSAGES as NO_MESSAGE_CAP,
 } from "@langwatch/plans";
+
 import { type PlanTypes as PlanType, PlanTypes } from "./plan-types.ts";
 
 /**

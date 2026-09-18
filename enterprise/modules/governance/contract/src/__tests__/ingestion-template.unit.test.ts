@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   PLATFORM_INGESTION_TEMPLATES,
   RETIRED_PLATFORM_TEMPLATE_SLUGS,

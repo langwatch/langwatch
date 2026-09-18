@@ -113,3 +113,5 @@ export const subscriptionTrpc = defineTrpcContract("subscription")
   .withInput(organizationScopeSchema)
   .withOutput(billingDisplayInvoiceSchema.array())
   .build();
+
+export const billingCallerEmailSchema = z.string().nullable();

@@ -79,9 +79,7 @@ export abstract class ScimGrantRepository {
 }
 
 export abstract class ScimRepository extends ScimGrantRepository {
-  abstract findOrganizationBySsoDomain(input: {
-    domain: string;
-  }): Promise<{ id: string } | null>;
+  abstract findOrganizationBySsoDomain(input: { domain: string }): Promise<{ id: string } | null>;
   // Declared as properties of function type, not method shorthand: tests hold
   // a mock repository and reference these members unbound (e.g.
   // `expect(repo.addMembership).toHaveBeenCalledWith(...)`), which

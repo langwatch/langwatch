@@ -17,7 +17,11 @@
  * @see enterprise/modules/scim/specs/scim.feature
  */
 import { anyAuthenticated, publicRoute } from "@langwatch/api/access";
-import { defineRestRouter, MANAGEMENT_API_VERSION, type RestErrorHandler } from "@langwatch/api/rest";
+import {
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  type RestErrorHandler,
+} from "@langwatch/api/rest";
 import {
   ScimApi,
   ScimProtocolError,
@@ -394,10 +398,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
 
     if (!parsed.success) return scimError(400, parsed.error.message);
 
-    return scimJson(
-      await app.createUser({ organizationId: scope.id, request: parsed.data }),
-      201,
-    );
+    return scimJson(await app.createUser({ organizationId: scope.id, request: parsed.data }), 201);
   })
 
   .get("/Users/:id", "scimGetUser")
@@ -494,10 +495,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
 
     if (!parsed.success) return scimError(400, parsed.error.message);
 
-    return scimJson(
-      await app.createGroup({ organizationId: scope.id, request: parsed.data }),
-      201,
-    );
+    return scimJson(await app.createGroup({ organizationId: scope.id, request: parsed.data }), 201);
   })
 
   .get("/Groups/:id", "scimGetGroup")

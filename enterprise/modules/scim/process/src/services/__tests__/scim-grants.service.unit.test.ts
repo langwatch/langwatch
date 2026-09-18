@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 import {
   ScimGrantRepository,
   type ScimGrantBindingScope,
   type ScimRoleBindingRecord,
 } from "../../repositories/scim.repository.ts";
 import { type DesiredScimGrant, ScimGrantsService } from "../scim-grants.service.ts";
-import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 
 const organizationId = "org_1";
 const userId = "user_1";

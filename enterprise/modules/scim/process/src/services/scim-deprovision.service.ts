@@ -3,10 +3,8 @@
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type {
-  ScimRemovalOperation,
-  ScimSyncLifecycle,
-} from "../app/scim.members.ts";
+
+import type { ScimRemovalOperation, ScimSyncLifecycle } from "../app/scim.members.ts";
 
 const logger = createLogger("langwatch:scim:deprovision");
 const SCIM_ACTOR = { type: "system", name: "scim" } as const;

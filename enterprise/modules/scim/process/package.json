@@ -1,5 +1,5 @@
 {
-  "name": "@langwatch/enterprise-scim-server",
+  "name": "@langwatch/enterprise-scim-process",
   "version": "0.1.0",
   "private": true,
   "description": "Enterprise SCIM token lifecycle and OpenAPI metadata.",
@@ -38,11 +38,11 @@
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
-    "@langwatch/process-stores": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@trpc/server": "catalog:",
@@ -51,7 +51,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/enterprise-governance-server": "workspace:*",
+    "@langwatch/enterprise-governance-process": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@types/node": "catalog:",
     "nanoid": "^6.0.0",

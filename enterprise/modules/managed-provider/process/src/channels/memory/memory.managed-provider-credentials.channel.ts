@@ -1,4 +1,5 @@
 import type { ManagedBedrockConfig } from "@langwatch/enterprise-managed-provider-contract";
+
 import {
   type ManagedProviderCredentials,
   ManagedProviderCredentialVendor,

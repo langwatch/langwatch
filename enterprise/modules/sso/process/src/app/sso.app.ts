@@ -31,6 +31,7 @@ import {
 import { IdentityApi } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
+import { reads } from "@langwatch/process-stores/members";
 import { UserApi } from "@langwatch/user-contract";
 
 import {
@@ -87,7 +88,7 @@ export class SsoApp implements SsoApiContract {
     identity: IdentityApi,
   };
   static readonly configSchema = ssoConfigurationSchema;
-  static readonly reads = ["logger"] as const;
+  static readonly reads = reads("logger");
 
   readonly #gate: SsoGateService;
   readonly #connections: SsoConnectionLedger;

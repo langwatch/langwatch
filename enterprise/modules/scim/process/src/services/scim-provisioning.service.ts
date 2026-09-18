@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { SYSTEM_ACTORS } from "@langwatch/actor";
-import type { AuthzGrantsService,RoleBindingScopeType,TeamUserRole } from "@langwatch/authz-contract";
-import type { UserProfile, UserApi } from "@langwatch/user-contract";
+import type {
+  AuthzGrantsService,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "@langwatch/authz-contract";
 import {
   type ScimCreateUserRequest,
   type ScimListResponse,
@@ -9,13 +12,15 @@ import {
   type ScimUser,
 } from "@langwatch/enterprise-scim-contract";
 import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
+import type { UserProfile, UserApi } from "@langwatch/user-contract";
+
 import type { ScimRepository } from "../repositories/scim.repository.ts";
-import { ScimGrantsService } from "./scim-grants.service.ts";
 import {
   ScimCostCenterService,
   type ScimDepartmentAssignment,
 } from "./scim-cost-center.service.ts";
 import { ScimDeprovisionService } from "./scim-deprovision.service.ts";
+import { ScimGrantsService } from "./scim-grants.service.ts";
 import { ScimUserPatchService, type ScimUserActivation } from "./scim-user-patch.service.ts";
 import {
   ScimUserProfileService,

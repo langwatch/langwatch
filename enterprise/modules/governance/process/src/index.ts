@@ -137,7 +137,7 @@ export { governanceServer } from "./governance.server.ts";
 // authenticate with a device-session bearer and dispatch into governance. They
 // sit under an auth path because the project-scoped governance REST rejects a
 // device token; the services underneath are the console's own.
-export { governanceCliRest, GovernanceCliRestApi } from "./transport/governance-cli.rest.ts";
+export { governanceCliRest } from "./transport/governance-cli.rest.ts";
 export type {
   GovernanceCliAccessApi,
   GovernanceCliAccessMembers,
@@ -160,10 +160,7 @@ export type {
 // The Activity Monitor's push-mode receivers. A signal whose collection this
 // process did not compose answers `not-served`, so an exporter gets a
 // permanent 404 rather than a 500 from a receiver that pretends to serve it.
-export {
-  governanceIngestRest,
-  GovernanceIngestRestApi,
-} from "./transport/governance-ingest.rest.ts";
+export { governanceIngestRest } from "./transport/governance-ingest.rest.ts";
 export type {
   GovernanceIngestAccessApi,
   GovernanceIngestAccessMembers,

@@ -1,7 +1,8 @@
-import { z } from "zod";
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
-import type { PlanTypes } from "./plan-types.ts";
 import type { Instant } from "@langwatch/time";
+import { z } from "zod";
+
+import type { PlanTypes } from "./plan-types.ts";
 
 export type UsageUnit = "traces" | "events";
 export type LimitType = "members" | "membersLite";

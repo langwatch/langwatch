@@ -28,8 +28,6 @@
  * See specs/identity/scim-connection-sync.feature.
  */
 import { SYSTEM_ACTORS } from "@langwatch/actor";
-import { type ScimSyncLifecycle } from "../app/scim.members.ts";
-import { nowInstant } from "@langwatch/time";
 import {
   ISSUE_SCIM_TOKEN_COMMAND_TYPE,
   RECORD_SCIM_APPLY_FAILURE_COMMAND_TYPE,
@@ -48,6 +46,9 @@ import {
   type ScimUserOp,
   scimSyncIdFor,
 } from "@langwatch/identity-contract";
+import { nowInstant } from "@langwatch/time";
+
+import { type ScimSyncLifecycle } from "../app/scim.members.ts";
 
 /**
  * The identity guards and ledger this adapter drives, named by their shape.

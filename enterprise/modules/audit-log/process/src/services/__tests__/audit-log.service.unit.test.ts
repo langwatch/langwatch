@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+
 import type { AuditLogRepository } from "../../repositories/audit-log.repository.ts";
 import { AuditLogService } from "../audit-log.service.ts";
 

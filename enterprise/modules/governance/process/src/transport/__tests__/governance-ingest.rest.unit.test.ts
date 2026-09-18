@@ -5,6 +5,7 @@
  * deployment folds nowhere. Spec: specs/ai-gateway/governance/
  */
 import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
+import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { TestGovernanceService } from "../../app/__tests__/support/test-governance-service.ts";
@@ -17,7 +18,8 @@ import {
   type GovernanceIngestPrincipalDirectory,
   type GovernanceIngestTraceCollection,
 } from "../../services/governance-ingest-receiver.service.ts";
-import { governanceIngestRest, type GovernanceIngestRestApi } from "../governance-ingest.rest.ts";
+import { GovernanceIngestService } from "../../services/governance-ingest.service.ts";
+import { governanceIngestRest } from "../governance-ingest.rest.ts";
 
 const SECRET = "lw_is_abcdef123";
 const SOURCE_ID = "src_1";
@@ -67,21 +69,50 @@ function mountIngest(world: World = {}) {
     findMemberIdByEmail: unreachable<GovernanceIngestPrincipalDirectory["findMemberIdByEmail"]>(),
   };
 
-  const app: GovernanceIngestRestApi = {
-    ingestAccess: () =>
-      GovernanceIngestAccessService.create({
-        governance: () => governance,
-        ...(world.rateLimit ? { rateLimit: world.rateLimit } : {}),
-      }),
-    ingestReceiver: () =>
-      GovernanceIngestReceiverService.create({
-        governance: () => governance,
-        projects: () => ({ ensureInternal: vi.fn().mockResolvedValue({ id: "gov_project" }) }),
-        traceCollection,
-        ...(world.logCollection ? { logCollection: world.logCollection } : {}),
-        ...(world.metricCollection ? { metricCollection: world.metricCollection } : {}),
-        directory: () => directory,
-      }),
+  const ingest = GovernanceIngestService.create({
+    access: GovernanceIngestAccessService.create({
+      governance: () => governance,
+      ...(world.rateLimit ? { rateLimit: world.rateLimit } : {}),
+    }),
+    receiver: GovernanceIngestReceiverService.create({
+      governance: () => governance,
+      projects: () => ({ ensureInternal: vi.fn().mockResolvedValue({ id: "gov_project" }) }),
+      traceCollection,
+      ...(world.logCollection ? { logCollection: world.logCollection } : {}),
+      ...(world.metricCollection ? { metricCollection: world.metricCollection } : {}),
+      directory: () => directory,
+    }),
+  });
+  const unsupportedRestOperation = (): Promise<never> =>
+    Promise.reject(new Error("not reachable through the ingest door"));
+  const app: GovernanceRestApi = {
+    ingestOtlpTraces: (input) => ingest.receiveOtlpTraces(input),
+    ingestWebhook: (input) => ingest.receiveWebhook(input),
+    ingestOtlpLogs: (input) => ingest.receiveOtlpLogs(input),
+    ingestOtlpMetrics: (input) => ingest.receiveOtlpMetrics(input),
+    cliBudgetStatus: unsupportedRestOperation,
+    cliBootstrapRead: unsupportedRestOperation,
+    cliBudgetOverview: unsupportedRestOperation,
+    cliPersonalProject: unsupportedRestOperation,
+    cliVirtualKey: unsupportedRestOperation,
+    cliProjectKey: unsupportedRestOperation,
+    cliIngestionSources: unsupportedRestOperation,
+    cliIngestionSourceEvents: unsupportedRestOperation,
+    cliIngestionSourceHealth: unsupportedRestOperation,
+    cliGovernanceStatus: unsupportedRestOperation,
+    cliIngestionTemplates: unsupportedRestOperation,
+    cliIngestionKey: unsupportedRestOperation,
+    cliIngestionKeys: unsupportedRestOperation,
+    cliIngestionKeyState: unsupportedRestOperation,
+    listIngestionTemplatesForMember: unsupportedRestOperation,
+    listIngestionTemplatesForAdmin: unsupportedRestOperation,
+    getIngestionTemplate: unsupportedRestOperation,
+    createIngestionTemplate: unsupportedRestOperation,
+    updateIngestionTemplateOttlRules: unsupportedRestOperation,
+    archiveIngestionTemplate: unsupportedRestOperation,
+    cloneIngestionTemplate: unsupportedRestOperation,
+    departmentResolveByNameOrCreate: unsupportedRestOperation,
+    departmentAssignUser: unsupportedRestOperation,
   };
 
   const runtime = createRestRuntime({

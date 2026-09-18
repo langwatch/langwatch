@@ -1,23 +1,14 @@
-import {
-  Config,
-  compileRuntimeConfig,
-  environmentBooleanSchema,
-  RuntimeConfig,
-  type ConfigValue,
-} from "@langwatch/config";
-import { z } from "zod";
+import { Config, environmentBooleanSchema, type ConfigOf } from "@langwatch/config";
+import { Secret } from "@langwatch/secrets/secret";
 
-/**
- * A blank webhook secret answers 404 so an unconfigured install looks unrouted.
- * `provenOffboarding` selects one process-wide offboarding path at boot.
- */
-export const scimServerConfigDefinition = RuntimeConfig.define({
-  auth0WebhookSecret: Config.value(z.string().optional(), { env: "AUTH0_SCIM_WEBHOOK_SECRET" }),
-  provenOffboarding: Config.value(environmentBooleanSchema.default(false), {
-    env: "SCIM_V2_GRANTS",
-  }),
-});
+/** `provenOffboarding` selects one process-wide offboarding path at boot. */
+export const scimConfig = Config.define((c) => ({
+  provenOffboarding: c.env("SCIM_V2_GRANTS", environmentBooleanSchema.default(false)),
+}));
 
-export type ScimServerConfig = ConfigValue<typeof scimServerConfigDefinition>;
+export type ScimServerConfig = ConfigOf<typeof scimConfig>;
 
-export const scimServerConfigSchema = compileRuntimeConfig(scimServerConfigDefinition);
+/** A blank webhook secret answers 404 so an unconfigured install looks unrouted. */
+export const scimSecrets = {
+  auth0WebhookSecret: Secret.load("AUTH0_SCIM_WEBHOOK_SECRET", { optional: true }),
+} as const;

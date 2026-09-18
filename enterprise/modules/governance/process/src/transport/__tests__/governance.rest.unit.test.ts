@@ -17,7 +17,9 @@ import {
   createRestRuntime,
   type RestErrorHandler,
 } from "@langwatch/api/rest";
+import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
   InvalidSourceTypeError,
   PlatformTemplateImmutableError,
@@ -31,11 +33,8 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  GovernanceApp,
-  type GovernanceActorDirectory,
-  type GovernancePersonalVirtualKeyMembers,
-} from "../../app/governance.app.ts";
+import { GovernanceApp } from "../../app/governance.app.ts";
+import type { GovernanceMemberDatabase } from "../../governance.server.ts";
 import type { NewIngestionTemplate } from "../../repositories/ingestion-template.repository.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
 import { governanceRest, governanceRestCaller, governanceRestSurface } from "../governance.rest.ts";
@@ -60,6 +59,8 @@ const USER_ID = "user-1";
 /** The two credential classes this family authenticates, as bearer values. */
 const USER_BOUND_TOKEN = "user-bound-token";
 const LEGACY_PROJECT_TOKEN = "legacy-project-token";
+
+const unreachablePrisma = createApiFixture<GovernanceMemberDatabase>();
 
 type RequestOptions = {
   method?: string;
@@ -132,18 +133,12 @@ function buildApi(
     repositories,
     dependencies: {
       projects: createApiFixture<ProjectApi>({ getOrganizationId }),
+      auth: createApiFixture<AuthApi>(),
+      entitlements: createApiFixture<EntitlementApi>(),
       organizations: createApiFixture<OrganizationApi>(),
       permissions: createApiFixture<AuthzApi>(),
     },
-    members: {
-      personalVirtualKeys: {
-        isOrganizationMember:
-          unreachable<GovernancePersonalVirtualKeyMembers["isOrganizationMember"]>(),
-        hasActivePersonalKeyLabelled:
-          unreachable<GovernancePersonalVirtualKeyMembers["hasActivePersonalKeyLabelled"]>(),
-      },
-      actors: { findUser: unreachable<GovernanceActorDirectory["findUser"]>() },
-    },
+    members: { prisma: unreachablePrisma },
     resources: new ResourceScope(),
   });
 

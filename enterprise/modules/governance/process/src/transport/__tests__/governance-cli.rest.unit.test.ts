@@ -6,7 +6,10 @@
  */
 import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import { PersonalSourceTypeNotAllowedError } from "@langwatch/enterprise-governance-contract";
+import {
+  PersonalSourceTypeNotAllowedError,
+  type GovernanceRestApi,
+} from "@langwatch/enterprise-governance-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -21,7 +24,8 @@ import {
   type GovernanceCliBudgetReader,
   type GovernanceCliPersonDirectory,
 } from "../../services/governance-cli-credentials.service.ts";
-import { governanceCliRest, type GovernanceCliRestApi } from "../governance-cli.rest.ts";
+import { GovernanceCliService } from "../../services/governance-cli.service.ts";
+import { governanceCliRest } from "../governance-cli.rest.ts";
 
 const USER_ID = "user_1";
 const ORGANIZATION_ID = "org_1";
@@ -91,30 +95,59 @@ function mountCli(world: World = {}) {
     revoke,
   };
 
-  const app: GovernanceCliRestApi = {
-    cliAccess: () =>
-      GovernanceCliAccessService.create({
-        accessTokens,
-        directory: () => directory,
-        plans,
-        permittedOnOrganization: () => Promise.resolve(world.permittedOnOrganization ?? true),
-        publicBaseUrl: "https://app.test",
+  const cli = GovernanceCliService.create({
+    access: GovernanceCliAccessService.create({
+      accessTokens,
+      directory: () => directory,
+      plans,
+      permittedOnOrganization: () => Promise.resolve(world.permittedOnOrganization ?? true),
+      publicBaseUrl: "https://app.test",
+    }),
+    credentials: GovernanceCliCredentialService.create({
+      governance: () => governance,
+      directory: () => directory,
+      supportContacts: () => ({
+        findSupportContact: vi.fn().mockResolvedValue(world.supportContact ?? null),
       }),
-    cliCredentials: () =>
-      GovernanceCliCredentialService.create({
-        governance: () => governance,
-        directory: () => directory,
-        supportContacts: () => ({
-          findSupportContact: vi.fn().mockResolvedValue(world.supportContact ?? null),
-        }),
-        ensurePersonalWorkspace: unreachable<() => Promise<never>>(),
-        tryFindPersonalWorkspace: vi.fn().mockResolvedValue(world.personalWorkspace ?? null),
-        permittedOnProject,
-        ...(world.budgets ? { budgets: world.budgets } : {}),
-        publicBaseUrl: "https://app.test",
-      }),
-    cliActivity: () => GovernanceCliActivityService.create({ governance: () => governance }),
-    governance: () => governance,
+      ensurePersonalWorkspace: unreachable<() => Promise<never>>(),
+      tryFindPersonalWorkspace: vi.fn().mockResolvedValue(world.personalWorkspace ?? null),
+      permittedOnProject,
+      ...(world.budgets ? { budgets: world.budgets } : {}),
+      publicBaseUrl: "https://app.test",
+    }),
+    activity: GovernanceCliActivityService.create({ governance: () => governance }),
+    governance,
+  });
+  const unavailable = (): Promise<never> =>
+    Promise.reject(new Error("not reachable through the CLI door"));
+  const app: GovernanceRestApi = {
+    cliBudgetStatus: (input) => cli.budgetStatus(input),
+    cliBootstrapRead: (input) => cli.bootstrap(input),
+    cliBudgetOverview: (input) => cli.budgetOverview(input),
+    cliPersonalProject: (input) => cli.personalProject(input),
+    cliVirtualKey: (input) => cli.virtualKey(input),
+    cliProjectKey: (input) => cli.projectKey(input),
+    cliIngestionSources: (input) => cli.ingestionSources(input),
+    cliIngestionSourceEvents: (input) => cli.ingestionSourceEvents(input),
+    cliIngestionSourceHealth: (input) => cli.ingestionSourceHealth(input),
+    cliGovernanceStatus: (input) => cli.governanceStatus(input),
+    cliIngestionTemplates: (input) => cli.ingestionTemplates(input),
+    cliIngestionKey: (input) => cli.ingestionKey(input),
+    cliIngestionKeys: (input) => cli.ingestionKeys(input),
+    cliIngestionKeyState: (input) => cli.ingestionKeyState(input),
+    ingestOtlpTraces: unavailable,
+    ingestWebhook: unavailable,
+    ingestOtlpLogs: unavailable,
+    ingestOtlpMetrics: unavailable,
+    listIngestionTemplatesForMember: unavailable,
+    listIngestionTemplatesForAdmin: unavailable,
+    getIngestionTemplate: unavailable,
+    createIngestionTemplate: unavailable,
+    updateIngestionTemplateOttlRules: unavailable,
+    archiveIngestionTemplate: unavailable,
+    cloneIngestionTemplate: unavailable,
+    departmentResolveByNameOrCreate: unavailable,
+    departmentAssignUser: unavailable,
   };
 
   const runtime = createRestRuntime({

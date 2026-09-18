@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { createLogger } from "@langwatch/observability";
 import type { ScimPatchOperation } from "@langwatch/enterprise-scim-contract";
+import { createLogger } from "@langwatch/observability";
+
 import type { ScimGroupRecord, ScimRepository } from "../repositories/scim.repository.ts";
 
 const logger = createLogger("langwatch:scim:group");

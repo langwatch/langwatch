@@ -5,6 +5,7 @@ import {
   type PrismaClient,
 } from "@langwatch/prisma-client/generated";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
+
 import {
   ScimRepository,
   type ScimGrantBindingScope,
@@ -152,18 +153,12 @@ export class PrismaScimRepository extends ScimRepository {
       data: { ...input, role: organizationUserRole(input.role) },
     });
   };
-  removeMembership = async (input: {
-    organizationId: string;
-    userId: string;
-  }): Promise<void> => {
+  removeMembership = async (input: { organizationId: string; userId: string }): Promise<void> => {
     await this.prisma.organizationUser.delete({
       where: { userId_organizationId: input },
     });
   };
-  async findGroup(input: {
-    organizationId: string;
-    id: string;
-  }): Promise<ScimGroupRecord | null> {
+  async findGroup(input: { organizationId: string; id: string }): Promise<ScimGroupRecord | null> {
     const row = await this.prisma.group.findFirst({
       where: { id: input.id, organizationId: input.organizationId },
     });
@@ -318,10 +313,7 @@ export class PrismaScimRepository extends ScimRepository {
   }
   // Arrow instance property to match the base class's property-typed
   // declaration (see `findMembership` above for why).
-  revokeToken = async (input: {
-    organizationId: string;
-    tokenId: string;
-  }): Promise<boolean> => {
+  revokeToken = async (input: { organizationId: string; tokenId: string }): Promise<boolean> => {
     return (
       (
         await this.prisma.scimToken.deleteMany({
@@ -330,10 +322,7 @@ export class PrismaScimRepository extends ScimRepository {
       ).count > 0
     );
   };
-  findToken(input: {
-    organizationId: string;
-    tokenId: string;
-  }): Promise<ScimTokenIdentity | null> {
+  findToken(input: { organizationId: string; tokenId: string }): Promise<ScimTokenIdentity | null> {
     return this.prisma.scimToken.findFirst({
       where: { id: input.tokenId, organizationId: input.organizationId },
       select: { id: true, organizationId: true, connectionId: true },

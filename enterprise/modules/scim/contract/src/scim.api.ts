@@ -9,8 +9,9 @@
  * what minting a token means, or which tenant a directory push provisions, had
  * three places to live. It has one.
  */
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
 
+import type { IssuedScimToken, ScimTokenEntitlement, ScimTokenSummary } from "./scim-token.ts";
 import type {
   ScimCreateGroupRequest,
   ScimCreateUserRequest,
@@ -20,7 +21,6 @@ import type {
   ScimReplaceGroupRequest,
   ScimUser,
 } from "./scim.contract.ts";
-import type { IssuedScimToken, ScimTokenEntitlement, ScimTokenSummary } from "./scim-token.ts";
 
 /** The organization a directory credential resolved to. */
 export type ScimDirectoryScope = Readonly<{ organizationId: string }>;

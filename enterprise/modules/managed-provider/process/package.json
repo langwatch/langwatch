@@ -1,5 +1,5 @@
 {
-  "name": "@langwatch/enterprise-managed-provider-server",
+  "name": "@langwatch/enterprise-managed-provider-process",
   "version": "0.1.0",
   "private": true,
   "description": "Server-side Enterprise managed model-provider services.",
@@ -23,11 +23,12 @@
   "dependencies": {
     "@aws-sdk/client-sts": "^3.1080.0",
     "@langwatch/enterprise-managed-provider-contract": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
     "@langwatch/observability": "workspace:*",
-    "@langwatch/project-contract": "workspace:*",
-    "@langwatch/kernel": "workspace:*"
+    "@langwatch/project-contract": "workspace:*"
   },
   "devDependencies": {
+    "@langwatch/secrets": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",

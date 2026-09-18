@@ -9,7 +9,9 @@
  * REST family needs none of the three. The one test that does need them
  * (the CLI/ingest accessors) builds its own app with the bag present.
  */
+import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type {
   GovernanceCallSurface,
   GovernanceProjectCaller,
@@ -56,6 +58,8 @@ function buildApp() {
     repositories,
     dependencies: {
       projects: createApiFixture<ProjectApi>({ getOrganizationId }),
+      auth: createApiFixture<AuthApi>(),
+      entitlements: createApiFixture<EntitlementApi>(),
       organizations: createApiFixture<OrganizationApi>(),
       permissions: createApiFixture<AuthzApi>(),
     },
@@ -70,12 +74,22 @@ function buildApp() {
 function buildAppWithUnfinishedCapability() {
   const repositories: GovernanceRepositories = MemoryGovernanceRepositories.create();
   const governance = new TestGovernanceService();
+  const findCliAccessSession = vi.fn<AuthApi["findCliAccessSession"]>(async () => ({
+    userId: "user-1",
+    organizationId: "organization-1",
+    clientInfo: { deviceLabel: "Work laptop", hostname: "laptop" },
+  }));
+  const getActivePlan = vi.fn<EntitlementApi["getActivePlan"]>(async () => ({
+    type: "ENTERPRISE",
+  }) as never);
 
   const app = GovernanceApp.create({
     config: void 0,
     repositories,
     dependencies: {
       projects: createApiFixture<ProjectApi>(),
+      auth: createApiFixture<AuthApi>({ findCliAccessSession }),
+      entitlements: createApiFixture<EntitlementApi>({ getActivePlan }),
       organizations: createApiFixture<OrganizationApi>(),
       permissions: createApiFixture<AuthzApi>(),
     },
@@ -83,9 +97,7 @@ function buildAppWithUnfinishedCapability() {
       prisma: unreachablePrisma,
       governance,
       cli: {
-        accessTokens: unreachable<GovernanceCliMembers["accessTokens"]>(),
         members: unreachable<GovernanceCliMembers["members"]>(),
-        plans: unreachable<GovernanceCliMembers["plans"]>(),
         persons: unreachable<GovernanceCliMembers["persons"]>(),
         supportContacts: unreachable<GovernanceCliMembers["supportContacts"]>(),
       },
@@ -98,7 +110,7 @@ function buildAppWithUnfinishedCapability() {
     resources: new ResourceScope(),
   });
 
-  return { app };
+  return { app, findCliAccessSession, getActivePlan };
 }
 
 describe("GovernanceApp ingestion templates", () => {
@@ -249,8 +261,29 @@ describe("GovernanceApp as the module a process installs", () => {
       expect(app.cliCredentials().budgetStatus).toBeTypeOf("function");
       expect(app.cliActivity().sources).toBeTypeOf("function");
       expect(app.governance().cliBootstrapResolve).toBeTypeOf("function");
-      expect(app.ingestAccess().authorize).toBeTypeOf("function");
-      expect(app.ingestReceiver().receiveTraces).toBeTypeOf("function");
+      expect(app.ingestOtlpTraces).toBeTypeOf("function");
+      expect(app.ingestWebhook).toBeTypeOf("function");
+      expect(app.ingestOtlpLogs).toBeTypeOf("function");
+      expect(app.ingestOtlpMetrics).toBeTypeOf("function");
+    });
+
+    it("resolves the CLI caller and Enterprise plan through the named peers", async () => {
+      const { app, findCliAccessSession, getActivePlan } = buildAppWithUnfinishedCapability();
+
+      await expect(app.cliAccess().findCaller("Bearer lw_at_token")).resolves.toEqual({
+        user_id: "user-1",
+        organization_id: "organization-1",
+        client_info: { device_label: "Work laptop", hostname: "laptop" },
+      });
+      await expect(
+        app.cliAccess().planDecision({
+          organizationId: "organization-2",
+          feature: "ingestionSources",
+        }),
+      ).resolves.toEqual({ entitled: true });
+
+      expect(findCliAccessSession).toHaveBeenCalledWith({ authorization: "Bearer lw_at_token" });
+      expect(getActivePlan).toHaveBeenCalledWith({ organizationId: "organization-2" });
     });
   });
 

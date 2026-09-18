@@ -24,7 +24,8 @@ import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import {
   ScimApi,
   ScimProtocolError,
-  scimServerConfigSchema,
+  scimConfig,
+  scimSecrets,
   type IssuedScimToken,
   type ScimApi as ScimApiContract,
   type ScimCreateGroupRequest,
@@ -48,8 +49,8 @@ import {
   EntitlementApi,
   isEnterpriseTier,
 } from "@langwatch/entitlement-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import type { FeatureSetup } from "@langwatch/kernel";
+import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { UserApi } from "@langwatch/user-contract";
 
 import { PrismaScimRepository } from "../repositories/prisma/prisma.scim.repository.ts";
@@ -107,7 +108,8 @@ export class ScimApp implements ScimApiContract {
     entitlements: EntitlementApi,
     auditLog: AuditLogApi,
   };
-  static readonly configSchema = scimServerConfigSchema;
+  static readonly config = scimConfig;
+  static readonly secrets = scimSecrets;
   static readonly reads = reads("prisma");
 
   readonly #scim: ScimService;
@@ -130,8 +132,9 @@ export class ScimApp implements ScimApiContract {
     });
   }
 
-  static create(setup: ScimSetup): ScimApp {
-    const { dependencies, members, config } = setup;
+  static async create(setup: ScimSetup): Promise<ScimApp> {
+    const { dependencies, members, config, secrets } = setup;
+    const auth0WebhookSecret = await secrets.into(scimSecrets.auth0WebhookSecret, (value) => value);
     const scim = PostgresScimService.create({
       repository: PrismaScimRepository.create(members.prisma),
       writer: dependencies.authorization,
@@ -147,7 +150,7 @@ export class ScimApp implements ScimApiContract {
       scim,
       entitlements: dependencies.entitlements,
       auditLog: dependencies.auditLog,
-      webhookSecret: () => config.auth0WebhookSecret,
+      webhookSecret: () => auth0WebhookSecret,
     });
   }
 

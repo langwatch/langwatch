@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { personalUsageQueryInputSchema, personalUsageSummarySchema } from "../personal-usage.ts";
 
 describe("personal usage contract", () => {

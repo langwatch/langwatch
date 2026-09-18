@@ -1,3 +1,4 @@
+import type { ScimTokenEntitlement, ScimTokenSummary } from "./scim-token.ts";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type {
   ScimCreateGroupRequest,
@@ -8,14 +9,11 @@ import type {
   ScimReplaceGroupRequest,
   ScimUser,
 } from "./scim.contract.ts";
-import type { ScimTokenEntitlement, ScimTokenSummary } from "./scim-token.ts";
 
 /** The portable provisioning capability used by every SCIM transport. */
 export abstract class ScimService {
   /** Resolve an Auth0 SCIM webhook's verified e-mail domain to its tenant. */
-  abstract findOrganizationBySsoDomain(input: {
-    domain: string;
-  }): Promise<{ id: string } | null>;
+  abstract findOrganizationBySsoDomain(input: { domain: string }): Promise<{ id: string } | null>;
   abstract generateToken(input: {
     organizationId: string;
     connectionId?: string | null;

@@ -32,8 +32,7 @@ export class ScimUserProfileService {
   }
 
   async updateProfile(input: UpdateUserProfileInput): Promise<UserProfile> {
-    const previous =
-      input.email === undefined ? null : await this.users.findById({ id: input.id });
+    const previous = input.email === undefined ? null : await this.users.findById({ id: input.id });
     const updated = await this.users.updateProfile(input);
 
     if (

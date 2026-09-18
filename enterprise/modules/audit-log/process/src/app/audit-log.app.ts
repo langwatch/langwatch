@@ -6,30 +6,27 @@ import {
   type RecordAuditLogCommand,
 } from "@langwatch/audit-log-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
-import { z } from "zod";
+
 import type { AuditLogRepositories } from "../repositories/audit-log.repositories.ts";
 import { AuditLogService } from "../services/audit-log.service.ts";
 
-export const auditLogConfigSchema = z.object({
-  maxArgsBytes: z
-    .number()
-    .int()
-    .positive()
-    .default(4 * 1024),
-});
-export type AuditLogConfig = z.infer<typeof auditLogConfigSchema>;
+/**
+ * No deployment ever fed this through the (now-deleted) app config — the
+ * schema's own default was the only value it ever took. Ported as the
+ * literal it always resolved to rather than minting a new env spelling.
+ */
+const MAX_ARGS_BYTES = 4 * 1024;
 
 type AuditLogSetup = FeatureSetup<
   typeof AuditLogApp.dependencies,
   never,
-  AuditLogConfig,
+  undefined,
   AuditLogRepositories
 >;
 
 export class AuditLogApp implements AuditLogApiContract {
   static readonly contract = AuditLogApi;
   static readonly dependencies = {};
-  static readonly configSchema = auditLogConfigSchema;
 
   readonly #entries: AuditLogService;
 
@@ -37,11 +34,11 @@ export class AuditLogApp implements AuditLogApiContract {
     this.#entries = entries;
   }
 
-  static create({ repositories, config }: AuditLogSetup): AuditLogApp {
+  static create({ repositories }: AuditLogSetup): AuditLogApp {
     return new AuditLogApp(
       AuditLogService.create({
         repository: repositories.entries,
-        maxArgsBytes: config.maxArgsBytes,
+        maxArgsBytes: MAX_ARGS_BYTES,
       }),
     );
   }

@@ -8,8 +8,8 @@
  * when wiring provisioning, so it must name the right resource.
  */
 import { createRestRuntime } from "@langwatch/api/rest";
-import { ENTERPRISE_FEATURE_ERRORS } from "@langwatch/entitlement-contract";
 import type { ScimListResponse, ScimUser } from "@langwatch/enterprise-scim-contract";
+import { ENTERPRISE_FEATURE_ERRORS } from "@langwatch/entitlement-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { scimProtocolErrorHandler, scimProtocolRest } from "../scim-protocol.rest.ts";

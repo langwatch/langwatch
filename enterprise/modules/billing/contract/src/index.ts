@@ -13,3 +13,8 @@ export * from "./stripe-price-catalog.ts";
 export * from "./stripe-prices.ts";
 export * from "./subscription.trpc.ts";
 export * from "./billing.config.ts";
+
+export {
+  billingStripeWebhookReceiptSchema,
+  billingStripeWebhookHeadersSchema,
+} from "./billing-webhook.schemas.ts";

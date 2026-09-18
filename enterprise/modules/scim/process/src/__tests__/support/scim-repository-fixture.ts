@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { vi } from "vitest";
+
 import type { ScimRepository } from "../../repositories/scim.repository.ts";
 
 /**
@@ -16,9 +17,7 @@ import type { ScimRepository } from "../../repositories/scim.repository.ts";
  * (`ScimDirectoryRepository`) and is what a group-only test should declare
  * instead of reaching for this.
  */
-export function scimRepositoryFixture(
-  overrides: Partial<ScimRepository> = {},
-): ScimRepository {
+export function scimRepositoryFixture(overrides: Partial<ScimRepository> = {}): ScimRepository {
   return {
     findOrganizationBySsoDomain: vi.fn(async () => null),
     createToken: vi.fn(async () => ({ id: "token-1" })),

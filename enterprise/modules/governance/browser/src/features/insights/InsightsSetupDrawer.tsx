@@ -14,11 +14,11 @@ import {
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Select } from "@langwatch/design-system/select";
-import { LANGY_CHAT_FEATURE_KEY } from "@langwatch/model-provider-contract";
 import {
   allModelOptions,
   ModelSelector,
 } from "@langwatch/model-provider-browser/surfaces/model-selector";
+import { LANGY_CHAT_FEATURE_KEY } from "@langwatch/model-provider-contract";
 import { UserRoundCog } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 

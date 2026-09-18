@@ -22,6 +22,7 @@ import {
   authzBindingIdentityKey,
 } from "@langwatch/authz-contract";
 import { nowInstant } from "@langwatch/time";
+
 import type {
   ScimGrantBindingScope,
   ScimGrantRepository,

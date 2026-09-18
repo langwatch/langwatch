@@ -6,6 +6,14 @@
  */
 import { z } from "zod";
 
+import { cliBootstrapResultSchema } from "./cli-bootstrap.ts";
+import { governanceSetupStateSchema } from "./governance.ts";
+import {
+  activityEventDetailRowSchema,
+  sourceHealthMetricsSchema,
+} from "./ingestion-source-activity.queries.ts";
+import { governanceBudgetOverviewForUserSchema } from "./personal-budget-overview.ts";
+
 /** The smallest and largest page one source's event feed will serve. */
 const EVENTS_PAGE_DEFAULT = 50;
 const EVENTS_PAGE_MAX = 200;
@@ -92,3 +100,96 @@ export const governanceCliIngestionKeySchema = z.object({
 });
 
 export type GovernanceCliIngestionKey = z.infer<typeof governanceCliIngestionKeySchema>;
+
+const cliRefusalSchema = z.object({
+  error: z.string(),
+  error_description: z.string(),
+  upgrade_url: z.string().optional(),
+});
+const cliBudgetRefusalSchema = z.object({
+  error: z.object({
+    type: z.literal("budget_exceeded"),
+    scope: z.string(),
+    limit_usd: z.string(),
+    spent_usd: z.string(),
+    period: z.string(),
+    request_increase_url: z.string(),
+    admin_email: z.string().nullable(),
+  }),
+});
+const cliProjectSchema = z.object({ id: z.string(), slug: z.string(), name: z.string() });
+const cliSuccessSchema = z.union([
+  z.object({ ok: z.literal(true) }),
+  cliBootstrapResultSchema,
+  governanceBudgetOverviewForUserSchema,
+  z.object({ project: cliProjectSchema.extend({ api_key: z.string() }) }),
+  z.object({ id: z.string(), secret: z.string(), prefix: z.string() }),
+  z.object({ api_key: z.string(), project: cliProjectSchema }),
+  z.object({
+    sources: z.array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        sourceType: z.string(),
+        description: z.string().nullable(),
+        status: z.string(),
+        lastEventAt: z.string().nullable(),
+        createdAt: z.string(),
+        archivedAt: z.string().nullable(),
+      }),
+    ),
+  }),
+  z.object({ events: z.array(activityEventDetailRowSchema) }),
+  z.object({
+    source: z.object({ id: z.string(), name: z.string(), status: z.string() }),
+    health: sourceHealthMetricsSchema,
+  }),
+  z.object({ setup: governanceSetupStateSchema }),
+  z.object({ ingestion_templates: z.array(governanceCliIngestionTemplateSchema) }),
+  z.object({
+    token: z.string(),
+    prefix: z.string(),
+    endpoint: z.string(),
+    project: cliProjectSchema.optional(),
+  }),
+  z.object({ keys: z.array(governanceCliIngestionKeySchema) }),
+  z.object({
+    lookup_id: z.string(),
+    status: z.enum(["unknown", "live", "revoked"]),
+    source_type: z.string().optional(),
+    revocation_cause: z.string().nullable().optional(),
+  }),
+]);
+
+// Released CLI versions read OAuth-shaped errors and the budget preflight's 402 document.
+export const governanceCliAnswers = {
+  200: cliSuccessSchema,
+  201: cliSuccessSchema,
+  400: cliRefusalSchema,
+  401: cliRefusalSchema,
+  402: z.union([cliRefusalSchema, cliBudgetRefusalSchema]),
+  403: cliRefusalSchema,
+  404: cliRefusalSchema,
+  409: cliRefusalSchema,
+  412: cliRefusalSchema,
+  500: cliRefusalSchema,
+} as const;
+export type GovernanceCliAnswer = {
+  [Status in keyof typeof governanceCliAnswers]: {
+    status: Status;
+    body: z.infer<(typeof governanceCliAnswers)[Status]>;
+  };
+}[keyof typeof governanceCliAnswers];
+
+export const governanceCliHeadersSchema = z.object({
+  authorization: z.string().nullable().default(null),
+});
+
+export type GovernanceCliRequest = Readonly<{ authorization: string | null }>;
+export type GovernanceCliRawRequest = GovernanceCliRequest & Readonly<{ raw: string }>;
+export type GovernanceCliSourcesRequest = GovernanceCliRequest &
+  Readonly<{ includeArchived: boolean }>;
+export type GovernanceCliSourceEventsRequest = GovernanceCliRequest &
+  Readonly<{ sourceId: string; limit: number; beforeIso: string | undefined }>;
+export type GovernanceCliSourceRequest = GovernanceCliRequest & Readonly<{ sourceId: string }>;
+export type GovernanceCliKeyLookupRequest = GovernanceCliRequest & Readonly<{ lookupId: string }>;

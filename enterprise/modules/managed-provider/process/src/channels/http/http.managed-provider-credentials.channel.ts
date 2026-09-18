@@ -1,5 +1,6 @@
 import { AssumeRoleCommand, STSClient } from "@aws-sdk/client-sts";
 import type { ManagedBedrockConfig } from "@langwatch/enterprise-managed-provider-contract";
+
 import {
   type ManagedProviderCredentials,
   ManagedProviderCredentialVendor,

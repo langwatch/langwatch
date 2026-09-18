@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { managedProviderServerConfigSchema } from "../managed-provider.config.ts";
+
+import { parseManagedBedrockDirectory } from "../managed-provider.config.ts";
 
 const DEPLOYMENT = {
   proxyRoleArn: "proxy",
@@ -10,22 +11,22 @@ const DEPLOYMENT = {
   region: "eu-west-1",
 };
 
-describe("managedProviderServerConfigSchema", () => {
+describe("parseManagedBedrockDirectory", () => {
   describe("given a directory naming two organizations", () => {
     describe("when the process reads its configuration", () => {
       /** @scenario "Serve several organizations from one configured directory" */
       it("resolves each organization to its own deployment", () => {
-        const parsed = managedProviderServerConfigSchema.parse({
-          bedrock: JSON.stringify({
+        const parsed = parseManagedBedrockDirectory(
+          JSON.stringify({
             org_1: DEPLOYMENT,
             org_2: { ...DEPLOYMENT, bedrockRoleArn: "other", region: "us-east-1" },
           }),
-        });
+        );
 
-        expect(parsed.bedrock.org_1?.bedrockRoleArn).toBe("customer");
-        expect(parsed.bedrock.org_1?.region).toBe("eu-west-1");
-        expect(parsed.bedrock.org_2?.bedrockRoleArn).toBe("other");
-        expect(parsed.bedrock.org_2?.region).toBe("us-east-1");
+        expect(parsed.org_1?.bedrockRoleArn).toBe("customer");
+        expect(parsed.org_1?.region).toBe("eu-west-1");
+        expect(parsed.org_2?.bedrockRoleArn).toBe("other");
+        expect(parsed.org_2?.region).toBe("us-east-1");
       });
     });
   });
@@ -34,8 +35,8 @@ describe("managedProviderServerConfigSchema", () => {
     describe("when the process reads its configuration", () => {
       /** @scenario "Run without managed Bedrock when none is configured" */
       it("resolves no organization and does not refuse", () => {
-        expect(managedProviderServerConfigSchema.parse({}).bedrock).toEqual({});
-        expect(managedProviderServerConfigSchema.parse({ bedrock: "  " }).bedrock).toEqual({});
+        expect(parseManagedBedrockDirectory(undefined)).toEqual({});
+        expect(parseManagedBedrockDirectory("  ")).toEqual({});
       });
     });
   });
@@ -44,10 +45,7 @@ describe("managedProviderServerConfigSchema", () => {
     describe("when the process reads its configuration", () => {
       /** @scenario "Refuse a malformed directory when the process starts" */
       it("refuses and says the configuration is invalid", () => {
-        const result = managedProviderServerConfigSchema.safeParse({ bedrock: "{not json" });
-
-        expect(result.success).toBe(false);
-        expect(result.error?.issues[0]?.message).toContain("not valid JSON");
+        expect(() => parseManagedBedrockDirectory("{not json")).toThrow(/not valid JSON/);
       });
     });
   });
@@ -57,12 +55,10 @@ describe("managedProviderServerConfigSchema", () => {
       /** @scenario "Refuse a directory whose deployment is incomplete" */
       it("refuses and says the configuration is invalid", () => {
         const { proxyAwsSecretAccessKey: _omitted, ...incomplete } = DEPLOYMENT;
-        const result = managedProviderServerConfigSchema.safeParse({
-          bedrock: JSON.stringify({ org_1: incomplete }),
-        });
 
-        expect(result.success).toBe(false);
-        expect(result.error?.issues[0]?.message).toContain("complete Bedrock deployment");
+        expect(() => parseManagedBedrockDirectory(JSON.stringify({ org_1: incomplete }))).toThrow(
+          /complete Bedrock deployment/,
+        );
       });
     });
   });

@@ -27,6 +27,7 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/plans": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
     "@langwatch/time": "workspace:*",
     "zod": "catalog:"
   },

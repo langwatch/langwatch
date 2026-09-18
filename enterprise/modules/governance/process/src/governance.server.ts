@@ -14,18 +14,21 @@ import {
 } from "@langwatch/api/rest";
 import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 import { defineServerModule } from "@langwatch/kernel";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import {
   GovernanceInstallationComposition,
   type GovernanceInstallationOptions,
 } from "./app/governance-installation-composition.build.ts";
 import {
+  createGovernanceMemberInfrastructure,
+  type GovernanceMemberDatabase,
+} from "./app/governance-member-infrastructure.ts";
+import {
   PostgresGovernanceAdapter,
   type PostgresGovernanceAdapterOptions,
   type PostgresGovernanceServices,
 } from "./app/governance-policy-composition.build.ts";
-import { GovernanceApp, type GovernanceBespokeMembers } from "./app/governance.app.ts";
+import { GovernanceApp } from "./app/governance.app.ts";
 import type {
   GovernanceDiagnosticsSink,
   GovernanceEncryptor,
@@ -309,46 +312,7 @@ export function createGovernanceServices(
   return PostgresGovernanceAdapter.create(options).build();
 }
 
-export type GovernanceMemberDatabase = Pick<
-  PrismaClient,
-  "organizationUser" | "user" | "virtualKey"
->;
-
-/** Live process adapters for the two bespoke reads used by the mounted REST surface. */
-export function createGovernanceMemberInfrastructure(
-  database: GovernanceMemberDatabase,
-): Pick<GovernanceBespokeMembers, "actors" | "personalVirtualKeys"> {
-  return {
-    actors: {
-      findUser: ({ token }) =>
-        database.user.findFirst({
-          where: { OR: [{ id: token }, { email: token }] },
-          select: { id: true, name: true, email: true },
-        }),
-    },
-    personalVirtualKeys: {
-      async isOrganizationMember({ organizationId, userId }) {
-        const membership = await database.organizationUser.findFirst({
-          where: { organizationId, userId, disabledAt: null },
-          select: { userId: true },
-        });
-        return membership !== null;
-      },
-      async hasActivePersonalKeyLabelled({ organizationId, userId, label }) {
-        const key = await database.virtualKey.findFirst({
-          where: {
-            organizationId,
-            principalUserId: userId,
-            name: label,
-            revokedAt: null,
-          },
-          select: { id: true },
-        });
-        return key !== null;
-      },
-    },
-  };
-}
+export { createGovernanceMemberInfrastructure, type GovernanceMemberDatabase };
 
 /** The Governance events pipeline a process registers on its event sourcing. */
 export function createGovernanceEventsPipeline(

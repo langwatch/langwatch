@@ -1,29 +1,25 @@
-import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@langwatch/config";
+import { Config, type ConfigOf } from "@langwatch/config";
+import { Secret } from "@langwatch/secrets/secret";
 import { z } from "zod";
+
+/** Neither is a credential: a payment-link id and a Slack channel address. */
+export const billingConfig = Config.define((c) => ({
+  licensePaymentLinkId: c.env("STRIPE_LICENSE_PAYMENT_LINK_ID", z.string().optional()),
+  slackSubscriptionsChannel: c.env("SLACK_CHANNEL_SUBSCRIPTIONS", z.string().optional()),
+}));
+
+export type BillingServerConfig = ConfigOf<typeof billingConfig>;
 
 /**
  * Both credentials required together; half a config looks like an outage.
- * Optional because self-hosted installs don't bill.
+ * The private key signs an issued licence key; absent means a licence
+ * checkout cannot be fulfilled.
  */
-export const billingServerConfigDefinition = RuntimeConfig.define({
-  stripeSecretKey: Config.value(z.string().optional(), { env: "STRIPE_SECRET_KEY" }),
-  /** Verified over the raw bytes per request, so a rotation needs no restart. */
-  stripeWebhookSecret: Config.value(z.string().optional(), { env: "STRIPE_WEBHOOK_SECRET" }),
-  licensePaymentLinkId: Config.value(z.string().optional(), {
-    env: "STRIPE_LICENSE_PAYMENT_LINK_ID",
-  }),
-  /** Signs an issued licence key; absent means a licence checkout cannot be fulfilled. */
-  licensePrivateKey: Config.value(z.string().optional(), {
-    env: "LANGWATCH_LICENSE_PRIVATE_KEY",
-  }),
-  slackSubscriptionsChannel: Config.value(z.string().optional(), {
-    env: "SLACK_CHANNEL_SUBSCRIPTIONS",
-  }),
-});
-
-export type BillingServerConfig = ConfigValue<typeof billingServerConfigDefinition>;
-
-export const billingServerConfigSchema = compileRuntimeConfig(billingServerConfigDefinition);
+export const billingSecrets = {
+  stripeSecretKey: Secret.load("STRIPE_SECRET_KEY", { optional: true }),
+  stripeWebhookSecret: Secret.load("STRIPE_WEBHOOK_SECRET", { optional: true }),
+  licensePrivateKey: Secret.load("LANGWATCH_LICENSE_PRIVATE_KEY", { optional: true }),
+} as const;
 
 /** Refuses a payment provider that is half configured, at boot. */
 export function assertBillingServerConfig(

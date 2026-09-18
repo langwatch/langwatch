@@ -1,5 +1,5 @@
 import type { ResolvePlanInput } from "@langwatch/entitlement-contract";
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel/module-api";
 
 import type { LimitCheckResult, LimitType } from "./license-limit-type.ts";
 import type { PlanInfo } from "./license-plan.ts";

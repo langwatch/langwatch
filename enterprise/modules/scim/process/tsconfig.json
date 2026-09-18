@@ -71,7 +71,7 @@
       "path": "../../../../modules/user/contract/tsconfig.build.json"
     },
     {
-      "path": "../../governance/server/tsconfig.build.json"
+      "path": "../../governance/process/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/test-harness/tsconfig.build.json"

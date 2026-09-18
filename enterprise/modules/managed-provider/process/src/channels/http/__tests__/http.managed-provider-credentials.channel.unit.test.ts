@@ -1,5 +1,6 @@
 import type { ManagedBedrockConfig } from "@langwatch/enterprise-managed-provider-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { HttpManagedProviderCredentialsChannel } from "../http.managed-provider-credentials.channel.ts";
 
 const sts = vi.hoisted(() => ({

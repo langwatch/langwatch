@@ -4,26 +4,27 @@
  * @see enterprise/modules/billing/specs/stripe-webhook.feature
  */
 import { publicRoute } from "@langwatch/api/access";
-import { defineRestRouter, MANAGEMENT_API_VERSION, type RestRawAnswer } from "@langwatch/api/rest";
-import { moduleApi } from "@langwatch/kernel";
+import {
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  BadRequestError,
+  NotFoundError,
+  InternalServerError,
+} from "@langwatch/api/rest";
+import {
+  billingStripeWebhookReceiptSchema,
+  billingStripeWebhookHeadersSchema,
+} from "@langwatch/enterprise-billing-contract";
+import { moduleApi } from "@langwatch/kernel/module-api";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
-import { HTTPException } from "hono/http-exception";
 import type Stripe from "stripe";
 
 import type { HandleEventResult } from "../services/billing-stripe-webhook.service.ts";
 
 const logger = createLogger("langwatch:billing:stripe-webhook");
 
-/** The 413 a body past its cap earns, in the plain sentence it has always been. */
-const payloadTooLarge = (): Error =>
-  new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
-
 const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
-
-/** The bodies this route writes for itself, and the headers Hono gave them. */
-const JSON_HEADERS = { "Content-Type": "application/json" } as const;
-const TEXT_HEADERS = { "Content-Type": "text/plain; charset=UTF-8" } as const;
 
 /** What the callback asks of the application. */
 export interface BillingStripeWebhookApi {
@@ -59,7 +60,7 @@ export const billingStripeWebhookRest = defineRestRouter(BillingStripeWebhookApi
   // The signature is computed over these bytes: a parse-then-reserialise
   // verifies nothing.
   .withRawBody("bytes")
-  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
   .withAccess(
     publicRoute({
       reason:
@@ -67,13 +68,14 @@ export const billingStripeWebhookRest = defineRestRouter(BillingStripeWebhookApi
         "the route itself; no API credential opens this door",
     }),
   )
-  .withRawResponse({ produces: ["application/json", "text/plain"] })
-  .handle(async ({ app, raw, request }) => {
+  .withHeaders(billingStripeWebhookHeadersSchema)
+  .withOutput(billingStripeWebhookReceiptSchema)
+  .handle(async ({ app, raw }, headers) => {
     if (!app.dispatchesEvents()) {
-      return { status: 404, headers: JSON_HEADERS, body: JSON.stringify({ error: "Not Found" }) };
+      throw new NotFoundError("Billing webhooks are not enabled");
     }
 
-    const signature = request.headers.get("stripe-signature");
+    const signature = headers["stripe-signature"];
     const secret = app.findSigningSecret();
 
     if (!signature || !secret) {
@@ -82,27 +84,24 @@ export const billingStripeWebhookRest = defineRestRouter(BillingStripeWebhookApi
         "[stripeWebhook] Missing signature or secret",
       );
 
-      return refusal("Webhook Error: Missing signature or secret");
+      throw new BadRequestError("Webhook Error: Missing signature or secret");
     }
 
     const event = findVerifiedEvent({ app, rawBody: raw, signature });
 
-    if (!event) return refusal("Webhook Error: Invalid payload or signature");
+    if (!event) throw new BadRequestError("Webhook Error: Invalid payload or signature");
 
     const result = await app.handleEvent(event);
 
     if (result.status === "error") {
-      return { status: result.httpStatus, headers: TEXT_HEADERS, body: result.message };
+      if (result.httpStatus === 400) throw new BadRequestError(result.message);
+
+      throw new InternalServerError(result.message);
     }
 
-    return { status: 200, headers: JSON_HEADERS, body: JSON.stringify({ received: true }) };
+    return { received: true as const };
   })
   .build();
-
-/** One of the two sentences the provider's delivery log shows an operator. */
-function refusal(message: string): RestRawAnswer {
-  return { status: 400, headers: TEXT_HEADERS, body: message };
-}
 
 /**
  * The event the delivery carries, or nothing where the payload or the

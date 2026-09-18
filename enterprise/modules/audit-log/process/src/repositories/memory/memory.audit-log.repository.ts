@@ -1,6 +1,3 @@
-import { generate } from "@langwatch/ksuid";
-import { Temporal, nowInstant, toDate } from "@langwatch/time";
-import type { Instant } from "@langwatch/time";
 import {
   auditLogHistoryEntrySchema,
   type AuditLogEntry,
@@ -8,6 +5,10 @@ import {
   type AuditLogJsonValue,
   type ListAuditLogEntityHistoryInput,
 } from "@langwatch/audit-log-contract";
+import { generate } from "@langwatch/ksuid";
+import { Temporal, nowInstant, toDate } from "@langwatch/time";
+import type { Instant } from "@langwatch/time";
+
 import type { AuditLogRepository } from "../audit-log.repository.ts";
 
 type StoredEntry = AuditLogEntry & { id: string; createdAt: Instant };

@@ -4,9 +4,12 @@
  * installation mounts an empty router rather than a surface that guesses.
  */
 import { defineTrpcFact, defineTrpcRouter } from "@langwatch/api/trpc";
-import { currencyTrpc, type DetectedCurrency } from "@langwatch/enterprise-billing-contract";
-import { moduleApi } from "@langwatch/kernel";
-import { z } from "zod";
+import {
+  currencyTrpc,
+  currencyRequestHeadersSchema,
+  type DetectedCurrency,
+} from "@langwatch/enterprise-billing-contract";
+import { moduleApi } from "@langwatch/kernel/module-api";
 
 import type { CurrencyRequest } from "../services/currency.service.ts";
 
@@ -25,7 +28,7 @@ export const BillingCurrencyApi = moduleApi<BillingCurrencyApi>()("billing");
  */
 export const currencyRequestHeadersFact = defineTrpcFact(
   "currencyRequestHeaders",
-  z.record(z.string(), z.union([z.string(), z.array(z.string())]).optional()).nullable(),
+  currencyRequestHeadersSchema,
 );
 
 /**

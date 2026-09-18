@@ -13,7 +13,9 @@ import { ScimServiceFake, scimTestApp } from "./support/scim-app.fixture.ts";
 
 type ScimTrpcTestContext = { actor: { id: string } };
 
-function testPorts(permits: (permission: string) => boolean): TrpcRuntimeMembers<ScimTrpcTestContext> {
+function testPorts(
+  permits: (permission: string) => boolean,
+): TrpcRuntimeMembers<ScimTrpcTestContext> {
   return {
     identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
     authorization: {

@@ -1,4 +1,4 @@
-import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@langwatch/config";
+import { Secret } from "@langwatch/secrets/secret";
 import { z } from "zod";
 
 import { managedBedrockConfigSchema } from "./managed-provider.api.ts";
@@ -15,53 +15,30 @@ export const managedBedrockDirectorySchema = z.record(
 
 export type ManagedBedrockDirectory = z.infer<typeof managedBedrockDirectorySchema>;
 
-const bedrockDirectoryLeaf = z
-  .string()
-  .optional()
-  .transform((raw, ctx) => {
-    const trimmed = raw?.trim();
-    if (!trimmed) return {} as ManagedBedrockDirectory;
+/** AWS role and key material for every managed Bedrock deployment: a credential, not config. */
+export const managedProviderSecrets = {
+  bedrock: Secret.load("MANAGED_BEDROCK_CONFIGS", { optional: true }),
+} as const;
 
-    let document: unknown;
-    try {
-      document = JSON.parse(trimmed);
-    } catch {
-      ctx.addIssue({
-        code: "custom",
-        message:
-          "The managed Bedrock configuration is not valid JSON. Correct it, or remove it to run without managed Bedrock providers.",
-      });
-      return z.NEVER;
-    }
+/** Parses the resolved secret into the directory, or refuses naming why. */
+export function parseManagedBedrockDirectory(raw: string | undefined): ManagedBedrockDirectory {
+  const trimmed = raw?.trim();
+  if (!trimmed) return {};
 
-    const directory = managedBedrockDirectorySchema.safeParse(document);
-    if (!directory.success) {
-      ctx.addIssue({
-        code: "custom",
-        message:
-          "The managed Bedrock configuration is not a map of organization id to a complete Bedrock deployment. Correct it, or remove it to run without managed Bedrock providers.",
-      });
-      return z.NEVER;
-    }
-    return directory.data;
-  });
+  let document: unknown;
+  try {
+    document = JSON.parse(trimmed);
+  } catch {
+    throw new Error(
+      "MANAGED_BEDROCK_CONFIGS is not valid JSON. Correct it, or remove it to run without managed Bedrock providers.",
+    );
+  }
 
-export const managedProviderServerConfigDefinition = RuntimeConfig.define({
-  bedrock: Config.value(bedrockDirectoryLeaf, { env: "MANAGED_BEDROCK_CONFIGS" }),
-});
-
-export type ManagedProviderServerConfig = ConfigValue<typeof managedProviderServerConfigDefinition>;
-
-export const managedProviderServerConfigSchema = compileRuntimeConfig(
-  managedProviderServerConfigDefinition,
-);
-
-/**
- * What the PROCESS hands the module: the directory it already parsed above.
- * Running the env-reading schema over a resolved record would reject it.
- */
-export const managedProviderAppConfigSchema = z
-  .object({ bedrock: managedBedrockDirectorySchema.default({}) })
-  .default({ bedrock: {} });
-
-export type ManagedProviderAppConfig = z.infer<typeof managedProviderAppConfigSchema>;
+  const directory = managedBedrockDirectorySchema.safeParse(document);
+  if (!directory.success) {
+    throw new Error(
+      "MANAGED_BEDROCK_CONFIGS is not a map of organization id to a complete Bedrock deployment. Correct it, or remove it to run without managed Bedrock providers.",
+    );
+  }
+  return directory.data;
+}

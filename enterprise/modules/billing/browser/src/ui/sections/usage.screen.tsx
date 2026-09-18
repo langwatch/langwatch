@@ -15,13 +15,13 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { PlanTypes } from "@langwatch/enterprise-billing-contract";
-import { UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
 import {
   mapLicenseStatusToLimits,
   mapUsageToLimits,
   RESOURCE_LABELS,
   ResourceLimitsDisplay,
 } from "@langwatch/enterprise-licensing-browser/surfaces/resource-limits";
+import { UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { ArrowRight } from "lucide-react";
 
 import { billingApi } from "../../behavior/billing-api.ts";

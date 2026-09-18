@@ -3,7 +3,7 @@
  * `POST /api/webhooks/stripe`: its address, its door, and its four answers.
  * @see enterprise/modules/billing/specs/stripe-webhook.feature
  */
-import { createRestRuntime } from "@langwatch/api/rest";
+import { createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
 import type Stripe from "stripe";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -15,7 +15,17 @@ import {
 
 const declaration = billingStripeWebhookRest.router();
 
-const EVENT = { id: "evt_1", type: "checkout.session.completed" } as unknown as Stripe.Event;
+const EVENT: Stripe.Event = {
+  id: "evt_1",
+  object: "event",
+  type: "account.application.deauthorized",
+  api_version: null,
+  created: 0,
+  data: { object: { id: "ca_1", object: "application", name: "Test application" } },
+  livemode: false,
+  pending_webhooks: 1,
+  request: null,
+};
 
 const dispatchesEvents = vi.fn<() => boolean>();
 const findSigningSecret = vi.fn<() => string | undefined>();
@@ -34,7 +44,7 @@ function mounted() {
   return runtime.mount(declaration, {
     app: () => ({ dispatchesEvents, findSigningSecret, constructEvent, handleEvent }),
     credential: "public",
-    onError: (error, context) => context.json({ error: String(error) }, 500),
+    onError: canonicalErrorResponse,
   });
 }
 
@@ -74,7 +84,8 @@ describe("given the provider callback declaration", () => {
       // The signature is computed over these bytes: a parse-then-reserialise
       // verifies nothing.
       expect(route?.rawBody).toEqual({ form: "bytes", mediaType: "application/octet-stream" });
-      expect(route?.rawResponse?.produces).toEqual(["application/json", "text/plain"]);
+      expect(route?.rawResponse).toBeUndefined();
+      expect(route?.output.safeParse({ received: true }).success).toBe(true);
     });
   });
 });
@@ -89,7 +100,7 @@ describe("given a deployment that dispatches no provider events", () => {
 
       expect(response.status).toBe(404);
       expect(response.headers.get("content-type")).toBe("application/json");
-      expect(await response.json()).toEqual({ error: "Not Found" });
+      expect(await response.json()).toMatchObject({ code: "not_found" });
       expect(constructEvent).not.toHaveBeenCalled();
     });
   });
@@ -102,8 +113,8 @@ describe("given a deployment that bills through the provider", () => {
       const response = await deliver({});
 
       expect(response.status).toBe(400);
-      expect(response.headers.get("content-type")).toBe("text/plain; charset=UTF-8");
-      expect(await response.text()).toBe("Webhook Error: Missing signature or secret");
+      expect(response.headers.get("content-type")).toContain("application/json");
+      expect(await response.json()).toMatchObject({ code: "bad_request" });
       expect(handleEvent).not.toHaveBeenCalled();
     });
   });
@@ -115,7 +126,7 @@ describe("given a deployment that bills through the provider", () => {
       const response = await deliver();
 
       expect(response.status).toBe(400);
-      expect(await response.text()).toBe("Webhook Error: Missing signature or secret");
+      expect(await response.json()).toMatchObject({ code: "bad_request" });
       expect(constructEvent).not.toHaveBeenCalled();
     });
   });
@@ -129,7 +140,7 @@ describe("given a deployment that bills through the provider", () => {
       const response = await deliver();
 
       expect(response.status).toBe(400);
-      expect(await response.text()).toBe("Webhook Error: Invalid payload or signature");
+      expect(await response.json()).toMatchObject({ code: "bad_request" });
       expect(handleEvent).not.toHaveBeenCalled();
     });
   });
@@ -160,8 +171,8 @@ describe("given a deployment that bills through the provider", () => {
       const response = await deliver();
 
       expect(response.status).toBe(500);
-      expect(response.headers.get("content-type")).toBe("text/plain; charset=UTF-8");
-      expect(await response.text()).toBe("Subscription write failed");
+      expect(response.headers.get("content-type")).toContain("application/json");
+      expect(await response.json()).toMatchObject({ code: "internal_error" });
     });
   });
 });

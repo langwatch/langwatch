@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import type { StripePriceMap } from "../index.ts";
 
 const prices = {

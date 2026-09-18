@@ -5,6 +5,7 @@ import {
   type ListAuditLogEntityHistoryInput,
   type RecordAuditLogCommand,
 } from "@langwatch/audit-log-contract";
+
 import type { AuditLogRepository } from "../repositories/audit-log.repository.ts";
 
 const TRUNCATION_LENGTHS = [2048, 1024, 512, 256, 128] as const;

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { UserApi } from "@langwatch/user-contract";
 import type { ScimPatchOperation } from "@langwatch/enterprise-scim-contract";
+import type { UserApi } from "@langwatch/user-contract";
+
 import { ScimCostCenterService } from "./scim-cost-center.service.ts";
 import { ScimDeprovisionService } from "./scim-deprovision.service.ts";
 import { ScimUserProfileService } from "./scim-user-profile.service.ts";

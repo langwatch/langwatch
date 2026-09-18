@@ -1,30 +1,23 @@
 import {
   ManagedProviderApi,
   type ManagedProviderApi as ManagedProviderApiContract,
-  managedProviderAppConfigSchema,
-  type ManagedProviderAppConfig,
+  managedProviderSecrets,
+  parseManagedBedrockDirectory,
 } from "@langwatch/enterprise-managed-provider-contract";
-import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
+import { ProjectApi } from "@langwatch/project-contract";
+
 import { HttpManagedProviderCredentialsChannel } from "../channels/http/http.managed-provider-credentials.channel.ts";
 import { ManagedProviderConfigurationService } from "../services/managed-provider-configuration.service.ts";
 import { ManagedProviderService } from "../services/managed-provider.service.ts";
 
-/**
- * The module reads no process member: a managed Bedrock call needs the
- * directory it was configured with and the customer's own AWS roles, and
- * nothing this process owns.
- */
-type ManagedProviderSetup = FeatureSetup<
-  typeof ManagedProviderApp.dependencies,
-  never,
-  ManagedProviderAppConfig
->;
+/** The directory is a credential (ADR-132): this App's own declared secret, not config. */
+type ManagedProviderSetup = FeatureSetup<typeof ManagedProviderApp.dependencies, never, undefined>;
 
 export class ManagedProviderApp implements ManagedProviderApiContract {
   static readonly contract = ManagedProviderApi;
   static readonly dependencies = { projects: ProjectApi };
-  static readonly configSchema = managedProviderAppConfigSchema;
+  static readonly secrets = managedProviderSecrets;
 
   readonly #service: ManagedProviderService;
 
@@ -32,10 +25,17 @@ export class ManagedProviderApp implements ManagedProviderApiContract {
     this.#service = service;
   }
 
-  static create({ config, dependencies }: ManagedProviderSetup): ManagedProviderApp {
+  static async create({
+    secrets,
+    dependencies,
+  }: ManagedProviderSetup): Promise<ManagedProviderApp> {
+    const bedrock = await secrets.into(
+      managedProviderSecrets.bedrock,
+      parseManagedBedrockDirectory,
+    );
     return new ManagedProviderApp(
       ManagedProviderService.create({
-        configuration: ManagedProviderConfigurationService.create({ bedrock: config.bedrock }),
+        configuration: ManagedProviderConfigurationService.create({ bedrock }),
         credentials: HttpManagedProviderCredentialsChannel.create(),
         projects: dependencies.projects,
       }),

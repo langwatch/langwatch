@@ -6,6 +6,7 @@
 import { defineTrpcFact, defineTrpcRouter } from "@langwatch/api/trpc";
 import {
   subscriptionTrpc,
+  billingCallerEmailSchema,
   UserEmailRequiredError,
   type BillingDisplayInvoice,
   type Currency,
@@ -13,8 +14,7 @@ import {
   type SubscriptionBillingInterval,
   type SubscriptionInvite,
 } from "@langwatch/enterprise-billing-contract";
-import { moduleApi } from "@langwatch/kernel";
-import { z } from "zod";
+import { moduleApi } from "@langwatch/kernel/module-api";
 
 /** The customer this checkout is opened for, as the provider knows them. */
 export type BillingSubscriber = Readonly<{ email?: string | null }>;
@@ -83,7 +83,7 @@ export const BillingSubscriptionApi = moduleApi<BillingSubscriptionApi>()("billi
  * than part of the actor: the provider records the address on the customer it
  * creates, and an actor id alone cannot open an account.
  */
-export const billingCallerEmailFact = defineTrpcFact("callerEmail", z.string().nullable());
+export const billingCallerEmailFact = defineTrpcFact("callerEmail", billingCallerEmailSchema);
 
 export const subscriptionTrpcTransport = defineTrpcRouter(BillingSubscriptionApi, subscriptionTrpc)
   .procedure("addTeamMemberOrEvents")

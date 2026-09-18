@@ -82,9 +82,11 @@ export type LicensingRuntime = Readonly<
  * Production supplies the closed members and the app derives its own
  * infrastructure; `infrastructure` is the test-only fabric seam.
  */
-type LicensingProcessMembers =
-  | (MembersRead<typeof LicensingApp.reads> & { infrastructure?: never })
-  | Readonly<{ prisma?: never; logger?: LicenseLogger; infrastructure: LicensingInfrastructure }>;
+type LicensingProcessMembers = Readonly<{ isSaas: boolean }> &
+  (
+    | (MembersRead<readonly ["prisma", "logger"]> & { infrastructure?: never })
+    | Readonly<{ prisma?: never; logger?: LicenseLogger; infrastructure: LicensingInfrastructure }>
+  );
 
 type LicensingSetup = FeatureSetup<
   Record<never, never>,
@@ -96,7 +98,8 @@ export class LicensingApp implements LicensingApiContract {
   static readonly contract: typeof LicensingApi = LicensingApi;
   static readonly dependencies: Readonly<Record<string, never>> = {};
   static readonly config = licensingConfig;
-  static readonly reads = reads("prisma", "logger");
+  /** `isSaas` is the process's own fact, drilled in; IS_SAAS has one owner. */
+  static readonly reads = [...reads("prisma", "logger"), "isSaas"] as const;
 
   readonly #service: LicenseService;
   readonly #entitlements: LicensingEntitlementSourceAdapter;
@@ -142,7 +145,7 @@ export class LicensingApp implements LicensingApiContract {
       runtime,
       LicensingEntitlementSourceAdapter.create({
         licensing: service,
-        mode: config.isSaas ? "cloud" : "self-hosted",
+        mode: members.isSaas ? "cloud" : "self-hosted",
       }),
     );
   }

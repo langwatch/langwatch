@@ -1,7 +1,25 @@
+import { parseProcessConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
-import { assertBillingServerConfig } from "../billing.config.ts";
+
+import { assertBillingServerConfig, billingConfig } from "../billing.config.ts";
 
 describe("billing server configuration", () => {
+  describe("given a deployment names where a licence is bought", () => {
+    /** @scenario "A feature reads its configuration through its own schema" */
+    it("carries the payment link id and the Slack channel as ordinary config", () => {
+      const config = parseProcessConfig({
+        owners: [{ name: "billing", config: billingConfig }],
+        environment: {
+          STRIPE_LICENSE_PAYMENT_LINK_ID: "plink_123",
+          SLACK_CHANNEL_SUBSCRIPTIONS: "#subscriptions",
+        },
+      });
+
+      expect(config.billing.licensePaymentLinkId).toBe("plink_123");
+      expect(config.billing.slackSubscriptionsChannel).toBe("#subscriptions");
+    });
+  });
+
   describe("given a deployment bills through nobody", () => {
     /** @scenario "A feature reads its configuration through its own schema" */
     it("accepts both credentials absent", () => {

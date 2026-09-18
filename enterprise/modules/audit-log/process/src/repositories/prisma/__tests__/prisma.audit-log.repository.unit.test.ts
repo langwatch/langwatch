@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { PrismaAuditLogRepository } from "../prisma.audit-log.repository.ts";
 
 describe("audit entity history", () => {

@@ -139,5 +139,6 @@ export function createSsoTestApp(
       logger: input.members?.logger ?? RecordingSsoGateLogger.create(),
     },
     resources: new ResourceScope(),
+    secrets: {} as never,
   });
 }

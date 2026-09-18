@@ -19,3 +19,7 @@ export const currencyTrpc = defineTrpcContract("currency")
   .withInput(detectCurrencyInputSchema)
   .withOutput(detectedCurrencySchema)
   .build();
+
+export const currencyRequestHeadersSchema = z
+  .record(z.string(), z.union([z.string(), z.array(z.string())]).optional())
+  .nullable();
