@@ -5,9 +5,9 @@ import { useOrganizationTeamProject } from "@langwatch/workflow-browser/studio-s
 import { useFormContext } from "react-hook-form";
 
 import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt.ts";
-import { VersionHistoryButton } from "../../elements/prompts/forms/prompt-config-form/version-history-button.tsx";
 import { GeneratePromptApiSnippetDialog } from "../../elements/prompts/generate-prompt-api-snippet-dialog.tsx";
 import { SavePromptButton } from "./save-prompt-button.tsx";
+import { VersionHistoryButton } from "./version-history-button.tsx";
 
 export type PromptEditorFooterProps = {
   /** Callback when save button is clicked */

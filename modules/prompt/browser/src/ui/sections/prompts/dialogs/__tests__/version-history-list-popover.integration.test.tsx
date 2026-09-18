@@ -7,7 +7,6 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { WireVersionedPrompt } from "../../../../model/wire-versioned-prompt.ts";
 import { VersionHistoryListPopover } from "../version-history-list-popover.tsx";
 
 vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
@@ -29,16 +28,15 @@ vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
 
 type Author = { name: string | null; email?: string | null; image?: string | null } | null;
 
-const versionWithAuthor = (author: Author) =>
-  [
-    {
-      id: "config-1",
-      versionId: "version-1",
-      version: 1,
-      commitMessage: "Initial version",
-      author,
-    },
-  ] as unknown as WireVersionedPrompt[];
+const versionWithAuthor = (author: Author) => [
+  {
+    id: "config-1",
+    versionId: "version-1",
+    version: 1,
+    commitMessage: "Initial version",
+    author,
+  },
+];
 
 const renderWithAuthor = async (author: Author) => {
   mockUseQuery.mockReturnValue({ data: versionWithAuthor(author), isLoading: false });

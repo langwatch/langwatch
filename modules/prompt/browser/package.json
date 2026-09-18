@@ -113,6 +113,7 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/topic-contract": "workspace:*",
     "@langwatch/trace-browser": "workspace:*",
+    "@langwatch/trace-browser-kit": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
     "@langwatch/workflow-browser": "workspace:*",

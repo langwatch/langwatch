@@ -6,10 +6,10 @@ import { useFormContext } from "react-hook-form";
 
 import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt.ts";
 import { ModelSelectFieldMini } from "../../elements/prompts/forms/fields/model-select-field-mini.tsx";
-import { VersionHistoryButton } from "../../elements/prompts/forms/prompt-config-form/version-history-button.tsx";
 import { GeneratePromptApiSnippetDialog } from "../../elements/prompts/generate-prompt-api-snippet-dialog.tsx";
 import { DeployPromptDialog } from "./deploy-prompt-dialog.tsx";
 import { SavePromptButton } from "./save-prompt-button.tsx";
+import { VersionHistoryButton } from "./version-history-button.tsx";
 
 export type PromptEditorHeaderProps = {
   /** Callback when save button is clicked */
