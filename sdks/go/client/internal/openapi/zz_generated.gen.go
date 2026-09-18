@@ -10867,12 +10867,31 @@ func (e PostApiScenarioEventsJSONBody0MetadataLangwatchActorLabel) Valid() bool 
 	}
 }
 
+// Defines values for PostApiScenarioEventsJSONBody0MetadataLangwatchCallerKind.
+const (
+	Human     PostApiScenarioEventsJSONBody0MetadataLangwatchCallerKind = "human"
+	Simulated PostApiScenarioEventsJSONBody0MetadataLangwatchCallerKind = "simulated"
+)
+
+// Valid indicates whether the value is a known member of the PostApiScenarioEventsJSONBody0MetadataLangwatchCallerKind enum.
+func (e PostApiScenarioEventsJSONBody0MetadataLangwatchCallerKind) Valid() bool {
+	switch e {
+	case Human:
+		return true
+	case Simulated:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostApiScenarioEventsJSONBody0MetadataLangwatchTargetType.
 const (
 	PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypeCode      PostApiScenarioEventsJSONBody0MetadataLangwatchTargetType = "code"
 	PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypeConnected PostApiScenarioEventsJSONBody0MetadataLangwatchTargetType = "connected"
 	PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypeHttp      PostApiScenarioEventsJSONBody0MetadataLangwatchTargetType = "http"
 	PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypePrompt    PostApiScenarioEventsJSONBody0MetadataLangwatchTargetType = "prompt"
+	PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypeVoice     PostApiScenarioEventsJSONBody0MetadataLangwatchTargetType = "voice"
 	PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypeWorkflow  PostApiScenarioEventsJSONBody0MetadataLangwatchTargetType = "workflow"
 )
 
@@ -10886,6 +10905,8 @@ func (e PostApiScenarioEventsJSONBody0MetadataLangwatchTargetType) Valid() bool 
 	case PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypeHttp:
 		return true
 	case PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypePrompt:
+		return true
+	case PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypeVoice:
 		return true
 	case PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypeWorkflow:
 		return true
@@ -10959,15 +10980,16 @@ func (e PostApiScenarioEventsJSONBody1ResultsVerdict) Valid() bool {
 
 // Defines values for PostApiScenarioEventsJSONBody1Status.
 const (
-	CANCELLED  PostApiScenarioEventsJSONBody1Status = "CANCELLED"
-	ERROR      PostApiScenarioEventsJSONBody1Status = "ERROR"
-	FAILED     PostApiScenarioEventsJSONBody1Status = "FAILED"
-	INPROGRESS PostApiScenarioEventsJSONBody1Status = "IN_PROGRESS"
-	PENDING    PostApiScenarioEventsJSONBody1Status = "PENDING"
-	QUEUED     PostApiScenarioEventsJSONBody1Status = "QUEUED"
-	RUNNING    PostApiScenarioEventsJSONBody1Status = "RUNNING"
-	STALLED    PostApiScenarioEventsJSONBody1Status = "STALLED"
-	SUCCESS    PostApiScenarioEventsJSONBody1Status = "SUCCESS"
+	CANCELLED         PostApiScenarioEventsJSONBody1Status = "CANCELLED"
+	ERROR             PostApiScenarioEventsJSONBody1Status = "ERROR"
+	FAILED            PostApiScenarioEventsJSONBody1Status = "FAILED"
+	INPROGRESS        PostApiScenarioEventsJSONBody1Status = "IN_PROGRESS"
+	PENDING           PostApiScenarioEventsJSONBody1Status = "PENDING"
+	PENDINGEVALUATION PostApiScenarioEventsJSONBody1Status = "PENDING_EVALUATION"
+	QUEUED            PostApiScenarioEventsJSONBody1Status = "QUEUED"
+	RUNNING           PostApiScenarioEventsJSONBody1Status = "RUNNING"
+	STALLED           PostApiScenarioEventsJSONBody1Status = "STALLED"
+	SUCCESS           PostApiScenarioEventsJSONBody1Status = "SUCCESS"
 )
 
 // Valid indicates whether the value is a known member of the PostApiScenarioEventsJSONBody1Status enum.
@@ -10982,6 +11004,8 @@ func (e PostApiScenarioEventsJSONBody1Status) Valid() bool {
 	case INPROGRESS:
 		return true
 	case PENDING:
+		return true
+	case PENDINGEVALUATION:
 		return true
 	case QUEUED:
 		return true
@@ -11491,6 +11515,7 @@ const (
 	GetApiSuites200JSONResponseBodyTargetsTypeConnected GetApiSuites200JSONResponseBodyTargetsType = "connected"
 	GetApiSuites200JSONResponseBodyTargetsTypeHttp      GetApiSuites200JSONResponseBodyTargetsType = "http"
 	GetApiSuites200JSONResponseBodyTargetsTypePrompt    GetApiSuites200JSONResponseBodyTargetsType = "prompt"
+	GetApiSuites200JSONResponseBodyTargetsTypeVoice     GetApiSuites200JSONResponseBodyTargetsType = "voice"
 	GetApiSuites200JSONResponseBodyTargetsTypeWorkflow  GetApiSuites200JSONResponseBodyTargetsType = "workflow"
 )
 
@@ -11504,6 +11529,8 @@ func (e GetApiSuites200JSONResponseBodyTargetsType) Valid() bool {
 	case GetApiSuites200JSONResponseBodyTargetsTypeHttp:
 		return true
 	case GetApiSuites200JSONResponseBodyTargetsTypePrompt:
+		return true
+	case GetApiSuites200JSONResponseBodyTargetsTypeVoice:
 		return true
 	case GetApiSuites200JSONResponseBodyTargetsTypeWorkflow:
 		return true
@@ -11596,6 +11623,7 @@ const (
 	PostApiSuitesJSONBodyTargetsTypeConnected PostApiSuitesJSONBodyTargetsType = "connected"
 	PostApiSuitesJSONBodyTargetsTypeHttp      PostApiSuitesJSONBodyTargetsType = "http"
 	PostApiSuitesJSONBodyTargetsTypePrompt    PostApiSuitesJSONBodyTargetsType = "prompt"
+	PostApiSuitesJSONBodyTargetsTypeVoice     PostApiSuitesJSONBodyTargetsType = "voice"
 	PostApiSuitesJSONBodyTargetsTypeWorkflow  PostApiSuitesJSONBodyTargetsType = "workflow"
 )
 
@@ -11609,6 +11637,8 @@ func (e PostApiSuitesJSONBodyTargetsType) Valid() bool {
 	case PostApiSuitesJSONBodyTargetsTypeHttp:
 		return true
 	case PostApiSuitesJSONBodyTargetsTypePrompt:
+		return true
+	case PostApiSuitesJSONBodyTargetsTypeVoice:
 		return true
 	case PostApiSuitesJSONBodyTargetsTypeWorkflow:
 		return true
@@ -11701,6 +11731,7 @@ const (
 	PostApiSuites201JSONResponseBodyTargetsTypeConnected PostApiSuites201JSONResponseBodyTargetsType = "connected"
 	PostApiSuites201JSONResponseBodyTargetsTypeHttp      PostApiSuites201JSONResponseBodyTargetsType = "http"
 	PostApiSuites201JSONResponseBodyTargetsTypePrompt    PostApiSuites201JSONResponseBodyTargetsType = "prompt"
+	PostApiSuites201JSONResponseBodyTargetsTypeVoice     PostApiSuites201JSONResponseBodyTargetsType = "voice"
 	PostApiSuites201JSONResponseBodyTargetsTypeWorkflow  PostApiSuites201JSONResponseBodyTargetsType = "workflow"
 )
 
@@ -11714,6 +11745,8 @@ func (e PostApiSuites201JSONResponseBodyTargetsType) Valid() bool {
 	case PostApiSuites201JSONResponseBodyTargetsTypeHttp:
 		return true
 	case PostApiSuites201JSONResponseBodyTargetsTypePrompt:
+		return true
+	case PostApiSuites201JSONResponseBodyTargetsTypeVoice:
 		return true
 	case PostApiSuites201JSONResponseBodyTargetsTypeWorkflow:
 		return true
@@ -11806,6 +11839,7 @@ const (
 	GetApiSuitesById200JSONResponseBodyTargetsTypeConnected GetApiSuitesById200JSONResponseBodyTargetsType = "connected"
 	GetApiSuitesById200JSONResponseBodyTargetsTypeHttp      GetApiSuitesById200JSONResponseBodyTargetsType = "http"
 	GetApiSuitesById200JSONResponseBodyTargetsTypePrompt    GetApiSuitesById200JSONResponseBodyTargetsType = "prompt"
+	GetApiSuitesById200JSONResponseBodyTargetsTypeVoice     GetApiSuitesById200JSONResponseBodyTargetsType = "voice"
 	GetApiSuitesById200JSONResponseBodyTargetsTypeWorkflow  GetApiSuitesById200JSONResponseBodyTargetsType = "workflow"
 )
 
@@ -11819,6 +11853,8 @@ func (e GetApiSuitesById200JSONResponseBodyTargetsType) Valid() bool {
 	case GetApiSuitesById200JSONResponseBodyTargetsTypeHttp:
 		return true
 	case GetApiSuitesById200JSONResponseBodyTargetsTypePrompt:
+		return true
+	case GetApiSuitesById200JSONResponseBodyTargetsTypeVoice:
 		return true
 	case GetApiSuitesById200JSONResponseBodyTargetsTypeWorkflow:
 		return true
@@ -11893,6 +11929,7 @@ const (
 	PatchApiSuitesByIdJSONBodyTargetsTypeConnected PatchApiSuitesByIdJSONBodyTargetsType = "connected"
 	PatchApiSuitesByIdJSONBodyTargetsTypeHttp      PatchApiSuitesByIdJSONBodyTargetsType = "http"
 	PatchApiSuitesByIdJSONBodyTargetsTypePrompt    PatchApiSuitesByIdJSONBodyTargetsType = "prompt"
+	PatchApiSuitesByIdJSONBodyTargetsTypeVoice     PatchApiSuitesByIdJSONBodyTargetsType = "voice"
 	PatchApiSuitesByIdJSONBodyTargetsTypeWorkflow  PatchApiSuitesByIdJSONBodyTargetsType = "workflow"
 )
 
@@ -11906,6 +11943,8 @@ func (e PatchApiSuitesByIdJSONBodyTargetsType) Valid() bool {
 	case PatchApiSuitesByIdJSONBodyTargetsTypeHttp:
 		return true
 	case PatchApiSuitesByIdJSONBodyTargetsTypePrompt:
+		return true
+	case PatchApiSuitesByIdJSONBodyTargetsTypeVoice:
 		return true
 	case PatchApiSuitesByIdJSONBodyTargetsTypeWorkflow:
 		return true
@@ -11998,6 +12037,7 @@ const (
 	PatchApiSuitesById200JSONResponseBodyTargetsTypeConnected PatchApiSuitesById200JSONResponseBodyTargetsType = "connected"
 	PatchApiSuitesById200JSONResponseBodyTargetsTypeHttp      PatchApiSuitesById200JSONResponseBodyTargetsType = "http"
 	PatchApiSuitesById200JSONResponseBodyTargetsTypePrompt    PatchApiSuitesById200JSONResponseBodyTargetsType = "prompt"
+	PatchApiSuitesById200JSONResponseBodyTargetsTypeVoice     PatchApiSuitesById200JSONResponseBodyTargetsType = "voice"
 	PatchApiSuitesById200JSONResponseBodyTargetsTypeWorkflow  PatchApiSuitesById200JSONResponseBodyTargetsType = "workflow"
 )
 
@@ -12011,6 +12051,8 @@ func (e PatchApiSuitesById200JSONResponseBodyTargetsType) Valid() bool {
 	case PatchApiSuitesById200JSONResponseBodyTargetsTypeHttp:
 		return true
 	case PatchApiSuitesById200JSONResponseBodyTargetsTypePrompt:
+		return true
+	case PatchApiSuitesById200JSONResponseBodyTargetsTypeVoice:
 		return true
 	case PatchApiSuitesById200JSONResponseBodyTargetsTypeWorkflow:
 		return true
@@ -12103,6 +12145,7 @@ const (
 	PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeConnected PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsType = "connected"
 	PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeHttp      PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsType = "http"
 	PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypePrompt    PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsType = "prompt"
+	PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeVoice     PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsType = "voice"
 	PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeWorkflow  PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsType = "workflow"
 )
 
@@ -12117,6 +12160,8 @@ func (e PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsType) Valid() bool {
 		return true
 	case PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypePrompt:
 		return true
+	case PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeVoice:
+		return true
 	case PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeWorkflow:
 		return true
 	default:
@@ -12130,6 +12175,7 @@ const (
 	PostApiSuitesByIdRunJSONBodyTargetsTypeConnected PostApiSuitesByIdRunJSONBodyTargetsType = "connected"
 	PostApiSuitesByIdRunJSONBodyTargetsTypeHttp      PostApiSuitesByIdRunJSONBodyTargetsType = "http"
 	PostApiSuitesByIdRunJSONBodyTargetsTypePrompt    PostApiSuitesByIdRunJSONBodyTargetsType = "prompt"
+	PostApiSuitesByIdRunJSONBodyTargetsTypeVoice     PostApiSuitesByIdRunJSONBodyTargetsType = "voice"
 	PostApiSuitesByIdRunJSONBodyTargetsTypeWorkflow  PostApiSuitesByIdRunJSONBodyTargetsType = "workflow"
 )
 
@@ -12144,6 +12190,8 @@ func (e PostApiSuitesByIdRunJSONBodyTargetsType) Valid() bool {
 		return true
 	case PostApiSuitesByIdRunJSONBodyTargetsTypePrompt:
 		return true
+	case PostApiSuitesByIdRunJSONBodyTargetsTypeVoice:
+		return true
 	case PostApiSuitesByIdRunJSONBodyTargetsTypeWorkflow:
 		return true
 	default:
@@ -12157,6 +12205,7 @@ const (
 	PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeConnected PostApiSuitesByIdRun200JSONResponseBodyItemsTargetType = "connected"
 	PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeHttp      PostApiSuitesByIdRun200JSONResponseBodyItemsTargetType = "http"
 	PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypePrompt    PostApiSuitesByIdRun200JSONResponseBodyItemsTargetType = "prompt"
+	PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeVoice     PostApiSuitesByIdRun200JSONResponseBodyItemsTargetType = "voice"
 	PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeWorkflow  PostApiSuitesByIdRun200JSONResponseBodyItemsTargetType = "workflow"
 )
 
@@ -12170,6 +12219,8 @@ func (e PostApiSuitesByIdRun200JSONResponseBodyItemsTargetType) Valid() bool {
 	case PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeHttp:
 		return true
 	case PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypePrompt:
+		return true
+	case PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeVoice:
 		return true
 	case PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeWorkflow:
 		return true
@@ -12196,6 +12247,27 @@ func (e PostApiTeamsByIdMembersJSONBodyRole) Valid() bool {
 	case PostApiTeamsByIdMembersJSONBodyRoleMEMBER:
 		return true
 	case PostApiTeamsByIdMembersJSONBodyRoleVIEWER:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiTracesFacets200JSONResponseBody0FacetsKind.
+const (
+	GetApiTracesFacets200JSONResponseBody0FacetsKindCategorical GetApiTracesFacets200JSONResponseBody0FacetsKind = "categorical"
+	GetApiTracesFacets200JSONResponseBody0FacetsKindDynamicKeys GetApiTracesFacets200JSONResponseBody0FacetsKind = "dynamic_keys"
+	GetApiTracesFacets200JSONResponseBody0FacetsKindRange       GetApiTracesFacets200JSONResponseBody0FacetsKind = "range"
+)
+
+// Valid indicates whether the value is a known member of the GetApiTracesFacets200JSONResponseBody0FacetsKind enum.
+func (e GetApiTracesFacets200JSONResponseBody0FacetsKind) Valid() bool {
+	switch e {
+	case GetApiTracesFacets200JSONResponseBody0FacetsKindCategorical:
+		return true
+	case GetApiTracesFacets200JSONResponseBody0FacetsKindDynamicKeys:
+		return true
+	case GetApiTracesFacets200JSONResponseBody0FacetsKindRange:
 		return true
 	default:
 		return false
@@ -12640,6 +12712,7 @@ const (
 	ListAgents200JSONResponseBodyDataTypeConnected ListAgents200JSONResponseBodyDataType = "connected"
 	ListAgents200JSONResponseBodyDataTypeHttp      ListAgents200JSONResponseBodyDataType = "http"
 	ListAgents200JSONResponseBodyDataTypeSignature ListAgents200JSONResponseBodyDataType = "signature"
+	ListAgents200JSONResponseBodyDataTypeVoice     ListAgents200JSONResponseBodyDataType = "voice"
 	ListAgents200JSONResponseBodyDataTypeWorkflow  ListAgents200JSONResponseBodyDataType = "workflow"
 )
 
@@ -12654,6 +12727,8 @@ func (e ListAgents200JSONResponseBodyDataType) Valid() bool {
 		return true
 	case ListAgents200JSONResponseBodyDataTypeSignature:
 		return true
+	case ListAgents200JSONResponseBodyDataTypeVoice:
+		return true
 	case ListAgents200JSONResponseBodyDataTypeWorkflow:
 		return true
 	default:
@@ -12667,6 +12742,7 @@ const (
 	CreateAgentJSONBodyTypeConnected CreateAgentJSONBodyType = "connected"
 	CreateAgentJSONBodyTypeHttp      CreateAgentJSONBodyType = "http"
 	CreateAgentJSONBodyTypeSignature CreateAgentJSONBodyType = "signature"
+	CreateAgentJSONBodyTypeVoice     CreateAgentJSONBodyType = "voice"
 	CreateAgentJSONBodyTypeWorkflow  CreateAgentJSONBodyType = "workflow"
 )
 
@@ -12680,6 +12756,8 @@ func (e CreateAgentJSONBodyType) Valid() bool {
 	case CreateAgentJSONBodyTypeHttp:
 		return true
 	case CreateAgentJSONBodyTypeSignature:
+		return true
+	case CreateAgentJSONBodyTypeVoice:
 		return true
 	case CreateAgentJSONBodyTypeWorkflow:
 		return true
@@ -12751,6 +12829,7 @@ const (
 	CreateAgent201JSONResponseBodyTypeConnected CreateAgent201JSONResponseBodyType = "connected"
 	CreateAgent201JSONResponseBodyTypeHttp      CreateAgent201JSONResponseBodyType = "http"
 	CreateAgent201JSONResponseBodyTypeSignature CreateAgent201JSONResponseBodyType = "signature"
+	CreateAgent201JSONResponseBodyTypeVoice     CreateAgent201JSONResponseBodyType = "voice"
 	CreateAgent201JSONResponseBodyTypeWorkflow  CreateAgent201JSONResponseBodyType = "workflow"
 )
 
@@ -12764,6 +12843,8 @@ func (e CreateAgent201JSONResponseBodyType) Valid() bool {
 	case CreateAgent201JSONResponseBodyTypeHttp:
 		return true
 	case CreateAgent201JSONResponseBodyTypeSignature:
+		return true
+	case CreateAgent201JSONResponseBodyTypeVoice:
 		return true
 	case CreateAgent201JSONResponseBodyTypeWorkflow:
 		return true
@@ -13054,6 +13135,7 @@ const (
 	ArchiveAgent200JSONResponseBodyTypeConnected ArchiveAgent200JSONResponseBodyType = "connected"
 	ArchiveAgent200JSONResponseBodyTypeHttp      ArchiveAgent200JSONResponseBodyType = "http"
 	ArchiveAgent200JSONResponseBodyTypeSignature ArchiveAgent200JSONResponseBodyType = "signature"
+	ArchiveAgent200JSONResponseBodyTypeVoice     ArchiveAgent200JSONResponseBodyType = "voice"
 	ArchiveAgent200JSONResponseBodyTypeWorkflow  ArchiveAgent200JSONResponseBodyType = "workflow"
 )
 
@@ -13067,6 +13149,8 @@ func (e ArchiveAgent200JSONResponseBodyType) Valid() bool {
 	case ArchiveAgent200JSONResponseBodyTypeHttp:
 		return true
 	case ArchiveAgent200JSONResponseBodyTypeSignature:
+		return true
+	case ArchiveAgent200JSONResponseBodyTypeVoice:
 		return true
 	case ArchiveAgent200JSONResponseBodyTypeWorkflow:
 		return true
@@ -13138,6 +13222,7 @@ const (
 	GetAgent200JSONResponseBodyTypeConnected GetAgent200JSONResponseBodyType = "connected"
 	GetAgent200JSONResponseBodyTypeHttp      GetAgent200JSONResponseBodyType = "http"
 	GetAgent200JSONResponseBodyTypeSignature GetAgent200JSONResponseBodyType = "signature"
+	GetAgent200JSONResponseBodyTypeVoice     GetAgent200JSONResponseBodyType = "voice"
 	GetAgent200JSONResponseBodyTypeWorkflow  GetAgent200JSONResponseBodyType = "workflow"
 )
 
@@ -13152,6 +13237,8 @@ func (e GetAgent200JSONResponseBodyType) Valid() bool {
 		return true
 	case GetAgent200JSONResponseBodyTypeSignature:
 		return true
+	case GetAgent200JSONResponseBodyTypeVoice:
+		return true
 	case GetAgent200JSONResponseBodyTypeWorkflow:
 		return true
 	default:
@@ -13165,6 +13252,7 @@ const (
 	UpdateAgentJSONBodyTypeConnected UpdateAgentJSONBodyType = "connected"
 	UpdateAgentJSONBodyTypeHttp      UpdateAgentJSONBodyType = "http"
 	UpdateAgentJSONBodyTypeSignature UpdateAgentJSONBodyType = "signature"
+	UpdateAgentJSONBodyTypeVoice     UpdateAgentJSONBodyType = "voice"
 	UpdateAgentJSONBodyTypeWorkflow  UpdateAgentJSONBodyType = "workflow"
 )
 
@@ -13178,6 +13266,8 @@ func (e UpdateAgentJSONBodyType) Valid() bool {
 	case UpdateAgentJSONBodyTypeHttp:
 		return true
 	case UpdateAgentJSONBodyTypeSignature:
+		return true
+	case UpdateAgentJSONBodyTypeVoice:
 		return true
 	case UpdateAgentJSONBodyTypeWorkflow:
 		return true
@@ -13249,6 +13339,7 @@ const (
 	UpdateAgent200JSONResponseBodyTypeConnected UpdateAgent200JSONResponseBodyType = "connected"
 	UpdateAgent200JSONResponseBodyTypeHttp      UpdateAgent200JSONResponseBodyType = "http"
 	UpdateAgent200JSONResponseBodyTypeSignature UpdateAgent200JSONResponseBodyType = "signature"
+	UpdateAgent200JSONResponseBodyTypeVoice     UpdateAgent200JSONResponseBodyType = "voice"
 	UpdateAgent200JSONResponseBodyTypeWorkflow  UpdateAgent200JSONResponseBodyType = "workflow"
 )
 
@@ -13263,6 +13354,8 @@ func (e UpdateAgent200JSONResponseBodyType) Valid() bool {
 		return true
 	case UpdateAgent200JSONResponseBodyTypeSignature:
 		return true
+	case UpdateAgent200JSONResponseBodyTypeVoice:
+		return true
 	case UpdateAgent200JSONResponseBodyTypeWorkflow:
 		return true
 	default:
@@ -13276,6 +13369,7 @@ const (
 	ReplaceAgentJSONBodyTypeConnected ReplaceAgentJSONBodyType = "connected"
 	ReplaceAgentJSONBodyTypeHttp      ReplaceAgentJSONBodyType = "http"
 	ReplaceAgentJSONBodyTypeSignature ReplaceAgentJSONBodyType = "signature"
+	ReplaceAgentJSONBodyTypeVoice     ReplaceAgentJSONBodyType = "voice"
 	ReplaceAgentJSONBodyTypeWorkflow  ReplaceAgentJSONBodyType = "workflow"
 )
 
@@ -13289,6 +13383,8 @@ func (e ReplaceAgentJSONBodyType) Valid() bool {
 	case ReplaceAgentJSONBodyTypeHttp:
 		return true
 	case ReplaceAgentJSONBodyTypeSignature:
+		return true
+	case ReplaceAgentJSONBodyTypeVoice:
 		return true
 	case ReplaceAgentJSONBodyTypeWorkflow:
 		return true
@@ -13360,6 +13456,7 @@ const (
 	ReplaceAgent200JSONResponseBodyTypeConnected ReplaceAgent200JSONResponseBodyType = "connected"
 	ReplaceAgent200JSONResponseBodyTypeHttp      ReplaceAgent200JSONResponseBodyType = "http"
 	ReplaceAgent200JSONResponseBodyTypeSignature ReplaceAgent200JSONResponseBodyType = "signature"
+	ReplaceAgent200JSONResponseBodyTypeVoice     ReplaceAgent200JSONResponseBodyType = "voice"
 	ReplaceAgent200JSONResponseBodyTypeWorkflow  ReplaceAgent200JSONResponseBodyType = "workflow"
 )
 
@@ -13373,6 +13470,8 @@ func (e ReplaceAgent200JSONResponseBodyType) Valid() bool {
 	case ReplaceAgent200JSONResponseBodyTypeHttp:
 		return true
 	case ReplaceAgent200JSONResponseBodyTypeSignature:
+		return true
+	case ReplaceAgent200JSONResponseBodyTypeVoice:
 		return true
 	case ReplaceAgent200JSONResponseBodyTypeWorkflow:
 		return true
@@ -14341,6 +14440,186 @@ func (e PostApiV1Query200JSONResponseBodyDiagnosticsCode) Valid() bool {
 	}
 }
 
+// Defines values for GetApiV1QueryReference200JSONResponseBodyExamplesIntent.
+const (
+	Conversations GetApiV1QueryReference200JSONResponseBodyExamplesIntent = "conversations"
+	Cost          GetApiV1QueryReference200JSONResponseBodyExamplesIntent = "cost"
+	Discovery     GetApiV1QueryReference200JSONResponseBodyExamplesIntent = "discovery"
+	Export        GetApiV1QueryReference200JSONResponseBodyExamplesIntent = "export"
+	Latency       GetApiV1QueryReference200JSONResponseBodyExamplesIntent = "latency"
+	Quality       GetApiV1QueryReference200JSONResponseBodyExamplesIntent = "quality"
+	Triage        GetApiV1QueryReference200JSONResponseBodyExamplesIntent = "triage"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1QueryReference200JSONResponseBodyExamplesIntent enum.
+func (e GetApiV1QueryReference200JSONResponseBodyExamplesIntent) Valid() bool {
+	switch e {
+	case Conversations:
+		return true
+	case Cost:
+		return true
+	case Discovery:
+		return true
+	case Export:
+		return true
+	case Latency:
+		return true
+	case Quality:
+		return true
+	case Triage:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1QueryReference200JSONResponseBodyExamplesLanguage.
+const (
+	Lwql        GetApiV1QueryReference200JSONResponseBodyExamplesLanguage = "lwql"
+	TraceFilter GetApiV1QueryReference200JSONResponseBodyExamplesLanguage = "trace-filter"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1QueryReference200JSONResponseBodyExamplesLanguage enum.
+func (e GetApiV1QueryReference200JSONResponseBodyExamplesLanguage) Valid() bool {
+	switch e {
+	case Lwql:
+		return true
+	case TraceFilter:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates.
+const (
+	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGatesCosts  GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates = "costs"
+	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGatesInput  GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates = "input"
+	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGatesOutput GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates = "output"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates enum.
+func (e GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates) Valid() bool {
+	switch e {
+	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGatesCosts:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGatesInput:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGatesOutput:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1QueryReference200JSONResponseBodyLwqlEndpointsMethod.
+const (
+	GetApiV1QueryReference200JSONResponseBodyLwqlEndpointsMethodGET  GetApiV1QueryReference200JSONResponseBodyLwqlEndpointsMethod = "GET"
+	GetApiV1QueryReference200JSONResponseBodyLwqlEndpointsMethodPOST GetApiV1QueryReference200JSONResponseBodyLwqlEndpointsMethod = "POST"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1QueryReference200JSONResponseBodyLwqlEndpointsMethod enum.
+func (e GetApiV1QueryReference200JSONResponseBodyLwqlEndpointsMethod) Valid() bool {
+	switch e {
+	case GetApiV1QueryReference200JSONResponseBodyLwqlEndpointsMethodGET:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlEndpointsMethodPOST:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsGates.
+const (
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsGatesCosts  GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsGates = "costs"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsGatesInput  GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsGates = "input"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsGatesOutput GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsGates = "output"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsGates enum.
+func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsGates) Valid() bool {
+	switch e {
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsGatesCosts:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsGatesInput:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsGatesOutput:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsUnit.
+const (
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsUnitLessThannil GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsUnit = "<nil>"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsUnitMs          GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsUnit = "ms"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsUnitTokens      GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsUnit = "tokens"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsUnitTokenss     GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsUnit = "tokens/s"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsUnitUSD         GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsUnit = "USD"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsUnit enum.
+func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsUnit) Valid() bool {
+	switch e {
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsUnitLessThannil:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsUnitMs:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsUnitTokens:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsUnitTokenss:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsUnitUSD:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1QueryReference200JSONResponseBodyTraceFilterEndpointsMethod.
+const (
+	GetApiV1QueryReference200JSONResponseBodyTraceFilterEndpointsMethodGET  GetApiV1QueryReference200JSONResponseBodyTraceFilterEndpointsMethod = "GET"
+	GetApiV1QueryReference200JSONResponseBodyTraceFilterEndpointsMethodPOST GetApiV1QueryReference200JSONResponseBodyTraceFilterEndpointsMethod = "POST"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1QueryReference200JSONResponseBodyTraceFilterEndpointsMethod enum.
+func (e GetApiV1QueryReference200JSONResponseBodyTraceFilterEndpointsMethod) Valid() bool {
+	switch e {
+	case GetApiV1QueryReference200JSONResponseBodyTraceFilterEndpointsMethodGET:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyTraceFilterEndpointsMethodPOST:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueType.
+const (
+	GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueTypeCategorical GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueType = "categorical"
+	GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueTypeExistence   GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueType = "existence"
+	GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueTypeRange       GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueType = "range"
+	GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueTypeText        GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueType = "text"
+)
+
+// Valid indicates whether the value is a known member of the GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueType enum.
+func (e GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueType) Valid() bool {
+	switch e {
+	case GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueTypeCategorical:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueTypeExistence:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueTypeRange:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueTypeText:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates.
 const (
 	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGatesCosts  GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates = "costs"
@@ -14364,25 +14643,25 @@ func (e GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates) Valid() bool
 
 // Defines values for GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit.
 const (
-	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitLessThannil GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "<nil>"
-	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitMs          GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "ms"
-	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitTokens      GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "tokens"
-	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitTokenss     GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "tokens/s"
-	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitUSD         GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "USD"
+	LessThannil GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "<nil>"
+	Ms          GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "ms"
+	Tokens      GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "tokens"
+	Tokenss     GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "tokens/s"
+	USD         GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "USD"
 )
 
 // Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit enum.
 func (e GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit) Valid() bool {
 	switch e {
-	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitLessThannil:
+	case LessThannil:
 		return true
-	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitMs:
+	case Ms:
 		return true
-	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitTokens:
+	case Tokens:
 		return true
-	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitTokenss:
+	case Tokenss:
 		return true
-	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitUSD:
+	case USD:
 		return true
 	default:
 		return false
@@ -14506,6 +14785,7 @@ const (
 	ListRunPlans200JSONResponseBodyTargetsTypeConnected ListRunPlans200JSONResponseBodyTargetsType = "connected"
 	ListRunPlans200JSONResponseBodyTargetsTypeHttp      ListRunPlans200JSONResponseBodyTargetsType = "http"
 	ListRunPlans200JSONResponseBodyTargetsTypePrompt    ListRunPlans200JSONResponseBodyTargetsType = "prompt"
+	ListRunPlans200JSONResponseBodyTargetsTypeVoice     ListRunPlans200JSONResponseBodyTargetsType = "voice"
 	ListRunPlans200JSONResponseBodyTargetsTypeWorkflow  ListRunPlans200JSONResponseBodyTargetsType = "workflow"
 )
 
@@ -14519,6 +14799,8 @@ func (e ListRunPlans200JSONResponseBodyTargetsType) Valid() bool {
 	case ListRunPlans200JSONResponseBodyTargetsTypeHttp:
 		return true
 	case ListRunPlans200JSONResponseBodyTargetsTypePrompt:
+		return true
+	case ListRunPlans200JSONResponseBodyTargetsTypeVoice:
 		return true
 	case ListRunPlans200JSONResponseBodyTargetsTypeWorkflow:
 		return true
@@ -14644,6 +14926,7 @@ const (
 	RunRunPlanJSONBodyConfigTargetsTypeConnected RunRunPlanJSONBodyConfigTargetsType = "connected"
 	RunRunPlanJSONBodyConfigTargetsTypeHttp      RunRunPlanJSONBodyConfigTargetsType = "http"
 	RunRunPlanJSONBodyConfigTargetsTypePrompt    RunRunPlanJSONBodyConfigTargetsType = "prompt"
+	RunRunPlanJSONBodyConfigTargetsTypeVoice     RunRunPlanJSONBodyConfigTargetsType = "voice"
 	RunRunPlanJSONBodyConfigTargetsTypeWorkflow  RunRunPlanJSONBodyConfigTargetsType = "workflow"
 )
 
@@ -14658,6 +14941,8 @@ func (e RunRunPlanJSONBodyConfigTargetsType) Valid() bool {
 		return true
 	case RunRunPlanJSONBodyConfigTargetsTypePrompt:
 		return true
+	case RunRunPlanJSONBodyConfigTargetsTypeVoice:
+		return true
 	case RunRunPlanJSONBodyConfigTargetsTypeWorkflow:
 		return true
 	default:
@@ -14671,6 +14956,7 @@ const (
 	RunRunPlan200JSONResponseBodyItemsTargetTypeConnected RunRunPlan200JSONResponseBodyItemsTargetType = "connected"
 	RunRunPlan200JSONResponseBodyItemsTargetTypeHttp      RunRunPlan200JSONResponseBodyItemsTargetType = "http"
 	RunRunPlan200JSONResponseBodyItemsTargetTypePrompt    RunRunPlan200JSONResponseBodyItemsTargetType = "prompt"
+	RunRunPlan200JSONResponseBodyItemsTargetTypeVoice     RunRunPlan200JSONResponseBodyItemsTargetType = "voice"
 	RunRunPlan200JSONResponseBodyItemsTargetTypeWorkflow  RunRunPlan200JSONResponseBodyItemsTargetType = "workflow"
 )
 
@@ -14684,6 +14970,8 @@ func (e RunRunPlan200JSONResponseBodyItemsTargetType) Valid() bool {
 	case RunRunPlan200JSONResponseBodyItemsTargetTypeHttp:
 		return true
 	case RunRunPlan200JSONResponseBodyItemsTargetTypePrompt:
+		return true
+	case RunRunPlan200JSONResponseBodyItemsTargetTypeVoice:
 		return true
 	case RunRunPlan200JSONResponseBodyItemsTargetTypeWorkflow:
 		return true
@@ -14824,6 +15112,7 @@ const (
 	GetRunPlan200JSONResponseBodyTargetsTypeConnected GetRunPlan200JSONResponseBodyTargetsType = "connected"
 	GetRunPlan200JSONResponseBodyTargetsTypeHttp      GetRunPlan200JSONResponseBodyTargetsType = "http"
 	GetRunPlan200JSONResponseBodyTargetsTypePrompt    GetRunPlan200JSONResponseBodyTargetsType = "prompt"
+	GetRunPlan200JSONResponseBodyTargetsTypeVoice     GetRunPlan200JSONResponseBodyTargetsType = "voice"
 	GetRunPlan200JSONResponseBodyTargetsTypeWorkflow  GetRunPlan200JSONResponseBodyTargetsType = "workflow"
 )
 
@@ -14838,6 +15127,8 @@ func (e GetRunPlan200JSONResponseBodyTargetsType) Valid() bool {
 		return true
 	case GetRunPlan200JSONResponseBodyTargetsTypePrompt:
 		return true
+	case GetRunPlan200JSONResponseBodyTargetsTypeVoice:
+		return true
 	case GetRunPlan200JSONResponseBodyTargetsTypeWorkflow:
 		return true
 	default:
@@ -14851,6 +15142,7 @@ const (
 	RerunRunPlan200JSONResponseBodyItemsTargetTypeConnected RerunRunPlan200JSONResponseBodyItemsTargetType = "connected"
 	RerunRunPlan200JSONResponseBodyItemsTargetTypeHttp      RerunRunPlan200JSONResponseBodyItemsTargetType = "http"
 	RerunRunPlan200JSONResponseBodyItemsTargetTypePrompt    RerunRunPlan200JSONResponseBodyItemsTargetType = "prompt"
+	RerunRunPlan200JSONResponseBodyItemsTargetTypeVoice     RerunRunPlan200JSONResponseBodyItemsTargetType = "voice"
 	RerunRunPlan200JSONResponseBodyItemsTargetTypeWorkflow  RerunRunPlan200JSONResponseBodyItemsTargetType = "workflow"
 )
 
@@ -14864,6 +15156,8 @@ func (e RerunRunPlan200JSONResponseBodyItemsTargetType) Valid() bool {
 	case RerunRunPlan200JSONResponseBodyItemsTargetTypeHttp:
 		return true
 	case RerunRunPlan200JSONResponseBodyItemsTargetTypePrompt:
+		return true
+	case RerunRunPlan200JSONResponseBodyItemsTargetTypeVoice:
 		return true
 	case RerunRunPlan200JSONResponseBodyItemsTargetTypeWorkflow:
 		return true
@@ -15325,6 +15619,7 @@ const (
 	RunTestSuiteJSONBodyTargetsTypeConnected RunTestSuiteJSONBodyTargetsType = "connected"
 	RunTestSuiteJSONBodyTargetsTypeHttp      RunTestSuiteJSONBodyTargetsType = "http"
 	RunTestSuiteJSONBodyTargetsTypePrompt    RunTestSuiteJSONBodyTargetsType = "prompt"
+	RunTestSuiteJSONBodyTargetsTypeVoice     RunTestSuiteJSONBodyTargetsType = "voice"
 	RunTestSuiteJSONBodyTargetsTypeWorkflow  RunTestSuiteJSONBodyTargetsType = "workflow"
 )
 
@@ -15339,6 +15634,8 @@ func (e RunTestSuiteJSONBodyTargetsType) Valid() bool {
 		return true
 	case RunTestSuiteJSONBodyTargetsTypePrompt:
 		return true
+	case RunTestSuiteJSONBodyTargetsTypeVoice:
+		return true
 	case RunTestSuiteJSONBodyTargetsTypeWorkflow:
 		return true
 	default:
@@ -15352,6 +15649,7 @@ const (
 	RunTestSuite200JSONResponseBodyItemsTargetTypeConnected RunTestSuite200JSONResponseBodyItemsTargetType = "connected"
 	RunTestSuite200JSONResponseBodyItemsTargetTypeHttp      RunTestSuite200JSONResponseBodyItemsTargetType = "http"
 	RunTestSuite200JSONResponseBodyItemsTargetTypePrompt    RunTestSuite200JSONResponseBodyItemsTargetType = "prompt"
+	RunTestSuite200JSONResponseBodyItemsTargetTypeVoice     RunTestSuite200JSONResponseBodyItemsTargetType = "voice"
 	RunTestSuite200JSONResponseBodyItemsTargetTypeWorkflow  RunTestSuite200JSONResponseBodyItemsTargetType = "workflow"
 )
 
@@ -15365,6 +15663,8 @@ func (e RunTestSuite200JSONResponseBodyItemsTargetType) Valid() bool {
 	case RunTestSuite200JSONResponseBodyItemsTargetTypeHttp:
 		return true
 	case RunTestSuite200JSONResponseBodyItemsTargetTypePrompt:
+		return true
+	case RunTestSuite200JSONResponseBodyItemsTargetTypeVoice:
 		return true
 	case RunTestSuite200JSONResponseBodyItemsTargetTypeWorkflow:
 		return true
@@ -22229,6 +22529,9 @@ type PostApiScenarioEventsJSONBody0MetadataAgentsRole string
 // PostApiScenarioEventsJSONBody0MetadataLangwatchActorLabel defines parameters for PostApiScenarioEvents.
 type PostApiScenarioEventsJSONBody0MetadataLangwatchActorLabel string
 
+// PostApiScenarioEventsJSONBody0MetadataLangwatchCallerKind defines parameters for PostApiScenarioEvents.
+type PostApiScenarioEventsJSONBody0MetadataLangwatchCallerKind string
+
 // PostApiScenarioEventsJSONBody0MetadataLangwatchTargetParameters0 defines parameters for PostApiScenarioEvents.
 type PostApiScenarioEventsJSONBody0MetadataLangwatchTargetParameters0 = string
 
@@ -22260,6 +22563,13 @@ type PostApiScenarioEventsJSONBody_0_Metadata struct {
 			Hostname string  `json:"hostname"`
 			Label    *string `json:"label"`
 		} `json:"agentInstance,omitempty"`
+		Caller *struct {
+			Effects              string  `json:"effects"`
+			InterruptProbability float32 `json:"interruptProbability"`
+			Voice                string  `json:"voice"`
+		} `json:"caller,omitempty"`
+		CallerKind             *PostApiScenarioEventsJSONBody0MetadataLangwatchCallerKind                                           `json:"callerKind,omitempty"`
+		IsCutAtLimit           *bool                                                                                                `json:"isCutAtLimit,omitempty"`
 		JudgeModel             *string                                                                                              `json:"judgeModel,omitempty"`
 		ResolvedJudgeModel     *string                                                                                              `json:"resolvedJudgeModel,omitempty"`
 		ResolvedSimulatorModel *string                                                                                              `json:"resolvedSimulatorModel,omitempty"`
@@ -23629,12 +23939,79 @@ type PostApiTeamsByIdMembersJSONBody struct {
 // PostApiTeamsByIdMembersJSONBodyRole defines parameters for PostApiTeamsByIdMembers.
 type PostApiTeamsByIdMembersJSONBodyRole string
 
+// GetApiTracesFacetsParams defines parameters for GetApiTracesFacets.
+type GetApiTracesFacetsParams struct {
+	Field     *string `form:"field,omitempty" json:"field,omitempty"`
+	Prefix    *string `form:"prefix,omitempty" json:"prefix,omitempty"`
+	Limit     *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset    *int    `form:"offset,omitempty" json:"offset,omitempty"`
+	StartDate *struct {
+		union json.RawMessage
+	} `form:"startDate,omitempty" json:"startDate,omitempty"`
+	EndDate *struct {
+		union json.RawMessage
+	} `form:"endDate,omitempty" json:"endDate,omitempty"`
+}
+
+// GetApiTracesFacetsParamsStartDate0 defines parameters for GetApiTracesFacets.
+type GetApiTracesFacetsParamsStartDate0 = float32
+
+// GetApiTracesFacetsParamsStartDate1 defines parameters for GetApiTracesFacets.
+type GetApiTracesFacetsParamsStartDate1 = string
+
+// GetApiTracesFacetsParamsEndDate0 defines parameters for GetApiTracesFacets.
+type GetApiTracesFacetsParamsEndDate0 = float32
+
+// GetApiTracesFacetsParamsEndDate1 defines parameters for GetApiTracesFacets.
+type GetApiTracesFacetsParamsEndDate1 = string
+
+// GetApiTracesFacets200JSONResponseBody0 defines parameters for GetApiTracesFacets.
+type GetApiTracesFacets200JSONResponseBody0 struct {
+	Facets []GetApiTracesFacets200JSONResponseBody_0_Facets_Item `json:"facets"`
+
+	// Pending True when the payload is still being computed and what you have is the last committed one, possibly empty. Call again shortly.
+	Pending bool `json:"pending"`
+}
+
+// GetApiTracesFacets200JSONResponseBody0FacetsKind defines parameters for GetApiTracesFacets.
+type GetApiTracesFacets200JSONResponseBody0FacetsKind string
+
+// GetApiTracesFacets200JSONResponseBody_0_Facets_Item defines parameters for GetApiTracesFacets.
+type GetApiTracesFacets200JSONResponseBody_0_Facets_Item struct {
+	Group                string                                           `json:"group"`
+	Key                  string                                           `json:"key"`
+	Kind                 GetApiTracesFacets200JSONResponseBody0FacetsKind `json:"kind"`
+	Label                string                                           `json:"label"`
+	AdditionalProperties map[string]interface{}                           `json:"-"`
+}
+
+// GetApiTracesFacets200JSONResponseBody1 defines parameters for GetApiTracesFacets.
+type GetApiTracesFacets200JSONResponseBody1 struct {
+	HasMore bool `json:"hasMore"`
+
+	// Total Distinct values the field holds in the window, before paging.
+	Total  float32 `json:"total"`
+	Values []struct {
+		Count float32 `json:"count"`
+		Label *string `json:"label,omitempty"`
+		Value string  `json:"value"`
+	} `json:"values"`
+}
+
+// GetApiTracesFacets200JSONResponseBody defines parameters for GetApiTracesFacets.
+type GetApiTracesFacets200JSONResponseBody struct {
+	union json.RawMessage
+}
+
 // PostApiTracesSearchJSONBody defines parameters for PostApiTracesSearch.
 type PostApiTracesSearchJSONBody struct {
 	// DateField Which timestamp the startDate/endDate window filters on. 'occurred' (default) selects traces by when they happened. 'updated' selects traces by when they were last modified — use this for incremental ETL ('give me everything changed since my last pull'), since a trace can occur long before it gains a later evaluation or annotation.
 	DateField *PostApiTracesSearchJSONBodyDateField `json:"dateField,omitempty"`
 	EndDate   PostApiTracesSearchJSONBody_EndDate   `json:"endDate"`
-	Filters   *struct {
+
+	// Filter A trace filter string in the same language the Trace Explorer's search bar speaks — `status:error AND model:gpt-*`, `trace.attribute.langwatch.user_id:alice`, `evaluatorVerdict:fail`, a quoted phrase for free text. It is combined with `filters`, `query` and `traceIds` rather than replacing any of them, so every condition you send must hold. `GET /api/v1/query/reference` lists every field and the syntax; `GET /api/traces/facets` says what values a field actually holds. A malformed filter, or one naming a field the language does not have, is a 422 that names the field.
+	Filter  *string `json:"filter,omitempty"`
+	Filters *struct {
 		AnnotationsHasAnnotation             *PostApiTracesSearchJSONBody_Filters_AnnotationsHasAnnotation             `json:"annotations.hasAnnotation,omitempty"`
 		EvaluationsEvaluatorId               *PostApiTracesSearchJSONBody_Filters_EvaluationsEvaluatorId               `json:"evaluations.evaluator_id,omitempty"`
 		EvaluationsEvaluatorIdGuardrailsOnly *PostApiTracesSearchJSONBody_Filters_EvaluationsEvaluatorIdGuardrailsOnly `json:"evaluations.evaluator_id.guardrails_only,omitempty"`
@@ -25956,6 +26333,30 @@ type PostApiV1QueryJSONBody_TimeWindow_Start struct {
 // PostApiV1Query200JSONResponseBodyDiagnosticsCode defines parameters for PostApiV1Query.
 type PostApiV1Query200JSONResponseBodyDiagnosticsCode string
 
+// GetApiV1QueryReference200JSONResponseBodyExamplesIntent defines parameters for GetApiV1QueryReference.
+type GetApiV1QueryReference200JSONResponseBodyExamplesIntent string
+
+// GetApiV1QueryReference200JSONResponseBodyExamplesLanguage defines parameters for GetApiV1QueryReference.
+type GetApiV1QueryReference200JSONResponseBodyExamplesLanguage string
+
+// GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates defines parameters for GetApiV1QueryReference.
+type GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates string
+
+// GetApiV1QueryReference200JSONResponseBodyLwqlEndpointsMethod defines parameters for GetApiV1QueryReference.
+type GetApiV1QueryReference200JSONResponseBodyLwqlEndpointsMethod string
+
+// GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsGates defines parameters for GetApiV1QueryReference.
+type GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsGates string
+
+// GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsUnit defines parameters for GetApiV1QueryReference.
+type GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsUnit string
+
+// GetApiV1QueryReference200JSONResponseBodyTraceFilterEndpointsMethod defines parameters for GetApiV1QueryReference.
+type GetApiV1QueryReference200JSONResponseBodyTraceFilterEndpointsMethod string
+
+// GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueType defines parameters for GetApiV1QueryReference.
+type GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueType string
+
 // GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates defines parameters for GetApiV1QuerySchema.
 type GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates string
 
@@ -26057,17 +26458,12 @@ type RunRunPlanJSONBody struct {
 	Config struct {
 		// Evaluators The plan's own evaluators, run beside the ones attached to the test suites its scenarios belong to. A plan evaluator reads the conversation and the trace, never a scenario field. Leave it out to keep what the plan already holds.
 		Evaluators *[]struct {
-			// EvaluatorId The id of the saved evaluator this attachment runs.
 			EvaluatorId string `json:"evaluatorId"`
-
-			// Id The attachment id. Stable across edits of the attachment.
-			Id string `json:"id"`
+			Id          string `json:"id"`
 
 			// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 			Mappings map[string]RunRunPlanJSONBody_Config_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-
-			// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
-			Required bool `json:"required"`
+			Required bool                                                                          `json:"required"`
 		} `json:"evaluators,omitempty"`
 
 		// JudgeModel The model that judges every scenario in the run. Overrides each scenario's own choice. Leave it out for the scenario or project default.
@@ -26394,26 +26790,18 @@ type ListTestSuites200JSONResponseBodyFieldsType string
 type CreateTestSuiteJSONBody struct {
 	// Evaluators The evaluators that run after every scenario run. Up to 20. A required evaluator that fails fails the scenario; a score-only evaluator reports and never gates.
 	Evaluators *[]struct {
-		// EvaluatorId The id of the saved evaluator this attachment runs.
 		EvaluatorId string `json:"evaluatorId"`
-
-		// Id The attachment id. Stable across edits of the attachment.
-		Id string `json:"id"`
+		Id          string `json:"id"`
 
 		// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 		Mappings map[string]CreateTestSuiteJSONBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-
-		// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
-		Required bool `json:"required"`
+		Required bool                                                                        `json:"required"`
 	} `json:"evaluators,omitempty"`
 
 	// Fields The fields the test suite declares, in the order the platform shows them. Up to 30. An identifier is lowercase letters, digits and underscores, starting with a letter; the type is text, number or boolean.
 	Fields *[]struct {
-		// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
-		Identifier string `json:"identifier"`
-
-		// Type The value type every scenario carries for this field.
-		Type CreateTestSuiteJSONBodyFieldsType `json:"type"`
+		Identifier string                            `json:"identifier"`
+		Type       CreateTestSuiteJSONBodyFieldsType `json:"type"`
 	} `json:"fields,omitempty"`
 
 	// Name The test suite name, as it reads in the platform.
@@ -26517,26 +26905,18 @@ type GetTestSuite200JSONResponseBodyFieldsType string
 type UpdateTestSuiteJSONBody struct {
 	// Evaluators The full list of evaluators attached to the suite. An evaluator the project does not hold answers 422 suite_evaluator_not_found; a mapping the run cannot read answers 422 suite_evaluator_mapping_invalid.
 	Evaluators *[]struct {
-		// EvaluatorId The id of the saved evaluator this attachment runs.
 		EvaluatorId string `json:"evaluatorId"`
-
-		// Id The attachment id. Stable across edits of the attachment.
-		Id string `json:"id"`
+		Id          string `json:"id"`
 
 		// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 		Mappings map[string]UpdateTestSuiteJSONBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-
-		// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
-		Required bool `json:"required"`
+		Required bool                                                                        `json:"required"`
 	} `json:"evaluators,omitempty"`
 
 	// Fields The full list of fields the suite declares. A field an attached evaluator still reads cannot be removed: answers 422 suite_field_in_use.
 	Fields *[]struct {
-		// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
-		Identifier string `json:"identifier"`
-
-		// Type The value type every scenario carries for this field.
-		Type UpdateTestSuiteJSONBodyFieldsType `json:"type"`
+		Identifier string                            `json:"identifier"`
+		Type       UpdateTestSuiteJSONBodyFieldsType `json:"type"`
 	} `json:"fields,omitempty"`
 
 	// Name The new name. The slug is kept.
@@ -32833,6 +33213,111 @@ func (a PostApiScenarioEventsJSONBody_0_Metadata) MarshalJSON() ([]byte, error) 
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling 'note': %w", err)
 		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// Getter for additional properties for GetApiTracesFacets200JSONResponseBody_0_Facets_Item. Returns the specified
+// element and whether it was found
+func (a GetApiTracesFacets200JSONResponseBody_0_Facets_Item) Get(fieldName string) (value interface{}, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for GetApiTracesFacets200JSONResponseBody_0_Facets_Item
+func (a *GetApiTracesFacets200JSONResponseBody_0_Facets_Item) Set(fieldName string, value interface{}) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]interface{})
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for GetApiTracesFacets200JSONResponseBody_0_Facets_Item to handle AdditionalProperties
+func (a *GetApiTracesFacets200JSONResponseBody_0_Facets_Item) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["group"]; found {
+		err = json.Unmarshal(raw, &a.Group)
+		if err != nil {
+			return fmt.Errorf("error reading 'group': %w", err)
+		}
+		delete(object, "group")
+	}
+
+	if raw, found := object["key"]; found {
+		err = json.Unmarshal(raw, &a.Key)
+		if err != nil {
+			return fmt.Errorf("error reading 'key': %w", err)
+		}
+		delete(object, "key")
+	}
+
+	if raw, found := object["kind"]; found {
+		err = json.Unmarshal(raw, &a.Kind)
+		if err != nil {
+			return fmt.Errorf("error reading 'kind': %w", err)
+		}
+		delete(object, "kind")
+	}
+
+	if raw, found := object["label"]; found {
+		err = json.Unmarshal(raw, &a.Label)
+		if err != nil {
+			return fmt.Errorf("error reading 'label': %w", err)
+		}
+		delete(object, "label")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]interface{})
+		for fieldName, fieldBuf := range object {
+			var fieldVal interface{}
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for GetApiTracesFacets200JSONResponseBody_0_Facets_Item to handle AdditionalProperties
+func (a GetApiTracesFacets200JSONResponseBody_0_Facets_Item) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["group"], err = json.Marshal(a.Group)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'group': %w", err)
+	}
+
+	object["key"], err = json.Marshal(a.Key)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'key': %w", err)
+	}
+
+	object["kind"], err = json.Marshal(a.Kind)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'kind': %w", err)
+	}
+
+	object["label"], err = json.Marshal(a.Label)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'label': %w", err)
 	}
 
 	for fieldName, field := range a.AdditionalProperties {
@@ -57314,6 +57799,68 @@ func (t *PostApiSuitesByIdRun200JSONResponseBody_Items_Target_RunParameters_Addi
 	return err
 }
 
+// AsGetApiTracesFacets200JSONResponseBody0 returns the union data inside the GetApiTracesFacets200JSONResponseBody as a GetApiTracesFacets200JSONResponseBody0
+func (t GetApiTracesFacets200JSONResponseBody) AsGetApiTracesFacets200JSONResponseBody0() (GetApiTracesFacets200JSONResponseBody0, error) {
+	var body GetApiTracesFacets200JSONResponseBody0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTracesFacets200JSONResponseBody0 overwrites any union data inside the GetApiTracesFacets200JSONResponseBody as the provided GetApiTracesFacets200JSONResponseBody0
+func (t *GetApiTracesFacets200JSONResponseBody) FromGetApiTracesFacets200JSONResponseBody0(v GetApiTracesFacets200JSONResponseBody0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTracesFacets200JSONResponseBody0 performs a merge with any union data inside the GetApiTracesFacets200JSONResponseBody, using the provided GetApiTracesFacets200JSONResponseBody0
+func (t *GetApiTracesFacets200JSONResponseBody) MergeGetApiTracesFacets200JSONResponseBody0(v GetApiTracesFacets200JSONResponseBody0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsGetApiTracesFacets200JSONResponseBody1 returns the union data inside the GetApiTracesFacets200JSONResponseBody as a GetApiTracesFacets200JSONResponseBody1
+func (t GetApiTracesFacets200JSONResponseBody) AsGetApiTracesFacets200JSONResponseBody1() (GetApiTracesFacets200JSONResponseBody1, error) {
+	var body GetApiTracesFacets200JSONResponseBody1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiTracesFacets200JSONResponseBody1 overwrites any union data inside the GetApiTracesFacets200JSONResponseBody as the provided GetApiTracesFacets200JSONResponseBody1
+func (t *GetApiTracesFacets200JSONResponseBody) FromGetApiTracesFacets200JSONResponseBody1(v GetApiTracesFacets200JSONResponseBody1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiTracesFacets200JSONResponseBody1 performs a merge with any union data inside the GetApiTracesFacets200JSONResponseBody, using the provided GetApiTracesFacets200JSONResponseBody1
+func (t *GetApiTracesFacets200JSONResponseBody) MergeGetApiTracesFacets200JSONResponseBody1(v GetApiTracesFacets200JSONResponseBody1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiTracesFacets200JSONResponseBody) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiTracesFacets200JSONResponseBody) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsPostApiTracesSearchJSONBodyEndDate0 returns the union data inside the PostApiTracesSearchJSONBody_EndDate as a PostApiTracesSearchJSONBodyEndDate0
 func (t PostApiTracesSearchJSONBody_EndDate) AsPostApiTracesSearchJSONBodyEndDate0() (PostApiTracesSearchJSONBodyEndDate0, error) {
 	var body PostApiTracesSearchJSONBodyEndDate0
@@ -68724,6 +69271,9 @@ type ClientInterface interface {
 	// PostApiTraceIdUnshare request
 	PostApiTraceIdUnshare(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetApiTracesFacets request
+	GetApiTracesFacets(ctx context.Context, params *GetApiTracesFacetsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// PostApiTracesSearchWithBody request with any body
 	PostApiTracesSearchWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -68896,6 +69446,9 @@ type ClientInterface interface {
 	PostApiV1QueryWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	PostApiV1Query(ctx context.Context, body PostApiV1QueryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetApiV1QueryReference request
+	GetApiV1QueryReference(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetApiV1QuerySchema request
 	GetApiV1QuerySchema(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -72841,6 +73394,18 @@ func (c *Client) PostApiTraceIdUnshare(ctx context.Context, id string, reqEditor
 	return c.Client.Do(req)
 }
 
+func (c *Client) GetApiTracesFacets(ctx context.Context, params *GetApiTracesFacetsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiTracesFacetsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) PostApiTracesSearchWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostApiTracesSearchRequestWithBody(c.Server, contentType, body)
 	if err != nil {
@@ -73611,6 +74176,18 @@ func (c *Client) PostApiV1QueryWithBody(ctx context.Context, contentType string,
 
 func (c *Client) PostApiV1Query(ctx context.Context, body PostApiV1QueryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostApiV1QueryRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiV1QueryReference(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiV1QueryReferenceRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -84585,6 +85162,120 @@ func NewPostApiTraceIdUnshareRequest(server string, id string) (*http.Request, e
 	return req, nil
 }
 
+// NewGetApiTracesFacetsRequest generates requests for GetApiTracesFacets
+func NewGetApiTracesFacetsRequest(server string, params *GetApiTracesFacetsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/traces/facets")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Field != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "field", *params.Field, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Prefix != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "prefix", *params.Prefix, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Offset != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "offset", *params.Offset, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.StartDate != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "startDate", *params.StartDate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.EndDate != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "endDate", *params.EndDate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewPostApiTracesSearchRequest calls the generic PostApiTracesSearch builder with application/json body
 func NewPostApiTracesSearchRequest(server string, body PostApiTracesSearchJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -86401,6 +87092,33 @@ func NewPostApiV1QueryRequestWithBody(server string, contentType string, body io
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetApiV1QueryReferenceRequest generates requests for GetApiV1QueryReference
+func NewGetApiV1QueryReferenceRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/query/reference")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -88631,6 +89349,9 @@ type ClientWithResponsesInterface interface {
 	// PostApiTraceIdUnshareWithResponse request
 	PostApiTraceIdUnshareWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*PostApiTraceIdUnshareResponse, error)
 
+	// GetApiTracesFacetsWithResponse request
+	GetApiTracesFacetsWithResponse(ctx context.Context, params *GetApiTracesFacetsParams, reqEditors ...RequestEditorFn) (*GetApiTracesFacetsResponse, error)
+
 	// PostApiTracesSearchWithBodyWithResponse request with any body
 	PostApiTracesSearchWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiTracesSearchResponse, error)
 
@@ -88803,6 +89524,9 @@ type ClientWithResponsesInterface interface {
 	PostApiV1QueryWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiV1QueryResponse, error)
 
 	PostApiV1QueryWithResponse(ctx context.Context, body PostApiV1QueryJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiV1QueryResponse, error)
+
+	// GetApiV1QueryReferenceWithResponse request
+	GetApiV1QueryReferenceWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiV1QueryReferenceResponse, error)
 
 	// GetApiV1QuerySchemaWithResponse request
 	GetApiV1QuerySchemaWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiV1QuerySchemaResponse, error)
@@ -97870,10 +98594,6 @@ func (r UpdateProjectResponse) ContentType() string {
 type GetProjectApiKeyResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *struct {
-		// ApiKey Send as X-Auth-Token, Bearer, or Basic
-		ApiKey string `json:"apiKey"`
-	}
 }
 
 // Status returns HTTPResponse.Status
@@ -97903,10 +98623,6 @@ func (r GetProjectApiKeyResponse) ContentType() string {
 type RegenerateProjectApiKeyResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *struct {
-		// ApiKey Send as X-Auth-Token, Bearer, or Basic
-		ApiKey string `json:"apiKey"`
-	}
 }
 
 // Status returns HTTPResponse.Status
@@ -101866,11 +102582,13 @@ type GetApiSimulationRunsResponse struct {
 			ScenarioRunId string `json:"scenarioRunId"`
 
 			// ScenarioVersion The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed. Absent on servers that predate scenario versions.
-			ScenarioVersion *int     `json:"scenarioVersion,omitempty"`
-			Status          string   `json:"status"`
-			Timestamp       float32  `json:"timestamp"`
-			TotalCost       *float32 `json:"totalCost,omitempty"`
-			UpdatedAt       float32  `json:"updatedAt"`
+			ScenarioVersion *int `json:"scenarioVersion,omitempty"`
+
+			// Status Where the run stands. PENDING_EVALUATION means the conversation is over and the judge has decided, but the evaluators the run's suite and plan attach have not been recorded yet, so a required one may still fail the run. Wait for another status before reading the verdict as final.
+			Status    string   `json:"status"`
+			Timestamp float32  `json:"timestamp"`
+			TotalCost *float32 `json:"totalCost,omitempty"`
+			UpdatedAt float32  `json:"updatedAt"`
 		} `json:"runs"`
 	}
 	JSON400 *struct {
@@ -102102,11 +102820,13 @@ type GetApiSimulationRunsByScenarioRunIdResponse struct {
 		ScenarioRunId string `json:"scenarioRunId"`
 
 		// ScenarioVersion The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed. Absent on servers that predate scenario versions.
-		ScenarioVersion *int     `json:"scenarioVersion,omitempty"`
-		Status          string   `json:"status"`
-		Timestamp       float32  `json:"timestamp"`
-		TotalCost       *float32 `json:"totalCost,omitempty"`
-		UpdatedAt       float32  `json:"updatedAt"`
+		ScenarioVersion *int `json:"scenarioVersion,omitempty"`
+
+		// Status Where the run stands. PENDING_EVALUATION means the conversation is over and the judge has decided, but the evaluators the run's suite and plan attach have not been recorded yet, so a required one may still fail the run. Wait for another status before reading the verdict as final.
+		Status    string   `json:"status"`
+		Timestamp float32  `json:"timestamp"`
+		TotalCost *float32 `json:"totalCost,omitempty"`
+		UpdatedAt float32  `json:"updatedAt"`
 	}
 	JSON400 *struct {
 		Error   string  `json:"error"`
@@ -103142,6 +103862,52 @@ func (r PostApiTraceIdUnshareResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r PostApiTraceIdUnshareResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetApiTracesFacetsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *GetApiTracesFacets200JSONResponseBody
+	JSON400      *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON401 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON422 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON500 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiTracesFacetsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiTracesFacetsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiTracesFacetsResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -106068,6 +106834,159 @@ func (r PostApiV1QueryResponse) ContentType() string {
 	return ""
 }
 
+type GetApiV1QueryReferenceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		DecisionTable []struct {
+			Use  string `json:"use"`
+			When string `json:"when"`
+			Why  string `json:"why"`
+		} `json:"decisionTable"`
+		Examples []struct {
+			Available  bool                                                      `json:"available"`
+			Id         string                                                    `json:"id"`
+			Intent     GetApiV1QueryReference200JSONResponseBodyExamplesIntent   `json:"intent"`
+			Language   GetApiV1QueryReference200JSONResponseBodyExamplesLanguage `json:"language"`
+			Notes      *string                                                   `json:"notes,omitempty"`
+			Parameters []struct {
+				Description string `json:"description"`
+				Name        string `json:"name"`
+				Type        string `json:"type"`
+			} `json:"parameters"`
+			Requires struct {
+				Functions []string                                                         `json:"functions"`
+				Gates     []GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates `json:"gates"`
+			} `json:"requires"`
+			Tags  []string `json:"tags"`
+			Text  string   `json:"text"`
+			Title string   `json:"title"`
+		} `json:"examples"`
+		Lwql struct {
+			Enabled   bool `json:"enabled"`
+			Endpoints []struct {
+				Description string                                                       `json:"description"`
+				Method      GetApiV1QueryReference200JSONResponseBodyLwqlEndpointsMethod `json:"method"`
+				Path        string                                                       `json:"path"`
+			} `json:"endpoints"`
+			Limits struct {
+				MaxExecutionTimeSeconds float32 `json:"maxExecutionTimeSeconds"`
+				MaxResultBytes          float32 `json:"maxResultBytes"`
+				MaxRowsReturned         float32 `json:"maxRowsReturned"`
+				MaxStatementLength      float32 `json:"maxStatementLength"`
+				Pagination              string  `json:"pagination"`
+			} `json:"limits"`
+			Schema struct {
+				Database string `json:"database"`
+				Datasets []struct {
+					Columns []struct {
+						Available   bool                                                                      `json:"available"`
+						Description string                                                                    `json:"description"`
+						Gates       []GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsGates `json:"gates"`
+						Name        string                                                                    `json:"name"`
+						Type        string                                                                    `json:"type"`
+						Unit        *GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsUnit   `json:"unit"`
+					} `json:"columns"`
+					Description string   `json:"description"`
+					ExampleSql  string   `json:"exampleSql"`
+					Freshness   string   `json:"freshness"`
+					Grain       string   `json:"grain"`
+					JoinKeys    []string `json:"joinKeys"`
+					Name        string   `json:"name"`
+					TimeColumn  string   `json:"timeColumn"`
+				} `json:"datasets"`
+			} `json:"schema"`
+		} `json:"lwql"`
+		TraceFilter struct {
+			DynamicPrefixes []struct {
+				Aliases     []string `json:"aliases"`
+				Description string   `json:"description"`
+				Label       string   `json:"label"`
+				Prefix      string   `json:"prefix"`
+			} `json:"dynamicPrefixes"`
+			Endpoints []struct {
+				Description string                                                              `json:"description"`
+				Method      GetApiV1QueryReference200JSONResponseBodyTraceFilterEndpointsMethod `json:"method"`
+				Path        string                                                              `json:"path"`
+			} `json:"endpoints"`
+			Fields []struct {
+				Facetable   bool                                                                `json:"facetable"`
+				Group       *string                                                             `json:"group"`
+				KnownValues []string                                                            `json:"knownValues"`
+				Label       string                                                              `json:"label"`
+				Name        string                                                              `json:"name"`
+				ValueType   GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueType `json:"valueType"`
+			} `json:"fields"`
+			Syntax string `json:"syntax"`
+		} `json:"traceFilter"`
+		Version string `json:"version"`
+	}
+	JSON400 *struct {
+		Error struct {
+			Code    string                  `json:"code"`
+			Message string                  `json:"message"`
+			Meta    *map[string]interface{} `json:"meta,omitempty"`
+			SpanId  *string                 `json:"span_id,omitempty"`
+			TraceId *string                 `json:"trace_id,omitempty"`
+			Type    string                  `json:"type"`
+		} `json:"error"`
+	}
+	JSON401 *struct {
+		Error struct {
+			Code    string                  `json:"code"`
+			Message string                  `json:"message"`
+			Meta    *map[string]interface{} `json:"meta,omitempty"`
+			SpanId  *string                 `json:"span_id,omitempty"`
+			TraceId *string                 `json:"trace_id,omitempty"`
+			Type    string                  `json:"type"`
+		} `json:"error"`
+	}
+	JSON403 *struct {
+		Error struct {
+			Code    string                  `json:"code"`
+			Message string                  `json:"message"`
+			Meta    *map[string]interface{} `json:"meta,omitempty"`
+			SpanId  *string                 `json:"span_id,omitempty"`
+			TraceId *string                 `json:"trace_id,omitempty"`
+			Type    string                  `json:"type"`
+		} `json:"error"`
+	}
+	JSON500 *struct {
+		Error struct {
+			Code    string                  `json:"code"`
+			Message string                  `json:"message"`
+			Meta    *map[string]interface{} `json:"meta,omitempty"`
+			SpanId  *string                 `json:"span_id,omitempty"`
+			TraceId *string                 `json:"trace_id,omitempty"`
+			Type    string                  `json:"type"`
+		} `json:"error"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiV1QueryReferenceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiV1QueryReferenceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiV1QueryReferenceResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetApiV1QuerySchemaResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -106169,17 +107088,12 @@ type ListRunPlansResponse struct {
 
 		// Evaluators The plan's own evaluators. Absent on servers that predate evaluators on this family.
 		Evaluators *[]struct {
-			// EvaluatorId The id of the saved evaluator this attachment runs.
 			EvaluatorId string `json:"evaluatorId"`
-
-			// Id The attachment id. Stable across edits of the attachment.
-			Id string `json:"id"`
+			Id          string `json:"id"`
 
 			// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 			Mappings map[string]ListRunPlans200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-
-			// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
-			Required bool `json:"required"`
+			Required bool                                                                                `json:"required"`
 		} `json:"evaluators,omitempty"`
 
 		// Id The run plan id.
@@ -106388,17 +107302,12 @@ type GetRunPlanResponse struct {
 
 		// Evaluators The plan's own evaluators. Absent on servers that predate evaluators on this family.
 		Evaluators *[]struct {
-			// EvaluatorId The id of the saved evaluator this attachment runs.
 			EvaluatorId string `json:"evaluatorId"`
-
-			// Id The attachment id. Stable across edits of the attachment.
-			Id string `json:"id"`
+			Id          string `json:"id"`
 
 			// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 			Mappings map[string]GetRunPlan200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-
-			// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
-			Required bool `json:"required"`
+			Required bool                                                                              `json:"required"`
 		} `json:"evaluators,omitempty"`
 
 		// Id The run plan id.
@@ -106571,26 +107480,18 @@ type ListTestSuitesResponse struct {
 
 		// Evaluators The evaluators attached to the test suite. Absent on servers that predate evaluators on this family.
 		Evaluators *[]struct {
-			// EvaluatorId The id of the saved evaluator this attachment runs.
 			EvaluatorId string `json:"evaluatorId"`
-
-			// Id The attachment id. Stable across edits of the attachment.
-			Id string `json:"id"`
+			Id          string `json:"id"`
 
 			// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 			Mappings map[string]ListTestSuites200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-
-			// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
-			Required bool `json:"required"`
+			Required bool                                                                                  `json:"required"`
 		} `json:"evaluators,omitempty"`
 
 		// Fields The fields the test suite declares. Absent on servers that predate fields on this family.
 		Fields *[]struct {
-			// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
-			Identifier string `json:"identifier"`
-
-			// Type The value type every scenario carries for this field.
-			Type ListTestSuites200JSONResponseBodyFieldsType `json:"type"`
+			Identifier string                                      `json:"identifier"`
+			Type       ListTestSuites200JSONResponseBodyFieldsType `json:"type"`
 		} `json:"fields,omitempty"`
 
 		// Id The test suite id.
@@ -106652,26 +107553,18 @@ type CreateTestSuiteResponse struct {
 
 		// Evaluators The evaluators attached to the test suite. Absent on servers that predate evaluators on this family.
 		Evaluators *[]struct {
-			// EvaluatorId The id of the saved evaluator this attachment runs.
 			EvaluatorId string `json:"evaluatorId"`
-
-			// Id The attachment id. Stable across edits of the attachment.
-			Id string `json:"id"`
+			Id          string `json:"id"`
 
 			// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 			Mappings map[string]CreateTestSuite201JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-
-			// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
-			Required bool `json:"required"`
+			Required bool                                                                                   `json:"required"`
 		} `json:"evaluators,omitempty"`
 
 		// Fields The fields the test suite declares. Absent on servers that predate fields on this family.
 		Fields *[]struct {
-			// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
-			Identifier string `json:"identifier"`
-
-			// Type The value type every scenario carries for this field.
-			Type CreateTestSuite201JSONResponseBodyFieldsType `json:"type"`
+			Identifier string                                       `json:"identifier"`
+			Type       CreateTestSuite201JSONResponseBodyFieldsType `json:"type"`
 		} `json:"fields,omitempty"`
 
 		// Id The test suite id.
@@ -106769,26 +107662,18 @@ type GetTestSuiteResponse struct {
 
 		// Evaluators The evaluators attached to the test suite. Absent on servers that predate evaluators on this family.
 		Evaluators *[]struct {
-			// EvaluatorId The id of the saved evaluator this attachment runs.
 			EvaluatorId string `json:"evaluatorId"`
-
-			// Id The attachment id. Stable across edits of the attachment.
-			Id string `json:"id"`
+			Id          string `json:"id"`
 
 			// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 			Mappings map[string]GetTestSuite200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-
-			// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
-			Required bool `json:"required"`
+			Required bool                                                                                `json:"required"`
 		} `json:"evaluators,omitempty"`
 
 		// Fields The fields the test suite declares. Absent on servers that predate fields on this family.
 		Fields *[]struct {
-			// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
-			Identifier string `json:"identifier"`
-
-			// Type The value type every scenario carries for this field.
-			Type GetTestSuite200JSONResponseBodyFieldsType `json:"type"`
+			Identifier string                                    `json:"identifier"`
+			Type       GetTestSuite200JSONResponseBodyFieldsType `json:"type"`
 		} `json:"fields,omitempty"`
 
 		// Id The test suite id.
@@ -106859,26 +107744,18 @@ type UpdateTestSuiteResponse struct {
 
 		// Evaluators The evaluators attached to the test suite. Absent on servers that predate evaluators on this family.
 		Evaluators *[]struct {
-			// EvaluatorId The id of the saved evaluator this attachment runs.
 			EvaluatorId string `json:"evaluatorId"`
-
-			// Id The attachment id. Stable across edits of the attachment.
-			Id string `json:"id"`
+			Id          string `json:"id"`
 
 			// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 			Mappings map[string]UpdateTestSuite200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-
-			// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
-			Required bool `json:"required"`
+			Required bool                                                                                   `json:"required"`
 		} `json:"evaluators,omitempty"`
 
 		// Fields The fields the test suite declares. Absent on servers that predate fields on this family.
 		Fields *[]struct {
-			// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
-			Identifier string `json:"identifier"`
-
-			// Type The value type every scenario carries for this field.
-			Type UpdateTestSuite200JSONResponseBodyFieldsType `json:"type"`
+			Identifier string                                       `json:"identifier"`
+			Type       UpdateTestSuite200JSONResponseBodyFieldsType `json:"type"`
 		} `json:"fields,omitempty"`
 
 		// Id The test suite id.
@@ -111181,6 +112058,15 @@ func (c *ClientWithResponses) PostApiTraceIdUnshareWithResponse(ctx context.Cont
 	return ParsePostApiTraceIdUnshareResponse(rsp)
 }
 
+// GetApiTracesFacetsWithResponse request returning *GetApiTracesFacetsResponse
+func (c *ClientWithResponses) GetApiTracesFacetsWithResponse(ctx context.Context, params *GetApiTracesFacetsParams, reqEditors ...RequestEditorFn) (*GetApiTracesFacetsResponse, error) {
+	rsp, err := c.GetApiTracesFacets(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiTracesFacetsResponse(rsp)
+}
+
 // PostApiTracesSearchWithBodyWithResponse request with arbitrary body returning *PostApiTracesSearchResponse
 func (c *ClientWithResponses) PostApiTracesSearchWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiTracesSearchResponse, error) {
 	rsp, err := c.PostApiTracesSearchWithBody(ctx, contentType, body, reqEditors...)
@@ -111742,6 +112628,15 @@ func (c *ClientWithResponses) PostApiV1QueryWithResponse(ctx context.Context, bo
 		return nil, err
 	}
 	return ParsePostApiV1QueryResponse(rsp)
+}
+
+// GetApiV1QueryReferenceWithResponse request returning *GetApiV1QueryReferenceResponse
+func (c *ClientWithResponses) GetApiV1QueryReferenceWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiV1QueryReferenceResponse, error) {
+	rsp, err := c.GetApiV1QueryReference(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiV1QueryReferenceResponse(rsp)
 }
 
 // GetApiV1QuerySchemaWithResponse request returning *GetApiV1QuerySchemaResponse
@@ -122475,19 +123370,6 @@ func ParseGetProjectApiKeyResponse(rsp *http.Response) (*GetProjectApiKeyRespons
 		HTTPResponse: rsp,
 	}
 
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			// ApiKey Send as X-Auth-Token, Bearer, or Basic
-			ApiKey string `json:"apiKey"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
 	return response, nil
 }
 
@@ -122502,19 +123384,6 @@ func ParseRegenerateProjectApiKeyResponse(rsp *http.Response) (*RegenerateProjec
 	response := &RegenerateProjectApiKeyResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			// ApiKey Send as X-Auth-Token, Bearer, or Basic
-			ApiKey string `json:"apiKey"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
 	}
 
 	return response, nil
@@ -127269,11 +128138,13 @@ func ParseGetApiSimulationRunsResponse(rsp *http.Response) (*GetApiSimulationRun
 				ScenarioRunId string `json:"scenarioRunId"`
 
 				// ScenarioVersion The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed. Absent on servers that predate scenario versions.
-				ScenarioVersion *int     `json:"scenarioVersion,omitempty"`
-				Status          string   `json:"status"`
-				Timestamp       float32  `json:"timestamp"`
-				TotalCost       *float32 `json:"totalCost,omitempty"`
-				UpdatedAt       float32  `json:"updatedAt"`
+				ScenarioVersion *int `json:"scenarioVersion,omitempty"`
+
+				// Status Where the run stands. PENDING_EVALUATION means the conversation is over and the judge has decided, but the evaluators the run's suite and plan attach have not been recorded yet, so a required one may still fail the run. Wait for another status before reading the verdict as final.
+				Status    string   `json:"status"`
+				Timestamp float32  `json:"timestamp"`
+				TotalCost *float32 `json:"totalCost,omitempty"`
+				UpdatedAt float32  `json:"updatedAt"`
 			} `json:"runs"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -127571,11 +128442,13 @@ func ParseGetApiSimulationRunsByScenarioRunIdResponse(rsp *http.Response) (*GetA
 			ScenarioRunId string `json:"scenarioRunId"`
 
 			// ScenarioVersion The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed. Absent on servers that predate scenario versions.
-			ScenarioVersion *int     `json:"scenarioVersion,omitempty"`
-			Status          string   `json:"status"`
-			Timestamp       float32  `json:"timestamp"`
-			TotalCost       *float32 `json:"totalCost,omitempty"`
-			UpdatedAt       float32  `json:"updatedAt"`
+			ScenarioVersion *int `json:"scenarioVersion,omitempty"`
+
+			// Status Where the run stands. PENDING_EVALUATION means the conversation is over and the judge has decided, but the evaluators the run's suite and plan attach have not been recorded yet, so a required one may still fail the run. Wait for another status before reading the verdict as final.
+			Status    string   `json:"status"`
+			Timestamp float32  `json:"timestamp"`
+			TotalCost *float32 `json:"totalCost,omitempty"`
+			UpdatedAt float32  `json:"updatedAt"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -128680,6 +129553,72 @@ func ParsePostApiTraceIdUnshareResponse(rsp *http.Response) (*PostApiTraceIdUnsh
 			return nil, err
 		}
 		response.JSON400 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetApiTracesFacetsResponse parses an HTTP response from a GetApiTracesFacetsWithResponse call
+func ParseGetApiTracesFacetsResponse(rsp *http.Response) (*GetApiTracesFacetsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiTracesFacetsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GetApiTracesFacets200JSONResponseBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
 
 	}
 
@@ -132106,6 +133045,179 @@ func ParsePostApiV1QueryResponse(rsp *http.Response) (*PostApiV1QueryResponse, e
 	return response, nil
 }
 
+// ParseGetApiV1QueryReferenceResponse parses an HTTP response from a GetApiV1QueryReferenceWithResponse call
+func ParseGetApiV1QueryReferenceResponse(rsp *http.Response) (*GetApiV1QueryReferenceResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiV1QueryReferenceResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			DecisionTable []struct {
+				Use  string `json:"use"`
+				When string `json:"when"`
+				Why  string `json:"why"`
+			} `json:"decisionTable"`
+			Examples []struct {
+				Available  bool                                                      `json:"available"`
+				Id         string                                                    `json:"id"`
+				Intent     GetApiV1QueryReference200JSONResponseBodyExamplesIntent   `json:"intent"`
+				Language   GetApiV1QueryReference200JSONResponseBodyExamplesLanguage `json:"language"`
+				Notes      *string                                                   `json:"notes,omitempty"`
+				Parameters []struct {
+					Description string `json:"description"`
+					Name        string `json:"name"`
+					Type        string `json:"type"`
+				} `json:"parameters"`
+				Requires struct {
+					Functions []string                                                         `json:"functions"`
+					Gates     []GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates `json:"gates"`
+				} `json:"requires"`
+				Tags  []string `json:"tags"`
+				Text  string   `json:"text"`
+				Title string   `json:"title"`
+			} `json:"examples"`
+			Lwql struct {
+				Enabled   bool `json:"enabled"`
+				Endpoints []struct {
+					Description string                                                       `json:"description"`
+					Method      GetApiV1QueryReference200JSONResponseBodyLwqlEndpointsMethod `json:"method"`
+					Path        string                                                       `json:"path"`
+				} `json:"endpoints"`
+				Limits struct {
+					MaxExecutionTimeSeconds float32 `json:"maxExecutionTimeSeconds"`
+					MaxResultBytes          float32 `json:"maxResultBytes"`
+					MaxRowsReturned         float32 `json:"maxRowsReturned"`
+					MaxStatementLength      float32 `json:"maxStatementLength"`
+					Pagination              string  `json:"pagination"`
+				} `json:"limits"`
+				Schema struct {
+					Database string `json:"database"`
+					Datasets []struct {
+						Columns []struct {
+							Available   bool                                                                      `json:"available"`
+							Description string                                                                    `json:"description"`
+							Gates       []GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsGates `json:"gates"`
+							Name        string                                                                    `json:"name"`
+							Type        string                                                                    `json:"type"`
+							Unit        *GetApiV1QueryReference200JSONResponseBodyLwqlSchemaDatasetsColumnsUnit   `json:"unit"`
+						} `json:"columns"`
+						Description string   `json:"description"`
+						ExampleSql  string   `json:"exampleSql"`
+						Freshness   string   `json:"freshness"`
+						Grain       string   `json:"grain"`
+						JoinKeys    []string `json:"joinKeys"`
+						Name        string   `json:"name"`
+						TimeColumn  string   `json:"timeColumn"`
+					} `json:"datasets"`
+				} `json:"schema"`
+			} `json:"lwql"`
+			TraceFilter struct {
+				DynamicPrefixes []struct {
+					Aliases     []string `json:"aliases"`
+					Description string   `json:"description"`
+					Label       string   `json:"label"`
+					Prefix      string   `json:"prefix"`
+				} `json:"dynamicPrefixes"`
+				Endpoints []struct {
+					Description string                                                              `json:"description"`
+					Method      GetApiV1QueryReference200JSONResponseBodyTraceFilterEndpointsMethod `json:"method"`
+					Path        string                                                              `json:"path"`
+				} `json:"endpoints"`
+				Fields []struct {
+					Facetable   bool                                                                `json:"facetable"`
+					Group       *string                                                             `json:"group"`
+					KnownValues []string                                                            `json:"knownValues"`
+					Label       string                                                              `json:"label"`
+					Name        string                                                              `json:"name"`
+					ValueType   GetApiV1QueryReference200JSONResponseBodyTraceFilterFieldsValueType `json:"valueType"`
+				} `json:"fields"`
+				Syntax string `json:"syntax"`
+			} `json:"traceFilter"`
+			Version string `json:"version"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Error struct {
+				Code    string                  `json:"code"`
+				Message string                  `json:"message"`
+				Meta    *map[string]interface{} `json:"meta,omitempty"`
+				SpanId  *string                 `json:"span_id,omitempty"`
+				TraceId *string                 `json:"trace_id,omitempty"`
+				Type    string                  `json:"type"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Error struct {
+				Code    string                  `json:"code"`
+				Message string                  `json:"message"`
+				Meta    *map[string]interface{} `json:"meta,omitempty"`
+				SpanId  *string                 `json:"span_id,omitempty"`
+				TraceId *string                 `json:"trace_id,omitempty"`
+				Type    string                  `json:"type"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Error struct {
+				Code    string                  `json:"code"`
+				Message string                  `json:"message"`
+				Meta    *map[string]interface{} `json:"meta,omitempty"`
+				SpanId  *string                 `json:"span_id,omitempty"`
+				TraceId *string                 `json:"trace_id,omitempty"`
+				Type    string                  `json:"type"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Error struct {
+				Code    string                  `json:"code"`
+				Message string                  `json:"message"`
+				Meta    *map[string]interface{} `json:"meta,omitempty"`
+				SpanId  *string                 `json:"span_id,omitempty"`
+				TraceId *string                 `json:"trace_id,omitempty"`
+				Type    string                  `json:"type"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetApiV1QuerySchemaResponse parses an HTTP response from a GetApiV1QuerySchemaWithResponse call
 func ParseGetApiV1QuerySchemaResponse(rsp *http.Response) (*GetApiV1QuerySchemaResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -132239,17 +133351,12 @@ func ParseListRunPlansResponse(rsp *http.Response) (*ListRunPlansResponse, error
 
 			// Evaluators The plan's own evaluators. Absent on servers that predate evaluators on this family.
 			Evaluators *[]struct {
-				// EvaluatorId The id of the saved evaluator this attachment runs.
 				EvaluatorId string `json:"evaluatorId"`
-
-				// Id The attachment id. Stable across edits of the attachment.
-				Id string `json:"id"`
+				Id          string `json:"id"`
 
 				// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 				Mappings map[string]ListRunPlans200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-
-				// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
-				Required bool `json:"required"`
+				Required bool                                                                                `json:"required"`
 			} `json:"evaluators,omitempty"`
 
 			// Id The run plan id.
@@ -132446,17 +133553,12 @@ func ParseGetRunPlanResponse(rsp *http.Response) (*GetRunPlanResponse, error) {
 
 			// Evaluators The plan's own evaluators. Absent on servers that predate evaluators on this family.
 			Evaluators *[]struct {
-				// EvaluatorId The id of the saved evaluator this attachment runs.
 				EvaluatorId string `json:"evaluatorId"`
-
-				// Id The attachment id. Stable across edits of the attachment.
-				Id string `json:"id"`
+				Id          string `json:"id"`
 
 				// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 				Mappings map[string]GetRunPlan200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-
-				// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
-				Required bool `json:"required"`
+				Required bool                                                                              `json:"required"`
 			} `json:"evaluators,omitempty"`
 
 			// Id The run plan id.
@@ -132621,26 +133723,18 @@ func ParseListTestSuitesResponse(rsp *http.Response) (*ListTestSuitesResponse, e
 
 			// Evaluators The evaluators attached to the test suite. Absent on servers that predate evaluators on this family.
 			Evaluators *[]struct {
-				// EvaluatorId The id of the saved evaluator this attachment runs.
 				EvaluatorId string `json:"evaluatorId"`
-
-				// Id The attachment id. Stable across edits of the attachment.
-				Id string `json:"id"`
+				Id          string `json:"id"`
 
 				// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 				Mappings map[string]ListTestSuites200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-
-				// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
-				Required bool `json:"required"`
+				Required bool                                                                                  `json:"required"`
 			} `json:"evaluators,omitempty"`
 
 			// Fields The fields the test suite declares. Absent on servers that predate fields on this family.
 			Fields *[]struct {
-				// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
-				Identifier string `json:"identifier"`
-
-				// Type The value type every scenario carries for this field.
-				Type ListTestSuites200JSONResponseBodyFieldsType `json:"type"`
+				Identifier string                                      `json:"identifier"`
+				Type       ListTestSuites200JSONResponseBodyFieldsType `json:"type"`
 			} `json:"fields,omitempty"`
 
 			// Id The test suite id.
@@ -132698,26 +133792,18 @@ func ParseCreateTestSuiteResponse(rsp *http.Response) (*CreateTestSuiteResponse,
 
 			// Evaluators The evaluators attached to the test suite. Absent on servers that predate evaluators on this family.
 			Evaluators *[]struct {
-				// EvaluatorId The id of the saved evaluator this attachment runs.
 				EvaluatorId string `json:"evaluatorId"`
-
-				// Id The attachment id. Stable across edits of the attachment.
-				Id string `json:"id"`
+				Id          string `json:"id"`
 
 				// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 				Mappings map[string]CreateTestSuite201JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-
-				// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
-				Required bool `json:"required"`
+				Required bool                                                                                   `json:"required"`
 			} `json:"evaluators,omitempty"`
 
 			// Fields The fields the test suite declares. Absent on servers that predate fields on this family.
 			Fields *[]struct {
-				// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
-				Identifier string `json:"identifier"`
-
-				// Type The value type every scenario carries for this field.
-				Type CreateTestSuite201JSONResponseBodyFieldsType `json:"type"`
+				Identifier string                                       `json:"identifier"`
+				Type       CreateTestSuite201JSONResponseBodyFieldsType `json:"type"`
 			} `json:"fields,omitempty"`
 
 			// Id The test suite id.
@@ -132807,26 +133893,18 @@ func ParseGetTestSuiteResponse(rsp *http.Response) (*GetTestSuiteResponse, error
 
 			// Evaluators The evaluators attached to the test suite. Absent on servers that predate evaluators on this family.
 			Evaluators *[]struct {
-				// EvaluatorId The id of the saved evaluator this attachment runs.
 				EvaluatorId string `json:"evaluatorId"`
-
-				// Id The attachment id. Stable across edits of the attachment.
-				Id string `json:"id"`
+				Id          string `json:"id"`
 
 				// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 				Mappings map[string]GetTestSuite200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-
-				// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
-				Required bool `json:"required"`
+				Required bool                                                                                `json:"required"`
 			} `json:"evaluators,omitempty"`
 
 			// Fields The fields the test suite declares. Absent on servers that predate fields on this family.
 			Fields *[]struct {
-				// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
-				Identifier string `json:"identifier"`
-
-				// Type The value type every scenario carries for this field.
-				Type GetTestSuite200JSONResponseBodyFieldsType `json:"type"`
+				Identifier string                                    `json:"identifier"`
+				Type       GetTestSuite200JSONResponseBodyFieldsType `json:"type"`
 			} `json:"fields,omitempty"`
 
 			// Id The test suite id.
@@ -132893,26 +133971,18 @@ func ParseUpdateTestSuiteResponse(rsp *http.Response) (*UpdateTestSuiteResponse,
 
 			// Evaluators The evaluators attached to the test suite. Absent on servers that predate evaluators on this family.
 			Evaluators *[]struct {
-				// EvaluatorId The id of the saved evaluator this attachment runs.
 				EvaluatorId string `json:"evaluatorId"`
-
-				// Id The attachment id. Stable across edits of the attachment.
-				Id string `json:"id"`
+				Id          string `json:"id"`
 
 				// Mappings Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.
 				Mappings map[string]UpdateTestSuite200JSONResponseBody_Evaluators_Mappings_AdditionalProperties `json:"mappings"`
-
-				// Required Whether a failing result fails the scenario. A score-only evaluator reports and never gates.
-				Required bool `json:"required"`
+				Required bool                                                                                   `json:"required"`
 			} `json:"evaluators,omitempty"`
 
 			// Fields The fields the test suite declares. Absent on servers that predate fields on this family.
 			Fields *[]struct {
-				// Identifier The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and underscores, starting with a letter.
-				Identifier string `json:"identifier"`
-
-				// Type The value type every scenario carries for this field.
-				Type UpdateTestSuite200JSONResponseBodyFieldsType `json:"type"`
+				Identifier string                                       `json:"identifier"`
+				Type       UpdateTestSuite200JSONResponseBodyFieldsType `json:"type"`
 			} `json:"fields,omitempty"`
 
 			// Id The test suite id.

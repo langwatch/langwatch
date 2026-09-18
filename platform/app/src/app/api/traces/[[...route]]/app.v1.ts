@@ -23,9 +23,11 @@ import {
   type CompiledProjection,
   compileProjection,
   type ProjectableTrace,
+  type ProjectionFrom,
   ProjectionValidationError,
   projectionRequestSchema,
 } from "~/server/traces/projection";
+import type { Protections } from "~/server/traces/protections";
 import {
   AmbiguousTraceIdPrefixError,
   TraceService,
@@ -252,34 +254,11 @@ export function registerTracesRoutes(
         projectId: project.id,
       });
 
-      // When `select` is present, compile the projection up front. The compiled
-      // plan drives column pruning + child-collection joins in the ENGINE; the
-      // resolved schema goes into the response envelope; the projector replaces
-      // formatTrace per row.
-      //
-      // An unknown select path is a validation failure like any other — the body
-      // parsed, and a field in it names something that does not exist — so it
-      // travels the same channel as a schema failure rather than as an anonymous
-      // 400: same code, same 422, one reason per offending path.
-      let projection: CompiledProjection | undefined;
-      if (select && select.length > 0) {
-        try {
-          projection = compileProjection({ from, select, protections });
-        } catch (err) {
-          if (err instanceof ProjectionValidationError) {
-            throw new RequestValidationError({
-              target: "json",
-              violations: err.invalidPaths.map((path) => ({
-                field: "select",
-                type: "unknown_path",
-                message: `Unknown or unsupported select path: ${path}`,
-                received: path,
-              })),
-            });
-          }
-          throw err;
-        }
-      }
+      const projection = compileSelectProjection({
+        from,
+        select,
+        protections,
+      });
 
       const startDate = coerceToEpoch(params.startDate);
       const endDate = coerceToEpoch(params.endDate);
@@ -407,119 +386,7 @@ export function registerTracesRoutes(
     },
   );
 
-  // GET /facets - what the filter fields actually hold.
-  //
-  // Registered BEFORE `/:traceId`: hono matches in registration order, so the
-  // trace-by-id route would otherwise take `facets` for a trace id and answer
-  // not found.
-  secured.access(requires("traces:view")).get(
-    "/facets",
-    describeRoute({
-      tags: ["Traces"],
-      summary: "Discover what the trace filter fields hold",
-      description: FACETS_DESCRIPTION,
-      parameters: [
-        {
-          name: "field",
-          in: "query",
-          description:
-            "The field to list values for — a filter field name (`model`, `status`, `evaluator`) or an attribute key under one of the namespace prefixes (`trace.attribute.<key>`, `span.attribute.<key>`, `event.attribute.<key>`). Omit it to get every facet with its top values instead.",
-          required: false,
-          schema: { type: "string" },
-        },
-        {
-          name: "prefix",
-          in: "query",
-          description:
-            "Only values starting with this. Needs `field`; ignored without it.",
-          required: false,
-          schema: { type: "string" },
-        },
-        {
-          name: "limit",
-          in: "query",
-          description: "Values per page, 1 to 1000. Default 50. Needs `field`.",
-          required: false,
-          schema: { type: "integer" },
-        },
-        {
-          name: "offset",
-          in: "query",
-          description: "Values to skip. Default 0. Needs `field`.",
-          required: false,
-          schema: { type: "integer" },
-        },
-        {
-          name: "startDate",
-          in: "query",
-          description:
-            "Window start, ISO string or epoch milliseconds. Default 24 hours ago.",
-          required: false,
-          schema: { type: "string" },
-        },
-        {
-          name: "endDate",
-          in: "query",
-          description:
-            "Window end, ISO string or epoch milliseconds. Default now.",
-          required: false,
-          schema: { type: "string" },
-        },
-      ],
-      responses: {
-        ...baseResponses,
-        200: {
-          description:
-            "Without `field`, every facet the project has with its top values and whether the payload is still being computed. With `field`, that field's values and counts plus the distinct total and whether more remain.",
-          content: {
-            "application/json": {
-              schema: resolver(
-                z.union([traceDiscoverSchema, traceFacetValuesSchema]),
-              ),
-            },
-          },
-        },
-      },
-    }),
-    zValidator("query", traceFacetsQuerySchema),
-    async (c) => {
-      const project = c.get("project");
-      const { field, prefix, limit, offset, startDate, endDate } =
-        c.req.valid("query");
-
-      const timeRange = {
-        from:
-          startDate === undefined
-            ? Date.now() - DAY_MS
-            : coerceToEpoch(startDate),
-        to: endDate === undefined ? Date.now() : coerceToEpoch(endDate),
-      };
-
-      const list = getApp().traces.list;
-
-      if (field === undefined) {
-        const discover = await list.getDiscover({
-          tenantId: project.id,
-          timeRange,
-        });
-        return c.json(discover);
-      }
-
-      const result = await list.getFacetValues({
-        tenantId: project.id,
-        timeRange,
-        facetKey: resolveFacetKey(field),
-        limit,
-        offset,
-        ...(prefix === undefined ? {} : { prefix }),
-      });
-      return c.json({
-        values: result.values,
-        total: result.totalDistinct,
-        hasMore: offset + result.values.length < result.totalDistinct,
-      });
-    },
-  );
+  registerFacetsRoute(secured);
 
   // GET /:traceId/transcript - the coding-agent transcript for one trace
   secured.access(requires("traces:view")).get(
@@ -820,4 +687,169 @@ export function registerTracesRoutes(
       return c.json({ traceId });
     },
   );
+}
+
+/** The OpenAPI description of `GET /facets`. */
+const FACETS_ROUTE_DOC: Parameters<typeof describeRoute>[0] = {
+  tags: ["Traces"],
+  summary: "Discover what the trace filter fields hold",
+  description: FACETS_DESCRIPTION,
+  parameters: [
+    {
+      name: "field",
+      in: "query",
+      description:
+        "The field to list values for — a filter field name (`model`, `status`, `evaluator`) or an attribute key under one of the namespace prefixes (`trace.attribute.<key>`, `span.attribute.<key>`, `event.attribute.<key>`). Omit it to get every facet with its top values instead.",
+      required: false,
+      schema: { type: "string" },
+    },
+    {
+      name: "prefix",
+      in: "query",
+      description:
+        "Only values starting with this. Needs `field`; ignored without it.",
+      required: false,
+      schema: { type: "string" },
+    },
+    {
+      name: "limit",
+      in: "query",
+      description: "Values per page, 1 to 1000. Default 50. Needs `field`.",
+      required: false,
+      schema: { type: "integer" },
+    },
+    {
+      name: "offset",
+      in: "query",
+      description: "Values to skip. Default 0. Needs `field`.",
+      required: false,
+      schema: { type: "integer" },
+    },
+    {
+      name: "startDate",
+      in: "query",
+      description:
+        "Window start, ISO string or epoch milliseconds. Default 24 hours ago.",
+      required: false,
+      schema: { type: "string" },
+    },
+    {
+      name: "endDate",
+      in: "query",
+      description: "Window end, ISO string or epoch milliseconds. Default now.",
+      required: false,
+      schema: { type: "string" },
+    },
+  ],
+  responses: {
+    ...baseResponses,
+    200: {
+      description:
+        "Without `field`, every facet the project has with its top values and whether the payload is still being computed. With `field`, that field's values and counts plus the distinct total and whether more remain.",
+      content: {
+        "application/json": {
+          schema: resolver(
+            z.union([traceDiscoverSchema, traceFacetValuesSchema]),
+          ),
+        },
+      },
+    },
+  },
+};
+
+/**
+ * `GET /facets`: what the filter fields actually hold.
+ *
+ * Registered BEFORE `/:traceId`: hono matches in registration order, so the
+ * trace-by-id route would otherwise take `facets` for a trace id and answer
+ * not found. Its own function because the registration is long enough to
+ * bury the two routes around it.
+ */
+function registerFacetsRoute(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
+  secured
+    .access(requires("traces:view"))
+    .get(
+      "/facets",
+      describeRoute(FACETS_ROUTE_DOC),
+      zValidator("query", traceFacetsQuerySchema),
+      async (c) => {
+        const project = c.get("project");
+        const { field, prefix, limit, offset, startDate, endDate } =
+          c.req.valid("query");
+
+        const timeRange = {
+          from:
+            startDate === undefined
+              ? Date.now() - DAY_MS
+              : coerceToEpoch(startDate),
+          to: endDate === undefined ? Date.now() : coerceToEpoch(endDate),
+        };
+
+        const list = getApp().traces.list;
+
+        if (field === undefined) {
+          const discover = await list.getDiscover({
+            tenantId: project.id,
+            timeRange,
+          });
+          return c.json(discover);
+        }
+
+        const result = await list.getFacetValues({
+          tenantId: project.id,
+          timeRange,
+          facetKey: resolveFacetKey(field),
+          limit,
+          offset,
+          ...(prefix === undefined ? {} : { prefix }),
+        });
+        return c.json({
+          values: result.values,
+          total: result.totalDistinct,
+          hasMore: offset + result.values.length < result.totalDistinct,
+        });
+      },
+    );
+}
+
+/**
+ * The compiled projection for a `select`, or undefined when there is none.
+ *
+ * The compiled plan drives column pruning and child-collection joins in the
+ * engine; the resolved schema goes into the response envelope; the projector
+ * replaces `formatTrace` per row.
+ *
+ * An unknown select path is a validation failure like any other: the body
+ * parsed, and a field in it names something that does not exist. So it travels
+ * the same channel as a schema failure rather than as an anonymous 400, with
+ * the same code, the same 422 and one reason per offending path.
+ */
+function compileSelectProjection({
+  from,
+  select,
+  protections,
+}: {
+  from: ProjectionFrom | undefined;
+  select: string[] | undefined;
+  protections: Protections;
+}): CompiledProjection | undefined {
+  if (!select || select.length === 0) return undefined;
+  try {
+    return compileProjection({ from, select, protections });
+  } catch (err) {
+    if (err instanceof ProjectionValidationError) {
+      throw new RequestValidationError({
+        target: "json",
+        violations: err.invalidPaths.map((path) => ({
+          field: "select",
+          type: "unknown_path",
+          message: `Unknown or unsupported select path: ${path}`,
+          received: path,
+        })),
+      });
+    }
+    throw err;
+  }
 }
