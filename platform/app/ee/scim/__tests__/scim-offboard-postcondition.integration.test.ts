@@ -63,11 +63,14 @@ const syncLifecycle = {
 } as never;
 
 function grantsService() {
-  return new GrantsService(new LedgerAuthzGrantsRepository(prisma, grantsLedgerWriter()), {
-    newBindingId: () => generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-    bumpEpoch: bumpAuthzEpoch,
-    collectorFor: (reader) => new AuthzCollectorService(reader),
-  });
+  return new GrantsService(
+    new LedgerAuthzGrantsRepository(prisma, grantsLedgerWriter()),
+    {
+      newBindingId: () => generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+      bumpEpoch: bumpAuthzEpoch,
+      collectorFor: (reader) => new AuthzCollectorService(reader),
+    },
+  );
 }
 
 async function seedMemberWithAccessEverywhere() {
@@ -250,7 +253,9 @@ describe("a directory deprovision, against real storage", () => {
         },
       });
       expect(membership).not.toBeNull();
-      expect(await prisma.groupMembership.count({ where: { userId: USER } })).toBe(1);
+      expect(
+        await prisma.groupMembership.count({ where: { userId: USER } }),
+      ).toBe(1);
       expect(before.isOrgMember).toBe(true);
     });
   });

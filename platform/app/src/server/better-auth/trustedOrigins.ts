@@ -96,7 +96,9 @@ export function resolveTrustedOrigins({
   const origins = [
     nextAuthUrl,
     ...(baseHost && baseHost !== nextAuthUrl ? [baseHost] : []),
-    ...registeredIssuers.map(originOf).filter((origin): origin is string => origin !== null),
+    ...registeredIssuers
+      .map(originOf)
+      .filter((origin): origin is string => origin !== null),
     ...originsIn(trustedIdpOrigins),
     ...(isProduction ? [] : originsIn(idpSimulatorUrl)),
   ];

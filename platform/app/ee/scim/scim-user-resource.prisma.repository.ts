@@ -14,7 +14,10 @@ export class ScimUserResourceRepository {
     return new ScimUserResourceRepository(prisma);
   }
 
-  find(organizationId: string, userId: string): Promise<ScimUserResource | null> {
+  find(
+    organizationId: string,
+    userId: string,
+  ): Promise<ScimUserResource | null> {
     assertScimOrganizationId(organizationId);
     return this.#prisma.scimUserResource.findUnique({
       where: { organizationId_userId: { organizationId, userId } },

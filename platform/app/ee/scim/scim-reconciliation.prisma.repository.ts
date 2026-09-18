@@ -62,18 +62,24 @@ export interface DirectoryIdentityRow {
 
 /** What an organization-scoped surface may ask for. */
 export interface ScimReconciliationReadRepository {
-  findAllSyncsForOrganization(args: { organizationId: string }): Promise<ScimSyncState[]>;
+  findAllSyncsForOrganization(args: {
+    organizationId: string;
+  }): Promise<ScimSyncState[]>;
   findSyncByIdForOrganization(args: {
     organizationId: string;
     connectionId: string;
   }): Promise<ScimSyncState | null>;
-  countManagedPeople(args: { connectionIds: string[] }): Promise<Map<string, number>>;
+  countManagedPeople(args: {
+    connectionIds: string[];
+  }): Promise<Map<string, number>>;
   findDirectoryCausedChanges(args: {
     organizationId: string;
     limit: number;
   }): Promise<DirectoryCausedChange[]>;
   findPeopleNames(args: { userIds: string[] }): Promise<Map<string, string>>;
-  findAllConnections(args: { organizationId: string }): Promise<OrganizationConnection[]>;
+  findAllConnections(args: {
+    organizationId: string;
+  }): Promise<OrganizationConnection[]>;
 }
 
 /**
@@ -101,7 +107,9 @@ export interface ScimOversightReadRepository {
     connectionId: string;
     limit: number;
   }): Promise<DirectoryIdentityRow[]>;
-  findOrganizationNames(args: { organizationIds: string[] }): Promise<Map<string, string>>;
+  findOrganizationNames(args: {
+    organizationIds: string[];
+  }): Promise<Map<string, string>>;
 }
 
 /**
@@ -214,7 +222,11 @@ export class PrismaScimReconciliationRepository
         select,
       }),
     ]);
-    const rows = [...new Map([...occurred, ...removed].map((row) => [row.id, row])).values()];
+    const rows = [
+      ...new Map(
+        [...occurred, ...removed].map((row) => [row.id, row]),
+      ).values(),
+    ];
     return rows
       .map((row) => ({
         grantId: row.id,
@@ -223,10 +235,18 @@ export class PrismaScimReconciliationRepository
         roleKey: row.roleKey,
         scopeType: row.scopeType as string,
         scopeId: row.scopeId,
-        kind: (row.revokedAt ? "removed" : "attached") as "attached" | "removed",
-        occurredAtMs: Math.max(row.occurredAt.getTime(), row.revokedAt?.getTime() ?? 0),
+        kind: (row.revokedAt ? "removed" : "attached") as
+          | "attached"
+          | "removed",
+        occurredAtMs: Math.max(
+          row.occurredAt.getTime(),
+          row.revokedAt?.getTime() ?? 0,
+        ),
       }))
-      .toSorted((a, b) => b.occurredAtMs - a.occurredAtMs || a.grantId.localeCompare(b.grantId))
+      .toSorted(
+        (a, b) =>
+          b.occurredAtMs - a.occurredAtMs || a.grantId.localeCompare(b.grantId),
+      )
       .slice(0, limit);
   }
 
@@ -236,14 +256,20 @@ export class PrismaScimReconciliationRepository
    * by somebody checking whether the right person left, and a name is what
    * they are checking against.
    */
-  async findPeopleNames({ userIds }: { userIds: string[] }): Promise<Map<string, string>> {
+  async findPeopleNames({
+    userIds,
+  }: {
+    userIds: string[];
+  }): Promise<Map<string, string>> {
     const unique = [...new Set(userIds)];
     if (unique.length === 0) return new Map();
     const rows = await this.prisma.user.findMany({
       where: { id: { in: unique } },
       select: { id: true, name: true, email: true },
     });
-    return new Map(rows.map((row) => [row.id, row.name ?? row.email ?? row.id] as const));
+    return new Map(
+      rows.map((row) => [row.id, row.name ?? row.email ?? row.id] as const),
+    );
   }
 
   /**
@@ -297,7 +323,11 @@ export class PrismaScimReconciliationRepository
     return { syncs: rows.map(rowToScimSync), total };
   }
 
-  async findSyncById({ connectionId }: { connectionId: string }): Promise<ScimSyncState | null> {
+  async findSyncById({
+    connectionId,
+  }: {
+    connectionId: string;
+  }): Promise<ScimSyncState | null> {
     const row = await this.prisma.scimSyncState.findUnique({
       where: { id: connectionId },
     });

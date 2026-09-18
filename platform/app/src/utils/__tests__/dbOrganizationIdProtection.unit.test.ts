@@ -55,59 +55,68 @@ describe("SCIM tenant records", () => {
       ).rejects.toThrow();
     }
   });
-  it.each([null, void 0, "", "   ", false, 0])(
-    "rejects invalid organization scope %j in direct and composite predicates",
-    async (organizationId) => {
-      for (const where of [
-        { organizationId },
-        { organizationId_userId: { organizationId, userId: "shared-user" } },
-      ]) {
-        await expect(
-          runGuard({
-            model: "ScimUserResource",
-            action: "findMany",
-            args: { where },
-          }),
-        ).rejects.toThrow();
-      }
+  it.each([
+    null,
+    void 0,
+    "",
+    "   ",
+    false,
+    0,
+  ])("rejects invalid organization scope %j in direct and composite predicates", async (organizationId) => {
+    for (const where of [
+      { organizationId },
+      { organizationId_userId: { organizationId, userId: "shared-user" } },
+    ]) {
       await expect(
         runGuard({
           model: "ScimUserResource",
-          action: "create",
-          args: { data: { organizationId, userId: "shared-user" } },
-        }),
-      ).rejects.toThrow();
-    },
-  );
-  it.each(["ScimUserResource", "ScimDirectoryUser", "ScimExternalId"])(
-    "requires organization scope for %s even when a global user is named",
-    async (model) => {
-      await expect(
-        runGuard({
-          model,
           action: "findMany",
-          args: { where: { userId: "shared-user" } },
+          args: { where },
         }),
       ).rejects.toThrow();
-      await expect(
-        runGuard({
-          model,
-          action: "findMany",
-          args: { where: { organizationId: "org-a", userId: "shared-user" } },
-        }),
-      ).resolves.toBe("ok");
-      await expect(
-        runGuard({
-          model,
-          action: "create",
-          args: { data: { userId: "shared-user" } },
-        }),
-      ).rejects.toThrow();
-    },
-  );
+    }
+    await expect(
+      runGuard({
+        model: "ScimUserResource",
+        action: "create",
+        args: { data: { organizationId, userId: "shared-user" } },
+      }),
+    ).rejects.toThrow();
+  });
+  it.each([
+    "ScimUserResource",
+    "ScimDirectoryUser",
+    "ScimExternalId",
+  ])("requires organization scope for %s even when a global user is named", async (model) => {
+    await expect(
+      runGuard({
+        model,
+        action: "findMany",
+        args: { where: { userId: "shared-user" } },
+      }),
+    ).rejects.toThrow();
+    await expect(
+      runGuard({
+        model,
+        action: "findMany",
+        args: { where: { organizationId: "org-a", userId: "shared-user" } },
+      }),
+    ).resolves.toBe("ok");
+    await expect(
+      runGuard({
+        model,
+        action: "create",
+        args: { data: { userId: "shared-user" } },
+      }),
+    ).rejects.toThrow();
+  });
 
   it.each([
-    ["ScimDirectoryUser", "connectionId_userId", { connectionId: "conn-a", userId: "shared-user" }],
+    [
+      "ScimDirectoryUser",
+      "connectionId_userId",
+      { connectionId: "conn-a", userId: "shared-user" },
+    ],
     [
       "ScimExternalId",
       "connectionId_externalId",
@@ -287,7 +296,10 @@ describe("guardOrganizationId — single-organization invariant", () => {
           args: {
             where: {
               organizationId: "org_1",
-              OR: [{ scopeType: "TEAM", scopeId: "team_1" }, { organizationId: "other_org" }],
+              OR: [
+                { scopeType: "TEAM", scopeId: "team_1" },
+                { organizationId: "other_org" },
+              ],
             },
           },
         }),
@@ -596,13 +608,17 @@ describe("organization-tenancy regime partition", () => {
 
   it("never guards a model that lacks an organizationId column", () => {
     const orgBearing = new Set(orgBearingModels);
-    const guardedWithoutColumn = ORG_SCOPED_MODEL_NAMES.filter((name) => !orgBearing.has(name));
+    const guardedWithoutColumn = ORG_SCOPED_MODEL_NAMES.filter(
+      (name) => !orgBearing.has(name),
+    );
     expect(guardedWithoutColumn).toEqual([]);
   });
 
   it("never exempts a model that lacks an organizationId column", () => {
     const orgBearing = new Set(orgBearingModels);
-    const exemptWithoutColumn = ORG_TENANCY_EXEMPT.filter((name) => !orgBearing.has(name));
+    const exemptWithoutColumn = ORG_TENANCY_EXEMPT.filter(
+      (name) => !orgBearing.has(name),
+    );
     expect(exemptWithoutColumn).toEqual([]);
   });
 });
@@ -628,9 +644,12 @@ describe("guardOrganizationId — platform-owned API-key sweeps", () => {
       apiKey: {
         updateMany: async (args: unknown) => {
           calls.push(args);
-          return guardOrganizationId({ model: "ApiKey", action: "updateMany", args }, async () => ({
-            count: rowsAffected,
-          }));
+          return guardOrganizationId(
+            { model: "ApiKey", action: "updateMany", args },
+            async () => ({
+              count: rowsAffected,
+            }),
+          );
         },
       },
     };
@@ -709,7 +728,8 @@ describe("guardOrganizationId — platform-owned API-key sweeps", () => {
 
   describe("when an updateMany carries the sweep's name and un-revoked clause but no expiry bound", () => {
     it("THROWS — that predicate is every LIVE session key, in every organization", async () => {
-      const { expiresAt: _elapsed, ...withoutExpiryBound } = await captureSweepWhere();
+      const { expiresAt: _elapsed, ...withoutExpiryBound } =
+        await captureSweepWhere();
 
       await expect(
         runGuard({
@@ -780,7 +800,9 @@ describe("guardOrganizationId — platform-owned API-key sweeps", () => {
       return { client, calls };
     }
 
-    async function captureLoginKeySweepWhere(): Promise<Record<string, unknown>> {
+    async function captureLoginKeySweepWhere(): Promise<
+      Record<string, unknown>
+    > {
       const { client, calls } = guardedReadPrisma([]);
       await reapExpiredCliLoginKeys({
         prisma: client as unknown as PrismaClient,
@@ -827,7 +849,8 @@ describe("guardOrganizationId — platform-owned API-key sweeps", () => {
     });
 
     it("THROWS when the read drops the elapsed-expiry bound: that is every live session in every organization", async () => {
-      const { expiresAt: _elapsed, ...withoutExpiryBound } = await captureLoginKeySweepWhere();
+      const { expiresAt: _elapsed, ...withoutExpiryBound } =
+        await captureLoginKeySweepWhere();
 
       await expect(
         runGuard({
@@ -972,7 +995,9 @@ describe("guardOrganizationId — the migration rollout's enrollment rows", () =
       user: { findMany: async () => [] },
     };
     return {
-      repository: new PrismaSystemMigrationEnrollmentRepository(prisma as unknown as PrismaClient),
+      repository: new PrismaSystemMigrationEnrollmentRepository(
+        prisma as unknown as PrismaClient,
+      ),
       calls,
     };
   }
@@ -991,7 +1016,9 @@ describe("guardOrganizationId — the migration rollout's enrollment rows", () =
     it("passes the guard — one read covers every tenant and every migration", async () => {
       const { repository } = guardedEnrollmentRepository();
 
-      await expect(repository.findEnrolledOrganizationIdsByMigration()).resolves.toEqual(new Map());
+      await expect(
+        repository.findEnrolledOrganizationIdsByMigration(),
+      ).resolves.toEqual(new Map());
     });
   });
 
@@ -999,7 +1026,9 @@ describe("guardOrganizationId — the migration rollout's enrollment rows", () =
     it("passes the guard — the groupBy reads across organizations", async () => {
       const { repository } = guardedEnrollmentRepository();
 
-      await expect(repository.countEnrolledByMigration()).resolves.toEqual(new Map());
+      await expect(repository.countEnrolledByMigration()).resolves.toEqual(
+        new Map(),
+      );
     });
   });
 

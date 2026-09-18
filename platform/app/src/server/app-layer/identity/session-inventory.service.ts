@@ -2,7 +2,10 @@ import { HandledError } from "@langwatch/handled-error";
 import { signInProvedSecondFactor } from "@langwatch/identity";
 
 import { signInMethodLabelFor } from "./session-claims";
-import type { RevocableSession, SessionRevocationService } from "./session-revocation.service";
+import type {
+  RevocableSession,
+  SessionRevocationService,
+} from "./session-revocation.service";
 
 /**
  * Somebody asked to end the session they are reading from.

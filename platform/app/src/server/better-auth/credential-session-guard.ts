@@ -18,7 +18,8 @@ const TWO_FACTOR_PATHS = new Set([
   "/two-factor/verify-backup-code",
   "/two-factor/verify-otp",
 ]);
-const ceremonyIdentifier = (challengeId: string): string => `sso-credential:${challengeId}`;
+const ceremonyIdentifier = (challengeId: string): string =>
+  `sso-credential:${challengeId}`;
 
 /** Checks the verified password's user, retaining its address through 2FA. */
 export class CredentialSessionGuard {
@@ -46,12 +47,16 @@ export class CredentialSessionGuard {
     if (context.context.session?.user.id === userId) return;
 
     const cookie = context.context.createAuthCookie("two_factor");
-    const challengeId = await context.getSignedCookie(cookie.name, context.context.secret);
+    const challengeId = await context.getSignedCookie(
+      cookie.name,
+      context.context.secret,
+    );
     if (!challengeId) throw this.#refusal();
 
-    const saved = await context.context.internalAdapter.consumeVerificationValue(
-      ceremonyIdentifier(challengeId),
-    );
+    const saved =
+      await context.context.internalAdapter.consumeVerificationValue(
+        ceremonyIdentifier(challengeId),
+      );
     if (!saved) throw this.#refusal();
 
     const ceremony = this.#parseCeremony(saved.value);

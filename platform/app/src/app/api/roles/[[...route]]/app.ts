@@ -19,7 +19,11 @@
  */
 
 import type { BaseApp, VersionBuilder } from "@langwatch/api";
-import { AUTHZ_ACTIONS, type AuthzPermission, permissionGrantTiers } from "@langwatch/authz";
+import {
+  AUTHZ_ACTIONS,
+  type AuthzPermission,
+  permissionGrantTiers,
+} from "@langwatch/authz";
 import type { Context } from "hono";
 import { z } from "zod";
 
@@ -86,7 +90,10 @@ const permissionCatalogSchema = z.object({
 const idParamsSchema = z.object({ id: z.string().min(1) });
 
 const roleWire = (
-  role: Pick<CustomRole, "id" | "name" | "description" | "createdAt" | "updatedAt"> & {
+  role: Pick<
+    CustomRole,
+    "id" | "name" | "description" | "createdAt" | "updatedAt"
+  > & {
     permissions: string[];
   },
 ): z.infer<typeof roleSchema> => ({
@@ -98,18 +105,25 @@ const roleWire = (
   updatedAt: role.updatedAt,
 });
 
-const organizationOf = (c: Context): Organization => c.get("organization") as Organization;
+const organizationOf = (c: Context): Organization =>
+  c.get("organization") as Organization;
 
 // ── handlers ─────────────────────────────────────────────────────────────────
 
-const listRolesHandler = async (c: Context, { app }: { app: RolesFamilyApp }) => {
+const listRolesHandler = async (
+  c: Context,
+  { app }: { app: RolesFamilyApp },
+) => {
   const roles = await app.roles.getAllRoles(organizationOf(c).id);
   return { roles: roles.map(roleWire) };
 };
 
 const createRoleHandler = async (
   c: Context,
-  { input, app }: { input: z.infer<typeof createRoleSchema>; app: RolesFamilyApp },
+  {
+    input,
+    app,
+  }: { input: z.infer<typeof createRoleSchema>; app: RolesFamilyApp },
 ) => {
   const organization = organizationOf(c);
   const role = await app.roles.createRole({
@@ -144,7 +158,10 @@ const permissionCatalogHandler = async () => {
 
 const getRoleHandler = async (
   c: Context,
-  { params, app }: { params: z.infer<typeof idParamsSchema>; app: RolesFamilyApp },
+  {
+    params,
+    app,
+  }: { params: z.infer<typeof idParamsSchema>; app: RolesFamilyApp },
 ) => {
   const role = await app.roles.getRoleForOrg({
     roleId: params.id,
@@ -171,8 +188,12 @@ const updateRoleHandler = async (
     organizationId: organization.id,
     params: {
       ...(input.name !== undefined ? { name: input.name } : {}),
-      ...(input.description !== undefined ? { description: input.description } : {}),
-      ...(input.permissions !== undefined ? { permissions: input.permissions } : {}),
+      ...(input.description !== undefined
+        ? { description: input.description }
+        : {}),
+      ...(input.permissions !== undefined
+        ? { permissions: input.permissions }
+        : {}),
     },
     actor: orgRequestLedgerActor(c),
   });
@@ -181,7 +202,10 @@ const updateRoleHandler = async (
 
 const deleteRoleHandler = async (
   c: Context,
-  { params, app }: { params: z.infer<typeof idParamsSchema>; app: RolesFamilyApp },
+  {
+    params,
+    app,
+  }: { params: z.infer<typeof idParamsSchema>; app: RolesFamilyApp },
 ) => {
   const organization = organizationOf(c);
   await app.roles.deleteRoleForOrg({
@@ -200,7 +224,8 @@ const registerCollectionEndpoints = (v: RolesVersion): void => {
     {
       ...guard("organization:manage"),
       output: z.object({ roles: z.array(roleSchema) }),
-      description: "List the organization's custom roles with their permission sets.",
+      description:
+        "List the organization's custom roles with their permission sets.",
       docs: { operationId: "listRoles", tags: ["Roles"] },
     },
     listRolesHandler,

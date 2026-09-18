@@ -202,7 +202,10 @@ const hasScopePredicate = (where: any): boolean => {
     if (
       Array.isArray(some.OR) &&
       some.OR.length > 0 &&
-      some.OR.every((o: any) => o && typeof o.scopeType === "string" && isScopeIdValue(o.scopeId))
+      some.OR.every(
+        (o: any) =>
+          o && typeof o.scopeType === "string" && isScopeIdValue(o.scopeId),
+      )
     ) {
       return true;
     }
@@ -219,7 +222,10 @@ const hasIdOrInPredicate = (where: any): boolean => {
   return false;
 };
 
-const validateRecursive = (where: any, passes: (clause: any) => boolean): boolean => {
+const validateRecursive = (
+  where: any,
+  passes: (clause: any) => boolean,
+): boolean => {
   if (!where || typeof where !== "object") return false;
   if (passes(where)) return true;
   if (Array.isArray(where.AND)) {
@@ -233,7 +239,9 @@ const validateRecursive = (where: any, passes: (clause: any) => boolean): boolea
   // hashedSecret + an in-grace previousHashedSecret; both branches name
   // a uniquely-keyed secret, so the guard recognises the query as bounded.
   if (Array.isArray(where.OR) && where.OR.length > 0) {
-    const allBranchesBounded = where.OR.every((clause: any) => validateRecursive(clause, passes));
+    const allBranchesBounded = where.OR.every((clause: any) =>
+      validateRecursive(clause, passes),
+    );
     if (allBranchesBounded) return true;
   }
   return false;
@@ -282,7 +290,9 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
         where,
         (c) =>
           typeof c.connectionId === "string" ||
-          (c.connectionId && Array.isArray(c.connectionId.in) && c.connectionId.in.length > 0),
+          (c.connectionId &&
+            Array.isArray(c.connectionId.in) &&
+            c.connectionId.in.length > 0),
       );
       return ok ? null : reason;
     },
@@ -335,7 +345,9 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       const ok = validateRecursive(
         where,
         (c) =>
-          hasIdOrInPredicate(c) || typeof c.organizationId === "string" || hasScopePredicate(c),
+          hasIdOrInPredicate(c) ||
+          typeof c.organizationId === "string" ||
+          hasScopePredicate(c),
       );
       return ok
         ? null
@@ -365,7 +377,9 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
           (c.modelProviderId && Array.isArray(c.modelProviderId.in)) ||
           hasScopePredicate(c),
       );
-      return ok ? null : "requires a row id, modelProviderId, or scope predicate";
+      return ok
+        ? null
+        : "requires a row id, modelProviderId, or scope predicate";
     },
     validateCreateData: (data) => {
       const records = Array.isArray(data) ? data : [data];
@@ -395,7 +409,9 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
           (c.routingPolicyId && Array.isArray(c.routingPolicyId.in)) ||
           hasScopePredicate(c),
       );
-      return ok ? null : "requires a row id, routingPolicyId, or scope predicate";
+      return ok
+        ? null
+        : "requires a row id, routingPolicyId, or scope predicate";
     },
     validateCreateData: (data) => {
       const records = Array.isArray(data) ? data : [data];
@@ -481,13 +497,18 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
   },
   ModelDefaultConfig: {
     validateWhere: (where) => {
-      if (!where) return "requires a row id, organizationId, or scope predicate";
+      if (!where)
+        return "requires a row id, organizationId, or scope predicate";
       const ok = validateRecursive(
         where,
         (c) =>
-          hasIdOrInPredicate(c) || typeof c.organizationId === "string" || hasScopePredicate(c),
+          hasIdOrInPredicate(c) ||
+          typeof c.organizationId === "string" ||
+          hasScopePredicate(c),
       );
-      return ok ? null : "requires a row id, organizationId, or scope predicate";
+      return ok
+        ? null
+        : "requires a row id, organizationId, or scope predicate";
     },
     validateCreateData: (data) => {
       const records = Array.isArray(data) ? data : [data];
@@ -570,7 +591,8 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
   // column - retention was scope-based from the first migration.
   RetentionPolicy: {
     validateWhere: (where) => {
-      const reason = "requires a row id, organizationId, or scope predicate in the where clause";
+      const reason =
+        "requires a row id, organizationId, or scope predicate in the where clause";
       if (!where) return reason;
       const ok = validateRecursive(
         where,
@@ -602,7 +624,8 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
   // upsert/delete. No projectId column - privacy rules are scope-based.
   DataPrivacyPolicy: {
     validateWhere: (where) => {
-      const reason = "requires a row id, organizationId, or scope predicate in the where clause";
+      const reason =
+        "requires a row id, organizationId, or scope predicate in the where clause";
       if (!where) return reason;
       const ok = validateRecursive(
         where,
@@ -680,7 +703,8 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       for (const d of records) {
         if (!d) return "create requires a data payload";
         const platformScoped =
-          typeof d.organizationId === "string" && typeof d.endpointId === "string";
+          typeof d.organizationId === "string" &&
+          typeof d.endpointId === "string";
         const automationsScoped =
           typeof d.projectId === "string" && typeof d.triggerId === "string";
         if (!platformScoped && !automationsScoped) {
@@ -724,7 +748,10 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       const records = Array.isArray(data) ? data : [data];
       for (const d of records) {
         if (!d) return "create requires a data payload";
-        if (typeof d.migrationName !== "string" || typeof d.tenantId !== "string") {
+        if (
+          typeof d.migrationName !== "string" ||
+          typeof d.tenantId !== "string"
+        ) {
           return "create requires a migrationName and tenantId in the data payload";
         }
       }
@@ -855,7 +882,9 @@ const _guardProjectId = ({ params }: { params: GuardParams }) => {
     action === "findFirst" &&
     model === "VirtualKey" &&
     Array.isArray(params.args?.where?.OR) &&
-    params.args.where.OR.every((o: any) => o?.hashedSecret || o?.previousHashedSecret)
+    params.args.where.OR.every(
+      (o: any) => o?.hashedSecret || o?.previousHashedSecret,
+    )
   ) {
     return;
   }
@@ -878,8 +907,13 @@ const _guardProjectId = ({ params }: { params: GuardParams }) => {
   }
 
   if (action === "create" || action === "createMany") {
-    const data = action === "create" ? params.args?.data : params.args?.data?.map((d: any) => d);
-    const hasProjectId = Array.isArray(data) ? data.every((d) => d.projectId) : data?.projectId;
+    const data =
+      action === "create"
+        ? params.args?.data
+        : params.args?.data?.map((d: any) => d);
+    const hasProjectId = Array.isArray(data)
+      ? data.every((d) => d.projectId)
+      : data?.projectId;
 
     if (!hasProjectId) {
       throw new Error(

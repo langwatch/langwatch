@@ -3,10 +3,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PrismaClient } from "~/generated/prisma/client";
-
-import { ScimGroupService } from "../scim-group.service";
 import { ScimService } from "../scim.service";
 import { isScimError, type ScimUser } from "../scim.types";
+import { ScimGroupService } from "../scim-group.service";
 
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({ redis: null }),
@@ -51,9 +50,12 @@ function makeStore(rows: Row[]) {
       orgMemberships?: { some: { organizationId: string } };
     }[];
     if (scope[0]?.orgMemberships?.some.organizationId !== ORG) return false;
-    const filter = where.AND as { OR: { email?: { equals: string } }[] }[] | undefined;
+    const filter = where.AND as
+      | { OR: { email?: { equals: string } }[] }[]
+      | undefined;
     const email = filter?.[0]?.OR[1]?.email?.equals;
-    if (email !== undefined && row.email.toLowerCase() !== email.toLowerCase()) return false;
+    if (email !== undefined && row.email.toLowerCase() !== email.toLowerCase())
+      return false;
     const id = where.id as { in?: string[] } | undefined;
     return id?.in === undefined || id.in.includes(row.userId);
   };
@@ -81,7 +83,10 @@ function makeStore(rows: Row[]) {
         const pivot = unorderedReads % Math.max(matched.length, 1);
         ordered = [...matched.slice(pivot), ...matched.slice(0, pivot)];
       }
-      const page = ordered.slice(skip, take === undefined ? undefined : skip + take);
+      const page = ordered.slice(
+        skip,
+        take === undefined ? undefined : skip + take,
+      );
       return Promise.resolve(
         page.map((row) => ({
           scimUserResources: [],
@@ -116,7 +121,8 @@ function makeStore(rows: Row[]) {
     }) => {
       const { connectionId, externalId } = where.connectionId_externalId;
       const hit = externalIds.find(
-        (row) => row.connectionId === connectionId && row.externalId === externalId,
+        (row) =>
+          row.connectionId === connectionId && row.externalId === externalId,
       );
       return Promise.resolve(hit ? { userId: hit.userId } : null);
     },
@@ -131,8 +137,11 @@ function makeStore(rows: Row[]) {
     prisma,
     findMany,
     rows,
-    mapExternalId: (args: { connectionId: string; externalId: string; userId: string }) =>
-      externalIds.push(args),
+    mapExternalId: (args: {
+      connectionId: string;
+      externalId: string;
+      userId: string;
+    }) => externalIds.push(args),
   };
 }
 
@@ -166,7 +175,8 @@ async function walkEveryPage({
       startIndex,
       count: pageSize,
     });
-    if (isScimError(page)) throw new Error(`unexpected refusal: ${page.detail}`);
+    if (isScimError(page))
+      throw new Error(`unexpected refusal: ${page.detail}`);
     pages += 1;
     for (const resource of page.Resources) seen.push(resource.id);
     if (page.Resources.length === 0) break;
@@ -526,7 +536,8 @@ describe("reading the directory's groups back", () => {
         let matched = rows.filter((row) => row.organizationId === ORG);
         if (nameFilter?.equals !== undefined) {
           matched = matched.filter(
-            (row) => row.name.toLowerCase() === nameFilter.equals?.toLowerCase(),
+            (row) =>
+              row.name.toLowerCase() === nameFilter.equals?.toLowerCase(),
           );
         }
         if (externalFilter !== undefined) {

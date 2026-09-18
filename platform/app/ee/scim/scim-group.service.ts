@@ -5,16 +5,14 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 
 import type { Group, PrismaClient } from "~/generated/prisma/client";
-import { type GrantsLedgerWriter, grantsLedgerWriter } from "~/server/app-layer/authz/ledger";
+import {
+  type GrantsLedgerWriter,
+  grantsLedgerWriter,
+} from "~/server/app-layer/authz/ledger";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
 
 import { ScimWriteOutsideConnectionError } from "./errors";
-import { ScimDirectoryIdentityService } from "./scim-directory-identity.service";
-import { parseScimFilter } from "./scim-filter";
-import { scimGrantsWritePathEnabled } from "./scim-grants-flag";
-import { reconcileScimGrants, retireScimMembershipGrants } from "./scim-grants.reconciler";
-import { assertScimOrganizationId } from "./scim-organization-scope";
 import type {
   ScimCreateGroupRequest,
   ScimError,
@@ -24,6 +22,14 @@ import type {
   ScimPatchRequest,
   ScimReplaceGroupRequest,
 } from "./scim.types";
+import { ScimDirectoryIdentityService } from "./scim-directory-identity.service";
+import { parseScimFilter } from "./scim-filter";
+import {
+  reconcileScimGrants,
+  retireScimMembershipGrants,
+} from "./scim-grants.reconciler";
+import { scimGrantsWritePathEnabled } from "./scim-grants-flag";
+import { assertScimOrganizationId } from "./scim-organization-scope";
 
 const logger = createLogger("langwatch:scim:group");
 
@@ -59,7 +65,10 @@ export class ScimGroupService {
     this.#directoryIdentity = ScimDirectoryIdentityService.create(prisma);
   }
 
-  static create(options: { prisma: PrismaClient; writer?: GrantsLedgerWriter }): ScimGroupService {
+  static create(options: {
+    prisma: PrismaClient;
+    writer?: GrantsLedgerWriter;
+  }): ScimGroupService {
     return new ScimGroupService(options);
   }
 
@@ -99,7 +108,10 @@ export class ScimGroupService {
       ...(connectionId === null
         ? {}
         : {
-            OR: [{ scimConnectionId: connectionId }, { scimConnectionId: null }],
+            OR: [
+              { scimConnectionId: connectionId },
+              { scimConnectionId: null },
+            ],
           }),
       scimSource: { not: null as string | null },
       ...(term?.attribute === "displayName"
@@ -132,7 +144,9 @@ export class ScimGroupService {
       this.prisma.group.count({ where }),
     ]);
 
-    const resources = groups.map((g) => this.toScimGroup(g, g.members, excludeMembers));
+    const resources = groups.map((g) =>
+      this.toScimGroup(g, g.members, excludeMembers),
+    );
     return {
       schemas: ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
       totalResults: totalCount,
@@ -160,7 +174,8 @@ export class ScimGroupService {
       organizationId,
       connectionId,
     });
-    if (!group) return this.scimError({ status: "404", detail: "Group not found" });
+    if (!group)
+      return this.scimError({ status: "404", detail: "Group not found" });
 
     const members = await this.prisma.groupMembership.findMany({
       where: { groupId: group.id },
@@ -247,7 +262,8 @@ export class ScimGroupService {
       organizationId,
       connectionId,
     });
-    if (!group) return this.scimError({ status: "404", detail: "Group not found" });
+    if (!group)
+      return this.scimError({ status: "404", detail: "Group not found" });
 
     const currentMembers = await this.prisma.groupMembership.findMany({
       where: { groupId: group.id },
@@ -266,7 +282,8 @@ export class ScimGroupService {
     // identifier too. It used to be accepted on create only, which meant a
     // directory that started sending one later could never attach it.
     const renamed = request.displayName !== group.name;
-    const reidentified = request.externalId != null && request.externalId !== group.externalId;
+    const reidentified =
+      request.externalId != null && request.externalId !== group.externalId;
     if (renamed || reidentified) {
       await this.prisma.group.update({
         where: { id: group.id },
@@ -326,7 +343,8 @@ export class ScimGroupService {
       organizationId,
       connectionId,
     });
-    if (!group) return this.scimError({ status: "404", detail: "Group not found" });
+    if (!group)
+      return this.scimError({ status: "404", detail: "Group not found" });
 
     await this.authorizeMembers({
       organizationId,
@@ -367,7 +385,8 @@ export class ScimGroupService {
       organizationId,
       connectionId,
     });
-    if (!group) return this.scimError({ status: "404", detail: "Group not found" });
+    if (!group)
+      return this.scimError({ status: "404", detail: "Group not found" });
 
     const affectedMembers = await this.prisma.groupMembership.findMany({
       where: { groupId: group.id },
@@ -445,7 +464,10 @@ export class ScimGroupService {
         ...(connectionId === null
           ? {}
           : {
-              OR: [{ scimConnectionId: connectionId }, { scimConnectionId: null }],
+              OR: [
+                { scimConnectionId: connectionId },
+                { scimConnectionId: null },
+              ],
             }),
       },
     });
@@ -472,7 +494,10 @@ export class ScimGroupService {
         ...(connectionId === null
           ? {}
           : {
-              OR: [{ scimConnectionId: connectionId }, { scimConnectionId: null }],
+              OR: [
+                { scimConnectionId: connectionId },
+                { scimConnectionId: null },
+              ],
             }),
       },
     });
@@ -591,11 +616,13 @@ export class ScimGroupService {
 
     for (const operation of operations) {
       if (operation.op === "add" && operation.path === "members") {
-        this.extractMemberIds(operation.value).forEach((id) => memberIds.add(id));
+        this.extractMemberIds(operation.value).forEach((id) =>
+          memberIds.add(id),
+        );
       }
       if (operation.op === "remove" && operation.path?.startsWith("members")) {
-        this.extractMemberIdsFromPath(operation.path, operation.value).forEach((id) =>
-          memberIds.add(id),
+        this.extractMemberIdsFromPath(operation.path, operation.value).forEach(
+          (id) => memberIds.add(id),
         );
       }
       if (operation.op === "replace") {
@@ -640,7 +667,10 @@ export class ScimGroupService {
     }
 
     if (operation.op === "remove" && operation.path?.startsWith("members")) {
-      const ids = this.extractMemberIdsFromPath(operation.path, operation.value);
+      const ids = this.extractMemberIdsFromPath(
+        operation.path,
+        operation.value,
+      );
       if (ids.length) {
         await this.removeMembers({
           organizationId,
@@ -664,7 +694,10 @@ export class ScimGroupService {
     operation: ScimPatchOperation;
     organizationId: string;
   }): Promise<void> {
-    if (operation.path === "displayName" && typeof operation.value === "string") {
+    if (
+      operation.path === "displayName" &&
+      typeof operation.value === "string"
+    ) {
       await this.renameGroup(group.id, operation.value);
       return;
     }
@@ -688,19 +721,30 @@ export class ScimGroupService {
     });
   }
 
-  private async renameFromValue(groupId: string, operation: ScimPatchOperation): Promise<boolean> {
-    if (operation.path || operation.value === null || typeof operation.value !== "object") {
+  private async renameFromValue(
+    groupId: string,
+    operation: ScimPatchOperation,
+  ): Promise<boolean> {
+    if (
+      operation.path ||
+      operation.value === null ||
+      typeof operation.value !== "object"
+    ) {
       return false;
     }
 
-    const displayName = (operation.value as Record<string, unknown>).displayName;
+    const displayName = (operation.value as Record<string, unknown>)
+      .displayName;
     if (typeof displayName !== "string") return false;
 
     await this.renameGroup(groupId, displayName);
     return true;
   }
 
-  private async renameGroup(groupId: string, displayName: string): Promise<void> {
+  private async renameGroup(
+    groupId: string,
+    displayName: string,
+  ): Promise<void> {
     await this.prisma.group.update({
       where: { id: groupId },
       data: { name: displayName },
@@ -740,7 +784,9 @@ export class ScimGroupService {
     organizationId: string;
     memberIds: string[];
   }): Promise<void> {
-    const current = await this.prisma.groupMembership.findMany({ where: { groupId } });
+    const current = await this.prisma.groupMembership.findMany({
+      where: { groupId },
+    });
     const requestedIds = new Set(memberIds);
     const currentIds = new Set(current.map(({ userId }) => userId));
     const toAdd = memberIds.filter((id) => !currentIds.has(id));
@@ -754,11 +800,16 @@ export class ScimGroupService {
     }
   }
 
-  private async uniqueSlug(organizationId: string, name: string): Promise<string> {
+  private async uniqueSlug(
+    organizationId: string,
+    name: string,
+  ): Promise<string> {
     const base = slugify(name, { lower: true, strict: true }) || "group";
     let slug = base;
     let i = 1;
-    while (await this.prisma.group.findFirst({ where: { organizationId, slug } })) {
+    while (
+      await this.prisma.group.findFirst({ where: { organizationId, slug } })
+    ) {
       slug = `${base}-${i++}`;
     }
     return slug;
@@ -828,8 +879,11 @@ export class ScimGroupService {
    * apart so the logs can be: one is a payload worth fixing, the other is an
    * ordinary operation that simply had nothing to say about members.
    */
-  private extractRequestedMemberIds(operation: ScimPatchOperation): MemberInstruction {
-    if (operation.path === "members") return this.readMemberList(operation.value);
+  private extractRequestedMemberIds(
+    operation: ScimPatchOperation,
+  ): MemberInstruction {
+    if (operation.path === "members")
+      return this.readMemberList(operation.value);
 
     if (
       !operation.path &&
@@ -837,7 +891,9 @@ export class ScimGroupService {
       operation.value !== null &&
       "members" in operation.value
     ) {
-      return this.readMemberList((operation.value as Record<string, unknown>).members);
+      return this.readMemberList(
+        (operation.value as Record<string, unknown>).members,
+      );
     }
 
     return { kind: "absent" };
@@ -873,7 +929,13 @@ export class ScimGroupService {
     return this.extractMemberIds(value);
   }
 
-  private scimError({ status, detail }: { status: string; detail: string }): ScimError {
+  private scimError({
+    status,
+    detail,
+  }: {
+    status: string;
+    detail: string;
+  }): ScimError {
     return {
       schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
       status,

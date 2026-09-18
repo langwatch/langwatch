@@ -2,7 +2,15 @@ import { readFileSync } from "node:fs";
 
 import { generate } from "@langwatch/ksuid";
 import { Client } from "pg";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
 
 const client = new Client({ connectionString: process.env.DATABASE_URL });
 const migration = readFileSync(
@@ -49,9 +57,9 @@ describe("SSO and SCIM ownership upgrade", () => {
       `INSERT INTO "SsoVerifiedDomain" VALUES ('acme.test', 'acme'); INSERT INTO "SsoVerifiedDomainHolder" VALUES ('acme.test', 'active', 'acme');`,
     );
     await client.query(migration);
-    expect((await client.query('SELECT * FROM "SsoVerifiedDomain"')).rows).toEqual([
-      { domain: "acme.test", organizationId: "acme" },
-    ]);
+    expect(
+      (await client.query('SELECT * FROM "SsoVerifiedDomain"')).rows,
+    ).toEqual([{ domain: "acme.test", organizationId: "acme" }]);
     expect(
       (
         await client.query(
@@ -59,19 +67,21 @@ describe("SSO and SCIM ownership upgrade", () => {
         )
       ).rows,
     ).toEqual([{ connectionId: "active" }, { connectionId: "replacement" }]);
-    expect((await client.query('SELECT "organizationId" FROM "ScimDirectoryUser"')).rows).toEqual([
-      { organizationId: "acme" },
-    ]);
-    expect((await client.query('SELECT "organizationId" FROM "ScimExternalId"')).rows).toEqual([
-      { organizationId: "acme" },
-    ]);
+    expect(
+      (await client.query('SELECT "organizationId" FROM "ScimDirectoryUser"'))
+        .rows,
+    ).toEqual([{ organizationId: "acme" }]);
+    expect(
+      (await client.query('SELECT "organizationId" FROM "ScimExternalId"'))
+        .rows,
+    ).toEqual([{ organizationId: "acme" }]);
   });
 
   it("creates a missing verified-domain owner", async () => {
     await client.query(migration);
-    expect((await client.query('SELECT * FROM "SsoVerifiedDomain"')).rows).toEqual([
-      { domain: "acme.test", organizationId: "acme" },
-    ]);
+    expect(
+      (await client.query('SELECT * FROM "SsoVerifiedDomain"')).rows,
+    ).toEqual([{ domain: "acme.test", organizationId: "acme" }]);
   });
 
   it("refuses cross-tenant domain collisions", async () => {
@@ -84,7 +94,9 @@ describe("SSO and SCIM ownership upgrade", () => {
   });
 
   it("refuses to guess the tenant of an orphaned directory identity", async () => {
-    await client.query(`INSERT INTO "ScimExternalId" VALUES ('missing', 'orphan', 'person')`);
+    await client.query(
+      `INSERT INTO "ScimExternalId" VALUES ('missing', 'orphan', 'person')`,
+    );
     await expect(client.query(migration)).rejects.toMatchObject({
       code: "23502",
     });

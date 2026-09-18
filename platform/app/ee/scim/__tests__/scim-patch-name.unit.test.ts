@@ -77,15 +77,22 @@ function createMockPrisma() {
     },
     roleBinding: { findMany: vi.fn().mockResolvedValue([]) },
     ssoConnection: {
-      findFirst: vi.fn(async ({ where }: { where: { id: string; organizationId: string } }) =>
-        where.id === "conn-okta" && where.organizationId === ORGANIZATION
-          ? { replacesConnectionId: null, migrationPhase: null }
-          : null,
+      findFirst: vi.fn(
+        async ({ where }: { where: { id: string; organizationId: string } }) =>
+          where.id === "conn-okta" && where.organizationId === ORGANIZATION
+            ? { replacesConnectionId: null, migrationPhase: null }
+            : null,
       ),
       findMany: vi.fn(
-        async ({ where }: { where: { id: { in: string[] }; organizationId: string } }) =>
+        async ({
+          where,
+        }: {
+          where: { id: { in: string[] }; organizationId: string };
+        }) =>
           where.organizationId === ORGANIZATION
-            ? where.id.in.filter((id) => id === "conn-entra").map((id) => ({ id }))
+            ? where.id.in
+                .filter((id) => id === "conn-entra")
+                .map((id) => ({ id }))
             : [],
       ),
     },
@@ -105,7 +112,9 @@ function createMockPrisma() {
       findMany: vi.fn().mockResolvedValue([]),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
-    $transaction: vi.fn().mockImplementation((ops: unknown[]) => Promise.all(ops)),
+    $transaction: vi
+      .fn()
+      .mockImplementation((ops: unknown[]) => Promise.all(ops)),
   } as unknown as PrismaClient;
   return { prisma, update };
 }

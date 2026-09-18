@@ -25,7 +25,9 @@ const directoryId = `directory-${id}`;
 const groupGrantId = `group-grant-${id}`;
 let events: ReturnType<typeof createAuthzTestEventSourcing>;
 let groups: ScimGroupService;
-const collector = new AuthzCollectorService(new GrantsAuthzReadRepository(prisma));
+const collector = new AuthzCollectorService(
+  new GrantsAuthzReadRepository(prisma),
+);
 
 beforeEach(async () => {
   await prisma.organization.create({
@@ -104,43 +106,51 @@ afterEach(async () => {
 });
 
 describe("SCIM group access removal", () => {
-  it.each(["remove", "replace", "delete"] as const)(
-    "retires duplicate directory access on %s and preserves a manual grant",
-    async (operation) => {
-      const before = await collector.collectGrants({
-        principal: { type: "user", id: userId },
-        organizationId,
-      });
-      expect(before.bindings.some(({ roleKey }) => roleKey === "admin")).toBe(true);
+  it.each([
+    "remove",
+    "replace",
+    "delete",
+  ] as const)("retires duplicate directory access on %s and preserves a manual grant", async (operation) => {
+    const before = await collector.collectGrants({
+      principal: { type: "user", id: userId },
+      organizationId,
+    });
+    expect(before.bindings.some(({ roleKey }) => roleKey === "admin")).toBe(
+      true,
+    );
 
-      if (operation === "delete") {
-        await groups.deleteGroup({ scimResourceId: groupId, organizationId });
-      } else {
-        await groups.updateGroup({
-          scimResourceId: groupId,
-          organizationId,
-          patchRequest: {
-            schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-            Operations:
-              operation === "remove"
-                ? [{ op: "remove", path: `members[value eq "${userId}"]` }]
-                : [{ op: "replace", path: "members", value: [] }],
-          },
-        });
-      }
-
-      const after = await collector.collectGrants({
-        principal: { type: "user", id: userId },
+    if (operation === "delete") {
+      await groups.deleteGroup({ scimResourceId: groupId, organizationId });
+    } else {
+      await groups.updateGroup({
+        scimResourceId: groupId,
         organizationId,
+        patchRequest: {
+          schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+          Operations:
+            operation === "remove"
+              ? [{ op: "remove", path: `members[value eq "${userId}"]` }]
+              : [{ op: "replace", path: "members", value: [] }],
+        },
       });
-      expect(after.bindings.map(({ roleKey }) => roleKey)).toEqual(["viewer"]);
-      expect(await prisma.grant.findUniqueOrThrow({ where: { id: manualId } })).toMatchObject({
-        revokedAt: null,
-      });
-      expect(
-        (await prisma.grant.findUniqueOrThrow({ where: { id: directoryId } })).revokedAt,
-      ).not.toBeNull();
-      expect(await prisma.groupMembership.count({ where: { groupId, userId } })).toBe(0);
-    },
-  );
+    }
+
+    const after = await collector.collectGrants({
+      principal: { type: "user", id: userId },
+      organizationId,
+    });
+    expect(after.bindings.map(({ roleKey }) => roleKey)).toEqual(["viewer"]);
+    expect(
+      await prisma.grant.findUniqueOrThrow({ where: { id: manualId } }),
+    ).toMatchObject({
+      revokedAt: null,
+    });
+    expect(
+      (await prisma.grant.findUniqueOrThrow({ where: { id: directoryId } }))
+        .revokedAt,
+    ).not.toBeNull();
+    expect(
+      await prisma.groupMembership.count({ where: { groupId, userId } }),
+    ).toBe(0);
+  });
 });

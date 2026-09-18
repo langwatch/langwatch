@@ -1,8 +1,14 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { AsyncLocalStorage } from "node:async_hooks";
 
-import type { SSOUserResolution, SSOUserResolutionInput } from "@better-auth/sso";
-import { LIVE_IDENTIFIER_STATES, normalizeIdentifierValue } from "@langwatch/identity";
+import type {
+  SSOUserResolution,
+  SSOUserResolutionInput,
+} from "@better-auth/sso";
+import {
+  LIVE_IDENTIFIER_STATES,
+  normalizeIdentifierValue,
+} from "@langwatch/identity";
 
 import type { Prisma } from "~/generated/prisma/client";
 
@@ -13,7 +19,9 @@ const REFUSE = { action: "reject", code: "OAuthAccountNotLinked" } as const;
 export class PrismaScimSsoUsers {
   readonly #transactions: AsyncLocalStorage<Prisma.TransactionClient>;
 
-  private constructor(transactions: AsyncLocalStorage<Prisma.TransactionClient>) {
+  private constructor(
+    transactions: AsyncLocalStorage<Prisma.TransactionClient>,
+  ) {
     this.#transactions = transactions;
   }
 
@@ -24,7 +32,9 @@ export class PrismaScimSsoUsers {
   async resolve(input: SSOUserResolutionInput): Promise<SSOUserResolution> {
     const database = this.#transactions.getStore();
     if (!database) {
-      throw new Error("SCIM sign-in resolution requires the native identity transaction");
+      throw new Error(
+        "SCIM sign-in resolution requires the native identity transaction",
+      );
     }
 
     if (await this.#isDirectoryInactive(database, input)) return REFUSE;
@@ -196,7 +206,9 @@ export class PrismaScimSsoUsers {
           account.issuer === input.accountKey.issuer &&
           account.providerAccountId === input.accountKey.accountId,
       );
-      return alreadyLinked ? { action: "link", userId, profile: "preserve" } : REFUSE;
+      return alreadyLinked
+        ? { action: "link", userId, profile: "preserve" }
+        : REFUSE;
     }
 
     if (await this.#hasStoredCredential(database, userId)) return REFUSE;
@@ -238,7 +250,10 @@ export class PrismaScimSsoUsers {
     return { action: "link", userId, profile: "preserve" };
   }
 
-  async #hasStoredCredential(database: Prisma.TransactionClient, userId: string): Promise<boolean> {
+  async #hasStoredCredential(
+    database: Prisma.TransactionClient,
+    userId: string,
+  ): Promise<boolean> {
     const credential = await database.accountCredential.findFirst({
       where: { userId },
       select: { id: true },

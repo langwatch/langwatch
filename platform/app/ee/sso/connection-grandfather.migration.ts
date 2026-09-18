@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { SystemMigration, TenantMigrationOutcome } from "@langwatch/system-migrations";
+import type {
+  SystemMigration,
+  TenantMigrationOutcome,
+} from "@langwatch/system-migrations";
 
 import { IDENTITY_CONNECTION_GRANDFATHER_MIGRATION_NAME } from "~/server/app-layer/identity/migration-name";
 
@@ -24,7 +27,9 @@ import type { SsoConnectionGrandfatherService } from "./sso-connection-grandfath
  * Spec: specs/identity/sso-connection-lifecycle.feature ("A legacy SSO
  * organization is grandfathered without noticing").
  */
-export class IdentitySsoConnectionGrandfatherMigration implements SystemMigration {
+export class IdentitySsoConnectionGrandfatherMigration
+  implements SystemMigration
+{
   // Never rename: the stable state-table key.
   readonly name = IDENTITY_CONNECTION_GRANDFATHER_MIGRATION_NAME;
   readonly title = "Enterprise SSO connection history";
@@ -40,10 +45,17 @@ export class IdentitySsoConnectionGrandfatherMigration implements SystemMigratio
   readonly enrolledAutomatically = true;
 
   constructor(
-    private readonly grandfather: Pick<SsoConnectionGrandfatherService, "migrateOrganization">,
+    private readonly grandfather: Pick<
+      SsoConnectionGrandfatherService,
+      "migrateOrganization"
+    >,
   ) {}
 
-  async migrateTenant({ tenantId }: { tenantId: string }): Promise<TenantMigrationOutcome> {
+  async migrateTenant({
+    tenantId,
+  }: {
+    tenantId: string;
+  }): Promise<TenantMigrationOutcome> {
     // Nothing here consults `previous`: the pass re-derives the same command
     // id from the organization and the guard states nothing for a connection
     // that already exists, so there is no partial state a failed pass could

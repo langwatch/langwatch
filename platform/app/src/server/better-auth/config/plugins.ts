@@ -1,5 +1,9 @@
 import { passkey } from "@better-auth/passkey";
-import { type SSOUserResolution, type SSOUserResolutionInput, sso } from "@better-auth/sso";
+import {
+  type SSOUserResolution,
+  type SSOUserResolutionInput,
+  sso,
+} from "@better-auth/sso";
 import { buildGenericOAuthConfigs } from "@ee/sso/providers";
 import { createLogger } from "@langwatch/observability";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
@@ -33,7 +37,10 @@ export interface SsoAssertionPort {
 }
 
 export interface SsoCallbackEvidencePort {
-  recordAuthenticatedSsoAccount(args: { providerId: string; providerAccountId: string }): void;
+  recordAuthenticatedSsoAccount(args: {
+    providerId: string;
+    providerAccountId: string;
+  }): void;
 }
 
 export interface SsoProvisionedUsersPort {
@@ -104,7 +111,9 @@ export function plugins({
   const passkeysEnabled = deploymentOffersPasskeys();
 
   return [
-    ...(genericOAuthConfigs.length > 0 ? [genericOAuth({ config: genericOAuthConfigs })] : []),
+    ...(genericOAuthConfigs.length > 0
+      ? [genericOAuth({ config: genericOAuthConfigs })]
+      : []),
     ...(mfaEnrollmentOpen
       ? [
           twoFactor({

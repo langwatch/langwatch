@@ -58,7 +58,9 @@ afterAll(async () => {
 
 describe("domain-scoped issuer trust", () => {
   it("follows the migration route and adds no trust for unknown or suspended domains", async () => {
-    expect(await repository.findIssuerForDomain({ domain: "unknown.test" })).toBeNull();
+    expect(
+      await repository.findIssuerForDomain({ domain: "unknown.test" }),
+    ).toBeNull();
     expect(await repository.findIssuerForDomain({ domain })).toBe(
       `https://${directId}.example.test`,
     );

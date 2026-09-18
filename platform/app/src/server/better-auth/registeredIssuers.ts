@@ -8,7 +8,9 @@ const logger = createLogger("langwatch:better-auth:registered-issuers");
 /** Fresh issuer reads fail closed at the request boundary. */
 export interface SsoIssuerDirectoryPort {
   /** The issuer one connection registered, or null when it registered none. */
-  findIssuerForConnection(args: { connectionId: string }): Promise<string | null>;
+  findIssuerForConnection(args: {
+    connectionId: string;
+  }): Promise<string | null>;
   findIssuerForDomain(args: { domain: string }): Promise<string | null>;
 }
 
@@ -72,14 +74,17 @@ export class RegisteredIssuers {
     if (!request || !isSingleSignOnRequest(request)) return [];
 
     const body = await requestBody(request);
-    const connectionId = connectionIdInPath(new URL(request.url).pathname) ?? body?.providerId;
+    const connectionId =
+      connectionIdInPath(new URL(request.url).pathname) ?? body?.providerId;
     if (!connectionId) return this.issuerForDomainRequest(body);
 
     const only = await this.issuerForConnection(connectionId);
     return only === null ? [] : [only];
   }
 
-  private async issuerForDomainRequest(body: SsoRequestBody | null): Promise<string[]> {
+  private async issuerForDomainRequest(
+    body: SsoRequestBody | null,
+  ): Promise<string[]> {
     try {
       const domain = body?.domain ?? extractEmailDomain(body?.email ?? "");
       if (!domain) return [];
@@ -92,7 +97,9 @@ export class RegisteredIssuers {
     }
   }
 
-  private async issuerForConnection(connectionId: string): Promise<string | null> {
+  private async issuerForConnection(
+    connectionId: string,
+  ): Promise<string | null> {
     try {
       return await this.deps.issuers.findIssuerForConnection({ connectionId });
     } catch (error) {

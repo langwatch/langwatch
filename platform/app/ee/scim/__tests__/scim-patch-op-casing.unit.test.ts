@@ -17,10 +17,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PrismaClient } from "~/generated/prisma/client";
-
-import { ScimGroupService } from "../scim-group.service";
 import { ScimService } from "../scim.service";
 import { scimPatchRequestSchema } from "../scim.types";
+import { ScimGroupService } from "../scim-group.service";
 import { resourceStore } from "./scim-user-resource.fixture";
 
 // An App carrying no Redis, so the revoke helper reachable from the SCIM
@@ -48,7 +47,9 @@ const PATCH_SCHEMA = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
 function parsePatch(body: unknown) {
   const parsed = scimPatchRequestSchema.safeParse(body);
   if (!parsed.success) {
-    throw new Error(`SCIM PATCH rejected at the schema: ${parsed.error.message}`);
+    throw new Error(
+      `SCIM PATCH rejected at the schema: ${parsed.error.message}`,
+    );
   }
   return parsed.data;
 }
@@ -150,7 +151,9 @@ describe("SCIM PATCH op casing", () => {
           createdAt: new Date("2024-01-01T00:00:00Z"),
           updatedAt: new Date("2024-01-02T00:00:00Z"),
         };
-        (prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
+        (
+          prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>
+        ).mockResolvedValue({
           userId: "user-1",
           organizationId: "org-1",
         });
@@ -189,7 +192,9 @@ describe("SCIM PATCH op casing", () => {
           organizationId: "org-1",
           patchRequest: parsePatch({
             schemas: [PATCH_SCHEMA],
-            Operations: [{ op: "Add", path: "members", value: [{ value: "user-1" }] }],
+            Operations: [
+              { op: "Add", path: "members", value: [{ value: "user-1" }] },
+            ],
           }),
         });
 
@@ -225,7 +230,9 @@ describe("SCIM PATCH op casing", () => {
           organizationId: "org-1",
           patchRequest: parsePatch({
             schemas: [PATCH_SCHEMA],
-            Operations: [{ op: "Replace", path: "displayName", value: "Platform" }],
+            Operations: [
+              { op: "Replace", path: "displayName", value: "Platform" },
+            ],
           }),
         });
 

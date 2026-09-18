@@ -99,7 +99,9 @@ const samlIdpConfigSchema = z.object({
  * MISSING first, then what is unreadable. Telling somebody their certificate
  * is malformed when they never pasted one sends them to the wrong screen.
  */
-export function validateSamlRegistration(registration: SsoSamlRegistration): SsoSamlIdpConfig {
+export function validateSamlRegistration(
+  registration: SsoSamlRegistration,
+): SsoSamlIdpConfig {
   const metadataXml = blankToNull(registration.metadataXml);
   const certificate = blankToNull(registration.certificate);
   const entityId = blankToNull(registration.entityId);
@@ -114,13 +116,19 @@ export function validateSamlRegistration(registration: SsoSamlRegistration): Sso
       "the supplied document is not a saml identity provider descriptor",
     );
   }
-  if (metadataXml !== null && certificate === null && !hasSigningCertificate(metadataXml)) {
+  if (
+    metadataXml !== null &&
+    certificate === null &&
+    !hasSigningCertificate(metadataXml)
+  ) {
     throw new SsoSamlMetadataInvalidError(
       "the identity provider metadata must contain a readable signing certificate",
     );
   }
   if (certificate !== null && !looksLikeCertificate(certificate)) {
-    throw new SsoCertificateInvalidError("the supplied signing certificate could not be read");
+    throw new SsoCertificateInvalidError(
+      "the supplied signing certificate could not be read",
+    );
   }
   return {
     entryPoint: registration.entryPoint,
@@ -196,21 +204,32 @@ function hasSigningCertificate(metadata: string): boolean {
         context: true,
       },
     ]).keys;
-    const candidates = z.union([z.string(), z.array(z.string())]).parse(descriptors);
+    const candidates = z
+      .union([z.string(), z.array(z.string())])
+      .parse(descriptors);
     const keys = Array.isArray(candidates) ? candidates : [candidates];
     return keys.some((key) => {
       const extracted = Extractor.extract(key, [
         { key: "use", localPath: ["KeyDescriptor"], attributes: ["use"] },
         {
           key: "certificate",
-          localPath: ["KeyDescriptor", "KeyInfo", "X509Data", "X509Certificate"],
+          localPath: [
+            "KeyDescriptor",
+            "KeyInfo",
+            "X509Data",
+            "X509Certificate",
+          ],
           attributes: [],
         },
       ]);
       if (extracted.use && extracted.use !== "signing") return false;
-      const parsed = z.union([z.string(), z.array(z.string())]).safeParse(extracted.certificate);
+      const parsed = z
+        .union([z.string(), z.array(z.string())])
+        .safeParse(extracted.certificate);
       if (!parsed.success) return false;
-      const certificates = Array.isArray(parsed.data) ? parsed.data : [parsed.data];
+      const certificates = Array.isArray(parsed.data)
+        ? parsed.data
+        : [parsed.data];
       return certificates.some(looksLikeCertificate);
     });
   } catch {

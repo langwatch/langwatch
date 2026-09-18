@@ -4,14 +4,19 @@ import { setEnvironment } from "@langwatch/ksuid";
 export default async function runSystemMigrations(): Promise<void> {
   setEnvironment(process.env.ENVIRONMENT ?? "local");
 
-  const [{ env }, { getApp }, { initializeMigrationApp }, { assertRedisReady }, boot] =
-    await Promise.all([
-      import("~/env.mjs"),
-      import("~/server/app-layer/app"),
-      import("~/server/app-layer/presets"),
-      import("~/server/app-layer/redis-readiness"),
-      import("~/server/app-layer/system-migrations/boot"),
-    ]);
+  const [
+    { env },
+    { getApp },
+    { initializeMigrationApp },
+    { assertRedisReady },
+    boot,
+  ] = await Promise.all([
+    import("~/env.mjs"),
+    import("~/server/app-layer/app"),
+    import("~/server/app-layer/presets"),
+    import("~/server/app-layer/redis-readiness"),
+    import("~/server/app-layer/system-migrations/boot"),
+  ]);
 
   initializeMigrationApp();
   await assertRedisReady();
@@ -20,7 +25,9 @@ export default async function runSystemMigrations(): Promise<void> {
   const queue = eventSourcing?.globalQueue;
   const waitUntilIdle = queue?.waitUntilPreflightIdle;
   if (!waitUntilIdle) {
-    throw new Error("Migration preflight queue does not expose a completion barrier");
+    throw new Error(
+      "Migration preflight queue does not expose a completion barrier",
+    );
   }
   await boot.runSystemMigrationsToQuiescence({
     redis: app.redis,

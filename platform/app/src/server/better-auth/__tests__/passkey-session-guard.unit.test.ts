@@ -8,7 +8,10 @@ import { CredentialSessionGuard } from "../credential-session-guard";
 
 const primaryEmail = "holder@company.test";
 const userId = "verified-passkey-holder";
-const paths = ["/passkey/verify-authentication", "/passkey/verify-registration"] as const;
+const paths = [
+  "/passkey/verify-authentication",
+  "/passkey/verify-registration",
+] as const;
 
 function sessionBoundary(path: (typeof paths)[number], permitted: boolean) {
   const canSignIn = vi.fn(async () => permitted);
@@ -52,7 +55,8 @@ function sessionBoundary(path: (typeof paths)[number], permitted: boolean) {
             path,
             { method: "POST", body: z.object({ email: z.string() }) },
             async (ctx) => {
-              const session = await ctx.context.internalAdapter.createSession(userId);
+              const session =
+                await ctx.context.internalAdapter.createSession(userId);
               return ctx.json({ session });
             },
           ),
@@ -87,7 +91,9 @@ describe("a verified passkey at the session boundary", () => {
     expect(harness.database.session).toEqual([]);
   });
 
-  it.each(paths)("permits %s when the authenticated address is authorized", async (path) => {
+  it.each(
+    paths,
+  )("permits %s when the authenticated address is authorized", async (path) => {
     const harness = sessionBoundary(path, true);
     const response = await harness.request();
     expect(response.status).toBe(200);

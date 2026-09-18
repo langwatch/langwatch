@@ -70,7 +70,9 @@ it("backfills distinct tenant resources and preserves historical account disable
       'SELECT "email", "deactivatedAt" IS NOT NULL AS disabled FROM "User" WHERE "id" = $1',
       ["disabled"],
     );
-    expect(sharedAccount.rows).toEqual([{ email: "Disabled@Example.test", disabled: true }]);
+    expect(sharedAccount.rows).toEqual([
+      { email: "Disabled@Example.test", disabled: true },
+    ]);
   } finally {
     await client.query("ROLLBACK");
     client.release();

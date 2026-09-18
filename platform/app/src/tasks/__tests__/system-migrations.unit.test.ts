@@ -56,13 +56,20 @@ describe("system-migrations task", () => {
 
     await runSystemMigrations();
 
-    expect(stubs.run).toHaveBeenCalledWith(expect.objectContaining({ requireNoParked: false }));
+    expect(stubs.run).toHaveBeenCalledWith(
+      expect.objectContaining({ requireNoParked: false }),
+    );
   });
 
   it("initializes the migration app and waits for quiescence", async () => {
     await runSystemMigrations();
 
-    expect(stubs.order).toEqual(["environment", "app", "redis-ready", "migrations"]);
+    expect(stubs.order).toEqual([
+      "environment",
+      "app",
+      "redis-ready",
+      "migrations",
+    ]);
     expect(stubs.run).toHaveBeenCalledWith({
       redis: stubs.redis,
       awaitPassEffects: expect.any(Function),

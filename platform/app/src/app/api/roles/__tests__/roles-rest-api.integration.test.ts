@@ -63,7 +63,9 @@ describe("Feature: Custom roles REST API", () => {
       planProvider: PlanProviderService.create({
         getActivePlan: vi
           .fn()
-          .mockResolvedValue(ENTERPRISE_TEST_PLAN) as PlanProvider["getActivePlan"],
+          .mockResolvedValue(
+            ENTERPRISE_TEST_PLAN,
+          ) as PlanProvider["getActivePlan"],
       }),
     });
 
@@ -125,14 +127,18 @@ describe("Feature: Custom roles REST API", () => {
       expect(response.status).toBe(200);
       const body = await response.json();
       const names = body.roles.map((role: { name: string }) => role.name);
-      expect(names).toEqual(expect.arrayContaining([`Release Manager ${ns}`, `Auditor ${ns}`]));
+      expect(names).toEqual(
+        expect.arrayContaining([`Release Manager ${ns}`, `Auditor ${ns}`]),
+      );
       const listed = body.roles.find(
         (role: { name: string }) => role.name === `Release Manager ${ns}`,
       );
       expect(listed.permissions).toEqual(
         expect.arrayContaining(["project:view", "prompts:manage"]),
       );
-      expect(body.roles.find((role: { id: string }) => role.id === otherOrgRoleId)).toBeUndefined();
+      expect(
+        body.roles.find((role: { id: string }) => role.id === otherOrgRoleId),
+      ).toBeUndefined();
     });
 
     /** @scenario Creating a role from permission keys succeeds */
@@ -148,7 +154,9 @@ describe("Feature: Custom roles REST API", () => {
       expect(body.id).toBeTruthy();
       expect(body.name).toBe(`Creator Role ${ns}`);
       expect(body.description).toBe("Ships releases");
-      expect(body.permissions).toEqual(expect.arrayContaining(["project:view", "prompts:manage"]));
+      expect(body.permissions).toEqual(
+        expect.arrayContaining(["project:view", "prompts:manage"]),
+      );
     });
 
     /** @scenario Creating a role with an unknown permission key is refused */
@@ -303,7 +311,9 @@ describe("Feature: Custom roles REST API", () => {
         (entry: { resource: string }) => entry.resource === "prompts",
       );
       expect(prompts.organizationExclusive).toBe(false);
-      const scim = body.resources.find((entry: { resource: string }) => entry.resource === "scim");
+      const scim = body.resources.find(
+        (entry: { resource: string }) => entry.resource === "scim",
+      );
       expect(scim.organizationExclusive).toBe(false);
     });
   });

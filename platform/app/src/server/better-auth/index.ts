@@ -97,7 +97,8 @@ export const auth = betterAuth({
           // hold: the same list gates the Origin header and `callbackURL`, so
           // the whole set made one tenant's registered origin a redirect
           // target on the single sign-on endpoints for every other tenant.
-          registeredIssuers: await ssoRegisteredIssuers().issuersForRequest(request),
+          registeredIssuers:
+            await ssoRegisteredIssuers().issuersForRequest(request),
           isProduction: env.NODE_ENV === "production",
         }),
   secret: isBuildTime ? "build-time-only" : env.NEXTAUTH_SECRET,
@@ -171,7 +172,8 @@ export const auth = betterAuth({
 
   emailAndPassword: emailAndPassword({
     hashRounds: PASSWORD_HASH_ROUNDS,
-    revokeAllSessions: ({ userId }) => sessionRevocation().revokeAll({ userId }),
+    revokeAllSessions: ({ userId }) =>
+      sessionRevocation().revokeAll({ userId }),
     recordPasswordReset: ({ userId }) =>
       passwordResetSessionBridge().recordPasswordReset({ userId }),
   }),
@@ -184,7 +186,8 @@ export const auth = betterAuth({
   plugins: plugins({
     backupCodeCount: BACKUP_CODE_COUNT,
     passkeySignUp,
-    confirmSignUpAddress: (ctx) => signUpConfirmationEndpoint().confirmSignUpAddress(ctx),
+    confirmSignUpAddress: (ctx) =>
+      signUpConfirmationEndpoint().confirmSignUpAddress(ctx),
     ssoAssertion,
     ssoProvisionedUsers,
     ssoCallbackEvidence: sessionCallbackEvidence,
@@ -208,12 +211,15 @@ export const auth = betterAuth({
   },
 
   hooks: requestHooks({
-    refuseIfItClosesTheLastDoor: (args) => lastWayInGuard().refuseIfItClosesTheLastDoor(args),
-    requiringOrganizations: ({ userId }) => twoStepAccount().requiringOrganizations({ userId }),
+    refuseIfItClosesTheLastDoor: (args) =>
+      lastWayInGuard().refuseIfItClosesTheLastDoor(args),
+    requiringOrganizations: ({ userId }) =>
+      twoStepAccount().requiringOrganizations({ userId }),
     deploymentIsFederationCapable,
     resolveSignInMethodPolicy,
     twoStepCeremonies: mfaCeremonies,
-    signInAfterPasswordReset: (ctx) => passwordResetSessionBridge().signInAfterPasswordReset(ctx),
+    signInAfterPasswordReset: (ctx) =>
+      passwordResetSessionBridge().signInAfterPasswordReset(ctx),
     addressRoutesToConnection,
     signInLockout,
   }),

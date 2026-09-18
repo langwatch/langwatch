@@ -1,5 +1,8 @@
 /** @vitest-environment node */
-import { identifierProviderFor, normalizeIdentifierValue } from "@langwatch/identity";
+import {
+  identifierProviderFor,
+  normalizeIdentifierValue,
+} from "@langwatch/identity";
 import { deriveIdentifierId } from "@langwatch/identity-server";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -8,7 +11,10 @@ import { prisma } from "~/server/db";
 import { PrismaSessionRecords, RedisSessionCache } from "../session-adapters";
 import { SessionInventoryService } from "../session-inventory.service";
 import { SessionRevocationService } from "../session-revocation.service";
-import { createSamlFixture, createSigningIdentity } from "./saml-signin.fixture";
+import {
+  createSamlFixture,
+  createSigningIdentity,
+} from "./saml-signin.fixture";
 
 let idp: Awaited<ReturnType<typeof createSigningIdentity>>;
 let fixture: Awaited<ReturnType<typeof createSamlFixture>>;
@@ -25,37 +31,42 @@ afterEach(async () => {
 
 describe("an existing local user signing in through signed SAML", () => {
   /** @scenario "An inactive directory user cannot sign in through its connection" */
-  it.each(["first", "linked", "deleted"])(
-    "refuses inactive tenant access on %s SAML sign-in",
-    async (kind) => {
-      const { email, user } = await fixture.createLocalUser();
-      if (kind !== "first") {
-        expect((await fixture.signIn(email)).session?.user.id).toBe(user.id);
-      }
-      const sessionsBefore = await prisma.session.count({
-        where: { userId: user.id },
-      });
-      await prisma.scimUserResource.create({
-        data: {
-          organizationId: fixture.organizationId,
-          userId: user.id,
-          userName: email,
-          active: false,
-          deletedAt: kind === "deleted" ? new Date() : null,
-        },
-      });
+  it.each([
+    "first",
+    "linked",
+    "deleted",
+  ])("refuses inactive tenant access on %s SAML sign-in", async (kind) => {
+    const { email, user } = await fixture.createLocalUser();
+    if (kind !== "first") {
+      expect((await fixture.signIn(email)).session?.user.id).toBe(user.id);
+    }
+    const sessionsBefore = await prisma.session.count({
+      where: { userId: user.id },
+    });
+    await prisma.scimUserResource.create({
+      data: {
+        organizationId: fixture.organizationId,
+        userId: user.id,
+        userName: email,
+        active: false,
+        deletedAt: kind === "deleted" ? new Date() : null,
+      },
+    });
 
-      const result = await fixture.signIn(email);
+    const result = await fixture.signIn(email);
 
-      expect(result.location).toContain("error=");
-      expect(result.session).toBeNull();
-      expect(await prisma.session.count({ where: { userId: user.id } })).toBe(sessionsBefore);
-      expect(await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).toMatchObject({
-        deactivatedAt: null,
-        email,
-      });
-    },
-  );
+    expect(result.location).toContain("error=");
+    expect(result.session).toBeNull();
+    expect(await prisma.session.count({ where: { userId: user.id } })).toBe(
+      sessionsBefore,
+    );
+    expect(
+      await prisma.user.findUniqueOrThrow({ where: { id: user.id } }),
+    ).toMatchObject({
+      deactivatedAt: null,
+      email,
+    });
+  });
 
   /** @scenario "Repeated SAML sessions retain their exact sign-in method" */
   it("attributes repeated callbacks for per-method revocation", async () => {
@@ -119,7 +130,8 @@ describe("an existing local user signing in through signed SAML", () => {
 
   /** @scenario "A signed SAML assertion links a verified local account" */
   it.each(["founder", "invitee"])("preserves %s on repeat", async (kind) => {
-    const { email, user, account, identifier } = await fixture.createLocalUser();
+    const { email, user, account, identifier } =
+      await fixture.createLocalUser();
     if (kind === "founder") {
       await prisma.organizationUser.create({
         data: {
@@ -153,15 +165,17 @@ describe("an existing local user signing in through signed SAML", () => {
       }),
     ).toEqual(expect.arrayContaining([{ id: account.id }, { id: binding.id }]));
     expect(await prisma.account.count({ where: { userId: user.id } })).toBe(2);
-    expect(await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).toMatchObject({
+    expect(
+      await prisma.user.findUniqueOrThrow({ where: { id: user.id } }),
+    ).toMatchObject({
       email: user.email,
       emailVerified: true,
       name: user.name,
       image: user.image,
     });
-    expect(await prisma.identifier.findUnique({ where: { id: identifier.id } })).toEqual(
-      identifier,
-    );
+    expect(
+      await prisma.identifier.findUnique({ where: { id: identifier.id } }),
+    ).toEqual(identifier);
     expect(await prisma.user.count({ where: { email: user.email } })).toBe(1);
   });
 
@@ -175,8 +189,14 @@ describe("an existing local user signing in through signed SAML", () => {
     "foreign-identifier",
     "foreign-account",
   ])("refuses %s without a new binding or session", async (kind) => {
-    const email = kind === "wrong-domain" ? "member@unproved.test" : `member@${fixture.domain}`;
-    const { user } = await fixture.createLocalUser(kind !== "unverified", email);
+    const email =
+      kind === "wrong-domain"
+        ? "member@unproved.test"
+        : `member@${fixture.domain}`;
+    const { user } = await fixture.createLocalUser(
+      kind !== "unverified",
+      email,
+    );
     if (kind === "deactivated") {
       await prisma.user.update({
         where: { id: user.id },
@@ -187,7 +207,10 @@ describe("an existing local user signing in through signed SAML", () => {
       await fixture.createLocalUser(true, email.toUpperCase());
     }
     if (kind === "foreign-identifier" || kind === "foreign-account") {
-      const foreign = await fixture.createLocalUser(true, `foreign@${fixture.domain}`);
+      const foreign = await fixture.createLocalUser(
+        true,
+        `foreign@${fixture.domain}`,
+      );
       if (kind === "foreign-identifier") {
         await prisma.identifier.update({
           where: { id: foreign.identifier.id },
@@ -223,9 +246,15 @@ describe("an existing local user signing in through signed SAML", () => {
 
     expect(result.location).toContain("error=");
     expect(result.session).toBeNull();
-    expect(await prisma.account.count({ where: { user: fixtureUsers } })).toBe(before);
-    expect(await prisma.session.count({ where: { user: fixtureUsers } })).toBe(0);
-    expect(await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).toMatchObject({
+    expect(await prisma.account.count({ where: { user: fixtureUsers } })).toBe(
+      before,
+    );
+    expect(await prisma.session.count({ where: { user: fixtureUsers } })).toBe(
+      0,
+    );
+    expect(
+      await prisma.user.findUniqueOrThrow({ where: { id: user.id } }),
+    ).toMatchObject({
       email,
       emailVerified: kind !== "unverified",
       name: user.name,

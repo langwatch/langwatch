@@ -97,15 +97,22 @@ function createMockPrisma() {
     groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
     group: { findMany: vi.fn().mockResolvedValue([]) },
     ssoConnection: {
-      findFirst: vi.fn(async ({ where }: { where: { id: string; organizationId: string } }) =>
-        where.id === "conn-okta" && where.organizationId === ORGANIZATION
-          ? { replacesConnectionId: null, migrationPhase: null }
-          : null,
+      findFirst: vi.fn(
+        async ({ where }: { where: { id: string; organizationId: string } }) =>
+          where.id === "conn-okta" && where.organizationId === ORGANIZATION
+            ? { replacesConnectionId: null, migrationPhase: null }
+            : null,
       ),
       findMany: vi.fn(
-        async ({ where }: { where: { id: { in: string[] }; organizationId: string } }) =>
+        async ({
+          where,
+        }: {
+          where: { id: { in: string[] }; organizationId: string };
+        }) =>
           where.organizationId === ORGANIZATION
-            ? where.id.in.filter((id) => id === "conn-entra").map((id) => ({ id }))
+            ? where.id.in
+                .filter((id) => id === "conn-entra")
+                .map((id) => ({ id }))
             : [],
       ),
     },
@@ -245,7 +252,9 @@ describe("ScimService, on the grants write path", () => {
     });
 
     it("takes the same path on a PUT that restates them as inactive", async () => {
-      prisma.user.update = vi.fn().mockResolvedValue(buildUser({ deactivatedAt: null }));
+      prisma.user.update = vi
+        .fn()
+        .mockResolvedValue(buildUser({ deactivatedAt: null }));
 
       await service.replaceUser({
         id: USER,
@@ -263,7 +272,9 @@ describe("ScimService, on the grants write path", () => {
 
     describe("when the proof still finds something resolving", () => {
       beforeEach(() => {
-        grants.offboard = vi.fn().mockRejectedValue(new OffboardIncompleteError({}));
+        grants.offboard = vi
+          .fn()
+          .mockRejectedValue(new OffboardIncompleteError({}));
       });
 
       /** @scenario A removal that cannot prove itself empty fails loudly */
@@ -375,7 +386,9 @@ describe("ScimService, on the grants write path", () => {
           connectionId: CONNECTION,
           patchRequest: {
             schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-            Operations: [{ op: "replace", value: { userName: "alice@acme.com" } }],
+            Operations: [
+              { op: "replace", value: { userName: "alice@acme.com" } },
+            ],
           },
         });
 
@@ -442,8 +455,9 @@ describe("ScimService, on the grants write path", () => {
       });
 
       expect(ledger.attachBindings).not.toHaveBeenCalled();
-      const created = (prisma.organizationUser.create as ReturnType<typeof vi.fn>).mock
-        .calls[0]![0];
+      const created = (
+        prisma.organizationUser.create as ReturnType<typeof vi.fn>
+      ).mock.calls[0]![0];
       expect(created.data.role).toBe("MEMBER");
     });
 
@@ -510,10 +524,14 @@ describe("ScimService, on the grants write path", () => {
       prisma.organizationUser.findUnique = vi.fn().mockResolvedValue(null);
       prisma.user.create = vi.fn().mockResolvedValue(buildUser());
       // One mapped group carrying ADMIN at the organization.
-      prisma.groupMembership.findMany = vi.fn().mockResolvedValue([{ groupId: "group-1" }]);
+      prisma.groupMembership.findMany = vi
+        .fn()
+        .mockResolvedValue([{ groupId: "group-1" }]);
       prisma.group.findMany = vi
         .fn()
-        .mockResolvedValue([{ id: "group-1", name: "Administrators", scimSource: CONNECTION }]);
+        .mockResolvedValue([
+          { id: "group-1", name: "Administrators", scimSource: CONNECTION },
+        ]);
       prisma.grant.findMany = vi
         .fn()
         .mockResolvedValueOnce([
@@ -553,8 +571,9 @@ describe("ScimService, on the grants write path", () => {
         },
       });
 
-      const created = (prisma.organizationUser.create as ReturnType<typeof vi.fn>).mock
-        .calls[0]![0];
+      const created = (
+        prisma.organizationUser.create as ReturnType<typeof vi.fn>
+      ).mock.calls[0]![0];
       expect(created.data.role).toBe("ADMIN");
       expect(prisma.groupMembership.findMany).toHaveBeenCalledWith({
         where: {

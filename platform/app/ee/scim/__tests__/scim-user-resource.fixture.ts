@@ -25,7 +25,13 @@ export function resourceStore() {
     ),
     findFirst: vi.fn().mockResolvedValue(null),
     upsert: vi.fn(
-      async ({ create, update }: { create: ResourceWrite; update: Partial<ResourceWrite> }) => {
+      async ({
+        create,
+        update,
+      }: {
+        create: ResourceWrite;
+        update: Partial<ResourceWrite>;
+      }) => {
         const key = `${create.organizationId}/${create.userId}`;
         const existing = rows.get(key);
         const row = existing
@@ -40,8 +46,14 @@ export function resourceStore() {
         return row;
       },
     ),
-    deleteMany: vi.fn(async ({ where }: { where: { organizationId: string; userId: string } }) => ({
-      count: Number(rows.delete(`${where.organizationId}/${where.userId}`)),
-    })),
+    deleteMany: vi.fn(
+      async ({
+        where,
+      }: {
+        where: { organizationId: string; userId: string };
+      }) => ({
+        count: Number(rows.delete(`${where.organizationId}/${where.userId}`)),
+      }),
+    ),
   };
 }

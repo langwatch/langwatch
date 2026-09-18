@@ -130,32 +130,38 @@ describe("ScimService", () => {
 
   describe("missing organization scope", () => {
     /** @scenario "Missing organization scope never widens a SCIM query" */
-    it.each([null, void 0, "", "   ", false, 0])(
-      "rejects invalid organization %s before every user operation",
-      async (organizationId) => {
-        const input = {
-          organizationId,
-          id: "user-1",
-          request: { schemas: [], userName: "alice@acme.com" },
-          patchRequest: { schemas: [], Operations: [] },
-        };
-        for (const method of [
-          "listUsers",
-          "getUser",
-          "createUser",
-          "replaceUser",
-          "updateUser",
-          "deleteUser",
-        ] as const) {
-          await expect(Reflect.apply(service[method], service, [input])).rejects.toThrow(ZodError);
-        }
-        expect(prisma.user.findUnique).not.toHaveBeenCalled();
-        expect(prisma.user.findMany).not.toHaveBeenCalled();
-        expect(prisma.organizationUser.findUnique).not.toHaveBeenCalled();
-        expect(prisma.scimUserResource.findUnique).not.toHaveBeenCalled();
-        expect(prisma.scimUserResource.findFirst).not.toHaveBeenCalled();
-      },
-    );
+    it.each([
+      null,
+      void 0,
+      "",
+      "   ",
+      false,
+      0,
+    ])("rejects invalid organization %s before every user operation", async (organizationId) => {
+      const input = {
+        organizationId,
+        id: "user-1",
+        request: { schemas: [], userName: "alice@acme.com" },
+        patchRequest: { schemas: [], Operations: [] },
+      };
+      for (const method of [
+        "listUsers",
+        "getUser",
+        "createUser",
+        "replaceUser",
+        "updateUser",
+        "deleteUser",
+      ] as const) {
+        await expect(
+          Reflect.apply(service[method], service, [input]),
+        ).rejects.toThrow(ZodError);
+      }
+      expect(prisma.user.findUnique).not.toHaveBeenCalled();
+      expect(prisma.user.findMany).not.toHaveBeenCalled();
+      expect(prisma.organizationUser.findUnique).not.toHaveBeenCalled();
+      expect(prisma.scimUserResource.findUnique).not.toHaveBeenCalled();
+      expect(prisma.scimUserResource.findFirst).not.toHaveBeenCalled();
+    });
   });
 
   it("maps a raced username uniqueness conflict to SCIM 409", async () => {
@@ -220,9 +226,15 @@ describe("ScimService", () => {
     describe("when the user does not exist", () => {
       it("creates a new user and adds them to the organization", async () => {
         const newUser = buildMockUser();
-        (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(null);
-        (prisma.user.create as ReturnType<typeof vi.fn>).mockResolvedValue(newUser);
-        (prisma.organizationUser.create as ReturnType<typeof vi.fn>).mockResolvedValue({});
+        (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+          null,
+        );
+        (prisma.user.create as ReturnType<typeof vi.fn>).mockResolvedValue(
+          newUser,
+        );
+        (
+          prisma.organizationUser.create as ReturnType<typeof vi.fn>
+        ).mockResolvedValue({});
 
         const result = await service.createUser({
           request: {
@@ -251,8 +263,12 @@ describe("ScimService", () => {
     describe("when the user already exists in the organization", () => {
       it("returns a 409 SCIM error", async () => {
         const existingUser = buildMockUser();
-        (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(existingUser);
-        (prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
+        (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+          existingUser,
+        );
+        (
+          prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>
+        ).mockResolvedValue({
           userId: "user-1",
           organizationId: "org-1",
         });
@@ -266,7 +282,10 @@ describe("ScimService", () => {
         });
 
         expect(result).toHaveProperty("status", "409");
-        expect(result).toHaveProperty("detail", "User already exists in this organization");
+        expect(result).toHaveProperty(
+          "detail",
+          "User already exists in this organization",
+        );
       });
     });
 
@@ -276,8 +295,12 @@ describe("ScimService", () => {
         (prisma.user.findUnique as ReturnType<typeof vi.fn>)
           .mockResolvedValueOnce(existingUser) // findByEmail
           .mockResolvedValueOnce(existingUser); // findById reload
-        (prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(null);
-        (prisma.organizationUser.create as ReturnType<typeof vi.fn>).mockResolvedValue({});
+        (
+          prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>
+        ).mockResolvedValue(null);
+        (
+          prisma.organizationUser.create as ReturnType<typeof vi.fn>
+        ).mockResolvedValue({});
 
         const result = await service.createUser({
           request: {
@@ -301,9 +324,15 @@ describe("ScimService", () => {
     describe("when the membership already exists (P2002 race)", () => {
       it("reconciles the membership grant before returning the user", async () => {
         const existingUser = buildMockUser();
-        (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(existingUser);
-        (prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(null);
-        (prisma.organizationUser.create as ReturnType<typeof vi.fn>).mockRejectedValue(
+        (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+          existingUser,
+        );
+        (
+          prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>
+        ).mockResolvedValue(null);
+        (
+          prisma.organizationUser.create as ReturnType<typeof vi.fn>
+        ).mockRejectedValue(
           new PrismaClientKnownRequestError("Unique constraint failed", {
             code: "P2002",
             clientVersion: "7.0.0",
@@ -349,7 +378,9 @@ describe("ScimService", () => {
     describe("when the user belongs to the organization", () => {
       it("returns the SCIM user", async () => {
         const user = buildMockUser();
-        (prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
+        (
+          prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>
+        ).mockResolvedValue({
           user,
         });
 
@@ -365,7 +396,9 @@ describe("ScimService", () => {
 
     describe("when the user does not belong to the organization", () => {
       it("returns a 404 SCIM error", async () => {
-        (prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+        (
+          prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>
+        ).mockResolvedValue(null);
 
         const result = await service.getUser({
           id: "user-1",
@@ -389,16 +422,23 @@ describe("ScimService", () => {
         const result = await service.listUsers({ organizationId: "org-1" });
         if (isScimError(result)) throw new Error("unexpected refusal");
 
-        expect(result.schemas).toEqual(["urn:ietf:params:scim:api:messages:2.0:ListResponse"]);
+        expect(result.schemas).toEqual([
+          "urn:ietf:params:scim:api:messages:2.0:ListResponse",
+        ]);
         expect(result.totalResults).toBe(1);
         expect(result.Resources).toHaveLength(1);
-        expect(result.Resources[0]).toHaveProperty("userName", "alice@acme.com");
+        expect(result.Resources[0]).toHaveProperty(
+          "userName",
+          "alice@acme.com",
+        );
       });
     });
 
     describe("when filtering by userName", () => {
       it("passes the email filter to the query", async () => {
-        (prisma.user.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+        (prisma.user.findMany as ReturnType<typeof vi.fn>).mockResolvedValue(
+          [],
+        );
         (prisma.user.count as ReturnType<typeof vi.fn>).mockResolvedValue(0);
 
         await service.listUsers({
@@ -441,7 +481,9 @@ describe("ScimService", () => {
     describe("when the user belongs to the organization", () => {
       it("deletes the tenant resource without deactivating the shared user", async () => {
         const user = buildMockUser();
-        (prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
+        (
+          prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>
+        ).mockResolvedValue({
           userId: "user-1",
           organizationId: "org-1",
         });
@@ -465,7 +507,9 @@ describe("ScimService", () => {
       });
 
       it("revokes the canonical grants for the departed member", async () => {
-        (prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
+        (
+          prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>
+        ).mockResolvedValue({
           userId: "user-1",
           organizationId: "org-1",
         });
@@ -486,7 +530,9 @@ describe("ScimService", () => {
 
     describe("when the user does not belong to the organization", () => {
       it("returns a 404 SCIM error", async () => {
-        (prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+        (
+          prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>
+        ).mockResolvedValue(null);
 
         const result = await service.deleteUser({
           id: "user-1",
@@ -502,7 +548,9 @@ describe("ScimService", () => {
     describe("when deactivating via PATCH", () => {
       it("calls deactivate on the user", async () => {
         const user = buildMockUser();
-        (prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
+        (
+          prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>
+        ).mockResolvedValue({
           userId: "user-1",
           organizationId: "org-1",
         });
@@ -539,7 +587,9 @@ describe("ScimService", () => {
     describe("when replacing with active: false", () => {
       it("deactivates the user", async () => {
         const user = buildMockUser();
-        (prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
+        (
+          prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>
+        ).mockResolvedValue({
           userId: "user-1",
           organizationId: "org-1",
         });
