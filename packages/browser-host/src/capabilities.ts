@@ -272,6 +272,8 @@ export type UiDeployment = {
   isSaaS: boolean;
   /** The shared demo project, when this deployment configures one. */
   demoProjectSlug?: string;
+  /** Where a licence is bought, when this deployment sells one. */
+  licensePaymentUrl?: string;
   hasNlpService: boolean;
   hasLangevals: boolean;
 };
