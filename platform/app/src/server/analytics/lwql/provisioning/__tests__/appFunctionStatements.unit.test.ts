@@ -226,6 +226,49 @@ describe("given the app-function catalog", () => {
       ]);
     });
 
+    it("treats a tuple body and a parenthesised one as the same definition", () => {
+      // 25.8 stores the pair body as `(a, b)`; the version the harness runs
+      // keeps `tuple(a, b)`. A comparison that read those as different would
+      // report our own functions as somebody else's on one of the two.
+      const definition = LWQL_APP_FUNCTION_CATALOG.find(
+        (candidate) => candidate.name === "llm_messages_span",
+      );
+      if (!definition) throw new Error("llm_messages_span left the catalog");
+
+      expect(
+        lwqlAppFunctionConflicts({
+          rows: [
+            {
+              name: definition.name,
+              origin: LWQL_SQL_UDF_ORIGIN,
+              create_query:
+                "CREATE FUNCTION llm_messages_span AS (trace_id, span_id) -> tuple(trace_id, span_id)",
+            },
+          ],
+        }),
+      ).toEqual([]);
+    });
+
+    it("treats a single parameter with and without parentheses as the same", () => {
+      const definition = LWQL_APP_FUNCTION_CATALOG.find(
+        (candidate) => candidate.name === "conversation",
+      );
+      if (!definition) throw new Error("conversation left the catalog");
+
+      expect(
+        lwqlAppFunctionConflicts({
+          rows: [
+            {
+              name: definition.name,
+              origin: LWQL_SQL_UDF_ORIGIN,
+              create_query:
+                "CREATE FUNCTION conversation AS (thread_key) -> thread_key",
+            },
+          ],
+        }),
+      ).toEqual([]);
+    });
+
     it("treats formatting alone as the same definition", () => {
       const [definition] = LWQL_APP_FUNCTION_CATALOG;
       if (!definition) throw new Error("the catalog is empty");

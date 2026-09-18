@@ -139,14 +139,16 @@ compared as well, and either kind is a conflict rather than something to
 replace.
 
 `SHOW CREATE FUNCTION` does not exist, which is why the definition is read from
-`system.functions` rather than dumped. What the server keeps there is
-normalised: the parentheses around a single parameter are dropped, `tuple(a, b)`
-is rewritten as `(a, b)`, and the statement reads `CREATE FUNCTION` even where
-`CREATE OR REPLACE FUNCTION` was submitted. The expected text is generated from
-the same catalog and checked against a real server, so a ClickHouse upgrade that
-changes the normalisation fails a test rather than reporting every function as
-drifted. A server too old to report `create_query` is treated as ours, since
-refusing every provisioning run there would be worse than the risk it avoids.
+`system.functions` rather than dumped, and what the server keeps there is
+rewritten before storage by an amount that varies with the version. Measured on
+two: 25.8 drops the parentheses around a single parameter and stores a pair body
+as `(a, b)`, while the version the harness suite runs keeps `tuple(a, b)`
+verbatim. Both spell the same function, so the comparison writes both sides into
+one form first and treats anything else as a difference. The expected text is
+generated from the same catalog, so a release that rewrites something new fails
+a test rather than reporting every function as drifted. A server too old to
+report `create_query` is treated as ours, since refusing every provisioning run
+there would be worse than the risk it avoids.
 
 A caller's spelling has to match exactly for the same reason the statement is
 never rewritten: ClickHouse resolves a SQL UDF letter for letter, so

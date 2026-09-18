@@ -247,7 +247,21 @@ export function lwqlAppFunctionConflicts({
   return conflicts;
 }
 
-/** Collapses whitespace so formatting alone is never read as a difference. */
+/**
+ * The two spellings of one definition, written the same way.
+ *
+ * How much a server rewrites before storing varies by version, so a text
+ * comparison has to be insensitive to exactly the places they differ. Measured:
+ * 25.8 stores a pair body as `(a, b)` and drops the parentheses around a single
+ * parameter, while the version the harness suite runs keeps `tuple(a, b)`
+ * verbatim. Both spellings are the same function, so both sides are written
+ * into one form before comparing, and anything else still counts as a
+ * difference.
+ */
 function normaliseCreateQuery(query: string): string {
-  return query.replace(/\s+/g, " ").trim();
+  return query
+    .replace(/\s+/g, " ")
+    .replace(/-> tuple\(/, "-> (")
+    .replace(/ AS \(([A-Za-z_][A-Za-z0-9_]*)\) ->/, " AS $1 ->")
+    .trim();
 }
