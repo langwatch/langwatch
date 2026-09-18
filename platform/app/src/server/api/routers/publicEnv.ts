@@ -2,12 +2,12 @@ import { resolveGatewayBaseUrl } from "@ee/governance/services/gatewayUrl";
 import { resolveAuthProvider } from "@ee/sso/sso-gate";
 import { RUM_DEFAULT_SAMPLE_RATIO } from "@langwatch/react-rum/constants";
 import { z } from "zod";
-import { isEmailPasswordEnabled } from "~/server/better-auth/config/email-and-password";
 import {
   deploymentOffersPasskeys,
   deploymentOffersTwoStepVerification,
   resolveSignInMethodPolicy,
 } from "~/server/app-layer/identity/signin-method-policy";
+import { isEmailPasswordEnabled } from "~/server/better-auth/config/email-and-password";
 import { auth0BridgeConnectionOf } from "~/utils/auth0-bridge";
 import { env } from "../../../env.mjs";
 import { hasEmailProvider } from "../../mailer/providers";
