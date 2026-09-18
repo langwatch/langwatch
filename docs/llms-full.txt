@@ -67937,6 +67937,7 @@ Two column families are gated rather than freely selectable: free-text carriers 
 | `coding_session_events` | One row per coding-agent session event: model calls, compactions, rate limits, tool runs and more, in event order. | `costs` | one row per (TenantId, SessionId, TimeUnixMs, RecordId) | `TimeUnixMs` |
 | `coding_trace_sessions` | Correlates a trace to the coding-agent session it belongs to. | None | one row per (TenantId, TraceId) | `OccurredAt` |
 | `coding_tool_results` | One row per coding-agent tool call, with the text it printed back to the agent. | `output` | one row per (TenantId, TraceId, SpanId), latest version only | `StartTime` |
+| `judgments` | One row per Instant Eval run, trace and question, with the verdict the judge gave. | None | one row per (TenantId, RunId, TraceId, SpanId, QuestionId), latest version only | `CreatedAt` |
 
 `coding_tool_results.OutputText` is what the tool printed back to the agent. Read it to answer "what did this failed tool call print":
 
