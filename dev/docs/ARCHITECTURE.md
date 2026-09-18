@@ -249,7 +249,8 @@ const app = await server.composeProcess("api")
   .withModules(processModules)          // dependencies resolve from config — no store lines (§5)
   .expose((transports) => transports    // REQUIRED on the api; not on the worker's builder at all
     .trpc()                             //   required iff any module declares namespaces
-    .rest()                             //   required iff any module declares families
+    .rest()                             //   required iff any module declares families; family
+                                        //   credentials bind at their declaring modules, not here
     .browserBundle())                   //   ALWAYS required on the api; .browserBundle(none) opts out loudly
   .produce((pipelines) => pipelines
     .commands())                        // the api emits commands onto the queue; never claims it
@@ -276,11 +277,15 @@ from the installed tuple: install the first namespace-declaring module and
 `.trpc()` becomes required (boot() refuses to compile, naming
 `surface.trpc`); uninstall the last one and the `.trpc()` line goes red in
 place. A bare member means config and declarations decide everything;
-**each member's callback is where that surface's policy lives** — header
-overlays, auth overrides (`rest((r) => r.withBearerTokens({ cron: "test"
-}))` for tests), routing tweaks — scoped to the surface it concerns. There
-is no process-wide transport-auth object: an override beats config exactly
-where it applies and nowhere else.
+**each member's callback holds only what is surface-generic** — the
+generic auth definition (`rest((r) => r.withAuth(SessionAuth.create(...)))`,
+a named CLASS from its own package, never inline data), header overlays,
+general security. Family-specific credentials are NOT surface policy: the
+cron, langy-internal and instance-admin bearers each bind **at the module
+that declares the family**, from that module's own config slice — no
+internal-family credential appears in a main, a surface block, or any
+process-global bag. An override beats config exactly where it applies and
+nowhere else.
 
 **`Server.create` ordering is the point:** fatal handlers first (raw stderr
 until a logger exists) → secrets resolve → config parses **under** telemetry,
