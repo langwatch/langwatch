@@ -31,6 +31,49 @@ import {
   type PersonalScope,
   type PersonalSuccessNotice,
 } from "../model/personal-workspace-host.ts";
+import { personalWorkspaceApi, type PersonalOrganizationGraph } from "./personal-workspace-api.ts";
+
+/** A stable reference, so a query still loading never re-triggers a memo below it. */
+const NO_ORGANIZATIONS: readonly PersonalOrganizationGraph[] = [];
+
+/**
+ * The organization in scope, in the port's shape: every project carries the
+ * team it belongs to, which the graph states by nesting rather than by field.
+ */
+function organizationOf(
+  graph: readonly PersonalOrganizationGraph[],
+  organizationId: string | null,
+): PersonalOrganization | undefined {
+  if (organizationId === null) return void 0;
+  const row = graph.find((candidate) => candidate.id === organizationId);
+  if (!row) return void 0;
+  return {
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    ssoProvider: row.ssoProvider,
+    teams: row.teams.map((team) => ({
+      id: team.id,
+      name: team.name,
+      projects: team.projects.map((project) => ({ ...project, teamId: team.id })),
+    })),
+  };
+}
+
+/** The project in scope, found wherever in the graph it sits. */
+function projectOf(
+  graph: readonly PersonalOrganizationGraph[],
+  projectId: string | null,
+): PersonalProject | undefined {
+  if (projectId === null) return void 0;
+  for (const row of graph) {
+    for (const team of row.teams) {
+      const found = team.projects.find((candidate) => candidate.id === projectId);
+      if (found) return { ...found, teamId: team.id };
+    }
+  }
+  return void 0;
+}
 
 class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
   constructor(
@@ -41,6 +84,8 @@ class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
     private readonly scope_: PersonalScope,
     private readonly organizationRole_: PersonalOrganizationRole,
     private readonly deployment_: PersonalDeployment,
+    private readonly organization_: PersonalOrganization | undefined,
+    private readonly project_: PersonalProject | undefined,
   ) {
     super();
   }
@@ -49,17 +94,12 @@ class CapabilityPersonalWorkspaceHost extends PersonalWorkspaceHostApi {
     return this.scope_;
   }
 
-  /**
-   * The rich organization row (SSO provider, every team) is not a
-   * browser-host capability — undefined is the honest reading.
-   */
   organization(): PersonalOrganization | undefined {
-    return void 0;
+    return this.organization_;
   }
 
-  /** No team-id capability exists alongside the project reading — undefined is honest. */
   project(): PersonalProject | undefined {
-    return void 0;
+    return this.project_;
   }
 
   isScopeResolved(): boolean {
@@ -158,6 +198,20 @@ export default function PersonalWorkspaceHostMount({ children }: { children?: Re
   const organizationRole = scope.scopeHost()?.organizationRole();
   const deployment = useUiDeployment();
 
+  // Shares the tRPC cache entry with every other reader of this procedure, so
+  // the graph is fetched once per page however many hosts want it.
+  const organizations = personalWorkspaceApi.organization.getAll.useQuery({ isDemo: false });
+  const graph = organizations.data ?? NO_ORGANIZATIONS;
+
+  const organization = useMemo(
+    () => organizationOf(graph, activeScope.organizationId),
+    [graph, activeScope.organizationId],
+  );
+  const project = useMemo(
+    () => projectOf(graph, activeScope.projectId),
+    [graph, activeScope.projectId],
+  );
+
   // Primitive dependencies only, so the host stays the SAME object across
   // renders that carry the same reading.
   const host = useMemo(
@@ -171,12 +225,14 @@ export default function PersonalWorkspaceHostMount({ children }: { children?: Re
         organizationRole,
         {
           isSaas: deployment.isSaaS,
-          // No capability carries these three yet — see the handoff for the
+          appBaseUrl: deployment.appBaseUrl,
+          // No capability carries these two yet — see the handoff for the
           // widening this host is waiting on.
-          appBaseUrl: "",
           passkeysEnabled: false,
           authProvider: void 0,
         },
+        organization,
+        project,
       ),
     [
       session,
@@ -187,6 +243,9 @@ export default function PersonalWorkspaceHostMount({ children }: { children?: Re
       activeScope.projectId,
       organizationRole,
       deployment.isSaaS,
+      deployment.appBaseUrl,
+      organization,
+      project,
     ],
   );
   return <PersonalWorkspaceHostProvider value={host}>{children}</PersonalWorkspaceHostProvider>;
