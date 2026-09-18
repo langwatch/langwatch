@@ -1,11 +1,11 @@
 ---
-name: resync
+name: reseed-architecture
 description: "Resync every teaching surface with dev/docs/ARCHITECTURE.md after rulings land in the record: CLAUDE.md, .claude/skills/*, dev/docs/best_practices/*, and the dev docs. The record is the single source of truth; this skill walks the surfaces that teach from it and removes drift — stale vocabulary, dead method names, superseded shapes, examples that no longer compile. Use after a design session amended the record, after a wave lands that renames vocabulary, or whenever a skill/doc is caught teaching something the record has overruled."
 user-invocable: true
-argument-hint: "[surface to resync, or blank for all]"
+argument-hint: "[surface to reseed, or blank for all]"
 ---
 
-# Resync the teaching surfaces with the record
+# Reseed the teaching surfaces from the record
 
 `dev/docs/ARCHITECTURE.md` is THE record — rulings land there first, in the
 same change that makes them (that rule lives in memory and in the record
