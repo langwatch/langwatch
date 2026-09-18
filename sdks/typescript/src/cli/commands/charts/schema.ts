@@ -10,7 +10,7 @@ import type { CommandResult } from "../../utils/output";
  * Returns the LangWatchQL analytics schema rather than printing it: the
  * output port renders it in whatever format the caller asked for
  * (utils/output.ts). This is the discovery step an agent runs before writing
- * chart SQL — dataset and column names come from here, never from guessing.
+ * chart SQL — view and column names come from here, never from guessing.
  */
 export const chartSchemaCommand = async (options?: {
   project?: string;
@@ -24,22 +24,22 @@ export const chartSchemaCommand = async (options?: {
     const schema = await service.schema();
 
     spinner.succeed(
-      `Found ${schema.datasets.length} dataset${schema.datasets.length !== 1 ? "s" : ""} in ${schema.database}`,
+      `Found ${schema.views.length} view${schema.views.length !== 1 ? "s" : ""} in ${schema.database}`,
     );
 
     return {
       data: schema,
       table: () => {
-        for (const dataset of schema.datasets) {
+        for (const view of schema.views) {
           console.log();
           console.log(
-            `  ${chalk.cyan.bold(dataset.name)} ${chalk.gray(`— ${dataset.description}`)}`,
+            `  ${chalk.cyan.bold(view.name)} ${chalk.gray(`— ${view.description}`)}`,
           );
           console.log(
-            `  ${chalk.gray("Grain:")} ${dataset.grain}  ${chalk.gray("Time column:")} ${dataset.timeColumn}`,
+            `  ${chalk.gray("Grain:")} ${view.grain}  ${chalk.gray("Time column:")} ${view.timeColumn}`,
           );
           formatTable({
-            data: dataset.columns.map((column) => ({
+            data: view.columns.map((column) => ({
               Column: column.name,
               Type: column.type,
               Available: column.available ? "yes" : "no",

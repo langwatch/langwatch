@@ -199,9 +199,7 @@ describe("runQueryCommand", () => {
     /** @scenario "The row limit is applied to what is printed" */
     it("keeps only that many rows", async () => {
       const result = await runQueryCommand("SELECT 1", { limit: "1" });
-      expect((result as { data: { rows: unknown[] } }).data.rows).toHaveLength(
-        1,
-      );
+      expect((result as { data: unknown[] }).data).toHaveLength(1);
     });
 
     it("refuses a limit that is not a whole number", async () => {
@@ -212,14 +210,21 @@ describe("runQueryCommand", () => {
   });
 
   describe("when the format is the default", () => {
-    /** @scenario "The table format prints the result's own columns" */
-    it("returns the result for the table renderer to print", async () => {
+    /**
+     * The payload is the rows array, so `-o json` prints exactly one JSON
+     * array. The columns reach a reader through the table renderer, which the
+     * command hands back alongside it.
+     *
+     * @scenario "The table format prints the result's own columns"
+     */
+    it("returns the rows for the table renderer to print", async () => {
       const result = await runQueryCommand("SELECT 1", {});
-      expect(
-        (result as { data: { columns: { name: string }[] } }).data.columns.map(
-          (column) => column.name,
-        ),
-      ).toEqual(["TraceId", "OccurredAt"]);
+      const { data, table } = result as {
+        data: Record<string, unknown>[];
+        table: () => void;
+      };
+      expect(Object.keys(data[0] ?? {})).toEqual(["TraceId", "OccurredAt"]);
+      expect(typeof table).toBe("function");
     });
   });
 
@@ -243,7 +248,7 @@ describe("runQueryCommand", () => {
     it("writes the file and prints nothing to standard output", async () => {
       const dir = mkdtempSync(join(tmpdir(), "lw-query-out-"));
       const file = join(dir, "rows.jsonl");
-      await runQueryCommand("SELECT 1", { format: "jsonl", output: file });
+      await runQueryCommand("SELECT 1", { format: "jsonl", out: file });
       expect(readFileSync(file, "utf-8").trim().split("\n")).toHaveLength(2);
       expect(stdoutWrite).not.toHaveBeenCalled();
     });

@@ -165,9 +165,10 @@ export const CAPABILITY_CATALOG = {
     digestStrategy: "query-ref",
     noun: { singular: "analytics query", plural: "analytics" },
   },
-  // `langwatch query` runs analytics SQL and describes both query languages.
-  // `query-ref` because the result is addressed by the STATEMENT that produced
-  // it, the same way an analytics query is: there is no row id to deep-link.
+  // The LangWatchQL door (`langwatch query <sql>`): a headless coding agent
+  // runs analytics SQL, and `langwatch query reference` describes both query
+  // languages. The result is an aggregate addressed by the statement, so it
+  // re-runs from the stored query, same as `analytics`.
   query: {
     surface: "analytics",
     digestStrategy: "query-ref",

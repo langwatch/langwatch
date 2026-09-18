@@ -1,5 +1,5 @@
 /**
- * `langwatch query schema` — the LangWatchQL datasets and columns.
+ * `langwatch query schema` — the LangWatchQL views and columns.
  *
  * The same document `langwatch chart schema` prints, on the query family it
  * belongs to: a statement run through `langwatch query` has nothing to do with
@@ -31,22 +31,22 @@ export const queryLwqlSchemaCommand = async (options?: {
     const schema = await service.schema();
 
     spinner.succeed(
-      `${schema.datasets.length} dataset${schema.datasets.length !== 1 ? "s" : ""} in ${schema.database}`,
+      `${schema.views.length} view${schema.views.length !== 1 ? "s" : ""} in ${schema.database}`,
     );
 
     return {
       data: schema,
       table: () => {
-        for (const dataset of schema.datasets) {
+        for (const view of schema.views) {
           console.log();
           console.log(
-            `  ${chalk.cyan.bold(dataset.name)} ${chalk.gray(`— ${dataset.description}`)}`,
+            `  ${chalk.cyan.bold(view.name)} ${chalk.gray(`— ${view.description}`)}`,
           );
           console.log(
-            `  ${chalk.gray("Grain:")} ${dataset.grain}  ${chalk.gray("Time column:")} ${dataset.timeColumn}`,
+            `  ${chalk.gray("Grain:")} ${view.grain}  ${chalk.gray("Time column:")} ${view.timeColumn}`,
           );
           formatTable({
-            data: dataset.columns.map((column) => ({
+            data: view.columns.map((column) => ({
               Column: column.name,
               Type: column.type,
               Unit: column.unit ?? "",

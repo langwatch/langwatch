@@ -5,7 +5,7 @@ Feature: One query reference for both query languages
   So that I never guess a field name, a column name or a syntax
 
   LangWatch answers two query languages. LangWatchQL is SQL over the analytics
-  datasets: counts, groupings, time series, joins. The trace filter is a
+  views: counts, groupings, time series, joins. The trace filter is a
   Lucene-flavoured string over one trace list: fields, attributes, evaluators,
   free text. An agent that only knows one of them writes the wrong query for
   half the questions it is asked, and an agent that knows neither invents field

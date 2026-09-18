@@ -148,7 +148,7 @@ function registerTools(server: McpServer): void {
 
   server.tool(
     "discover_schema",
-    "Discover what LangWatch can be queried with: the trace filter fields and syntax, the analytics SQL datasets and columns, the analytics metrics, aggregation types, group-by options, scenario schema and evaluator types. Call this before using search_traces, run_query, get_analytics, scenario tools or evaluator tools, so you never guess a field, a column or a value.",
+    "Discover what LangWatch can be queried with: the trace filter fields and syntax, the analytics SQL views and columns, the analytics metrics, aggregation types, group-by options, scenario schema and evaluator types. Call this before using search_traces, run_query, get_analytics, scenario tools or evaluator tools, so you never guess a field, a column or a value.",
     {
       category: z
         .enum([
@@ -162,7 +162,7 @@ function registerTools(server: McpServer): void {
           "all",
         ])
         .describe(
-          "Which schema category to discover. 'filters' is the trace filter language, 'lwql' the analytics SQL datasets; both are read from the platform and need the API key"
+          "Which schema category to discover. 'filters' is the trace filter language, 'lwql' the analytics SQL views; both are read from the platform and need the API key"
         ),
       evaluatorType: z
         .string()
@@ -214,7 +214,7 @@ function registerTools(server: McpServer): void {
 
   server.tool(
     "run_query",
-    "Run one read-only analytics SQL statement (LangWatchQL) over this project's traces, spans, evaluations and metrics, and get the rows back as a table. This is the tool for a count, a rate, a sum, a percentile or any of them grouped or over time — questions search_traces would need many calls to answer. The statement runs exactly as written. Call discover_schema with category 'lwql' first for the datasets, columns and worked statements.",
+    "Run one read-only analytics SQL statement (LangWatchQL) over this project's traces, spans, evaluations and metrics, and get the rows back as a table. This is the tool for a count, a rate, a sum, a percentile or any of them grouped or over time — questions search_traces would need many calls to answer. The statement runs exactly as written. Call discover_schema with category 'lwql' first for the views, columns and worked statements.",
     {
       sql: z
         .string()

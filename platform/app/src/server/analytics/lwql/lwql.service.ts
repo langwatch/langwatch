@@ -38,18 +38,20 @@
  * The settings profile pins `readonly`, `max_execution_time` and
  * `max_memory_usage` `CONST`, so a query that outgrows the *database's* budget
  * is killed by the server and surfaces as a coded error. The ceilings this
- * layer adds are about the response — how many rows, how many bytes — and they
- * truncate rather than throw, always marked. Neither can be relaxed by a
- * caller: the first because `readonly = 1` refuses the setting change, the
- * second because it is not in the request shape.
+ * layer adds are about the response, and neither cuts silently: a statement
+ * that names no `LIMIT` is capped by one this layer appends (a too-high
+ * explicit `LIMIT` is refused before execution), and a result past the byte
+ * ceiling is refused outright as `lwql_result_too_large`. Neither can be
+ * relaxed by a caller: the row cap is applied to the statement itself, the byte
+ * ceiling is not in the request shape.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  * @see ./provisioning/accessModel.ts — the isolation this composes over
  */
 
 import { createLogger } from "@langwatch/observability";
 import type { Protections } from "../../traces/protections";
-import { lwqlTenantCapability } from "./capability";
+import { lwqlTenantCapabilitySet } from "./capability";
 import { LWQL_VIEW_CATALOG } from "./catalog/lwqlViews";
 import {
   type LangWatchQLViewDefinition,
@@ -60,6 +62,7 @@ import {
 import { type LangWatchQLDiagnostic, lwqlDiagnostics } from "./diagnostics";
 import {
   LangWatchQLParameterMissingError,
+  LangWatchQLResultTooLargeError,
   LangWatchQLUnavailableError,
 } from "./errors";
 import {
@@ -82,6 +85,7 @@ import { describeLangWatchQLSchema, type LangWatchQLSchema } from "./schema";
 import type { LangWatchQLTimeWindow } from "./timeWindow";
 import { LWQL_PERIOD_GRANULARITY_PARAMETER } from "./timeWindow";
 import { lwqlValidationError } from "./validation/errors";
+import type { SqlSourcePosition } from "./validation/parser";
 import {
   type AcceptedLangWatchQL,
   validateLangWatchQL,
@@ -170,13 +174,101 @@ function resolveRunGranularityOrRefuseUnfilled({
   return granularity;
 }
 
+/**
+ * Appends the default row `LIMIT` to a statement that named none.
+ *
+ * A trailing `;` is stripped and the clause goes on its own line, so it is
+ * neither swallowed by a trailing line comment nor turned into a second
+ * statement. This is the one edit this API makes to a submitted statement: the
+ * validator decides when it applies (`appendRowLimit`, only for a single
+ * top-level `SELECT` naming no `LIMIT`) and refuses a too-high explicit
+ * `LIMIT` before this runs.
+ *
+ * `beforeOffset`, when given, is the position of that statement's own
+ * `OFFSET` (`SELECT … OFFSET 5` with no `LIMIT`) — ClickHouse only accepts
+ * `LIMIT n OFFSET m` in that order, so the default is inserted immediately
+ * before the `OFFSET` keyword instead of appended after it, which would be a
+ * syntax error.
+ */
+export function appendDefaultRowLimit(
+  sql: string,
+  maxRows: number,
+  beforeOffset?: SqlSourcePosition,
+): string {
+  if (beforeOffset) {
+    // The AST position names the OFFSET clause's *value* (its literal or bound
+    // parameter), not the `OFFSET` keyword itself, which the parser gives no
+    // node for. The keyword always sits immediately before that value, so the
+    // insertion point is the nearest `OFFSET` before it — found by search
+    // rather than assumed adjacent, since arbitrary whitespace or a comment
+    // may separate the two.
+    const valueAt = charIndexOfPosition(sql, beforeOffset);
+    const keywordAt = lastOffsetKeywordBefore(sql, valueAt);
+    if (keywordAt !== null) {
+      return `${sql.slice(0, keywordAt)}LIMIT ${maxRows} ${sql.slice(keywordAt)}`;
+    }
+  }
+  const trimmed = sql.replace(/;\s*$/u, "").replace(/\s+$/u, "");
+  return `${trimmed}\nLIMIT ${maxRows}`;
+}
+
+/**
+ * Converts a parser's 1-based `{ line, column }` into a character index into
+ * `sql`, so {@link appendDefaultRowLimit} can splice text at an exact AST
+ * position instead of guessing at a keyword's location with a regular
+ * expression, which a string literal or comment containing the word `OFFSET`
+ * could mislead.
+ */
+function charIndexOfPosition(sql: string, position: SqlSourcePosition): number {
+  const lines = sql.split("\n");
+  let index = 0;
+  for (let i = 0; i < position.line - 1; i++) {
+    index += (lines[i]?.length ?? 0) + 1;
+  }
+  return index + (position.column - 1);
+}
+
+/** The start of the last `OFFSET` keyword before `before`, or `null` if none is found. */
+function lastOffsetKeywordBefore(sql: string, before: number): number | null {
+  const pattern = /\bOFFSET\b/gi;
+  let match: RegExpExecArray | null;
+  let found: number | null = null;
+  while ((match = pattern.exec(sql)) !== null) {
+    if (match.index >= before) break;
+    found = match.index;
+  }
+  return found;
+}
+
+/**
+ * Refuses a result whose JSON encoding exceeds the byte ceiling, naming the cap.
+ *
+ * The work is bounded: the row count is already capped by the appended (or the
+ * caller's own) `LIMIT` before this runs, so this walks at most that many rows.
+ *
+ * @throws {LangWatchQLResultTooLargeError} when the rows exceed `maxResultBytes`.
+ */
+function assertResultWithinByteCeiling({
+  rows,
+  maxResultBytes,
+}: {
+  rows: readonly Record<string, unknown>[];
+  maxResultBytes: number;
+}): void {
+  let bytes = 0;
+  for (const row of rows) {
+    bytes += JSON.stringify(row)?.length ?? 0;
+    if (bytes > maxResultBytes) {
+      throw new LangWatchQLResultTooLargeError(maxResultBytes);
+    }
+  }
+}
+
 /** What a caller gets back from the query endpoint. */
 export interface LangWatchQLQueryResult {
   readonly columns: readonly LangWatchQLColumn[];
   readonly rows: readonly Record<string, unknown>[];
   readonly statistics: LangWatchQLStatistics;
-  /** Whether a result ceiling cut the answer short. */
-  readonly truncated: boolean;
   /**
    * Notes about the result. An empty list means no known issue was detected,
    * which is not a claim that the answer is the one the caller meant — see
@@ -224,7 +316,7 @@ export interface LangWatchQLQueryResult {
   readonly coarsenedFromSeconds?: number;
 }
 
-/** The tenant a query runs for. Only these two fields are ever needed. */
+/** One project a query runs for. Only these two fields are ever needed. */
 export interface LangWatchQLCaller {
   /** Project id. Used for logging; the database resolves the tenant itself. */
   readonly id: string;
@@ -236,7 +328,15 @@ export interface LangWatchQLCaller {
 }
 
 export interface LangWatchQLExecuteInput {
-  readonly project: LangWatchQLCaller;
+  /**
+   * Every project this query may read — one for an in-product surface bound to
+   * the project it is showing, many for an API key that reaches several. Their
+   * secrets become the tenant-capability SET the row policy resolves, so a
+   * query returns the union of these projects' rows and nothing else. An empty
+   * set is a valid scope (a key that can read nothing) and reads zero rows; the
+   * database, not this, decides which rows each project contributes.
+   */
+  readonly projects: readonly LangWatchQLCaller[];
   /** Resolved server-side from the authenticated context. */
   readonly protections: Protections;
   /** The SQL exactly as submitted. */
@@ -514,7 +614,7 @@ export class LangWatchQLService {
    *   is provisioned.
    */
   async execute({
-    project,
+    projects,
     protections,
     sql,
     parameters,
@@ -522,8 +622,11 @@ export class LangWatchQLService {
     granularitySeconds,
     onBudgetOverflow,
   }: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
+    // Only logging reads this; the database resolves the tenant set itself.
+    const scopeLabel =
+      projects.map((project) => project.id).join(",") || "(none)";
     const validation = this.validate({
-      projectId: project.id,
+      projectId: scopeLabel,
       protections,
       sql,
       ...(parameters ? { parameters } : {}),
@@ -545,7 +648,7 @@ export class LangWatchQLService {
     const { executor } = this.deps;
     if (!executor) {
       logger.error(
-        { projectId: project.id },
+        { projectIds: projects.map((project) => project.id) },
         "LangWatchQL query refused: no restricted identity is provisioned",
       );
       throw new LangWatchQLUnavailableError();
@@ -553,7 +656,7 @@ export class LangWatchQLService {
 
     return await this.executeValidated({
       executor,
-      project,
+      projects,
       sql,
       validation,
       granularity,
@@ -570,13 +673,13 @@ export class LangWatchQLService {
    */
   private async executeValidated({
     executor,
-    project,
+    projects,
     sql,
     validation,
     granularity,
   }: {
     readonly executor: LangWatchQLExecutor;
-    readonly project: LangWatchQLCaller;
+    readonly projects: readonly LangWatchQLCaller[];
     readonly sql: string;
     readonly validation: ValidatedLangWatchQL;
     readonly granularity: LangWatchQLGranularityResolution;
@@ -594,14 +697,31 @@ export class LangWatchQLService {
     };
 
     const execution = await executor.execute({
-      sql,
+      // The submitted statement, with one edit and no other: a default `LIMIT`
+      // appended when the caller named none, so an unbounded query is capped
+      // rather than streamed. A statement that already pages is sent verbatim.
+      sql: validation.appendRowLimit
+        ? appendDefaultRowLimit(
+            sql,
+            this.limits.maxRows,
+            validation.appendRowLimitBeforeOffset,
+          )
+        : sql,
       ...(Object.keys(executionParameters).length > 0
         ? { parameters: executionParameters }
         : {}),
-      tenantCapability: lwqlTenantCapability({
-        secret: project.lwqlKey,
+      tenantCapability: lwqlTenantCapabilitySet({
+        secrets: projects.map((project) => project.lwqlKey),
       }),
-      limits: this.limits,
+    });
+
+    // A finished result larger than the byte ceiling is refused outright rather
+    // than cut: a body that looks whole but is missing its tail is the worse
+    // failure for an analytics caller. The row count is already bounded by the
+    // LIMIT above; this is the ceiling a query can still overshoot on width.
+    assertResultWithinByteCeiling({
+      rows: execution.rows,
+      maxResultBytes: this.limits.maxResultBytes,
     });
 
     // The facts the walk recorded, plus what actually came back. Both halves
@@ -613,20 +733,16 @@ export class LangWatchQLService {
       views: this.views,
       columns: execution.columns,
       rows: execution.rows,
-      truncated: execution.truncated,
-      limits: this.limits,
-      rowsReturned: execution.statistics.rowsReturned,
       now: this.now(),
     });
 
     logger.info(
       {
-        projectId: project.id,
+        projectIds: projects.map((project) => project.id),
         tables: validation.tables,
         rowsReturned: execution.statistics.rowsReturned,
         rowsRead: execution.statistics.rowsRead,
         elapsedMs: execution.statistics.elapsedMs,
-        truncated: execution.truncated,
         diagnostics: diagnostics.map((diagnostic) => diagnostic.code),
         followsTimeWindow: validation.followsTimeWindow,
         followsGranularity: granularity.followsGranularity,
@@ -638,7 +754,6 @@ export class LangWatchQLService {
       columns: execution.columns,
       rows: execution.rows,
       statistics: execution.statistics,
-      truncated: execution.truncated,
       diagnostics,
       followsTimeWindow: validation.followsTimeWindow,
       followsGranularity: granularity.followsGranularity,

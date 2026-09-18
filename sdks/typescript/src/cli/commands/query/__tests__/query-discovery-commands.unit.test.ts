@@ -53,7 +53,7 @@ const REFERENCE = {
   version: "1",
   lwql: {
     enabled: true,
-    schema: { database: "analytics", datasets: [] },
+    schema: { database: "analytics", views: [] },
     limits: {
       maxStatementLength: 1,
       maxRowsReturned: 2,
@@ -121,7 +121,7 @@ beforeEach(() => {
   );
   for (const name of AGENT_MODE_ENV_VARS) delete process.env[name];
 
-  mockSchema.mockResolvedValue({ database: "analytics", datasets: [] });
+  mockSchema.mockResolvedValue({ database: "analytics", views: [] });
   mockReference.mockResolvedValue(REFERENCE);
   // A plain function, not an arrow: the command calls `new QueryApiService()`,
   // and an arrow implementation is not constructible.
@@ -148,11 +148,11 @@ afterEach(() => {
 });
 
 describe("queryLwqlSchemaCommand", () => {
-  /** @scenario "The schema subcommand prints the datasets and their columns" */
-  it("returns the datasets the endpoint publishes", async () => {
+  /** @scenario "The schema subcommand prints the views and their columns" */
+  it("returns the views the endpoint publishes", async () => {
     mockSchema.mockResolvedValue({
       database: "analytics",
-      datasets: [
+      views: [
         {
           name: "analytics.traces",
           description: "one row per trace",
@@ -176,7 +176,7 @@ describe("queryLwqlSchemaCommand", () => {
     });
     const result = await queryLwqlSchemaCommand({});
     expect(
-      (result as { data: { datasets: { name: string }[] } }).data.datasets[0]
+      (result as { data: { views: { name: string }[] } }).data.views[0]
         ?.name,
     ).toBe("analytics.traces");
   });

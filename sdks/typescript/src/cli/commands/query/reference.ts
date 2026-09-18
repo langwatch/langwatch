@@ -90,13 +90,13 @@ function printLwql(reference: QueryReferenceResult): void {
     )}`,
   );
   formatTable({
-    data: reference.lwql.schema.datasets.map((dataset) => ({
-      Dataset: dataset.name,
-      "Time column": dataset.timeColumn,
-      Columns: String(dataset.columns.length),
-      Grain: dataset.grain,
+    data: reference.lwql.schema.views.map((view) => ({
+      View: view.name,
+      "Time column": view.timeColumn,
+      Columns: String(view.columns.length),
+      Grain: view.grain,
     })),
-    headers: ["Dataset", "Time column", "Columns", "Grain"],
+    headers: ["View", "Time column", "Columns", "Grain"],
   });
   console.log();
   console.log(
@@ -166,7 +166,7 @@ export const queryReferenceCommand = async (
     const reference = await service.reference();
 
     spinner.succeed(
-      `Query reference v${reference.version}: ${reference.lwql.schema.datasets.length} datasets, ${reference.traceFilter.fields.length} filter fields, ${reference.examples.length} examples`,
+      `Query reference v${reference.version}: ${reference.lwql.schema.views.length} views, ${reference.traceFilter.fields.length} filter fields, ${reference.examples.length} examples`,
     );
 
     return {

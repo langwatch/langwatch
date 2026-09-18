@@ -35,7 +35,7 @@ export interface QueryRunResponse {
 }
 
 /** One published dataset. */
-export interface QueryReferenceDataset {
+export interface QueryReferenceView {
   name: string;
   description: string;
   grain: string;
@@ -72,7 +72,7 @@ export interface QueryReferenceResponse {
   version: string;
   lwql: {
     enabled: boolean;
-    schema: { database: string; datasets: QueryReferenceDataset[] };
+    schema: { database: string; views: QueryReferenceView[] };
     limits: {
       maxStatementLength: number;
       maxRowsReturned: number;

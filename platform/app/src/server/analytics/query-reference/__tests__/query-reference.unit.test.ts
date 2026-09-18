@@ -245,7 +245,7 @@ describe("the query reference", () => {
 
     /**
      * Embedded, not re-derived: a caller that fetches the reference must not
-     * have to also fetch the schema to be sure the datasets agree.
+     * have to also fetch the schema to be sure the views agree.
      *
      */
     /** @scenario "The reference embeds the very schema the schema endpoint publishes" */
@@ -310,7 +310,7 @@ describe("the query reference", () => {
      */
     /** @scenario "The LangWatchQL section says whether the surface is open to this project" */
     it("withholds the catalog rather than only flagging it", () => {
-      expect(document.lwql.schema.datasets).toEqual([]);
+      expect(document.lwql.schema.views).toEqual([]);
       expect(document.lwql.schema.database).toBe(DATABASE);
     });
 

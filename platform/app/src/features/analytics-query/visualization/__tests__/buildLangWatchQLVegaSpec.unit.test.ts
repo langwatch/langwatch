@@ -46,7 +46,7 @@ const build = (
 describe("building the specification the chart runtime is given", () => {
   describe("given a validated specification and the registered datasets", () => {
     describe("when the specification is built", () => {
-      /** @scenario "Caller-supplied datasets and inline values are rejected" */
+      /** @scenario "Caller-supplied views and inline values are rejected" */
       it("injects the registered rows and discards any datasets the caller wrote", () => {
         const { spec, datasetNames } = build(callerSuppliedDatasets);
         const datasets = spec.datasets as Record<string, unknown[]>;
@@ -82,7 +82,7 @@ describe("building the specification the chart runtime is given", () => {
         expect(JSON.stringify(spec)).not.toContain("embedOptions");
       });
 
-      /** @scenario "The renderer contract accepts multiple registered named datasets" */
+      /** @scenario "The renderer contract accepts multiple registered named views" */
       it("injects every registered dataset the specification reads, by name", () => {
         const { spec, datasetNames } = build(lookupBetweenRegisteredDatasets, {
           query_result: QUERY_ROWS,

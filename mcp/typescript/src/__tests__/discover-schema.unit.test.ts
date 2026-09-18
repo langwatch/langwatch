@@ -82,11 +82,11 @@ describe("formatSchema()", () => {
   });
 
   describe("when category is 'lwql'", () => {
-    it("lists every dataset with its time column", async () => {
+    it("lists every view with its time column", async () => {
       const result = await formatSchema("lwql", reference);
-      for (const dataset of reference.lwql.schema.datasets) {
-        expect(result).toContain(dataset.name);
-        expect(result).toContain(dataset.timeColumn);
+      for (const view of reference.lwql.schema.views) {
+        expect(result).toContain(view.name);
+        expect(result).toContain(view.timeColumn);
       }
     });
 

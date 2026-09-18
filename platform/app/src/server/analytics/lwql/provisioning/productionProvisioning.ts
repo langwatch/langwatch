@@ -20,7 +20,7 @@
  * approved views ({@link productionPostgresApprovedViewStatements}), and the
  * key-map backfill plan ({@link planLwqlKeyMapBackfill}).
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { lwqlTenantCapability } from "../capability";

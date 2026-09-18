@@ -107,7 +107,7 @@ export class QueryApiService {
   }
 
   /**
-   * Runs one read-only LangWatchQL `SELECT` over the analytics datasets and
+   * Runs one read-only LangWatchQL `SELECT` over the analytics views and
    * returns typed columns, rows, execution statistics, truncation state and
    * diagnostics, scoped to the caller's project.
    */
@@ -121,7 +121,7 @@ export class QueryApiService {
   }
 
   /**
-   * Lists the LangWatchQL analytics datasets this key may query, with each
+   * Lists the LangWatchQL analytics views this key may query, with each
    * column's type, description, the permissions that unlock it, and whether
    * this caller holds them — plus each dataset's grain, join keys,
    * partition-pruning time column, freshness and a runnable example query.

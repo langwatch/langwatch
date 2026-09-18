@@ -286,6 +286,7 @@ export const APP_ERROR_CODES = [
   "lwql_provisioning_incomplete",
   "lwql_reserved_parameter_supplied",
   "lwql_reserved_parameter_type",
+  "lwql_result_too_large",
   "lwql_unavailable",
   "lwql_unknown_identifier",
   "lwql_unparseable",

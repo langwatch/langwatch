@@ -148,17 +148,17 @@ function formatLangWatchQL(reference?: QueryReferenceResponse): string {
     `Ceilings: ${reference.lwql.limits.maxRowsReturned} rows, ${reference.lwql.limits.maxExecutionTimeSeconds} seconds. ${reference.lwql.limits.pagination}`,
   );
   lines.push("");
-  for (const dataset of reference.lwql.schema.datasets) {
-    lines.push(`### ${dataset.name}`);
-    lines.push(`${dataset.description} One row is: ${dataset.grain}`);
+  for (const view of reference.lwql.schema.views) {
+    lines.push(`### ${view.name}`);
+    lines.push(`${view.description} One row is: ${view.grain}`);
     lines.push(
-      `Filter on \`${dataset.timeColumn}\` to prune partitions. Join keys: ${dataset.joinKeys.join(", ") || "none"}.`,
+      `Filter on \`${view.timeColumn}\` to prune partitions. Join keys: ${view.joinKeys.join(", ") || "none"}.`,
     );
     lines.push("");
     lines.push(
       markdownTable({
         headers: ["Column", "Type", "Available", "Description"],
-        rows: dataset.columns.map((column) => ({
+        rows: view.columns.map((column) => ({
           Column: column.name,
           Type: column.type,
           Available: column.available

@@ -79,7 +79,7 @@ export interface QueryRunOptions {
   limit?: string;
   format?: string;
   pageBy?: string;
-  output?: string;
+  out?: string;
   project?: string;
 }
 
@@ -273,8 +273,12 @@ async function runSinglePage({
     });
   }
 
+  // `data` is the rows array, not the whole result: `langwatch query "<sql>"
+  // -o json` must print exactly one JSON array of rows, which is also what
+  // `--format json` renders. The statistics and diagnostics reach a reader
+  // through the table and the spinner line, not through the machine payload.
   return {
-    data: { ...result, rows },
+    data: rows,
     table: () => printTable({ ...result, rows }),
   };
 }
@@ -299,7 +303,7 @@ export const runQueryCommand = async (
     format: resolveFormat(options.format),
     ...(limit === undefined ? {} : { limit }),
     ...(timeWindow ? { timeWindow } : {}),
-    ...(options.output === undefined ? {} : { output: options.output }),
+    ...(options.out === undefined ? {} : { output: options.out }),
   };
 
   await resolveCredentials({ project: options.project });
@@ -329,7 +333,7 @@ function writeOrPrint({
     return;
   }
   writeFileSync(output, body.endsWith("\n") ? body : `${body}\n`);
-  // On stderr: with `--output` the whole point is that stdout stays empty, so
+  // On stderr: with `--out` the whole point is that stdout stays empty, so
   // a shell redirect of the command's output carries the rows and nothing else.
   process.stderr.write(
     `${chalk.green(

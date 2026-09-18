@@ -2,7 +2,7 @@
  * One reference door for both of LangWatch's query languages.
  *
  * LangWatch answers two of them, and they are not alternatives. LangWatchQL is
- * SQL over the analytics datasets: counts, rates, groupings, time series,
+ * SQL over the analytics views: counts, rates, groupings, time series,
  * joins. The trace filter is a Lucene-flavored string over one trace list:
  * named fields, open-ended attribute namespaces, evaluator verdicts, free text.
  * A question belongs to one or the other, and picking wrong is expensive — an
@@ -218,7 +218,7 @@ const LWQL_ENDPOINTS: readonly QueryReferenceEndpoint[] = [
     method: "GET",
     path: "/api/v1/query/schema",
     description:
-      "The datasets and columns this key may query, each column's type and the permissions that unlock it.",
+      "The views and columns this key may query, each column's type and the permissions that unlock it.",
   },
   {
     method: "GET",
@@ -279,7 +279,7 @@ const DECISION_TABLE: readonly QueryReferenceDecision[] = [
   },
   {
     when: "Group by model, evaluator, user, conversation or topic",
-    use: "LangWatchQL over the metrics datasets",
+    use: "LangWatchQL over the metrics views",
     why: "`trace_metrics` and the per-minute rollups carry those identities already grouped. The filter has no GROUP BY.",
   },
   {
@@ -437,7 +437,7 @@ export function describeQueryReference({
             protections,
             views: LWQL_VIEW_CATALOG,
           })
-        : { database, datasets: [] },
+        : { database, functions: [], views: [] },
       limits: {
         maxStatementLength: MAX_LWQL_LENGTH,
         maxRowsReturned: DEFAULT_LWQL_RESULT_LIMITS.maxRows,

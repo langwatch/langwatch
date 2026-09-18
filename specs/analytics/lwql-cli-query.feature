@@ -119,7 +119,7 @@ Feature: Running LangWatchQL from the CLI
   # ---------------------------------------------------------------------------
 
   @unit
-  Scenario: The schema subcommand prints the datasets and their columns
+  Scenario: The schema subcommand prints the views and their columns
     When the caller runs the schema subcommand
     Then it prints each dataset with its columns, types and availability
 

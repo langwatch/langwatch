@@ -389,19 +389,26 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     });
 
   // AI Gateway governance — read identity, deep-link, request budget increase.
-  program
-    .command("whoami")
-    .description("Print the identity persisted by `langwatch login --device` (governance plane).")
-    .action(async () => {
+  // Speaks the output port: `-o json|yaml`, `--json <fields>` and `--jq` all
+  // project from the returned `data`. No bespoke boolean `--json` — that spelling
+  // is the port's own projection flag and a boolean would collide with it.
+  emitsResult(
+    program
+      .command("whoami")
+      .description(
+        "Print the identity persisted by `langwatch login --device` (governance plane).",
+      ),
+    async () => {
       try {
         const { whoamiCommand } = await import("./commands/whoami.js");
-        await whoamiCommand();
+        return await whoamiCommand();
       } catch (error) {
         const { reportCommandError } = await import("./utils/errorOutput.js");
         reportCommandError({ error });
         process.exit(1);
       }
-    });
+    },
+  );
 
   // AI Gateway governance — wrapped tool runners.
   // Each `langwatch <tool>` exec's the underlying binary with the
@@ -2992,7 +2999,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         "--page-by <mode>",
         "keyset: walk every page by rebinding the statement's {after_ts} and {after_id} parameters, without rewriting the statement",
       )
-      .option("-o, --output <file>", "Write the result to a file instead of stdout")
+      .option("--out <file>", "Write the result to a file instead of stdout")
       .option("--project <idOrSlug>", PROJECT_FLAG_HELP),
     async (sql: string | undefined, options: Record<string, string>) => {
       const { runQueryCommand: impl } = await import("./commands/query/run.js");
@@ -3003,7 +3010,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   emitsResult(
     queryCmd
       .command("schema")
-      .description("List the analytics datasets and columns a statement can name")
+      .description("List the analytics views and columns a statement can name")
       .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (options: { project?: string }) => {
