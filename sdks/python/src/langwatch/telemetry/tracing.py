@@ -16,6 +16,7 @@ from langwatch.utils.transformation import (
 )
 from opentelemetry import trace as trace_api
 from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.sampling import ALWAYS_OFF
 from opentelemetry.trace import Link
 from typing import (
     Dict,
@@ -80,6 +81,30 @@ _retry_on_transient = retry(
     reraise=True,
 )
 
+_non_recording_provider: Optional[TracerProvider] = None
+
+
+def _validate_trace_metadata(metadata: Any) -> Optional[str]:
+    if metadata is None:
+        return None
+    if not isinstance(metadata, dict):
+        return f"metadata must be a dictionary, got {type(metadata).__name__}"
+
+    labels = metadata.get("labels")
+    if labels is not None and not isinstance(labels, list):
+        return f"metadata labels must be a list of strings, got {type(labels).__name__}"
+    if labels is not None and not all(isinstance(label, str) for label in labels):
+        return "metadata labels must contain only strings"
+
+    return None
+
+
+def _get_non_recording_provider() -> TracerProvider:
+    global _non_recording_provider
+    if _non_recording_provider is None:
+        _non_recording_provider = TracerProvider(sampler=ALWAYS_OFF)
+    return _non_recording_provider
+
 
 class LangWatchTrace:
     """A trace represents a complete request/response cycle in your application.
@@ -126,6 +151,14 @@ class LangWatchTrace:
         tracer_provider: Optional[TracerProvider] = None,
     ):
         ensure_setup()
+        validation_error = _validate_trace_metadata(metadata)
+        if validation_error is not None:
+            warn(
+                f"LangWatch trace will not be sent: {validation_error}",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            tracer_provider = _get_non_recording_provider()
         if api_key is not None:
             warn(
                 "Setting API key on trace is deprecated. Please set it on the LangWatch client instance instead using `langwatch.setup(api_key=<api_key>)`"
