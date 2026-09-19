@@ -3344,6 +3344,34 @@ const presentations = {
     describe: () =>
       "A license works with one install. If you rebuilt or moved this one, ask LangWatch to reset the license binding.",
   },
+  connect_service_not_entitled: {
+    title: "This hosted service is not part of your license",
+    describe: () => "Contact LangWatch to add it to your license.",
+  },
+  connect_license_required: {
+    title: "Only a self-hosted license can change this cap",
+    describe: () =>
+      "This cap belongs to a self-hosted license. Budgets of a virtual key are managed in the AI Gateway settings.",
+  },
+  connect_budget_not_set: {
+    title: "No hosted usage budget is set up yet",
+    describe: () =>
+      "Contact LangWatch to agree a usage commit for hosted services. There is no cap to change until then.",
+  },
+  connect_budget_above_contract_maximum: {
+    title: "That cap is above what your license allows",
+    describe: (error) => {
+      const maximum = num(error, "maximumUsd", 0);
+      return maximum > 0
+        ? `The highest cap you can set is ${maximum.toFixed(2)} USD. Contact LangWatch to raise it.`
+        : "Contact LangWatch to raise the maximum.";
+    },
+  },
+  hosted_service_unavailable: {
+    title: "The hosted service did not answer",
+    describe: () =>
+      "Nothing was judged and nothing was charged. Try again in a moment.",
+  },
   rate_limited: {
     title: "Too many requests",
     describe: () => "Slow down for a moment, then try again.",

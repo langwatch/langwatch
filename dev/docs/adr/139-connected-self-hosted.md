@@ -182,26 +182,63 @@ stated.
 - A pure TypeScript route would have to re-implement license authentication,
   the budget check and the 402.
 
-`POST /v1/instant-evals/classify` is a Go route. It authenticates, checks the
-entitlement, runs the existing budget precheck with its existing 402, then
-forwards over the HMAC-signed internal channel to a control plane handler. That
-handler runs the process's one classifier and records spend through the ADR-137
-recorder, with the license's managed key on the record.
+`POST /v1/instant-evals/classify`, `GET /v1/usage` and `PUT /v1/budget` are Go
+routes in the authenticated `/v1` group. The gateway authenticates the caller,
+runs the existing budget precheck for classify (the same `BudgetBreachError` and
+402 a chat completion gets, fail-open when the precheck itself errors), then
+posts a signed envelope `{virtual_key_id, organization_id, project_id, payload}`
+to `POST /api/internal/gateway/connect/<operation>` on the control plane, with
+`<operation>` one of `instant-evals-classify`, `usage`, `budget`. The gateway
+relays the control plane's status and body as they are; a 5xx or an unreachable
+control plane becomes `hosted_service_unavailable` (503). Request bodies above
+2 MiB are refused with 413 before the envelope is built.
+
+The identity in the envelope is what the gateway resolved, never what the caller
+put in its payload. The control plane handler looks the managed key up in the
+registry (`IssuedLicense.virtualKeyId`, active, same organization) and that
+lookup is the entitlement check: a license without the service, a revoked
+license, or a key that belongs to another organization is refused with 403
+`connect_service_not_entitled` and the judge is never called. A virtual key may
+read usage but has no license and cannot set a budget (403
+`connect_license_required`). The handler answers a `HandledError` in the
+gateway's own error envelope, `{error: {type, code, message, meta}}`, so an
+install sees one shape whichever side refused.
+
+The handler runs the process's one classifier under the license's hidden
+governance project and charges the list rate only: the answer carries
+`charged_usd` and never the provider cost. Spend is not written one row per
+judged text. An install judging ten thousand conversations makes ten thousand
+calls worth a few cents; they are summed per managed key and written every five
+seconds, or every 500 calls under one key, as one `instant_eval` spend row with
+`requests` set and `virtual_key_id` naming the install. A failed write is kept
+and merged into the next window. The process flushes on shutdown
+(`connect-spend` phase). The cost of this trade is stated: a crash loses at most
+one window, and the budget sees spend up to one window late.
 
 The hosted handler does not consult the free Instant Evals allowance. A customer
 organization has no Cloud subscription, reads as a free plan and would be cut
-off after 1 USD. Its contract budget governs instead.
+off after 1 USD. Its contract budget governs instead: a `GatewayBudget` on the
+organization, `MANUAL` window, `BLOCK`, `externalId = connect-contract`, written
+by the registry after every issue, revoke, term change and link, attributed to
+the operator who made the change. Its default cap is the sum of the commits of
+the licenses that count (active, not replaced by a live reissue). The maximum a
+customer may set is the commit plus the overage maximum of each license with
+overage enabled. A cap the customer lowered is kept across term changes unless
+it is above the new maximum.
 
 Budget figures reach the gateway on its 60 second config refresh. Overshoot is
 bounded by the judge's sustained rate: 300,000 tokens a second for 60 seconds at
-0.0546 USD per million tokens is about 1 USD.
+0.0546 USD per million tokens is about 1 USD, plus one spend window.
 
 `GET /v1/usage` reads live spend from the ClickHouse budget ledger and reports
-`spend_available: false` when it can not. `GatewayBudget.spentUsd` in Postgres
-has had no writer since the ledger cutover and is never read here.
+`spend_available: false` with `spent_usd: null` when it can not.
+`GatewayBudget.spentUsd` in Postgres has had no writer since the ledger cutover
+and is never read here.
 
-`PUT /v1/budget` accepts a cap between zero and the contract maximum: the commit,
-plus the overage maximum when overage is enabled. Only a license may call it.
+`PUT /v1/budget` accepts `cap_usd` between zero and the contract maximum. Above
+it, the refusal names the maximum (400
+`connect_budget_above_contract_maximum`). A customer with no commit agreed has no
+budget to set (409 `connect_budget_not_set`).
 
 ### 6. The sync lease is the grace rule
 
@@ -352,7 +389,10 @@ side. `validateLicense`, `LicenseHandler` and the seat guard import neither.
 | Env (install) | `LANGWATCH_CONNECT_ENABLED`, `LANGWATCH_CONNECT_LICENSE_ENDPOINT`, `LANGWATCH_CONNECT_GATEWAY_ENDPOINT`, `DISABLE_USAGE_STATS`, `HTTPS_PROXY` |
 | Helm | `connect.enabled`, `connect.licenseEndpoint`, `connect.gatewayEndpoint` |
 | Gateway host | `POST /v1/instant-evals/classify`, `GET /v1/usage`, `PUT /v1/budget` |
+| Control plane, gateway only | `POST /api/internal/gateway/connect/:operation` (HMAC signed) |
 | Connect host | `POST /v1/license/sync`, `POST /v1/stats` |
+| Contract budget | `GatewayBudget.externalId = connect-contract`, metadata `connect_cap_set_by` |
+| Error codes | `connect_service_not_entitled`, `connect_license_required`, `connect_budget_not_set`, `connect_budget_above_contract_maximum`, `hosted_service_unavailable` |
 
 ## Consequences
 

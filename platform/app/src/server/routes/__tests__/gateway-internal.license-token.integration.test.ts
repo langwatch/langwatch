@@ -87,6 +87,7 @@ describe("a license token on resolve-key (real PG + internal route)", () => {
     repository: new PrismaIssuedLicenseRepository(prisma),
     organizations: new PrismaCustomerOrganizations(prisma),
     managedKeys: new PrismaConnectManagedKeys(prisma),
+    contractBudgets: { sync: async () => undefined },
     signingKey: () => privateKey,
     publicKey,
     encrypt: (plain) => `enc:${plain.length}`,
@@ -131,8 +132,12 @@ describe("a license token on resolve-key (real PG + internal route)", () => {
     const inOrganizations = { organizationId: { in: organizationIds } };
     await prisma.issuedLicense.deleteMany({ where: inOrganizations });
     await prisma.gatewayChangeEvent.deleteMany({ where: inOrganizations });
+    const keys = await prisma.virtualKey.findMany({
+      where: inOrganizations,
+      select: { id: true },
+    });
     await prisma.virtualKeyScope.deleteMany({
-      where: { virtualKey: inOrganizations },
+      where: { virtualKeyId: { in: keys.map((key) => key.id) } },
     });
     await prisma.virtualKey.deleteMany({ where: inOrganizations });
     await prisma.modelProvider.deleteMany({ where: inOrganizations });

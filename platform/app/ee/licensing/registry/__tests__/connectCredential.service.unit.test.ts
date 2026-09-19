@@ -10,6 +10,7 @@ import {
   InMemoryConnectManagedKeys,
   InMemoryCustomerOrganizations,
   InMemoryIssuedLicenseRepository,
+  RecordingContractBudgets,
 } from "./registryFakes";
 
 const NOW = new Date("2026-09-19T12:00:00.000Z");
@@ -32,6 +33,7 @@ function build() {
     repository,
     organizations,
     managedKeys,
+    contractBudgets: new RecordingContractBudgets(),
     signingKey: () => privateKey,
     publicKey,
     encrypt: (plain) => `enc:${plain.length}`,

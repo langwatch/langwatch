@@ -7,6 +7,7 @@
 import { generateKeyPairSync } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
+import { PrismaConnectManagedKeys } from "../connectManagedKey.prisma";
 import {
   PrismaCustomerOrganizations,
   PrismaIssuedLicenseRepository,
@@ -27,6 +28,8 @@ describe("the license registry on Postgres", () => {
   const service = new LicenseRegistryService({
     repository: new PrismaIssuedLicenseRepository(prisma),
     organizations: new PrismaCustomerOrganizations(prisma),
+    managedKeys: new PrismaConnectManagedKeys(prisma),
+    contractBudgets: { sync: async () => undefined },
     signingKey: () => privateKey,
     publicKey,
     encrypt: (plain) => `enc:${plain.length}`,

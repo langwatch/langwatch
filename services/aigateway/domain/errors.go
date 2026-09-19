@@ -165,6 +165,10 @@ const (
 	// Either the token leaked, or the install was rebuilt and an operator has
 	// to reset the binding.
 	ErrConnectWrongInstance = herr.Code("connect_wrong_instance")
+	// ErrHostedServiceUnavailable means the gateway could not get an answer
+	// from the control plane for a hosted-service call. Nothing was judged and
+	// nothing was charged, so the caller can retry.
+	ErrHostedServiceUnavailable = herr.Code("hosted_service_unavailable")
 	// ErrNoProviderConfigured means the virtual key's bundle carries zero
 	// provider credentials — the organization has no ModelProvider configured.
 	// Without this guard the dispatcher would hand Bifrost a zero-value

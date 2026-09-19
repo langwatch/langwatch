@@ -3,6 +3,7 @@
  */
 import type {
   ConnectManagedKeyPort,
+  ContractBudgetSyncPort,
   CustomerOrganizationPort,
   IssuedLicenseRecord,
   IssuedLicenseRepository,
@@ -51,6 +52,19 @@ export class InMemoryIssuedLicenseRepository
       (candidate) => candidate.tokenHash === tokenHash,
     );
     return row ? { ...row } : null;
+  }
+
+  async findByVirtualKeyId(virtualKeyId: string) {
+    const row = this.rows.find(
+      (candidate) => candidate.virtualKeyId === virtualKeyId,
+    );
+    return row ? { ...row } : null;
+  }
+
+  async findAllByOrganization(organizationId: string) {
+    return this.rows
+      .filter((candidate) => candidate.organizationId === organizationId)
+      .map((row) => ({ ...row }));
   }
 
   async findAll() {
@@ -123,6 +137,14 @@ export class InMemoryCustomerOrganizations implements CustomerOrganizationPort {
   async markSelfHostedCustomer(id: string) {
     const organization = this.organizations.get(id);
     if (organization) organization.selfHostedCustomer = true;
+  }
+}
+
+export class RecordingContractBudgets implements ContractBudgetSyncPort {
+  synced: { organizationId: string; operatorId: string }[] = [];
+
+  async sync(params: { organizationId: string; operatorId: string }) {
+    this.synced.push(params);
   }
 }
 

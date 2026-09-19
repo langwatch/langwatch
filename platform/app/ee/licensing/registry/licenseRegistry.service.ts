@@ -101,6 +101,9 @@ export interface IssuedLicenseRepository {
   ): Promise<IssuedLicenseRecord>;
   findById(id: string): Promise<IssuedLicenseRecord | null>;
   findByTokenHash(tokenHash: string): Promise<IssuedLicenseRecord | null>;
+  findByVirtualKeyId(virtualKeyId: string): Promise<IssuedLicenseRecord | null>;
+  /** Every license of a customer, whatever its state. */
+  findAllByOrganization(organizationId: string): Promise<IssuedLicenseRecord[]>;
   findAll(params: {
     page: number;
     pageSize: number;
@@ -157,10 +160,19 @@ export interface CustomerOrganizationPort {
   markSelfHostedCustomer(id: string): Promise<void>;
 }
 
+/**
+ * The customer's contract budget, which follows the commercial terms of its
+ * licenses. Called after any change that can move those terms.
+ */
+export interface ContractBudgetSyncPort {
+  sync(params: { organizationId: string; operatorId: string }): Promise<void>;
+}
+
 export interface LicenseRegistryDependencies {
   repository: IssuedLicenseRepository;
   organizations: CustomerOrganizationPort;
   managedKeys: ConnectManagedKeyPort;
+  contractBudgets: ContractBudgetSyncPort;
   /** The signing key from the server secret, or undefined when none is set. */
   signingKey: () => string | undefined;
   /** The key licenses are verified against. */
@@ -247,6 +259,7 @@ export class LicenseRegistryService {
       overrides: terms,
     });
     await this.deps.organizations.markSelfHostedCustomer(organization.id);
+    await this.syncContractBudget(row, input.operatorId);
     return { licenseKey, license: this.toView(row) };
   }
 
@@ -325,6 +338,7 @@ export class LicenseRegistryService {
       revokedReason: input.reason,
       pendingDeliveryLicense: null,
     });
+    await this.syncContractBudget(updated, input.operatorId);
     return this.toView(updated);
   }
 
@@ -414,12 +428,13 @@ export class LicenseRegistryService {
 
   /** Entitlements and commercial terms. None of them changes the license itself. */
   async updateTerms(
-    input: { id: string } & LicenseTermsInput,
+    input: { id: string; operatorId: string } & LicenseTermsInput,
   ): Promise<IssuedLicenseView> {
-    const { id, ...terms } = input;
+    const { id, operatorId, ...terms } = input;
     const row = await this.requireRow(id);
     const resolved = this.resolveTerms({ current: row, input: terms });
     const updated = await this.deps.repository.update(row.id, resolved);
+    await this.syncContractBudget(updated, operatorId);
     return this.toView(updated);
   }
 
@@ -445,6 +460,13 @@ export class LicenseRegistryService {
       ...(moves ? { virtualKeyId: null } : {}),
     });
     await this.deps.organizations.markSelfHostedCustomer(organization.id);
+    if (moves && row.organizationId) {
+      await this.deps.contractBudgets.sync({
+        organizationId: row.organizationId,
+        operatorId: input.operatorId,
+      });
+    }
+    await this.syncContractBudget(updated, input.operatorId);
     return this.toView(updated);
   }
 
@@ -459,6 +481,17 @@ export class LicenseRegistryService {
   }): Promise<{ licenses: IssuedLicenseView[]; total: number }> {
     const { rows, total } = await this.deps.repository.findAll(input);
     return { licenses: rows.map((row) => this.toView(row)), total };
+  }
+
+  private async syncContractBudget(
+    row: IssuedLicenseRecord,
+    operatorId: string,
+  ): Promise<void> {
+    if (!row.organizationId) return;
+    await this.deps.contractBudgets.sync({
+      organizationId: row.organizationId,
+      operatorId,
+    });
   }
 
   private async retireManagedKey(

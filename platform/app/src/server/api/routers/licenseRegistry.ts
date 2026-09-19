@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "~/server/db";
 import { adminSurfaceHidden } from "../../../../ee/admin/adminSurfaceHidden";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
-import { createLicenseRegistryService } from "../../../../ee/licensing/registry/issuedLicense.prisma";
+import { createLicenseRegistryService } from "../../../../ee/licensing/registry/composition";
 import { CONNECT_SERVICES } from "../../../../ee/licensing/registry/licenseRegistry.service";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -255,7 +255,10 @@ export const licenseRegistryRouter = createTRPCRouter({
       const operator = requireOperator(
         ctx.session.user.impersonator ?? ctx.session.user,
       );
-      const license = await service().updateTerms(input);
+      const license = await service().updateTerms({
+        ...input,
+        operatorId: operator.userId,
+      });
       const { id, ...terms } = input;
       await auditLog({
         userId: operator.userId,

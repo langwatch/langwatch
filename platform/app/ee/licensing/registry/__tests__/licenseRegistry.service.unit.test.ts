@@ -8,6 +8,7 @@ import {
   InMemoryConnectManagedKeys,
   InMemoryCustomerOrganizations,
   InMemoryIssuedLicenseRepository,
+  RecordingContractBudgets,
 } from "./registryFakes";
 
 const NOW = new Date("2026-09-19T12:00:00.000Z");
@@ -38,17 +39,19 @@ function buildService({
   const repository = new InMemoryIssuedLicenseRepository(NOW);
   const organizations = new InMemoryCustomerOrganizations();
   const managedKeys = new InMemoryConnectManagedKeys();
+  const contractBudgets = new RecordingContractBudgets();
   const service = new LicenseRegistryService({
     repository,
     organizations,
     managedKeys,
+    contractBudgets,
     signingKey: () =>
       signing === "configured" ? langwatchKeys.privateKey : undefined,
     publicKey: langwatchKeys.publicKey,
     encrypt: (plain) => `enc(${Buffer.from(plain).toString("base64")})`,
     now: () => NOW,
   });
-  return { service, repository, organizations, managedKeys };
+  return { service, repository, organizations, managedKeys, contractBudgets };
 }
 
 const issueInput = (organizationId: string) => ({

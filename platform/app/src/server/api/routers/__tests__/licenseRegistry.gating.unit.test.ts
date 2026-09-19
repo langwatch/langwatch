@@ -27,7 +27,7 @@ const { mockService, mockAuditLog } = vi.hoisted(() => ({
 }));
 
 /** The service has its own suite; here it is a spy that says which verb was reached. */
-vi.mock("../../../../../ee/licensing/registry/issuedLicense.prisma", () => ({
+vi.mock("../../../../../ee/licensing/registry/composition", () => ({
   createLicenseRegistryService: () => mockService,
 }));
 

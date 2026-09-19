@@ -201,6 +201,12 @@ func NewRouter(deps RouterDeps) http.Handler {
 			// The OpenAI socket reports its usage to the client, not to us, so
 			// the client posts it back to close the session's spend record.
 			v1.Post("/realtime/sessions/{session_id}/usage", realtimeUsageHandler(deps))
+			// Hosted services (ADR-139). Open to a license token and to a
+			// virtual key alike; what each may do is decided by the control
+			// plane, which knows whether the key belongs to a license.
+			v1.Post("/instant-evals/classify", hostedServiceHandler(deps, domain.HostedInstantEvalsClassify))
+			v1.Get("/usage", hostedServiceHandler(deps, domain.HostedUsage))
+			v1.Put("/budget", hostedServiceHandler(deps, domain.HostedBudget))
 		})
 	})
 
@@ -2008,6 +2014,7 @@ func registerErrorStatusesOnce() {
 	herr.RegisterStatus(domain.ErrConnectLicenseRevoked, http.StatusForbidden)
 	herr.RegisterStatus(domain.ErrConnectLicenseExpired, http.StatusForbidden)
 	herr.RegisterStatus(domain.ErrConnectWrongInstance, http.StatusForbidden)
+	herr.RegisterStatus(domain.ErrHostedServiceUnavailable, http.StatusServiceUnavailable)
 	herr.RegisterStatus(domain.ErrRateLimited, http.StatusTooManyRequests)
 	herr.RegisterStatus(domain.ErrBudgetExceeded, http.StatusPaymentRequired)
 	herr.RegisterStatus(domain.ErrGuardrailBlocked, http.StatusForbidden)

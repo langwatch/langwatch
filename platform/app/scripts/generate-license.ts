@@ -43,7 +43,7 @@
 
 import { prisma as defaultPrisma } from "~/server/db";
 import { generateLicenseKey } from "../ee/licensing/licenseGenerationService";
-import { createLicenseRegistryService } from "../ee/licensing/registry/issuedLicense.prisma";
+import { createLicenseRegistryService } from "../ee/licensing/registry/composition";
 import type { PrismaClient } from "../src/generated/prisma/client";
 
 interface ApplyLicenseInput {

@@ -197,6 +197,14 @@ export const goErrorCodes = {
    */
   guardrail_upstream_unavailable: { service: "aigateway", httpStatus: 503 },
   /**
+   * ErrHostedServiceUnavailable — means the gateway could not get an answer
+   * from the control plane for a hosted-service call. Nothing was judged and
+   * nothing was charged, so the caller can retry.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  hosted_service_unavailable: { service: "aigateway", httpStatus: 503 },
+  /**
    * ErrIdleTimeout — signals the SSE stream went silent past
    * NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS and the engine closed the
    * connection.
