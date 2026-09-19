@@ -29637,6 +29637,26 @@ export interface operations {
                     };
                 };
             };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
         };
     };
     cancelInstantEvalRun: {
@@ -29719,6 +29739,46 @@ export interface operations {
                         startedAt: string | null;
                         /** @description When the run ended. */
                         finishedAt: string | null;
+                    };
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                        };
                     };
                 };
             };
