@@ -1,0 +1,153 @@
+Feature: Hosted services on the gateway host
+  LangWatch serves the hosted services itself, so it meters them itself. A
+  connected install is never asked to report its own hosted usage.
+
+  The gateway authenticates the caller, checks that the license is entitled to
+  the service and that the organization's budget has room, and only then hands
+  the request to the one classifier LangWatch Cloud uses. Spend is recorded at
+  the list rate under the customer organization.
+
+  As the operator of a connected self-hosted install
+  I want hosted services to be metered and capped on the LangWatch side
+  So that I can see what I use and can never be invoiced past the cap I agreed
+
+  Background:
+    Given LangWatch Cloud with the gateway running
+    And customer organization "ACME" with an active registered license
+    And "ACME" has a prepaid commit of 1000 USD and a budget equal to it
+
+  # ============================================================================
+  # POST /v1/instant-evals/classify
+  # ============================================================================
+
+  @integration @unimplemented
+  Scenario: A classify call is judged and metered under the customer organization
+    Given the license is entitled to "instant_evals"
+    When the install sends a text and its questions to the classify route
+    Then it receives the verdicts and the input tokens that were judged
+    And a spend row of request type "instant_eval" is recorded under "ACME" at the list rate
+    And the row names the managed key of that license
+
+  @unit @unimplemented
+  Scenario: The customer is charged the list rate and never sees the provider cost
+    When a classify call judging 1,000,000 input tokens is recorded
+    Then the recorded cost is the list rate for 1,000,000 input tokens
+    And the response carries no provider cost
+
+  @unit @unimplemented
+  Scenario: A license without the entitlement is refused
+    Given the license is not entitled to "instant_evals"
+    When the install calls the classify route
+    Then the call is refused with code "connect_service_not_entitled"
+    And nothing is judged and nothing is recorded
+
+  @unit @unimplemented
+  Scenario: A connected customer is governed by its contract budget, not the free allowance
+    Given "ACME" has no LangWatch Cloud subscription
+    And "ACME" has spent more than the free Instant Evals allowance
+    When the install calls the classify route within its budget
+    Then the call is judged
+
+  @integration @unimplemented
+  Scenario: The budget is a hard stop
+    Given "ACME" has spent its whole budget
+    When the install calls the classify route
+    Then the call is refused with status 402 and code "budget_exceeded"
+    And nothing is judged and nothing is recorded
+
+  @unit @unimplemented
+  Scenario: A request that is too large is refused before it is judged
+    When the install sends a text larger than the classifier accepts
+    Then the call is refused as too large
+    And nothing is recorded
+
+  @unit @unimplemented
+  Scenario: A judge that skips reports the reason and costs nothing
+    Given the judge is rate limited upstream
+    When the install calls the classify route
+    Then the response reports the skip reason
+    And no spend is recorded for the skipped request
+
+  @unit @unimplemented
+  Scenario: Judged text is not stored
+    When a classify call completes
+    Then the judged text and the questions are not written to any LangWatch store
+    And the spend row holds token counts and cost only
+
+  # ============================================================================
+  # GET /v1/usage
+  # ============================================================================
+
+  @integration @unimplemented
+  Scenario: A connected install reads its usage
+    Given "ACME" has spent 120 USD of its 1000 USD budget this term
+    When the install reads the usage route
+    Then it sees 120 USD spent, a cap of 1000 USD and 880 USD of credit remaining
+    And it sees the period the figures cover
+    And it sees "instant_evals" among its entitled services
+
+  @integration @unimplemented
+  Scenario: A virtual key reads its usage too
+    Given a Cloud project with a virtual key and a budget
+    When a call with that virtual key reads the usage route
+    Then it sees the spend and the cap of the budgets that apply to that key
+    And it sees no entitled services, because a virtual key is not a license
+
+  @unit @unimplemented
+  Scenario: Usage says so when live spend is not available
+    Given the spend ledger cannot be read
+    When the install reads the usage route
+    Then the response marks spend as unavailable
+    And it does not report zero spent
+
+  @unit @unimplemented
+  Scenario: Usage without any budget reports no cap
+    Given an organization with no budget
+    When the usage route is read
+    Then the cap and the remaining credit are reported as not set
+
+  # ============================================================================
+  # PUT /v1/budget
+  # ============================================================================
+
+  @integration @unimplemented
+  Scenario: A customer lowers its own cap
+    When the install sets the cap to 400 USD
+    Then the budget of "ACME" is 400 USD
+    And the usage route reports the new cap
+
+  @unit @unimplemented
+  Scenario: A cap above the prepaid commit is refused when overage is off
+    Given on-demand overage is not enabled for "ACME"
+    When the install sets the cap to 1500 USD
+    Then the request is refused with code "connect_budget_above_contract_maximum"
+    And the refusal states the maximum of 1000 USD
+
+  @unit @unimplemented
+  Scenario: A cap may reach the commit plus the agreed overage maximum
+    Given on-demand overage is enabled for "ACME" up to 500 USD
+    When the install sets the cap to 1500 USD
+    Then the budget of "ACME" is 1500 USD
+
+  @unit @unimplemented
+  Scenario: A cap above the commit plus the overage maximum is refused
+    Given on-demand overage is enabled for "ACME" up to 500 USD
+    When the install sets the cap to 1501 USD
+    Then the request is refused with code "connect_budget_above_contract_maximum"
+
+  @unit @unimplemented
+  Scenario: A cap below what is already spent stops further use
+    Given "ACME" has spent 120 USD
+    When the install sets the cap to 100 USD
+    Then the budget of "ACME" is 100 USD
+    And the next classify call is refused with status 402
+
+  @unit @unimplemented
+  Scenario: A virtual key cannot change a budget through this route
+    When a call with a virtual key sets the cap
+    Then the request is refused because only a license may change its contract cap here
+
+  @unit @unimplemented
+  Scenario: A cap that is not a positive amount is refused
+    When the install sets the cap to a negative amount
+    Then the request is refused as invalid

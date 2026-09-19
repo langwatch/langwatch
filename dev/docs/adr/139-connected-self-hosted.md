@@ -1,0 +1,281 @@
+# ADR-139: Connected self-hosted, hosted services metered against the license
+
+**Date:** 2026-09-19
+
+**Status:** Accepted
+
+**Builds on:**
+[ADR-045](045-domain-errors-handled-boundary.md): every refusal below is a
+`HandledError` or an `herr` code with a stable code and customer copy.
+[ADR-137](137-instant-eval-run-is-a-judgment-job.md): the classifier interface
+and the `InstantEvalSpendRecorder` port are that ADR's, reused unchanged in
+shape.
+
+**Behavioural contract:**
+[license-registry](../../../specs/self-hosting/connected-services/license-registry.feature),
+[license-credential](../../../specs/self-hosting/connected-services/license-credential.feature),
+[hosted-services](../../../specs/self-hosting/connected-services/hosted-services.feature),
+[connect-settings](../../../specs/self-hosting/connected-services/connect-settings.feature),
+[license-sync](../../../specs/self-hosting/connected-services/license-sync.feature),
+[connected-billing](../../../specs/self-hosting/connected-services/connected-billing.feature),
+[managed-models-provider](../../../specs/self-hosting/connected-services/managed-models-provider.feature).
+
+## Context
+
+Self-hosted LangWatch is sold as an annual seat license and documented as
+air-gapped. Two products need a LangWatch-hosted backend: Instant Evals, whose
+judge model needs GPUs a customer should not have to run, and managed models in
+the gateway. A regulated customer should be able to open one outbound door, buy
+the usage through the contract they already have, see what they spend and never
+be invoiced past a cap they agreed.
+
+What the code had when this was written:
+
+- A license is base64 JSON `{data, signature}`, RSA-SHA256, verified offline
+  against an embedded public key. It carries no organization id and no instance
+  id. There was no record of issued licenses.
+- Any organization admin on any deployment could post a private key to
+  `license.generate`. That mutation bypassed `licenseGenerationService`, so its
+  validation had drifted from the service.
+- The daily statistics post identified an install as
+  `<organization name>__<organization id>`: one id per organization, changing on
+  rename, and carrying the organization name.
+- The gateway spend spine, organization budgets with a 402, managed virtual
+  keys and the Instant Evals spend recorder already existed.
+
+## Decisions taken by the founder (not reopened here)
+
+1. The license is the credential: `Authorization: Bearer lwl_<sha256 hex>` plus
+   `X-LangWatch-Instance`. The license format does not change.
+2. Two hosts split by data: `gateway.langwatch.ai` carries hosted services,
+   `connect.langwatch.ai` carries license sync and the optional statistics post.
+3. Hard stop when the prepaid commit is spent. On-demand overage only when the
+   contract enables it, with a maximum.
+4. Overage invoiced quarterly in arrears. No air-gapped rate change.
+5. Opt-in per hosted service in Settings, default off, stating what leaves.
+
+## Decisions
+
+### 1. A license registry on LangWatch Cloud
+
+`IssuedLicense` records every license: customer organization, plan, seats,
+term, status, entitled services, seat overage allowance, seat rate, commit,
+overage switch and maximum, instance binding, the managed key, who issued it and
+what it replaces. Status `expired` is derived from the term, never written.
+
+Every issue path writes it through one service: the backoffice, the purchase
+webhook and `scripts/generate-license.ts`. The signing key is read from
+`LANGWATCH_LICENSE_PRIVATE_KEY`. `license.generate` and its form are removed;
+issuing is an operator action in the backoffice.
+
+A license issued before the registry existed is registered by pasting it. The
+signature is verified, and the seats and term are read from the license itself.
+
+The customer organization is marked `selfHostedCustomer`. Hosted usage, budgets,
+credits and invoices attach to it through the models that already exist.
+
+### 2. What the registry stores
+
+The token is `lwl_` plus the SHA-256 of the canonical license, which is
+`JSON.stringify` of the parsed `{data, signature}`. Validity is already judged
+on the re-serialized payload, so hashing the same form means line wrapping or a
+trailing newline in a pasted license can not split an install from its row.
+
+The registry stores `HMAC-SHA256(LW_VIRTUAL_KEY_PEPPER, token)`, the same scheme
+virtual keys use. A read of the table does not yield a working credential.
+
+The one license text the registry holds is a reissued license waiting for
+delivery over sync. It is encrypted at rest and erased when the install first
+presents it. `ORGANIZATION_SAFE_SELECT` no longer returns `Organization.license`
+to the backoffice, because license text is now credential material.
+
+### 3. One managed key per license
+
+Each license resolves to its own virtual key with `purpose: CONNECT`, on a
+dedicated Connect project of the customer organization. Spend rows name a
+virtual key and nothing else, so a key per organization would make two installs
+of one customer indistinguishable in a usage dispute.
+
+Revoking a license revokes its key in the same transaction. The gateway's
+existing change feed then evicts the cached credential. No new revocation
+channel is built. The budget stays at organization scope, so it spans licenses.
+
+### 4. Resolving the credential
+
+The Go gateway did no shape validation and had no negative cache: an unknown
+token was a signed round trip into Postgres every time. For license tokens only,
+the gateway now checks the shape (prefix, 64 hex characters) and keeps a short
+negative cache. Virtual key behaviour is unchanged.
+
+The auth cache was keyed on the token alone, and background refresh runs on a
+detached context. The resolver signatures take a struct with the token and the
+instance id, and the instance id is part of the cache key. A cached credential
+is never served to another instance, and refresh keeps the instance id.
+
+The control plane answers with stable codes, and the gateway's status switch
+maps each one. Left unmapped, a terminal refusal would reach the caller as a
+retryable 503.
+
+| Code | Status | Meaning |
+|---|---|---|
+| `connect_license_not_registered` | 401 | the token is not in the registry |
+| `connect_license_revoked` | 403 | revoked by LangWatch |
+| `connect_license_expired` | 403 | the term has ended |
+| `connect_wrong_instance` | 403 | bound to another instance |
+| `connect_instance_required` | 400 | no `X-LangWatch-Instance` |
+| `connect_service_not_entitled` | 403 | the license does not include the service |
+
+Binding on first use is one conditional update (`WHERE instanceId IS NULL`), so
+two instances racing leave exactly one bound.
+
+### 5. Classify is a gateway route that forwards to the one classifier
+
+The plan asked for a check between a Go route with the judge as an upstream
+provider and an ingress path to a TypeScript handler. Neither is chosen as
+stated.
+
+- A pure Go route would need a second implementation of the judge client, its
+  token accounting and its rate limiter. The judge API is not OpenAI-compatible.
+  Two implementations that both produce billable token counts will drift, and
+  Cloud and connected customers would be charged by different code.
+- The spend wire from the gateway is quantities only by design. It could carry
+  `request_type=instant_eval` and input tokens, so the emitter was not the
+  obstacle. The judge client was.
+- A pure TypeScript route would have to re-implement license authentication,
+  the budget check and the 402.
+
+`POST /v1/instant-evals/classify` is a Go route. It authenticates, checks the
+entitlement, runs the existing budget precheck with its existing 402, then
+forwards over the HMAC-signed internal channel to a control plane handler. That
+handler runs the process's one classifier and records spend through the ADR-137
+recorder, with the license's managed key on the record.
+
+The hosted handler does not consult the free Instant Evals allowance. A customer
+organization has no Cloud subscription, reads as a free plan and would be cut
+off after 1 USD. Its contract budget governs instead.
+
+Budget figures reach the gateway on its 60 second config refresh. Overshoot is
+bounded by the judge's sustained rate: 300,000 tokens a second for 60 seconds at
+0.0546 USD per million tokens is about 1 USD.
+
+`GET /v1/usage` reads live spend from the ClickHouse budget ledger and reports
+`spend_available: false` when it can not. `GatewayBudget.spentUsd` in Postgres
+has had no writer since the ledger cutover and is never read here.
+
+`PUT /v1/budget` accepts a cap between zero and the contract maximum: the commit,
+plus the overage maximum when overage is enabled. Only a license may call it.
+
+### 6. The sync lease is the grace rule
+
+`POST /v1/license/sync` sends the token, the instance id, the version and the
+two seat counts. It answers with a lease:
+`{licenseId, instanceId, services, seatOverageAllowance, issuedAt, validUntil}`,
+signed with the license key pair and verified with the public key the install
+already embeds. `validUntil` is 14 days out.
+
+The install applies the allowance where plan limits are resolved, so every
+caller of the seat guard sees it: licensed seats plus the allowance while a
+lease is valid, licensed seats alone once it is not. Existing members are never
+locked out, which keeps the rule in `specs/licensing/seat-reconciliation.feature`.
+
+A "last successful sync" timestamp in the install's own database was rejected.
+An admin of a self-hosted install can edit a row. A lease that expires needs no
+local clock to be trusted, and the allowance can not be forged without changing
+code. 14 days survives an outage, a holiday and a firewall ticket, and is short
+enough that an install can not take the allowance and stop reporting for a
+quarter.
+
+Going over the licensed seats costs money later, so the install says so when it
+happens: on the invitation and on the members page.
+
+The install's identity is a random UUID created once and stored. It replaces the
+organization-derived id for sync. The statistics post keeps its payload, moves
+to the connect host, and stays off with `DISABLE_USAGE_STATS`.
+`app.langwatch.ai/api/track_usage` keeps working for older installs.
+
+"Seat reconciliation" already names the in-app flow of disabling members down to
+the license. The quarterly billing job is called the seat true-up everywhere.
+
+### 7. Billing
+
+Verified against the Stripe documentation and in Stripe test mode on 2026-09-19.
+
+- Credit grants apply only to metered subscription items reported through
+  Meters, and only when an invoice is finalized. With a quarterly invoice the
+  Stripe credit balance can lag real use by a quarter. The cap and the remaining
+  credit a customer sees therefore come from LangWatch's own budget ledger.
+- Credit grants never apply to one-off invoice items. Seat lines can not draw
+  down the usage commit.
+- A grant applies only when the invoice `period_end` is before `expires_at`. A
+  grant expiring at the end of the term would give the last quarter no credit.
+  The grant expires 7 days after the term ends. The term itself is enforced by
+  the budget and the license.
+- Bank transfer on invoices requires `collection_method=send_invoice`. The
+  transfer type depends on the customer: `us_bank_transfer` for a customer in
+  the United States, `eu_bank_transfer` with a country for EUR. It is an
+  onboarding input. A customer who can use neither is invoiced without bank
+  transfer instructions and finance marks the invoice paid out of band.
+- The repository pins `stripe@15.12.0` at API version `2024-04-10`, which has no
+  credit grants. A global bump would change subscriptions, checkout and webhooks
+  for every Cloud customer, so it is not part of this change. A small adapter
+  extends `StripeResource` for the credit grant endpoints and passes a
+  per-request API version. A probe created a grant, read its balance and voided
+  it in test mode through that adapter.
+
+Onboarding is one idempotent action: invoice customer, quarterly metered
+subscription anchored at the start of the term, credit grant, and an
+organization budget equal to the commit with window `MANUAL` and breach action
+`BLOCK`. Each step stores the id it created, so a run that failed halfway
+resumes.
+
+The seat true-up runs on a daily worker tick and dispatches a checkpointed
+command per license and term quarter. Added seats are the quarter's highest
+reported count minus the seats already invoiced. The amount is
+`added seats * annual seat rate * days remaining / term days`, rounded to the
+cent. It creates pending invoice items, which Stripe adds to the next quarterly
+invoice, so a customer receives one invoice per quarter. A quarter closes one
+day before its boundary so the items land on that quarter's invoice. Seats are
+not credited back mid-term. A license that never synced in a quarter is flagged
+and not invoiced on a guess.
+
+### 8. The `langwatch` provider
+
+A self-hosted gateway gets a provider type `langwatch` that forwards
+OpenAI-compatible calls to the configured gateway endpoint with the license
+token and the instance id. It reuses the OpenAI-compatible dispatch lane that
+`custom` providers use. `langwatch` is added to the closed set of provider
+families; without that, `langwatch/gpt-5-mini` would be read as a model name
+and match no credential without an error. The entitlement is `managed_models`.
+Routing by evaluation results is not built.
+
+## Threat model
+
+| Threat | What happens | Bound |
+|---|---|---|
+| A license key leaks (an email is forwarded) | Once an install has bound the license, a caller without its instance id is refused. Before first use, the attacker can bind first; the real install then sees `connect_wrong_instance`, and LangWatch reissues and revokes. | Spend is capped by the organization budget. License keys stop travelling by email once sync delivers them. |
+| The token and instance id are replayed from another network | Both travel only under TLS to the two hosts. They are bearer secrets; replay with both succeeds. | The budget cap, per-license spend rows that make the use visible, and revocation in seconds. |
+| A revoked license with a cached gateway credential | Revoking revokes the managed key; the change feed evicts the cache entry on the next poll. The 15 minute JWT expiry is the backstop. | While the control plane is unreachable the gateway serves stale entries for up to its 6 hour hard grace. Exposure is capped by the budget. |
+| Hash enumeration | The token is the SHA-256 of a payload that contains a 2048-bit RSA signature. It can not be guessed. The shape check and the negative cache keep a flood of unknown tokens off Postgres. | Refusals never include customer name, seats or term. |
+| A read of the registry table | Rows hold a peppered HMAC of the token, not the token. A held reissued license is encrypted. | The pepper and the encryption key live outside the database. |
+| A self-hosted admin tampers with the client | They can forge nothing LangWatch signs: not a license, not a lease. They can patch the seat guard out of their own build, as they always could. Hosted usage can not be under-reported because LangWatch meters it. Seats can be under-reported by a patched build. | A license that stops syncing is flagged in the backoffice, and the contract's audit clause covers the rest. |
+| A customer changes its own cap | `PUT /v1/budget` is bounded by the contract maximum on the registry row. | The install only offers it to organization admins. |
+
+## Operator names
+
+| Kind | Name |
+|---|---|
+| Env (Cloud) | `LANGWATCH_LICENSE_PRIVATE_KEY`, `LW_VIRTUAL_KEY_PEPPER`, `STRIPE_SECRET_KEY` |
+| Env (install) | `LANGWATCH_CONNECT_ENABLED`, `LANGWATCH_CONNECT_LICENSE_ENDPOINT`, `LANGWATCH_CONNECT_GATEWAY_ENDPOINT`, `DISABLE_USAGE_STATS`, `HTTPS_PROXY` |
+| Helm | `connect.enabled`, `connect.licenseEndpoint`, `connect.gatewayEndpoint` |
+| Gateway host | `POST /v1/instant-evals/classify`, `GET /v1/usage`, `PUT /v1/budget` |
+| Connect host | `POST /v1/license/sync`, `POST /v1/stats` |
+
+## Consequences
+
+- An air-gapped install is unchanged: no sync, no hosted services, hard seat cap.
+- Hosted services fail closed when the gateway is down. The install keeps
+  running for everything else.
+- The Stripe adapter is a second path to the Stripe API with its own API
+  version. It goes away when the SDK is bumped for the whole billing module.
+- DNS and ingress for the two hosts live in the infrastructure repository and
+  are listed in the pull request.
