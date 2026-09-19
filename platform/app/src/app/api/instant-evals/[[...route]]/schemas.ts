@@ -107,7 +107,7 @@ export const instantEvalRunInputSchema = z.object({
     .array(instantEvalShorthandQuestionSchema)
     .optional()
     .describe(
-      "With target: what to ask of each row. One classification asks them all, which is why a three-question run costs about what a one-question run does.",
+      "With target: what to ask of each row. One classification asks them all per row, and the question text is part of what that classification is priced on; the estimate endpoint prices the exact set.",
     ),
   name: z
     .string()
