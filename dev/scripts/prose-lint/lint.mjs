@@ -117,19 +117,52 @@ function loadRules(which, only, skip) {
   const sets = which === "both" ? ["docs", "writing"] : which === "landing" ? ["landing", "writing"] : [which];
   const out = [];
   const seen = new Set();
+  const amend = {};
   for (const set of sets) {
     const file = join(HERE, "rules", `${set}.json`);
     const doc = JSON.parse(readFileSync(file, "utf8"));
+    Object.assign(amend, doc.amend ?? {});
     for (const r of doc.rules) {
       if (seen.has(r.id)) continue; // shared rules (em-dash) run once
       seen.add(r.id);
       const key = `${set}/${r.id}`;
       if (only && !only.has(r.id) && !only.has(key)) continue;
       if (skip && (skip.has(r.id) || skip.has(key))) continue;
-      out.push({ ...r, set, key });
+      const extra = amend[r.id];
+      out.push(extra && r.kind === "judge" ? { ...r, set, key, instruction: `${r.instruction} ${extra}` } : { ...r, set, key });
     }
   }
   return out;
+}
+
+// A sentence the founder supplied verbatim is marked "[founder]" in the copy
+// file. Findings the judge locates on one are reported but never fail the run
+// (landing-page-writing rule 13); regex bans still apply to them.
+const FOUNDER_MARK = /\s*\[founder\]\s*$/;
+const isFounder = (sentence) => typeof sentence === "string" && FOUNDER_MARK.test(sentence.trim());
+
+// The mark sits at the end of the line the founder supplied, so every sentence
+// of that line is his, not only the one carrying the mark. Other lines of the
+// same block (the earlier items of a list, the line above in a paragraph) are
+// not covered by it.
+function founderUnitsIn(paragraphs) {
+  const marked = new Set();
+  const plain = new Set();
+  for (const p of paragraphs) {
+    const founderLines = p.text
+      .split("\n")
+      .map((l) => l.replace(/\s+/g, " ").trim())
+      .filter(isFounder);
+    for (const u of p.units) {
+      if (isFounder(u) || founderLines.some((l) => l.includes(u))) marked.add(u);
+      else plain.add(u);
+    }
+  }
+  // The judge answers with sentence text, so the same sentence on a marked and
+  // an unmarked line is one choice. It keeps failing: the exemption is the
+  // claim that needs proof.
+  for (const u of plain) marked.delete(u);
+  return marked;
 }
 
 // ---------- document parsing ----------
@@ -455,19 +488,34 @@ async function judgeSection(key, rules, section, doc, opts, usage) {
 }
 
 async function locateSentences(key, findings, section, doc, opts, usage) {
-  const fired = findings.filter((f) => f.rule.kind === "judge" && f.probability >= opts.locate);
-  const sentences = section.paragraphs.filter((p) => p.kind !== "code" && p.kind !== "tag").flatMap((p) => p.units);
+  // A finding that can fail the run is located even below --locate: without a
+  // sentence there is no way to tell whether it sits on a founder line.
+  const cutoff = Math.min(opts.locate, opts.threshold);
+  const fired = findings.filter((f) => f.rule.kind === "judge" && f.probability >= cutoff);
+  const prose = section.paragraphs.filter((p) => p.kind !== "code" && p.kind !== "tag");
+  const sentences = prose.flatMap((p) => p.units);
+  const founderUnits = founderUnitsIn(prose);
+  const markFounder = (f) => {
+    f.founder = isFounder(f.sentence) || founderUnits.has(f.sentence);
+  };
   const targets = [];
   for (const f of fired) {
     // rules about the heading or the opener need no second request
     if (f.rule.locate === "heading") f.sentence = section.heading ? `${"#".repeat(section.level)} ${section.heading}` : sentences[0];
     else if (f.rule.locate === "first-sentence") f.sentence = sentences[0];
-    else targets.push(f);
+    else {
+      targets.push(f);
+      continue;
+    }
+    markFounder(f);
   }
   if (targets.length === 0) return;
   const uniq = [...new Set(sentences)].slice(0, MAX_CHOICE_OPTIONS);
   if (uniq.length < 2) {
-    for (const f of targets) f.sentence = uniq[0];
+    for (const f of targets) {
+      f.sentence = uniq[0];
+      markFounder(f);
+    }
     return;
   }
   const criteria = Object.fromEntries(uniq.map((s, i) => [`s${i + 1}`, s.length > 400 ? s.slice(0, 400) + "..." : s]));
@@ -489,6 +537,7 @@ async function locateSentences(key, findings, section, doc, opts, usage) {
     const pick = a.choice;
     f.sentence = criteria[pick];
     f.sentenceProbability = a.probabilities?.[pick];
+    markFounder(f);
   }
 }
 
@@ -503,6 +552,8 @@ async function lintFile(file, rules, opts, key) {
   const doc = { file, frontmatter, firstHeading, firstContentIndex, context: opts.context, sections };
   const skipped = rules.filter((r) => r.context && !opts.context);
   if (skipped.length) console.error(`note: ${skipped.map((r) => r.key).join(", ")} need --context and were skipped`);
+  if (opts.noLocate && /\[founder\]/.test(src))
+    console.error("note: --no-locate skips the sentence-locating request, so [founder] lines are not recognised and can fail the run");
   const usage = { requests: 0, inputTokens: 0 };
   const docCounts = {};
   const results = new Array(sections.length);
@@ -548,11 +599,12 @@ async function lintFile(file, rules, opts, key) {
           sentence: f.sentence ?? null,
           match: f.match ?? null,
           count: f.count ?? null,
+          founder: f.rule.kind === "judge" && (f.founder ?? isFounder(f.sentence)),
         })),
     })),
     usage: { ...usage, usd: round((usage.inputTokens / 1e6) * PRICE_PER_MTOK, 6) },
   };
-  out.failed = out.sections.some((s) => s.findings.some((f) => f.probability >= opts.threshold));
+  out.failed = out.sections.some((s) => s.findings.some((f) => f.probability >= opts.threshold && !f.founder));
   return out;
 }
 
@@ -567,7 +619,7 @@ function printReport(rep, opts) {
     if (s.error) lines.push(`  error: ${s.error}`);
     if (s.findings.length === 0) lines.push("  clean");
     for (const f of s.findings) {
-      const flag = f.probability >= opts.threshold ? "!" : " ";
+      const flag = f.founder ? "f" : f.probability >= opts.threshold ? "!" : " ";
       const extra = f.count && f.count > 1 ? `  (${f.count} hits)` : "";
       lines.push(`${flag} ${f.probability.toFixed(2)}  ${f.rule}  ${f.name}${extra}`);
       if (f.sentence) lines.push(`        > ${f.sentence}`);
