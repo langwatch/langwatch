@@ -32,10 +32,21 @@ export function infoRunKind(args: string[]): InfoRunKind | null {
 	return null;
 }
 
-/** The args the tool receives: the user's own, minus the wrapper's flags. */
+/**
+ * The args the tool receives: the user's own, minus the wrapper's flags.
+ * Everything from `--` on is the tool's, so a `--project` written there is
+ * the tool's own flag and reaches it as typed.
+ */
 export function infoRunToolArgs(args: string[]): string[] {
+	const boundary = args.indexOf("--");
+	const beforeBoundary = boundary === -1 ? args : args.slice(0, boundary);
+	const fromBoundary = boundary === -1 ? [] : args.slice(boundary);
 	// An empty env keeps LANGWATCH_TOOL_MODE out of a parse that only strips.
-	return parseToolModeFlag(parseProjectScopeFlags(args).args, {}).args;
+	const stripped = parseToolModeFlag(
+		parseProjectScopeFlags(beforeBoundary).args,
+		{},
+	).args;
+	return [...stripped, ...fromBoundary];
 }
 
 /** What the wrapper adds under the tool's own help. */

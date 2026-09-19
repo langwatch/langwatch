@@ -85,6 +85,21 @@ describe("infoRunToolArgs", () => {
 			]),
 		).toEqual(["exec", "--help"]);
 	});
+
+	/** @scenario "What follows -- reaches the tool as typed" */
+	it("strips the wrapper's flags before -- and keeps everything from -- on", () => {
+		expect(
+			infoRunToolArgs([
+				"--project",
+				"acme",
+				"--help",
+				"--",
+				"--project",
+				"acme",
+				"--tool-mode=gateway",
+			]),
+		).toEqual(["--help", "--", "--project", "acme", "--tool-mode=gateway"]);
+	});
 });
 
 describe("runWrapped", () => {

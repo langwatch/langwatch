@@ -51,6 +51,13 @@ Feature: Asking a wrapped tool for its help or version has no side effects
       Then codex is launched with `--help` alone
 
     @unit
+    Scenario: What follows -- reaches the tool as typed
+      # Everything from `--` on belongs to the tool, so a `--project` written
+      # there is the tool's own flag.
+      When the user runs `langwatch codex --project acme --help -- --project acme`
+      Then codex is launched with `--help -- --project acme`
+
+    @unit
     Scenario: A help run lists the wrapper's own flags after the tool's help
       When the user runs `langwatch codex --help`
       Then after codex's help the wrapper lists `--project`, `--personal` and `--tool-mode`
