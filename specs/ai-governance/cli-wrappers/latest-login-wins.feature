@@ -183,6 +183,21 @@ Feature: The latest login wins over stale persisted telemetry wiring
       Then claude's wiring is rewritten with the new instance's endpoint and a live ingest key
 
     @unit @cli-wrappers @latest-login-wins @loopback-login
+    Scenario: A host that only starts with localhost is not this machine
+      # The address is parsed and judged by its host. `localhost.acme.test` is
+      # a deployment elsewhere, however its name starts.
+      Given a tool's shell function reports to "https://localhost.acme.test/api/otel"
+      When the user completes `langwatch login --device` against a localhost instance
+      Then the shell function is left exactly as it was
+      And the refresh reports the tool as left alone because the login is on this machine
+
+    @unit @cli-wrappers @latest-login-wins @loopback-login
+    Scenario: A shell function that reports to this machine is refreshed by a login on this machine
+      Given a tool's shell function reports to a localhost instance on another port
+      When the user completes `langwatch login --device` against a localhost instance
+      Then the shell function is rewritten with the new instance's endpoint
+
+    @unit @cli-wrappers @latest-login-wins @loopback-login
     Scenario: A login on this machine leaves a codex gateway block that routes elsewhere
       Given the codex config file carries a langwatch gateway block whose base_url is not on this machine
       When the user completes `langwatch login --device` against a localhost instance

@@ -465,6 +465,51 @@ describe("refreshTelemetryWiringForLogin", () => {
 				expect(result.kept).toBeUndefined();
 			});
 
+			describe("given a tool wired through a shell function", () => {
+				const wireGeminiAt = (endpoint: string) =>
+					persistBlockToRc(
+						"zsh",
+						buildScopedToolFunction(
+							"gemini",
+							buildOtelEnvBlock("gemini", endpoint, STALE_TOKEN),
+							"zsh",
+						),
+						toolMarkers("gemini"),
+					);
+
+				/** @scenario "A host that only starts with localhost is not this machine" */
+				it("leaves a function that reports to localhost.acme.test", async () => {
+					wireGeminiAt("https://localhost.acme.test/api/otel");
+					const before = fs.readFileSync(rcPath("zsh"), "utf8");
+
+					const result = await refreshTelemetryWiringForLogin(localCfg());
+
+					expect(cliApi.mintIngestionKey).not.toHaveBeenCalled();
+					expect(fs.readFileSync(rcPath("zsh"), "utf8")).toBe(before);
+					expect(result.kept).toEqual({
+						tools: ["gemini"],
+						reason: "loopback_login",
+					});
+				});
+
+				/** @scenario "A shell function that reports to this machine is refreshed by a login on this machine" */
+				it("refreshes a function that reports to another port of this machine", async () => {
+					wireGeminiAt("http://[::1]:5580/api/otel");
+					vi.mocked(cliApi.mintIngestionKey).mockResolvedValue({
+						token: CURRENT_TOKEN,
+						prefix: "ik-lw-test",
+						endpoint: "http://localhost:5620/api/otel",
+					});
+
+					const result = await refreshTelemetryWiringForLogin(localCfg());
+
+					const zshrc = fs.readFileSync(rcPath("zsh"), "utf8");
+					expect(zshrc).toContain("http://localhost:5620/api/otel");
+					expect(zshrc).not.toContain("[::1]:5580");
+					expect(result.kept).toBeUndefined();
+				});
+			});
+
 			/** @scenario "A login on this machine leaves a codex gateway block that routes elsewhere" */
 			it("leaves a codex gateway block whose base_url is elsewhere", async () => {
 				writeCodexGatewayBlock({ gatewayUrl: "https://gateway.acme.test" });

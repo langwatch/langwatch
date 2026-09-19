@@ -90,6 +90,7 @@ import {
 	assertCodexTurnHarvest,
 	persistBlockToRc,
 	rcHasLangwatchBlock,
+	rcLangwatchBlockUrls,
 	rcPath,
 	tildify,
 	toolMarkers,
@@ -565,8 +566,8 @@ export function isLoopbackEndpoint(endpoint: string | undefined): boolean {
 
 /**
  * Whether a tool's persisted wiring reports to an instance on this machine.
- * A scoped shell function carries no parsed endpoint, so its block is asked
- * for each loopback spelling.
+ * A scoped shell function carries no parsed endpoint, so every address in
+ * its block is parsed and judged by its host.
  */
 function toolWiringPointsAtLoopback(tool: string): boolean {
 	if (tool === "claude") {
@@ -583,9 +584,7 @@ function toolWiringPointsAtLoopback(tool: string): boolean {
 	}
 	const markers = toolMarkers(tool);
 	return REFRESH_SHELLS.some((shell) =>
-		["://localhost", "://127.0.0.1", "://[::1]"].some((host) =>
-			rcHasLangwatchBlock({ shell, markers, requiredKeys: [host] }),
-		),
+		rcLangwatchBlockUrls({ shell, markers }).some(isLoopbackEndpoint),
 	);
 }
 
