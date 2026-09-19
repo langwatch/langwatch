@@ -3700,7 +3700,7 @@ export interface paths {
         /** @description List the project's runs, newest first. The project comes from the credential, so a run of another project is never listed. Page through them with before, which takes the created time of the oldest run the previous page carried. */
         get: operations["listInstantEvalRuns"];
         put?: never;
-        /** @description Start a run. The statement is accepted, its questions are derived from the eval functions it projects, and the judging happens on the queue: the answer is the queued run, and its progress is read back from the run endpoint. A statement the query policy refuses, one that projects no TraceId, one that projects no eval function, and a row limit past what the plan allows are all refused before anything is judged. */
+        /** @description Start a run. The statement is accepted, its questions are derived from the eval functions it projects, and the judging happens on the queue: the answer is the queued run, and its progress is read back from the run endpoint. A statement the query policy refuses, one that projects no TraceId, one that projects no eval function, and a row limit past what the plan allows are all refused before anything is judged. Instead of a statement you may send a target and your questions, and the statement is written for you and handed back on the run; sending both is refused. */
         post: operations["createInstantEvalRun"];
         delete?: never;
         options?: never;
@@ -3719,7 +3719,7 @@ export interface paths {
         put?: never;
         /**
          * Estimate a run
-         * @description Price a run without starting it. The rows are counted, a sample of their texts is measured, and the cost is worked out from that. Nothing is judged and nothing is charged.
+         * @description Price a run without starting it. The rows are counted, a sample of their texts is measured, and the cost is worked out from that. Nothing is judged and nothing is charged. Takes the same body a run does, a statement or a target with questions.
          */
         post: operations["estimateInstantEvalRun"];
         delete?: never;
@@ -29323,12 +29323,60 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @description The LangWatchQL statement to judge. It must project TraceId and at least one eval function column. */
-                    sql: string;
+                    /** @description The LangWatchQL statement to judge. It must project TraceId and at least one eval function column. Send this or target, never both. */
+                    sql?: string;
                     /** @description Values for the parameters the statement declares. */
                     parameters?: {
                         [key: string]: string | number | boolean | null;
                     };
+                    /**
+                     * @description What one judged row is, in place of a statement: a trace, a conversation, or one model call. The statement is written for you from this and the questions, and handed back on the run so you can edit it and resubmit.
+                     * @enum {string}
+                     */
+                    target?: "traces" | "threads" | "llm_spans";
+                    /** @description With target: a trace filter, in the language the trace explorer's search bar speaks, narrowing which rows are judged. */
+                    filter?: string;
+                    /**
+                     * Format: date-time
+                     * @description With target: the oldest instant to judge, as an ISO 8601 timestamp. Defaults to seven days ago.
+                     */
+                    start?: string;
+                    /**
+                     * Format: date-time
+                     * @description With target: the newest instant to judge. Defaults to now.
+                     */
+                    end?: string;
+                    /** @description With target: what to ask of each row. One classification asks them all, which is why a three-question run costs about what a one-question run does. */
+                    questions?: {
+                        /** @description What to call this question. It becomes the statement's output column and the name every judgement is filed under. Defaults to q1, q2 and so on. */
+                        id?: string;
+                        /**
+                         * @description What kind of answer you want: a yes or no, a rating on a scale, or one of a list of options.
+                         * @default boolean
+                         * @enum {string}
+                         */
+                        kind?: "boolean" | "score" | "category";
+                        /** @description The question, in your own words, as you would write it for a human reader. */
+                        instructions: string;
+                        /** @description For a yes or no question: what counts as yes, then what counts as no. Cannot be combined with a threshold. */
+                        criteria?: string[];
+                        /** @description For a yes or no question: the probability at or above which the answer counts as yes. Without one the column carries the probability itself and a run draws the line at an even chance. */
+                        threshold?: number;
+                        /** @description For a rating: the two ends of the scale. */
+                        range?: {
+                            /** @description The lowest level of the scale. */
+                            min: number;
+                            /** @description The highest level of the scale. */
+                            max: number;
+                        };
+                        /** @description For a choice: the options to pick between. */
+                        options?: {
+                            /** @description What the column holds when this option is the answer. */
+                            name: string;
+                            /** @description What this option means, in your own words. */
+                            description: string;
+                        }[];
+                    }[];
                     /** @description What to call the run. Yours to choose. */
                     name?: string;
                     /** @description Rows the run may judge. Ten thousand by default on every plan, up to one hundred thousand on a plan that lifts the cap. */
@@ -29422,12 +29470,60 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @description The LangWatchQL statement to judge. It must project TraceId and at least one eval function column. */
-                    sql: string;
+                    /** @description The LangWatchQL statement to judge. It must project TraceId and at least one eval function column. Send this or target, never both. */
+                    sql?: string;
                     /** @description Values for the parameters the statement declares. */
                     parameters?: {
                         [key: string]: string | number | boolean | null;
                     };
+                    /**
+                     * @description What one judged row is, in place of a statement: a trace, a conversation, or one model call. The statement is written for you from this and the questions, and handed back on the run so you can edit it and resubmit.
+                     * @enum {string}
+                     */
+                    target?: "traces" | "threads" | "llm_spans";
+                    /** @description With target: a trace filter, in the language the trace explorer's search bar speaks, narrowing which rows are judged. */
+                    filter?: string;
+                    /**
+                     * Format: date-time
+                     * @description With target: the oldest instant to judge, as an ISO 8601 timestamp. Defaults to seven days ago.
+                     */
+                    start?: string;
+                    /**
+                     * Format: date-time
+                     * @description With target: the newest instant to judge. Defaults to now.
+                     */
+                    end?: string;
+                    /** @description With target: what to ask of each row. One classification asks them all, which is why a three-question run costs about what a one-question run does. */
+                    questions?: {
+                        /** @description What to call this question. It becomes the statement's output column and the name every judgement is filed under. Defaults to q1, q2 and so on. */
+                        id?: string;
+                        /**
+                         * @description What kind of answer you want: a yes or no, a rating on a scale, or one of a list of options.
+                         * @default boolean
+                         * @enum {string}
+                         */
+                        kind?: "boolean" | "score" | "category";
+                        /** @description The question, in your own words, as you would write it for a human reader. */
+                        instructions: string;
+                        /** @description For a yes or no question: what counts as yes, then what counts as no. Cannot be combined with a threshold. */
+                        criteria?: string[];
+                        /** @description For a yes or no question: the probability at or above which the answer counts as yes. Without one the column carries the probability itself and a run draws the line at an even chance. */
+                        threshold?: number;
+                        /** @description For a rating: the two ends of the scale. */
+                        range?: {
+                            /** @description The lowest level of the scale. */
+                            min: number;
+                            /** @description The highest level of the scale. */
+                            max: number;
+                        };
+                        /** @description For a choice: the options to pick between. */
+                        options?: {
+                            /** @description What the column holds when this option is the answer. */
+                            name: string;
+                            /** @description What this option means, in your own words. */
+                            description: string;
+                        }[];
+                    }[];
                     /** @description What to call the run. Yours to choose. */
                     name?: string;
                     /** @description Rows the run may judge. Ten thousand by default on every plan, up to one hundred thousand on a plan that lifts the cap. */

@@ -506,6 +506,20 @@ export class LangWatchQLService {
   private cachedInstantEvals?: LangWatchQLInstantEvalSupport;
 
   /**
+   * The database the views live in, and what an unqualified name resolves to.
+   *
+   * Published because a caller that WRITES a statement has to qualify its
+   * tables the way the schema publishes them, and the deployment is what
+   * decides the name: `analytics` in production, a per-suite database under
+   * test. Both the generated statement and the query reference read it off the
+   * service, which is what keeps them naming the same thing on a deployment
+   * where it differs.
+   */
+  get database(): string {
+    return this.deps.database;
+  }
+
+  /**
    * Releases the transport the executor holds, where it holds one.
    *
    * The service does not own the executor's construction, but it is the only
@@ -554,19 +568,6 @@ export class LangWatchQLService {
       views: this.views,
       instantEvalsEnabled: await this.instantEvals().isEnabled({ projectIds }),
     });
-  }
-
-  /**
-   * The database every dataset name is qualified with.
-   *
-   * Published because the query reference assembles the same schema alongside a
-   * second query language, and the qualifier is a deployment fact only this
-   * service holds — `analytics` in production, a per-suite database under test.
-   * Re-deriving it at the reference would mean a document whose dataset names
-   * are unrunnable on exactly the deployments where it differs.
-   */
-  get database(): string {
-    return this.deps.database;
   }
 
   /**

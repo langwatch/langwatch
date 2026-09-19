@@ -77,18 +77,23 @@ export async function estimateInstantEvalRun({
     });
     const isRowsCapped = total > rowLimit;
 
-    const keyPage =
+    // Spread across the whole selection, not its first rows. A statement's own
+    // order correlates with row length on real data, so the first fifty rows
+    // of a ten thousand row selection measured 231 tokens against its true
+    // 1,138 and the price came out five times low.
+    const sampled =
       total === 0
-        ? { keys: [] as const }
-        : await rowSource.keys({
+        ? []
+        : await rowSource.sampleKeys({
             caller,
             sql: accepted.sql,
             parameters: accepted.parameters,
             keyColumns: accepted.keyColumns,
             limit: INSTANT_EVAL_ESTIMATE_SAMPLE,
+            total,
           });
 
-    const sampleIds = [...new Set(keyPage.keys.map((key) => key.traceId))];
+    const sampleIds = [...new Set(sampled.map((key) => key.traceId))];
     const sample =
       sampleIds.length === 0
         ? []

@@ -10,6 +10,8 @@ import { describe, expect, it } from "vitest";
 import { estimateTokensFromBytes } from "~/shared/traces/tokenBudget";
 import type { InstantEvalQuestion } from "../classifier";
 import {
+  estimateInstantEvalRequestTokens,
+  estimateJudgedTextTokens,
   INSTANT_EVAL_CLASSIFIER_LIMITS,
   instantEvalQuestionTokens,
   instantEvalTextBudget,
@@ -70,6 +72,52 @@ describe("given a text longer than its budget", () => {
       });
 
       expect(prepared).toEqual({ text: "short enough", isTruncated: false });
+    });
+  });
+});
+
+describe("given a piece of judged text", () => {
+  describe("when its input tokens are estimated", () => {
+    /** @scenario "Judged text is priced at the classifier's own published byte ratio" */
+    it("counts it at the ratio the classifier publishes", () => {
+      const text = "x".repeat(2_700);
+
+      expect(estimateJudgedTextTokens({ text })).toBe(
+        Math.ceil(2_700 / INSTANT_EVAL_CLASSIFIER_LIMITS.bytesPerInputToken),
+      );
+    });
+
+    /** @scenario "Judged text is priced at the classifier's own published byte ratio" */
+    it("counts more tokens than the four-bytes-per-token prose rule", () => {
+      const text = "x".repeat(4_000);
+
+      // The prose rule is what a conversation transcript is not: measured
+      // against the live API, real transcripts run 2.4 to 2.7 bytes per token,
+      // so pricing them at four understated a run by about a third.
+      expect(estimateJudgedTextTokens({ text })).toBeGreaterThan(
+        estimateTokensFromBytes(text),
+      );
+    });
+
+    it("honours a classifier that publishes a different ratio", () => {
+      const text = "x".repeat(1_000);
+
+      expect(
+        estimateJudgedTextTokens({
+          text,
+          limits: { ...INSTANT_EVAL_CLASSIFIER_LIMITS, bytesPerInputToken: 4 },
+        }),
+      ).toBe(250);
+    });
+
+    it("prices a whole request as the text plus its questions", () => {
+      const text = "x".repeat(2_700);
+      const questions = [question("q1", "the customer sounds annoyed")];
+
+      expect(estimateInstantEvalRequestTokens({ text, questions })).toBe(
+        estimateJudgedTextTokens({ text }) +
+          instantEvalQuestionTokens(questions),
+      );
     });
   });
 });

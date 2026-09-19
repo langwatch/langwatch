@@ -64462,7 +64462,7 @@
             }
           }
         },
-        "description": "Start a run. The statement is accepted, its questions are derived from the eval functions it projects, and the judging happens on the queue: the answer is the queued run, and its progress is read back from the run endpoint. A statement the query policy refuses, one that projects no TraceId, one that projects no eval function, and a row limit past what the plan allows are all refused before anything is judged.",
+        "description": "Start a run. The statement is accepted, its questions are derived from the eval functions it projects, and the judging happens on the queue: the answer is the queued run, and its progress is read back from the run endpoint. A statement the query policy refuses, one that projects no TraceId, one that projects no eval function, and a row limit past what the plan allows are all refused before anything is judged. Instead of a statement you may send a target and your questions, and the statement is written for you and handed back on the run; sending both is refused.",
         "tags": [
           "Instant Evals"
         ],
@@ -64477,7 +64477,7 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 50000,
-                    "description": "The LangWatchQL statement to judge. It must project TraceId and at least one eval function column."
+                    "description": "The LangWatchQL statement to judge. It must project TraceId and at least one eval function column. Send this or target, never both."
                   },
                   "parameters": {
                     "type": "object",
@@ -64499,6 +64499,126 @@
                     },
                     "description": "Values for the parameters the statement declares."
                   },
+                  "target": {
+                    "type": "string",
+                    "enum": [
+                      "traces",
+                      "threads",
+                      "llm_spans"
+                    ],
+                    "description": "What one judged row is, in place of a statement: a trace, a conversation, or one model call. The statement is written for you from this and the questions, and handed back on the run so you can edit it and resubmit."
+                  },
+                  "filter": {
+                    "type": "string",
+                    "maxLength": 4000,
+                    "description": "With target: a trace filter, in the language the trace explorer's search bar speaks, narrowing which rows are judged."
+                  },
+                  "start": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "With target: the oldest instant to judge, as an ISO 8601 timestamp. Defaults to seven days ago."
+                  },
+                  "end": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "With target: the newest instant to judge. Defaults to now."
+                  },
+                  "questions": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64,
+                          "description": "What to call this question. It becomes the statement's output column and the name every judgement is filed under. Defaults to q1, q2 and so on."
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "boolean",
+                            "score",
+                            "category"
+                          ],
+                          "default": "boolean",
+                          "description": "What kind of answer you want: a yes or no, a rating on a scale, or one of a list of options."
+                        },
+                        "instructions": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2000,
+                          "description": "The question, in your own words, as you would write it for a human reader."
+                        },
+                        "criteria": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "minItems": 2,
+                          "maxItems": 2,
+                          "description": "For a yes or no question: what counts as yes, then what counts as no. Cannot be combined with a threshold."
+                        },
+                        "threshold": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1,
+                          "description": "For a yes or no question: the probability at or above which the answer counts as yes. Without one the column carries the probability itself and a run draws the line at an even chance."
+                        },
+                        "range": {
+                          "type": "object",
+                          "properties": {
+                            "min": {
+                              "type": "integer",
+                              "description": "The lowest level of the scale."
+                            },
+                            "max": {
+                              "type": "integer",
+                              "description": "The highest level of the scale."
+                            }
+                          },
+                          "required": [
+                            "min",
+                            "max"
+                          ],
+                          "description": "For a rating: the two ends of the scale."
+                        },
+                        "options": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "description": "What the column holds when this option is the answer."
+                              },
+                              "description": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 500,
+                                "description": "What this option means, in your own words."
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "description"
+                            ]
+                          },
+                          "minItems": 2,
+                          "maxItems": 255,
+                          "description": "For a choice: the options to pick between."
+                        }
+                      },
+                      "required": [
+                        "instructions"
+                      ]
+                    },
+                    "description": "With target: what to ask of each row. One classification asks them all, which is why a three-question run costs about what a one-question run does."
+                  },
                   "name": {
                     "type": "string",
                     "minLength": 1,
@@ -64511,10 +64631,7 @@
                     "maximum": 100000,
                     "description": "Rows the run may judge. Ten thousand by default on every plan, up to one hundred thousand on a plan that lifts the cap."
                   }
-                },
-                "required": [
-                  "sql"
-                ]
+                }
               }
             }
           }
@@ -64842,7 +64959,7 @@
             }
           }
         },
-        "description": "Price a run without starting it. The rows are counted, a sample of their texts is measured, and the cost is worked out from that. Nothing is judged and nothing is charged.",
+        "description": "Price a run without starting it. The rows are counted, a sample of their texts is measured, and the cost is worked out from that. Nothing is judged and nothing is charged. Takes the same body a run does, a statement or a target with questions.",
         "summary": "Estimate a run",
         "tags": [
           "Instant Evals"
@@ -64858,7 +64975,7 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 50000,
-                    "description": "The LangWatchQL statement to judge. It must project TraceId and at least one eval function column."
+                    "description": "The LangWatchQL statement to judge. It must project TraceId and at least one eval function column. Send this or target, never both."
                   },
                   "parameters": {
                     "type": "object",
@@ -64880,6 +64997,126 @@
                     },
                     "description": "Values for the parameters the statement declares."
                   },
+                  "target": {
+                    "type": "string",
+                    "enum": [
+                      "traces",
+                      "threads",
+                      "llm_spans"
+                    ],
+                    "description": "What one judged row is, in place of a statement: a trace, a conversation, or one model call. The statement is written for you from this and the questions, and handed back on the run so you can edit it and resubmit."
+                  },
+                  "filter": {
+                    "type": "string",
+                    "maxLength": 4000,
+                    "description": "With target: a trace filter, in the language the trace explorer's search bar speaks, narrowing which rows are judged."
+                  },
+                  "start": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "With target: the oldest instant to judge, as an ISO 8601 timestamp. Defaults to seven days ago."
+                  },
+                  "end": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "With target: the newest instant to judge. Defaults to now."
+                  },
+                  "questions": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64,
+                          "description": "What to call this question. It becomes the statement's output column and the name every judgement is filed under. Defaults to q1, q2 and so on."
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "boolean",
+                            "score",
+                            "category"
+                          ],
+                          "default": "boolean",
+                          "description": "What kind of answer you want: a yes or no, a rating on a scale, or one of a list of options."
+                        },
+                        "instructions": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2000,
+                          "description": "The question, in your own words, as you would write it for a human reader."
+                        },
+                        "criteria": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "minItems": 2,
+                          "maxItems": 2,
+                          "description": "For a yes or no question: what counts as yes, then what counts as no. Cannot be combined with a threshold."
+                        },
+                        "threshold": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1,
+                          "description": "For a yes or no question: the probability at or above which the answer counts as yes. Without one the column carries the probability itself and a run draws the line at an even chance."
+                        },
+                        "range": {
+                          "type": "object",
+                          "properties": {
+                            "min": {
+                              "type": "integer",
+                              "description": "The lowest level of the scale."
+                            },
+                            "max": {
+                              "type": "integer",
+                              "description": "The highest level of the scale."
+                            }
+                          },
+                          "required": [
+                            "min",
+                            "max"
+                          ],
+                          "description": "For a rating: the two ends of the scale."
+                        },
+                        "options": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 100,
+                                "description": "What the column holds when this option is the answer."
+                              },
+                              "description": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 500,
+                                "description": "What this option means, in your own words."
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "description"
+                            ]
+                          },
+                          "minItems": 2,
+                          "maxItems": 255,
+                          "description": "For a choice: the options to pick between."
+                        }
+                      },
+                      "required": [
+                        "instructions"
+                      ]
+                    },
+                    "description": "With target: what to ask of each row. One classification asks them all, which is why a three-question run costs about what a one-question run does."
+                  },
                   "name": {
                     "type": "string",
                     "minLength": 1,
@@ -64892,10 +65129,7 @@
                     "maximum": 100000,
                     "description": "Rows the run may judge. Ten thousand by default on every plan, up to one hundred thousand on a plan that lifts the cap."
                   }
-                },
-                "required": [
-                  "sql"
-                ]
+                }
               }
             }
           }

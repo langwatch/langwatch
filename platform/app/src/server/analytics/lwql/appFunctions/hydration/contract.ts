@@ -104,6 +104,25 @@ export interface LangWatchQLEvalUsage {
   readonly inputTokens: number;
   /** Distinct texts that came back unjudged, by why. */
   readonly skipped: Readonly<Record<string, number>>;
+  /**
+   * Time the classifications spent waiting for rate-limit capacity, summed
+   * over every attempt.
+   *
+   * Summed rather than elapsed, so it exceeds the wall clock when requests
+   * wait in parallel. What it answers is whether the limiter or the provider
+   * owns a slow run, which is not a question the wall clock can settle.
+   */
+  readonly limiterWaitMs: number;
+}
+
+/** Where the wall clock of one hydration went. */
+export interface LangWatchQLHydrationTimings {
+  /** Reading the traces the keys name, one query per kind. */
+  readonly readMs: number;
+  /** Turning those traces into the text to judge. */
+  readonly computeMs: number;
+  /** Judging that text, including any limiter wait. */
+  readonly judgeMs: number;
 }
 
 export interface LangWatchQLHydrationResult {
@@ -115,6 +134,8 @@ export interface LangWatchQLHydrationResult {
   readonly unresolvedKeys: readonly LangWatchQLUnresolvedKeys[];
   /** Present only when the statement called an eval function. */
   readonly evalUsage?: LangWatchQLEvalUsage;
+  /** Where this hydration's own wall clock went. */
+  readonly timings?: LangWatchQLHydrationTimings;
 }
 
 /** A call, with the catalog entry it names. */

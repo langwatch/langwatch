@@ -12357,13 +12357,13 @@ func (e PostApiTracesSearchJSONBodyFormat) Valid() bool {
 
 // Defines values for PostApiTracesSearchJSONBodyFrom.
 const (
-	Traces PostApiTracesSearchJSONBodyFrom = "traces"
+	PostApiTracesSearchJSONBodyFromTraces PostApiTracesSearchJSONBodyFrom = "traces"
 )
 
 // Valid indicates whether the value is a known member of the PostApiTracesSearchJSONBodyFrom enum.
 func (e PostApiTracesSearchJSONBodyFrom) Valid() bool {
 	switch e {
-	case Traces:
+	case PostApiTracesSearchJSONBodyFromTraces:
 		return true
 	default:
 		return false
@@ -13576,6 +13576,48 @@ func (e ListInstantEvalRuns200JSONResponseBodyRunsStatus) Valid() bool {
 	}
 }
 
+// Defines values for CreateInstantEvalRunJSONBodyQuestionsKind.
+const (
+	CreateInstantEvalRunJSONBodyQuestionsKindBoolean  CreateInstantEvalRunJSONBodyQuestionsKind = "boolean"
+	CreateInstantEvalRunJSONBodyQuestionsKindCategory CreateInstantEvalRunJSONBodyQuestionsKind = "category"
+	CreateInstantEvalRunJSONBodyQuestionsKindScore    CreateInstantEvalRunJSONBodyQuestionsKind = "score"
+)
+
+// Valid indicates whether the value is a known member of the CreateInstantEvalRunJSONBodyQuestionsKind enum.
+func (e CreateInstantEvalRunJSONBodyQuestionsKind) Valid() bool {
+	switch e {
+	case CreateInstantEvalRunJSONBodyQuestionsKindBoolean:
+		return true
+	case CreateInstantEvalRunJSONBodyQuestionsKindCategory:
+		return true
+	case CreateInstantEvalRunJSONBodyQuestionsKindScore:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateInstantEvalRunJSONBodyTarget.
+const (
+	CreateInstantEvalRunJSONBodyTargetLlmSpans CreateInstantEvalRunJSONBodyTarget = "llm_spans"
+	CreateInstantEvalRunJSONBodyTargetThreads  CreateInstantEvalRunJSONBodyTarget = "threads"
+	CreateInstantEvalRunJSONBodyTargetTraces   CreateInstantEvalRunJSONBodyTarget = "traces"
+)
+
+// Valid indicates whether the value is a known member of the CreateInstantEvalRunJSONBodyTarget enum.
+func (e CreateInstantEvalRunJSONBodyTarget) Valid() bool {
+	switch e {
+	case CreateInstantEvalRunJSONBodyTargetLlmSpans:
+		return true
+	case CreateInstantEvalRunJSONBodyTargetThreads:
+		return true
+	case CreateInstantEvalRunJSONBodyTargetTraces:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateInstantEvalRun202JSONResponseBodyQuestionsKind.
 const (
 	CreateInstantEvalRun202JSONResponseBodyQuestionsKindBoolean  CreateInstantEvalRun202JSONResponseBodyQuestionsKind = "boolean"
@@ -13621,6 +13663,48 @@ func (e CreateInstantEvalRun202JSONResponseBodyStatus) Valid() bool {
 	case CreateInstantEvalRun202JSONResponseBodyStatusQueued:
 		return true
 	case CreateInstantEvalRun202JSONResponseBodyStatusRunning:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EstimateInstantEvalRunJSONBodyQuestionsKind.
+const (
+	EstimateInstantEvalRunJSONBodyQuestionsKindBoolean  EstimateInstantEvalRunJSONBodyQuestionsKind = "boolean"
+	EstimateInstantEvalRunJSONBodyQuestionsKindCategory EstimateInstantEvalRunJSONBodyQuestionsKind = "category"
+	EstimateInstantEvalRunJSONBodyQuestionsKindScore    EstimateInstantEvalRunJSONBodyQuestionsKind = "score"
+)
+
+// Valid indicates whether the value is a known member of the EstimateInstantEvalRunJSONBodyQuestionsKind enum.
+func (e EstimateInstantEvalRunJSONBodyQuestionsKind) Valid() bool {
+	switch e {
+	case EstimateInstantEvalRunJSONBodyQuestionsKindBoolean:
+		return true
+	case EstimateInstantEvalRunJSONBodyQuestionsKindCategory:
+		return true
+	case EstimateInstantEvalRunJSONBodyQuestionsKindScore:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EstimateInstantEvalRunJSONBodyTarget.
+const (
+	LlmSpans EstimateInstantEvalRunJSONBodyTarget = "llm_spans"
+	Threads  EstimateInstantEvalRunJSONBodyTarget = "threads"
+	Traces   EstimateInstantEvalRunJSONBodyTarget = "traces"
+)
+
+// Valid indicates whether the value is a known member of the EstimateInstantEvalRunJSONBodyTarget enum.
+func (e EstimateInstantEvalRunJSONBodyTarget) Valid() bool {
+	switch e {
+	case LlmSpans:
+		return true
+	case Threads:
+		return true
+	case Traces:
 		return true
 	default:
 		return false
@@ -26193,6 +26277,12 @@ type ListInstantEvalRuns200JSONResponseBodyRunsStatus string
 
 // CreateInstantEvalRunJSONBody defines parameters for CreateInstantEvalRun.
 type CreateInstantEvalRunJSONBody struct {
+	// End With target: the newest instant to judge. Defaults to now.
+	End *time.Time `json:"end,omitempty"`
+
+	// Filter With target: a trace filter, in the language the trace explorer's search bar speaks, narrowing which rows are judged.
+	Filter *string `json:"filter,omitempty"`
+
 	// Limit Rows the run may judge. Ten thousand by default on every plan, up to one hundred thousand on a plan that lifts the cap.
 	Limit *int `json:"limit,omitempty"`
 
@@ -26202,8 +26292,50 @@ type CreateInstantEvalRunJSONBody struct {
 	// Parameters Values for the parameters the statement declares.
 	Parameters *map[string]*CreateInstantEvalRunJSONBody_Parameters_AdditionalProperties `json:"parameters,omitempty"`
 
-	// Sql The LangWatchQL statement to judge. It must project TraceId and at least one eval function column.
-	Sql string `json:"sql"`
+	// Questions With target: what to ask of each row. One classification asks them all, which is why a three-question run costs about what a one-question run does.
+	Questions *[]struct {
+		// Criteria For a yes or no question: what counts as yes, then what counts as no. Cannot be combined with a threshold.
+		Criteria *[]string `json:"criteria,omitempty"`
+
+		// Id What to call this question. It becomes the statement's output column and the name every judgement is filed under. Defaults to q1, q2 and so on.
+		Id *string `json:"id,omitempty"`
+
+		// Instructions The question, in your own words, as you would write it for a human reader.
+		Instructions string `json:"instructions"`
+
+		// Kind What kind of answer you want: a yes or no, a rating on a scale, or one of a list of options.
+		Kind *CreateInstantEvalRunJSONBodyQuestionsKind `json:"kind,omitempty"`
+
+		// Options For a choice: the options to pick between.
+		Options *[]struct {
+			// Description What this option means, in your own words.
+			Description string `json:"description"`
+
+			// Name What the column holds when this option is the answer.
+			Name string `json:"name"`
+		} `json:"options,omitempty"`
+
+		// Range For a rating: the two ends of the scale.
+		Range *struct {
+			// Max The highest level of the scale.
+			Max int `json:"max"`
+
+			// Min The lowest level of the scale.
+			Min int `json:"min"`
+		} `json:"range,omitempty"`
+
+		// Threshold For a yes or no question: the probability at or above which the answer counts as yes. Without one the column carries the probability itself and a run draws the line at an even chance.
+		Threshold *float32 `json:"threshold,omitempty"`
+	} `json:"questions,omitempty"`
+
+	// Sql The LangWatchQL statement to judge. It must project TraceId and at least one eval function column. Send this or target, never both.
+	Sql *string `json:"sql,omitempty"`
+
+	// Start With target: the oldest instant to judge, as an ISO 8601 timestamp. Defaults to seven days ago.
+	Start *time.Time `json:"start,omitempty"`
+
+	// Target What one judged row is, in place of a statement: a trace, a conversation, or one model call. The statement is written for you from this and the questions, and handed back on the run so you can edit it and resubmit.
+	Target *CreateInstantEvalRunJSONBodyTarget `json:"target,omitempty"`
 }
 
 // CreateInstantEvalRunJSONBodyParameters0 defines parameters for CreateInstantEvalRun.
@@ -26219,6 +26351,12 @@ type CreateInstantEvalRunJSONBodyParameters2 = bool
 type CreateInstantEvalRunJSONBody_Parameters_AdditionalProperties struct {
 	union json.RawMessage
 }
+
+// CreateInstantEvalRunJSONBodyQuestionsKind defines parameters for CreateInstantEvalRun.
+type CreateInstantEvalRunJSONBodyQuestionsKind string
+
+// CreateInstantEvalRunJSONBodyTarget defines parameters for CreateInstantEvalRun.
+type CreateInstantEvalRunJSONBodyTarget string
 
 // CreateInstantEvalRun202JSONResponseBodyParameters0 defines parameters for CreateInstantEvalRun.
 type CreateInstantEvalRun202JSONResponseBodyParameters0 = string
@@ -26242,6 +26380,12 @@ type CreateInstantEvalRun202JSONResponseBodyStatus string
 
 // EstimateInstantEvalRunJSONBody defines parameters for EstimateInstantEvalRun.
 type EstimateInstantEvalRunJSONBody struct {
+	// End With target: the newest instant to judge. Defaults to now.
+	End *time.Time `json:"end,omitempty"`
+
+	// Filter With target: a trace filter, in the language the trace explorer's search bar speaks, narrowing which rows are judged.
+	Filter *string `json:"filter,omitempty"`
+
 	// Limit Rows the run may judge. Ten thousand by default on every plan, up to one hundred thousand on a plan that lifts the cap.
 	Limit *int `json:"limit,omitempty"`
 
@@ -26251,8 +26395,50 @@ type EstimateInstantEvalRunJSONBody struct {
 	// Parameters Values for the parameters the statement declares.
 	Parameters *map[string]*EstimateInstantEvalRunJSONBody_Parameters_AdditionalProperties `json:"parameters,omitempty"`
 
-	// Sql The LangWatchQL statement to judge. It must project TraceId and at least one eval function column.
-	Sql string `json:"sql"`
+	// Questions With target: what to ask of each row. One classification asks them all, which is why a three-question run costs about what a one-question run does.
+	Questions *[]struct {
+		// Criteria For a yes or no question: what counts as yes, then what counts as no. Cannot be combined with a threshold.
+		Criteria *[]string `json:"criteria,omitempty"`
+
+		// Id What to call this question. It becomes the statement's output column and the name every judgement is filed under. Defaults to q1, q2 and so on.
+		Id *string `json:"id,omitempty"`
+
+		// Instructions The question, in your own words, as you would write it for a human reader.
+		Instructions string `json:"instructions"`
+
+		// Kind What kind of answer you want: a yes or no, a rating on a scale, or one of a list of options.
+		Kind *EstimateInstantEvalRunJSONBodyQuestionsKind `json:"kind,omitempty"`
+
+		// Options For a choice: the options to pick between.
+		Options *[]struct {
+			// Description What this option means, in your own words.
+			Description string `json:"description"`
+
+			// Name What the column holds when this option is the answer.
+			Name string `json:"name"`
+		} `json:"options,omitempty"`
+
+		// Range For a rating: the two ends of the scale.
+		Range *struct {
+			// Max The highest level of the scale.
+			Max int `json:"max"`
+
+			// Min The lowest level of the scale.
+			Min int `json:"min"`
+		} `json:"range,omitempty"`
+
+		// Threshold For a yes or no question: the probability at or above which the answer counts as yes. Without one the column carries the probability itself and a run draws the line at an even chance.
+		Threshold *float32 `json:"threshold,omitempty"`
+	} `json:"questions,omitempty"`
+
+	// Sql The LangWatchQL statement to judge. It must project TraceId and at least one eval function column. Send this or target, never both.
+	Sql *string `json:"sql,omitempty"`
+
+	// Start With target: the oldest instant to judge, as an ISO 8601 timestamp. Defaults to seven days ago.
+	Start *time.Time `json:"start,omitempty"`
+
+	// Target What one judged row is, in place of a statement: a trace, a conversation, or one model call. The statement is written for you from this and the questions, and handed back on the run so you can edit it and resubmit.
+	Target *EstimateInstantEvalRunJSONBodyTarget `json:"target,omitempty"`
 }
 
 // EstimateInstantEvalRunJSONBodyParameters0 defines parameters for EstimateInstantEvalRun.
@@ -26268,6 +26454,12 @@ type EstimateInstantEvalRunJSONBodyParameters2 = bool
 type EstimateInstantEvalRunJSONBody_Parameters_AdditionalProperties struct {
 	union json.RawMessage
 }
+
+// EstimateInstantEvalRunJSONBodyQuestionsKind defines parameters for EstimateInstantEvalRun.
+type EstimateInstantEvalRunJSONBodyQuestionsKind string
+
+// EstimateInstantEvalRunJSONBodyTarget defines parameters for EstimateInstantEvalRun.
+type EstimateInstantEvalRunJSONBodyTarget string
 
 // GetInstantEvalRun200JSONResponseBodyParameters0 defines parameters for GetInstantEvalRun.
 type GetInstantEvalRun200JSONResponseBodyParameters0 = string

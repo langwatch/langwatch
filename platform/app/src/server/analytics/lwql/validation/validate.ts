@@ -84,6 +84,7 @@ import {
   lwqlAppFunction,
   lwqlAppFunctionSignature,
 } from "../appFunctions/catalog";
+import { isEvalFunctionName } from "../appFunctions/evalCatalog";
 import type {
   LangWatchQLAppFunctionCall,
   LangWatchQLAppFunctionOption,
@@ -898,9 +899,33 @@ function directAppFunctionCall(
 // the refusal has to happen here.
 // ---------------------------------------------------------------------------
 
-const APP_FUNCTION_POSITION_MESSAGE =
-  "can only be used in the top-level SELECT list of a single SELECT statement, with an alias. " +
+const APP_FUNCTION_POSITION_PLACE =
+  "can only be used in the top-level SELECT list of a single SELECT statement, with an alias.";
+
+/**
+ * What to do instead, which depends on what the function returns.
+ *
+ * An extraction function hands back a value the caller can project and then
+ * filter, group or sort on. An eval function does not: its answer is decided
+ * after the query has run, so there is no column in the same statement to put
+ * in a WHERE. Telling the caller to "filter on a plain column instead" sends
+ * them looking for a column that cannot exist, so they are pointed at the two
+ * things that do work.
+ */
+const APP_FUNCTION_POSITION_EXTRACTION_ADVICE =
   "Project it there and filter, group or sort on a plain column instead.";
+
+const APP_FUNCTION_POSITION_EVAL_ADVICE =
+  "Its answer is decided after the query runs, so there is no column in this statement to filter on. " +
+  "To keep only the matches, filter the rows it returns, " +
+  "or run the statement as an Instant Eval and read `instant-eval results --matched`.";
+
+function appFunctionPositionMessage(name: string): string {
+  const advice = isEvalFunctionName(name)
+    ? APP_FUNCTION_POSITION_EVAL_ADVICE
+    : APP_FUNCTION_POSITION_EXTRACTION_ADVICE;
+  return `The function "${echoIdentifier(name)}" ${APP_FUNCTION_POSITION_PLACE} ${advice}`;
+}
 
 function reportAppFunctionPosition({
   name,
@@ -917,7 +942,7 @@ function reportAppFunctionPosition({
     ctx,
     frame,
     code: "APP_FUNCTION_POSITION",
-    message: `The function "${echoIdentifier(name)}" ${APP_FUNCTION_POSITION_MESSAGE}`,
+    message: appFunctionPositionMessage(name),
     node,
   });
 }

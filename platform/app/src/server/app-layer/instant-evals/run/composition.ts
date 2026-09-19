@@ -59,11 +59,15 @@ export const INSTANT_EVAL_PAGE_PARAMETER = "instant_eval_page_ids";
 export const INSTANT_EVAL_AFTER_PARAMETER = "instant_eval_after_trace_id";
 export const INSTANT_EVAL_AFTER_SPAN_PARAMETER = "instant_eval_after_span_id";
 
+/** The bucket count a spread sample divides the selection into. */
+export const INSTANT_EVAL_SAMPLE_BUCKET_PARAMETER = "instant_eval_buckets";
+
 /** Every parameter name this surface owns. */
 export const INSTANT_EVAL_RESERVED_PARAMETERS = [
   INSTANT_EVAL_PAGE_PARAMETER,
   INSTANT_EVAL_AFTER_PARAMETER,
   INSTANT_EVAL_AFTER_SPAN_PARAMETER,
+  INSTANT_EVAL_SAMPLE_BUCKET_PARAMETER,
 ] as const;
 
 /** Whether a parameter name belongs to the run rather than to the caller. */
@@ -179,6 +183,65 @@ export function instantEvalKeyPassSql({
  * matching the pair. That over-fetch is what the page's own row ceiling
  * bounds.
  */
+/**
+ * A sample of the selection's keys, spread evenly across all of it.
+ *
+ * Why not the first N keys: the key pass returns rows in the statement's own
+ * order, so the first fifty of a statement ordered by conversation id are the
+ * fifty lowest ids. When row length correlates with that order, and on real
+ * data it does, a head sample measures the wrong rows. Measured on a ten
+ * thousand conversation selection, the head fifty averaged 231 tokens against
+ * the selection's true 1,138, so the price came out five times low.
+ *
+ * Why a hash bucket rather than every Nth row: striding needs the whole key
+ * list, and reading a hundred thousand keys to choose fifty of them is the
+ * read the count pass exists to avoid. `cityHash64` over the key spreads the
+ * same fifty rows across the selection in one query that returns fifty rows,
+ * and it does it uniformly rather than evenly, so a selection whose length
+ * varies periodically cannot line up with the stride.
+ *
+ * The caller's statement is untouched inside the subquery, exactly as the page
+ * pass leaves it (ADR-082/084/101): the bucket predicate is the wrapper's.
+ */
+export function instantEvalSampleKeysSql({
+  sql,
+  keyColumns,
+  limit,
+}: {
+  readonly sql: string;
+  /** The optional key columns the probe found, in catalog order. */
+  readonly keyColumns: readonly string[];
+  readonly limit: number;
+}): string {
+  const projection = [INSTANT_EVAL_TRACE_COLUMN, ...keyColumns]
+    .map((column) => `q.${column} AS ${column}`)
+    .join(", ");
+  return (
+    `SELECT ${projection}\nFROM (\n${sql}\n) AS q` +
+    `\nWHERE cityHash64(q.${INSTANT_EVAL_TRACE_COLUMN}) % ` +
+    `{${INSTANT_EVAL_SAMPLE_BUCKET_PARAMETER}:UInt64} = 0` +
+    `\nORDER BY q.${INSTANT_EVAL_TRACE_COLUMN}\nLIMIT ${limit}`
+  );
+}
+
+/**
+ * How many buckets a selection of this size is divided into to sample it.
+ *
+ * One in every `total / limit` rows, so a selection of ten thousand sampled
+ * fifty at a time draws one row in two hundred. Never below one, which is the
+ * sample-everything case a selection smaller than the sample needs.
+ */
+export function instantEvalSampleBuckets({
+  total,
+  limit,
+}: {
+  readonly total: number;
+  readonly limit: number;
+}): number {
+  if (total <= limit || limit <= 0) return 1;
+  return Math.max(1, Math.floor(total / limit));
+}
+
 export function instantEvalPagePassSql(sql: string): string {
   return (
     `SELECT * FROM (\n${sql}\n) AS q` +

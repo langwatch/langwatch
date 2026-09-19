@@ -30,8 +30,13 @@ import type {
   InstantEvalJudgement,
   InstantEvalQuestion,
 } from "~/server/app-layer/instant-evals/classifier/classifier";
-import { estimateInstantEvalRequestTokens } from "~/server/app-layer/instant-evals/classifier/token-budget";
+import {
+  estimateInstantEvalRequestTokens,
+  instantEvalTextBudget,
+} from "~/server/app-layer/instant-evals/classifier/token-budget";
 import { InstantEvalQueryBudgetExceededError } from "~/server/app-layer/instant-evals/errors";
+import { estimateTokensFromBytes } from "~/shared/traces/tokenBudget";
+import { lwqlAppFunction } from "../catalog";
 import { instantEvalQuestionFor, judgedCellValue } from "../evalQuestions";
 import { computeAppFunctionValue } from "./compute";
 import {
@@ -51,6 +56,8 @@ interface JudgementUnit {
   /** The calls whose cell this unit's verdicts fill. */
   readonly calls: readonly ResolvedCall[];
   readonly questions: readonly InstantEvalQuestion[];
+  /** Whether this text was cut to fit the judge before it was sent. */
+  readonly isTruncated: boolean;
 }
 
 export interface EvaluationOutcome {
@@ -76,10 +83,17 @@ export async function evaluateCalls({
   );
   const values = emptyValues(evalCalls);
   if (evalCalls.length === 0) {
-    return { values, usage: { requests: 0, inputTokens: 0, skipped: {} } };
+    return {
+      values,
+      usage: { requests: 0, inputTokens: 0, skipped: {}, limiterWaitMs: 0 },
+    };
   }
 
-  const units = await buildUnits({ evalCalls, traces });
+  const units = await buildUnits({
+    evalCalls,
+    traces,
+    limits: support.classifier.limits,
+  });
   assertQueryBudget({
     units,
     budget: support.queryTokenBudget,
@@ -93,6 +107,7 @@ export async function evaluateCalls({
     requests: 0,
     inputTokens: 0,
     skipped: {} as Record<string, number>,
+    limiterWaitMs: 0,
   };
   let failures = 0;
 
@@ -185,13 +200,20 @@ function textSignature(entry: ResolvedCall): string {
 async function buildUnits({
   evalCalls,
   traces,
+  limits,
 }: {
   evalCalls: readonly ResolvedCall[];
   traces: FetchedTraces;
+  limits: InstantEvalClassifierLimits;
 }): Promise<JudgementUnit[]> {
   const grouped = new Map<
     string,
-    { keyId: string; text: string; calls: ResolvedCall[] }
+    {
+      keyId: string;
+      text: string;
+      calls: ResolvedCall[];
+      parts: readonly string[];
+    }
   >();
 
   for (const entry of evalCalls) {
@@ -205,22 +227,87 @@ async function buildUnits({
       }
       const text = await textFor({ entry, parts, traces });
       if (text === null || text === "") continue;
-      grouped.set(unitId, { keyId, text, calls: [entry] });
+      grouped.set(unitId, { keyId, text, calls: [entry], parts });
     }
   }
 
-  return [...grouped.values()].map((unit) => ({
-    keyId: unit.keyId,
-    text: unit.text,
-    calls: unit.calls,
-    questions: unit.calls.map((entry) =>
-      instantEvalQuestionFor({
-        definition: entry.definition,
-        options: entry.call.options,
-        column: entry.call.column,
-      }),
-    ),
-  }));
+  return await Promise.all(
+    [...grouped.values()].map(async (unit) => {
+      const questions = unit.calls.map((entry) =>
+        instantEvalQuestionFor({
+          definition: entry.definition,
+          options: entry.call.options,
+          column: entry.call.column,
+        }),
+      );
+      const fitted = await withinJudgeBudget({
+        text: unit.text,
+        entry: unit.calls[0],
+        parts: unit.parts,
+        traces,
+        questions,
+        limits,
+      });
+      return {
+        keyId: unit.keyId,
+        text: fitted.text,
+        calls: unit.calls,
+        questions,
+        isTruncated: fitted.isTruncated,
+      };
+    }),
+  );
+}
+
+/**
+ * A conversation too long for the judge, re-rendered under the judge's budget.
+ *
+ * `conversation` carries no budget of its own, so a thread longer than the
+ * classifier's state arrives here whole. Left alone the classifier cuts it by
+ * bytes, which keeps the opening, drops the close and says nothing about what
+ * went missing. The close is the part most questions are about, so the cut is
+ * made here instead, through the same renderer `conversation_bounded` uses:
+ * both ends are kept and a marker names how many turns went from the middle.
+ *
+ * Measured with the renderer's own ruler rather than the classifier's denser
+ * one, so the text that comes back satisfies the check the classifier is about
+ * to make and is not then cut a second time.
+ */
+async function withinJudgeBudget({
+  text,
+  entry,
+  parts,
+  traces,
+  questions,
+  limits,
+}: {
+  text: string;
+  entry: ResolvedCall | undefined;
+  parts: readonly string[];
+  traces: FetchedTraces;
+  questions: readonly InstantEvalQuestion[];
+  limits: InstantEvalClassifierLimits;
+}): Promise<{ text: string; isTruncated: boolean }> {
+  if (entry?.source?.name !== "conversation") {
+    return { text, isTruncated: false };
+  }
+  const budget = instantEvalTextBudget({ questions, limits });
+  if (budget === null || estimateTokensFromBytes(text) <= budget) {
+    return { text, isTruncated: false };
+  }
+
+  const bounded = lwqlAppFunction("conversation_bounded");
+  if (!bounded) return { text, isTruncated: false };
+  const rendered = await computeAppFunctionValue({
+    definition: bounded,
+    options: [budget, ""],
+    parts,
+    traces,
+  });
+  if (!rendered.isResolved || typeof rendered.value !== "string") {
+    return { text, isTruncated: false };
+  }
+  return { text: rendered.value, isTruncated: true };
 }
 
 /**
@@ -332,10 +419,15 @@ function record({
     requests: number;
     inputTokens: number;
     skipped: Record<string, number>;
+    limiterWaitMs: number;
   };
 }): void {
   usage.requests += 1;
   usage.inputTokens += judgement.inputTokens;
+  usage.limiterWaitMs += judgement.limiterWaitMs ?? 0;
+  // A unit cut to fit before it was sent is a truncated row even though the
+  // classifier had nothing left to cut.
+  const isTextTruncated = judgement.isTextTruncated || unit.isTruncated;
   if (judgement.skippedReason) {
     usage.skipped[judgement.skippedReason] =
       (usage.skipped[judgement.skippedReason] ?? 0) + 1;
@@ -356,7 +448,7 @@ function record({
     // would name one event twice under two different causes.
     values.get(entry.call.column)?.set(unit.keyId, {
       value,
-      isTruncated: judgement.isTextTruncated,
+      isTruncated: isTextTruncated,
       isResolved: true,
     });
   }

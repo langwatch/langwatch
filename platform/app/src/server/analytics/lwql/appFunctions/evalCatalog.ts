@@ -298,6 +298,19 @@ export function statementMightCallEvalFunction(sql: string): boolean {
   return EVAL_FUNCTION_MENTION.test(sql);
 }
 
+/**
+ * Whether a name is one of the eval functions.
+ *
+ * Its caller is the position refusal, which tells a caller what to do instead.
+ * The advice differs by kind: an extraction function returns a column you can
+ * go on to filter on, and an eval function does not.
+ */
+export function isEvalFunctionName(name: string): boolean {
+  return LWQL_EVAL_FUNCTION_CATALOG.some(
+    (definition) => definition.name === name.toLowerCase(),
+  );
+}
+
 /** Whether a validated statement actually judges anything. */
 export function callsEvalFunction(
   calls: readonly { readonly function: string }[],

@@ -184,8 +184,10 @@ export class JevInstantEvalClassifier implements InstantEvalClassifier {
     // The questions cost the same on every attempt; the text may be cut
     // between them, so it is measured per send.
     const questionTokens = instantEvalQuestionTokens(request.questions);
+    let limiterWaitMs = 0;
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      const waitedFrom = Date.now();
       await this.options.limiter.acquire(
         {
           tokens: estimateTokensFromBytes(state.text) + questionTokens,
@@ -193,6 +195,7 @@ export class JevInstantEvalClassifier implements InstantEvalClassifier {
         },
         signal,
       );
+      limiterWaitMs += Date.now() - waitedFrom;
       const outcome = await this.send({
         text: state.text,
         request,
@@ -205,10 +208,10 @@ export class JevInstantEvalClassifier implements InstantEvalClassifier {
         state,
         isLastAttempt: attempt === MAX_ATTEMPTS,
       });
-      if (settled) return settled;
+      if (settled) return { ...settled, limiterWaitMs };
       if (outcome.kind === "retry") await this.sleep(outcome.waitMs, signal);
     }
-    return instantEvalSkipped("classifier_rate_limited");
+    return { ...instantEvalSkipped("classifier_rate_limited"), limiterWaitMs };
   }
 
   /** One send, classified into an {@link Attempt}. */

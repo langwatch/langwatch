@@ -96,6 +96,47 @@ describe("given an eval function over an extraction function", () => {
   });
 });
 
+describe("given a call outside the projection", () => {
+  describe("when the function is an eval function", () => {
+    /** @scenario "An eval function used outside the projection is told what to do instead" */
+    it("does not send the caller looking for a column to filter on", () => {
+      const refused = validateLangWatchQL({
+        sql:
+          "SELECT ConversationId FROM analytics.trace_metrics " +
+          "WHERE eval(CapturedOutput, 'the customer sounds annoyed')",
+        ...POLICY,
+      });
+
+      expect(codesOf(refused)).toContain("APP_FUNCTION_POSITION");
+      // An eval answers after the query has run, so the statement holds no
+      // column carrying its verdict. The old advice pointed at one.
+      expect(messagesOf(refused)).not.toContain("on a plain column instead");
+      expect(messagesOf(refused)).toContain(
+        "there is no column in this statement to filter on",
+      );
+      expect(messagesOf(refused)).toContain("instant-eval results --matched");
+    });
+  });
+
+  describe("when the function is an extraction function", () => {
+    /** @scenario "An extraction function used outside the projection keeps its advice" */
+    it("still points at projecting it and filtering on a plain column", () => {
+      const refused = validateLangWatchQL({
+        sql:
+          "SELECT ConversationId FROM analytics.trace_metrics " +
+          "WHERE conversation(ConversationId) != ''",
+        ...POLICY,
+      });
+
+      expect(codesOf(refused)).toContain("APP_FUNCTION_POSITION");
+      expect(messagesOf(refused)).toContain(
+        "filter, group or sort on a plain column instead",
+      );
+      expect(messagesOf(refused)).not.toContain("instant-eval results");
+    });
+  });
+});
+
 describe("given nesting the validator does not allow", () => {
   describe("when an eval is nested inside an eval", () => {
     /** @scenario "An eval nested inside an eval is refused" */

@@ -42,7 +42,30 @@ export const INSTANT_EVAL_CLASSIFIER_LIMITS: InstantEvalClassifierLimits = {
   maxCategoryOptions: 255,
   maxScoreLevels: 10,
   reserveTokens: 768,
+  bytesPerInputToken: 2.7,
 };
+
+/**
+ * Estimated input tokens in a piece of judged text.
+ *
+ * Not {@link estimateTokensFromBytes}, which divides by four: that rule is
+ * calibrated on English prose and a run judges conversation transcripts in
+ * markdown, which tokenise nearly half again as dense. Measured against the
+ * live API on real transcripts the ratio is 2.4 to 2.7 bytes per token, so the
+ * generic rule under-counts a run by about a third, which is a third off the
+ * price a caller reads before spending, and a third of the state cap a request
+ * may silently exceed.
+ */
+export function estimateJudgedTextTokens({
+  text,
+  limits = INSTANT_EVAL_CLASSIFIER_LIMITS,
+}: {
+  text: string;
+  limits?: InstantEvalClassifierLimits;
+}): number {
+  const bytes = new TextEncoder().encode(text).length;
+  return Math.ceil(bytes / Math.max(0.1, limits.bytesPerInputToken));
+}
 
 /** Estimated tokens the questions themselves occupy. */
 export function instantEvalQuestionTokens(
@@ -82,7 +105,17 @@ export interface PreparedInstantEvalText {
   readonly isTruncated: boolean;
 }
 
-/** Cuts a text to a budget, on a character boundary. */
+/**
+ * Cuts a text to a budget, on a character boundary.
+ *
+ * Measured with {@link estimateTokensFromBytes} rather than with the
+ * classifier's own denser ratio, because the extraction functions cut their
+ * `max_tokens` argument with that same rule: a conversation rendered to fit
+ * eight thousand tokens must not be re-measured here by a different ruler and
+ * cut a second time. Pricing is the other way round: it has no matching cut to
+ * agree with, so it uses the measured ratio and reports what the request will
+ * really carry.
+ */
 export function prepareInstantEvalText({
   text,
   budgetTokens,
@@ -119,7 +152,7 @@ export function estimateInstantEvalRequestTokens({
   const questionTokens = instantEvalQuestionTokens(questions);
   const budget = limits.stateTokens - questionTokens - limits.reserveTokens;
   const textTokens = Math.min(
-    estimateTokensFromBytes(text),
+    estimateJudgedTextTokens({ text, limits }),
     Math.max(0, budget),
   );
   return textTokens + questionTokens;

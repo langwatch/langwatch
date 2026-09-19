@@ -65,7 +65,8 @@ def sync_detailed(
     projects, and the judging happens on the queue: the answer is the queued run, and its progress is
     read back from the run endpoint. A statement the query policy refuses, one that projects no TraceId,
     one that projects no eval function, and a row limit past what the plan allows are all refused before
-    anything is judged.
+    anything is judged. Instead of a statement you may send a target and your questions, and the
+    statement is written for you and handed back on the run; sending both is refused.
 
     Args:
         body (CreateInstantEvalRunBody):
@@ -98,7 +99,8 @@ def sync(
     projects, and the judging happens on the queue: the answer is the queued run, and its progress is
     read back from the run endpoint. A statement the query policy refuses, one that projects no TraceId,
     one that projects no eval function, and a row limit past what the plan allows are all refused before
-    anything is judged.
+    anything is judged. Instead of a statement you may send a target and your questions, and the
+    statement is written for you and handed back on the run; sending both is refused.
 
     Args:
         body (CreateInstantEvalRunBody):
@@ -126,7 +128,8 @@ async def asyncio_detailed(
     projects, and the judging happens on the queue: the answer is the queued run, and its progress is
     read back from the run endpoint. A statement the query policy refuses, one that projects no TraceId,
     one that projects no eval function, and a row limit past what the plan allows are all refused before
-    anything is judged.
+    anything is judged. Instead of a statement you may send a target and your questions, and the
+    statement is written for you and handed back on the run; sending both is refused.
 
     Args:
         body (CreateInstantEvalRunBody):
@@ -157,7 +160,8 @@ async def asyncio(
     projects, and the judging happens on the queue: the answer is the queued run, and its progress is
     read back from the run endpoint. A statement the query policy refuses, one that projects no TraceId,
     one that projects no eval function, and a row limit past what the plan allows are all refused before
-    anything is judged.
+    anything is judged. Instead of a statement you may send a target and your questions, and the
+    statement is written for you and handed back on the run; sending both is refused.
 
     Args:
         body (CreateInstantEvalRunBody):

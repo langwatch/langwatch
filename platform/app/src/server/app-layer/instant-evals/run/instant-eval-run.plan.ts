@@ -57,8 +57,10 @@ export async function planRun(
   });
   const isCapped = total > row.rowLimit;
 
-  // The first rows' texts, read without judging any of them, which is what
-  // the page size is chosen from.
+  // A spread of the selection's texts, read without judging any of them, which
+  // is what the page size is chosen from. Spread rather than the first rows for
+  // the same reason the estimate is: the statement's own order correlates with
+  // row length, so a head sample sizes the page for the wrong rows.
   const sample =
     total === 0
       ? []
@@ -69,6 +71,7 @@ export async function planRun(
           parameters,
           keyColumns,
           projectId,
+          total: Math.min(total, row.rowLimit),
         });
   const averageTextBytes = instantEvalAverageTextBytes({
     rows: sample,
@@ -86,7 +89,7 @@ export async function planRun(
   };
 }
 
-/** The first rows' judged text, read without judging any of it. */
+/** A spread of the selection's judged text, read without judging any of it. */
 async function sampleTexts({
   deps,
   row,
@@ -94,6 +97,7 @@ async function sampleTexts({
   parameters,
   keyColumns,
   projectId,
+  total,
 }: {
   deps: InstantEvalRunExecutorDependencies;
   row: { sql: string; plan: unknown };
@@ -101,21 +105,23 @@ async function sampleTexts({
   parameters: Record<string, unknown>;
   keyColumns: readonly string[];
   projectId: string;
+  total: number;
 }): Promise<readonly Record<string, unknown>[]> {
-  const keyPage = await deps.rowSource.keys({
+  const keys = await deps.rowSource.sampleKeys({
     caller,
     sql: row.sql,
     parameters,
     keyColumns,
     limit: INSTANT_EVAL_SAMPLE_ROWS,
+    total,
   });
-  if (keyPage.keys.length === 0) return [];
+  if (keys.length === 0) return [];
   return await deps.rowSource.texts({
     caller,
     protections: await deps.protections(projectId),
     sql: row.sql,
     parameters,
     calls: instantEvalHydrationPlan(row.plan),
-    traceIds: [...new Set(keyPage.keys.map((key) => key.traceId))],
+    traceIds: [...new Set(keys.map((key) => key.traceId))],
   });
 }

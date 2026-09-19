@@ -64,7 +64,8 @@ def sync_detailed(
     """Estimate a run
 
      Price a run without starting it. The rows are counted, a sample of their texts is measured, and the
-    cost is worked out from that. Nothing is judged and nothing is charged.
+    cost is worked out from that. Nothing is judged and nothing is charged. Takes the same body a run
+    does, a statement or a target with questions.
 
     Args:
         body (EstimateInstantEvalRunBody):
@@ -96,7 +97,8 @@ def sync(
     """Estimate a run
 
      Price a run without starting it. The rows are counted, a sample of their texts is measured, and the
-    cost is worked out from that. Nothing is judged and nothing is charged.
+    cost is worked out from that. Nothing is judged and nothing is charged. Takes the same body a run
+    does, a statement or a target with questions.
 
     Args:
         body (EstimateInstantEvalRunBody):
@@ -123,7 +125,8 @@ async def asyncio_detailed(
     """Estimate a run
 
      Price a run without starting it. The rows are counted, a sample of their texts is measured, and the
-    cost is worked out from that. Nothing is judged and nothing is charged.
+    cost is worked out from that. Nothing is judged and nothing is charged. Takes the same body a run
+    does, a statement or a target with questions.
 
     Args:
         body (EstimateInstantEvalRunBody):
@@ -153,7 +156,8 @@ async def asyncio(
     """Estimate a run
 
      Price a run without starting it. The rows are counted, a sample of their texts is measured, and the
-    cost is worked out from that. Nothing is judged and nothing is charged.
+    cost is worked out from that. Nothing is judged and nothing is charged. Takes the same body a run
+    does, a statement or a target with questions.
 
     Args:
         body (EstimateInstantEvalRunBody):

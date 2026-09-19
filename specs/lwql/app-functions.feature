@@ -192,6 +192,13 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
     When hydration runs
     Then it succeeds, because the cap counts distinct keys
 
+  @unit
+  Scenario: A page of conversations never loses a trace to the read's ceiling
+    Given two hundred conversations holding more than a thousand traces between them
+    When their traces are read for hydration
+    Then the read's ceiling is sized by the conversations asked for
+    And no conversation's traces are dropped
+
   # ---------------------------------------------------------------------------
   # Truncation and unresolved keys
   # ---------------------------------------------------------------------------

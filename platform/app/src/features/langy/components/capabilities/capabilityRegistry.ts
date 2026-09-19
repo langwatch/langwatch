@@ -360,6 +360,7 @@ export const SURFACE_BY_FEATURE: Record<string, CapabilitySurface> = {
   "observability.annotations": "annotations",
   "evaluations.experiments": "experiments",
   "evaluations.online-evaluation": "evaluations",
+  "evaluations.instant-evals": "evaluations",
   "agent-simulations.scenarios": "scenarios",
   "agent-simulations.runs": "simulations",
   "agent-simulations.test-suites": "simulations",

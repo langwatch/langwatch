@@ -104,6 +104,12 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Online Evaluation Overview](https://langwatch.ai/docs/evaluations/online-evaluation/overview.md): Score your production traffic as it arrives with monitors that run an evaluator on every matching trace or thread, and read the results on the trace, in the list and in analytics.
 - [Online Evaluations: set up a monitor on your production traffic](https://langwatch.ai/docs/evaluations/online-evaluation/setup-monitors.md): Create an online evaluation that scores every incoming trace or thread with an evaluator, filter and sample the traffic it runs on, and read the results on the trace and in analytics.
 
+### Instant Evals
+
+- [Instant Evals](https://langwatch.ai/docs/features/instant-evals/overview.md): Run an eval question over every trace, conversation or LLM call in your history, up to 100,000 rows in one run, and get the matches back in minutes.
+- [Instant Evals CLI](https://langwatch.ai/docs/features/instant-evals/cli.md): Every langwatch instant-eval subcommand and flag, with the lines that start a run, follow it, read its matches and sample the text that was judged.
+- [The target shorthand](https://langwatch.ai/docs/features/instant-evals/shorthand.md): What a target and a filter expand into, which filter fields a shorthand can ask for, and how to take the statement it wrote and edit it.
+
 ### Guardrails
 
 - [Guardrails Overview](https://langwatch.ai/docs/evaluations/guardrails/overview.md): Block or modify harmful LLM responses in real-time to enforce safety and policy constraints.

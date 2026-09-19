@@ -59,6 +59,11 @@ from .create_api_key_response_201 import CreateApiKeyResponse201
 from .create_api_key_response_201_api_key import CreateApiKeyResponse201ApiKey
 from .create_instant_eval_run_body import CreateInstantEvalRunBody
 from .create_instant_eval_run_body_parameters import CreateInstantEvalRunBodyParameters
+from .create_instant_eval_run_body_questions_item import CreateInstantEvalRunBodyQuestionsItem
+from .create_instant_eval_run_body_questions_item_kind import CreateInstantEvalRunBodyQuestionsItemKind
+from .create_instant_eval_run_body_questions_item_options_item import CreateInstantEvalRunBodyQuestionsItemOptionsItem
+from .create_instant_eval_run_body_questions_item_range import CreateInstantEvalRunBodyQuestionsItemRange
+from .create_instant_eval_run_body_target import CreateInstantEvalRunBodyTarget
 from .create_instant_eval_run_response_202 import CreateInstantEvalRunResponse202
 from .create_instant_eval_run_response_202_matched_by_question import CreateInstantEvalRunResponse202MatchedByQuestion
 from .create_instant_eval_run_response_202_parameters import CreateInstantEvalRunResponse202Parameters
@@ -500,6 +505,13 @@ from .delete_role_response_200 import DeleteRoleResponse200
 from .error import Error
 from .estimate_instant_eval_run_body import EstimateInstantEvalRunBody
 from .estimate_instant_eval_run_body_parameters import EstimateInstantEvalRunBodyParameters
+from .estimate_instant_eval_run_body_questions_item import EstimateInstantEvalRunBodyQuestionsItem
+from .estimate_instant_eval_run_body_questions_item_kind import EstimateInstantEvalRunBodyQuestionsItemKind
+from .estimate_instant_eval_run_body_questions_item_options_item import (
+    EstimateInstantEvalRunBodyQuestionsItemOptionsItem,
+)
+from .estimate_instant_eval_run_body_questions_item_range import EstimateInstantEvalRunBodyQuestionsItemRange
+from .estimate_instant_eval_run_body_target import EstimateInstantEvalRunBodyTarget
 from .estimate_instant_eval_run_response_200 import EstimateInstantEvalRunResponse200
 from .evaluation import Evaluation
 from .evaluation_timestamps import EvaluationTimestamps
@@ -6812,6 +6824,11 @@ __all__ = (
     "CreateApiKeyResponse201ApiKey",
     "CreateInstantEvalRunBody",
     "CreateInstantEvalRunBodyParameters",
+    "CreateInstantEvalRunBodyQuestionsItem",
+    "CreateInstantEvalRunBodyQuestionsItemKind",
+    "CreateInstantEvalRunBodyQuestionsItemOptionsItem",
+    "CreateInstantEvalRunBodyQuestionsItemRange",
+    "CreateInstantEvalRunBodyTarget",
     "CreateInstantEvalRunResponse202",
     "CreateInstantEvalRunResponse202MatchedByQuestion",
     "CreateInstantEvalRunResponse202Parameters",
@@ -7071,6 +7088,11 @@ __all__ = (
     "Error",
     "EstimateInstantEvalRunBody",
     "EstimateInstantEvalRunBodyParameters",
+    "EstimateInstantEvalRunBodyQuestionsItem",
+    "EstimateInstantEvalRunBodyQuestionsItemKind",
+    "EstimateInstantEvalRunBodyQuestionsItemOptionsItem",
+    "EstimateInstantEvalRunBodyQuestionsItemRange",
+    "EstimateInstantEvalRunBodyTarget",
     "EstimateInstantEvalRunResponse200",
     "Evaluation",
     "EvaluationTimestamps",

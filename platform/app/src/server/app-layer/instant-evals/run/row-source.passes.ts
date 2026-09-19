@@ -1,5 +1,5 @@
 /**
- * The five reads a run performs, each one a wrapper around the caller's own
+ * The eight reads a run performs, each one a wrapper around the caller's own
  * statement.
  *
  * Separate from `./row-source.ts`, which holds the contract and the types,
@@ -25,6 +25,7 @@ import {
   INSTANT_EVAL_AFTER_PARAMETER,
   INSTANT_EVAL_AFTER_SPAN_PARAMETER,
   INSTANT_EVAL_PAGE_PARAMETER,
+  INSTANT_EVAL_SAMPLE_BUCKET_PARAMETER,
   INSTANT_EVAL_SPAN_COLUMN,
   INSTANT_EVAL_TRACE_COLUMN,
   instantEvalCountSql,
@@ -32,6 +33,8 @@ import {
   instantEvalPagePassSql,
   instantEvalPagesBySpan,
   instantEvalProbeSql,
+  instantEvalSampleBuckets,
+  instantEvalSampleKeysSql,
 } from "./composition";
 import {
   type InstantEvalPreparedPage,
@@ -199,6 +202,33 @@ export async function keyPass(
   };
 }
 
+/** A sample of the selection's keys, spread across the whole of it. */
+export async function sampleKeysPass(
+  passes: InstantEvalPasses,
+  {
+    caller,
+    sql,
+    parameters,
+    keyColumns,
+    limit,
+    total,
+  }: Parameters<InstantEvalRowSource["sampleKeys"]>[0],
+): Promise<readonly InstantEvalRowKey[]> {
+  const execution = await passes.run({
+    caller,
+    sql: instantEvalSampleKeysSql({ sql, keyColumns, limit }),
+    parameters: {
+      ...parameters,
+      [INSTANT_EVAL_SAMPLE_BUCKET_PARAMETER]: instantEvalSampleBuckets({
+        total,
+        limit,
+      }),
+    },
+    maxRows: limit,
+  });
+  return execution.rows.map(toRowKey);
+}
+
 /** One page of rows, read and extracted, with nothing judged. */
 export async function readPass(
   passes: InstantEvalPasses,
@@ -214,12 +244,14 @@ export async function readPass(
   }: Parameters<InstantEvalRowSource["read"]>[0],
 ): Promise<InstantEvalPreparedPage> {
   const traceIds = [...new Set(keys.map((key) => key.traceId))];
+  const startedQuery = Date.now();
   const execution = await passes.run({
     caller,
     sql: instantEvalPagePassSql(sql),
     parameters: { ...parameters, [INSTANT_EVAL_PAGE_PARAMETER]: traceIds },
     maxRows: INSTANT_EVAL_PAGE_ROW_CEILING,
   });
+  const queryMs = Date.now() - startedQuery;
   if (execution.truncated) throw new InstantEvalResultTruncatedError("page");
 
   // Rows of a trace the page shares with its neighbour are dropped here: the
@@ -242,7 +274,7 @@ export async function readPass(
         Math.max(1, owned.length) * classifier.limits.stateTokens,
     },
   });
-  return { rows: owned.length, hydration };
+  return { rows: owned.length, queryMs, hydration };
 }
 
 /** Judges a page {@link readPass} prepared. */
@@ -261,6 +293,13 @@ export async function judgePreparedPass(
       requests: 0,
       inputTokens: 0,
       skipped: {},
+      limiterWaitMs: 0,
+    },
+    timings: {
+      queryMs: page.queryMs,
+      readMs: hydration.timings?.readMs ?? 0,
+      computeMs: hydration.timings?.computeMs ?? 0,
+      judgeMs: hydration.timings?.judgeMs ?? 0,
     },
   };
 }

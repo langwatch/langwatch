@@ -82,6 +82,7 @@ function harness({
   const rowSource: InstantEvalRowSource = {
     probe: vi.fn(),
     count: vi.fn(),
+    sampleKeys: vi.fn(),
     texts: vi.fn(),
     keys: vi.fn(async ({ after }) => {
       const index = after
@@ -95,6 +96,7 @@ function harness({
       if (judging > 0) readsWhileJudging += 1;
       return {
         rows: keys.length,
+        queryMs: 0,
         hydration: { keys } as unknown as InstantEvalPreparedPage["hydration"],
       };
     }),
@@ -119,7 +121,13 @@ function harness({
         return {
           columns: [],
           rows,
-          usage: { requests: keys.length, inputTokens: 0, skipped: {} },
+          usage: {
+            requests: keys.length,
+            inputTokens: 0,
+            skipped: {},
+            limiterWaitMs: 0,
+          },
+          timings: { queryMs: 0, readMs: 0, computeMs: 0, judgeMs: 0 },
         };
       } finally {
         judging -= 1;

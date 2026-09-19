@@ -13,6 +13,7 @@ import type {
   LangWatchQLEvalUsage,
   LangWatchQLHydrationInput,
   LangWatchQLHydrationResult,
+  LangWatchQLHydrationTimings,
   ResolvedCall,
 } from "./contract";
 
@@ -25,11 +26,13 @@ export function assembleResult({
   resolved,
   computed,
   evalUsage,
+  timings,
 }: {
   input: LangWatchQLHydrationInput;
   resolved: readonly ResolvedCall[];
   computed: ComputedValues;
   evalUsage?: LangWatchQLEvalUsage;
+  timings?: LangWatchQLHydrationTimings;
 }): LangWatchQLHydrationResult {
   const hydrated = input.rows.map((row) => {
     const next: Record<string, unknown> = { ...row };
@@ -73,6 +76,7 @@ export function assembleResult({
       }))
       .filter((report) => report.keys > 0),
     ...(evalUsage ? { evalUsage } : {}),
+    ...(timings ? { timings } : {}),
   };
 }
 

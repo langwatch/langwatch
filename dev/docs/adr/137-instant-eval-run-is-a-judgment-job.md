@@ -30,7 +30,9 @@ rather than requests (§9).
 [specs/instant-evals/instant-eval-api.feature](../../../specs/instant-evals/instant-eval-api.feature),
 [specs/instant-evals/instant-eval-pipeline.feature](../../../specs/instant-evals/instant-eval-pipeline.feature),
 [specs/instant-evals/instant-eval-cost.feature](../../../specs/instant-evals/instant-eval-cost.feature),
-[specs/analytics/lwql-judgments-view.feature](../../../specs/analytics/lwql-judgments-view.feature).
+[specs/analytics/lwql-judgments-view.feature](../../../specs/analytics/lwql-judgments-view.feature),
+[specs/instant-evals/instant-eval-shorthand.feature](../../../specs/instant-evals/instant-eval-shorthand.feature),
+[specs/features/instant-eval-cli.feature](../../../specs/features/instant-eval-cli.feature).
 
 ## Context
 
@@ -284,6 +286,158 @@ With the bucket as the governor, the in-flight ceiling only has to be high
 enough that the bucket, not the number of open requests, is what a page waits
 on. It is 128 for both the synchronous path and a run's page; at about 250 ms a
 call, thirty-two in flight could never have reached the bucket's rate.
+
+## Amendment (2026-09-18): the target shorthand writes the statement
+
+The run's input stays one LangWatchQL statement. A request may instead carry a
+**shorthand**: a `target`, an optional trace `filter`, an optional window, and
+the `questions` to ask of each row. The server expands it into one statement
+from a template per target, and that statement then goes through the same
+acceptance gate a submitted one does. Everything after the expansion is
+unchanged: the run stores the statement, derives its questions from the eval
+functions the statement projects, pages it, and hands it back as `sql`.
+
+A request carrying both `sql` and `target` is refused 422
+`instant_eval_query_invalid`, and so is one carrying neither. A shorthand
+carrying `parameters` is refused too: the expansion writes the statement's
+parameters, so there is none of the caller's left to fill.
+
+### The three templates
+
+| Target | View | Text | Addressed by |
+|---|---|---|---|
+| `traces` | `analytics.traces` | `llm_readable_trace(TraceId, 8000)` | the trace |
+| `threads` | `analytics.trace_metrics` grouped by `ConversationId` | `conversation_bounded(ConversationId, 8000, '')` | `argMax(TraceId, OccurredAt)` |
+| `llm_spans` | `analytics.spans` where the span type is `llm` | `llm_messages_span(TraceId, SpanId)` | the trace and span pair |
+
+Each projects `TraceId`, whatever optional key columns the target has
+(`ThreadId`, `SpanId`, `OccurredAt`), and one eval column per question aliased
+to the question's own name. The `threads` template qualifies every reference
+with a table alias, because its projection reuses two of the view's own column
+names and an unqualified `max(OccurredAt) AS OccurredAt` is an alias shadowing
+the column it reads.
+
+The window is resolved once, at expansion, and bound as two `DateTime`
+parameters. A window written as `subtractDays(now(), 7)` would move between the
+count and the pages, so the keyset pages would tile a selection that was never
+the one counted.
+
+The budget written into the bounded extraction calls is 8,000 tokens, the
+default the function catalog documents, or whatever the questions leave of the
+classifier's state when that is less. The ceiling is a cost decision rather
+than a technical one: the cost study puts a typical product trace well under
+8,000 and a coding session at many times it, so cutting at the classifier's
+own 31,000 would quadruple the price of exactly the rows least worth reading in
+full. A caller who wants the whole thing writes the statement.
+
+### The filter is compiled, not resolved into ids
+
+`--filter` speaks the traces-v2 filter language, and its existing compiler
+(`translateFilterToClickHouse`) cannot be reused here. That compiler targets
+the base tables, with partition-pruned subqueries over `stored_spans`,
+`evaluation_runs` and `simulation_runs`, and binds `{tenantId:String}` itself.
+A statement runs against the LangWatchQL views under a restricted identity that
+cannot see any of those tables and needs no bound tenant, because the row policy
+is what scopes it. Inlining that SQL would produce a statement the query policy
+refuses on the first table name.
+
+Resolving the filter into a list of trace ids and binding them was the
+alternative the plan carried, and it is worse in three ways: a hundred thousand
+ids is about three and a half megabytes of statement or of parameter, the run's
+parameters are scalars by contract, and the statement handed back would no
+longer be one a caller could rerun, which is the whole point of handing it
+back.
+
+So there is a second dialect, `app-layer/instant-evals/shorthand/filter.ts`,
+over the LangWatchQL trace view. The language's boolean structure is shared
+with the trace compiler through `translateFilterAst`; only the per-tag
+compilation differs. It answers about half the filter language:
+
+- Direct columns and attribute lookups: `traceId`, `traceName`, `service`,
+  `origin`, `user`, `customer`, `conversation`, `scenarioRun`, `topic`,
+  `subtopic`, `selectedPrompt`, `lastUsedPrompt`, `tokensEstimated`.
+- Numeric comparisons: `cost`, `duration`, `tokens`, `promptTokens`,
+  `completionTokens`, `tokensPerSecond`, `ttft`, `ttlt`, `spans`,
+  `promptVersion`.
+- List membership: `model` (with `*` wildcards), `label`.
+- `trace.attribute.<key>`, and a bare word over the captured input, the
+  captured output and the trace name.
+- `status`, for the value `error` only. Telling `ok` from `warning` needs the
+  guardrail column, which the view does not carry, so the two values it would
+  have to guess at are refused.
+
+Every other field the explorer filters on reaches outside the trace row, and a
+shorthand refuses it BY NAME with the statement door named as the way to ask
+it. A refusal that names the field costs the caller one more line; a shorthand
+that silently dropped a condition would charge them for judging rows they meant
+to exclude. A unit test asserts each supported field's expression still equals
+the facet registry's own, so the two surfaces cannot answer the same field
+differently.
+
+Over `traces` the compiled filter is a condition in the statement's own WHERE.
+Over the other two targets it is a `TraceId IN (SELECT TraceId FROM
+analytics.traces WHERE ...)` subquery bounding its own time column, because
+neither the metrics view nor the span view carries the trace's attributes: a
+conversation is kept when any of its traces matches, and a model call when its
+trace matches.
+
+### The questions become eval calls
+
+A shorthand question is `{id?, kind, instructions, criteria?, threshold?,
+range?, options?}`, the same vocabulary the `llm_*` evaluators use plus a
+threshold, because the judge answers a probability and the line between yes and
+no is the caller's. Each becomes one eval call:
+
+| Question | Call |
+|---|---|
+| boolean | `eval(text, instructions)` |
+| boolean with two criteria | `eval_criteria(text, instructions, [yes, no])` |
+| boolean with a threshold | `eval_passed(text, instructions, threshold)` |
+| score | `eval_score(text, instructions, min, max)` |
+| category | `eval_category(text, instructions, ['name: meaning', ...])` |
+
+Criteria and a threshold together are refused, naming both forms. There is no
+function taking both, because a ClickHouse SQL UDF is a lambda with a fixed
+parameter list and cannot be overloaded, so every argument shape is its own
+name. Refusing beats picking one of the two and charging for a question the
+caller did not ask.
+
+The question's id is the statement's output column, so it is validated as a
+column name, refused when it collides with a key column the template already
+projects or with another question, and defaults to `q1`, `q2` and so on. The
+instructions are written into the SQL as a quoted literal rather than bound,
+because an app function's options must be literals (ADR-136): the hydration
+plan is built before a row comes back. The quote and the backslash are escaped,
+and the expansion goes through the same parser a submitted statement does, so a
+mis-escape is a parse failure rather than a different query.
+
+### The CLI
+
+`langwatch instant-eval` is the seventh top-level group to take a
+`--wait`-style poll, and it follows the shared contract: `emitsResult` for the
+five read commands, `rendersOwnResult` for `run` and `status` because a poll
+and an estimate line follow the answer, and `-o table|json|agents|yaml` with
+`--jq` throughout. Two decisions are its own:
+
+- **A run says what it will cost before it starts.** `--estimate` prices the
+  run and exits. A plain `run` whose limit is over a thousand rows asks for the
+  estimate first, prints one line, and then creates. If the estimate itself
+  fails the run still goes ahead, unpriced: the caller asked for a run, not for
+  a price, and the limit they wrote is the ceiling on what it can spend. That
+  ceiling, not the estimate, is what bounds the bill.
+- **`run` prints the statement.** Under a Statement heading in table mode, with
+  its bound parameters. A caller who asked a question with `--target` gets back
+  the LangWatchQL that answered it, which is what they edit when the shorthand
+  stops being enough. In a machine format it is already a field of the run, so
+  it is not printed twice.
+
+The question flags are order-sensitive: `--criteria`, `--score`, `--category`,
+`--threshold` and `--id` describe the `--ask` before them, the same way
+`--required` describes its `--evaluator`. Commander reports no order across
+different options, so `program.ts` listens to the option events as it parses,
+which is where `trackEvaluatorFlags` already does the same thing. A modifier
+written before any `--ask` describes the question given as the positional
+argument.
 
 ## Consequences
 

@@ -125,6 +125,31 @@ Feature: The Instant Eval run over REST, one LWQL statement, judged as a job
     When an estimate is requested
     Then at most fifty rows had their text measured
 
+  @unit
+  Scenario: The sampled rows are spread across the selection, not taken from its start
+    Given a statement matching ten thousand rows
+    When an estimate is requested
+    Then the sampled rows are drawn from across the whole selection
+    And the sample is not the first rows the statement returns
+
+  @unit
+  Scenario: The page size is measured from the same spread of rows
+    Given a statement matching ten thousand rows
+    When the run is planned
+    Then the page size comes from rows drawn across the whole selection
+
+  @unit
+  Scenario: A selection smaller than the sample has every row sampled
+    Given a statement matching ten rows
+    When an estimate is requested
+    Then every matched row had its text measured
+
+  @unit
+  Scenario: Judged text is priced at the classifier's own published byte ratio
+    Given a judged text of known length
+    When its input tokens are estimated
+    Then the count uses the ratio the classifier publishes rather than a prose rule
+
   # ---------------------------------------------------------------------------
   # Reading a run
   # ---------------------------------------------------------------------------

@@ -18,6 +18,10 @@ import {
   INSTANT_EVAL_RESULTS_CEILING,
   INSTANT_EVAL_SAMPLE_CEILING,
 } from "~/server/app-layer/instant-evals/run";
+import {
+  INSTANT_EVAL_TARGETS,
+  instantEvalShorthandQuestionSchema,
+} from "~/server/app-layer/instant-evals/shorthand";
 
 /**
  * A bound parameter's value. Scalars only, the same rule the query family
@@ -67,12 +71,44 @@ export const instantEvalRunInputSchema = z.object({
     .string()
     .min(1)
     .max(MAX_LWQL_LENGTH)
+    .optional()
     .describe(
-      "The LangWatchQL statement to judge. It must project TraceId and at least one eval function column.",
+      "The LangWatchQL statement to judge. It must project TraceId and at least one eval function column. Send this or target, never both.",
     ),
   parameters: instantEvalParametersSchema
     .optional()
     .describe("Values for the parameters the statement declares."),
+  target: z
+    .enum(INSTANT_EVAL_TARGETS)
+    .optional()
+    .describe(
+      "What one judged row is, in place of a statement: a trace, a conversation, or one model call. The statement is written for you from this and the questions, and handed back on the run so you can edit it and resubmit.",
+    ),
+  filter: z
+    .string()
+    .max(4_000)
+    .optional()
+    .describe(
+      "With target: a trace filter, in the language the trace explorer's search bar speaks, narrowing which rows are judged.",
+    ),
+  start: z
+    .string()
+    .datetime({ offset: true })
+    .optional()
+    .describe(
+      "With target: the oldest instant to judge, as an ISO 8601 timestamp. Defaults to seven days ago.",
+    ),
+  end: z
+    .string()
+    .datetime({ offset: true })
+    .optional()
+    .describe("With target: the newest instant to judge. Defaults to now."),
+  questions: z
+    .array(instantEvalShorthandQuestionSchema)
+    .optional()
+    .describe(
+      "With target: what to ask of each row. One classification asks them all, which is why a three-question run costs about what a one-question run does.",
+    ),
   name: z
     .string()
     .min(1)
@@ -161,6 +197,7 @@ export const instantEvalSampleQuerySchema = z.object({
 });
 
 export type InstantEvalRunInputBody = z.infer<typeof instantEvalRunInputSchema>;
+
 export type InstantEvalListQuery = z.infer<typeof instantEvalListQuerySchema>;
 export type InstantEvalResultsQuery = z.infer<
   typeof instantEvalResultsQuerySchema
@@ -168,3 +205,52 @@ export type InstantEvalResultsQuery = z.infer<
 export type InstantEvalSampleQuery = z.infer<
   typeof instantEvalSampleQuerySchema
 >;
+
+/**
+ * Whichever of these keys the body actually carried.
+ *
+ * Absent rather than `undefined`, because the service's own input type is
+ * exact: a key present and holding `undefined` is not the same as a key the
+ * caller left out, and the second is what a body without it means.
+ */
+function present<T extends object>(fields: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(fields).filter(([, value]) => value !== undefined),
+  ) as Partial<T>;
+}
+
+/** The shorthand half of the body, or nothing when no target was named. */
+function shorthandOf(body: InstantEvalRunInputBody) {
+  if (body.target === undefined) return {};
+  return {
+    shorthand: {
+      target: body.target,
+      questions: body.questions ?? [],
+      ...present({
+        filter: body.filter,
+        start: body.start,
+        end: body.end,
+      }),
+    },
+  };
+}
+
+/**
+ * The body as the service takes it: a statement, or a shorthand under one key.
+ *
+ * The wire is flat because that is what a caller writes on a command line and
+ * in a JSON body; the service takes the shorthand as one object because a
+ * target with no questions is not a shorthand. Held together here rather than
+ * in the routes, so both the create and the estimate route read one line.
+ */
+export function toInstantEvalRunInput(body: InstantEvalRunInputBody) {
+  return {
+    ...present({
+      sql: body.sql,
+      parameters: body.parameters,
+      name: body.name,
+      limit: body.limit,
+    }),
+    ...shorthandOf(body),
+  };
+}

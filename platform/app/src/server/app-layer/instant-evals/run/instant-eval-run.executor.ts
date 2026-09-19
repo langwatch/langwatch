@@ -74,6 +74,16 @@ import type {
 const logger = createLogger("langwatch:instant-evals:run-executor");
 
 /**
+ * When each run's previous page finished, so a page can report the gap before
+ * it.
+ *
+ * Per pod and best-effort: a run whose pages are spread over several pods sees
+ * a gap only for consecutive pages on the same one, which is enough for the
+ * question it answers. Entries are dropped when the run finishes.
+ */
+const lastPageFinishedAt = new Map<string, number>();
+
+/**
  * Rows one page judges when the texts are ordinary.
  *
  * Five hundred, which is half the thousand-key cap the hydration stage
@@ -229,6 +239,8 @@ interface PrefetchKey {
 interface PrefetchedPage {
   readonly keyPage: InstantEvalKeyPage;
   readonly prepared: InstantEvalPreparedPage | null;
+  /** How long the key pass took, for the page profile. */
+  readonly keyMs: number;
 }
 
 /**
@@ -337,6 +349,7 @@ async function readPage({
   keyColumns: Parameters<InstantEvalRunPort["judgePage"]>[0]["keyColumns"];
   after: PageCursor;
 }): Promise<PrefetchedPage> {
+  const startedKeys = Date.now();
   const keyPage = await deps.rowSource.keys({
     caller,
     sql: row.sql,
@@ -352,7 +365,8 @@ async function readPage({
           },
         }),
   });
-  if (keyPage.keys.length === 0) return { keyPage, prepared: null };
+  const keyMs = Date.now() - startedKeys;
+  if (keyPage.keys.length === 0) return { keyPage, prepared: null, keyMs };
   const prepared = await deps.rowSource.read({
     caller,
     protections: await deps.protections(projectId),
@@ -363,7 +377,7 @@ async function readPage({
     classifier: deps.classifier(),
     maxConcurrency: deps.maxConcurrency,
   });
-  return { keyPage, prepared };
+  return { keyPage, prepared, keyMs };
 }
 
 /**
@@ -424,7 +438,10 @@ async function writeJudgedPage({
   questions: Awaited<ReturnType<typeof loadRun>>["questions"];
   judged: Awaited<ReturnType<typeof judgeUnderCancellation>>;
   keys: readonly InstantEvalRowKey[];
-}): Promise<ReturnType<typeof mapInstantEvalPage>> {
+}): Promise<{
+  mapping: ReturnType<typeof mapInstantEvalPage>;
+  insertMs: number;
+}> {
   const mapping = mapInstantEvalPage({
     tenantId: projectId,
     runId,
@@ -445,8 +462,67 @@ async function writeJudgedPage({
     );
   }
 
+  const startedInsert = Date.now();
   await deps.judgments.insert(mapping.records);
-  return mapping;
+  return { mapping, insertMs: Date.now() - startedInsert };
+}
+
+/**
+ * The page this intent asked for, and the next one started behind it.
+ *
+ * The read-ahead is started here rather than after judging because the point
+ * of it is to overlap the two: by the time this returns, the next page's key
+ * pass and trace read are already under way against services the classifier
+ * does not contend with. `prefetched` says whether this page came off that
+ * read, which is what tells the profile its key and query time was paid before
+ * the intent arrived.
+ */
+async function takePageAndReadAhead({
+  deps,
+  prefetches,
+  input,
+  row,
+  caller,
+  parameters,
+}: {
+  deps: InstantEvalRunExecutorDependencies;
+  prefetches: InstantEvalPrefetches;
+  input: Parameters<InstantEvalRunPort["judgePage"]>[0];
+  row: Awaited<ReturnType<typeof loadRun>>["row"];
+  caller: Awaited<ReturnType<typeof loadRun>>["caller"];
+  parameters: Awaited<ReturnType<typeof loadRun>>["parameters"];
+}): Promise<PrefetchedPage & { prefetched: boolean }> {
+  const { runId, projectId, afterTraceId, afterSpanId, pageSize, remaining } =
+    input;
+  const limit = Math.max(1, Math.min(pageSize, remaining));
+  const read = (after: PageCursor) =>
+    readPage({
+      deps,
+      projectId,
+      row,
+      caller,
+      parameters,
+      keyColumns: input.keyColumns,
+      after,
+    });
+
+  const taken = await prefetches.take({
+    runId,
+    afterTraceId,
+    afterSpanId,
+    limit,
+  });
+  const current = taken ?? (await read({ afterTraceId, afterSpanId, limit }));
+  startNextPageRead({
+    prefetches,
+    runId,
+    read,
+    last: current.keyPage.keys.at(-1),
+    hasMore: current.keyPage.hasMore,
+    remaining: remaining - current.keyPage.keys.length,
+    pageSize,
+  });
+  return { ...current, prefetched: taken !== null };
 }
 
 async function judgeRunPageOrThrow(
@@ -454,15 +530,7 @@ async function judgeRunPageOrThrow(
   prefetches: InstantEvalPrefetches,
   input: Parameters<InstantEvalRunPort["judgePage"]>[0],
 ): Promise<InstantEvalPageOutcome> {
-  const {
-    runId,
-    projectId,
-    page,
-    afterTraceId,
-    afterSpanId,
-    pageSize,
-    remaining,
-  } = input;
+  const { runId, projectId, page, remaining } = input;
   const { row, caller, questions, parameters } = await loadRun({
     deps,
     projectId,
@@ -477,34 +545,17 @@ async function judgeRunPageOrThrow(
     return emptyPage();
   }
 
-  const limit = Math.max(1, Math.min(pageSize, remaining));
-  const read = (after: PageCursor) =>
-    readPage({
-      deps,
-      projectId,
-      row,
-      caller,
-      parameters,
-      keyColumns: input.keyColumns,
-      after,
-    });
-
-  const current =
-    (await prefetches.take({ runId, afterTraceId, afterSpanId, limit })) ??
-    (await read({ afterTraceId, afterSpanId, limit }));
-  const { keyPage, prepared } = current;
-  if (keyPage.keys.length === 0 || prepared === null) return emptyPage();
-
-  const last = keyPage.keys.at(-1);
-  startNextPageRead({
+  const startedPage = Date.now();
+  const { keyPage, prepared, keyMs, prefetched } = await takePageAndReadAhead({
+    deps,
     prefetches,
-    runId,
-    read,
-    last,
-    hasMore: keyPage.hasMore,
-    remaining: remaining - keyPage.keys.length,
-    pageSize,
+    input,
+    row,
+    caller,
+    parameters,
   });
+  if (keyPage.keys.length === 0 || prepared === null) return emptyPage();
+  const last = keyPage.keys.at(-1);
 
   const judged = await judgeUnderCancellation({
     deps,
@@ -513,7 +564,7 @@ async function judgeRunPageOrThrow(
     prepared,
   });
 
-  const mapping = await writeJudgedPage({
+  const { mapping, insertMs } = await writeJudgedPage({
     deps,
     projectId,
     runId,
@@ -521,6 +572,18 @@ async function judgeRunPageOrThrow(
     questions,
     judged,
     keys: keyPage.keys,
+  });
+
+  recordPageProfile({
+    projectId,
+    runId,
+    page,
+    rows: mapping.counters.rows,
+    startedPage,
+    prefetched,
+    keyMs,
+    insertMs,
+    judged,
   });
 
   return {
@@ -533,6 +596,63 @@ async function judgeRunPageOrThrow(
     cursorSpanId: last?.spanId ? last.spanId : null,
     hasNextPage: keyPage.hasMore && remaining - mapping.counters.rows > 0,
   };
+}
+
+/**
+ * What one page spent its wall clock on, at debug level.
+ *
+ * A run is a loop of pages, so a run several times slower than its judging
+ * should be is explained by one of these numbers rather than by the total.
+ * `gapMs` is the part no step here owns: the time between the previous page of
+ * this run finishing and this one starting, which is what the pipeline spent
+ * delivering the page event and scheduling the next intent. `keyMs` and
+ * `queryMs` are off this page's clock when `prefetched` is true, because the
+ * previous page paid for them while it was judging.
+ */
+function recordPageProfile({
+  projectId,
+  runId,
+  page,
+  rows,
+  startedPage,
+  prefetched,
+  keyMs,
+  insertMs,
+  judged,
+}: {
+  projectId: string;
+  runId: string;
+  page: number;
+  rows: number;
+  startedPage: number;
+  prefetched: boolean;
+  keyMs: number;
+  insertMs: number;
+  judged: Awaited<ReturnType<InstantEvalRowSource["judge"]>>;
+}): void {
+  const finishedAt = Date.now();
+  const previous = lastPageFinishedAt.get(runId);
+  logger.debug(
+    {
+      projectId,
+      runId,
+      page,
+      rows,
+      inputTokens: judged.usage.inputTokens,
+      gapMs: previous === undefined ? null : startedPage - previous,
+      prefetched,
+      keyMs,
+      queryMs: judged.timings.queryMs,
+      readMs: judged.timings.readMs,
+      computeMs: judged.timings.computeMs,
+      judgeMs: judged.timings.judgeMs,
+      limiterWaitMs: judged.usage.limiterWaitMs,
+      insertMs,
+      pageMs: finishedAt - startedPage,
+    },
+    "Instant Eval page profile",
+  );
+  lastPageFinishedAt.set(runId, finishedAt);
 }
 
 /**
@@ -614,6 +734,7 @@ async function finishRun(
     );
   }
 
+  lastPageFinishedAt.delete(runId);
   return { costUsd, priceUsd };
 }
 

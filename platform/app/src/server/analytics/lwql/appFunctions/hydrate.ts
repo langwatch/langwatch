@@ -44,6 +44,7 @@ import type {
   LangWatchQLEvalUsage,
   LangWatchQLHydrationInput,
   LangWatchQLHydrationResult,
+  LangWatchQLHydrationTimings,
   ResolvedCall,
 } from "./hydration/contract";
 import {
@@ -92,6 +93,8 @@ export interface LangWatchQLPreparedHydration {
   readonly traces: FetchedTraces;
   /** The extraction functions' values, computed; the judged columns are not here. */
   readonly extracted: ComputedValues;
+  /** What the read half spent, which the judged result reports as its own. */
+  readonly timings: Omit<LangWatchQLHydrationTimings, "judgeMs">;
 }
 
 /**
@@ -104,13 +107,31 @@ export async function prepareLangWatchQLHydration(
   input: LangWatchQLHydrationInput,
 ): Promise<LangWatchQLPreparedHydration> {
   if (input.calls.length === 0) {
-    return { input, resolved: [], traces: EMPTY_TRACES, extracted: new Map() };
+    return {
+      input,
+      resolved: [],
+      traces: EMPTY_TRACES,
+      extracted: new Map(),
+      timings: { readMs: 0, computeMs: 0 },
+    };
   }
   const resolved = collectKeys(input);
   assertKeyCaps(resolved);
+
+  const startedRead = Date.now();
   const traces = await readTraces({ input, resolved });
+  const startedCompute = Date.now();
   const extracted = await computeValues({ input, resolved, traces });
-  return { input, resolved, traces, extracted };
+  return {
+    input,
+    resolved,
+    traces,
+    extracted,
+    timings: {
+      readMs: startedCompute - startedRead,
+      computeMs: Date.now() - startedCompute,
+    },
+  };
 }
 
 /**
@@ -140,13 +161,16 @@ export async function judgeLangWatchQLHydration({
   }
 
   const { resolved, traces, extracted } = prepared;
+  const startedJudge = Date.now();
   const judged = await judgeCalls({ input, resolved, traces });
+  const finished = Date.now();
 
   return assembleResult({
     input,
     resolved,
     computed: merge([extracted, judged.values]),
     ...(judged.usage ? { evalUsage: judged.usage } : {}),
+    timings: { ...prepared.timings, judgeMs: finished - startedJudge },
   });
 }
 

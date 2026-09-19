@@ -38531,6 +38531,515 @@ If you encounter any hurdles or have questions, our support team is eager to ass
 
 ---
 
+# FILE: ./features/instant-evals/cli.mdx
+
+---
+title: Instant Evals CLI
+sidebarTitle: CLI reference
+description: Every langwatch instant-eval subcommand and flag, with the lines that start a run, follow it, read its matches and sample the text that was judged.
+---
+
+## Asking a first question
+
+```bash
+langwatch instant-eval run "the customer sounds annoyed" \
+  --target threads --last 7d --limit 100
+```
+
+That judges a hundred of the last seven days of conversations and prints the
+matches when it is done. While it works you see the LangWatchQL statement it
+ran, which is the statement you edit when you want more than the shorthand
+gives you, and a progress line.
+
+## Pricing a run before you ask
+
+```bash
+langwatch instant-eval estimate "the customer sounds annoyed" \
+  --target threads --last 30d --limit 10000
+```
+
+The estimate counts the rows, measures fifty of their texts spread across the
+whole selection, and prices the run from that. No row is judged and no charge
+is made. `run --estimate` does the same and exits; a plain `run` over a
+thousand rows prints the price first, then starts.
+
+Take the row count as exact, and on a selection of ordinary conversations trust
+the price to within a few percent. Because fifty rows are still a sample, expect
+to pay more than it quoted on a selection holding a handful of enormous rows
+among small ones, and check the finished run for the tokens it actually read.
+
+## Reading what came back
+
+```bash
+langwatch instant-eval sample <id> -n 5
+langwatch instant-eval results <id> --matched -o json
+```
+
+`sample` re-reads a few rows with the text that was judged beside the verdict it
+received, which is how you see what the judge saw. `results` reads a page of
+judgements, narrowed by question, by whether they matched, and by whether the
+judge answered at all.
+
+## run
+
+Starts a run. Takes a question, or a statement of your own.
+
+| Flag | What it does |
+|---|---|
+| `[question]` | The question, as the first argument |
+| `--ask <question>` | The same, as a flag. Repeat it to ask several questions of the same text |
+| `--criteria <text>` | For a yes or no question: what counts as yes, then what counts as no. Write it twice. Not combinable with `--threshold` on the same question |
+| `--score <min..max>` | Ask for a rating on that whole-numbered scale instead of a yes or no |
+| `--category <name=meaning>` | Ask which option fits. Repeat it for each option |
+| `--threshold <probability>` | Where a yes or no question's probability becomes a pass. Not combinable with `--criteria` on the same question |
+| `--id <name>` | What to call the question before it, which becomes its column |
+| `--questions-file <path>` | Read the questions from a JSON or YAML file |
+| `--target <target>` | What one row is: `traces`, `threads` or `llm-spans` (default `traces`) |
+| `--filter <filter>` | Narrow the rows with a trace filter |
+| `--last <window>` | How far back to look: `7d`, `24h`, `30m`, `2w` (default `7d`) |
+| `--start <instant>` `--end <instant>` | The window, exactly |
+| `--sql <statement>` `--sql-file <path>` | Run a LangWatchQL statement of your own |
+| `--param <key=value>` | Bind one of your statement's parameters |
+| `--limit <n>` | Rows the run may judge (default 1000) |
+| `--name <name>` | What to call the run |
+| `--estimate` | Price the run and exit |
+| `--detach` | Create the run and return its id instead of waiting for it |
+| `--show <n>` | Rows to print when the run finishes (default 20, at most 25) |
+
+A modifier flag describes the question before it, so a line may ask two
+questions that each carry their own criteria:
+
+```bash
+langwatch instant-eval run \
+  --ask "the customer sounds annoyed" \
+    --criteria "sarcasm, repetition or a raised voice count" \
+    --criteria "a calm complaint does not count" \
+  --ask "the agent apologised" --threshold 0.8 \
+  --target threads --last 7d
+```
+
+### Several questions from a file
+
+```json
+[
+  { "id": "annoyed", "kind": "boolean", "instructions": "the customer sounds annoyed" },
+  { "id": "intent", "kind": "category", "instructions": "what is being asked for",
+    "options": [
+      { "name": "refund", "description": "wants money back" },
+      { "name": "bug", "description": "reports something broken" }
+    ] }
+]
+```
+
+```bash
+langwatch instant-eval run --questions-file questions.json --target threads --last 7d
+```
+
+A file is also how you name a question. Without a name, questions are called
+`q1`, `q2` and so on. The answer goes into a column with that name, and every
+judgement is filed under it.
+
+### What `--filter` accepts
+
+`--filter` takes the same syntax as the trace explorer's search bar. With a
+`--target`, you can filter on the fields of the trace row itself.
+
+| Group | Fields |
+|---|---|
+| Identity | `traceId`, `traceName`, `service`, `origin`, `user`, `customer`, `conversation`, `scenarioRun` |
+| Classification | `topic`, `subtopic`, `label`, `model`, `status:error` |
+| Cost and size | `cost`, `duration`, `tokens`, `promptTokens`, `completionTokens`, `tokensPerSecond`, `ttft`, `ttlt`, `spans`, `tokensEstimated` |
+| Prompts | `selectedPrompt`, `lastUsedPrompt`, `promptVersion` |
+| Attributes | `trace.attribute.<key>` |
+| Free text | a bare word |
+
+Every other field sits outside the trace row, so a `--target` refuses it by
+name and lists what you can use instead.
+
+| Group | Refused fields |
+|---|---|
+| Spans | `spanId`, `spanName`, `spanType`, `spanStatus`, `rootSpanType`, `span.attribute.<key>`, `containsAi` |
+| Evaluations | `eval`, `evaluator*`, `guardrail` |
+| Events and annotations | `event`, `event.attribute.<key>`, `annotation`, `feedback` |
+| Scenario runs | `scenario`, `scenarioSet`, `scenarioBatch`, `scenarioStatus`, `scenarioVerdict` |
+| Errors | `status:ok`, `status:warning` |
+
+Ask for any of those with `--sql`, which reaches every table. To see where
+each target puts the filter in its statement, read
+[the target shorthand](/features/instant-evals/shorthand).
+
+### Rerunning the statement a target wrote
+
+`run` prints the statement it wrote. It binds its window as two parameters, so
+running it again through `langwatch query` needs both:
+
+```bash
+langwatch query "$(cat written.sql)" \
+  --param start_at=2026-09-11T00:00:00 \
+  --param end_at=2026-09-18T00:00:00
+```
+
+Change the values to move the window without touching the query. Resubmitting
+it as a run works the same way, with `--sql` and two `--param` flags.
+
+### What you see while it runs
+
+`run` prints the statement, then one progress line that updates in place:
+
+```
+Judging 3,200/10,000 · 412 matched · 1.9M tokens · 12s
+```
+
+When the run ends, that is replaced by the headline and the first rows:
+
+```
+Found 412 matches in 10,000 conversations · 20.4s · 6.1M tokens · $0.33
+```
+
+Press Ctrl-C to stop watching. The run keeps going, and the command prints the
+`status` line that reads it back. `run` exits non-zero when the run did not
+finish, so a script can tell a red run from a green one.
+
+In `-o json` and `-o agents` the command still waits, and answers with one
+document holding the run and the judgements of the rows it printed.
+
+### Starting a run without waiting
+
+```bash
+langwatch instant-eval run "the customer sounds annoyed" --target threads --detach
+```
+
+`--detach` creates the run, prints its id and returns. Read it back later with
+`status`, or follow it with `status <id> --wait`.
+
+## status
+
+```bash
+langwatch instant-eval status <id> --wait
+```
+
+Reads one run: where it is, how many rows it found and judged, how many
+matched in total and per question, what the judge could not answer, and the
+tokens and price the judging came to. Prints the statement too.
+
+## list
+
+```bash
+langwatch instant-eval list -o json
+```
+
+The project's runs, newest first. Page with `--before` and `--before-id`, which
+take the created time and the id of the oldest run on the previous page.
+
+## results
+
+```bash
+langwatch instant-eval results <id> --question annoyed --matched --limit 200
+```
+
+| Flag | What it does |
+|---|---|
+| `--question <id>` | Only that question's judgements |
+| `--matched` / `--unmatched` | Only the ones that matched, or only the ones that did not |
+| `--status <status>` | Only `judged`, `skipped` or `failed` judgements |
+| `--limit <n>` | Judgements per page, at most 1000 (default 100) |
+| `--cursor <cursor>` | The cursor you got from the previous page |
+
+Use the cursor to read the next page. It is the only way to page safely while
+the run is still writing: you never see the same judgement twice, and you never
+skip one.
+
+## sample
+
+```bash
+langwatch instant-eval sample <id> -n 5
+```
+
+A few of the run's rows with the judged text beside the verdict. The text is
+re-read through the statement's own extraction functions, so sampling judges no
+row again and costs no money.
+
+## cancel
+
+```bash
+langwatch instant-eval cancel <id>
+```
+
+Stops the run before its next page, keeping every judgement it had already
+written for you to read the same way. Cancel a run that has already finished
+and you get back a 409.
+
+## Output
+
+Use the shared output flags on any subcommand: `-o table|json|agents|yaml`,
+`--json <fields>` and `--jq <path>`. In a machine format the statement is a
+field of the run rather than a printed block, and the progress line stays on
+standard error so the document a script reads holds one object.
+
+---
+
+# FILE: ./features/instant-evals/overview.mdx
+
+---
+title: Instant Evals
+sidebarTitle: Overview
+description: Run an eval question over every trace, conversation or LLM call in your history, up to 100,000 rows in one run, and get the matches back in minutes.
+---
+
+## What is an Instant Eval
+
+An Instant Eval is one eval question asked of every trace, conversation or LLM call you have already sent, at a low cost per row. For example, ask for "all conversations where the customer was frustrated" and LangWatch judges every conversation in parallel, up to 100,000 in one run. Minutes later you have the frustration rate and the matched conversations across your whole history, and because every conversation is judged, no edge case is skipped.
+
+```bash
+langwatch instant-eval run "the customer sounds frustrated" --target threads --last 30d --limit 10000
+```
+
+<Frame caption="One run over 10,000 conversations: the price before it starts, the statement it wrote, then the matches and the totals.">
+  <img src="/images/instant-evals/cli-run.png" alt="Terminal output of an Instant Eval run over 10,000 conversations" />
+</Frame>
+
+## What you can ask
+
+One run asks up to ten questions of each row, and the questions share one judge request per row, so ten questions cost about the same as one.
+
+| Question | Target | Answer |
+|---|---|---|
+| `"The customer sounds frustrated"` | `threads` | yes or no per conversation, plus the rate over the run |
+| `"The agent promised a refund it cannot give"` | `threads` | yes or no |
+| `"The agent called an external HTTP API"` | `traces` | yes or no |
+| `"The tests the agent ran failed"` | `traces` | yes or no, for coding agent sessions |
+| `--score 1..5 "How well the answer follows the retrieved context"` | `traces` | a score from 1 to 5 |
+| `--category billing=... shipping=... account=... other=...` | `threads` | the most likely category and its probability |
+
+Each question is written in plain words. The judge reads the row's text, answers with a calibrated probability, and the run turns that into a pass, a score or a label.
+
+## When to use it
+
+- An incident report: find every conversation in the last month where the customer was told something wrong, and read them.
+- A new eval, applied backwards: you wrote a check today, run it over six months of production to see how often it would have fired.
+- A dataset: the matched rows of a run are the examples you want to test against, so read them with `instant-eval results <run-id> --matched -o json`.
+- A rate you cannot get from metrics: the share of conversations that ended without an answer, or with the user repeating themselves.
+
+## How it works
+
+A run is a [LangWatchQL](/api-reference/query/overview) statement, and the `--target` shorthand writes it for you. Read the [target shorthand](/features/instant-evals/shorthand) page to see the statement each target expands into, and edit it when the shorthand is not enough.
+
+1. The statement selects the rows: conversations, traces or LLM calls, filtered by time and by anything the trace explorer can filter on.
+2. Each row is rendered to text: the conversation transcript, the trace as the evaluators read it, or the chat messages of one LLM call. A conversation is sent whole, so what the judge reads is what you would read in the drawer.
+3. Each row's text goes to the judge in one request with all your questions, in parallel across rows, and the run stores one verdict per row and question while it reports progress.
+
+## What it costs
+
+The price is 0.0546 USD per million input tokens judged, where the input is each row's text plus your questions. Long conversations therefore cost more than short ones, and the estimate prices your rows as they actually are rather than assuming an average. The run in the screenshot above judged 10,000 conversations in 2 minutes 26 seconds, read 11.4 million input tokens, and cost 0.62 USD. Its estimate beforehand said 11.87 million tokens and 0.65 USD.
+
+Run `langwatch instant-eval estimate` with the same arguments to see the row count and the price before you start. A run over more than 1,000 rows prints its price first. The count is exact, and the price comes from fifty rows sampled across the whole run.
+
+## Where the answers go
+
+Every verdict is stored against its trace: passed or not, the probability behind it, the score or the label, and the full distribution for a category question. Read them with `langwatch instant-eval results <run-id> --matched`, or query the `judgments` view with LangWatchQL and join it to `traces`.
+
+## Also check
+
+<CardGroup cols={3}>
+  <Card title="CLI reference" icon="terminal" href="/features/instant-evals/cli">
+    Every command and flag of `langwatch instant-eval`.
+  </Card>
+  <Card title="Target shorthand" icon="code" href="/features/instant-evals/shorthand">
+    The LangWatchQL statement each target expands into.
+  </Card>
+  <Card title="API reference" icon="plug" href="/api-reference/instant-evals/overview">
+    Create, poll and read runs over REST.
+  </Card>
+</CardGroup>
+
+---
+
+# FILE: ./features/instant-evals/shorthand.mdx
+
+---
+title: The target shorthand
+sidebarTitle: Target shorthand
+description: What a target and a filter expand into, which filter fields a shorthand can ask for, and how to take the statement it wrote and edit it.
+---
+
+## Where does the statement come from
+
+Every run executes one LangWatchQL statement. Send a target and your questions
+instead of a statement and LangWatch writes one for you, stores it on the run,
+and `run` prints it under a Statement heading.
+
+Take that statement when you need more than the shorthand covers. Edit it and
+submit it back with `--sql`, or run it through
+[the query endpoint](/api-reference/query/overview) to see the rows before you
+judge them.
+
+The statement takes two parameters, `start_at` and `end_at`, so supply both
+when you run it again:
+
+```bash
+langwatch query "$(cat written.sql)" \
+  --param start_at=2026-09-11T00:00:00 \
+  --param end_at=2026-09-18T00:00:00
+```
+
+`run` prints these two values beside the statement. Change them to move the
+window.
+
+## What each target expands into
+
+Every statement projects `TraceId`, whatever other key columns the target has,
+and one column per question. The window is bound as two instants rather than
+written as a relative expression, because a run executes its statement several
+times and a moving window would page a selection that was never counted.
+
+### traces
+
+```sql
+SELECT
+  TraceId,
+  Attributes['gen_ai.conversation.id'] AS ThreadId,
+  OccurredAt,
+  eval(llm_readable_trace(TraceId, 8000), 'the customer sounds annoyed') AS q1
+FROM analytics.traces
+WHERE OccurredAt >= {start_at:DateTime}
+  AND OccurredAt < {end_at:DateTime}
+ORDER BY TraceId
+```
+
+### threads
+
+```sql
+SELECT
+  argMax(m.TraceId, m.OccurredAt) AS TraceId,
+  m.ConversationId AS ThreadId,
+  max(m.OccurredAt) AS OccurredAt,
+  eval(conversation(m.ConversationId), 'the customer sounds annoyed') AS q1
+FROM analytics.trace_metrics AS m
+WHERE m.OccurredAt >= {start_at:DateTime}
+  AND m.OccurredAt < {end_at:DateTime}
+  AND m.ConversationId != ''
+GROUP BY m.ConversationId
+ORDER BY ThreadId
+```
+
+One row per conversation, addressed by the conversation's last trace. A trace
+carrying no conversation id is left out, so a project that does not set one
+should ask for `traces` instead.
+
+`conversation` carries no budget of its own, so an ordinary conversation reaches
+the judge whole. See [The token budget](#the-token-budget) for what happens to
+one that does not fit, and for how to put a budget back.
+
+### llm-spans
+
+```sql
+SELECT
+  TraceId,
+  SpanId,
+  StartTime AS OccurredAt,
+  eval(llm_messages_span(TraceId, SpanId), 'the model was asked to do two things at once') AS q1
+FROM analytics.spans
+WHERE StartTime >= {start_at:DateTime}
+  AND StartTime < {end_at:DateTime}
+  AND SpanAttributes['langwatch.span.type'] = 'llm'
+ORDER BY TraceId, SpanId
+```
+
+## The token budget
+
+`traces` and `llm-spans` are written with a budget of 8,000 tokens, which is
+the default the function catalog documents. A typical product trace renders to
+well under it; a coding session renders to many times it.
+
+`threads` is written without one. A conversation is the thing people most often
+want read end to end, and cutting it at 8,000 tokens to save a fraction of a
+cent is the wrong trade, so the only ceiling it meets is the judge's own state:
+about 31,000 tokens once your questions are in.
+
+Expect a long conversation to cost more than a bounded one would, up to roughly
+four times on the longest threads. Read the estimate before the run: it prices
+the rows as they actually are.
+
+A conversation past that ceiling is still judged. It is cut to fit and the row
+comes back marked truncated, and the cut keeps the opening and the close and
+writes a marker naming how many turns went from the middle, so a question about
+how a conversation ended reads the ending.
+
+To set the budget yourself rather than take the judge's, write the statement
+with `conversation_bounded`, which cuts the same way at the size you name:
+
+```sql
+eval(conversation_bounded(m.ConversationId, 8000, ''), 'the customer left angry') AS q1
+```
+
+A long list of questions leaves less room, and a budget written into a
+statement is then capped at whatever the questions leave.
+
+## What a shorthand filter can ask for
+
+`--filter` takes the same syntax as the trace explorer's search bar. A target
+supports the fields of the trace row itself:
+
+| Group | Fields |
+|---|---|
+| Identity | `traceId`, `traceName`, `service`, `origin`, `user`, `customer`, `conversation`, `scenarioRun` |
+| Classification | `topic`, `subtopic`, `label`, `model`, `status:error` |
+| Cost and size | `cost`, `duration`, `tokens`, `promptTokens`, `completionTokens`, `tokensPerSecond`, `ttft`, `ttlt`, `spans`, `tokensEstimated` |
+| Prompts | `selectedPrompt`, `lastUsedPrompt`, `promptVersion` |
+| Attributes | `trace.attribute.<key>` |
+| Free text | a bare word, matched against the captured input, the captured output and the trace name |
+
+`AND`, `OR`, `NOT` and parentheses work as they do in the explorer, and so do
+`*` wildcards on `model` and the range spellings `cost:>0.01` and
+`duration:[100 TO 500]`.
+
+Every other field the explorer filters on reaches outside the trace row, and a
+shorthand refuses it by name rather than dropping the condition. A dropped
+condition would charge you for judging rows you meant to exclude.
+
+| Group | Refused fields |
+|---|---|
+| Spans | `spanId`, `spanName`, `spanType`, `spanStatus`, `rootSpanType`, `span.attribute.<key>`, `containsAi` |
+| Evaluations | `eval`, `evaluator`, `evaluatorLabel`, `evaluatorPassed`, `evaluatorScore`, `evaluatorStatus`, `evaluatorVerdict`, `guardrail` |
+| Events and annotations | `event`, `event.attribute.<key>`, `annotation`, `feedback` |
+| Scenario runs | `scenario`, `scenarioSet`, `scenarioBatch`, `scenarioStatus`, `scenarioVerdict` |
+| Errors | `error`, `errorMessage`, and `status:ok` or `status:warning` |
+
+You can filter on `status:error`, because the error flag is a column of the
+trace row. `status:ok` and `status:warning` read the evaluation rows instead,
+so ask for those with `--sql`.
+
+Ask any of those with a statement instead, using `--sql`: LangWatchQL reaches
+every table, and the trace filter is only a shortcut for the common case. When
+a field is refused you get back the field you wrote and the fields you can use
+instead.
+
+## Where does the filter go
+
+Over `traces`, LangWatch puts your filter in the statement's own WHERE clause.
+Over `threads` and `llm-spans` it goes into a subquery on the trace view,
+because the trace's attributes are not columns of the metrics view or the span
+view.
+
+You get a conversation when any of its traces matches, and a model call when
+its trace matches. The same time bounds apply inside each subquery, so you
+never pay for rows outside your window.
+
+## Sending a statement instead
+
+A statement needs two things to be a run: it has to project `TraceId`, and it
+has to project at least one eval function column. Everything else is yours.
+
+```bash
+langwatch instant-eval run --sql "$(cat annoyed.sql)" --limit 10000
+```
+
+Send either `sql` or `target`, not both and not neither. Use `--param` only
+with your own statement: a target writes its own parameters, so you have none
+left to fill.
+
+---
+
 # FILE: ./features/querying-your-data.mdx
 
 ---

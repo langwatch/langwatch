@@ -1,0 +1,71 @@
+---
+title: Instant Evals
+sidebarTitle: Overview
+description: Run an eval question over every trace, conversation or LLM call in your history, up to 100,000 rows in one run, and get the matches back in minutes.
+---
+
+## What is an Instant Eval
+
+An Instant Eval is one eval question asked of every trace, conversation or LLM call you have already sent, at a low cost per row. For example, ask for "all conversations where the customer was frustrated" and LangWatch judges every conversation in parallel, up to 100,000 in one run. Minutes later you have the frustration rate and the matched conversations across your whole history, and because every conversation is judged, no edge case is skipped.
+
+```bash
+langwatch instant-eval run "the customer sounds frustrated" --target threads --last 30d --limit 10000
+```
+
+<Frame caption="One run over 10,000 conversations: the price before it starts, the statement it wrote, then the matches and the totals.">
+  <img src="/images/instant-evals/cli-run.png" alt="Terminal output of an Instant Eval run over 10,000 conversations" />
+</Frame>
+
+## What you can ask
+
+One run asks up to ten questions of each row, and the questions share one judge request per row, so ten questions cost about the same as one.
+
+| Question | Target | Answer |
+|---|---|---|
+| `"The customer sounds frustrated"` | `threads` | yes or no per conversation, plus the rate over the run |
+| `"The agent promised a refund it cannot give"` | `threads` | yes or no |
+| `"The agent called an external HTTP API"` | `traces` | yes or no |
+| `"The tests the agent ran failed"` | `traces` | yes or no, for coding agent sessions |
+| `--score 1..5 "How well the answer follows the retrieved context"` | `traces` | a score from 1 to 5 |
+| `--category billing=... shipping=... account=... other=...` | `threads` | the most likely category and its probability |
+
+Each question is written in plain words. The judge reads the row's text, answers with a calibrated probability, and the run turns that into a pass, a score or a label.
+
+## When to use it
+
+- An incident report: find every conversation in the last month where the customer was told something wrong, and read them.
+- A new eval, applied backwards: you wrote a check today, run it over six months of production to see how often it would have fired.
+- A dataset: the matched rows of a run are the examples you want to test against, so read them with `instant-eval results <run-id> --matched -o json`.
+- A rate you cannot get from metrics: the share of conversations that ended without an answer, or with the user repeating themselves.
+
+## How it works
+
+A run is a [LangWatchQL](/api-reference/query/overview) statement, and the `--target` shorthand writes it for you. Read the [target shorthand](/features/instant-evals/shorthand) page to see the statement each target expands into, and edit it when the shorthand is not enough.
+
+1. The statement selects the rows: conversations, traces or LLM calls, filtered by time and by anything the trace explorer can filter on.
+2. Each row is rendered to text: the conversation transcript, the trace as the evaluators read it, or the chat messages of one LLM call. A conversation is sent whole, so what the judge reads is what you would read in the drawer.
+3. Each row's text goes to the judge in one request with all your questions, in parallel across rows, and the run stores one verdict per row and question while it reports progress.
+
+## What it costs
+
+The price is 0.0546 USD per million input tokens judged, where the input is each row's text plus your questions. Long conversations therefore cost more than short ones, and the estimate prices your rows as they actually are rather than assuming an average. The run in the screenshot above judged 10,000 conversations in 2 minutes 26 seconds, read 11.4 million input tokens, and cost 0.62 USD. Its estimate beforehand said 11.87 million tokens and 0.65 USD.
+
+Run `langwatch instant-eval estimate` with the same arguments to see the row count and the price before you start. A run over more than 1,000 rows prints its price first. The count is exact, and the price comes from fifty rows sampled across the whole run.
+
+## Where the answers go
+
+Every verdict is stored against its trace: passed or not, the probability behind it, the score or the label, and the full distribution for a category question. Read them with `langwatch instant-eval results <run-id> --matched`, or query the `judgments` view with LangWatchQL and join it to `traces`.
+
+## Also check
+
+<CardGroup cols={3}>
+  <Card title="CLI reference" icon="terminal" href="/features/instant-evals/cli">
+    Every command and flag of `langwatch instant-eval`.
+  </Card>
+  <Card title="Target shorthand" icon="code" href="/features/instant-evals/shorthand">
+    The LangWatchQL statement each target expands into.
+  </Card>
+  <Card title="API reference" icon="plug" href="/api-reference/instant-evals/overview">
+    Create, poll and read runs over REST.
+  </Card>
+</CardGroup>

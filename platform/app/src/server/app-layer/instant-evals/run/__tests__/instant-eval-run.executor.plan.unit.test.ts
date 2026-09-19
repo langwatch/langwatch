@@ -72,7 +72,8 @@ describe("given a run about to be planned", () => {
     });
 
     /** @scenario "The average token count comes from a sample rather than from every row" */
-    it("measures at most fifty rows of text", async () => {
+    /** @scenario "The page size is measured from the same spread of rows" */
+    it("measures at most fifty rows of text, drawn across the selection", async () => {
       const { executor, rowSource } = fakes({
         total: 120,
         keys: [Array.from({ length: 50 }, (_, index) => rowKey(`t${index}`))],
@@ -80,10 +81,12 @@ describe("given a run about to be planned", () => {
 
       await executor.plan({ runId: RUN_ID, projectId: PROJECT_ID });
 
-      // The key pass the sample runs asks for fifty, so the text read is
-      // bounded before the rows arrive rather than sliced after.
-      expect(rowSource.keys).toHaveBeenCalledWith(
-        expect.objectContaining({ limit: 50 }),
+      // The sample asks for fifty keys spread over the whole selection, so
+      // the text read is bounded before the rows arrive rather than sliced
+      // after, and it is measured on rows from everywhere rather than on the
+      // statement's first fifty.
+      expect(rowSource.sampleKeys).toHaveBeenCalledWith(
+        expect.objectContaining({ limit: 50, total: 120 }),
       );
       const call = (rowSource.texts as Mock).mock.calls[0]?.[0] as {
         traceIds: string[];

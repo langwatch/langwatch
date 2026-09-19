@@ -12,12 +12,13 @@
 
 import { MockAgent } from "undici";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-
+import { estimateTokensFromBytes } from "~/shared/traces/tokenBudget";
 import { InstantEvalClassifierUnavailableError } from "../../errors";
 import type { InstantEvalQuestion } from "../classifier";
 import { UnlimitedInstantEvalRateLimiter } from "../globalRateLimiter";
 import { JEV_DEFAULT_BASE_URL, JevInstantEvalClassifier } from "../jev.client";
 import { NullInstantEvalClassifier } from "../null.client";
+import { instantEvalTextBudget } from "../token-budget";
 
 const QUESTION: InstantEvalQuestion = {
   id: "annoyed",
@@ -253,6 +254,72 @@ describe("given a deployment with no classifier", () => {
         inputTokens: 0,
         isTextTruncated: false,
       });
+    });
+  });
+});
+
+describe("given an unbounded conversation larger than the judge takes", () => {
+  describe("when it is judged", () => {
+    /** @scenario "An unbounded conversation past the judge's state cap is cut to the budget and marked truncated" */
+    it("cuts it to the budget, answers, and marks the row truncated", async () => {
+      // What `--target threads` now sends: `conversation(ConversationId)` with
+      // no budget of its own, so a thread longer than the classifier's state
+      // arrives here whole and the budget is the only thing that cuts it.
+      const conversation = "a".repeat(400_000);
+      let sentState = "";
+      endpoint()
+        .intercept({ path: "/v1/systemone", method: "POST" })
+        .reply(200, (options) => {
+          sentState = JSON.parse(String(options.body)).state;
+          return ANSWER;
+        });
+
+      const judgement = await classifier().classify({
+        projectId: "project-under-test",
+        text: conversation,
+        questions: [QUESTION],
+      });
+
+      // Cut rather than refused: the run judges the conversation it can see
+      // instead of losing the row.
+      expect(judgement.skippedReason).toBeUndefined();
+      expect(judgement.verdicts).toHaveLength(1);
+      expect(judgement.isTextTruncated).toBe(true);
+
+      // And the cut happened before the send, so the request is inside the cap
+      // rather than being refused by the API as max_tokens_exceeded.
+      expect(sentState.length).toBeLessThan(conversation.length);
+      expect(instantEvalTextBudget({ questions: [QUESTION] })).not.toBeNull();
+      expect(estimateTokensFromBytes(sentState)).toBeLessThanOrEqual(
+        instantEvalTextBudget({ questions: [QUESTION] }) ?? 0,
+      );
+
+      // This is the last-resort cut, for a text that reaches the classifier
+      // already over budget. A conversation never arrives here that way: the
+      // hydration stage re-renders one through the bounded renderer first,
+      // which keeps both ends and names the turns it dropped
+      // (../../../../analytics/lwql/appFunctions/hydration/evaluate.ts).
+    });
+
+    /** @scenario "A conversation inside the judge's state cap is sent whole and not marked truncated" */
+    it("sends a conversation inside the cap whole", async () => {
+      const conversation = "a".repeat(1_000);
+      let sentState = "";
+      endpoint()
+        .intercept({ path: "/v1/systemone", method: "POST" })
+        .reply(200, (options) => {
+          sentState = JSON.parse(String(options.body)).state;
+          return ANSWER;
+        });
+
+      const judgement = await classifier().classify({
+        projectId: "project-under-test",
+        text: conversation,
+        questions: [QUESTION],
+      });
+
+      expect(judgement.isTextTruncated).toBe(false);
+      expect(sentState).toBe(conversation);
     });
   });
 });

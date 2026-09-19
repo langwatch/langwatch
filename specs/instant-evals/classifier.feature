@@ -196,3 +196,22 @@ Feature: The Instant Evals classifier interface — one judged question, priced 
     When tokens are asked for
     Then they are granted at the local fallback rate
     And the query still runs
+
+  # ---------------------------------------------------------------------------
+  # Cutting a conversation that arrives without a budget of its own
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: An unbounded conversation past the judge's state cap is cut to the budget and marked truncated
+    Given a conversation far longer than the classifier's state cap
+    When it is judged
+    Then it is cut to what the questions leave of the state
+    And the verdict comes back with the row marked truncated
+    And the row is judged rather than skipped
+
+  @unit
+  Scenario: A conversation inside the judge's state cap is sent whole and not marked truncated
+    Given a conversation smaller than the classifier's state cap
+    When it is judged
+    Then the whole conversation is sent
+    And the row is not marked truncated

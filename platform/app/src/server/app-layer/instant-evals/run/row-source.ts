@@ -48,6 +48,7 @@ import {
   keyPass,
   probePass,
   readPass,
+  sampleKeysPass,
   textPass,
 } from "./row-source.passes";
 
@@ -101,11 +102,25 @@ export class InstantEvalResultTruncatedError extends Error {
   }
 }
 
+/** Where the wall clock of one judged page went. */
+export interface InstantEvalPageTimings {
+  /** Running the page statement against the database. */
+  readonly queryMs: number;
+  /** Reading the traces its keys name. */
+  readonly readMs: number;
+  /** Rendering those traces into the text to judge. */
+  readonly computeMs: number;
+  /** Judging that text, limiter wait included. */
+  readonly judgeMs: number;
+}
+
 /** One page of judged rows, and what judging them spent. */
 export interface InstantEvalJudgedPage {
   readonly columns: readonly LangWatchQLColumn[];
   readonly rows: readonly Record<string, unknown>[];
   readonly usage: LangWatchQLEvalUsage;
+  /** Where the page's own wall clock went. */
+  readonly timings: InstantEvalPageTimings;
 }
 
 /**
@@ -119,6 +134,8 @@ export interface InstantEvalJudgedPage {
 export interface InstantEvalPreparedPage {
   /** Rows the page owns, which is what will be judged. */
   readonly rows: number;
+  /** How long the page statement took, for the judged page's timings. */
+  readonly queryMs: number;
   readonly hydration: LangWatchQLPreparedHydration;
 }
 
@@ -155,6 +172,25 @@ export interface InstantEvalRowSource {
     limit: number;
     after?: InstantEvalCursor;
   }): Promise<InstantEvalKeyPage>;
+
+  /**
+   * A sample of the selection's keys, spread across the whole of it.
+   *
+   * What the page size and the price are measured from. Separate from
+   * {@link keys} because a page wants the *next* rows in order and a sample
+   * wants rows from everywhere: the first fifty keys of a statement ordered by
+   * conversation id are the fifty lowest ids, and measuring those prices the
+   * wrong rows.
+   */
+  sampleKeys(input: {
+    caller: InstantEvalRunCaller;
+    sql: string;
+    parameters?: Readonly<Record<string, unknown>>;
+    keyColumns: readonly string[];
+    limit: number;
+    /** Rows the statement matches, which sets how wide the spread has to be. */
+    total: number;
+  }): Promise<readonly InstantEvalRowKey[]>;
 
   /**
    * One page of rows, read and extracted but not judged.
@@ -366,7 +402,7 @@ export function createInstantEvalRowSource(
   return instantEvalRowSourceOver(passes);
 }
 
-/** The row source's seven reads, each one pass composed over the three above. */
+/** The row source's eight reads, each one pass composed over the three above. */
 function instantEvalRowSourceOver(
   passes: InstantEvalPasses,
 ): InstantEvalRowSource {
@@ -374,6 +410,7 @@ function instantEvalRowSourceOver(
     probe: (input) => probePass(passes, input),
     count: (input) => countPass(passes, input),
     keys: (input) => keyPass(passes, input),
+    sampleKeys: (input) => sampleKeysPass(passes, input),
     read: (input) => readPass(passes, input),
     judgePrepared: (input) => judgePreparedPass(passes, input),
     judge: (input) => judgePass(passes, input),

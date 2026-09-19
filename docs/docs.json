@@ -202,6 +202,14 @@
                 ]
               },
               {
+                "group": "Instant Evals",
+                "pages": [
+                  "features/instant-evals/overview",
+                  "features/instant-evals/cli",
+                  "features/instant-evals/shorthand"
+                ]
+              },
+              {
                 "group": "Guardrails",
                 "pages": [
                   "evaluations/guardrails/overview",
