@@ -86,6 +86,15 @@ describe("infoRunToolArgs", () => {
 		).toEqual(["exec", "--help"]);
 	});
 
+	/** @scenario "A --tool-mode with no value does not swallow the option after it" */
+	it("keeps --help after a --tool-mode that has no value", () => {
+		expect(infoRunKind(["--tool-mode", "--help"])).toBe("help");
+		expect(infoRunToolArgs(["--tool-mode", "--help"])).toEqual(["--help"]);
+		expect(infoRunToolArgs(["--tool-mode", "gateway", "--help"])).toEqual([
+			"--help",
+		]);
+	});
+
 	/** @scenario "What follows -- reaches the tool as typed" */
 	it("strips the wrapper's flags before -- and keeps everything from -- on", () => {
 		expect(

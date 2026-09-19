@@ -58,6 +58,13 @@ Feature: Asking a wrapped tool for its help or version has no side effects
       Then codex is launched with `--help -- --project acme`
 
     @unit
+    Scenario: A --tool-mode with no value does not swallow the option after it
+      # A following option is a missing value, the same rule `--project` follows.
+      When the user runs `langwatch codex --tool-mode --help`
+      Then codex is launched with `--help` alone
+      And no session starts
+
+    @unit
     Scenario: A help run lists the wrapper's own flags after the tool's help
       When the user runs `langwatch codex --help`
       Then after codex's help the wrapper lists `--project`, `--personal` and `--tool-mode`
