@@ -32,9 +32,18 @@ export type RestTransportDocs = Readonly<{
   /** Kept out of the published document: an alias or a compatibility path. */
   readonly hide?: boolean;
   /**
-   * The answers the operation documents beyond its declared success, merged over the
-   * generated block one status at a time. An entry with only a description keeps the
-   * declared content, so a route never restates the schema `withOutput` already named.
+   * A refusal this operation documents beyond its declared success: a status and a
+   * sentence, never a body — a route that answers an error WITH a schema names it
+   * through `responses`/`documentedResponses()` instead, which resolves a real Zod
+   * type rather than accepting hand-written JSON. This field cannot carry `content`
+   * at all, so there is no way to restate the schema `withOutput` already named.
+   */
+  readonly errors?: readonly Readonly<{ status: number; description: string }>[];
+  /**
+   * The answers the operation documents beyond its declared success and its plain
+   * `errors`, merged over the generated block one status at a time — for the rare
+   * response that needs its OWN schema (`documentedResponses()` builds this from a
+   * real Zod type; nothing here should ever be hand-written JSON).
    */
   readonly responses?: Readonly<Record<number, DocumentedRouteResponse>>;
   /**
@@ -195,6 +204,10 @@ function multipartSchema(multipart: RestMultipart): Record<string, unknown> {
 function documentedAnswers(route: RestTransportRoute<unknown>): Record<string, RouteResponse> {
   const declared = declaredAnswers(route);
   const published: Record<string, RouteResponse> = { ...declared };
+
+  for (const error of route.docs?.errors ?? []) {
+    published[String(error.status)] = { description: error.description, content: {} };
+  }
 
   for (const [status, stated] of Object.entries(route.docs?.responses ?? {})) {
     published[status] = { ...stated, content: stated.content ?? declared[status]?.content ?? {} };

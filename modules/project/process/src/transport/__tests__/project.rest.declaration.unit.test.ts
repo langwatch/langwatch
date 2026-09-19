@@ -124,13 +124,12 @@ describe("the projects REST declaration", () => {
       ]);
     });
 
-    it("publishes a summary and documented answers for every operation", () => {
+    it("publishes a summary and at least one documented error for every operation", () => {
       for (const route of declaration.routes) {
         expect([route.operation, typeof route.docs?.summary]).toEqual([route.operation, "string"]);
-        expect([route.operation, Object.keys(route.docs?.responses ?? {}).length > 0]).toEqual([
-          route.operation,
-          true,
-        ]);
+        const documentedAnswers =
+          Object.keys(route.docs?.responses ?? {}).length + (route.docs?.errors?.length ?? 0);
+        expect([route.operation, documentedAnswers > 0]).toEqual([route.operation, true]);
       }
     });
   });

@@ -942,6 +942,19 @@ never thinks about resolution at all. The per-module resolver adapters
   `*-legacy.rest.ts` family, each carrying a one-line reason.
 - The **process** mounts declarations; `boot()` opens the hosts. A module
   never mounts anything.
+- **A route's documentation lives on the route, in its own `.withDocs()`
+  call, in the same `*.rest.ts` file `.withOutput()` is in — never in a
+  separate `*-openapi.rules.ts` file (§15).** The success body is
+  `.withOutput()`'s Zod schema, generated live; `.withDocs()` adds
+  `summary`/`description`/`tags` and, when useful, `errors` — a status and a
+  sentence, never a body. A response that genuinely needs its own schema
+  beyond the declared success (an extra status, a non-JSON body) names it
+  through `documentedResponses()`, which resolves a real Zod type; nothing
+  publishes hand-written JSON Schema or a bare `$ref` string, because nothing
+  merges a components section for one to resolve against. A split-out docs
+  file did exactly that — the schema and the route drifted, one `$ref`
+  pointed at a component that had never existed, and the discovery route
+  crashed presenting the document rather than at the split.
 
 ---
 
@@ -1434,7 +1447,12 @@ array; `get*` = one or throws) · `static readonly configSchema` and its
 var another owner already declares (`BASE_HOST` outside the process owner) ·
 `surfaces/` and `screens/` browser folders · any `exports` entry on a browser
 package other than `./declaration` · any `exports` entry on a kit other than
-`.` · a kit importing another kit.
+`.` · a kit importing another kit · `*-openapi.rules.ts` files hand-writing a
+route's REST response schema (§8) — migrate the summary/description/tags
+into the route's own `.withDocs()` call and drop any hand-written success
+body outright; an error keeps only its status and a sentence via `errors`,
+and a response that truly needs its own schema goes through
+`documentedResponses()`, never raw JSON.
 
 ---
 
@@ -1501,7 +1519,7 @@ an Nx executor, and Nx generates nothing — a module is still installed by
 editing `modules/catalogue.json` and running `pnpm generate:modules`. The
 whole configuration is `nx.json` at the root.
 
-What Nx decides is *when* a script runs and whether it may be skipped, never
+What Nx decides is _when_ a script runs and whether it may be skipped, never
 what a package is. That distinction is load-bearing: the file grammar, the
 architecture-enforcer and the catalogue already say what a package is, and a
 second system describing the same packages would be a second authority

@@ -22,14 +22,12 @@ import { Temporal, toEpochMs } from "@langwatch/time";
 import { z } from "zod";
 
 import {
-  CREATE_EXPERIMENT,
-  GET_EXPERIMENT,
-  LIST_EXPERIMENTS,
-} from "../rules/experiment-openapi.rules.ts";
-import {
   createExperimentBodySchema,
   createExperimentResponseSchema,
 } from "../rules/experiment-schemas.rules.ts";
+
+/** Every operation in this family is filed under one tag. */
+const EXPERIMENT_TAGS = ["Experiments"] as const;
 
 /**
  * The credential the request arrived on, in the vocabulary the attribution
@@ -75,7 +73,12 @@ export const experimentRest = defineRestRouter(ExperimentApi)
   .withQuery(listExperimentsQuerySchema)
   .withPermission("experiments:view")
   .withOutput(experimentsListResponseSchema)
-  .withDocs(LIST_EXPERIMENTS)
+  .withDocs({
+    tags: EXPERIMENT_TAGS,
+    summary: "List experiments for the project",
+    description:
+      "List experiments for the project. Includes a runs count and last-run timestamp per experiment.",
+  })
   .handle(async ({ app, input, scope }) => {
     const { page, pageSize } = input;
     const { experiments: paged, totalHits } = await app.getPage({
@@ -112,7 +115,13 @@ export const experimentRest = defineRestRouter(ExperimentApi)
   .withParams(slugParamsSchema)
   .withPermission("experiments:view")
   .withOutput(experimentSummarySchema)
-  .withDocs(GET_EXPERIMENT)
+  .withDocs({
+    tags: EXPERIMENT_TAGS,
+    summary: "Read one experiment",
+    description:
+      "Read a single experiment by its slug, in the same shape the list returns. Accepts the experiment id as well, so either identifier the list hands back can be used.",
+    errors: [{ status: 404, description: "No experiment with that slug or id in this project" }],
+  })
   .handle(async ({ app, input, scope }) => {
     const experiment = await app.getBySlugOrId({ projectId: scope.id, slugOrId: input.slug });
     const [withRuns] = await app.withRunAggregates({
@@ -129,7 +138,19 @@ export const experimentRest = defineRestRouter(ExperimentApi)
   .withInput(createExperimentBodySchema)
   .withPermission("experiments:create")
   .withOutput(createExperimentResponseSchema)
-  .withDocs(CREATE_EXPERIMENT)
+  .withDocs({
+    tags: EXPERIMENT_TAGS,
+    summary: "Create an experiment and its setup",
+    description:
+      "Create an evaluations experiment. Send a setup to start from, or send none and get a blank workbench with one inline dataset. The slug it answers with is what every other experiment endpoint takes.",
+    errors: [
+      {
+        status: 400,
+        description:
+          "The setup did not match the schema (experiment_invalid_workbench_state) or points at something that no longer exists (experiment_workbench_missing_reference)",
+      },
+    ],
+  })
   .withMiddleware(experimentRestCredential)
   .handle(async ({ app, input, scope }, credential) => {
     // A caller that sends no setup still gets a workbench they can open. The

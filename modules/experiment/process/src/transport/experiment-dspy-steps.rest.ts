@@ -17,7 +17,6 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
 import { dspyStepOf } from "../rules/experiment-dspy-step.rules.ts";
-import { LOG_DSPY_STEPS } from "../rules/experiment-openapi.rules.ts";
 
 /**
  * Experiments carry their own permission, decoupled from workflows. The check
@@ -61,7 +60,25 @@ export const experimentDspyStepsRest = defineRestRouter(ExperimentApi)
   .withAccess(publicRoute({ reason: DOOR_REASON }))
   .withRawResponse({ produces: "application/json" })
   .withBodyLimit({ maxBytes: MAX_BODY_BYTES, onExceeded: payloadTooLarge })
-  .withDocs(LOG_DSPY_STEPS)
+  .withDocs({
+    tags: ["Experiments"],
+    summary: "Report DSPy optimizer steps",
+    description:
+      "Report the steps of a DSPy optimizer run against an experiment, so the run's progress and scores show up in the app. Send the steps as an array; the optimizer typically posts each batch as it finishes. Bodies up to 20MB are accepted.",
+    errors: [
+      {
+        status: 400,
+        description:
+          "The body was not valid JSON, failed validation, or carried timestamps in seconds rather than milliseconds",
+      },
+      { status: 401, description: "Missing or invalid API key" },
+      {
+        status: 500,
+        description:
+          "A step could not be stored. The cause is on our side and is logged with the run and step ids; retrying the batch is safe.",
+      },
+    ],
+  })
   .withMiddleware(dspyStepsCaller)
   .handle(async ({ app, raw }, caller) => {
     const { projectId } = caller;

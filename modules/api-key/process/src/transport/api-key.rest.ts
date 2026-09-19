@@ -30,13 +30,13 @@ import {
 } from "@langwatch/api/rest";
 import { z } from "zod";
 
-import {
-  CREATE_API_KEY,
-  GET_API_KEY,
-  LIST_API_KEYS,
-  REVOKE_API_KEY,
-  UPDATE_API_KEY,
-} from "../rules/api-key-openapi.rules.ts";
+/** Every operation in this family is filed under one tag. */
+const API_KEY_TAGS = ["API Keys"] as const;
+
+const INVALID_TOKEN: Readonly<{ status: 401; description: string }> = {
+  status: 401,
+  description: "Invalid or missing API key token",
+};
 
 /**
  * The organization credential this door resolved: the key, and the member it
@@ -221,7 +221,16 @@ export const apiKeyRest: Readonly<{
   .get("/", "listApiKeys")
   .withPermission("organization:view")
   .withOutput(apiKeyRestListSchema)
-  .withDocs(LIST_API_KEYS)
+  .withDocs({
+    tags: API_KEY_TAGS,
+    summary: "List API keys",
+    description:
+      "List all API keys owned by the authenticated user in this organization. Requires organization:view permission.",
+    errors: [
+      INVALID_TOKEN,
+      { status: 403, description: "Insufficient permissions (requires organization:view)" },
+    ],
+  })
   .withMiddleware(apiKeyRestCredential)
   .handle(async ({ app, scope }, caller) => {
     if (!caller.userId) {
@@ -260,7 +269,25 @@ export const apiKeyRest: Readonly<{
   .withPermission("organization:manage")
   .withOutput(apiKeyRestMintedSchema)
   .withStatus(201)
-  .withDocs(CREATE_API_KEY)
+  .withDocs({
+    tags: API_KEY_TAGS,
+    summary: "Create an API key",
+    description:
+      'Create a new API key. For service keys, pass keyType:"service". Optionally scope to specific projects via projectIds (ADMIN on each). Omit projectIds for full org access. Pass assignedToUserId to mint the key for another member, and permissionMode:"restricted" with a permissions list to grant exactly those permissions. Minting a service key or a key for another member requires organization admin rights. The plaintext token is returned once — store it securely.',
+    errors: [
+      INVALID_TOKEN,
+      {
+        status: 403,
+        description:
+          "Requested binding exceeds the creator's own permissions, or the scope does not belong to this organization (api_key_scope_violation); a service key or a key for another member was requested without organization admin rights (api_key_admin_required)",
+      },
+      {
+        status: 422,
+        description:
+          "Validation error, for example a missing name or empty bindings (validation_error), or a name LangWatch reserves for its own keys (api_key_reserved_name)",
+      },
+    ],
+  })
   .withMiddleware(apiKeyRestCredential)
   .handle(async ({ app, input, scope }, caller) => {
     const isService = input.keyType === "service";
@@ -307,7 +334,17 @@ export const apiKeyRest: Readonly<{
   .withParams(apiKeyRestParamsSchema)
   .withPermission("organization:view")
   .withOutput(apiKeyRestDetailSchema)
-  .withDocs(GET_API_KEY)
+  .withDocs({
+    tags: API_KEY_TAGS,
+    summary: "Get an API key",
+    description:
+      "Read one API key by id, including its role bindings, permission mode and explicit permissions. Returns your own keys; organization admins may read any key in the organization. The secret is never returned. An id that does not exist, belongs to another organization, or belongs to another member all answer 404 api_key_not_found, so the response cannot be used to probe for keys.",
+    errors: [
+      INVALID_TOKEN,
+      { status: 403, description: "Insufficient permissions (requires organization:view)" },
+      { status: 404, description: "API key not found (api_key_not_found)" },
+    ],
+  })
   // Reading one key by id names a person, so it leaves a trail: the runtime
   // writes the row from the actor, the id in the path and the organization
   // the door resolved.
@@ -333,7 +370,27 @@ export const apiKeyRest: Readonly<{
   .withInput(apiKeyRestUpdateSchema)
   .withPermission("organization:manage")
   .withOutput(apiKeyRestDetailSchema)
-  .withDocs(UPDATE_API_KEY)
+  .withDocs({
+    tags: API_KEY_TAGS,
+    summary: "Update an API key",
+    description:
+      "Update an API key's name, description, permission mode, permissions or bindings. Every field is optional; bindings are replaced outright, and the response is exactly what a subsequent GET returns. You may update your own keys; organization admins may update any key in the organization. Bindings can never exceed the access of the member the key belongs to. The token itself never changes.",
+    errors: [
+      INVALID_TOKEN,
+      {
+        status: 403,
+        description:
+          "Insufficient permissions (requires organization:manage), the requested binding exceeds the key owner's own permissions, or the scope does not belong to this organization (api_key_scope_violation)",
+      },
+      { status: 404, description: "API key not found, or not yours to edit (api_key_not_found)" },
+      { status: 409, description: "API key is already revoked (api_key_already_revoked)" },
+      {
+        status: 422,
+        description:
+          "Validation error, for example restricted mode without a permissions list (validation_error)",
+      },
+    ],
+  })
   .withAudit("management.api-key.update")
   .withMiddleware(apiKeyRestCredential)
   .handle(async ({ app, input, scope }, caller) => {
@@ -378,7 +435,22 @@ export const apiKeyRest: Readonly<{
   .withParams(apiKeyRestParamsSchema)
   .withPermission("organization:manage")
   .withOutput(apiKeyRestRevokedSchema)
-  .withDocs(REVOKE_API_KEY)
+  .withDocs({
+    tags: API_KEY_TAGS,
+    summary: "Revoke an API key",
+    description:
+      "Revoke (soft-delete) an API key. Revoked keys can no longer authenticate. Requires organization:manage permission.",
+    errors: [
+      INVALID_TOKEN,
+      {
+        status: 403,
+        description:
+          "Not authorized to revoke this API key, which belongs to another member (api_key_not_owned)",
+      },
+      { status: 404, description: "API key not found (api_key_not_found)" },
+      { status: 409, description: "API key is already revoked (api_key_already_revoked)" },
+    ],
+  })
   .withMiddleware(apiKeyRestCredential)
   .handle(async ({ app, input, scope }, caller) => {
     // Real adminness, so revoke() can enforce its owner-only path: without

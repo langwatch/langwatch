@@ -8,9 +8,9 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import type { RestTransportRoute } from "../declaration.ts";
 import type { RestTransportDocs } from "../openapi.ts";
 import { normalizeExclusiveBounds, restRouteDocumentation } from "../openapi.ts";
-import type { RestTransportRoute } from "../declaration.ts";
 
 /** A webhook intake: the signature is over the exact characters, so nothing parses them. */
 function rawBodyRoute(docs?: RestTransportDocs): RestTransportRoute<unknown> {
@@ -52,9 +52,9 @@ describe("restRouteDocumentation", () => {
 
         const derived = restRouteDocumentation({ route: declaredOutputRoute() });
 
-        const success = (published.responses as Record<string, { description: string; content: unknown }>)[
-          "200"
-        ];
+        const success = (
+          published.responses as Record<string, { description: string; content: unknown }>
+        )["200"];
 
         const declaredSuccess = (derived.responses as Record<string, { content: unknown }>)["200"];
         expect(success?.description).toBe("The project's widgets");
@@ -82,6 +82,22 @@ describe("restRouteDocumentation", () => {
 
         const success = (published.responses as Record<string, { content: unknown }>)["200"];
         expect(success?.content).toEqual(statedContent);
+      });
+    });
+
+    describe("when its docs name an error by status and a sentence alone", () => {
+      it("publishes the sentence with no content at all, never a hand-written schema", () => {
+        const published = restRouteDocumentation({
+          route: declaredOutputRoute({
+            errors: [{ status: 404, description: "No widget with that id" }],
+          }),
+        });
+
+        const notFound = (
+          published.responses as Record<string, { description: string; content: unknown }>
+        )["404"];
+        expect(notFound?.description).toBe("No widget with that id");
+        expect(notFound?.content).toEqual({});
       });
     });
   });

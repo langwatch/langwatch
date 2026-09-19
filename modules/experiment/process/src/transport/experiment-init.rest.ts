@@ -16,8 +16,6 @@ import { resolveRequestBound } from "@langwatch/plans";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
-import { INIT_EXPERIMENT } from "../rules/experiment-openapi.rules.ts";
-
 /**
  * Experiments carry their own permission, decoupled from workflows. The check
  * itself is the process's: its bound credential fact resolves the project and
@@ -76,7 +74,25 @@ export const experimentInitRest = defineRestRouter(ExperimentApi)
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withAccess(publicRoute({ reason: DOOR_REASON }))
   .withRawResponse({ produces: "application/json" })
-  .withDocs(INIT_EXPERIMENT)
+  .withDocs({
+    tags: ["Experiments"],
+    summary: "Create an experiment",
+    description:
+      "Create an experiment, or return the existing one when the slug is already taken. This is the first call in an experiment run: take the slug back, report results against it, and every run under that slug groups together in the app. The SDKs call this endpoint for you. The body carries `experiment_type` and at least one of `experiment_slug` (the stable slug you choose, which is what makes repeated runs land together) or `experiment_id`; `experiment_name` names it on creation and `workflowId` ties it to an Optimization Studio workflow.",
+    errors: [
+      {
+        status: 400,
+        description:
+          "The body was not valid JSON, or neither experiment_slug nor experiment_id was supplied",
+      },
+      { status: 401, description: "Missing or invalid API key" },
+      {
+        status: 403,
+        description:
+          "The API key lacks experiments:manage, or the plan's experiment limit is already reached",
+      },
+    ],
+  })
   .withMiddleware(experimentInitCaller)
   .handle(async ({ app, raw }, caller) => {
     let rawBody: unknown;

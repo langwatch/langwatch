@@ -38,15 +38,18 @@ import {
   type UpdateProjectInput,
 } from "@langwatch/project-contract";
 
-import {
-  ARCHIVE_PROJECT,
-  CREATE_PROJECT,
-  GET_PROJECT,
-  GET_PROJECT_API_KEY,
-  LIST_PROJECTS,
-  REGENERATE_PROJECT_API_KEY,
-  UPDATE_PROJECT,
-} from "../rules/project-openapi.rules.ts";
+const PROJECT_INVALID_TOKEN: Readonly<{ status: 401; description: string }> = {
+  status: 401,
+  description: "Invalid or missing API key token",
+};
+const PROJECT_INSUFFICIENT_PERMISSIONS: Readonly<{ status: 403; description: string }> = {
+  status: 403,
+  description: "Insufficient permissions for this operation",
+};
+const PROJECT_NOT_FOUND: Readonly<{ status: 404; description: string }> = {
+  status: 404,
+  description: "Project not found",
+};
 
 /**
  * What the management door reaches: flat operations `ProjectApp` serves via
@@ -148,7 +151,12 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
   .withQuery(projectRestPaginationQuerySchema)
   .withAccess(anyAuthenticated({ reason: LISTING_ANSWERS_WHAT_THE_KEY_REACHES }))
   .withOutput(projectRestPageSchema)
-  .withDocs(LIST_PROJECTS)
+  .withDocs({
+    summary: "List projects",
+    description:
+      "List all non-archived projects for the organization (paginated). Requires an admin API key with project:view permission.",
+    errors: [PROJECT_INVALID_TOKEN, PROJECT_INSUFFICIENT_PERMISSIONS],
+  })
   .withMiddleware(projectRestCredential)
   .handle(async ({ app, input, scope }, credential) => {
     const visible = await app.resolveVisibleProjects({
@@ -171,7 +179,18 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
   .withPermission("project:create")
   .withOutput(projectRestCreatedSchema)
   .withStatus(201)
-  .withDocs(CREATE_PROJECT)
+  .withDocs({
+    summary: "Create a project",
+    description:
+      "Create a new project in the organization. Returns the project with its API key (sk-lw-...) for sending traces. Provide either teamId (existing team) or newTeamName (creates a new team). Requires project:create permission.",
+    errors: [
+      { status: 400, description: "Team does not belong to this organization" },
+      PROJECT_INVALID_TOKEN,
+      { status: 403, description: "Insufficient permissions (requires project:create)" },
+      { status: 409, description: "A project with this name already exists in the team" },
+      { status: 422, description: "Validation error (missing required fields)" },
+    ],
+  })
   .withMiddleware(projectRestCredential)
   .handle(async ({ app, input, scope }, credential) => {
     const project = await provisionProject({
@@ -199,7 +218,11 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
   .withParams(projectRestParamsSchema)
   .withPermission("project:view", { at: "route", param: "projectId" })
   .withOutput(projectRestSchema)
-  .withDocs(GET_PROJECT)
+  .withDocs({
+    summary: "Get a project",
+    description: "Get a project by ID, including its API key. Requires project:view permission.",
+    errors: [PROJECT_INVALID_TOKEN, PROJECT_INSUFFICIENT_PERMISSIONS, PROJECT_NOT_FOUND],
+  })
   .handle(async ({ app, input, scope }) =>
     projectResponse(
       await projectInOrganization({ app, id: input.projectId, organizationId: scope.id }),
@@ -211,7 +234,16 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
   .withInput(projectRestUpdateSchema)
   .withPermission("project:update", { at: "route", param: "projectId" })
   .withOutput(projectRestSchema)
-  .withDocs(UPDATE_PROJECT)
+  .withDocs({
+    summary: "Update a project",
+    description:
+      "Update project fields. Only provided fields are changed. Requires project:update permission.",
+    errors: [
+      PROJECT_INVALID_TOKEN,
+      { status: 403, description: "Insufficient permissions (requires project:update)" },
+      PROJECT_NOT_FOUND,
+    ],
+  })
   .handle(async ({ app, input, scope }) => {
     try {
       return projectResponse(
@@ -235,7 +267,16 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
   .withParams(projectRestParamsSchema)
   .withPermission("project:delete", { at: "route", param: "projectId" })
   .withOutput(projectRestArchivedSchema)
-  .withDocs(ARCHIVE_PROJECT)
+  .withDocs({
+    summary: "Archive a project",
+    description:
+      "Soft-delete (archive) a project. Archived projects are excluded from list responses. Requires project:delete permission.",
+    errors: [
+      PROJECT_INVALID_TOKEN,
+      { status: 403, description: "Insufficient permissions (requires project:delete)" },
+      PROJECT_NOT_FOUND,
+    ],
+  })
   .handle(async ({ app, input, scope }) => {
     const project = await archiveProject({ app, id: input.projectId, organizationId: scope.id });
 
@@ -248,14 +289,38 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
   .withParams(projectRestParamsSchema)
   .withAccess(anyAuthenticated({ reason: BASE_KEY_IS_REFUSED_TO_EVERY_TOKEN }))
   .withOutput(projectApiKeyRotationSchema)
-  .withDocs(GET_PROJECT_API_KEY)
+  .withDocs({
+    summary: "Get the project API key",
+    description:
+      "Deprecated. Project base keys can be revealed only by a signed-in project administrator in the browser or an approved device flow. Organization API keys are always refused with 403.",
+    errors: [
+      PROJECT_INVALID_TOKEN,
+      {
+        status: 403,
+        description:
+          "A signed-in project administrator is required; API-key principals cannot reveal base keys",
+      },
+    ],
+  })
   .handle(async () => refuseBaseKeyToApiToken())
 
   .post("/:projectId/regenerate-api-key", "regenerateProjectApiKey")
   .withParams(projectRestParamsSchema)
   .withAccess(anyAuthenticated({ reason: BASE_KEY_IS_REFUSED_TO_EVERY_TOKEN }))
   .withOutput(projectApiKeyRotationSchema)
-  .withDocs(REGENERATE_PROJECT_API_KEY)
+  .withDocs({
+    summary: "Regenerate the project API key",
+    description:
+      "Deprecated. Project base keys can be rotated only by a signed-in project administrator in the browser. Organization API keys are always refused with 403.",
+    errors: [
+      PROJECT_INVALID_TOKEN,
+      {
+        status: 403,
+        description:
+          "A signed-in project administrator is required; API-key principals cannot rotate base keys",
+      },
+    ],
+  })
   .handle(async () => refuseBaseKeyToApiToken())
   .build();
 
