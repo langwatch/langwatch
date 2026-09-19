@@ -120,12 +120,12 @@ describe("renderConversationMarkdown", () => {
       expect(result.omittedTurns).toBe(3);
     });
 
-    it("stays inside the budget at every budget between the marker and one turn", () => {
+    it("stays inside the budget at every budget from one token up to one turn", () => {
       const turns = manyTurns(4);
       const oneTurn = renderConversationMarkdown({
         turns: [turns[3]!],
       }).estimatedTokens;
-      for (let maxTokens = 12; maxTokens <= oneTurn; maxTokens++) {
+      for (let maxTokens = 1; maxTokens <= oneTurn; maxTokens++) {
         const result = renderConversationMarkdown({
           conversationId: "conv-1",
           turns,
