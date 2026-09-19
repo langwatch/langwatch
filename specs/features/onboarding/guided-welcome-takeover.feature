@@ -130,6 +130,12 @@ Feature: Guided welcome flow and takeover screens
     When I pick Gateway and then Evals & LLM Ops
     Then the Gateway card shows 1 and the Evals & LLM Ops card shows 2
 
+  @unit
+  Scenario: The pick order reads as white on a filled brand orange square
+    When a card is picked
+    Then its number sits in white on a filled brand orange square
+    And every brand colour the takeover screens name exists in the theme
+
   @integration
   Scenario: Unpicking a card renumbers the ones picked after it
     Given I picked Gateway, Evals & LLM Ops and Governance

@@ -79,6 +79,86 @@ Feature: Langy asks how to reach the customer's code, once
       When I reopen the conversation before the folder connects
       Then the card still shows the command and the countdown
 
+    # The waiting line is a claim that a terminal can approve something. The
+    # platform says whether that is true: the request is open, it expired, it
+    # was declined in the terminal, or the share it opened has ended. The card
+    # waits only on an open request, so a reload shows what the platform knows.
+
+    @unit
+    Scenario Outline: The platform says what became of the conversation's latest request
+      Given the conversation's latest request to share a folder <history>
+      When the card reads the folder state
+      Then the request reads as <state>
+
+      Examples:
+        | history                                        | state    |
+        | is within its fifteen minutes                  | open     |
+        | was approved and the folder is connected       | approved |
+        | is past its fifteen minutes                    | expired  |
+        | was declined in the terminal before it expired | declined |
+        | was approved and the share has ended           | ended    |
+        | never existed                                  | none     |
+
+    @integration
+    Scenario: A card reopened after its request expired says so
+      Given I chose to share my local folder
+      And the request expired while I was away
+      When I reopen the conversation
+      Then the card says the request expired
+      And the card shows no waiting line and no spinner
+      And the card offers to try again
+
+    @integration
+    Scenario: A waiting card turns expired when its time runs out
+      Given a card waiting for my approval in the terminal
+      When the request's fifteen minutes run out
+      Then the card says the request expired and offers to try again
+      And the card reads the folder state again
+
+    @integration
+    Scenario: Trying again opens a fresh request on the same card
+      Given a card that says the request expired
+      When I choose to try again
+      Then a fresh request is recorded for the same conversation
+      And the card shows the command and a new countdown
+      And no message is sent in my name
+
+    @integration
+    Scenario: A request declined in the terminal reads as declined
+      Given I chose to share my local folder
+      And I declined the request in the terminal
+      When the card reads the folder state
+      Then the card says the request was declined in the terminal
+      And the card offers to try again
+
+    @integration
+    Scenario: A share that ended offers to share again
+      Given the folder was shared with this conversation and the share has ended
+      When the card reads the folder state
+      Then the card says sharing stopped
+      And the card offers to share again
+
+    @integration
+    Scenario: Choosing the local folder after the request expired opens a fresh one
+      Given a fresh code access card whose request already expired
+      When I choose to share my local folder
+      Then a fresh request is recorded for the same conversation
+      And the card shows the command and a new countdown
+
+    @integration
+    Scenario: A fresh request reaches the terminal that is already waiting
+      Given a terminal signed in as me is waiting for a Langy conversation to ask
+      When I choose to try again on the card
+      Then the fresh request is among the requests that terminal lists
+      And the conversation's record carries the request and its expiry
+
+    @integration
+    Scenario: A fresh request can only be opened on my own conversation
+      Given a conversation that is not mine
+      When I ask for a fresh request to share a folder with it
+      Then the platform answers that the conversation was not found
+      And no request is recorded
+
     @integration
     Scenario: A card that cannot read the folder state says so and offers to try again
       Given the read of my folder state fails

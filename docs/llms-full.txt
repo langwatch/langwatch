@@ -57559,6 +57559,8 @@ Langy asks which way to use the first time a request needs a code change. Reques
     ```
 
     This signs you in if you are not signed in yet, then shows the request from your conversation. Press Enter to approve it. The request expires after 15 minutes.
+
+    The command acts as you, so the only credential it uses is your `langwatch login` on this machine. A `LANGWATCH_API_KEY` in the folder's `.env` or in your shell is never used here and is left as it is. When the login is missing or no longer valid, the command runs the browser sign-in first and then continues.
   </Step>
   <Step title="Langy works in the folder">
     Once approved, the card shows the connected folder and the branch, and Langy starts. It explores the project, creates a branch from the latest default branch, makes the change, runs the project's own checks, commits in your git identity, pushes, and opens the pull request when `gh` is signed in. When `gh` is not signed in, Langy reports the branch name instead.

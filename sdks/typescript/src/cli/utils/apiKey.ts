@@ -4,6 +4,7 @@ import {
   setResolvedApiKey,
   setResolvedProjectId,
 } from "@/internal/credentialContext";
+import { normalizeEndpoint } from "@/internal/endpoint";
 import { getEndpoint } from "./endpoint";
 import { getOutputFormat, renderErrorAsJson } from "./errorOutput";
 import { maybePrintIdentityNotice } from "./identityNotice";
@@ -123,14 +124,6 @@ export const resolveCredentials = async (
   opts: {
     apiKey?: string;
     project?: string;
-    /**
-     * Resolve the device session before a key from the environment or the
-     * folder's .env. For a command that acts as a person: a control request
-     * is addressed to the developer who asked, and the project key Langy
-     * wrote into the folder's .env carries no person, so it can never answer
-     * one. The flag key still wins, since it was typed on this command.
-     */
-    preferSession?: boolean;
   } = {},
 ): Promise<ResolvedCredentials> => {
   // Load environment variables from .env file (scoped, see above)
@@ -141,11 +134,6 @@ export const resolveCredentials = async (
   // would be sent to the cloud default. `??=` keeps an explicit env value
   // authoritative, matching the 4-source resolver's order (env above config).
   process.env.LANGWATCH_ENDPOINT ??= endpoint;
-
-  if (opts.preferSession && !opts.apiKey?.trim()) {
-    const session = await resolveFromSession({ opts, endpoint });
-    if (session) return session;
-  }
 
   const flagKey = opts.apiKey?.trim();
   if (flagKey) {
@@ -176,22 +164,147 @@ export const resolveCredentials = async (
     return { apiKey: envKey, source: "env", endpoint, projectId };
   }
 
-  const session = await resolveFromSession({ opts, endpoint });
+  // A key given by flag or by LANGWATCH_API_KEY belongs to the address the
+  // command targets, so it was used above whatever the login says. The login's
+  // own key is different: see `loginMadeElsewhere`.
+  const elsewhere = loginMadeElsewhere();
+  if (elsewhere) return reportLoginMadeElsewhere(elsewhere);
+
+  const session = await resolveFromSession({
+    project: opts.project,
+    endpoint,
+    isLoginKeyRequired: false,
+  });
   if (session) return session;
 
   return reportMissingCredentials(endpoint);
 };
 
 /**
- * The device session's credential, published into the request-scoped store,
- * or nothing when the machine holds no live session.
+ * The credentials of a command that acts as a person: the login key of the
+ * device session in ~/.langwatch/config.json, and nothing else.
+ *
+ * `LANGWATCH_API_KEY` is never the credential here, whether it comes from the
+ * folder's .env or from the shell. A project key carries no person, and
+ * nothing in a key tells the command line whether a person stands behind it,
+ * so the login is the only credential that is known to. The variable is left
+ * as it is for the app in the folder and for every other command.
+ *
+ * Resolves to nothing when the machine has no login, when the server refuses
+ * the one it has, when that login holds no login key, or when the login was
+ * made against another address than the one the command targets (see
+ * `loginMadeElsewhere`).
+ *
+ * Spec: specs/typescript-sdk/cli-langy-share-control.feature
  */
-async function resolveFromSession({
-  opts,
+export const resolvePersonCredentials = async (): Promise<
+  ResolvedCredentials | undefined
+> => {
+  // The folder's .env still names the endpoint the folder works against.
+  loadEnvFileScoped();
+  const endpoint = getEndpoint();
+  process.env.LANGWATCH_ENDPOINT ??= endpoint;
+  return resolveFromSession({ endpoint, isLoginKeyRequired: true });
+};
+
+/**
+ * An address as its origin: scheme, host in lower case and port, so a trailing
+ * slash, a capital letter or a spelled-out default port do not make two
+ * addresses out of one. `localhost` and `127.0.0.1` stay two addresses: what
+ * answers on each is for the machine to decide, not for a string comparison.
+ */
+const originOf = (endpoint: string): string | undefined => {
+  try {
+    return new URL(normalizeEndpoint(endpoint)).origin;
+  } catch {
+    return undefined;
+  }
+};
+
+export interface LoginElsewhere {
+  /** The address the login on this machine was made against. */
+  loginEndpoint: string;
+  /** The address the command targets. */
+  endpoint: string;
+}
+
+/**
+ * The two addresses, when the login in `cfg` was made against one and the
+ * command targets another. Nothing when there is no login, or when both are
+ * one address.
+ */
+const loginElsewhere = ({
+  cfg,
   endpoint,
 }: {
-  opts: { project?: string; preferSession?: boolean };
+  cfg: GovernanceConfig | undefined;
   endpoint: string;
+}): LoginElsewhere | undefined => {
+  if (!cfg || !isLoggedIn(cfg)) return undefined;
+  const loginEndpoint = normalizeEndpoint(cfg.control_plane_url);
+  const loginOrigin = originOf(loginEndpoint);
+  const isSameAddress =
+    loginOrigin !== undefined && loginOrigin === originOf(endpoint);
+  return isSameAddress ? undefined : { loginEndpoint, endpoint };
+};
+
+/**
+ * The two addresses, when the login on this machine was made against one and
+ * the command targets another.
+ *
+ * `LANGWATCH_ENDPOINT` decides the target, and a folder's .env can set it. The
+ * device session's key, whether the login key or the personal project's, was
+ * issued by one address and is only ever sent there: a folder that names
+ * another address gets no key from the login, whoever wrote its .env. A key
+ * given by flag or in `LANGWATCH_API_KEY` is that address's own and is used
+ * as given.
+ */
+export const loginMadeElsewhere = (): LoginElsewhere | undefined => {
+  loadEnvFileScoped();
+  let cfg: GovernanceConfig | undefined;
+  try {
+    cfg = loadConfig();
+  } catch {
+    cfg = undefined;
+  }
+  return loginElsewhere({ cfg, endpoint: getEndpoint() });
+};
+
+/**
+ * What a command says when the login belongs to another address. `outcome`
+ * finishes the sentence about the key for a command with something of its own
+ * to say, and `canUseApiKey` is off for a command that acts as a person, where
+ * a project key is no way out.
+ */
+export const loginElsewhereMessage = ({
+  loginEndpoint,
+  endpoint,
+  outcome = "",
+  canUseApiKey = true,
+}: LoginElsewhere & { outcome?: string; canUseApiKey?: boolean }): string =>
+  [
+    `The login on this machine is for ${loginEndpoint}, and LANGWATCH_ENDPOINT (in the shell or in this folder's .env) points this command at ${endpoint}.`,
+    `A login's key is only sent to the address that issued it${outcome}.`,
+    `Run \`langwatch login --device\` here to sign in to ${endpoint}, or unset LANGWATCH_ENDPOINT to use the login you have.`,
+    ...(canUseApiKey
+      ? [`A key of ${endpoint} in LANGWATCH_API_KEY or --api-key works too.`]
+      : []),
+  ].join(" ");
+
+/**
+ * The device session's credential, published into the request-scoped store,
+ * or nothing when the machine holds no live session. `isLoginKeyRequired`
+ * accepts the user-scoped login key only, since the personal project's key
+ * carries no person.
+ */
+async function resolveFromSession({
+  project,
+  endpoint,
+  isLoginKeyRequired,
+}: {
+  project?: string;
+  endpoint: string;
+  isLoginKeyRequired: boolean;
 }): Promise<ResolvedCredentials | undefined> {
   // Stored state. Re-read from disk on every call, never cached in-process
   // (the daemon identity boundary again; loadConfig is built for this).
@@ -202,22 +315,25 @@ async function resolveFromSession({
     cfg = undefined;
   }
   if (!cfg || !isLoggedIn(cfg)) return undefined;
+  // Every key the session holds goes through here, so this is the one place
+  // that keeps it with the address that issued it.
+  if (loginElsewhere({ cfg, endpoint })) return undefined;
   const session = await resolveSessionCredential(cfg);
   if (!session) return undefined;
+  if (isLoginKeyRequired && !session.isLoginKey) return undefined;
 
   setResolvedApiKey(session.apiKey);
   // `--project` decides the target BEFORE anything is published: the
   // personal project is the default only when no flag says otherwise,
   // and a flag that does not resolve must leave no target behind at all.
   const projectId =
-    (await applyProjectScope({ project: opts.project, cfg })) ??
-    session.projectId;
+    (await applyProjectScope({ project, cfg })) ?? session.projectId;
   setResolvedProjectId(projectId);
   // An explicit --project names the identity on the command line, so
   // there is nothing implicit left to warn about. A command that acts as
   // the person reads no project either way, so the notice about which
   // project it reads would be wrong; that command names its own login.
-  if (opts.project === undefined && !opts.preferSession) {
+  if (project === undefined && !isLoginKeyRequired) {
     await maybePrintIdentityNotice({
       mode: session.isLoginKey ? "device-login-key" : "device",
       apiKey: session.apiKey,
@@ -442,6 +558,28 @@ export const missingCredentialsLines = (authUrl: string): string[] => [
   "",
   "For agents: don't reuse keys outside the project folder, check more options with `langwatch login --help` to help the user",
 ];
+
+/**
+ * Ends the command when the login's key would go to another address than its
+ * own: structured on stdout for machine callers, prose on stderr for people.
+ */
+function reportLoginMadeElsewhere(elsewhere: LoginElsewhere): never {
+  const message = loginElsewhereMessage(elsewhere);
+  if (getOutputFormat() !== "text") {
+    console.log(
+      renderErrorAsJson({
+        code: "login_endpoint_mismatch",
+        kind: "login_endpoint_mismatch",
+        message,
+        httpStatus: 0,
+        meta: { ...elsewhere },
+        isHandled: true,
+      }),
+    );
+  }
+  console.error(chalk.red(`Error: ${message}`));
+  process.exit(1);
+}
 
 function reportMissingCredentials(endpoint: string): never {
   const authUrl = `${endpoint}/authorize`;

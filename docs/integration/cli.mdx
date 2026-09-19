@@ -112,6 +112,10 @@ The CLI picks up your self-hosted endpoint from any of these (highest priority f
 | 3 | `~/.langwatch/config.json:control_plane_url` | persisted from prior login (daily driver) |
 | 4 | `https://app.langwatch.ai` | built-in cloud default |
 
+A device login's key is only sent to the address the login was made against. A project's `.env` can set `LANGWATCH_ENDPOINT`, so the CLI never pairs your login with an address a folder names.
+
+When `LANGWATCH_ENDPOINT` names another address than your login's, a command uses the API key given for that address (`LANGWATCH_API_KEY` or `--api-key`). With no key it stops and names both addresses. Run `langwatch login --device` with the variable set to sign in there, or unset it to use the login you have.
+
 The simplest path for self-hosted users is the interactive prompt, pick "Self-hosted instance", enter your URL, and the CLI saves it for future invocations:
 
 ```bash

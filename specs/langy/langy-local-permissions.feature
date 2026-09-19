@@ -457,3 +457,34 @@ Feature: The CLI decides what Langy may run on the developer's machine
       Given permission checks are off for this session
       When the conversation switches to a model that is not allowed to skip
       Then the next command asks again
+
+  Rule: A shared folder answers only to the owner of its conversation
+
+    # A conversation shared with the project is readable by a teammate. The
+    # folder behind it sits on the owner's machine, so reading is all a
+    # teammate gets.
+
+    @integration
+    Scenario: A teammate reading a shared conversation cannot act on its folder
+      Given a teammate shared their conversation with the project
+      And their folder is connected with a permission card waiting
+      When I answer the card, switch the permission checks off, close the folder or ask for the folder again
+      Then the platform answers that the conversation was not found
+      And the card, the policy, the folder and the terminal's requests are untouched
+
+    # The worker's routes take a Langy key. A worker only ever runs a turn for
+    # the owner, so a key that names a teammate's conversation is not a worker
+    # doing its job.
+    @unit
+    Scenario: A key never reaches the folder of a teammate's shared conversation
+      Given a teammate shared their conversation with the project
+      When a Langy key of mine names that conversation to open a request, run a call or read a card
+      Then the platform answers that the conversation was not found
+      And the answer is the one a conversation that does not exist gets
+
+    @integration
+    Scenario: A teammate reading a shared conversation still sees its folder state
+      Given a teammate shared their conversation with the project
+      And their folder is connected
+      When I open the conversation
+      Then the panel reads the folder as connected
