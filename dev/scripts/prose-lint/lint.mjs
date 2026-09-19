@@ -14,6 +14,7 @@ const MODEL = "jev-latest";
 const PRICE_PER_MTOK = 0.042; // USD per million input tokens, output is free
 const TOKEN_BUDGET = 30000; // state cap is 32k tokens, text and questions together
 const MAX_CHOICE_OPTIONS = 255;
+const REQUEST_TIMEOUT_MS = 120000;
 
 // ---------- args ----------
 
@@ -38,12 +39,12 @@ function parseArgs(argv) {
     if (a === "--rules") opts.rules = next();
     else if (a === "--section-level") opts.sectionLevel = Number(next());
     else if (a === "--json") opts.json = true;
-    else if (a === "--threshold") opts.threshold = Number(next());
-    else if (a === "--min") opts.min = Number(next());
-    else if (a === "--locate") opts.locate = Number(next());
+    else if (a === "--threshold") opts.threshold = probability(a, next());
+    else if (a === "--min") opts.min = probability(a, next());
+    else if (a === "--locate") opts.locate = probability(a, next());
     else if (a === "--no-locate") opts.noLocate = true;
     else if (a === "--context") opts.context = true;
-    else if (a === "--concurrency") opts.concurrency = Number(next());
+    else if (a === "--concurrency") opts.concurrency = positiveInteger(a, next());
     else if (a === "--only") opts.only = new Set(next().split(","));
     else if (a === "--skip") opts.skip = new Set(next().split(","));
     else if (a === "-h" || a === "--help") {
@@ -62,6 +63,26 @@ function parseArgs(argv) {
   return opts;
 }
 
+// A flag that takes a probability: a finite number from 0 to 1. Anything else
+// would silently make every rule fire, or none, so it is refused up front.
+function probability(flag, raw) {
+  const value = Number(raw);
+  if (raw === undefined || raw === "" || !Number.isFinite(value) || value < 0 || value > 1) {
+    console.error(`${flag} takes a number from 0 to 1, got ${raw === undefined ? "nothing" : JSON.stringify(raw)}`);
+    process.exit(2);
+  }
+  return value;
+}
+
+function positiveInteger(flag, raw) {
+  const value = Number(raw);
+  if (raw === undefined || raw === "" || !Number.isInteger(value) || value < 1) {
+    console.error(`${flag} takes a whole number of 1 or more, got ${raw === undefined ? "nothing" : JSON.stringify(raw)}`);
+    process.exit(2);
+  }
+  return value;
+}
+
 function usage() {
   console.error(`usage: node lint.mjs <file.md|mdx> [more files] [options]
   --rules docs|writing|both|landing   rule set (default docs; landing loads landing-page-writing plus writing)
@@ -71,7 +92,7 @@ function usage() {
   --min P                     report rules at or above P (default 0.5)
   --locate P                  ask which sentence for rules at or above P (default 0.6)
   --no-locate                 skip the sentence-locating request
-  --context                   give the judge every section above the one it reads, for rules marked "context" (landing rule 2)
+  --context                   give the judge every section above the one it reads, for rules marked "context" (landing rules 2 and 9)
   --concurrency N             sections judged in parallel (default 4)
   --only a,b,c                run only these rule ids
   --skip a,b,c                skip these rule ids`);
@@ -230,15 +251,20 @@ function classify(lines, kind) {
       if (/^\s*([-*+]|\d+[.)])\s/.test(l)) items.push(l.replace(/^\s*([-*+]|\d+[.)])\s+/, ""));
       else if (items.length) items[items.length - 1] += " " + l.trim();
     }
-    return { kind: "list", text, exempt, units: items.flatMap(splitSentences) };
+    return { kind: "list", text, exempt, units: items.map(stripMarkup).flatMap(splitSentences) };
   }
   if (lines.every((l) => /^\s*<\/?[A-Z][\w.]*[^>]*>\s*$/.test(l))) {
     return { kind: "tag", text, exempt, units: [] };
   }
-  const prose = lines
-    .map((l) => l.replace(/^\s*<\/?[A-Z][\w.]*[^>]*>\s*$/, "").trim())
-    .filter(Boolean)
-    .join(" ");
+  // Stripped over the whole paragraph rather than per sentence, so a comment
+  // or an image that spans a sentence boundary never leaks half of itself
+  // into a unit.
+  const prose = stripMarkup(
+    lines
+      .map((l) => l.replace(/^\s*<\/?[A-Z][\w.]*[^>]*>\s*$/, "").trim())
+      .filter(Boolean)
+      .join(" "),
+  );
   return { kind: "prose", text, exempt, units: splitSentences(prose), words: prose.split(/\s+/).length };
 }
 
@@ -251,8 +277,15 @@ function splitSentences(s) {
     .filter((x) => x.length > 0);
 }
 
+// Markup that is not prose and carries punctuation the regex rules would
+// otherwise count: an image's leading exclamation mark, a comment's arrow.
+// Both go entirely, so nothing is left for a rule to match.
+function stripMarkup(s) {
+  return s.replace(/<!--[\s\S]*?-->/g, "").replace(/!\[[^\]]*\]\([^)]*\)/g, "");
+}
+
 function stripInlineCode(s) {
-  return s.replace(/`[^`]*`/g, "`code`");
+  return stripMarkup(s).replace(/`[^`]*`/g, "`code`");
 }
 
 // ---------- regex and local rules ----------
@@ -269,7 +302,12 @@ function runRegexRules(rules, section, doc, docCounts) {
       const heads = [section.heading ? `${"#".repeat(section.level)} ${section.heading}` : ""].concat(
         section.paragraphs.filter((p) => p.kind === "heading").map((p) => p.text.trim()),
       );
-      for (const h of heads) if (h && re.test(h)) hits.push({ sentence: h, match: h });
+      for (const h of heads) {
+        // The pattern carries the g flag, so test() would resume from where
+        // the previous heading matched and skip a hit at the start of this one.
+        re.lastIndex = 0;
+        if (h && re.test(h)) hits.push({ sentence: h, match: h });
+      }
     } else {
       for (const p of section.paragraphs) {
         if (p.kind === "code" || p.kind === "tag" || p.exempt) continue;
@@ -356,6 +394,9 @@ async function jev(key, state, questions, usage) {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
         body,
+        // A hung request becomes a failed attempt and is retried like a
+        // dropped socket, instead of holding the section forever.
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
     } catch (e) {
       if (attempt >= 6) throw e;
@@ -421,11 +462,14 @@ async function askInBatches(key, state, questions, usage) {
 
 const hasContent = (section) => section.paragraphs.some((p) => p.kind === "code" || p.units.length > 0);
 
-function sectionState(section, doc) {
+// The state a section is judged in. `withAbove` adds everything the reader
+// has seen before this block, so a rule can ask whether the block is
+// understandable from the page above it alone. Only the rules marked
+// "context" get it: for every other rule the page above is tokens paid for
+// nothing, and a judge reading a whole page may answer about the wrong block.
+function sectionState(section, doc, { withAbove = false } = {}) {
   const state = { heading: section.heading || "(no heading)", text: section.text };
-  if (doc.context) {
-    // Everything the reader has seen before this block, so a rule can ask
-    // whether the block is understandable from the page above it alone.
+  if (withAbove) {
     const above = doc.sections.slice(0, section.index).map((s) => s.text).join("\n\n");
     state.above = above || "(nothing: this is the first block on the page)";
   }
@@ -436,15 +480,35 @@ function sectionState(section, doc) {
   return state;
 }
 
+// Sends one set of questions per kind of state: the ordinary rules over the
+// section alone, the contextual rules over the section plus the page above.
+// Returns every answer keyed by question, whichever request carried it.
+async function askByContext(key, section, doc, items, toQuestion, usage) {
+  const answers = {};
+  for (const withAbove of [false, true]) {
+    const batch = items.filter((item) => Boolean(item.rule.context) === withAbove);
+    if (batch.length === 0) continue;
+    const state = sectionState(section, doc, { withAbove });
+    const questions = Object.fromEntries(batch.map((item) => [item.rule.key, toQuestion(item)]));
+    Object.assign(answers, await askInBatches(key, state, questions, usage));
+  }
+  return answers;
+}
+
 async function judgeSection(key, rules, section, doc, opts, usage) {
   if (!hasContent(section)) return []; // a bare heading has nothing to judge
   const judge = rules.filter(
     (r) => r.kind === "judge" && (r.scope !== "first-section" || section.index === doc.firstContentIndex) && (!r.context || doc.context),
   );
   if (judge.length === 0) return [];
-  const state = sectionState(section, doc);
-  const questions = Object.fromEntries(judge.map((r) => [r.key, noul(r)]));
-  const answers = await askInBatches(key, state, questions, usage);
+  const answers = await askByContext(
+    key,
+    section,
+    doc,
+    judge.map((rule) => ({ rule })),
+    ({ rule }) => noul(rule),
+    usage,
+  );
   const findings = [];
   for (const r of judge) {
     const a = answers[r.key];
@@ -471,18 +535,18 @@ async function locateSentences(key, findings, section, doc, opts, usage) {
     return;
   }
   const criteria = Object.fromEntries(uniq.map((s, i) => [`s${i + 1}`, s.length > 400 ? s.slice(0, 400) + "..." : s]));
-  const state = sectionState(section, doc);
-  const questions = Object.fromEntries(
-    targets.map((f) => [
-      f.rule.key,
-      {
-        type: "choice",
-        instructions: `Which sentence of \`text\` is the clearest instance of the following? ${f.rule.instruction}`,
-        criteria,
-      },
-    ]),
+  const answers = await askByContext(
+    key,
+    section,
+    doc,
+    targets,
+    (f) => ({
+      type: "choice",
+      instructions: `Which sentence of \`text\` is the clearest instance of the following? ${f.rule.instruction}`,
+      criteria,
+    }),
+    usage,
   );
-  const answers = await askInBatches(key, state, questions, usage);
   for (const f of targets) {
     const a = answers[f.rule.key];
     if (!a) continue;

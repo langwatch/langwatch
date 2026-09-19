@@ -18,13 +18,17 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import type { InstantEvalRun } from "@/client-sdk/services/instant-evals";
+import type {
+  InstantEvalJudgment,
+  InstantEvalRun,
+} from "@/client-sdk/services/instant-evals";
 
 import {
   elapsedLabel,
   followInstantEvalRun,
   instantEvalHeadline,
   instantEvalProgressLine,
+  printInstantEvalRows,
 } from "../liveRun";
 
 const run = (overrides: Partial<InstantEvalRun> = {}): InstantEvalRun =>
@@ -210,6 +214,64 @@ describe("followInstantEvalRun, given a run to follow", () => {
 
       expect(live.outcome).toBe("poll_failure");
       expect(live.run.id).toBe("instant_eval_abc");
+    });
+  });
+});
+
+describe("printInstantEvalRows, given a model-call run", () => {
+  describe("when two spans of one trace were judged", () => {
+    /** @scenario "run reads back the first rows of a finished run" */
+    it("shows each span its own verdict", () => {
+      const spanRun = run({
+        status: "finished",
+        sql: "SELECT TraceId, SpanId FROM analytics.spans WHERE SpanAttributes['langwatch.span.type'] = 'llm'",
+      });
+      const judgment = (
+        overrides: Partial<InstantEvalJudgment>,
+      ): InstantEvalJudgment =>
+        ({
+          traceId: "trace_1",
+          questionId: "q1",
+          threadId: "",
+          spanId: "",
+          kind: "boolean",
+          status: "judged",
+          passed: true,
+          score: null,
+          label: null,
+          probability: 0.9,
+          probabilities: null,
+          error: null,
+          occurredAt: "2026-09-18T12:00:00.000Z",
+          ...overrides,
+        }) as InstantEvalJudgment;
+      const printed: string[] = [];
+      const logSpy = vi
+        .spyOn(console, "log")
+        .mockImplementation((...parts: unknown[]) => {
+          printed.push(parts.map(String).join(" "));
+        });
+
+      try {
+        printInstantEvalRows({
+          rows: [
+            { TraceId: "trace_1", SpanId: "span_a", q1: "first call" },
+            { TraceId: "trace_1", SpanId: "span_b", q1: "second call" },
+          ],
+          judgments: [
+            judgment({ spanId: "span_a", passed: true, probability: 0.9 }),
+            judgment({ spanId: "span_b", passed: false, probability: 0.1 }),
+          ],
+          run: spanRun,
+        });
+      } finally {
+        logSpy.mockRestore();
+      }
+
+      const rowA = printed.find((line) => line.includes("span_a"));
+      const rowB = printed.find((line) => line.includes("span_b"));
+      expect(rowA).toContain("yes (0.90)");
+      expect(rowB).toContain("no (0.10)");
     });
   });
 });

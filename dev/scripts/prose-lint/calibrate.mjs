@@ -11,6 +11,10 @@ import { spawnSync } from "node:child_process";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIX = join(HERE, "fixtures");
 const threshold = Number(process.argv[2] ?? 0.7);
+if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
+  console.error(`threshold must be a number from 0 to 1, got ${JSON.stringify(process.argv[2])}`);
+  process.exit(2);
+}
 
 const expected = JSON.parse(readFileSync(join(FIX, "expected.json"), "utf8"));
 const files = readdirSync(FIX).filter((f) => /\.(md|mdx)$/.test(f)).sort();
@@ -20,6 +24,10 @@ files.length = 0;
 files.push(...labelled);
 
 const results = {};
+// Fixtures where a section could not be judged. Their expected rules are not
+// scored: a request that failed says nothing about the rule, and counting it
+// as a miss would drag recall down for a network error.
+const failed = [];
 let tokens = 0;
 let requests = 0;
 for (const f of files) {
@@ -38,7 +46,10 @@ for (const f of files) {
   const max = {};
   const sentence = {};
   for (const s of rep.sections) {
-    if (s.error) console.error(`${f} / ${s.heading}: ${s.error}`);
+    if (s.error) {
+      console.error(`${f} / ${s.heading || "(intro)"}: ${s.error}`);
+      if (!failed.includes(f)) failed.push(f);
+    }
     for (const fd of s.findings) {
       if ((max[fd.rule] ?? -1) < fd.probability) {
         max[fd.rule] = fd.probability;
@@ -51,17 +62,18 @@ for (const f of files) {
 }
 writeFileSync(join(FIX, "results.json"), JSON.stringify(results, null, 2));
 
-// score per rule
+// score per rule, over the fixtures every section of which was judged
+const scored = files.filter((f) => !failed.includes(f));
 const rules = new Set();
-for (const f of files) for (const r of Object.keys(results[f].max)) rules.add(r);
-for (const list of Object.values(expected)) for (const r of list) rules.add(r);
+for (const f of scored) for (const r of Object.keys(results[f].max)) rules.add(r);
+for (const f of scored) for (const r of expected[f]) rules.add(r);
 
 const rows = [];
 for (const r of [...rules].sort()) {
   let tp = 0, fp = 0, fn = 0, tn = 0;
   const fps = [];
   const fns = [];
-  for (const f of files) {
+  for (const f of scored) {
     const exp = (expected[f] ?? []).includes(r);
     const fired = (results[f].max[r] ?? 0) >= threshold;
     if (exp && fired) tp++;
@@ -76,7 +88,11 @@ for (const r of [...rules].sort()) {
 
 const fmt = (x) => (x == null ? "n/a" : (x * 100).toFixed(0) + "%");
 const lines = [];
-lines.push(`Threshold ${threshold}. ${files.length} fixtures, ${requests} requests, ${tokens.toLocaleString()} input tokens, USD ${((tokens / 1e6) * 0.042).toFixed(4)}.`);
+lines.push(`Threshold ${threshold}. ${scored.length} fixtures scored, ${requests} requests, ${tokens.toLocaleString()} input tokens, USD ${((tokens / 1e6) * 0.042).toFixed(4)}.`);
+if (failed.length) {
+  lines.push("");
+  lines.push(`Not scored, a section failed to judge (re-run to include them): ${failed.join(", ")}`);
+}
 lines.push("");
 lines.push("| Rule | TP | FP | FN | Precision | Recall | Misses |");
 lines.push("|---|---|---|---|---|---|---|");

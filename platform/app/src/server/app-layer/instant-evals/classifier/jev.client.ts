@@ -33,7 +33,6 @@
 import { createLogger } from "@langwatch/observability";
 import { type Dispatcher, Pool, fetch as undiciFetch } from "undici";
 
-import { estimateTokensFromBytes } from "~/shared/traces/tokenBudget";
 import { InstantEvalClassifierUnavailableError } from "../errors";
 import {
   type InstantEvalClassifier,
@@ -50,6 +49,7 @@ import {
 } from "./questions";
 import {
   INSTANT_EVAL_CLASSIFIER_LIMITS,
+  estimateJudgedTextTokens,
   instantEvalQuestionTokens,
   instantEvalTextBudget,
   prepareInstantEvalText,
@@ -182,7 +182,9 @@ export class JevInstantEvalClassifier implements InstantEvalClassifier {
     };
 
     // The questions cost the same on every attempt; the text may be cut
-    // between them, so it is measured per send.
+    // between them, so it is measured per send. The permit is measured with
+    // the classifier's own bytes-per-token ratio, the same one the price is,
+    // so the bucket is debited what the request really carries.
     const questionTokens = instantEvalQuestionTokens(request.questions);
     let limiterWaitMs = 0;
 
@@ -190,7 +192,9 @@ export class JevInstantEvalClassifier implements InstantEvalClassifier {
       const waitedFrom = Date.now();
       await this.options.limiter.acquire(
         {
-          tokens: estimateTokensFromBytes(state.text) + questionTokens,
+          tokens:
+            estimateJudgedTextTokens({ text: state.text, limits: this.limits }) +
+            questionTokens,
           tenantId: request.projectId,
         },
         signal,
@@ -200,6 +204,7 @@ export class JevInstantEvalClassifier implements InstantEvalClassifier {
         text: state.text,
         request,
         isTruncated: state.isTruncated,
+        attempt,
         ...(signal ? { signal } : {}),
       });
 
@@ -214,16 +219,24 @@ export class JevInstantEvalClassifier implements InstantEvalClassifier {
     return { ...instantEvalSkipped("classifier_rate_limited"), limiterWaitMs };
   }
 
-  /** One send, classified into an {@link Attempt}. */
+  /**
+   * One send, classified into an {@link Attempt}.
+   *
+   * `attempt` sizes the backoff when the API names no wait of its own, so a
+   * transport failure or a bare 5xx waits longer each time rather than the
+   * same second five times over.
+   */
   private async send({
     text,
     request,
     isTruncated,
+    attempt,
     signal,
   }: {
     text: string;
     request: InstantEvalClassifyRequest;
     isTruncated: boolean;
+    attempt: number;
     signal?: AbortSignal;
   }): Promise<Attempt> {
     const body = JSON.stringify({
@@ -249,13 +262,17 @@ export class JevInstantEvalClassifier implements InstantEvalClassifier {
       // A transport failure is worth another try: the reference client retries
       // these on the same backoff as a 5xx, and one dropped socket in a
       // thousand-row query should not cost that row its answer.
-      return { kind: "retry", waitMs: backoffMs(1), isRateLimited: false };
+      return {
+        kind: "retry",
+        waitMs: backoffMs(attempt),
+        isRateLimited: false,
+      };
     }
 
     if (response.status === 200) {
       return await this.readAnswer({ response, request, isTruncated });
     }
-    return await classifyFailure({ response });
+    return await classifyFailure({ response, attempt });
   }
 
   private async readAnswer({
@@ -355,8 +372,10 @@ function cutForRetry(state: AttemptState): InstantEvalJudgement | null {
 /** Reads one non-200 into an outcome. */
 async function classifyFailure({
   response,
+  attempt,
 }: {
   response: Awaited<ReturnType<typeof undiciFetch>>;
+  attempt: number;
 }): Promise<Attempt> {
   const body = await response.text().catch(() => "");
   const { status } = response;
@@ -375,7 +394,7 @@ async function classifyFailure({
     }
     return {
       kind: "retry",
-      waitMs: Math.min(waitMs ?? backoffMs(1), MAX_RETRY_AFTER_MS),
+      waitMs: Math.min(waitMs ?? backoffMs(attempt), MAX_RETRY_AFTER_MS),
       isRateLimited,
     };
   }
@@ -392,7 +411,7 @@ function retryAfterMs(header: string | null): number | null {
   return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : null;
 }
 
-/** Flat 1s base, which the caller caps. Kept simple: the API names its own waits. */
+/** 1s, 2s, 4s, 8s: doubles per attempt, capped, for when the API names no wait. */
 function backoffMs(attempt: number): number {
   return Math.min(1_000 * 2 ** (attempt - 1), MAX_RETRY_AFTER_MS);
 }

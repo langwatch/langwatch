@@ -11,8 +11,10 @@ Feature: langwatch instant-eval, asking one question of a whole production histo
     or a statement (`--sql`, `--sql-file`), starts a run and prints it.
   - In table mode `run` prints the statement it started under a "Statement" heading, so a
     reader learns the LangWatchQL the shorthand wrote for them.
-  - Money is never spent by surprise: `--estimate` prices the run and exits, and a plain
-    `run` over a thousand rows prints the estimate line before it creates anything.
+  - `--estimate` prices the run and exits. A plain `run` over a thousand rows prices itself
+    first and prints the estimate line before it creates anything, when that estimate
+    succeeds; when pricing fails the run still starts, with a note saying so, and the
+    caller's `--limit` bounds what can be judged and so what can be spent.
   - `--wait` polls every three seconds and reports progress on one line.
   - Every subcommand honours the output contract: `-o table|json|agents|yaml`, `--jq`.
 
