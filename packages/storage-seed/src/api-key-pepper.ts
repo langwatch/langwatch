@@ -1,4 +1,4 @@
-import { SecretEnvironmentService } from "@langwatch/secrets";
+import { SecretsChain } from "@langwatch/secrets";
 
 /**
  * The pepper seeded API-key hashes and encrypted credentials are keyed
@@ -40,7 +40,16 @@ export async function resolveApiKeyPepper({
 }: {
   source: Readonly<Record<string, unknown>>;
 }): Promise<ApiKeyPepperResolution> {
-  const { environment } = await SecretEnvironmentService.create({ source }).resolve();
+  const environment = Object.fromEntries(
+    Object.entries(source).map(([key, value]) => [key, typeof value === "string" ? value : void 0]),
+  );
+  const chain = SecretsChain.start({ environment }).withEnv();
+  const resolved: Record<string, string> = {};
 
-  return apiKeyPepperFrom({ environment });
+  for (const key of API_KEY_PEPPER_KEYS) {
+    const value = await chain.fetch(key);
+    if (value !== undefined) resolved[key] = value;
+  }
+
+  return apiKeyPepperFrom({ environment: resolved });
 }
