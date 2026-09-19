@@ -51,6 +51,12 @@ An experiment is a table. Each row is a dataset entry, and each column is a prom
 
 The workbench autosaves. **History** lists the saved versions, and **Restore** writes an old setup forward as a new version.
 
+## Map image and file columns
+
+A dataset column of type `image` or `file` maps to a prompt input of type **Image** or **File**, and to an agent input. A connected agent column also has an optional **attachment** input for the same columns.
+
+A prompt gets the file as an image, an audio or a document content part. A plain text or JSON file is different: LangWatch reads it and sends its text inline, under the file name, rather than as a file content part. An agent gets the file as a base64 data URL, so it never has to open a LangWatch address. See [Images and files in datasets](/datasets/dataset-images).
+
 ## Map evaluator inputs
 
 Every evaluator declares the fields it reads, for example `input`, `output`, `expected_output` or `contexts`. The **Variables** section of the evaluator editor maps each field to a source: the output of the column it is attached to, or a dataset column.

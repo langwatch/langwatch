@@ -33,6 +33,7 @@ export const datasetColumnTypeSchema = z.union([
   z.literal("annotations"),
   z.literal("evaluations"),
   z.literal("image"),
+  z.literal("file"),
 ]);
 
 export type DatasetColumnType = z.infer<typeof datasetColumnTypeSchema>;
@@ -50,6 +51,7 @@ export const DATASET_COLUMN_TYPES = [
   "annotations",
   "evaluations",
   "image",
+  "file",
 ] as const;
 
 export const datasetColumnsSchema = z.array(
@@ -186,7 +188,10 @@ export const datasetColumnTypeMapping: {
   chat_messages: z.array(chatMessageSchema).optional().nullable(),
   annotations: z.array(annotationScoreSchema).optional().nullable(),
   evaluations: z.array(evaluationsSchema).optional().nullable(),
-  image: z.string().url().optional().nullable(),
+  // Image and file cells hold either an absolute URL, a data URL, or a
+  // LangWatch-relative `/api/files/...` reference, so they are plain strings.
+  image: z.string().optional().nullable(),
+  file: z.string().optional().nullable(),
 };
 
 export const newDatasetEntriesSchema = z.object({

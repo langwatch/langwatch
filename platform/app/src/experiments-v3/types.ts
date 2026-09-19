@@ -132,6 +132,7 @@ export const localPromptConfigSchema = z.object({
         "float",
         "bool",
         "image",
+        "file",
         "list[str]",
         "list[float]",
         "list[int]",
