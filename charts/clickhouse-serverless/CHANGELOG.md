@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/langwatch/langwatch/compare/clickhouse-serverless@v0.4.0...clickhouse-serverless@v0.5.0) (2026-09-19)
+
+
+### Miscellaneous
+
+* **clickhouse-serverless:** Synchronize clickhouse-serverless versions
+
 ## [0.4.0](https://github.com/langwatch/langwatch/compare/clickhouse-serverless@v0.3.0...clickhouse-serverless@v0.4.0) (2026-09-12)
 
 
