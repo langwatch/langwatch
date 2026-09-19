@@ -29,6 +29,17 @@ export const INSTANT_EVAL_PRICING: InstantEvalPricing = {
 
 const TOKENS_PER_MILLION = 1_000_000;
 
+/**
+ * The ledger keeps integer nano-USD, so an amount here is rounded to that
+ * precision: a raw product such as 0.011560294200000001 is float noise past
+ * the ninth decimal, and it would otherwise reach the REST wire as is.
+ */
+const NANO_USD_PER_USD = 1_000_000_000;
+
+function toNanoUsdPrecision(usd: number): number {
+  return Math.round(usd * NANO_USD_PER_USD) / NANO_USD_PER_USD;
+}
+
 /** What the classifier charged us for these input tokens. */
 export function instantEvalCostUsd({
   inputTokens,
@@ -38,7 +49,9 @@ export function instantEvalCostUsd({
   pricing?: InstantEvalPricing;
 }): number {
   if (inputTokens <= 0) return 0;
-  return (inputTokens / TOKENS_PER_MILLION) * pricing.usdPerMillionInputTokens;
+  return toNanoUsdPrecision(
+    (inputTokens / TOKENS_PER_MILLION) * pricing.usdPerMillionInputTokens,
+  );
 }
 
 /** What the customer is charged for a cost of ours. */
@@ -49,5 +62,5 @@ export function instantEvalPriceUsd({
   costUsd: number;
   pricing?: InstantEvalPricing;
 }): number {
-  return costUsd * pricing.markup;
+  return toNanoUsdPrecision(costUsd * pricing.markup);
 }
