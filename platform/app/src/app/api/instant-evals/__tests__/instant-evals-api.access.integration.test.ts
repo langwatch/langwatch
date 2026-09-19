@@ -88,6 +88,8 @@ describe("Feature: The Instant Eval run over REST", () => {
 
         expect(res.status).toBe(409);
         expect(body.code).toBe("instant_eval_already_finished");
+        // The state it ended in, in the wire's own spelling.
+        expect(body.meta.status).toBe("finished");
       });
     });
   });

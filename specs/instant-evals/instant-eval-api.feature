@@ -240,6 +240,7 @@ Feature: The Instant Eval run over REST, one LWQL statement, judged as a job
     Given a finished run
     When it is cancelled
     Then the response is 409 with code instant_eval_already_finished
+    And meta.status is spelled the way the run's own wire status is
 
   # ---------------------------------------------------------------------------
   # Access
