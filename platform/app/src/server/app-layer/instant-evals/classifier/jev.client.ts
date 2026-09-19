@@ -48,8 +48,8 @@ import {
   toClassifierQuestions,
 } from "./questions";
 import {
-  INSTANT_EVAL_CLASSIFIER_LIMITS,
   estimateJudgedTextTokens,
+  INSTANT_EVAL_CLASSIFIER_LIMITS,
   instantEvalQuestionTokens,
   instantEvalTextBudget,
   prepareInstantEvalText,
@@ -193,8 +193,10 @@ export class JevInstantEvalClassifier implements InstantEvalClassifier {
       await this.options.limiter.acquire(
         {
           tokens:
-            estimateJudgedTextTokens({ text: state.text, limits: this.limits }) +
-            questionTokens,
+            estimateJudgedTextTokens({
+              text: state.text,
+              limits: this.limits,
+            }) + questionTokens,
           tenantId: request.projectId,
         },
         signal,

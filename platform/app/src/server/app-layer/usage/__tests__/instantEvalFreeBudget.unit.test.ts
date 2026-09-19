@@ -168,10 +168,9 @@ describe("given a free organization with sixty cents of budget left", () => {
       expect((error as { code?: unknown }).code).toBe(
         "instant_eval_free_budget_exhausted",
       );
-      expect((error as { meta?: { spentUsd?: number } }).meta?.spentUsd).toBeCloseTo(
-        0.8,
-        6,
-      );
+      expect(
+        (error as { meta?: { spentUsd?: number } }).meta?.spentUsd,
+      ).toBeCloseTo(0.8, 6);
     });
   });
 

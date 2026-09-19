@@ -37,6 +37,9 @@ import { LWQL_KEY_MAP_INSERT_SETTINGS } from "../server/analytics/lwql/lwqlKeyMa
 import {
   canProvisionAppFunctions,
   KEY_MAP_COLUMNS,
+  type LangWatchQLNames,
+  type LwqlKeyMapBackfillPlan,
+  type LwqlSelfProvisionEnv,
   lwqlKeyMapTableQualifiedName,
   lwqlPostgresEndpointFromDatabaseUrl,
   lwqlPostgresReaderModeFromEnv,
@@ -49,9 +52,6 @@ import {
   productionLangWatchQLNames,
   productionPostgresApprovedViewStatements,
   selfHostedClickHouseProvisioningStatements,
-  type LangWatchQLNames,
-  type LwqlKeyMapBackfillPlan,
-  type LwqlSelfProvisionEnv,
   withLwqlSelfProvisionLock,
   withTenancyOptOut,
 } from "../server/analytics/lwql/provisioning";

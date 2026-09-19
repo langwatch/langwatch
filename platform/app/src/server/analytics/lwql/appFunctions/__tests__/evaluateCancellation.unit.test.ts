@@ -12,13 +12,12 @@
  */
 
 import { describe, expect, it } from "vitest";
-
-import { INSTANT_EVAL_PRICING } from "~/server/app-layer/instant-evals/classifier/pricing";
-import { INSTANT_EVAL_CLASSIFIER_LIMITS } from "~/server/app-layer/instant-evals/classifier/token-budget";
 import type {
   InstantEvalClassifier,
   InstantEvalClassifyRequest,
 } from "~/server/app-layer/instant-evals/classifier/classifier";
+import { INSTANT_EVAL_PRICING } from "~/server/app-layer/instant-evals/classifier/pricing";
+import { INSTANT_EVAL_CLASSIFIER_LIMITS } from "~/server/app-layer/instant-evals/classifier/token-budget";
 import type { LangWatchQLAppFunctionCall } from "../plan";
 import { hydrate, sourceOf, trace } from "./hydrateFixtures";
 
@@ -37,7 +36,9 @@ const COLUMNS = [{ name: "annoyed", type: "Nullable(String)" }];
  * A classifier that answers its first request and aborts the signal while
  * answering the second, the way a cancel lands between two units.
  */
-function classifierAbortingOnSecond(controller: AbortController): InstantEvalClassifier & {
+function classifierAbortingOnSecond(
+  controller: AbortController,
+): InstantEvalClassifier & {
   requests: InstantEvalClassifyRequest[];
 } {
   const requests: InstantEvalClassifyRequest[] = [];
@@ -78,7 +79,11 @@ describe("given a judged query the caller cancels part way", () => {
             trace({ traceId: "t3" }),
           ],
         }),
-        instantEvals: { classifier, maxConcurrency: 1, queryTokenBudget: 1_000_000 },
+        instantEvals: {
+          classifier,
+          maxConcurrency: 1,
+          queryTokenBudget: 1_000_000,
+        },
         signal: controller.signal,
       });
 

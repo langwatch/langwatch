@@ -37,24 +37,11 @@ export function assembleResult({
   /** Whether the judging stopped early, leaving some judged cells absent. */
   isCancelled?: boolean;
 }): LangWatchQLHydrationResult {
-  const unjudgedRows: number[] = [];
-  const hydrated = input.rows.map((row, index) => {
-    const next: Record<string, unknown> = { ...row };
-    for (const entry of resolved) {
-      const parts = appFunctionKeyParts(row[entry.call.column]);
-      const cell =
-        parts === null
-          ? null
-          : computed.get(entry.call.column)?.get(appFunctionKeyId(parts));
-      // An absent cell on a judged column is a unit the abort reached before
-      // the answer did, which is the one null a caller must not read as a
-      // verdict.
-      if (isCancelled && parts !== null && cell === undefined) {
-        if (unjudgedRows.at(-1) !== index) unjudgedRows.push(index);
-      }
-      next[entry.call.column] = cell?.value ?? null;
-    }
-    return next;
+  const { hydrated, unjudgedRows } = hydrateRows({
+    rows: input.rows,
+    resolved,
+    computed,
+    isCancelled,
   });
 
   const { rows, isTruncatedByBytes } = applyHydratedByteCeiling({
@@ -88,6 +75,54 @@ export function assembleResult({
     ...(timings ? { timings } : {}),
     ...(isCancelled ? { cancellation: { unjudgedRows } } : {}),
   };
+}
+
+/**
+ * Puts every computed value in its cell, and names the rows a cancellation
+ * left without one.
+ *
+ * An absent cell on a judged column is a unit the abort reached before the
+ * answer did, which is the one null a caller must not read as a verdict.
+ */
+function hydrateRows({
+  rows,
+  resolved,
+  computed,
+  isCancelled,
+}: {
+  rows: readonly Record<string, unknown>[];
+  resolved: readonly ResolvedCall[];
+  computed: ComputedValues;
+  isCancelled: boolean;
+}): { hydrated: Record<string, unknown>[]; unjudgedRows: number[] } {
+  const unjudgedRows: number[] = [];
+  const hydrated = rows.map((row, index) => {
+    const next: Record<string, unknown> = { ...row };
+    for (const entry of resolved) {
+      const cell = cellFor({ row, entry, computed });
+      if (isCancelled && cell === undefined && unjudgedRows.at(-1) !== index) {
+        unjudgedRows.push(index);
+      }
+      next[entry.call.column] = cell?.value ?? null;
+    }
+    return next;
+  });
+  return { hydrated, unjudgedRows };
+}
+
+/** The computed value for one cell: null for a null key, undefined when the key was never answered. */
+function cellFor({
+  row,
+  entry,
+  computed,
+}: {
+  row: Record<string, unknown>;
+  entry: ResolvedCall;
+  computed: ComputedValues;
+}): ComputedValue | null | undefined {
+  const parts = appFunctionKeyParts(row[entry.call.column]);
+  if (parts === null) return null;
+  return computed.get(entry.call.column)?.get(appFunctionKeyId(parts));
 }
 
 function countWhere({

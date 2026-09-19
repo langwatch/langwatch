@@ -120,9 +120,7 @@ describe("given a store with sixty units of room", () => {
         20,
       );
       now = HOUR;
-      await expect(store.heldNanoUsd({ organizationId: ORG })).resolves.toBe(
-        0,
-      );
+      await expect(store.heldNanoUsd({ organizationId: ORG })).resolves.toBe(0);
     });
   });
 });

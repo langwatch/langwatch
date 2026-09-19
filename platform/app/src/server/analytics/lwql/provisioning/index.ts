@@ -45,13 +45,13 @@ export {
 } from "./productionProvisioning";
 export {
   canProvisionAppFunctions,
+  type LwqlPostgresReaderMode,
+  type LwqlSelfProvisionEnv,
   lwqlPostgresEndpointFromDatabaseUrl,
   lwqlPostgresReaderModeFromEnv,
   lwqlSelfProvisionFromEnv,
   probeAppFunctionStore,
   selfHostedClickHouseProvisioningStatements,
   selfHostedPostgresReaderStatements,
-  type LwqlPostgresReaderMode,
-  type LwqlSelfProvisionEnv,
 } from "./selfProvisioning";
 export { withLwqlSelfProvisionLock } from "./selfProvisionLock";

@@ -544,26 +544,55 @@ async function inParallel<T>({
   signal?: AbortSignal;
 }): Promise<{ isCancelled: boolean }> {
   let next = 0;
+  const take = () => items[next++];
   const workers = Array.from(
     { length: Math.max(1, Math.min(limit, items.length)) },
-    async () => {
-      for (;;) {
-        // Checked between units as well as inside the request, so a query the
-        // caller walked away from stops before the next classification rather
-        // than after the last one.
-        if (signal?.aborted) return;
-        const index = next++;
-        const item = items[index];
-        if (item === undefined) return;
-        try {
-          await run(item);
-        } catch (error) {
-          if (signal?.aborted || isAbortError(error)) return;
-          throw error;
-        }
-      }
-    },
+    () => drain({ take, run, signal }),
   );
   await Promise.all(workers);
   return { isCancelled: signal?.aborted === true };
+}
+
+/**
+ * One worker: takes items until there are none, or until the signal fires.
+ *
+ * Checked between units as well as inside the request, so a query the caller
+ * walked away from stops before the next classification rather than after the
+ * last one. An abort surfacing from inside a unit ends the worker the same
+ * way; any other failure is the caller's to see.
+ */
+async function drain<T>({
+  take,
+  run,
+  signal,
+}: {
+  take: () => T | undefined;
+  run: (item: T) => Promise<void>;
+  signal?: AbortSignal;
+}): Promise<void> {
+  while (!signal?.aborted) {
+    const item = take();
+    if (item === undefined) return;
+    const isStopped = await runOrStop({ item, run, signal });
+    if (isStopped) return;
+  }
+}
+
+/** Runs one unit; true when an abort ended it, which ends the worker too. */
+async function runOrStop<T>({
+  item,
+  run,
+  signal,
+}: {
+  item: T;
+  run: (item: T) => Promise<void>;
+  signal?: AbortSignal;
+}): Promise<boolean> {
+  try {
+    await run(item);
+    return false;
+  } catch (error) {
+    if (signal?.aborted || isAbortError(error)) return true;
+    throw error;
+  }
 }

@@ -47,9 +47,9 @@ describe("given a page whose traces together weigh more than the read budget", (
         code: "lwql_app_function_read_budget",
         meta: { budgetBytes: 600_000 },
       });
-      expect((failure as { meta: { readBytes: number } }).meta.readBytes).toBeGreaterThan(
-        600_000,
-      );
+      expect(
+        (failure as { meta: { readBytes: number } }).meta.readBytes,
+      ).toBeGreaterThan(600_000);
       // Two chunks of 25 fit under the budget, the third passes it, and the
       // fourth is never asked for.
       expect(source.askedTraceIds).toHaveLength(3);

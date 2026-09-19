@@ -23,7 +23,9 @@ let redis: Redis;
 let store: RedisInstantEvalBudgetReservations;
 
 async function clearKeys() {
-  const keys = await redis.keys(`langwatch:{instant-evals:free-budget:${ORG}}*`);
+  const keys = await redis.keys(
+    `langwatch:{instant-evals:free-budget:${ORG}}*`,
+  );
   if (keys.length > 0) await redis.del(...keys);
 }
 
@@ -97,7 +99,9 @@ describe("given two processes holding against one organization's budget", () => 
 
       await expect(store.heldNanoUsd({ organizationId: ORG })).resolves.toBe(0);
       await expect(
-        redis.smembers(`langwatch:{instant-evals:free-budget:${ORG}}:reservations`),
+        redis.smembers(
+          `langwatch:{instant-evals:free-budget:${ORG}}:reservations`,
+        ),
       ).resolves.toEqual([]);
     });
   });

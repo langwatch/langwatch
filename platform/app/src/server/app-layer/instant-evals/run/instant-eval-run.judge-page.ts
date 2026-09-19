@@ -32,6 +32,7 @@ import {
   type InstantEvalPrefetches,
   takePageAndReadAhead,
 } from "./instant-eval-run.prefetch";
+import type { InstantEvalPageCounters } from "./judgments";
 import {
   cutPageAtStop,
   type InstantEvalPageStop,
@@ -41,6 +42,7 @@ import {
 import type {
   InstantEvalJudgedPage,
   InstantEvalPreparedPage,
+  InstantEvalRowKey,
 } from "./row-source";
 
 const logger = createLogger("langwatch:instant-evals:run-judge-page");
@@ -66,7 +68,7 @@ async function judgeRunPageOrThrow(
   prefetches: InstantEvalPrefetches,
   input: Parameters<InstantEvalRunPort["judgePage"]>[0],
 ): Promise<InstantEvalPageOutcome> {
-  const { runId, projectId, page, remaining } = input;
+  const { runId, projectId, page } = input;
   const { row, caller, questions, parameters } = await loadRun({
     deps,
     projectId,
@@ -100,7 +102,6 @@ async function judgeRunPageOrThrow(
     parameters,
   });
   if (keyPage.keys.length === 0 || prepared === null) return emptyPage();
-  const last = keyPage.keys.at(-1);
 
   const { judged, stop } = await judgeUnderCancellation({
     deps,
@@ -120,14 +121,7 @@ async function judgeRunPageOrThrow(
     questions,
     judged: { ...judged, rows: cut.rows },
     keys: keyPage.keys,
-    ...(stop && cut.unjudgedIndexes.size > 0
-      ? {
-          unjudgedRows: {
-            indexes: cut.unjudgedIndexes,
-            reason: pageStopReason(stop),
-          },
-        }
-      : {}),
+    ...unjudgedRowsFor({ stop, cut }),
   });
   if (stop) {
     logger.info(
@@ -148,9 +142,58 @@ async function judgeRunPageOrThrow(
     judged,
   });
 
-  // A page cut short by its deadline ends where its judging did, and a page
-  // that judged nothing before the deadline stays where it started, so the
-  // next intent asks for the same rows again rather than for the run's first.
+  return pageOutcomeFor({
+    input,
+    cut,
+    keyPage,
+    counters: mapping.counters,
+    judged,
+    stop,
+  });
+}
+
+/** The rows a stop left unjudged, named with its reason, for the page write. */
+function unjudgedRowsFor({
+  stop,
+  cut,
+}: {
+  stop: InstantEvalPageStop | null;
+  cut: ReturnType<typeof cutPageAtStop>;
+}): Pick<Parameters<typeof writeJudgedPage>[0], "unjudgedRows"> {
+  if (!stop || cut.unjudgedIndexes.size === 0) return {};
+  return {
+    unjudgedRows: {
+      indexes: cut.unjudgedIndexes,
+      reason: pageStopReason(stop),
+    },
+  };
+}
+
+/**
+ * Where the next page starts and whether there is one.
+ *
+ * A page cut short by its deadline ends where its judging did, and a page
+ * that judged nothing before the deadline stays where it started, so the
+ * next intent asks for the same rows again rather than for the run's first.
+ * A cancelled run has no next page whatever is left: the process is finishing
+ * it, and the intent for the next page would never be sent.
+ */
+function pageOutcomeFor({
+  input,
+  cut,
+  keyPage,
+  counters,
+  judged,
+  stop,
+}: {
+  input: Parameters<InstantEvalRunPort["judgePage"]>[0];
+  cut: ReturnType<typeof cutPageAtStop>;
+  keyPage: { keys: readonly InstantEvalRowKey[]; hasMore: boolean };
+  counters: InstantEvalPageCounters;
+  judged: InstantEvalJudgedPage;
+  stop: InstantEvalPageStop | null;
+}): InstantEvalPageOutcome {
+  const last = keyPage.keys.at(-1);
   const resumeFrom = cut.last ?? (cut.isCutShort ? null : last);
   const cursor =
     resumeFrom === null
@@ -160,18 +203,15 @@ async function judgeRunPageOrThrow(
           spanId: resumeFrom?.spanId || null,
         };
   const hasRowsLeft =
-    (cut.isCutShort || keyPage.hasMore) &&
-    remaining - mapping.counters.rows > 0;
+    (cut.isCutShort || keyPage.hasMore) && input.remaining - counters.rows > 0;
   return {
-    ...mapping.counters,
+    ...counters,
     inputTokens: judged.usage.inputTokens,
     requests: judged.usage.requests,
     cursor: cursor.traceId,
     // Empty when the statement has one row per trace, which is what tells the
     // next key pass to compare the trace alone.
     cursorSpanId: cursor.spanId,
-    // A cancelled run has no next page whatever is left: the process is
-    // finishing it, and the intent for the next page would never be sent.
     hasNextPage: stop === "cancelled" ? false : hasRowsLeft,
   };
 }
@@ -224,28 +264,49 @@ async function judgeUnderCancellation({
     projectId,
     runId,
   });
-  const signals = [cancelWatch?.signal, deadline].filter(
-    (candidate): candidate is AbortSignal =>
-      candidate !== null && candidate !== undefined,
-  );
+  const signal = anySignal([cancelWatch?.signal, deadline]);
   try {
     const judged = await deps.rowSource.judgePrepared({
       page: prepared,
-      ...(signals.length > 0 ? { signal: AbortSignal.any(signals) } : {}),
+      ...(signal ? { signal } : {}),
     });
-    // A page that reports a cancellation nobody here asked for was stopped
-    // by the signal its own caller handed down, which is a cancel.
-    const stop: InstantEvalPageStop | null = cancelWatch?.signal.aborted
-      ? "cancelled"
-      : deadline?.aborted
-        ? "deadline"
-        : judged.cancellation
-          ? "cancelled"
-          : null;
-    return { judged, stop };
+    return {
+      judged,
+      stop: stopReasonFor({ cancelWatch, deadline, judged }),
+    };
   } finally {
     cancelWatch?.stop();
   }
+}
+
+/** One signal over the ones that exist, or none when there are none. */
+function anySignal(
+  candidates: readonly (AbortSignal | null | undefined)[],
+): AbortSignal | null {
+  const signals = candidates.filter(
+    (candidate): candidate is AbortSignal =>
+      candidate !== null && candidate !== undefined,
+  );
+  return signals.length > 0 ? AbortSignal.any(signals) : null;
+}
+
+/**
+ * Which stop reached the page, if any. A page that reports a cancellation
+ * nobody here asked for was stopped by the signal its own caller handed down,
+ * which is a cancel.
+ */
+function stopReasonFor({
+  cancelWatch,
+  deadline,
+  judged,
+}: {
+  cancelWatch: { signal: AbortSignal } | null;
+  deadline: AbortSignal | null;
+  judged: InstantEvalJudgedPage;
+}): InstantEvalPageStop | null {
+  if (cancelWatch?.signal.aborted) return "cancelled";
+  if (deadline?.aborted) return "deadline";
+  return judged.cancellation ? "cancelled" : null;
 }
 
 /**

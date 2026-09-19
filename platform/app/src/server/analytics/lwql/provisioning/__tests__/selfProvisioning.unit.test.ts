@@ -32,10 +32,10 @@ import { productionLangWatchQLNames } from "../productionProvisioning";
 import {
   canProvisionAppFunctions,
   LWQL_SELF_PROVISION_DEFAULTS,
-  probeAppFunctionStore,
   lwqlPostgresEndpointFromDatabaseUrl,
   lwqlPostgresReaderModeFromEnv,
   lwqlSelfProvisionFromEnv,
+  probeAppFunctionStore,
   selfHostedClickHouseProvisioningStatements,
   selfHostedPostgresReaderStatements,
 } from "../selfProvisioning";
@@ -469,9 +469,9 @@ describe("given a self-hosted ClickHouse with more than one replica", () => {
         includeAppFunctions: false,
       });
 
-      expect(statements.some((s) => s.startsWith("CREATE OR REPLACE FUNCTION"))).toBe(
-        false,
-      );
+      expect(
+        statements.some((s) => s.startsWith("CREATE OR REPLACE FUNCTION")),
+      ).toBe(false);
       expect(statements.some((s) => s.startsWith("CREATE USER"))).toBe(true);
     });
   });
@@ -494,9 +494,7 @@ describe("given a single-node ClickHouse", () => {
     it("reads no replicas and keeps the functions on local disk", async () => {
       const probe = await probeAppFunctionStore({
         query: async (sql) =>
-          sql.includes("system.replicas")
-            ? [{ max_total_replicas: "0" }]
-            : [],
+          sql.includes("system.replicas") ? [{ max_total_replicas: "0" }] : [],
       });
 
       expect(probe).toEqual({
@@ -513,9 +511,9 @@ describe("given a single-node ClickHouse", () => {
           readerPassword: "reader",
         },
       });
-      expect(statements.some((s) => s.startsWith("CREATE OR REPLACE FUNCTION"))).toBe(
-        true,
-      );
+      expect(
+        statements.some((s) => s.startsWith("CREATE OR REPLACE FUNCTION")),
+      ).toBe(true);
     });
 
     it("reads a server that cannot answer as a single node", async () => {

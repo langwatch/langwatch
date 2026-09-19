@@ -53,6 +53,7 @@
  * @see ./provisioning/accessModel.ts — the isolation this composes over
  */
 
+import { randomUUID } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
 import type { InstantEvalClassifier } from "~/server/app-layer/instant-evals/classifier/classifier";
 import {
@@ -114,7 +115,6 @@ import {
 } from "./resolveTimeWindow";
 import { describeLangWatchQLSchema, type LangWatchQLSchema } from "./schema";
 import type { LangWatchQLTimeWindow } from "./timeWindow";
-import { randomUUID } from "node:crypto";
 import { LWQL_PERIOD_GRANULARITY_PARAMETER } from "./timeWindow";
 import { lwqlValidationError } from "./validation/errors";
 import type { SqlSourcePosition } from "./validation/parser";
@@ -703,7 +703,9 @@ export class LangWatchQLService {
    *   {@link LangWatchQLUnavailableError} when no LangWatchQL identity
    *   is provisioned.
    */
-  async execute(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
+  async execute(
+    input: LangWatchQLExecuteInput,
+  ): Promise<LangWatchQLQueryResult> {
     const { projects, protections, sql, parameters, timeWindow } = input;
     // Only logging reads this; the database resolves the tenant set itself.
     const scopeLabel =

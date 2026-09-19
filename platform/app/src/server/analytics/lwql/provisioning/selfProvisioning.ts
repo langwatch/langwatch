@@ -282,7 +282,9 @@ export interface AppFunctionStoreProbe {
  * @see ./appFunctionStatements.ts
  * @see dev/docs/adr/136-lwql-app-functions-identity-udfs.md
  */
-export function canProvisionAppFunctions(probe: AppFunctionStoreProbe): boolean {
+export function canProvisionAppFunctions(
+  probe: AppFunctionStoreProbe,
+): boolean {
   return (
     probe.maxTotalReplicas <= 1 || probe.userDefinedZookeeperPath.trim() !== ""
   );
