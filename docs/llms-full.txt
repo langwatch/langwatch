@@ -38746,7 +38746,7 @@ The estimate counts the rows exactly, measures the text of fifty rows spread acr
 
 Without a paid plan, your organization can spend 1 USD on Instant Evals in total, across all of its projects. Run `estimate` to see what is left, as `freeBudgetRemainingUsd`. Once you pass the budget, a new run or a judged `langwatch query` is refused with `instant_eval_free_budget_exhausted`, carrying `spentUsd` and `budgetUsd`, until you upgrade the organization. If a run is under way when the budget runs out, it stops there and you keep the verdicts it wrote.
 
-A paid plan has no free budget and no ceiling beyond the row cap: it is billed monthly for what was judged.
+A paid plan has no free budget: it is billed monthly for what was judged, up to the row cap. A gateway budget you set on the project, the team or the organization still applies, and stops a run when it is reached.
 
 ## Where the spend shows up
 
@@ -38766,14 +38766,14 @@ LangWatch stores the trace, the question and the answer for each verdict, and no
 title: Instant Evals
 sidebarTitle: Overview
 keywords: langwatch, instant evals, eval every trace, judge conversations, frustration rate, production history, langwatchql
-description: Ask one question of every conversation, trace or LLM call in your history and read the matches back in about a minute per 10,000 rows.
+description: Ask up to ten questions of every conversation, trace or LLM call in your history and read the matches back in about a minute per 10,000 rows.
 ---
 
 ## What is an Instant Eval
 
 An Instant Eval is a question in plain words, judged against every row in a time window of your history. For example, "the customer sounds frustrated" over the last 30 days of conversations comes back as a yes or no per conversation, with the probability behind it, and the count across all of them.
 
-Every row is judged rather than a sample, so the one conversation in ten thousand where the agent promised a refund it cannot give is in the result. The judge is a small calibrated model: 10,000 conversations take about a minute and cost well under a dollar, and a run over 1,000 rows answers in about nine seconds.
+Every row is judged rather than a sample, so the one conversation in ten thousand where the agent promised a refund it cannot give is in the result. The judge is a small calibrated model: 10,000 conversations take about a minute and cost well under a dollar, and 1,000 rows take about nine seconds.
 
 ## Your first run
 
@@ -38793,7 +38793,7 @@ langwatch instant-eval run "the customer sounds frustrated" --target threads --l
 The command prints the LangWatchQL statement it wrote for you, then a progress line that updates in place, then the headline and the first twenty matches. Press Ctrl-C to stop watching: the run keeps going and the command prints the line that reads it back later.
 
 <Frame caption="The first run over 100 conversations: the statement it wrote, the progress line, then the headline with 32 matches in about 8 seconds and the first 20 of them.">
-  <img src="/images/instant-evals/cli-run.png" alt="Terminal output of an Instant Eval run over 10,000 conversations" />
+  <img src="/images/instant-evals/cli-run.png" alt="Terminal output of an Instant Eval run over 100 conversations" />
 </Frame>
 
 ## What comes back
@@ -38978,6 +38978,8 @@ langwatch instant-eval run --questions-file questions.json --target threads --la
 
 The file is JSON or YAML with the same fields as the flags: `kind` is `boolean`, `score` or `category`; `criteria` is a list of two strings; `range` has `min` and `max`; `options` is a list of `name` and `description`. The REST API takes the same list as `questions`.
 
+Ask with the file or with the flags, not both: `--questions-file` next to a positional question, `--ask`, `--criteria`, `--threshold`, `--score`, `--category` or `--id` is refused.
+
 ## Naming a question
 
 Without a name, questions are called `q1`, `q2` and so on. Give one with `--id annoyed` after the `--ask`, or `id` in the file. The name shows up in three places:
@@ -39001,7 +39003,7 @@ description: Page through a run's verdicts, read the text the judge saw beside e
 
 ## The headline and the first rows
 
-When a run finishes, the CLI prints one line with the totals and then the first twenty matched rows:
+A result is one verdict per row and question. When a run finishes, the CLI prints one line with the totals and then the first twenty matched rows:
 
 ```
 Found 3,351 matches in 10,000 conversations · 2m 26s · 11.4M tokens · $0.62
@@ -39026,7 +39028,7 @@ Use `results` to page through the run's verdicts, one per row and question. Narr
 
 You get up to 1,000 verdicts per page, and the last line prints the `--cursor` value to pass for the next page.
 
-The cursor is the only safe way to page while a run is still writing: a page read by cursor neither repeats a verdict nor skips one. In `-o json` a verdict looks like this:
+Page by cursor while a run is still writing: you neither see a verdict twice nor skip one. In `-o json` a verdict looks like this:
 
 ```json
 {
@@ -39051,7 +39053,7 @@ The cursor is the only safe way to page while a run is still writing: a page rea
 | `passed`, `probability` | A yes or no question |
 | `score` | A score question |
 | `label`, `probability`, `probabilities` | A category question: the most likely option, its probability, and every option's probability |
-| `status`, `error` | Every verdict: `judged`, `skipped` (the judge declined the row) or `failed` (the judge could not be reached), with the reason in `error` | For example, a row is skipped when its text is too large even after cutting.
+| `status`, `error` | Every verdict: `judged`, `skipped` (the judge declined the row) or `failed` (the judge could not be reached), with the reason in `error`. For example, a row is skipped when its text is too large even after cutting |
 
 ## What did the judge read
 
@@ -39108,15 +39110,17 @@ langwatch query "$(cat by-user.sql)" --param run=<run-id>
 
 ## Rows the judge did not answer
 
-Run `status <run-id>` and look at the `Unjudged` line:
+Read the run and look at the `Unjudged` line:
+
+```bash
+langwatch instant-eval status <run-id>
+```
 
 ```
 Unjudged: 12 failed, 3 skipped
 ```
 
-When more than half of a page fails, LangWatch retries the page instead of writing it, so you get an answer for well over half the rows of any finished run.
-
-To read the rows it missed, pass `--status skipped` or `--status failed` to `results`. To get them judged, run a statement of your own over those trace ids.
+Pass `--status skipped` or `--status failed` to `results` to read those rows. To judge them, run your own statement over those trace ids.
 
 ---
 

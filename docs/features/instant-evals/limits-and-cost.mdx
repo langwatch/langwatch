@@ -55,7 +55,7 @@ The estimate counts the rows exactly, measures the text of fifty rows spread acr
 
 Without a paid plan, your organization can spend 1 USD on Instant Evals in total, across all of its projects. Run `estimate` to see what is left, as `freeBudgetRemainingUsd`. Once you pass the budget, a new run or a judged `langwatch query` is refused with `instant_eval_free_budget_exhausted`, carrying `spentUsd` and `budgetUsd`, until you upgrade the organization. If a run is under way when the budget runs out, it stops there and you keep the verdicts it wrote.
 
-A paid plan has no free budget and no ceiling beyond the row cap: it is billed monthly for what was judged.
+A paid plan has no free budget: it is billed monthly for what was judged, up to the row cap. A gateway budget you set on the project, the team or the organization still applies, and stops a run when it is reached.
 
 ## Where the spend shows up
 

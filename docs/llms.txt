@@ -106,7 +106,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ### Instant Evals
 
-- [Instant Evals](https://langwatch.ai/docs/features/instant-evals/overview.md): Ask one question of every conversation, trace or LLM call in your history and read the matches back in about a minute per 10,000 rows.
+- [Instant Evals](https://langwatch.ai/docs/features/instant-evals/overview.md): Ask up to ten questions of every conversation, trace or LLM call in your history and read the matches back in about a minute per 10,000 rows.
 - [Instant Evals questions](https://langwatch.ai/docs/features/instant-evals/questions.md): The three kinds of question a run can ask, how to sharpen a yes or no with criteria and a threshold, and how to ask up to ten questions of the same text in one run.
 - [Instant Evals targets and statements](https://langwatch.ai/docs/features/instant-evals/targets.md): What one judged row is, how the time window and the trace filter narrow the rows, the LangWatchQL statement each target writes for you, and how to write your own.
 - [Reading Instant Eval results](https://langwatch.ai/docs/features/instant-evals/results.md): Page through a run's verdicts, read the text the judge saw beside each one, and query the judgments dataset with LangWatchQL to join verdicts to your traces.

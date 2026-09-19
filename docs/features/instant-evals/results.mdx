@@ -7,7 +7,7 @@ description: Page through a run's verdicts, read the text the judge saw beside e
 
 ## The headline and the first rows
 
-When a run finishes, the CLI prints one line with the totals and then the first twenty matched rows:
+A result is one verdict per row and question. When a run finishes, the CLI prints one line with the totals and then the first twenty matched rows:
 
 ```
 Found 3,351 matches in 10,000 conversations · 2m 26s · 11.4M tokens · $0.62
@@ -32,7 +32,7 @@ Use `results` to page through the run's verdicts, one per row and question. Narr
 
 You get up to 1,000 verdicts per page, and the last line prints the `--cursor` value to pass for the next page.
 
-The cursor is the only safe way to page while a run is still writing: a page read by cursor neither repeats a verdict nor skips one. In `-o json` a verdict looks like this:
+Page by cursor while a run is still writing: you neither see a verdict twice nor skip one. In `-o json` a verdict looks like this:
 
 ```json
 {
@@ -57,7 +57,7 @@ The cursor is the only safe way to page while a run is still writing: a page rea
 | `passed`, `probability` | A yes or no question |
 | `score` | A score question |
 | `label`, `probability`, `probabilities` | A category question: the most likely option, its probability, and every option's probability |
-| `status`, `error` | Every verdict: `judged`, `skipped` (the judge declined the row) or `failed` (the judge could not be reached), with the reason in `error` | For example, a row is skipped when its text is too large even after cutting.
+| `status`, `error` | Every verdict: `judged`, `skipped` (the judge declined the row) or `failed` (the judge could not be reached), with the reason in `error`. For example, a row is skipped when its text is too large even after cutting |
 
 ## What did the judge read
 
@@ -114,12 +114,14 @@ langwatch query "$(cat by-user.sql)" --param run=<run-id>
 
 ## Rows the judge did not answer
 
-Run `status <run-id>` and look at the `Unjudged` line:
+Read the run and look at the `Unjudged` line:
+
+```bash
+langwatch instant-eval status <run-id>
+```
 
 ```
 Unjudged: 12 failed, 3 skipped
 ```
 
-When more than half of a page fails, LangWatch retries the page instead of writing it, so you get an answer for well over half the rows of any finished run.
-
-To read the rows it missed, pass `--status skipped` or `--status failed` to `results`. To get them judged, run a statement of your own over those trace ids.
+Pass `--status skipped` or `--status failed` to `results` to read those rows. To judge them, run your own statement over those trace ids.

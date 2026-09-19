@@ -2,14 +2,14 @@
 title: Instant Evals
 sidebarTitle: Overview
 keywords: langwatch, instant evals, eval every trace, judge conversations, frustration rate, production history, langwatchql
-description: Ask one question of every conversation, trace or LLM call in your history and read the matches back in about a minute per 10,000 rows.
+description: Ask up to ten questions of every conversation, trace or LLM call in your history and read the matches back in about a minute per 10,000 rows.
 ---
 
 ## What is an Instant Eval
 
 An Instant Eval is a question in plain words, judged against every row in a time window of your history. For example, "the customer sounds frustrated" over the last 30 days of conversations comes back as a yes or no per conversation, with the probability behind it, and the count across all of them.
 
-Every row is judged rather than a sample, so the one conversation in ten thousand where the agent promised a refund it cannot give is in the result. The judge is a small calibrated model: 10,000 conversations take about a minute and cost well under a dollar, and a run over 1,000 rows answers in about nine seconds.
+Every row is judged rather than a sample, so the one conversation in ten thousand where the agent promised a refund it cannot give is in the result. The judge is a small calibrated model: 10,000 conversations take about a minute and cost well under a dollar, and 1,000 rows take about nine seconds.
 
 ## Your first run
 
@@ -29,7 +29,7 @@ langwatch instant-eval run "the customer sounds frustrated" --target threads --l
 The command prints the LangWatchQL statement it wrote for you, then a progress line that updates in place, then the headline and the first twenty matches. Press Ctrl-C to stop watching: the run keeps going and the command prints the line that reads it back later.
 
 <Frame caption="The first run over 100 conversations: the statement it wrote, the progress line, then the headline with 32 matches in about 8 seconds and the first 20 of them.">
-  <img src="/images/instant-evals/cli-run.png" alt="Terminal output of an Instant Eval run over 10,000 conversations" />
+  <img src="/images/instant-evals/cli-run.png" alt="Terminal output of an Instant Eval run over 100 conversations" />
 </Frame>
 
 ## What comes back

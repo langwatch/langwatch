@@ -105,6 +105,8 @@ langwatch instant-eval run --questions-file questions.json --target threads --la
 
 The file is JSON or YAML with the same fields as the flags: `kind` is `boolean`, `score` or `category`; `criteria` is a list of two strings; `range` has `min` and `max`; `options` is a list of `name` and `description`. The REST API takes the same list as `questions`.
 
+Ask with the file or with the flags, not both: `--questions-file` next to a positional question, `--ask`, `--criteria`, `--threshold`, `--score`, `--category` or `--id` is refused.
+
 ## Naming a question
 
 Without a name, questions are called `q1`, `q2` and so on. Give one with `--id annoyed` after the `--ask`, or `id` in the file. The name shows up in three places:
