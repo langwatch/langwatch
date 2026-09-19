@@ -56,6 +56,14 @@ Feature: One OpenTelemetry setup every process uses
       When its metrics are composed
       Then no route is contributed at "/metrics"
 
+  Rule: A blank optional value is absent, not a value
+
+    @unit
+    Scenario: An optional field is left blank in the environment
+      Given a process whose OTLP endpoint is declared but blank, as ".env.example" ships it
+      When its configuration is parsed
+      Then the endpoint is treated as unconfigured, not refused
+
   Rule: The collector's credential is a secret, never a config field
 
     @unit

@@ -7,7 +7,10 @@ import { Config } from "@langwatch/config";
 import { metricsScrapeTokenSecret, otlpHeadersSecret } from "@langwatch/observability/node";
 import { z } from "zod";
 
-const optionalString = z.string().min(1).optional();
+const optionalString = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  z.string().min(1).optional(),
+);
 const truthy = z
   .string()
   .optional()
