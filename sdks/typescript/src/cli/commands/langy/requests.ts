@@ -20,7 +20,10 @@ import type { WorkspaceInfo } from "../../../agent/local-control-protocol";
 import { buildAuthHeaders } from "../../../internal/api/auth";
 import { LANGWATCH_SDK_VERSION } from "../../../internal/constants";
 import { langwatchFetch } from "../../../internal/http/langwatchFetch";
-import { resolvePersonCredentials } from "../../utils/apiKey";
+import {
+  loginMadeElsewhere,
+  resolvePersonCredentials,
+} from "../../utils/apiKey";
 import { isLoggedIn, loadConfig } from "../../utils/governance/config";
 import {
   askBox,
@@ -323,6 +326,16 @@ export function hasDeviceSession(): boolean {
 export const SIGN_IN_FAILED_MESSAGE =
   "Could not sign you in, so this folder is not shared. Run `langwatch login --device`, then run `langwatch langy --share-control` again.";
 
+/** What the command says when the login belongs to another address. */
+export const loginElsewhereMessage = ({
+  loginEndpoint,
+  endpoint,
+}: {
+  loginEndpoint: string;
+  endpoint: string;
+}): string =>
+  `The login on this machine is for ${loginEndpoint}, and LANGWATCH_ENDPOINT (in the shell or in this folder's .env) points this command at ${endpoint}. A login's key is only sent to the address that issued it, so this folder is not shared. Run \`langwatch login --device\` here to sign in to ${endpoint}, or unset LANGWATCH_ENDPOINT to use the login you have.`;
+
 export type PersonCredentials = {
   apiKey: string;
   endpoint: string;
@@ -341,6 +354,10 @@ export type PersonCredentials = {
  * the device login runs right away and the login is read again. The login is
  * the standard flow, called rather than repeated. A sign-in that still leaves
  * no usable login ends the command with `SIGN_IN_FAILED_MESSAGE`.
+ *
+ * A login made against another address than the one the command targets ends
+ * the command before any key is read: the key stays with the address that
+ * issued it, and replacing the machine's login is the person's call.
  */
 export async function ensureSignedIn({
   login,
@@ -350,6 +367,9 @@ export async function ensureSignedIn({
   /** Whether the platform takes the login's key. Defaults to yes. */
   isAccepted?: (credentials: PersonCredentials) => Promise<boolean>;
 }): Promise<PersonCredentials> {
+  const elsewhere = loginMadeElsewhere();
+  if (elsewhere) throw new ShareControlError(loginElsewhereMessage(elsewhere));
+
   const usableLogin = async () => {
     const found = await resolvePersonCredentials();
     return found && (await isAccepted(found)) ? found : undefined;

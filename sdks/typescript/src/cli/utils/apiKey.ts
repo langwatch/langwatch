@@ -4,6 +4,7 @@ import {
   setResolvedApiKey,
   setResolvedProjectId,
 } from "@/internal/credentialContext";
+import { normalizeEndpoint } from "@/internal/endpoint";
 import { getEndpoint } from "./endpoint";
 import { getOutputFormat, renderErrorAsJson } from "./errorOutput";
 import { maybePrintIdentityNotice } from "./identityNotice";
@@ -184,8 +185,9 @@ export const resolveCredentials = async (
  * as it is for the app in the folder and for every other command.
  *
  * Resolves to nothing when the machine has no login, when the server refuses
- * the one it has, or when that login holds no login key: the caller signs in
- * and asks again.
+ * the one it has, when that login holds no login key, or when the login was
+ * made against another address than the one the command targets (see
+ * `loginMadeElsewhere`).
  *
  * Spec: specs/typescript-sdk/cli-langy-share-control.feature
  */
@@ -196,7 +198,46 @@ export const resolvePersonCredentials = async (): Promise<
   loadEnvFileScoped();
   const endpoint = getEndpoint();
   process.env.LANGWATCH_ENDPOINT ??= endpoint;
+  if (loginMadeElsewhere()) return undefined;
   return resolveFromSession({ endpoint, isLoginKeyRequired: true });
+};
+
+/** One address in one spelling, or nothing when it is not an address. */
+const endpointIdentity = (endpoint: string): string | undefined => {
+  try {
+    const url = new URL(normalizeEndpoint(endpoint));
+    return `${url.origin}${url.pathname.replace(/\/+$/, "")}`;
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * The two addresses, when the login on this machine was made against one and
+ * the command targets another.
+ *
+ * `LANGWATCH_ENDPOINT` decides the target, and a folder's .env can set it. A
+ * person's login key opens everything that person can reach, so it is only
+ * ever sent to the address that issued it: a folder that names another
+ * address gets no key, whoever wrote its .env.
+ */
+export const loginMadeElsewhere = ():
+  | { loginEndpoint: string; endpoint: string }
+  | undefined => {
+  loadEnvFileScoped();
+  let cfg: GovernanceConfig | undefined;
+  try {
+    cfg = loadConfig();
+  } catch {
+    cfg = undefined;
+  }
+  if (!cfg || !isLoggedIn(cfg)) return undefined;
+  const loginEndpoint = normalizeEndpoint(cfg.control_plane_url);
+  const endpoint = getEndpoint();
+  const isSameAddress =
+    endpointIdentity(loginEndpoint) !== undefined &&
+    endpointIdentity(loginEndpoint) === endpointIdentity(endpoint);
+  return isSameAddress ? undefined : { loginEndpoint, endpoint };
 };
 
 /**

@@ -15,6 +15,7 @@ import {
   describeWorkspace,
   ensureSignedIn,
   isGitRepository,
+  loginElsewhereMessage,
   packageManagerOf,
   platformTakesTheKey,
   resolveShareRoot,
@@ -24,6 +25,7 @@ import {
   type ControlApi,
   type ControlRequest,
 } from "../requests";
+import { resolvePersonCredentials } from "../../../utils/apiKey";
 import type { KeyEvent, KeySource } from "../approval";
 import type { UiWriter } from "../ui";
 
@@ -408,6 +410,56 @@ describe("given the share-control command", () => {
 
         expect(failure).toBeInstanceOf(ShareControlError);
         expect((failure as Error).message).toBe(SIGN_IN_FAILED_MESSAGE);
+      });
+    });
+
+    describe("given a login made against another address than the command targets", () => {
+      const OTHER = "https://langwatch.other.test";
+
+      /** @scenario "The login's key is never sent to another address than its own" */
+      it("ends naming both addresses, sends no key and leaves the login alone", async () => {
+        writeLogin();
+        const loginBefore = fs.readFileSync(configPath, "utf8");
+        fs.writeFileSync(envPath, `${ENV_FILE}LANGWATCH_ENDPOINT=${OTHER}\n`);
+        delete process.env.LANGWATCH_ENDPOINT;
+        const fetchSpy = vi.fn();
+        vi.stubGlobal("fetch", fetchSpy);
+        const login = loginThatSignsIn();
+        const isAccepted = vi.fn(async () => true);
+
+        const failure = await ensureSignedIn({ login, isAccepted }).catch(
+          (e) => e,
+        );
+
+        expect(failure).toBeInstanceOf(ShareControlError);
+        expect((failure as Error).message).toBe(
+          loginElsewhereMessage({ loginEndpoint: ENDPOINT, endpoint: OTHER }),
+        );
+        expect((failure as Error).message).toContain("langwatch login --device");
+        expect(isAccepted).not.toHaveBeenCalled();
+        expect(fetchSpy).not.toHaveBeenCalled();
+        expect(login).not.toHaveBeenCalled();
+        expect(fs.readFileSync(configPath, "utf8")).toBe(loginBefore);
+      });
+
+      /** @scenario "The login's key is never sent to another address than its own" */
+      it("resolves no key for the other address, whoever asks", async () => {
+        writeLogin();
+        process.env.LANGWATCH_ENDPOINT = OTHER;
+
+        expect(await resolvePersonCredentials()).toBeUndefined();
+      });
+
+      /** @scenario "Two spellings of one address are the same address" */
+      it("reads a trailing slash and a capital letter as the same address", async () => {
+        writeLogin();
+        process.env.LANGWATCH_ENDPOINT = "https://APP.langwatch.test/";
+        const login = loginThatSignsIn();
+
+        const credentials = await ensureSignedIn({ login });
+
+        expect(login).not.toHaveBeenCalled();
+        expect(credentials.apiKey).toBe("sk-lw-login-key");
       });
     });
   });

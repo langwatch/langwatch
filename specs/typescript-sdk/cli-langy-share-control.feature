@@ -82,6 +82,26 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
       Then the command ends with "Could not sign you in, so this folder is not shared. Run `langwatch login --device`, then run `langwatch langy --share-control` again."
       And no request list is read
 
+    # LANGWATCH_ENDPOINT decides which LangWatch a command talks to, and a
+    # folder's .env can set it. My login key opens everything I can reach, so
+    # it goes to the address that issued it and to no other, whoever wrote
+    # the folder's .env. Replacing the login on my machine is my call.
+    @unit
+    Scenario: The login's key is never sent to another address than its own
+      Given a device session on this machine made against one LangWatch address
+      And LANGWATCH_ENDPOINT, in the shell or in the folder's .env, names another address
+      When I run "langwatch langy --share-control"
+      Then no request carries the login's key to that other address
+      And the command ends naming both addresses and what to run to sign in to the other one
+      And the login on this machine is left as it is
+
+    @unit
+    Scenario: Two spellings of one address are the same address
+      Given a device session on this machine made against "https://app.acme.test"
+      And LANGWATCH_ENDPOINT is "https://APP.acme.test/"
+      When I run "langwatch langy --share-control"
+      Then the command uses the login as it is
+
     # A request is addressed to me and answered on its own project, so the
     # line says who I am, not which project the login reads by default.
     @unit
