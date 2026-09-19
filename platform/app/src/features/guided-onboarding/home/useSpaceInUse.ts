@@ -72,18 +72,20 @@ export function useSpaceInUse({
   }
 }
 
-/** What a read has to say for itself: its data, and whether it failed. */
 interface SpaceRead<T> {
   data: T | undefined;
   isError: boolean;
 }
 
-/** What a read answered, or undefined while it is loading or after it failed. */
+/**
+ * `data` alone cannot be trusted: the query cache keeps the last answer
+ * through a failed refetch, so a read that failed has answered nothing.
+ */
 function settled<T>(read: SpaceRead<T>): T | undefined {
   return read.isError ? undefined : read.data;
 }
 
-/** Whether a list that was read has any entry; null while it is unknown. */
+/** Null is "not known yet", which keeps the offer hidden; false shows it. */
 function hasAny(read: SpaceRead<readonly unknown[]>): boolean | null {
   const list = settled(read);
   return list ? list.length > 0 : null;
