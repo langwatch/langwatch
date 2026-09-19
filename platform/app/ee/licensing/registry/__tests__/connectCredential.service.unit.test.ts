@@ -10,6 +10,7 @@ import {
   InMemoryConnectManagedKeys,
   InMemoryCustomerOrganizations,
   InMemoryIssuedLicenseRepository,
+  InMemoryLicenseSeatReports,
   RecordingContractBudgets,
 } from "./registryFakes";
 
@@ -27,10 +28,12 @@ const { privateKey, publicKey } = generateKeyPairSync("rsa", {
 function build() {
   let now = NOW;
   const repository = new InMemoryIssuedLicenseRepository(NOW);
+  const seatReports = new InMemoryLicenseSeatReports();
   const organizations = new InMemoryCustomerOrganizations();
   const managedKeys = new InMemoryConnectManagedKeys();
   const registry = new LicenseRegistryService({
     repository,
+    seatReports,
     organizations,
     managedKeys,
     contractBudgets: new RecordingContractBudgets(),

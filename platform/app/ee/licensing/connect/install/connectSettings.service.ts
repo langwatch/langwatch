@@ -15,24 +15,42 @@
 import { HandledError } from "@langwatch/handled-error";
 
 import type { PrismaClient } from "~/generated/prisma/client";
+import { PUBLIC_KEY } from "../../constants";
 import {
   ConnectLicenseRequiredError,
   ConnectServiceNotEntitledError,
 } from "../errors";
+import type { LeaseState } from "../lease";
 import { type ConnectConfig, readConnectConfig } from "./connectConfig";
 import { resolveConnectCredential } from "./connectCredential";
 import { ConnectDisabledError } from "./connectErrors";
 import {
-  type ConnectCredential,
   type ConnectGatewayClient,
   type ConnectUsage,
   getConnectGatewayClient,
 } from "./connectGatewayClient";
+import type { ConnectCredential } from "./connectTransport";
+import { installInstanceId, readInstalledLease } from "./installedLease";
 
 /** What a refused read came back as, for the page to render. */
 export interface ConnectRefusal {
   readonly code: string;
   readonly meta?: unknown;
+}
+
+/** The lease the last sync left, as the page reads it. */
+export interface ConnectLeaseView {
+  readonly seatOverageAllowance: number;
+  readonly warnAfter: string;
+  readonly validUntil: string;
+  readonly state: LeaseState;
+}
+
+/** Where the daily license sync stands (ADR-139, section 6). */
+export interface ConnectSyncView {
+  readonly lastSyncAt: string | null;
+  readonly lastError: { readonly code: string } | null;
+  readonly lease: ConnectLeaseView | null;
 }
 
 export type ConnectStatus =
@@ -45,6 +63,7 @@ export type ConnectStatus =
       readonly entitledServices: string[] | null;
       readonly usage: ConnectUsage | null;
       readonly refusal: ConnectRefusal | null;
+      readonly sync: ConnectSyncView;
     };
 
 export interface ConnectSettingsDependencies {
@@ -53,6 +72,10 @@ export interface ConnectSettingsDependencies {
   readonly config?: ConnectConfig;
   /** Injected by suites; the process's shared client otherwise. */
   readonly client?: ConnectGatewayClient;
+  /** Injected by suites; the key the license handler verifies with otherwise. */
+  readonly publicKey?: string;
+  /** Injected by suites; the wall clock otherwise. */
+  readonly now?: () => Date;
 }
 
 export class ConnectSettingsService {
@@ -62,14 +85,15 @@ export class ConnectSettingsService {
     const config = this.config();
     if (!config.enabled) return { deployment: "off" };
 
-    const [credential, enabledServices] = await Promise.all([
+    const [credential, organization] = await Promise.all([
       this.credentialOf(organizationId),
-      this.enabledServicesOf(organizationId),
+      this.organizationOf(organizationId),
     ]);
     const base = {
       deployment: "on",
       gatewayHost: new URL(config.gatewayEndpoint).host,
-      enabledServices,
+      enabledServices: organization?.connectServices ?? [],
+      sync: this.syncOf({ organizationId, organization }),
     } as const;
 
     if (!credential) {
@@ -178,10 +202,72 @@ export class ConnectSettingsService {
   }
 
   private async enabledServicesOf(organizationId: string): Promise<string[]> {
-    const organization = await this.deps.prisma.organization.findUnique({
-      where: { id: organizationId },
-      select: { connectServices: true },
-    });
+    const organization = await this.organizationOf(organizationId);
     return organization?.connectServices ?? [];
   }
+
+  private async organizationOf(
+    organizationId: string,
+  ): Promise<ConnectOrganizationRow | null> {
+    return await this.deps.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: {
+        connectServices: true,
+        license: true,
+        connectLease: true,
+        connectLastSyncAt: true,
+        connectLastSyncError: true,
+      },
+    });
+  }
+
+  /**
+   * Where the daily sync stands, for the page to say so.
+   *
+   * The lease is read through the same check the plan reads it through, so
+   * what the page shows and what the seat guard enforces can not disagree. An
+   * expired lease is still reported, because "the allowance was withdrawn on
+   * this day" is the answer an admin is looking for.
+   */
+  private syncOf({
+    organizationId,
+    organization,
+  }: {
+    organizationId: string;
+    organization: ConnectOrganizationRow | null;
+  }): ConnectSyncView {
+    const licenseKey = organization?.license ?? null;
+    const installed = licenseKey
+      ? readInstalledLease({
+          licenseKey,
+          lease: organization?.connectLease,
+          instanceId: installInstanceId(organizationId),
+          publicKey: this.deps.publicKey ?? PUBLIC_KEY,
+          now: this.deps.now?.() ?? new Date(),
+        })
+      : null;
+
+    return {
+      lastSyncAt: organization?.connectLastSyncAt?.toISOString() ?? null,
+      lastError: organization?.connectLastSyncError
+        ? { code: organization.connectLastSyncError }
+        : null,
+      lease: installed
+        ? {
+            seatOverageAllowance: installed.payload.seatOverageAllowance,
+            warnAfter: installed.payload.warnAfter,
+            validUntil: installed.payload.validUntil,
+            state: installed.state,
+          }
+        : null,
+    };
+  }
+}
+
+interface ConnectOrganizationRow {
+  connectServices: string[];
+  license: string | null;
+  connectLease: unknown;
+  connectLastSyncAt: Date | null;
+  connectLastSyncError: string | null;
 }

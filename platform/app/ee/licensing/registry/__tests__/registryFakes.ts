@@ -8,6 +8,11 @@ import type {
   IssuedLicenseRecord,
   IssuedLicenseRepository,
 } from "../licenseRegistry.service";
+import type {
+  LicenseSeatQuarterKey,
+  LicenseSeatReportRecord,
+  LicenseSeatReportRepository,
+} from "../seatReports";
 
 export class InMemoryIssuedLicenseRepository
   implements IssuedLicenseRepository
@@ -61,6 +66,13 @@ export class InMemoryIssuedLicenseRepository
     return row ? { ...row } : null;
   }
 
+  async findByReplacesId(replacesId: string) {
+    const row = this.rows.find(
+      (candidate) => candidate.replacesId === replacesId,
+    );
+    return row ? { ...row } : null;
+  }
+
   async findAllByOrganization(organizationId: string) {
     return this.rows
       .filter((candidate) => candidate.organizationId === organizationId)
@@ -107,6 +119,65 @@ export class InMemoryIssuedLicenseRepository
     if (!row || row.virtualKeyId !== null) return false;
     row.virtualKeyId = virtualKeyId;
     return true;
+  }
+}
+
+export class InMemoryLicenseSeatReports implements LicenseSeatReportRepository {
+  rows: LicenseSeatReportRecord[] = [];
+  private sequence = 0;
+
+  // Raises the peak the way the `GREATEST` upsert does, so a later, lower
+  // report leaves the quarter's figure alone.
+  async recordPeak({
+    licenseId,
+    quarterStartsAt,
+    members,
+    membersLite,
+    at,
+  }: {
+    licenseId: string;
+    quarterStartsAt: Date;
+    members: number;
+    membersLite: number;
+    at: Date;
+  }) {
+    const existing = this.rows.find(
+      (row) =>
+        row.licenseId === licenseId &&
+        row.quarterStartsAt.getTime() === quarterStartsAt.getTime(),
+    );
+    if (existing) {
+      existing.peakMembers = Math.max(existing.peakMembers, members);
+      existing.peakMembersLite = Math.max(
+        existing.peakMembersLite,
+        membersLite,
+      );
+      existing.lastReportedAt = at;
+      return { ...existing };
+    }
+    const row: LicenseSeatReportRecord = {
+      id: `lsr_${++this.sequence}`,
+      licenseId,
+      quarterStartsAt,
+      peakMembers: members,
+      peakMembersLite: membersLite,
+      firstReportedAt: at,
+      lastReportedAt: at,
+    };
+    this.rows.push(row);
+    return { ...row };
+  }
+
+  async findByQuarters(keys: LicenseSeatQuarterKey[]) {
+    return this.rows
+      .filter((row) =>
+        keys.some(
+          (key) =>
+            key.licenseId === row.licenseId &&
+            key.quarterStartsAt.getTime() === row.quarterStartsAt.getTime(),
+        ),
+      )
+      .map((row) => ({ ...row }));
   }
 }
 

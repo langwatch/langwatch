@@ -45,6 +45,9 @@ export function LicensesTableRow({
         )}
       </Table.Cell>
       <Table.Cell>
+        <SyncCell license={license} />
+      </Table.Cell>
+      <Table.Cell>
         <RowActions
           license={license}
           onOpen={onOpen}
@@ -64,6 +67,24 @@ function CustomerCell({ license }: { license: License }) {
         {license.organizationId
           ? license.email
           : "Not linked to a customer organization"}
+      </Text>
+    </VStack>
+  );
+}
+
+/** When the install last reported, what it reported, and the quarter's peak. */
+function SyncCell({ license }: { license: License }) {
+  if (!license.lastSyncAt) return <EmptyCell>never synced</EmptyCell>;
+  const quarter = license.currentQuarterSeats;
+  return (
+    <VStack align="start" gap={0}>
+      <Text>
+        {formatDate(license.lastSyncAt)}
+        {license.lastSyncVersion ? ` (${license.lastSyncVersion})` : ""}
+      </Text>
+      <Text fontSize="xs" color="fg.muted">
+        {license.reportedMembers ?? 0} in use
+        {quarter ? `, ${quarter.peakMembers} peak this quarter` : ""}
       </Text>
     </VStack>
   );

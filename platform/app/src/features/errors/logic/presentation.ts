@@ -1281,6 +1281,14 @@ const presentations = {
     title: "Your license has expired",
     describe: () => "Renew it to carry on, or talk to your account team.",
   },
+  license_sync_failed: {
+    // The reader is the administrator of a self-hosted install, in Settings,
+    // Connect. The daily sync runs on its own, so there is nothing to retry by
+    // hand; what they need to know is that seats keep working meanwhile.
+    title: "The daily license sync did not complete",
+    describe: () =>
+      "It runs again in a day. Your seats are unchanged until the current lease runs out.",
+  },
   license_signing_key_not_pem: {
     title: "The signing key on the server isn't a private key",
     describe: () =>

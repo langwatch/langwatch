@@ -11,6 +11,7 @@ import { PrismaConnectManagedKeys } from "../connectManagedKey.prisma";
 import {
   PrismaCustomerOrganizations,
   PrismaIssuedLicenseRepository,
+  PrismaLicenseSeatReports,
 } from "../issuedLicense.prisma";
 import { LicenseRegistryService } from "../licenseRegistry.service";
 
@@ -27,6 +28,7 @@ describe("the license registry on Postgres", () => {
   const organizationIds: string[] = [];
   const service = new LicenseRegistryService({
     repository: new PrismaIssuedLicenseRepository(prisma),
+    seatReports: new PrismaLicenseSeatReports(prisma),
     organizations: new PrismaCustomerOrganizations(prisma),
     managedKeys: new PrismaConnectManagedKeys(prisma),
     contractBudgets: { sync: async () => undefined },

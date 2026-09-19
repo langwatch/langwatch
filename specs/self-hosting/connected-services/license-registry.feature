@@ -67,7 +67,7 @@ Feature: License registry
     And neither the license key nor the token itself appears in the row
     And the token cannot be computed from what the row holds
 
-  @unit @unimplemented
+  @unit
   Scenario: A reissued license is held encrypted only until it is delivered
     Given a license that was reissued and is waiting for its install to pick it up
     Then the registry holds the new license encrypted
@@ -201,8 +201,9 @@ Feature: License registry
     Then an organization "ACME" exists on LangWatch Cloud marked as a self-hosted customer
     And the license is linked to it
 
-  @integration @unimplemented
+  @integration
   Scenario: The backoffice lists licenses with their state
     Given licenses in the registry that are active, revoked and expired
     When an operator opens the licenses screen
     Then each license shows its customer, seats, term, status, entitled services and whether an instance is bound
+    And a license that has synced shows when it last did and the seats it reported

@@ -1,13 +1,14 @@
 /**
- * The one place that builds the license registry and the credential service as
- * the app uses them: Prisma, the server's signing key, real encryption, and the
- * customer's contract budget (ADR-139).
+ * The one place that builds the license registry, the credential service and
+ * the license sync as the app uses them: Prisma, the server's signing key, real
+ * encryption, and the customer's contract budget (ADR-139).
  */
 
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { encrypt } from "~/utils/encryption";
+import { rateLimit } from "~/server/rateLimit";
+import { decrypt, encrypt } from "~/utils/encryption";
 import { createContractBudgetService } from "../connect/connect.prisma";
 import { PUBLIC_KEY } from "../constants";
 import { ConnectCredentialService } from "./connectCredential.service";
@@ -15,19 +16,37 @@ import { PrismaConnectManagedKeys } from "./connectManagedKey.prisma";
 import {
   PrismaCustomerOrganizations,
   PrismaIssuedLicenseRepository,
+  PrismaLicenseSeatReports,
 } from "./issuedLicense.prisma";
 import { LicenseRegistryService } from "./licenseRegistry.service";
+import { LicenseSyncService } from "./licenseSync.service";
+
+/**
+ * A connected install syncs once a day. Two a day is already a restart loop,
+ * and 48 leaves room for one every half hour before anything is refused.
+ */
+const SYNCS_PER_DAY = 48;
+const ONE_DAY_SECONDS = 24 * 60 * 60;
+
+/**
+ * The key licenses and leases are signed with, read on every call so a rotated
+ * secret needs no rebuild of the service. `process.env` comes first because
+ * `env` captured its value when the module was first imported.
+ */
+const licenseSigningKey = (): string | undefined =>
+  process.env.LANGWATCH_LICENSE_PRIVATE_KEY ??
+  env.LANGWATCH_LICENSE_PRIVATE_KEY;
 
 export function createLicenseRegistryService(
   prisma: PrismaClient,
 ): LicenseRegistryService {
   return new LicenseRegistryService({
     repository: new PrismaIssuedLicenseRepository(prisma),
+    seatReports: new PrismaLicenseSeatReports(prisma),
     organizations: new PrismaCustomerOrganizations(prisma),
     managedKeys: new PrismaConnectManagedKeys(prisma),
     contractBudgets: createContractBudgetService(prisma),
-    // Read per call, so a rotated secret needs no rebuild of the service.
-    signingKey: () => env.LANGWATCH_LICENSE_PRIVATE_KEY,
+    signingKey: licenseSigningKey,
     publicKey: PUBLIC_KEY,
     encrypt,
   });
@@ -40,6 +59,31 @@ export function createConnectCredentialService(
   return new ConnectCredentialService({
     repository: new PrismaIssuedLicenseRepository(prisma),
     managedKeys: new PrismaConnectManagedKeys(prisma),
+    systemActorId: SYSTEM_ACTORS.connectLicense,
+  });
+}
+
+/** What `POST /api/connect/v1/license/sync` calls. */
+export function createLicenseSyncService(
+  prisma: PrismaClient,
+): LicenseSyncService {
+  return new LicenseSyncService({
+    credentials: createConnectCredentialService(prisma),
+    repository: new PrismaIssuedLicenseRepository(prisma),
+    seatReports: new PrismaLicenseSeatReports(prisma),
+    managedKeys: new PrismaConnectManagedKeys(prisma),
+    rateLimit: {
+      allow: async ({ licenseRowId }) =>
+        (
+          await rateLimit({
+            key: `license_sync:${licenseRowId}`,
+            windowSeconds: ONE_DAY_SECONDS,
+            max: SYNCS_PER_DAY,
+          })
+        ).allowed,
+    },
+    signingKey: licenseSigningKey,
+    decrypt,
     systemActorId: SYSTEM_ACTORS.connectLicense,
   });
 }

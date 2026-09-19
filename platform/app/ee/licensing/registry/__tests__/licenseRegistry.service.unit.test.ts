@@ -8,6 +8,7 @@ import {
   InMemoryConnectManagedKeys,
   InMemoryCustomerOrganizations,
   InMemoryIssuedLicenseRepository,
+  InMemoryLicenseSeatReports,
   RecordingContractBudgets,
 } from "./registryFakes";
 
@@ -37,11 +38,13 @@ function buildService({
   signing?: "configured" | "unconfigured";
 } = {}) {
   const repository = new InMemoryIssuedLicenseRepository(NOW);
+  const seatReports = new InMemoryLicenseSeatReports();
   const organizations = new InMemoryCustomerOrganizations();
   const managedKeys = new InMemoryConnectManagedKeys();
   const contractBudgets = new RecordingContractBudgets();
   const service = new LicenseRegistryService({
     repository,
+    seatReports,
     organizations,
     managedKeys,
     contractBudgets,
@@ -51,7 +54,14 @@ function buildService({
     encrypt: (plain) => `enc(${Buffer.from(plain).toString("base64")})`,
     now: () => NOW,
   });
-  return { service, repository, organizations, managedKeys, contractBudgets };
+  return {
+    service,
+    repository,
+    seatReports,
+    organizations,
+    managedKeys,
+    contractBudgets,
+  };
 }
 
 const issueInput = (organizationId: string) => ({
@@ -488,6 +498,7 @@ describe("LicenseRegistryService", () => {
       it("reads as expired without the row having been edited", async () => {
         const later = new LicenseRegistryService({
           repository: context.repository,
+          seatReports: context.seatReports,
           organizations: context.organizations,
           managedKeys: context.managedKeys,
           contractBudgets: context.contractBudgets,
@@ -505,6 +516,7 @@ describe("LicenseRegistryService", () => {
       it("can still be reissued, which is how a lapsed license is renewed", async () => {
         const later = new LicenseRegistryService({
           repository: context.repository,
+          seatReports: context.seatReports,
           organizations: context.organizations,
           managedKeys: context.managedKeys,
           contractBudgets: context.contractBudgets,

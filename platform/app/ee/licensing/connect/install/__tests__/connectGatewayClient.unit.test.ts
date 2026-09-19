@@ -14,11 +14,11 @@ import { Agent, EnvHttpProxyAgent, MockAgent } from "undici";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { InstantEvalQuestion } from "~/server/app-layer/instant-evals/classifier/classifier";
+import { ConnectGatewayClient } from "../connectGatewayClient";
 import {
   type ConnectCredential,
-  ConnectGatewayClient,
   createConnectDispatcher,
-} from "../connectGatewayClient";
+} from "../connectTransport";
 
 const ENDPOINT = "https://gateway.example.test";
 

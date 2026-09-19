@@ -3,7 +3,7 @@ import { LicensesTableRow } from "./LicensesTableRow";
 import type { License } from "./types";
 import { useLicenseCommands } from "./useLicenseCommands";
 
-const COLUMN_COUNT = 8;
+const COLUMN_COUNT = 9;
 
 export function LicensesTable({
   licenses,
@@ -29,6 +29,7 @@ export function LicensesTable({
           <Table.ColumnHeader>Status</Table.ColumnHeader>
           <Table.ColumnHeader>Hosted services</Table.ColumnHeader>
           <Table.ColumnHeader>Instance</Table.ColumnHeader>
+          <Table.ColumnHeader>Last sync</Table.ColumnHeader>
           <Table.ColumnHeader width="1%" />
         </Table.Row>
       </Table.Header>

@@ -7,6 +7,7 @@ import { api } from "~/utils/api";
 
 import { ConnectServicesSection } from "./connect/ConnectServicesSection";
 import { ConnectSpendSection } from "./connect/ConnectSpendSection";
+import { ConnectSyncSection } from "./connect/ConnectSyncSection";
 import type { ConnectEnabledView } from "./connect/connectStatus";
 
 /**
@@ -99,6 +100,7 @@ function ConnectedOrganization({
         canManage={canManage}
         onSaved={onChanged}
       />
+      <ConnectSyncSection status={status} />
     </VStack>
   );
 }

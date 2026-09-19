@@ -64,6 +64,7 @@ import { app as authApp } from "./routes/auth";
 import { app as authCliApp } from "./routes/auth-cli";
 import { app as bugReportsApp } from "./routes/bug-reports";
 import { app as collectorApp } from "./routes/collector";
+import { app as connectApp } from "./routes/connect";
 import { app as cronApp } from "./routes/cron";
 import { app as datasetGenerateApp } from "./routes/dataset-generate";
 import { app as elevenLabsApp } from "./routes/elevenlabs";
@@ -199,6 +200,7 @@ export function createApiRouter() {
   api.route("/", workflowsCrudApp); // CRUD — complements workflowsApp (code-completion, post_event)
 
   api.route("/", gatewayInternalApp);
+  api.route("/", connectApp); // /api/connect/v1, what a connected self-hosted install calls
   api.route("/", otelApp);
   api.route("/", rumApp); // /api/rum/v1/traces — browser telemetry proxy
   api.route("/", playgroundApp);

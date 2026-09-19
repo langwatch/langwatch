@@ -37,10 +37,10 @@ import { INSTANT_EVAL_CLASSIFIER_LIMITS } from "~/server/app-layer/instant-evals
 import type { ConnectConfigOn } from "./connectConfig";
 import { resolveConnectCredential } from "./connectCredential";
 import {
-  type ConnectCredential,
   type ConnectGatewayClient,
   getConnectGatewayClient,
 } from "./connectGatewayClient";
+import type { ConnectCredential } from "./connectTransport";
 
 /** The hosted service this classifier is part of, as the license names it. */
 export const CONNECT_INSTANT_EVALS_SERVICE = "instant_evals";

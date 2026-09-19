@@ -20,6 +20,7 @@ import { PrismaConnectManagedKeys } from "@ee/licensing/registry/connectManagedK
 import {
   PrismaCustomerOrganizations,
   PrismaIssuedLicenseRepository,
+  PrismaLicenseSeatReports,
 } from "@ee/licensing/registry/issuedLicense.prisma";
 import { LicenseRegistryService } from "@ee/licensing/registry/licenseRegistry.service";
 import { nanoid } from "nanoid";
@@ -85,6 +86,7 @@ describe("a license token on resolve-key (real PG + internal route)", () => {
   const organizationIds: string[] = [];
   const registry = new LicenseRegistryService({
     repository: new PrismaIssuedLicenseRepository(prisma),
+    seatReports: new PrismaLicenseSeatReports(prisma),
     organizations: new PrismaCustomerOrganizations(prisma),
     managedKeys: new PrismaConnectManagedKeys(prisma),
     contractBudgets: { sync: async () => undefined },

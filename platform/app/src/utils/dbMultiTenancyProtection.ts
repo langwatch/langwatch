@@ -277,6 +277,39 @@ const parentEntryScoped = (): ScopedModelConfig => ({
 const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
   AiToolEntryTeam: parentEntryScoped(),
   AiToolEntryDepartment: parentEntryScoped(),
+  // The seats one license reported in one quarter (ADR-139). It carries no
+  // organizationId: its parent `IssuedLicense` row names the customer, and the
+  // sync that writes it has only just resolved that row from a token. Every
+  // query names the license, which is what keeps a bare findMany from walking
+  // every customer's seat history.
+  LicenseSeatReport: {
+    validateWhere: (where) => {
+      const reason = "requires a row id or licenseId in the where clause";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.licenseId === "string" ||
+          (c.licenseId &&
+            Array.isArray(c.licenseId.in) &&
+            c.licenseId.in.length > 0) ||
+          // The compound unique, as `findUnique` spells it.
+          typeof c.licenseId_quarterStartsAt?.licenseId === "string",
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const record of records) {
+        if (!record) return "create requires a data payload";
+        if (typeof record.licenseId !== "string") {
+          return "create requires a licenseId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
   // Idempotency receipts carry their tenancy on `scopeId` alone: the project
   // on the gateway platform's creates, the organization on the webhook
   // platform's. Every query names either the row id just claimed or the

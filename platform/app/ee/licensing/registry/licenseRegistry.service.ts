@@ -27,6 +27,10 @@ import {
   LicenseOverageMaxRequiresOverageError,
   LicenseSigningNotConfiguredError,
 } from "./errors";
+import {
+  type LicenseSeatReportRepository,
+  seatQuarterKeyFor,
+} from "./seatReports";
 
 export type IssuedLicenseSource =
   | "BACKOFFICE"
@@ -66,6 +70,10 @@ export interface IssuedLicenseRecord {
   overageMaxUsdCents: number | null;
   instanceId: string | null;
   instanceBoundAt: Date | null;
+  lastSyncAt: Date | null;
+  lastSyncVersion: string | null;
+  reportedMembers: number | null;
+  reportedMembersLite: number | null;
   virtualKeyId: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -90,6 +98,19 @@ export type IssuedLicenseView = Omit<
   effectiveSeatOverageAllowance: number;
   /** Whether a reissued license is waiting to be delivered to its install. */
   hasPendingDelivery: boolean;
+};
+
+/**
+ * A row on the licenses screen, which also shows what the install reported in
+ * the term quarter now running. Reading that costs a second query, so only the
+ * list and the detail carry it; a write answers with the row alone.
+ */
+export type IssuedLicenseBrowseView = IssuedLicenseView & {
+  currentQuarterSeats: {
+    quarterStartsAt: Date;
+    peakMembers: number;
+    peakMembersLite: number;
+  } | null;
 };
 
 export interface IssuedLicenseRepository {
@@ -124,6 +145,8 @@ export interface IssuedLicenseRepository {
     id: string;
     virtualKeyId: string;
   }): Promise<boolean>;
+  /** The license that replaced this one, when it was reissued. */
+  findByReplacesId(replacesId: string): Promise<IssuedLicenseRecord | null>;
 }
 
 /**
@@ -167,6 +190,8 @@ export interface ContractBudgetSyncPort {
 
 export interface LicenseRegistryDependencies {
   repository: IssuedLicenseRepository;
+  /** What the licenses screen reads for the quarter now running. */
+  seatReports: LicenseSeatReportRepository;
   organizations: CustomerOrganizationPort;
   managedKeys: ConnectManagedKeyPort;
   contractBudgets: ContractBudgetSyncPort;
@@ -467,17 +492,46 @@ export class LicenseRegistryService {
     return this.toView(updated);
   }
 
-  async getById(input: { id: string }): Promise<IssuedLicenseView> {
-    return this.toView(await this.requireRow(input.id));
+  async getById(input: { id: string }): Promise<IssuedLicenseBrowseView> {
+    const [license] = await this.browse([await this.requireRow(input.id)]);
+    if (!license) throw new IssuedLicenseNotFoundError();
+    return license;
   }
 
   async getAll(input: {
     page: number;
     pageSize: number;
     search?: string;
-  }): Promise<{ licenses: IssuedLicenseView[]; total: number }> {
+  }): Promise<{ licenses: IssuedLicenseBrowseView[]; total: number }> {
     const { rows, total } = await this.deps.repository.findAll(input);
-    return { licenses: rows.map((row) => this.toView(row)), total };
+    return { licenses: await this.browse(rows), total };
+  }
+
+  /** The rows with the seats each reported in the quarter now running. */
+  private async browse(
+    rows: IssuedLicenseRecord[],
+  ): Promise<IssuedLicenseBrowseView[]> {
+    const now = this.now();
+    const keys = rows.map((row) =>
+      seatQuarterKeyFor({ licenseId: row.id, issuedAt: row.issuedAt, now }),
+    );
+    const reports = await this.deps.seatReports.findByQuarters(keys);
+    const byLicense = new Map(
+      reports.map((report) => [report.licenseId, report]),
+    );
+    return rows.map((row) => {
+      const report = byLicense.get(row.id);
+      return {
+        ...this.toView(row),
+        currentQuarterSeats: report
+          ? {
+              quarterStartsAt: report.quarterStartsAt,
+              peakMembers: report.peakMembers,
+              peakMembersLite: report.peakMembersLite,
+            }
+          : null,
+      };
+    });
   }
 
   private async syncContractBudget(
@@ -599,6 +653,10 @@ export class LicenseRegistryService {
       overageMaxUsdCents: null,
       instanceId: null,
       instanceBoundAt: null,
+      lastSyncAt: null,
+      lastSyncVersion: null,
+      reportedMembers: null,
+      reportedMembersLite: null,
       virtualKeyId: null,
       ...overrides,
     });

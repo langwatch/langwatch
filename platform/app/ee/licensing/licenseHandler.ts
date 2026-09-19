@@ -7,6 +7,12 @@ import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
   RETENTION_CATEGORIES,
 } from "../../src/server/data-retention/retentionPolicy.schema";
+import { readConnectConfig } from "./connect/install/connectConfig";
+import {
+  installInstanceId,
+  readInstalledLease,
+  seatAllowanceOf,
+} from "./connect/install/installedLease";
 import { PUBLIC_KEY, UNLIMITED_PLAN } from "./constants";
 import { resolvePlanDefaults } from "./defaults";
 import { OrganizationNotFoundError } from "./errors";
@@ -143,9 +149,14 @@ export class LicenseHandler {
    * A license we did not sign is not a license. Its numbers could say anything,
    * so an unreadable or tampered key resolves to the baseline, exactly like no
    * license at all.
+   *
+   * A connected install can hold a signed lease on top, and then the seats it
+   * may fill are the licensed count plus the allowance LangWatch signed. See
+   * {@link LicenseHandler.withSeatAllowance}.
    */
   async getSelfHostedPlan(organizationId: string): Promise<PlanInfo> {
-    const licenseKey = await this.readStoredLicense(organizationId);
+    const organization = await this.readOrganizationLicense(organizationId);
+    const licenseKey = organization?.license ?? null;
 
     if (!licenseKey) {
       return UNLIMITED_PLAN;
@@ -157,18 +168,76 @@ export class LicenseHandler {
       return UNLIMITED_PLAN;
     }
 
-    return mapToPlanInfo(signedLicense.data);
+    return this.withSeatAllowance({
+      plan: mapToPlanInfo(signedLicense.data),
+      organizationId,
+      licenseKey,
+      lease: organization?.connectLease,
+    });
+  }
+
+  /**
+   * The plan a current lease widens, and the plain licensed plan otherwise
+   * (ADR-139, section 6).
+   *
+   * `maxMembers` carries the widened count because that is what every caller
+   * of the seat guard already enforces, and the licensed count travels beside
+   * it so the members page and the invitation can say how many seats will be
+   * invoiced at the next quarterly true-up. With Connect off, no lease, a
+   * lease we did not sign, one naming another license or another install, or
+   * one past its 30 days, this is the plan main resolves.
+   */
+  private withSeatAllowance({
+    plan,
+    organizationId,
+    licenseKey,
+    lease,
+  }: {
+    plan: PlanInfo;
+    organizationId: string;
+    licenseKey: string;
+    lease: unknown;
+  }): PlanInfo {
+    if (!readConnectConfig().enabled) {
+      return plan;
+    }
+
+    const allowance = seatAllowanceOf(
+      readInstalledLease({
+        licenseKey,
+        lease,
+        instanceId: installInstanceId(organizationId),
+        publicKey: this.publicKey,
+        now: new Date(),
+      }),
+    );
+    if (allowance <= 0) {
+      return plan;
+    }
+
+    return {
+      ...plan,
+      maxMembers: plan.maxMembers + allowance,
+      licensedMembers: plan.maxMembers,
+      seatOverageAllowance: allowance,
+    };
   }
 
   private async readStoredLicense(
     organizationId: string,
   ): Promise<string | null> {
-    const organization = await this.prisma.organization.findUnique({
-      where: { id: organizationId },
-      select: { license: true },
-    });
+    const organization = await this.readOrganizationLicense(organizationId);
 
     return organization?.license ?? null;
+  }
+
+  private async readOrganizationLicense(
+    organizationId: string,
+  ): Promise<{ license: string | null; connectLease?: unknown } | null> {
+    return await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { license: true, connectLease: true },
+    });
   }
 
   /**

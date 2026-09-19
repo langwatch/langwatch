@@ -59,12 +59,16 @@ const NOW = new Date("2026-09-19T12:00:00.000Z");
  * Any other model, the registry included, throws on access, which is how this
  * test proves the offline path never looks at the registry.
  */
-function offlinePrisma(licenseKey: string | null) {
+function offlinePrisma(
+  licenseKey: string | null,
+  connectLease: unknown = null,
+) {
   const organization = {
     findUnique: vi.fn(async () => ({
       id: ORG,
       name: "ACME Offline",
       license: licenseKey,
+      connectLease,
     })),
   };
   return new Proxy(
@@ -161,6 +165,25 @@ describe("a license minted by main before this change", () => {
 
       expect(plan.maxMembers).toBe(fixture.expected.plan.maxMembers);
       expect(plan.maxMembersLite).toBe(fixture.expected.plan.maxMembersLite);
+    });
+
+    it("carries no allowance and reads no lease", async () => {
+      // A lease on the row is not enough on its own: with Connect off the plan
+      // is the plain licensed one, whatever a previous connected run left.
+      const withLease = new LicenseHandler({
+        prisma: offlinePrisma(fixture.licenseKey, {
+          payload: { seatOverageAllowance: 500 },
+          signature: "whatever",
+        }),
+        publicKey: fixture.publicKey,
+        repository: repositoryWith(0),
+      });
+
+      const plan = await withLease.getSelfHostedPlan(ORG);
+
+      expect(plan.maxMembers).toBe(fixture.expected.plan.maxMembers);
+      expect(plan.licensedMembers).toBeUndefined();
+      expect(plan.seatOverageAllowance).toBeUndefined();
     });
 
     it("reports the same license status", async () => {
@@ -263,6 +286,32 @@ describe("an install upgraded with no Connect configuration", () => {
       expect(env.LANGWATCH_CONNECT_GATEWAY_ENDPOINT).toBeUndefined();
       expect(env.LANGWATCH_CONNECT_LICENSE_ENDPOINT).toBeUndefined();
       expect(env.LANGWATCH_CONNECT_INSTANCE_ID).toBeUndefined();
+    });
+  });
+
+  describe("when its daily jobs run", () => {
+    /** @scenario "An install with Connect disabled sends no sync" */
+    it("starts no sync worker and posts its statistics where it always did", async () => {
+      vi.resetModules();
+      vi.doMock("~/env.mjs", () => ({ env: { NODE_ENV: "test" } }));
+      vi.doMock("~/server/db", () => ({ prisma: {} }));
+
+      const { startLicenseSyncWorker } = await import(
+        "~/server/licenseSyncWorker"
+      );
+      const { usageStatsEndpoint, USAGE_STATS_APP_HOST_URL } = await import(
+        "~/server/usageStatsWorker"
+      );
+
+      expect(startLicenseSyncWorker()).toBeUndefined();
+      expect(usageStatsEndpoint()).toBe(USAGE_STATS_APP_HOST_URL);
+      expect(USAGE_STATS_APP_HOST_URL).toBe(
+        "https://app.langwatch.ai/api/track_usage",
+      );
+
+      vi.doUnmock("~/server/db");
+      vi.doUnmock("~/env.mjs");
+      vi.resetModules();
     });
   });
 

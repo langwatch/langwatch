@@ -304,6 +304,7 @@ export const APP_ERROR_CODES = [
   "license_signing_key_encrypted",
   "license_signing_key_not_pem",
   "license_signing_not_configured",
+  "license_sync_failed",
   "lite_member_restricted",
   "lite_member_viewer_only",
   "lwql_app_function_hydration_failed",

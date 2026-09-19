@@ -272,13 +272,44 @@ and stop reporting for a quarter.
 Going over the licensed seats costs money later, so the install says so when it
 happens: on the invitation and on the members page.
 
-The install's identity is a random UUID created once and stored. It replaces the
-organization-derived id for sync. The statistics post keeps its payload, moves
-to the connect host, and stays off with `DISABLE_USAGE_STATS`.
-`app.langwatch.ai/api/track_usage` keeps working for older installs.
+The install's identity on sync is the one it presents to the gateway (section
+9): the organization id, or `LANGWATCH_CONNECT_INSTANCE_ID`. One identity for
+both hosts, because the registry binds a license to one instance and a sync
+that presented another id than the classify calls would be refused as the wrong
+instance. It carries no organization name. The statistics post keeps its
+payload, moves to the connect host when Connect is on, and stays off with
+`DISABLE_USAGE_STATS`. `app.langwatch.ai/api/track_usage` keeps working for
+older installs and for installs without Connect.
 
 "Seat reconciliation" already names the in-app flow of disabling members down to
 the license. The quarterly billing job is called the seat true-up everywhere.
+
+What the registry keeps from a sync: the last report on the row (`lastSyncAt`,
+`lastSyncVersion`, `reportedMembers`, `reportedMembersLite`) and the peak of the
+license term quarter in `LicenseSeatReport`, keyed by `(licenseId,
+quarterStartsAt)` and only ever raised. The quarter runs in three-month steps
+from the license's own `issuedAt`, not from the calendar year, because that is
+the term the seats were bought for. Sync is rate limited per registry row at 48
+calls per 24 hours, answered `rate_limited` 429; a refused sync records nothing.
+
+A reissued license travels inside the sync answer (`license`) until the install
+presents the new token. The lease beside it still names the license being
+replaced, so the install does not keep that lease: it applies the new license
+through the same validation a pasted key gets, then syncs once more with the new
+token. That second sync is what earns a lease for the new `licenseId` and what
+tells the registry the replaced license is out of use: the replaced row is
+marked superseded, its managed key is retired, and the encrypted copy held for
+delivery is erased. A delivered license that does not verify is not applied and
+the failure is shown in Settings, Connect.
+
+The install reports its version from `SERVICE_VERSION`, then `service.version`
+in `OTEL_RESOURCE_ATTRIBUTES`, then the package version, and `unknown` when none
+is set. The chart sets `SERVICE_VERSION` from the app image tag when Connect is
+on.
+
+`POST /api/connect/v1/stats` and `POST /api/track_usage` are one handler behind
+two routes, so switching Connect on changes the host the statistics report
+travels to and nothing else about it.
 
 ### 7. Billing
 

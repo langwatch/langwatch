@@ -17,7 +17,7 @@ import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { licenseTokenFromKey } from "../../licenseToken";
 import { readConnectConfig } from "./connectConfig";
-import type { ConnectCredential } from "./connectGatewayClient";
+import type { ConnectCredential } from "./connectTransport";
 
 export async function resolveConnectCredential({
   prisma,

@@ -19,6 +19,7 @@ describe("resolveWorkerBootPlan", () => {
       "anomaly",
       "spend-spike-anomaly",
       "usage-stats",
+      "license-sync",
       "realtime-session-poller",
     ]);
   });

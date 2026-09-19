@@ -21,6 +21,9 @@ export type ConnectEnabledView = Extract<
 export type ConnectUsageView = NonNullable<ConnectEnabledView["usage"]>;
 export type ConnectContractView = NonNullable<ConnectUsageView["contract"]>;
 
+/** The lease the last license sync left, where there is one. */
+export type SeatLeaseView = NonNullable<ConnectEnabledView["sync"]["lease"]>;
+
 export interface HostedService {
   /** The name the license uses for the service. */
   id: ConnectService;

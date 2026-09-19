@@ -781,6 +781,18 @@ model Organization {
   /// the whole opt-in: with nothing here an install sends nothing, whatever
   /// its license is entitled to (ADR-139).
   connectServices        String[]                       @default([])
+  /// The signed lease the last successful license sync answered with (ADR-139,
+  /// section 6). Written only after it verified against the public key the
+  /// install embeds, for this license and this install, so a lease that was
+  /// edited or minted elsewhere never lands here. It carries the seat overage
+  /// allowance and the two dates that withdraw it, which is why no timestamp
+  /// in this database decides how long the allowance lasts.
+  connectLease           Json?
+  /// When the last license sync succeeded.
+  connectLastSyncAt      DateTime?
+  /// The code of the failure the last sync ended on, cleared on the next
+  /// success. Settings, Connect renders the copy for it.
+  connectLastSyncError   String?
   issuedLicenses         IssuedLicense[]
   gatewayChangeEvents    GatewayChangeEvent[]
   routingPolicies        RoutingPolicy[]
@@ -871,6 +883,14 @@ model IssuedLicense {
   instanceId      String?
   instanceBoundAt DateTime?
 
+  /// The last license sync this install reported: when it arrived, the
+  /// LangWatch version that sent it, and the seats in use at that moment.
+  /// Null until the install syncs for the first time.
+  lastSyncAt          DateTime?
+  lastSyncVersion     String?
+  reportedMembers     Int?
+  reportedMembersLite Int?
+
   /// The managed gateway key (purpose CONNECT) that hosted-service traffic of
   /// this license runs under. One per license, so spend rows name the install.
   /// Created when the license first resolves. A plain column, not a relation.
@@ -881,6 +901,27 @@ model IssuedLicense {
 
   @@index([organizationId])
   @@index([expiresAt])
+}
+
+/// The seats one license reported in one quarter of its term, kept at the
+/// highest figure reported. The quarterly seat true-up invoices from this, so
+/// a customer that adds seats for a week pays for them even if the install
+/// drops back before the quarter ends.
+model LicenseSeatReport {
+  id String @id @default(nanoid())
+  /// The `IssuedLicense` row. A plain column ref, like `replacesId`:
+  /// relationMode="prisma" carries no foreign keys.
+  licenseId String
+  /// Start of the term quarter, counted in three-month steps from the
+  /// license's own `issuedAt` rather than from the calendar year.
+  quarterStartsAt DateTime
+  peakMembers     Int
+  peakMembersLite Int
+  firstReportedAt DateTime
+  lastReportedAt  DateTime
+
+  @@unique([licenseId, quarterStartsAt])
+  @@index([licenseId])
 }
 
 model ScimToken {

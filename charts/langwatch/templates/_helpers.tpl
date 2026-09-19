@@ -1389,6 +1389,10 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- if .Values.app.connect.enabled }}
 - name: LANGWATCH_CONNECT_ENABLED
   value: "true"
+{{- /* The version the license sync reports, so the registry knows which
+       release each install runs. The app image tag is the release. */}}
+- name: SERVICE_VERSION
+  value: {{ .Values.images.app.tag | default .Chart.AppVersion | quote }}
 {{- if .Values.app.connect.gatewayEndpoint }}
 - name: LANGWATCH_CONNECT_GATEWAY_ENDPOINT
   value: {{ .Values.app.connect.gatewayEndpoint | quote }}

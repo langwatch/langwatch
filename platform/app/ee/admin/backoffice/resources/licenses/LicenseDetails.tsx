@@ -28,6 +28,27 @@ export function LicenseDetails({ license }: { license: License }) {
       <Detail label="Replaces">
         {license.replacesId ?? <EmptyCell>none</EmptyCell>}
       </Detail>
+      <Detail label="Last sync">
+        {license.lastSyncAt ? (
+          `${formatDateTime(license.lastSyncAt)} from ${license.lastSyncVersion ?? "an unnamed version"}`
+        ) : (
+          <EmptyCell>never synced</EmptyCell>
+        )}
+      </Detail>
+      <Detail label="Seats reported">
+        {license.lastSyncAt ? (
+          `${license.reportedMembers ?? 0} full, ${license.reportedMembersLite ?? 0} lite`
+        ) : (
+          <EmptyCell>none</EmptyCell>
+        )}
+      </Detail>
+      <Detail label="Quarter peak">
+        {license.currentQuarterSeats ? (
+          `${license.currentQuarterSeats.peakMembers} full, ${license.currentQuarterSeats.peakMembersLite} lite since ${formatDate(license.currentQuarterSeats.quarterStartsAt)}`
+        ) : (
+          <EmptyCell>nothing reported this quarter</EmptyCell>
+        )}
+      </Detail>
       {license.revokedAt ? (
         <Detail label="Revoked">
           {formatDateTime(license.revokedAt)}: {license.revokedReason}

@@ -86,6 +86,7 @@ function request({ body, ip = "203.0.113.5" }: { body: unknown; ip?: string }) {
 
 describe("POST /api/track_usage", () => {
   describe("when the event is the allowlisted daily_usage_stats report", () => {
+    /** @scenario An install on an older version still reaches the old statistics route */
     it("accepts it and forwards exactly the known fields to PostHog", async () => {
       const res = await request({
         body: dailyUsageStatsBody({ totalTraces: 42 }),

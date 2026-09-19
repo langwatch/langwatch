@@ -120,6 +120,7 @@ const connectedStatus = (overrides: Record<string, unknown> = {}) => ({
     budgets: [],
   },
   refusal: null,
+  sync: { lastSyncAt: null, lastError: null, lease: null },
   ...overrides,
 });
 

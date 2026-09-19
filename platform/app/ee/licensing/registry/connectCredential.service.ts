@@ -51,7 +51,11 @@ export type ConnectCredentialRefusalCode =
 export type ConnectCredentialResolution =
   | {
       ok: true;
-      license: IssuedLicenseRecord & { organizationId: string };
+      /** Bound to a customer and to the install that presented it. */
+      license: IssuedLicenseRecord & {
+        organizationId: string;
+        instanceId: string;
+      };
       virtualKeyId: string;
     }
   | { ok: false; code: ConnectCredentialRefusalCode };
