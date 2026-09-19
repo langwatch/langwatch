@@ -10,6 +10,7 @@
  * definition forward unchanged.
  *
  * @see ../instant-eval-run.repository.ts
+ * @see ../instant-eval-run.projection-store.ts
  * @see ../../../../clickhouse/migrations/00098_create_instant_eval_runs.sql
  * @see ../../../../../../../specs/instant-evals/instant-eval-api.feature
  * @see ../../../../../../../specs/instant-evals/instant-eval-pipeline.feature
@@ -22,8 +23,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { createTenantId } from "~/server/event-sourcing";
 import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
+import { ClickHouseInstantEvalRunProjectionStore } from "../instant-eval-run.projection-store";
 import {
-  ClickHouseInstantEvalRunProjectionStore,
   ClickHouseInstantEvalRunRepository,
   type InstantEvalRunDefinition,
 } from "../instant-eval-run.repository";

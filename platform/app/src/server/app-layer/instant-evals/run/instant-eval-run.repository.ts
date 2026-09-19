@@ -24,25 +24,20 @@
  * `WrittenAt` through the IN-tuple pattern, because the merge is eventual.
  *
  * @see ../../../clickhouse/migrations/00098_create_instant_eval_runs.sql
- * @see ../../../event-sourcing/pipelines/instant-eval-processing/projections/instantEvalRun.stateProjection.ts
+ * @see ./instant-eval-run.rows.ts
+ * @see ./instant-eval-run.projection-store.ts
  */
 
-import { createLogger } from "@langwatch/observability";
-
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import type {
-  InstantEvalRunProjectedStatus,
-  InstantEvalRunProjectionState,
-} from "~/server/event-sourcing/pipelines/instant-eval-processing/projections/instantEvalRun.stateProjection";
-import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
-import type {
-  StateProjectionStore,
-  StoredProjection,
-} from "~/server/event-sourcing/projections/stateProjection.types";
-
-const TABLE_NAME = "instant_eval_runs" as const;
-
-const logger = createLogger("langwatch:instant-evals:run-repository");
+import type { InstantEvalRunProjectedStatus } from "~/server/event-sourcing/pipelines/instant-eval-processing/projections/instantEvalRun.stateProjection";
+import {
+  INSTANT_EVAL_RUNS_TABLE,
+  type InstantEvalRunNarrowing,
+  type InstantEvalRunRecord,
+  latestRowsQuery,
+  toRow,
+  toWriteRecord,
+} from "./instant-eval-run.rows";
 
 /** One run as the application reads it: the definition and the counters. */
 export interface InstantEvalRunRow {
@@ -127,225 +122,6 @@ export interface InstantEvalRunRepository {
   }): Promise<void>;
 }
 
-/** The row as ClickHouse answers it, timestamps as epoch milliseconds. */
-interface RunRecord {
-  TenantId: string;
-  RunId: string;
-  Name: string | null;
-  Sql: string;
-  Parameters: string;
-  Questions: string;
-  Plan: string;
-  RowLimit: number;
-  Status: string;
-  Total: number | null;
-  Progress: number;
-  Matched: number | null;
-  MatchedByQuestion: string;
-  Failed: number;
-  Skipped: number;
-  Tokens: number | string;
-  CostUsd: number;
-  PriceUsd: number;
-  Error: string | null;
-  CreatedAt: number | string;
-  UpdatedAt: number | string;
-  StartedAt: number | string | null;
-  FinishedAt: number | string | null;
-  OccurredAt: number | string | null;
-  AcceptedAt: number | string | null;
-  LastEventId: string;
-  ProjectionVersion: string;
-}
-
-/** The row as it is inserted: dates as dates, so the driver formats them. */
-interface RunWriteRecord {
-  TenantId: string;
-  RunId: string;
-  Name: string | null;
-  Sql: string;
-  Parameters: string;
-  Questions: string;
-  Plan: string;
-  RowLimit: number;
-  Status: string;
-  Total: number | null;
-  Progress: number;
-  Matched: number | null;
-  MatchedByQuestion: string;
-  Failed: number;
-  Skipped: number;
-  Tokens: number;
-  CostUsd: number;
-  PriceUsd: number;
-  Error: string | null;
-  CreatedAt: Date;
-  UpdatedAt: Date;
-  StartedAt: Date | null;
-  FinishedAt: Date | null;
-  OccurredAt: Date | null;
-  AcceptedAt: Date | null;
-  LastEventId: string;
-  ProjectionVersion: string;
-  WrittenAt: Date;
-}
-
-/**
- * A predicate on the table's own columns, spelled for the outer read (where
- * the columns are reached through the `t` alias, because the projection
- * shadows their names with epoch numbers) and for the inner max (where they
- * are bare).
- */
-type Narrowing = (column: (name: string) => string) => string;
-
-/**
- * The latest version of each run, by the IN-tuple pattern.
- *
- * `narrowings` narrow both the outer read and the inner max, so a list page
- * never dedups rows it is about to discard. Every timestamp is projected as
- * epoch milliseconds through the table alias, because the inner comparison
- * has to see the raw `WrittenAt` rather than a projected number.
- */
-function latestRowsQuery({
-  narrowings,
-}: {
-  narrowings: readonly Narrowing[];
-}): string {
-  const outer = narrowings
-    .map((narrowing) => `AND ${narrowing((name) => `t.${name}`)}`)
-    .join("\n      ");
-  const inner = narrowings
-    .map((narrowing) => `AND ${narrowing((name) => name)}`)
-    .join("\n          ");
-  return `
-    SELECT
-      t.TenantId AS TenantId,
-      t.RunId AS RunId,
-      t.Name AS Name,
-      t.Sql AS Sql,
-      t.Parameters AS Parameters,
-      t.Questions AS Questions,
-      t.Plan AS Plan,
-      t.RowLimit AS RowLimit,
-      t.Status AS Status,
-      t.Total AS Total,
-      t.Progress AS Progress,
-      t.Matched AS Matched,
-      t.MatchedByQuestion AS MatchedByQuestion,
-      t.Failed AS Failed,
-      t.Skipped AS Skipped,
-      t.Tokens AS Tokens,
-      t.CostUsd AS CostUsd,
-      t.PriceUsd AS PriceUsd,
-      t.Error AS Error,
-      toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
-      toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
-      toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
-      toUnixTimestamp64Milli(t.FinishedAt) AS FinishedAt,
-      toUnixTimestamp64Milli(t.OccurredAt) AS OccurredAt,
-      toUnixTimestamp64Milli(t.AcceptedAt) AS AcceptedAt,
-      t.LastEventId AS LastEventId,
-      t.ProjectionVersion AS ProjectionVersion
-    FROM ${TABLE_NAME} AS t
-    WHERE t.TenantId = {tenantId:String}
-      ${outer}
-      AND (t.TenantId, t.RunId, t.WrittenAt) IN (
-        SELECT TenantId, RunId, max(WrittenAt)
-        FROM ${TABLE_NAME}
-        WHERE TenantId = {tenantId:String}
-          ${inner}
-        GROUP BY TenantId, RunId
-      )
-  `;
-}
-
-const ms = (value: number | string | null): number | null =>
-  value === null ? null : Number(value);
-const dateOf = (value: number | string | null): Date | null => {
-  const at = ms(value);
-  return at === null ? null : new Date(at);
-};
-
-function parseJson<T>(text: string, fallback: T): T {
-  try {
-    return text ? (JSON.parse(text) as T) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function toRow(record: RunRecord): InstantEvalRunRow {
-  return {
-    id: record.RunId,
-    projectId: record.TenantId,
-    name: record.Name,
-    sql: record.Sql,
-    parameters: parseJson<Record<string, unknown>>(record.Parameters, {}),
-    questions: parseJson<unknown[]>(record.Questions, []),
-    plan: parseJson<unknown[]>(record.Plan, []),
-    rowLimit: Number(record.RowLimit),
-    status: record.Status as InstantEvalRunProjectedStatus,
-    total: ms(record.Total),
-    progress: Number(record.Progress),
-    matched: ms(record.Matched),
-    matchedByQuestion: parseJson<Record<string, number>>(
-      record.MatchedByQuestion,
-      {},
-    ),
-    failed: Number(record.Failed),
-    skipped: Number(record.Skipped),
-    tokens: Number(record.Tokens),
-    costUsd: Number(record.CostUsd),
-    priceUsd: Number(record.PriceUsd),
-    error: record.Error,
-    createdAt: new Date(Number(record.CreatedAt)),
-    updatedAt: new Date(Number(record.UpdatedAt)),
-    startedAt: dateOf(record.StartedAt),
-    finishedAt: dateOf(record.FinishedAt),
-    occurredAt: ms(record.OccurredAt),
-    acceptedAt: ms(record.AcceptedAt),
-    lastEventId: record.LastEventId || null,
-    projectionVersion: record.ProjectionVersion || null,
-  };
-}
-
-/** A row as it is written back, whole. */
-function toWriteRecord(
-  row: InstantEvalRunRow,
-  writtenAt: Date,
-): RunWriteRecord {
-  return {
-    TenantId: row.projectId,
-    RunId: row.id,
-    Name: row.name,
-    Sql: row.sql,
-    Parameters: JSON.stringify(row.parameters),
-    Questions: JSON.stringify(row.questions),
-    Plan: JSON.stringify(row.plan),
-    RowLimit: row.rowLimit,
-    Status: row.status,
-    Total: row.total,
-    Progress: row.progress,
-    Matched: row.matched,
-    MatchedByQuestion: JSON.stringify(row.matchedByQuestion),
-    Failed: row.failed,
-    Skipped: row.skipped,
-    Tokens: row.tokens,
-    CostUsd: row.costUsd,
-    PriceUsd: row.priceUsd,
-    Error: row.error,
-    CreatedAt: row.createdAt,
-    UpdatedAt: row.updatedAt,
-    StartedAt: row.startedAt,
-    FinishedAt: row.finishedAt,
-    OccurredAt: row.occurredAt === null ? null : new Date(row.occurredAt),
-    AcceptedAt: row.acceptedAt === null ? null : new Date(row.acceptedAt),
-    LastEventId: row.lastEventId ?? "",
-    ProjectionVersion: row.projectionVersion ?? "",
-    WrittenAt: writtenAt,
-  };
-}
-
 export interface ClickHouseInstantEvalRunRepositoryOptions {
   readonly resolveClient: ClickHouseClientResolver;
   /** Injected so a suite can pin the write clock. */
@@ -408,7 +184,7 @@ export class ClickHouseInstantEvalRunRepository
       query_params: { tenantId: projectId, runId },
       format: "JSONEachRow",
     });
-    const [record] = await result.json<RunRecord>();
+    const [record] = await result.json<InstantEvalRunRecord>();
     return record ? toRow(record) : null;
   }
 
@@ -422,7 +198,7 @@ export class ClickHouseInstantEvalRunRepository
     // a page that ended between them would, with `createdAt < before` alone,
     // skip every other run written in that same millisecond. The id breaks
     // the tie and is unique, so the order is total.
-    const narrowings: Narrowing[] = [];
+    const narrowings: InstantEvalRunNarrowing[] = [];
     if (before && beforeId) {
       narrowings.push(
         (column) =>
@@ -448,7 +224,7 @@ export class ClickHouseInstantEvalRunRepository
       },
       format: "JSONEachRow",
     });
-    return (await result.json<RunRecord>()).map(toRow);
+    return (await result.json<InstantEvalRunRecord>()).map(toRow);
   }
 
   async fail({
@@ -476,114 +252,10 @@ export class ClickHouseInstantEvalRunRepository
   async write(row: InstantEvalRunRow): Promise<void> {
     const client = await this.resolveClient(row.projectId);
     await client.insert({
-      table: TABLE_NAME,
-      values: [toWriteRecord(row, new Date(this.now()))],
+      table: INSTANT_EVAL_RUNS_TABLE,
+      values: [toWriteRecord({ row, writtenAt: new Date(this.now()) })],
       format: "JSONEachRow",
       clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
     });
   }
 }
-
-/**
- * The projection's half of the row.
- *
- * `load` answers null when the row has no checkpoint yet, which is the state
- * every accepted run starts in: the service wrote the definition and no event
- * has been folded, so the fold starts from `init()` rather than from counters
- * that were never applied to anything.
- */
-export class ClickHouseInstantEvalRunProjectionStore
-  implements StateProjectionStore<InstantEvalRunProjectionState>
-{
-  constructor(private readonly runs: ClickHouseInstantEvalRunRepository) {}
-
-  async load(
-    projectionKey: string,
-    context: ProjectionStoreContext,
-  ): Promise<StoredProjection<InstantEvalRunProjectionState> | null> {
-    const row = await this.runs.findById({
-      projectId: String(context.tenantId),
-      runId: projectionKey,
-    });
-    if (!row || row.lastEventId === null || row.acceptedAt === null) {
-      return null;
-    }
-    return {
-      state: stateFromRow(row),
-      cursor: { acceptedAt: row.acceptedAt, eventId: row.lastEventId },
-      occurredAt: row.occurredAt ?? row.createdAt.getTime(),
-      createdAt: row.createdAt.getTime(),
-      updatedAt: row.updatedAt.getTime(),
-      version: row.projectionVersion ?? INITIAL_PROJECTION_VERSION,
-    };
-  }
-
-  async store(
-    projection: StoredProjection<InstantEvalRunProjectionState>,
-    context: ProjectionStoreContext,
-  ): Promise<void> {
-    const projectId = String(context.tenantId);
-    const runId = context.key ?? context.aggregateId;
-    // The run id rides with the project id, so a key from another tenant's
-    // stream could never read, or overwrite, this project's row.
-    const current = await this.runs.findById({ projectId, runId });
-    if (!current) {
-      logger.warn(
-        { projectId, runId },
-        "Instant Eval run row is gone; its counters are not written",
-      );
-      return;
-    }
-    const { state } = projection;
-    await this.runs.write({
-      ...current,
-      status: state.status,
-      total: state.total,
-      progress: state.progress,
-      matched: state.matched,
-      matchedByQuestion: state.matchedByQuestion,
-      failed: state.failed,
-      skipped: state.skipped,
-      tokens: state.tokens,
-      costUsd: state.costUsd,
-      priceUsd: state.priceUsd,
-      error: state.error,
-      startedAt:
-        state.startedAtMs === null ? null : new Date(state.startedAtMs),
-      finishedAt:
-        state.finishedAtMs === null ? null : new Date(state.finishedAtMs),
-      // The envelope's timestamps, not the clock: a replay has to reproduce
-      // the same row rather than stamp it with whenever it was replayed. The
-      // version column is the one exception, and the repository owns it.
-      updatedAt: new Date(projection.updatedAt),
-      occurredAt: projection.occurredAt,
-      acceptedAt: projection.cursor.acceptedAt,
-      lastEventId: projection.cursor.eventId,
-      projectionVersion: projection.version,
-    });
-  }
-}
-
-/** The counters a row carries, read back as the projection's state. */
-function stateFromRow(row: InstantEvalRunRow): InstantEvalRunProjectionState {
-  return {
-    status: row.status,
-    total: row.total,
-    progress: row.progress,
-    matched: row.matched,
-    matchedByQuestion: row.matchedByQuestion,
-    failed: row.failed,
-    skipped: row.skipped,
-    tokens: row.tokens,
-    costUsd: row.costUsd,
-    priceUsd: row.priceUsd,
-    error: row.error,
-    startedAtMs: row.startedAt?.getTime() ?? null,
-    finishedAtMs: row.finishedAt?.getTime() ?? null,
-  };
-}
-
-/** What a row with no recorded version is read as. */
-const INITIAL_PROJECTION_VERSION = "2026-09-18";
-
-export { stateFromRow };
