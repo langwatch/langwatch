@@ -139,7 +139,24 @@ function loadRules(which, only, skip) {
 // file. Findings the judge locates on one are reported but never fail the run
 // (landing-page-writing rule 13); regex bans still apply to them.
 const FOUNDER_MARK = /\s*\[founder\]\s*$/;
-const isFounder = (sentence) => typeof sentence === "string" && FOUNDER_MARK.test(sentence);
+const isFounder = (sentence) => typeof sentence === "string" && FOUNDER_MARK.test(sentence.trim());
+
+// The mark sits at the end of the line the founder supplied, so every sentence
+// of that line is his, not only the one carrying the mark. Other lines of the
+// same block (the earlier items of a list, the line above in a paragraph) are
+// not covered by it.
+function founderUnitsIn(paragraphs) {
+  const units = new Set();
+  for (const p of paragraphs) {
+    const marked = p.text
+      .split("\n")
+      .filter(isFounder)
+      .map((l) => l.replace(/\s+/g, " ").trim());
+    if (marked.length === 0) continue;
+    for (const u of p.units) if (isFounder(u) || marked.some((l) => l.includes(u))) units.add(u);
+  }
+  return units;
+}
 
 // ---------- document parsing ----------
 
@@ -465,9 +482,9 @@ async function judgeSection(key, rules, section, doc, opts, usage) {
 
 async function locateSentences(key, findings, section, doc, opts, usage) {
   const fired = findings.filter((f) => f.rule.kind === "judge" && f.probability >= opts.locate);
-  const sentences = section.paragraphs.filter((p) => p.kind !== "code" && p.kind !== "tag").flatMap((p) => p.units);
-  // Every sentence of a paragraph the founder supplied is his, not only the one carrying the mark.
-  const founderUnits = new Set(section.paragraphs.filter((p) => isFounder(p.text)).flatMap((p) => p.units));
+  const prose = section.paragraphs.filter((p) => p.kind !== "code" && p.kind !== "tag");
+  const sentences = prose.flatMap((p) => p.units);
+  const founderUnits = founderUnitsIn(prose);
   const markFounder = (f) => {
     f.founder = isFounder(f.sentence) || founderUnits.has(f.sentence);
   };
@@ -476,8 +493,11 @@ async function locateSentences(key, findings, section, doc, opts, usage) {
     // rules about the heading or the opener need no second request
     if (f.rule.locate === "heading") f.sentence = section.heading ? `${"#".repeat(section.level)} ${section.heading}` : sentences[0];
     else if (f.rule.locate === "first-sentence") f.sentence = sentences[0];
-    else targets.push(f);
-    if (!targets.includes(f)) markFounder(f);
+    else {
+      targets.push(f);
+      continue;
+    }
+    markFounder(f);
   }
   if (targets.length === 0) return;
   const uniq = [...new Set(sentences)].slice(0, MAX_CHOICE_OPTIONS);
@@ -587,7 +607,7 @@ function printReport(rep, opts) {
     if (s.error) lines.push(`  error: ${s.error}`);
     if (s.findings.length === 0) lines.push("  clean");
     for (const f of s.findings) {
-      const flag = f.probability >= opts.threshold ? (f.founder ? "f" : "!") : " ";
+      const flag = f.founder ? "f" : f.probability >= opts.threshold ? "!" : " ";
       const extra = f.count && f.count > 1 ? `  (${f.count} hits)` : "";
       lines.push(`${flag} ${f.probability.toFixed(2)}  ${f.rule}  ${f.name}${extra}`);
       if (f.sentence) lines.push(`        > ${f.sentence}`);
