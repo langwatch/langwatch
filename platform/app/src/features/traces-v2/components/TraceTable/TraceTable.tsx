@@ -2,6 +2,7 @@ import { Button } from "@chakra-ui/react";
 import type React from "react";
 import { HandledErrorState, readHandledError } from "~/features/errors";
 import { requoteBareTerms } from "~/server/app-layer/traces/query-language/mutations";
+import { useExplorerCounts } from "../../hooks/useExplorerCounts";
 import {
   SESSIONS_MAX_PAGE_SIZE,
   type SessionGroupsResult,
@@ -23,7 +24,8 @@ import { TraceTableLayout } from "./TraceTableLayout";
 /**
  * What the table shell (totals copy, pagination, empty state) reads, from
  * whichever data source the active lens paginates: the sessions lens walks
- * its own server-grouped rows, every other lens walks the traces.
+ * its own server-grouped rows, every other lens walks the traces. The total
+ * is `useExplorerCounts`'s, the read every count on the page shares.
  */
 interface TableShell {
   totalHits: number;
@@ -44,8 +46,14 @@ interface TableShell {
   maxPageSize?: number;
 }
 
-const sessionsShell = (sessions: SessionGroupsResult): TableShell => ({
-  totalHits: sessions.totalHits,
+const sessionsShell = ({
+  sessions,
+  totalHits,
+}: {
+  sessions: SessionGroupsResult;
+  totalHits: number;
+}): TableShell => ({
+  totalHits,
   nextCursor: sessions.nextCursor,
   visibleCount: sessions.groups.length,
   isLoading: sessions.isLoading,
@@ -118,7 +126,6 @@ const SearchAsOnePhraseAction: React.FC = () => {
 export const TraceTable: React.FC = () => {
   const {
     data: traces,
-    totalHits,
     nextCursor,
     isLoading,
     isFetching,
@@ -131,6 +138,7 @@ export const TraceTable: React.FC = () => {
   // (specs/traces-v2/sessions-lens.feature). The hook only queries while the
   // by-conversation grouping is active.
   const sessions = useSessionGroups();
+  const { totalHits } = useExplorerCounts();
   const activeLens = useViewStore(getEffectiveLens);
 
   if (!activeLens) return <EmptyFilterState />;
@@ -138,7 +146,7 @@ export const TraceTable: React.FC = () => {
   const rowKind = rowKindForGrouping(activeLens.grouping);
   const shell =
     rowKind === "conversation"
-      ? sessionsShell(sessions)
+      ? sessionsShell({ sessions, totalHits })
       : tracesShell({
           totalHits,
           nextCursor,
@@ -155,13 +163,11 @@ export const TraceTable: React.FC = () => {
 
   return (
     <TraceTableLayout
-      totalHits={shell.totalHits}
       nextCursor={shell.nextCursor}
       visibleCount={shell.visibleCount}
       isLoading={shell.isLoading}
       isTransitioning={shell.isTransitioning}
       isEmpty={shell.visibleCount === 0}
-      itemNoun={shell.itemNoun}
       maxPageSize={shell.maxPageSize}
     >
       {rowKind === "conversation" && (

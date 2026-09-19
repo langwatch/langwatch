@@ -108,9 +108,11 @@ export function useTraceListRefresh(): UseTraceListRefreshResult {
     // race the fresh one and overwrite the view with stale data.
     void trpcUtils.tracesV2.list.cancel();
     void trpcUtils.tracesV2.discover.cancel();
+    void trpcUtils.tracesV2.facets.cancel();
     void trpcUtils.tracesV2.newCount.cancel();
     void trpcUtils.tracesV2.list.invalidate();
     void trpcUtils.tracesV2.discover.invalidate();
+    void trpcUtils.tracesV2.facets.invalidate();
     void trpcUtils.tracesV2.newCount.invalidate();
   }, [trpcUtils, requestRefresh]);
 

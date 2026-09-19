@@ -1,6 +1,7 @@
 import type React from "react";
 import { Pagination as PaginationBar } from "~/components/ui/Pagination";
 import { TRACE_LIST_MAX_OFFSET_ROWS } from "~/shared/traces/listWindow";
+import { useExplorerCounts } from "../../hooks/useExplorerCounts";
 import type { PageCursor } from "../../stores/filterStore";
 import { useFilterStore } from "../../stores/filterStore";
 import { useViewStore } from "../../stores/viewStore";
@@ -9,12 +10,9 @@ import { useTraceTableScrollElement } from "./scrollContext";
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 250, 500, 1000] as const;
 
 interface PaginationProps {
-  totalHits: number;
   /** Cursor returned by the current batch; null means the end. */
   nextCursor?: PageCursor | null;
   visibleCount?: number;
-  /** What one row is, for the totals copy: "traces" (default) or "conversations". */
-  itemNoun?: string;
   /**
    * Renders a placeholder bar in place of the page description while data is
    * loading, so the pagination row doesn't pop in when the first page
@@ -58,7 +56,9 @@ function reachableWithCursorsOnly({
 
 /**
  * Store-driven pagination for the trace table: translates the filter store's
- * page state into the shared bar's props, one translation per lens.
+ * page state into the shared bar's props, one translation per lens. The total
+ * and its noun come from `useExplorerCounts`, the read every count on the
+ * page shares.
  *
  * The flat lens's endpoint falls back to an offset read when no cursor is
  * passed, so every page number is jumpable; the cursor is still used for the
@@ -67,14 +67,13 @@ function reachableWithCursorsOnly({
  * offers only the pages a cursor can reach.
  */
 export const Pagination: React.FC<PaginationProps> = ({
-  totalHits,
   nextCursor = null,
   visibleCount = 0,
-  itemNoun = "traces",
   isLoading = false,
   isTransitioning = false,
   maxPageSize,
 }) => {
+  const { totalHits, itemNoun } = useExplorerCounts();
   const page = useFilterStore((s) => s.page);
   const pageSize = useFilterStore((s) => s.pageSize);
   const pageCursors = useFilterStore((s) => s.pageCursors);

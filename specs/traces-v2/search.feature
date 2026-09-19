@@ -1006,23 +1006,85 @@ Rule: Two-way sync edge cases
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Facet count updates
-  Facet counts reflect the currently filtered dataset.
+  Facet counts reflect the currently filtered dataset: the active query, the
+  exact time window the table reads, and the same hidden origins. Each facet
+  is counted with its own field left out of the query, so it keeps listing
+  its other values and each value's count is what the table would show with
+  that value selected.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And the project has traces
 
+  @integration
   Scenario: Facet counts update when a filter is applied
     When the user checks "Error" under Status
     Then the count badges on all other facets update to reflect the filtered dataset
 
+  @integration
   Scenario: Facet counts show how many results another filter would yield
     Given the user has "Error" checked under Status
     Then the Model facet counts show how many error traces each model has
+    And the Status facet still lists "Ok" with its own count, because the facet's own field is left out
 
+  @unit
   Scenario: Facet counts are fetched in a single batched query
     When the user applies a filter
     Then all facet counts are fetched in one query, not one per facet
+
+  @integration
+  Scenario: A facet value's count equals the table count after selecting it
+    Given the user has "Error" checked under Status
+    And the Service facet shows "api" with a count
+    When the user checks "api" under Service
+    Then the table's total is that count
+
+  @integration
+  Scenario: Facets show nothing under a query the table answers with zero traces
+    Given the user applied a query that matches no trace
+    Then the table shows no traces
+    And no facet the query does not name shows a nonzero count
+
+  @integration
+  Scenario: Facet counts leave out the hidden origin and the traces outside the window
+    Given the project has a trace from Langy's own origin in the window
+    And a trace outside the selected window
+    Then neither trace is counted in any facet but Origin
+    And the Origin facet still offers Langy with its count
+    And the counts read the window the table reads, never a rounded one
+
+  @integration
+  Scenario: Facet counts are cached only per query and window
+    When the user changes the query or the time window
+    Then the counts are requested again for the new input
+    And a count kept for a previous input is never shown as the current one
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# NUMBERS THAT AGREE
+# ─────────────────────────────────────────────────────────────────────────────
+
+Rule: Numbers that agree
+  Every count on the Explorer reads the total the list already returned for
+  the active filter and window, so no two surfaces can disagree.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the project has traces
+
+  @integration
+  Scenario: The header, the pagination line and the sidebar total show one number
+    Given the list read answered a total for the active filter
+    Then the selection header, the pagination line and the sidebar total all show that number
+    And on the Conversations lens the number is the sessions read's total, named in conversations
+
+  @integration
+  Scenario: Counts next to values are hidden until the filtered counts land
+    Given the sidebar renders from the previous session's facet shape
+    And the filtered counts for the active query have not arrived
+    Then each facet value shows its name and no count
+    When the filtered counts arrive
+    Then each facet value shows its count for the active query
 
 
 # ─────────────────────────────────────────────────────────────────────────────

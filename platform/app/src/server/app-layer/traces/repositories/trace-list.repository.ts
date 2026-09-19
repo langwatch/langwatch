@@ -45,10 +45,6 @@ export interface TraceListPage {
   totalHits: number;
 }
 
-export interface FacetCountResult {
-  values: Record<string, number>;
-}
-
 /**
  * Optional per-value aggregates the evaluator facet attaches alongside
  * its row counts so the sidebar drilldown can render verdict pills and
@@ -120,20 +116,6 @@ export interface BatchedFacetResult {
 export interface TraceListRepository {
   findAll(query: TraceListQuery): Promise<TraceListPage>;
 
-  findFacetCounts(params: {
-    tenantId: string;
-    timeRange: { from: number; to: number; live?: boolean };
-    facetExpression: string;
-    filterWhere?: { sql: string; params: Record<string, unknown> };
-  }): Promise<FacetCountResult>;
-
-  findRangeStats(params: {
-    tenantId: string;
-    timeRange: { from: number; to: number; live?: boolean };
-    column: string;
-    filterWhere?: { sql: string; params: Record<string, unknown> };
-  }): Promise<{ min: number; max: number }>;
-
   findCount(params: {
     tenantId: string;
     timeRange: { from: number; to: number; live?: boolean };
@@ -148,15 +130,21 @@ export interface TraceListRepository {
     limit: number;
   }): Promise<string[]>;
 
+  /**
+   * `filterWhere` on the facet reads below is the active trace filter, which
+   * every read scopes to its own table through `scopeTraceFilterToTable` and
+   * applies after the version dedup. Absent for the unfiltered discover read.
+   */
   findCategoricalFacet(params: {
     tenantId: string;
     timeRange: { from: number; to: number; live?: boolean };
-    table: string;
+    table: FacetTableName;
     timeColumn: string;
     facetExpression: string;
     limit: number;
     offset: number;
     prefix?: string;
+    filterWhere?: { sql: string; params: Record<string, unknown> };
   }): Promise<CategoricalFacetResult>;
 
   findCategoricalFacetRaw(params: {
@@ -167,9 +155,10 @@ export interface TraceListRepository {
   findRangeStatsForTable(params: {
     tenantId: string;
     timeRange: { from: number; to: number; live?: boolean };
-    table: string;
+    table: FacetTableName;
     timeColumn: string;
     column: string;
+    filterWhere?: { sql: string; params: Record<string, unknown> };
   }): Promise<{ min: number; max: number }>;
 
   /**
@@ -185,6 +174,7 @@ export interface TraceListRepository {
     timeColumn: string;
     column: string;
     limit: number;
+    filterWhere?: { sql: string; params: Record<string, unknown> };
   }): Promise<DiscreteFacetResult>;
 
   /**
@@ -200,6 +190,7 @@ export interface TraceListRepository {
     categoricalSpecs: { key: string; expression: string }[];
     rangeSpecs: { key: string; expression: string }[];
     topN: number;
+    filterWhere?: { sql: string; params: Record<string, unknown> };
   }): Promise<BatchedFacetResult>;
 
   /**
@@ -249,12 +240,6 @@ export interface TraceListRepository {
 export class NullTraceListRepository implements TraceListRepository {
   async findAll(): Promise<TraceListPage> {
     return { rows: [], totalHits: 0 };
-  }
-  async findFacetCounts(): Promise<FacetCountResult> {
-    return { values: {} };
-  }
-  async findRangeStats(): Promise<{ min: number; max: number }> {
-    return { min: 0, max: 0 };
   }
   async findCount(): Promise<number> {
     return 0;

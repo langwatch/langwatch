@@ -42,6 +42,7 @@ import { useDrawerStore } from "../../stores/drawerStore";
 import { useFilterStore } from "../../stores/filterStore";
 import { useUIStore } from "../../stores/uiStore";
 import { useViewStore } from "../../stores/viewStore";
+import { ExplorerTotal } from "./ExplorerTotal";
 import { FacetManagerPopover } from "./FacetManagerPopover";
 import { FilterSidebarSkeleton } from "./FilterSidebarSkeleton";
 import { HoverHighlightStyle } from "./HoverHighlightStyle";
@@ -390,25 +391,31 @@ export const FilterSidebar: React.FC = () => {
         align="center"
         justify="space-between"
       >
-        <Tooltip
-          positioning={{ placement: "bottom" }}
-          content={
-            <HStack gap={1.5}>
-              <Text>Hide filters sidebar</Text>
-              <Kbd>{"["}</Kbd>
-            </HStack>
-          }
-        >
-          <IconButton
-            aria-label="Hide filters sidebar"
-            size="2xs"
-            variant="ghost"
-            color="fg.subtle"
-            onClick={toggleSidebar}
+        <HStack gap={1.5} align="center" minWidth={0}>
+          <Tooltip
+            positioning={{ placement: "bottom" }}
+            content={
+              <HStack gap={1.5}>
+                <Text>Hide filters sidebar</Text>
+                <Kbd>{"["}</Kbd>
+              </HStack>
+            }
           >
-            <PanelLeftClose size={14} />
-          </IconButton>
-        </Tooltip>
+            <IconButton
+              aria-label="Hide filters sidebar"
+              size="2xs"
+              variant="ghost"
+              color="fg.subtle"
+              onClick={toggleSidebar}
+            >
+              <PanelLeftClose size={14} />
+            </IconButton>
+          </Tooltip>
+          {/* The same number the pagination line and the selection header
+              show, from the same read (`useExplorerCounts`), so the sidebar
+              can never claim more or fewer rows than the table. */}
+          <ExplorerTotal />
+        </HStack>
         <HStack gap={1} align="center">
           {/* Clear-all and Reset-to-lens only mount while there's something
               to act on (active filters / a local draft). Both carry a soft

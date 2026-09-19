@@ -46,6 +46,29 @@ vi.mock("../../../hooks/useSessionGroups", () => ({
   SESSIONS_MAX_PAGE_SIZE: 100,
 }));
 
+// The page-wide count read, answering from whichever source the active lens
+// paginates, the way the real selector does.
+vi.mock("../../../hooks/useExplorerCounts", () => ({
+  useExplorerCounts: () =>
+    mockGrouping === "by-conversation"
+      ? {
+          totalHits: mockSessionGroupsResult.totalHits,
+          itemNoun: "conversations",
+          pageTraceIds: [],
+          isLoading: mockSessionGroupsResult.isLoading,
+          isFetching: mockSessionGroupsResult.isFetching,
+          isPlaceholderData: mockSessionGroupsResult.isPlaceholderData,
+        }
+      : {
+          totalHits: mockTraceListResult.totalHits,
+          itemNoun: "traces",
+          pageTraceIds: mockTraceListResult.data.map((t) => t.traceId),
+          isLoading: mockTraceListResult.isLoading,
+          isFetching: mockTraceListResult.isFetching,
+          isPlaceholderData: mockTraceListResult.isPlaceholderData,
+        },
+}));
+
 // ─── viewStore mock — returns activeLens so TraceTable doesn't bail early ────
 
 // Which lens the table renders. The flat grouping walks the trace list, the

@@ -9,6 +9,7 @@ import { AnimatePresence, motion } from "motion/react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTracesV2Presence } from "~/features/presence/hooks/useTracesV2Presence";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useExplorerCounts } from "../../hooks/useExplorerCounts";
 import { useFirstTraceWatch } from "../../hooks/useFirstTraceWatch";
 import { useLensFilterDirtySync } from "../../hooks/useLensFilterDirtySync";
 import { useLensSync } from "../../hooks/useLensSync";
@@ -402,8 +403,10 @@ const FilterAside: React.FC<{
 FilterAside.displayName = "FilterAside";
 
 const ResultsPane: React.FC = React.memo(() => {
-  const { data, totalHits } = useTraceListQuery();
-  const pageTraceIds = useMemo(() => data.map((t) => t.traceId), [data]);
+  const { data } = useTraceListQuery();
+  // The selection header's count is the same read the pagination line and
+  // the sidebar total show.
+  const { totalHits, pageTraceIds } = useExplorerCounts();
   // Name lookup for the "Add to context" action, so a trace lands in Langy as
   // its name rather than a raw id.
   const traceNamesById = useMemo(

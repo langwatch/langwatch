@@ -1268,6 +1268,14 @@ export const tracesV2Router = createTRPCRouter({
         }),
     ),
 
+  /**
+   * The sidebar's counts for the active query and the exact window the list
+   * reads (specs/traces-v2/search.feature, "Facet count updates"). The
+   * service compiles the query once per facet whose field it names, so a
+   * facet keeps its other values while the rest of the query applies; the
+   * hidden-origins rule is the list's. Nothing is cached server side: a count
+   * shown next to a value has to answer the same predicate as the table.
+   */
   facets: protectedProcedure
     .input(
       z.object({
@@ -1282,7 +1290,7 @@ export const tracesV2Router = createTRPCRouter({
       return app.traces.list.getFacets({
         tenantId: input.projectId,
         timeRange: input.timeRange,
-        filterWhere: buildFilterWhere(input),
+        query: input.query,
         hiddenOrigins: explorerHiddenOrigins(input.query),
       });
     }),

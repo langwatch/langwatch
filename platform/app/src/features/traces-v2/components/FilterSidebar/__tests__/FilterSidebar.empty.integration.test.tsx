@@ -38,6 +38,23 @@ vi.mock("../../../hooks/useTraceFacets", () => ({
   }),
 }));
 
+vi.mock("../../../hooks/useFilteredTraceFacets", () => ({
+  useFilteredTraceFacets: () => ({
+    data: undefined,
+    isPlaceholderData: false,
+    isFetching: false,
+    isError: false,
+  }),
+}));
+
+vi.mock("../../../onboarding/hooks/usePreviewTracesActive", () => ({
+  usePreviewTracesActive: () => false,
+}));
+
+vi.mock("../ExplorerTotal", () => ({
+  ExplorerTotal: () => null,
+}));
+
 vi.mock("../../../stores/uiStore", () => ({
   useUIStore: (selector: (s: unknown) => unknown) =>
     selector({
