@@ -67,11 +67,14 @@ let virtualKeys: { status: string }[] | undefined = [];
 let ingestionSources: { id: string }[] | undefined = [];
 let personalKeys: { id: string }[] | undefined = [];
 let personalRequests: number | undefined = 0;
-function queryOf(data: () => unknown) {
+/** The reads whose last refetch failed; the cache still holds their data. */
+let failedReads: string[] = [];
+function queryOf(name: string, data: () => unknown) {
   return {
     useQuery: (_input: unknown, opts: { enabled: boolean }) => ({
       data: opts.enabled ? data() : undefined,
       isLoading: false,
+      isError: opts.enabled && failedReads.includes(name),
     }),
   };
 }
@@ -94,11 +97,13 @@ vi.mock("~/utils/api", () => ({
       beginPath: { useMutation: () => ({ mutateAsync: beginPathMutateAsync }) },
       recordTour: { useMutation: () => ({ mutate: recordTourMutate }) },
     },
-    virtualKeys: { list: queryOf(() => virtualKeys) },
-    ingestionSources: { list: queryOf(() => ingestionSources) },
-    personalVirtualKeys: { list: queryOf(() => personalKeys) },
+    virtualKeys: { list: queryOf("virtualKeys", () => virtualKeys) },
+    ingestionSources: {
+      list: queryOf("ingestionSources", () => ingestionSources),
+    },
+    personalVirtualKeys: { list: queryOf("personalKeys", () => personalKeys) },
     user: {
-      personalUsage: queryOf(() =>
+      personalUsage: queryOf("personalUsage", () =>
         personalRequests === undefined
           ? undefined
           : { summary: { requests: personalRequests } },
@@ -142,6 +147,7 @@ describe("GuidedOnboardingOffer", () => {
     ingestionSources = [];
     personalKeys = [];
     personalRequests = 0;
+    failedReads = [];
     isNewProject = true;
     guidedState = { variant: "guided", paths: [], donePaths: [] };
     beginPathMutateAsync.mockReset();
@@ -301,6 +307,30 @@ describe("GuidedOnboardingOffer", () => {
       personalRequests = undefined;
       renderOffer("me");
       expect(pill()).toBeNull();
+    });
+
+    /** @scenario a read that failed is not read as an empty space */
+    it("shows no pill when a read failed over an empty list still in the cache", () => {
+      for (const [space, read] of [
+        ["gateway", "virtualKeys"],
+        ["governance", "ingestionSources"],
+        ["me", "personalKeys"],
+        ["me", "personalUsage"],
+      ] as const) {
+        failedReads = [read];
+        renderOffer(space);
+        expect(pill(), `${space} with ${read} failed`).toBeNull();
+        cleanup();
+      }
+    });
+
+    /** @scenario a read that failed is not read as an empty space */
+    it("still shows the pill on the same empty lists once the reads succeed", () => {
+      for (const space of ["gateway", "governance", "me"] as const) {
+        renderOffer(space);
+        expect(pill(), space).not.toBeNull();
+        cleanup();
+      }
     });
   });
 

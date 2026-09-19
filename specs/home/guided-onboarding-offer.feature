@@ -103,6 +103,15 @@ Feature: Guided onboarding offer on the home pages
     When the gateway home renders
     Then there is no pill
 
+  # A failed refetch keeps the last list in the cache, and that list may be
+  # the empty one from before the space was used.
+  @unit
+  Scenario: a read that failed is not read as an empty space
+    Given the gateway's virtual keys failed to load over an empty list still in the cache
+    When the gateway home renders
+    Then there is no pill
+    And the same holds for governance's sources and for the personal home's keys and usage
+
   @unit
   Scenario: an organization outside the guided variant is never offered it on the gateway, governance or personal pages
     Given the organization went through the classic onboarding, or predates the experiment

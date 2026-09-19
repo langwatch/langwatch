@@ -11,7 +11,9 @@
  *
  * Null while the answer is unknown (loading, failed, or a read the member
  * may not make), and the offer stays hidden then: a space in use must never
- * flash the pill.
+ * flash the pill. A read that failed is unknown even with an earlier answer
+ * still in the cache, since the cache keeps the last list through a failed
+ * refetch and that list may be the empty one from before the space was used.
  *
  * @see specs/home/guided-onboarding-offer.feature
  */
@@ -62,19 +64,28 @@ export function useSpaceInUse({
     case "project":
       return false;
     case "gateway":
-      return hasAny(virtualKeys.data);
+      return hasAny(virtualKeys);
     case "governance":
-      return canReadSources ? hasAny(sources.data) : null;
+      return canReadSources ? hasAny(sources) : null;
     case "me":
-      return personalSpaceInUse({
-        personalKeys: personalKeys.data,
-        requests: personalUsage.data?.summary.requests,
-      });
+      return personalSpaceInUse({ personalKeys, personalUsage });
   }
 }
 
-/** Whether a loaded list has any entry; null while it is not loaded. */
-function hasAny(list: readonly unknown[] | undefined): boolean | null {
+/** What a read has to say for itself: its data, and whether it failed. */
+interface SpaceRead<T> {
+  data: T | undefined;
+  isError: boolean;
+}
+
+/** What a read answered, or undefined while it is loading or after it failed. */
+function settled<T>(read: SpaceRead<T>): T | undefined {
+  return read.isError ? undefined : read.data;
+}
+
+/** Whether a list that was read has any entry; null while it is unknown. */
+function hasAny(read: SpaceRead<readonly unknown[]>): boolean | null {
+  const list = settled(read);
   return list ? list.length > 0 : null;
 }
 
@@ -84,12 +95,13 @@ function hasAny(list: readonly unknown[] | undefined): boolean | null {
  */
 function personalSpaceInUse({
   personalKeys,
-  requests,
+  personalUsage,
 }: {
-  personalKeys: readonly unknown[] | undefined;
-  requests: number | undefined;
+  personalKeys: SpaceRead<readonly unknown[]>;
+  personalUsage: SpaceRead<{ summary: { requests: number } }>;
 }): boolean | null {
-  if (hasAny(personalKeys)) return true;
-  if (!personalKeys || requests === undefined) return null;
-  return requests > 0;
+  const hasKey = hasAny(personalKeys);
+  if (hasKey !== false) return hasKey;
+  const requests = settled(personalUsage)?.summary.requests;
+  return requests === undefined ? null : requests > 0;
 }
