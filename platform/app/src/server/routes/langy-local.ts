@@ -27,7 +27,6 @@ import {
   LangyApiCredentialMissingError,
   LangyApiIdentityDeniedError,
   LangyApiRequestInvalidError,
-  LangyConversationNotFoundError,
 } from "~/server/app-layer/langy/errors";
 import { resolveLangyKeyIdentity } from "~/server/app-layer/langy/langyApiKeyIdentity";
 import { prisma } from "~/server/db";
@@ -44,6 +43,7 @@ import {
   workspaceStatusSchema,
 } from "~/server/langy-local-control/http";
 import { openControlRequest } from "~/server/langy-local-control/open-control-request";
+import { requireOwnConversation } from "~/server/langy-local-control/own-conversation";
 import { getLocalControlRuntime } from "~/server/langy-local-control/runtime";
 import { reconcileSkipPolicy } from "~/server/langy-local-control/skip-policy";
 import { bodyLimit } from "./_lib/body-limit";
@@ -110,28 +110,13 @@ async function authorize(c: Context) {
 }
 
 /**
- * The conversation the caller named, proved against the key.
- *
- * A conversation the key's user cannot see dies as not-found rather than as a
- * refusal, so a foreign id never confirms that it exists.
+ * The conversation the caller named, proved against the key: it has to be the
+ * key's own person's conversation. Every route here reads or drives a folder
+ * on that person's machine, and a worker only ever runs a turn for the owner,
+ * so a key that names a teammate's shared conversation gets the same
+ * not-found a foreign id gets.
  */
-async function requireConversation({
-  conversationId,
-  projectId,
-  userId,
-}: {
-  conversationId: string;
-  projectId: string;
-  userId: string;
-}) {
-  const conversation = await getApp().langy.conversations.findByIdVisible({
-    id: conversationId,
-    projectId,
-    userId,
-  });
-  if (!conversation) throw new LangyConversationNotFoundError(conversationId);
-  return conversation;
-}
+const requireConversation = requireOwnConversation;
 
 async function parseBody<T extends z.ZodTypeAny>(
   c: Context,

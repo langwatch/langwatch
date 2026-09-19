@@ -89,13 +89,16 @@ let latestRequest: {
   approved: boolean;
 } | null;
 
+/** Whether the caller owns the conversation, or reads one a teammate shared. */
+let isOwnConversation: boolean;
+
 function conversationRow(id: string) {
   return {
     id,
     title: "Instrument tracing",
     currentTurnId: null,
     lastModel,
-    isOwn: true,
+    isOwn: isOwnConversation,
   };
 }
 
@@ -208,6 +211,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   commands = [];
   latestRequest = null;
+  isOwnConversation = true;
   lastModel = "anthropic/claude-fable-5-1";
   skipDecision.current = {
     allowed: false,
@@ -581,6 +585,74 @@ describe("given a folder shared with the conversation", () => {
           conversationId: otherConversationId,
         }),
       ).toMatchObject({ connected: false, workspace: null });
+    });
+  });
+});
+
+describe("given a teammate's shared conversation with its folder connected", () => {
+  const notFound = { message: expect.stringMatching(/not found/i) };
+
+  beforeEach(async () => {
+    await shareFolder();
+    const runtime = getLocalControlRuntime();
+    for (const open of await runtime.requests.listOpen({ userId })) {
+      await runtime.requests.cancel({ requestId: open.id, userId });
+    }
+  });
+
+  describe("when the reader acts on the folder", () => {
+    /** @scenario "A teammate reading a shared conversation cannot act on its folder" */
+    it("answers not found and leaves the card, the policy, the folder and the requests alone", async () => {
+      const { waitId } = await permissionCard();
+      skipDecision.current = {
+        allowed: true,
+        provider: "anthropic",
+        modelId: "claude-fable-5-1",
+      };
+      isOwnConversation = false;
+
+      await expect(
+        caller().answerLocalPermission({
+          projectId,
+          conversationId,
+          waitId,
+          decision: "allow_once",
+        }),
+      ).rejects.toMatchObject(notFound);
+      await expect(
+        caller().setLocalPolicy({
+          projectId,
+          conversationId,
+          skipPermissions: true,
+        }),
+      ).rejects.toMatchObject(notFound);
+      await expect(
+        caller().disconnectLocalWorkspace({ projectId, conversationId }),
+      ).rejects.toMatchObject(notFound);
+      await expect(
+        caller().renewLocalControlRequest({ projectId, conversationId }),
+      ).rejects.toMatchObject(notFound);
+
+      const runtime = getLocalControlRuntime();
+      expect((await runtime.waits.read(waitId))?.state).toBe("pending");
+      expect(await runtime.presence.read(conversationId)).toMatchObject({
+        workspace: { name: "acme-app" },
+      });
+      expect(await runtime.requests.listOpen({ userId })).toEqual([]);
+      expect(
+        commands.filter((command) => command.name !== "user_wait_started"),
+      ).toEqual([]);
+    });
+  });
+
+  describe("when the reader opens the conversation", () => {
+    /** @scenario "A teammate reading a shared conversation still sees its folder state" */
+    it("reads the folder as connected", async () => {
+      isOwnConversation = false;
+
+      expect(
+        await caller().getLocalWorkspace({ projectId, conversationId }),
+      ).toMatchObject({ connected: true });
     });
   });
 });

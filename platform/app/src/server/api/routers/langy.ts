@@ -41,6 +41,10 @@ import {
 } from "~/server/langy-local-control/errors";
 import { workspaceChannel } from "~/server/langy-local-control/keys";
 import { openControlRequest } from "~/server/langy-local-control/open-control-request";
+import {
+  requireOwnConversation,
+  requireVisibleConversation,
+} from "~/server/langy-local-control/own-conversation";
 import { controlRequestState } from "~/server/langy-local-control/request-state";
 import { getLocalControlRuntime } from "~/server/langy-local-control/runtime";
 import { reconcileSkipPolicy } from "~/server/langy-local-control/skip-policy";
@@ -259,30 +263,6 @@ async function canWatchTurn({
 }
 
 /** The claim/complete side of the UI-action channel, on the shared app deps. */
-/**
- * The conversation, when it is this caller's to act on.
- *
- * A conversation the caller cannot see dies as not-found rather than as a
- * refusal, exactly like every other Langy read, so an id never confirms that
- * it exists.
- */
-async function requireOwnConversation({
-  projectId,
-  conversationId,
-  userId,
-}: {
-  projectId: string;
-  conversationId: string;
-  userId: string;
-}): Promise<ConversationDetail> {
-  const conversation = await getApp().langy.conversations.findByIdVisible({
-    id: conversationId,
-    projectId,
-    userId,
-  });
-  if (!conversation) throw new LangyConversationNotFoundError(conversationId);
-  return conversation;
-}
 
 /**
  * What became of the conversation's latest request to share a folder. The
@@ -1140,7 +1120,7 @@ export const langyRouter = createTRPCRouter({
   getLocalWorkspace: langyReadProcedure
     .input(z.object({ conversationId: z.string() }))
     .query(async ({ input, ctx }) => {
-      const conversation = await requireOwnConversation({
+      const conversation = await requireVisibleConversation({
         projectId: input.projectId,
         conversationId: input.conversationId,
         userId: ctx.session.user.id,
