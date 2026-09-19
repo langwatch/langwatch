@@ -36,6 +36,7 @@ const TOKENS_PER_MILLION = 1_000_000;
  */
 const NANO_USD_PER_USD = 1_000_000_000;
 
+/** The amount at the ledger's precision, nine decimals. */
 function toNanoUsdPrecision(usd: number): number {
   return Math.round(usd * NANO_USD_PER_USD) / NANO_USD_PER_USD;
 }

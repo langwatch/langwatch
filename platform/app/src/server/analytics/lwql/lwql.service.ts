@@ -1161,13 +1161,13 @@ function appFunctionDiagnosticsInput({
   };
 }
 
-/** One line per executed statement, with what the caller actually received. */
 /** What the hydration stage spent, in wall-clock milliseconds, or nothing. */
 function hydrationMs(timings: LangWatchQLHydrationResult["timings"]): number {
   if (!timings) return 0;
   return timings.readMs + timings.computeMs + timings.judgeMs;
 }
 
+/** One line per executed statement, with what the caller actually received. */
 function logExecuted({
   projects,
   validation,
