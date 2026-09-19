@@ -10,25 +10,22 @@
  * @see specs/self-hosting/connected-services/connect-settings.feature
  */
 
+import { ConnectInstantEvalClassifier } from "@ee/licensing/connect/install/connectClassifier";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-const env: Record<string, unknown> = {};
-
-vi.mock("~/env.mjs", () => ({ env }));
-vi.mock("~/server/app-layer/app", () => ({ tryGetApp: () => null }));
-vi.mock("~/server/db", () => ({ prisma: {} }));
-
-const { ConnectInstantEvalClassifier } = await import(
-  "@ee/licensing/connect/install/connectClassifier"
-);
-const { JevInstantEvalClassifier } = await import("../jev.client");
-const { NullInstantEvalClassifier } = await import("../null.client");
-const {
+import {
   getInstantEvalClassifier,
   isInstantEvalClassifierAvailableForOrganization,
   isInstantEvalClassifierConfigured,
   resetInstantEvalClassifier,
-} = await import("../index");
+} from "../index";
+import { JevInstantEvalClassifier } from "../jev.client";
+import { NullInstantEvalClassifier } from "../null.client";
+
+const env = vi.hoisted(() => ({}) as Record<string, unknown>);
+
+vi.mock("~/env.mjs", () => ({ env }));
+vi.mock("~/server/app-layer/app", () => ({ tryGetApp: () => null }));
+vi.mock("~/server/db", () => ({ prisma: {} }));
 
 const fetchSpy = vi.fn(() => {
   throw new Error("choosing a classifier attempted a network call");

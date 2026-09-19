@@ -7,12 +7,11 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { readConnectConfig } from "../connectConfig";
 
-const env: Record<string, unknown> = {};
+const env = vi.hoisted(() => ({}) as Record<string, unknown>);
 
 vi.mock("~/env.mjs", () => ({ env }));
-
-const { readConnectConfig } = await import("../connectConfig");
 
 beforeEach(() => {
   for (const key of Object.keys(env)) delete env[key];

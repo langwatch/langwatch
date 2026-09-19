@@ -10,15 +10,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PrismaClient } from "~/generated/prisma/client";
 import type { InstantEvalQuestion } from "~/server/app-layer/instant-evals/classifier/classifier";
+import {
+  ConnectInstantEvalClassifier,
+  STATE_TTL_MS,
+} from "../connectClassifier";
+import { readConnectConfig } from "../connectConfig";
 
-const env: Record<string, unknown> = {};
+const env = vi.hoisted(() => ({}) as Record<string, unknown>);
 
 vi.mock("~/env.mjs", () => ({ env }));
-
-const { ConnectInstantEvalClassifier, STATE_TTL_MS } = await import(
-  "../connectClassifier"
-);
-const { readConnectConfig } = await import("../connectConfig");
 
 const ORGANIZATION = "organization-of-record";
 const PROJECT = "project-of-record";
