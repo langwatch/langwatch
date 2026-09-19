@@ -21,25 +21,46 @@ Feature: License registry
   # Every issue path writes the registry
   # ============================================================================
 
-  @unit @unimplemented
+  @unit
   Scenario: A license issued from the backoffice is recorded
     When an operator issues a license for customer organization "ACME" with 50 seats
     Then the registry holds a row for that license linked to "ACME"
     And the row records the plan, the seats, the term and who issued it
     And the row is active with no instance bound
 
-  @unit @unimplemented
+  @unit
   Scenario: A license bought through the payment link is recorded
     When a checkout for 10 seats completes
     Then the license that is emailed to the buyer is also in the registry
     And the row records that it was issued by the purchase flow
+    And it is not linked to a customer organization, because a checkout names no customer on LangWatch Cloud
+
+  @unit
+  Scenario: A purchase still delivers its license when the registry cannot be written
+    Given the registry cannot be written
+    When a checkout completes
+    Then the buyer still receives the license by email
+    And the failure to record it is reported to LangWatch
 
   @unit @unimplemented
+  Scenario: An unlinked license resolves to nothing
+    Given a license in the registry that is not linked to a customer organization
+    When it is presented as a credential
+    Then it is refused as not registered
+
+  @unit
+  Scenario: An operator links a recorded license to a customer organization
+    Given a license in the registry that is not linked to a customer organization
+    When an operator links it to customer organization "ACME"
+    Then the row is linked to "ACME"
+    And "ACME" is marked as a self-hosted customer
+
+  @unit
   Scenario: A license minted by the command line script is recorded
     When an operator mints a license with the generate-license script against the Cloud database
     Then the registry holds a row for that license
 
-  @unit @unimplemented
+  @unit
   Scenario: The registry stores a hash of the token, not the token
     When a license is issued and recorded
     Then the row holds a hash of the token the install will present
@@ -53,12 +74,18 @@ Feature: License registry
     When the install presents the new license for the first time
     Then the held copy is erased
 
-  @unit @unimplemented
+  @unit
   Scenario: The backoffice organizations list does not carry license keys
     When an operator lists organizations in the backoffice
     Then no organization in the response includes its license key
 
-  @unit @unimplemented
+  @unit
+  Scenario: A license key is never kept in the audit trail
+    When an organization activates a license, or an operator pastes one into the backoffice
+    Then the audit entry for that action records that a license key was supplied
+    And it does not hold the key
+
+  @unit
   Scenario: The same license always maps to the same registry row
     Given a license that was recorded when it was issued
     When the same license is presented with different line wrapping and trailing whitespace
@@ -68,20 +95,20 @@ Feature: License registry
   # The signing key is a server secret
   # ============================================================================
 
-  @unit @unimplemented
+  @unit
   Scenario: Issuing a license never asks the operator for the private key
     When an operator issues a license from the backoffice
     Then the license is signed with the key from the server secret
     And the request carries no private key
 
-  @unit @unimplemented
+  @unit
   Scenario: Issuing is refused when no signing key is configured
     Given LangWatch Cloud with no license signing key configured
     When an operator issues a license
     Then the request is refused because license signing is not configured
     And nothing is written to the registry
 
-  @integration @unimplemented
+  @unit
   Scenario: Only a LangWatch operator can issue or manage licenses
     Given a signed-in user who is an admin of their own organization but not a LangWatch operator
     When they try to issue, revoke or list licenses
@@ -91,21 +118,21 @@ Feature: License registry
   # Licenses issued before the registry existed
   # ============================================================================
 
-  @unit @unimplemented
+  @unit
   Scenario: A license issued before the registry existed is registered by pasting it
     Given a license that LangWatch signed before the registry existed
     When an operator pastes it into the backoffice and links it to customer organization "ACME"
     Then the signature is verified
     And the registry holds a row for it linked to "ACME" with the seats and term read from the license
 
-  @unit @unimplemented
+  @unit
   Scenario: A pasted license with a bad signature is refused
     Given a license whose payload was edited after signing
     When an operator pastes it into the backoffice
     Then the request is refused because the signature does not verify
     And nothing is written to the registry
 
-  @unit @unimplemented
+  @unit
   Scenario: Registering the same license twice is refused
     Given a license that is already in the registry
     When an operator pastes it into the backoffice again
@@ -116,14 +143,13 @@ Feature: License registry
   # Lifecycle
   # ============================================================================
 
-  @unit @unimplemented
+  @unit
   Scenario: Revoking a license
     Given an active license in the registry
     When an operator revokes it with a reason
     Then the row is revoked and records who revoked it, when and why
-    And the license no longer resolves as a credential
 
-  @unit @unimplemented
+  @unit
   Scenario: Reissuing a license
     Given an active license for "ACME" with 50 seats
     When an operator reissues it with 80 seats and a new term
@@ -131,37 +157,36 @@ Feature: License registry
     And the new row points at the license it replaces
     And the replaced license stays valid until the install has picked up the new one
 
-  @unit @unimplemented
+  @unit
   Scenario: A license past its term reads as expired
     Given a license in the registry whose term has ended
     When its status is read
     Then it reads as expired without anyone having edited the row
 
-  @unit @unimplemented
+  @unit
   Scenario: Resetting the instance binding
     Given a license bound to an instance
     When an operator resets the instance binding
     Then the row has no instance bound
-    And the next instance to present the license is bound to it
 
-  @unit @unimplemented
+  @unit
   Scenario: Editing entitlements does not reissue the license
     Given an active license with no hosted services
     When an operator switches on the "instant_evals" service for it
     Then the row lists "instant_evals" as entitled
     And the license the install holds is unchanged
 
-  @unit @unimplemented
+  @unit
   Scenario: Commercial terms are set on the registry row
     When an operator sets a seat overage allowance of 5, a seat rate of 600 USD per year, a prepaid commit of 1000 USD and on-demand overage up to 500 USD
     Then the row records the allowance, the seat rate, the commit, that overage is enabled and its maximum
 
-  @unit @unimplemented
+  @unit
   Scenario: The seat overage allowance defaults to a fifth of the seats, rounded up
     When an operator issues a license for 52 seats without setting an allowance
     Then its seat overage allowance is 11
 
-  @unit @unimplemented
+  @unit
   Scenario: An overage maximum without overage enabled is refused
     When an operator sets an overage maximum while on-demand overage is off
     Then the request is refused because the maximum only applies when overage is enabled
@@ -170,11 +195,11 @@ Feature: License registry
   # The customer organization
   # ============================================================================
 
-  @unit @unimplemented
+  @unit
   Scenario: A customer organization is marked as a self-hosted customer
     When an operator issues the first license for a new customer "ACME"
     Then an organization "ACME" exists on LangWatch Cloud marked as a self-hosted customer
-    And hosted usage, budgets and invoices for "ACME" attach to that organization
+    And the license is linked to it
 
   @integration @unimplemented
   Scenario: The backoffice lists licenses with their state

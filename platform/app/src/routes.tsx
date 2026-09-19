@@ -739,6 +739,10 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/ops/backoffice/sso-connections")),
   },
   {
+    path: "/ops/backoffice/licenses",
+    ...page(() => import("./pages/ops/backoffice/licenses")),
+  },
+  {
     path: "/ops/backoffice/identity-lookup",
     ...page(() => import("./pages/ops/backoffice/identity-lookup")),
   },

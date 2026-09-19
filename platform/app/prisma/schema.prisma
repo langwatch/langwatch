@@ -773,6 +773,10 @@ model Organization {
   license                String?                        @db.Text
   licenseExpiresAt       DateTime?
   licenseLastValidatedAt DateTime?
+  /// A customer that runs LangWatch self-hosted. The hosted usage, budgets and
+  /// invoices of its connected installs attach to this organization (ADR-139).
+  selfHostedCustomer     Boolean                        @default(false)
+  issuedLicenses         IssuedLicense[]
   gatewayChangeEvents    GatewayChangeEvent[]
   routingPolicies        RoutingPolicy[]
   ingestionSources       IngestionSource[]
@@ -785,6 +789,88 @@ model Organization {
   githubBranchPrChecks   GithubBranchPullRequestCheck[]
 
   @@index([ssoProvider])
+}
+
+/// Where a license in the registry came from.
+enum IssuedLicenseSource {
+  /// Issued by a LangWatch operator in the backoffice.
+  BACKOFFICE
+  /// Minted by the payment link purchase flow.
+  PURCHASE
+  /// Minted by scripts/generate-license.ts.
+  SCRIPT
+  /// Signed before the registry existed, registered later by pasting it.
+  LEGACY_IMPORT
+}
+
+/// The registry of licenses LangWatch has issued (ADR-139). It lives on
+/// LangWatch Cloud; a self-hosted install has the table and no rows.
+///
+/// The row never holds the token an install presents. `tokenHash` is the
+/// SHA-256 of that token, so read access to this table is not credential
+/// access. Status is derived: revoked, superseded, past `expiresAt`, else active.
+model IssuedLicense {
+  id             String       @id @default(nanoid())
+  /// The `licenseId` inside the signed license (`lic-<uuid>`).
+  licenseId      String       @unique
+  /// SHA-256 of the `lwl_` token. Looked up on every credential resolution.
+  tokenHash      String       @unique
+  /// The customer organization on LangWatch Cloud. Null for a license that is
+  /// recorded but not linked to a customer yet, such as a self-serve purchase:
+  /// it resolves to nothing until an operator links it.
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  /// As signed into the license.
+  organizationName String
+  email            String
+  planType         String
+  maxMembers       Int
+  maxMembersLite   Int
+  issuedAt         DateTime
+  expiresAt        DateTime
+
+  source     IssuedLicenseSource
+  /// The operator who issued or registered it. Null for the purchase flow and the script.
+  issuedById String?
+
+  revokedAt     DateTime?
+  revokedById   String?
+  revokedReason String?
+
+  /// Set when the install first presents the license that replaced this one.
+  supersededAt DateTime?
+  /// The id of the IssuedLicense this one replaces, when it was reissued. A
+  /// plain column ref (relationMode="prisma" cannot declare a self-relation on
+  /// Postgres); the registry service validates it. Unique, so a license is
+  /// replaced by one license at most.
+  replacesId   String?   @unique
+  /// A reissued license waiting to be delivered over sync, encrypted. Erased
+  /// when the install first presents it. The only license text the registry holds.
+  pendingDeliveryLicense String? @db.Text
+
+  /// Hosted services this license may call, such as `instant_evals`.
+  services             String[] @default([])
+  /// Seats the install may go over by. Null means a fifth of `maxMembers`, rounded up.
+  seatOverageAllowance Int?
+  /// The annual rate of one seat, in cents of `seatCurrency`. Needed to prorate added seats.
+  seatRateCents        Int?
+  seatCurrency         Currency?
+  /// The prepaid usage commit for the term, in USD cents.
+  commitUsdCents       Int      @default(0)
+  /// Whether usage may continue past the commit, up to `overageMaxUsdCents`.
+  overageEnabled       Boolean  @default(false)
+  overageMaxUsdCents   Int?
+
+  /// The install this license is bound to. Set on first use, cleared by an operator.
+  instanceId      String?
+  instanceBoundAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([expiresAt])
 }
 
 model ScimToken {

@@ -670,6 +670,16 @@ function findFirstId(value: unknown): string | undefined {
 const CREDENTIAL_OBJECT_FIELDS = ["customKeys", "providerConfig"] as const;
 
 /**
+ * String fields whose value is a credential on every action that carries them.
+ *
+ * A license key is one: a connected install derives the token it presents to
+ * LangWatch-hosted services from it (ADR-139), so an audit row holding the key
+ * would hold the means to mint that token. Unlike `parameters`, the name means
+ * one thing everywhere, so the rule is bound to the name.
+ */
+const CREDENTIAL_STRING_FIELDS = ["licenseKey"] as const;
+
+/**
  * Action paths whose input carries values a person typed for one run, keyed by
  * the field that holds them.
  *
@@ -775,6 +785,13 @@ export function redactAuditArgs({
 
   if (Array.isArray(record.extraHeaders)) {
     replace("extraHeaders", redactHeaderValues(record.extraHeaders));
+  }
+
+  for (const field of CREDENTIAL_STRING_FIELDS) {
+    const value = record[field];
+    if (typeof value === "string" && value !== "") {
+      replace(field, "[redacted]");
+    }
   }
 
   return redacted ?? input;

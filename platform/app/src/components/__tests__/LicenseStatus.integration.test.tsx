@@ -43,10 +43,6 @@ vi.mock("../license/useLicenseActions", () => ({
   }),
 }));
 
-vi.mock("../license/LicenseGeneratorDrawer", () => ({
-  LicenseGeneratorDrawer: () => null,
-}));
-
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
@@ -78,14 +74,7 @@ const unsignedStatus: LicenseStatusPayload = {
 
 const renderWith = (status: LicenseStatusPayload) => {
   statusResult.current = status;
-  render(
-    <LicenseStatus
-      organizationId="org-123"
-      isGeneratorOpen={false}
-      onGeneratorOpenChange={vi.fn()}
-    />,
-    { wrapper: Wrapper },
-  );
+  render(<LicenseStatus organizationId="org-123" />, { wrapper: Wrapper });
 };
 
 describe("LicenseStatus", () => {

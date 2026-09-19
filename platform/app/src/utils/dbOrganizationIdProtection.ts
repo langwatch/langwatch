@@ -556,6 +556,13 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   // ownership rule is made of. It holds no customer content: ids, domains,
   // enums and credential references.
   "SsoConnection",
+  // The license registry (ADR-139). Org-bearing, and deliberately not
+  // org-CONSTRAINED: a presented license token is resolved by `tokenHash`
+  // before any organization is known, which is what identifies the customer in
+  // the first place, and LangWatch operators list it across customers in the
+  // backoffice. A guard demanding organizationId would refuse both. It holds
+  // no customer content: ids, a token hash, seat counts, terms and amounts.
+  "IssuedLicense",
   "Subscription",
 ];
 

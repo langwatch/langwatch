@@ -34,6 +34,7 @@ export const organizationFactory = Factory.define<
   license: null,
   licenseExpiresAt: null,
   licenseLastValidatedAt: null,
+  selfHostedCustomer: false,
   presenceEnabled: false,
   traceSharingEnabled: true,
   supportContact: null,

@@ -2,7 +2,6 @@ import { VStack } from "@chakra-ui/react";
 import { useState } from "react";
 import { api } from "~/utils/api";
 import { LicenseDetailsCard } from "./license/LicenseDetailsCard";
-import { LicenseGeneratorDrawer } from "./license/LicenseGeneratorDrawer";
 import { LicenseLoadError } from "./license/LicenseLoadError";
 import { LicenseLoadingSkeleton } from "./license/LicenseLoadingSkeleton";
 import {
@@ -15,15 +14,9 @@ import { useLicenseActions } from "./license/useLicenseActions";
 
 interface LicenseStatusProps {
   organizationId: string;
-  isGeneratorOpen: boolean;
-  onGeneratorOpenChange: (open: boolean) => void;
 }
 
-export function LicenseStatus({
-  organizationId,
-  isGeneratorOpen,
-  onGeneratorOpenChange,
-}: LicenseStatusProps) {
+export function LicenseStatus({ organizationId }: LicenseStatusProps) {
   const [licenseKey, setLicenseKey] = useState("");
 
   const {
@@ -83,11 +76,6 @@ export function LicenseStatus({
           onFileActivate={handleFileActivate}
           isActivating={isUploading}
         />
-        <LicenseGeneratorDrawer
-          open={isGeneratorOpen}
-          onClose={() => onGeneratorOpenChange(false)}
-          organizationId={organizationId}
-        />
       </VStack>
     );
   }
@@ -104,11 +92,6 @@ export function LicenseStatus({
         status={status}
         onRemove={remove}
         isRemoving={isRemoving}
-      />
-      <LicenseGeneratorDrawer
-        open={isGeneratorOpen}
-        onClose={() => onGeneratorOpenChange(false)}
-        organizationId={organizationId}
       />
     </VStack>
   );

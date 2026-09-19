@@ -1266,17 +1266,52 @@ const presentations = {
     describe: () => "Renew it to carry on, or talk to your account team.",
   },
   license_signing_key_not_pem: {
-    title: "That doesn't look like a private key",
-    describe: () => "Paste the whole key, including its BEGIN and END lines.",
+    title: "The signing key on the server isn't a private key",
+    describe: () =>
+      "The license signing secret must hold the whole key, including its BEGIN and END lines.",
   },
   license_signing_key_encrypted: {
-    title: "That private key is passphrase-protected",
-    describe: () => "Use an unencrypted private key to sign licenses.",
+    title: "The signing key on the server is passphrase-protected",
+    describe: () =>
+      "Store an unencrypted private key in the license signing secret.",
   },
   license_signing_failed: {
-    title: "That private key couldn't sign the license",
+    title: "The signing key on the server couldn't sign the license",
     describe: () =>
-      "Check it is the license signing key and was copied in full.",
+      "Check the license signing secret holds the license signing key, stored in full.",
+  },
+  license_signing_not_configured: {
+    title: "License signing isn't set up",
+    describe: () =>
+      "Add the license signing key as a server secret, then issue the license again.",
+  },
+  license_already_registered: {
+    title: "This license is already in the registry",
+    describe: () => "Search for it in the list. Nothing was changed.",
+  },
+  license_already_reissued: {
+    title: "This license was already reissued",
+    describe: () => "Open its replacement and reissue that one instead.",
+  },
+  license_overage_max_requires_overage: {
+    title: "An overage maximum needs overage switched on",
+    describe: () =>
+      "Switch on-demand overage on to set a maximum, or clear the maximum.",
+  },
+  issued_license_not_found: {
+    title: "That license isn't in the registry",
+    describe: () => "It may have been registered under another customer.",
+  },
+  issued_license_not_active: {
+    title: "This license can't be changed this way",
+    describe: (error) => {
+      const status = str(error, "status", "");
+      if (status === "revoked") return "It was revoked. Issue a new license.";
+      if (status === "superseded") {
+        return "It was replaced. Open the license that replaced it.";
+      }
+      return "Its term has ended. Reissue it to renew.";
+    },
   },
   malformed_custom_role_permissions: {
     title: "This role's permissions are invalid",

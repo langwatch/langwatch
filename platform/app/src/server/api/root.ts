@@ -56,6 +56,7 @@ import { langyRouter } from "./routers/langy";
 import { langyEgressRouter } from "./routers/langyEgress";
 import { licenseRouter } from "./routers/license";
 import { licenseEnforcementRouter } from "./routers/licenseEnforcement";
+import { licenseRegistryRouter } from "./routers/licenseRegistry";
 import { limitsRouter } from "./routers/limits";
 import { llmModelCostsRouter } from "./routers/llmModelCosts";
 import { modelProviderRouter } from "./routers/modelProviders";
@@ -166,6 +167,7 @@ const coreRouters = {
   savedViews: savedViewsRouter,
   secrets: secretsRouter,
   license: licenseRouter,
+  licenseRegistry: licenseRegistryRouter,
   licenseEnforcement: licenseEnforcementRouter,
   scimToken: scimTokenRouter,
   roleBinding: roleBindingRouter,

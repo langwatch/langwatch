@@ -363,6 +363,7 @@ export function backofficeGroup(): SettingsMenuGroup {
         href: "/ops/backoffice/sso-connections",
         icon: ShieldCheck,
       },
+      { label: "Licenses", href: "/ops/backoffice/licenses", icon: KeyRound },
       {
         label: "Identity Lookup",
         href: "/ops/backoffice/identity-lookup",

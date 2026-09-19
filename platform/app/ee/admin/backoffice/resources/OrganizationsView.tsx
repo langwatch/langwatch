@@ -52,7 +52,6 @@ interface AdminOrganization {
   stripeCustomerId: string | null;
   currency: Currency;
   pricingModel: PricingModel;
-  license: string | null;
   licenseExpiresAt: string | null;
   useCustomS3: boolean;
   createdAt: string;
@@ -226,7 +225,9 @@ function OrganizationEditDrawer({
       stripeCustomerId: organization.stripeCustomerId ?? "",
       currency: organization.currency,
       pricingModel: organization.pricingModel,
-      license: organization.license ?? "",
+      // A license key is credential material (a connected install derives its
+      // token from it), so like the S3 fields below it is write-only.
+      license: "",
       licenseExpiresAt: toDateInputValue(organization.licenseExpiresAt),
       useCustomS3: !!organization.useCustomS3,
       // Credentials are write-only: the server doesn't echo them back in
@@ -267,8 +268,7 @@ function OrganizationEditDrawer({
     if (form.currency !== organization.currency) data.currency = form.currency;
     if (form.pricingModel !== organization.pricingModel)
       data.pricingModel = form.pricingModel;
-    if (form.license !== (organization.license ?? ""))
-      data.license = nullIfEmpty(form.license);
+    if (form.license.trim() !== "") data.license = form.license.trim();
     const nextExpires = dateInputToISO(form.licenseExpiresAt);
     if (nextExpires !== organization.licenseExpiresAt) {
       data.licenseExpiresAt = nextExpires;
@@ -427,9 +427,14 @@ function OrganizationEditDrawer({
                   rows={4}
                   value={form.license}
                   onChange={(e) => setField("license", e.target.value)}
+                  placeholder="Paste a license to replace the current one. The stored key is never shown here."
                   fontFamily="mono"
                   fontSize="xs"
                 />
+                <Field.HelperText>
+                  Leave empty to keep the current license. Issue and manage
+                  licenses under Backoffice, Licenses.
+                </Field.HelperText>
               </Field.Root>
               <Field.Root>
                 <Field.Label>License expires at</Field.Label>

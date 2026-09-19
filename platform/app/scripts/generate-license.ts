@@ -43,6 +43,7 @@
 
 import { prisma as defaultPrisma } from "~/server/db";
 import { generateLicenseKey } from "../ee/licensing/licenseGenerationService";
+import { createLicenseRegistryService } from "../ee/licensing/registry/issuedLicense.prisma";
 import type { PrismaClient } from "../src/generated/prisma/client";
 
 interface ApplyLicenseInput {
@@ -99,6 +100,15 @@ export async function applyLicenseToOrg(
       : {}),
     ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt } : {}),
     privateKey: input.privateKey,
+  });
+
+  // Recorded before it is applied: if the registry cannot be written, the
+  // organization is left exactly as it was, and no license exists that the
+  // registry never heard about (ADR-139).
+  await createLicenseRegistryService(input.prisma).record({
+    licenseKey,
+    source: "SCRIPT",
+    organizationId: org.id,
   });
 
   await input.prisma.organization.update({

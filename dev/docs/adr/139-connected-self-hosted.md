@@ -278,6 +278,26 @@ families; without that, `langwatch/gpt-5-mini` would be read as a model name
 and match no credential without an error. The entitlement is `managed_models`.
 Routing by evaluation results is not built.
 
+## Existing offline licenses
+
+A customer on an offline license must notice nothing when they upgrade. Where a
+cleaner design and this guarantee disagree, the guarantee wins. Each line names
+the test that pins it.
+
+| Guarantee | Pinned by |
+|---|---|
+| A license issued before this change verifies with the same public key and the same schema, and re-serializes byte for byte. | `ee/licensing/__tests__/offlineLicenseCompat.unit.test.ts`, on a fixture minted with the licensing code of `origin/main` |
+| The embedded production public key is unchanged. | same file, "is still verified against the production public key main shipped" |
+| With no `connect.*` value set, seat enforcement is the same hard cap: the seat past the licensed count is refused, the one within it is admitted. | same file, "keeps the hard seat cap" and "keeps admitting a seat within the licensed count" |
+| Validating and enforcing an offline license makes no network call and never reads the registry. | same file, "makes no network call and never reads the registry": `fetch` is stubbed to throw, and the database stub throws on any model but `Organization` |
+| No new required environment variable or Helm value. `connect.enabled` defaults to off, and every `LANGWATCH_CONNECT_*` variable is optional. | the env schema declares them optional; an install boots with none set |
+| The migration is additive and needs only the normal `prisma migrate deploy`: one enum, one empty table, one column with a default. | `20260919120000_issued_license_registry`, replayed on a scratch database |
+| The usage statistics worker behaves as before and `/api/track_usage` stays. | `track-usage-security.integration.test.ts` stays green; the worker only gains a separate sync when Connect is enabled |
+| The license page of an install is unchanged. The one control removed, "New License", was only ever rendered on LangWatch Cloud. | `LicenseStatus.integration.test.tsx` |
+
+The registry and the token derivation exist only on the issuing and the hosted
+side. `validateLicense`, `LicenseHandler` and the seat guard import neither.
+
 ## Threat model
 
 | Threat | What happens | Bound |
