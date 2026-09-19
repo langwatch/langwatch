@@ -114,6 +114,7 @@ import {
 } from "./resolveTimeWindow";
 import { describeLangWatchQLSchema, type LangWatchQLSchema } from "./schema";
 import type { LangWatchQLTimeWindow } from "./timeWindow";
+import { randomUUID } from "node:crypto";
 import { LWQL_PERIOD_GRANULARITY_PARAMETER } from "./timeWindow";
 import { lwqlValidationError } from "./validation/errors";
 import type { SqlSourcePosition } from "./validation/parser";
@@ -702,16 +703,8 @@ export class LangWatchQLService {
    *   {@link LangWatchQLUnavailableError} when no LangWatchQL identity
    *   is provisioned.
    */
-  async execute({
-    projects,
-    protections,
-    sql,
-    parameters,
-    timeWindow,
-    granularitySeconds,
-    onBudgetOverflow,
-    signal,
-  }: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
+  async execute(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
+    const { projects, protections, sql, parameters, timeWindow } = input;
     // Only logging reads this; the database resolves the tenant set itself.
     const scopeLabel =
       projects.map((project) => project.id).join(",") || "(none)";
@@ -734,7 +727,34 @@ export class LangWatchQLService {
       ...(parameters ? { parameters } : {}),
       ...(timeWindow ? { timeWindow } : {}),
     });
-    await this.assertJudgingWithinFreeBudget({ projects, validation });
+    const reservation = await this.reserveJudgingBudget({
+      projects,
+      validation,
+    });
+    try {
+      return await this.executeReserved({ input, validation });
+    } finally {
+      await reservation?.release();
+    }
+  }
+
+  /** The half of {@link execute} that runs under the budget hold. */
+  private async executeReserved({
+    input: {
+      projects,
+      protections,
+      sql,
+      parameters,
+      timeWindow,
+      granularitySeconds,
+      onBudgetOverflow,
+      signal,
+    },
+    validation,
+  }: {
+    readonly input: LangWatchQLExecuteInput;
+    readonly validation: ValidatedLangWatchQL;
+  }): Promise<LangWatchQLQueryResult> {
     const granularity = resolveRunGranularityOrRefuseUnfilled({
       declared: validation.parameters,
       ...(parameters ? { parameters } : {}),
@@ -924,25 +944,45 @@ export class LangWatchQLService {
   }
 
   /**
-   * Refuses a statement that judges once the organization has spent its free
-   * allowance.
+   * Holds the query's ceiling price against the free budget, or refuses a
+   * statement that judges once the organization has spent its allowance.
    *
    * Before the database runs, so the budget bounds what was spent rather than
-   * what will be billed: nothing reaches the classifier past it. The scope is
-   * one project wherever an eval call was admitted, which is what the
-   * validator enforces and what gives the spend an owner.
+   * what will be billed: nothing reaches the classifier past it. The ceiling
+   * is the price of the whole query token budget, which is the most the query
+   * can spend; the hold is released once the spend it stood for is recorded,
+   * or when the query fails before judging. The scope is one project wherever
+   * an eval call was admitted, which is what the validator enforces and what
+   * gives the spend an owner.
    */
-  private async assertJudgingWithinFreeBudget({
+  private async reserveJudgingBudget({
     projects,
     validation,
   }: {
     readonly projects: readonly LangWatchQLCaller[];
     readonly validation: ReturnType<LangWatchQLService["validate"]>;
-  }): Promise<void> {
-    if (!callsEvalFunction(validation.appFunctions)) return;
+  }): Promise<{ release(): Promise<void> } | null> {
+    if (!callsEvalFunction(validation.appFunctions)) return null;
     const judging = projects.length === 1 ? projects[0] : undefined;
-    if (!judging) return;
-    await this.instantEvals().assertFreeBudget({ projectId: judging.id });
+    if (!judging) return null;
+    const support = this.instantEvals();
+    const reservationId = `query:${randomUUID()}`;
+    const costUsd = instantEvalCostUsd({
+      inputTokens: support.queryTokenBudget,
+      pricing: support.classifier().pricing,
+    });
+    await support.reserveFreeBudget({
+      projectId: judging.id,
+      reservationId,
+      priceUsd: instantEvalPriceUsd({
+        costUsd,
+        pricing: support.classifier().pricing,
+      }),
+    });
+    return {
+      release: () =>
+        support.releaseFreeBudget({ projectId: judging.id, reservationId }),
+    };
   }
 
   /**

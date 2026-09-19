@@ -62,8 +62,11 @@ export function fakes(options?: {
   /** Refuses the next page, standing in for an exhausted free budget. */
   assertWithinBudget?: (input: {
     projectId: string;
+    runId: string;
     inFlightUsd: number;
   }) => Promise<void>;
+  /** Records the run's hold being let go, once its spend is recorded. */
+  releaseBudget?: (input: { projectId: string; runId: string }) => Promise<void>;
   /**
    * Makes the judged page stop part way, naming the rows left unjudged.
    * With `onSignal`, the page waits for the executor's signal to fire first,
@@ -175,6 +178,9 @@ export function fakes(options?: {
     isCancelled: async () => options?.isCancelled === true,
     ...(options?.assertWithinBudget
       ? { assertWithinBudget: options.assertWithinBudget }
+      : {}),
+    ...(options?.releaseBudget
+      ? { releaseBudget: options.releaseBudget }
       : {}),
     now: () => NOW,
   });

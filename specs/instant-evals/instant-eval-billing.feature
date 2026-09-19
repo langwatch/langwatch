@@ -172,6 +172,53 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       When a run is requested
       Then it is accepted
 
+    # The ledger learns about a run when the run finishes, so an admission
+    # check that read the ledger alone would admit any number of runs while
+    # none had landed a row. A hold is the run's expected price, kept from
+    # acceptance until its spend lands, and every check counts the holds.
+    @unit
+    Scenario: A run holds its estimated price when it is accepted
+      Given a free organization under its budget
+      When a run is requested
+      Then its estimated price is held under the run's id before the run is queued
+
+    @unit
+    Scenario: Runs accepted together share the budget
+      Given a free organization with sixty cents of budget left
+      When two runs estimated at forty cents each are requested at once
+      Then the first is accepted and the second is refused with instant_eval_free_budget_exhausted
+
+    @unit
+    Scenario: A run under way counts the runs accepted beside it
+      Given a free organization with a run under way and another run's hold
+      When the run under way asks for its next page
+      Then the check counts the other run's hold and this run's own judging, not its own hold
+
+    @unit
+    Scenario: A hold is released when the run's spend lands
+      Given a run whose spend was just recorded
+      When it finishes, on any outcome
+      Then its hold is released after the record and the next check reads the ledger again
+
+    @unit
+    Scenario: A run that could not be queued holds nothing
+      Given a free organization whose run was accepted but never queued
+      When the queue refuses it
+      Then the hold taken for it is released
+
+    @unit
+    Scenario: A judged query holds its ceiling while it judges
+      Given a free organization under its budget
+      When a statement calling an eval function is run
+      Then the price of the whole query token budget is held before anything is judged
+      And the hold is released once the query's spend is recorded
+
+    @integration
+    Scenario: Holds are shared across processes
+      Given two processes accepting runs for one organization
+      When each holds an amount against the same budget
+      Then the second sees the first's hold, and a released hold no longer counts
+
     @unit
     Scenario: The spend is read across every project of the organization
       Given an organization with two projects that spent 0.60 and 0.50 dollars

@@ -42,6 +42,46 @@ describe("given a run that is finishing", () => {
     });
   });
 
+  describe("when its spend has been recorded", () => {
+    /** @scenario "A hold is released when the run's spend lands" */
+    it("lets go of the run's hold, after the record and on every outcome", async () => {
+      const releaseBudget = vi.fn(async () => undefined);
+      const { executor, spends } = fakes({ releaseBudget });
+
+      for (const outcome of ["finished", "failed", "cancelled"] as const) {
+        await executor.finish({
+          runId: RUN_ID,
+          projectId: PROJECT_ID,
+          outcome,
+          inputTokens: 1_000,
+          requests: 1,
+        });
+      }
+
+      expect(releaseBudget).toHaveBeenCalledTimes(3);
+      expect(releaseBudget).toHaveBeenCalledWith({
+        projectId: PROJECT_ID,
+        runId: RUN_ID,
+      });
+      expect(spends).toHaveLength(3);
+    });
+
+    it("lets go of the hold of a run that judged nothing", async () => {
+      const releaseBudget = vi.fn(async () => undefined);
+      const { executor } = fakes({ releaseBudget });
+
+      await executor.finish({
+        runId: RUN_ID,
+        projectId: PROJECT_ID,
+        outcome: "finished",
+        inputTokens: 0,
+        requests: 0,
+      });
+
+      expect(releaseBudget).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("when it judged nothing", () => {
     /** @scenario "A run that judged nothing reports no spend" */
     it("reports no spend", async () => {

@@ -38,7 +38,10 @@ import {
   InstantEvalRunNotFoundError,
 } from "./errors";
 import { instantEvalStatementFor } from "./input";
-import { createInstantEvalRun } from "./instant-eval-create";
+import {
+  createInstantEvalRun,
+  newInstantEvalRunId,
+} from "./instant-eval-create";
 import {
   estimateInstantEvalRun,
   type InstantEvalEstimate,
@@ -205,14 +208,70 @@ export class InstantEvalRunService {
     // Before the statement is accepted, so a free organization past its
     // budget is told so without the probe reading anything on its behalf.
     await this.deps.budget.assertWithinBudget({ projectId });
-    return await createInstantEvalRun({
-      runs: this.deps.runs,
-      commands: this.deps.commands(),
+    const accepted = await this.accept({ caller, protections, input });
+    const runId = newInstantEvalRunId();
+    await this.reserveForRun({
       projectId,
-      name: input.name ?? null,
-      accepted: await this.accept({ caller, protections, input }),
+      protections,
+      caller,
+      accepted,
       rowLimit,
-      now: this.now(),
+      runId,
+    });
+    try {
+      return await createInstantEvalRun({
+        runs: this.deps.runs,
+        commands: this.deps.commands(),
+        projectId,
+        runId,
+        name: input.name ?? null,
+        accepted,
+        rowLimit,
+        now: this.now(),
+      });
+    } catch (error) {
+      // A run that was never queued spends nothing, so its hold goes with it.
+      await this.deps.budget.release({ projectId, reservationId: runId });
+      throw error;
+    }
+  }
+
+  /**
+   * Holds the run's estimated price against the free budget before the run
+   * is queued, so runs accepted together share the budget instead of each
+   * being admitted against a ledger that knows about none of them. The hold
+   * is released when the run's spend lands. A paid organization holds nothing.
+   */
+  private async reserveForRun({
+    projectId,
+    protections,
+    caller,
+    accepted,
+    rowLimit,
+    runId,
+  }: {
+    projectId: string;
+    protections: Protections;
+    caller: InstantEvalRunCaller;
+    accepted: AcceptedInstantEvalStatement;
+    rowLimit: number;
+    runId: string;
+  }): Promise<void> {
+    const standing = await this.deps.budget.standing({ projectId });
+    if (!standing.isFree) return;
+    const estimate = await estimateInstantEvalRun({
+      projectId,
+      protections,
+      caller,
+      accepted,
+      rowLimit,
+      rowSource: this.deps.rowSource,
+      classifier: this.deps.classifier(),
+    });
+    await this.deps.budget.reserve({
+      projectId,
+      reservationId: runId,
+      priceUsd: estimate.priceUsd,
     });
   }
 

@@ -35,10 +35,16 @@ export interface InstantEvalRequestRunCommand {
   }): Promise<unknown>;
 }
 
+/** A fresh run id, minted before the row so a reservation can be held under it. */
+export function newInstantEvalRunId(): string {
+  return generate(KSUID_RESOURCES.INSTANT_EVAL_RUN).toString();
+}
+
 export async function createInstantEvalRun({
   runs,
   commands,
   projectId,
+  runId = newInstantEvalRunId(),
   name,
   accepted,
   rowLimit,
@@ -47,12 +53,12 @@ export async function createInstantEvalRun({
   runs: InstantEvalRunRepository;
   commands: InstantEvalRequestRunCommand;
   projectId: string;
+  runId?: string;
   name: string | null;
   accepted: AcceptedInstantEvalStatement;
   rowLimit: number;
   now: number;
 }) {
-  const runId = generate(KSUID_RESOURCES.INSTANT_EVAL_RUN).toString();
   const row = await runs.create({
     id: runId,
     projectId,

@@ -143,7 +143,18 @@ export interface InstantEvalRunExecutorDependencies {
    */
   readonly assertWithinBudget?: (input: {
     projectId: string;
+    runId: string;
     inFlightUsd: number;
+  }) => Promise<void>;
+  /**
+   * Drops the hold the run was accepted under, once its spend is recorded.
+   * Called on every outcome: a run that failed or was cancelled spends what
+   * it judged and nothing more, and holding its estimate any longer would
+   * refuse the runs after it for money that was never spent.
+   */
+  readonly releaseBudget?: (input: {
+    projectId: string;
+    runId: string;
   }) => Promise<void>;
   readonly now?: () => number;
 }
@@ -572,6 +583,7 @@ async function judgeRunPageOrThrow(
   // partial answer as the whole one.
   await deps.assertWithinBudget?.({
     projectId,
+    runId,
     inFlightUsd: runSpendSoFarUsd(deps, row.tokens),
   });
 
@@ -845,6 +857,11 @@ async function finishRun(
       "Instant Eval run spend recorded",
     );
   }
+
+  // After the spend is recorded, never before: a hold released ahead of a
+  // recorder that then fails would let the retry find the budget already
+  // handed to someone else.
+  await deps.releaseBudget?.({ projectId, runId });
 
   lastPageFinishedAt.delete(runId);
   return { costUsd, priceUsd };

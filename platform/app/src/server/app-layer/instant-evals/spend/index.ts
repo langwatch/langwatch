@@ -19,6 +19,7 @@ import { prisma } from "~/server/db";
 import { BILLING_REPORTING_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/billing-reporting/pipeline";
 import { GATEWAY_SPEND_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
 import { getBillingMonth } from "../../../../../ee/billing/services/billableEventsQuery";
+import { createInstantEvalBudgetReservations } from "../../usage/instant-eval-budget-reservations";
 import {
   type InstantEvalFreeBudget,
   InstantEvalFreeBudgetService,
@@ -138,5 +139,8 @@ export function createInstantEvalFreeBudgetFromEnv(): InstantEvalFreeBudget {
         requestType,
       });
     },
+    reservations: createInstantEvalBudgetReservations({
+      redis: tryGetApp()?.redis,
+    }),
   });
 }

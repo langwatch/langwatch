@@ -21,6 +21,7 @@ import { INSTANT_EVAL_CLASSIFIER_LIMITS } from "~/server/app-layer/instant-evals
 import type { InstantEvalSpendRecord } from "~/server/app-layer/instant-evals/instant-eval-spend.recorder";
 import type { Protections } from "../../../traces/protections";
 import { recordingExecutor } from "../executor.testFakes";
+import type { LangWatchQLInstantEvalSupport } from "../instantEvalSupport";
 import { LangWatchQLService } from "../lwql.service";
 import { describeLangWatchQLAppFunctions } from "../schema";
 
@@ -57,13 +58,15 @@ function serviceJudgingWith({
   queryTokenBudget = 4_000_000,
   spends = [],
   rows = [{ annoyed: "the agent said sorry" }],
-  assertFreeBudget = async () => {},
+  reserveFreeBudget = async () => {},
+  releaseFreeBudget = async () => {},
 }: {
   classifier: InstantEvalClassifier;
   queryTokenBudget?: number;
   spends?: InstantEvalSpendRecord[];
   rows?: Record<string, unknown>[];
-  assertFreeBudget?: () => Promise<void>;
+  reserveFreeBudget?: LangWatchQLInstantEvalSupport["reserveFreeBudget"];
+  releaseFreeBudget?: LangWatchQLInstantEvalSupport["releaseFreeBudget"];
 }): LangWatchQLService {
   return new LangWatchQLService({
     executor: recordingExecutor({
@@ -76,7 +79,8 @@ function serviceJudgingWith({
       classifier: () => classifier,
       maxConcurrency: 4,
       queryTokenBudget,
-      assertFreeBudget,
+      reserveFreeBudget,
+      releaseFreeBudget,
       recordSpend: async (record) => {
         spends.push(record);
       },
@@ -140,7 +144,7 @@ describe("given an organization that has spent its free Instant Evals budget", (
           classified += 1;
           throw new Error("nothing should have been sent");
         }),
-        assertFreeBudget: async () => {
+        reserveFreeBudget: async () => {
           throw new InstantEvalFreeBudgetExhaustedError({
             spentUsd: 1,
             budgetUsd: 1,
@@ -301,7 +305,8 @@ describe("given a statement that calls no eval function", () => {
             gateReads += 1;
             return true;
           },
-          assertFreeBudget: async () => {},
+          reserveFreeBudget: async () => {},
+          releaseFreeBudget: async () => {},
           classifier: () => {
             throw new Error("a statement that judges nothing needs no judge");
           },
@@ -320,6 +325,47 @@ describe("given a statement that calls no eval function", () => {
       });
 
       expect(gateReads).toBe(0);
+    });
+  });
+});
+
+describe("given a free organization under its budget", () => {
+  describe("when a judged statement is executed", () => {
+    /** @scenario "A judged query holds its ceiling while it judges" */
+    it("holds the price of the whole query token budget first and lets it go once the spend is recorded", async () => {
+      const events: string[] = [];
+      const holds: { reservationId: string; priceUsd: number }[] = [];
+      const spends: InstantEvalSpendRecord[] = [];
+      const service = serviceJudgingWith({
+        spends,
+        queryTokenBudget: 1_000_000,
+        classifier: classifierAnswering(async () => {
+          events.push("judged");
+          return {
+            verdicts: [{ questionId: "annoyed", probability: 0.5 }],
+            inputTokens: 500,
+            isTextTruncated: false,
+          };
+        }),
+        reserveFreeBudget: async ({ reservationId, priceUsd }) => {
+          events.push("held");
+          holds.push({ reservationId, priceUsd });
+        },
+        releaseFreeBudget: async ({ reservationId }) => {
+          events.push(`released ${reservationId === holds[0]?.reservationId}`);
+        },
+      });
+
+      await run(service);
+
+      expect(events).toEqual(["held", "judged", "released true"]);
+      expect(holds[0]?.priceUsd).toBeCloseTo(
+        (1_000_000 / 1_000_000) *
+          INSTANT_EVAL_PRICING.usdPerMillionInputTokens *
+          INSTANT_EVAL_PRICING.markup,
+        9,
+      );
+      expect(spends).toHaveLength(1);
     });
   });
 });

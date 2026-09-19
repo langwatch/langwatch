@@ -8,6 +8,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 
+import { InMemoryInstantEvalBudgetReservations } from "../instant-eval-budget-reservations";
 import {
   INSTANT_EVAL_FREE_BUDGET_USD,
   InstantEvalFreeBudgetService,
@@ -29,13 +30,15 @@ function serviceWith({
   projects?: string[];
 } = {}) {
   const sumSpendNanoUsd = vi.fn(async () => spentNanoUsd);
+  const reservations = new InMemoryInstantEvalBudgetReservations();
   const service = new InstantEvalFreeBudgetService({
     organizationOf: async () => "org_1",
     projectsOf: async () => projects,
     isFreePlan: async () => isFree,
     sumSpendNanoUsd,
+    reservations,
   });
-  return { service, sumSpendNanoUsd };
+  return { service, sumSpendNanoUsd, reservations };
 }
 
 async function codeOf(run: () => Promise<unknown>): Promise<unknown> {
@@ -141,6 +144,123 @@ describe("given an organization on a paid plan", () => {
         (await service.standing({ projectId: "proj_1" })).remainingUsd,
       ).toBeNull();
       expect(sumSpendNanoUsd).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given a free organization with sixty cents of budget left", () => {
+  describe("when two runs estimated at forty cents each are accepted together", () => {
+    /** @scenario "Runs accepted together share the budget" */
+    it("holds the first and refuses the second", async () => {
+      const { service } = serviceWith({ spentNanoUsd: 0.4 * NANO });
+
+      await expect(
+        service.reserve({
+          projectId: "proj_1",
+          reservationId: "run_a",
+          priceUsd: 0.4,
+        }),
+      ).resolves.toBeUndefined();
+      const error = await service
+        .reserve({ projectId: "proj_1", reservationId: "run_b", priceUsd: 0.4 })
+        .catch((thrown: unknown) => thrown);
+
+      expect((error as { code?: unknown }).code).toBe(
+        "instant_eval_free_budget_exhausted",
+      );
+      expect((error as { meta?: { spentUsd?: number } }).meta?.spentUsd).toBeCloseTo(
+        0.8,
+        6,
+      );
+    });
+  });
+
+  describe("when a run under way checks its next page beside another run's hold", () => {
+    /** @scenario "A run under way counts the runs accepted beside it" */
+    it("counts the other hold and not its own", async () => {
+      const { service } = serviceWith({ spentNanoUsd: 0.4 * NANO });
+      await service.reserve({
+        projectId: "proj_1",
+        reservationId: "run_a",
+        priceUsd: 0.3,
+      });
+      await service.reserve({
+        projectId: "proj_1",
+        reservationId: "run_b",
+        priceUsd: 0.3,
+      });
+
+      // Spent 0.4, the other run holds 0.3, this run has judged 0.2: 0.9 is
+      // under the dollar, so the page goes ahead.
+      await expect(
+        service.assertWithinBudget({
+          projectId: "proj_1",
+          reservationId: "run_a",
+          inFlightUsd: 0.2,
+        }),
+      ).resolves.toBeUndefined();
+      // Its own hold of 0.3 is not counted twice; with it, 0.4 + 0.3 + 0.3 +
+      // 0.2 would already refuse. Judging 0.3 more is what crosses the line.
+      const error = await service
+        .assertWithinBudget({
+          projectId: "proj_1",
+          reservationId: "run_a",
+          inFlightUsd: 0.3,
+        })
+        .catch((thrown: unknown) => thrown);
+
+      expect((error as { code?: unknown }).code).toBe(
+        "instant_eval_free_budget_exhausted",
+      );
+    });
+  });
+
+  describe("when a run's spend has landed and its hold is released", () => {
+    /** @scenario "A hold is released when the run's spend lands" */
+    it("frees the budget for the next run and reads the ledger again", async () => {
+      const { service, sumSpendNanoUsd } = serviceWith({
+        spentNanoUsd: 0.4 * NANO,
+      });
+      await service.reserve({
+        projectId: "proj_1",
+        reservationId: "run_a",
+        priceUsd: 0.5,
+      });
+      const before = sumSpendNanoUsd.mock.calls.length;
+
+      await service.release({ projectId: "proj_1", reservationId: "run_a" });
+
+      await expect(
+        service.reserve({
+          projectId: "proj_1",
+          reservationId: "run_b",
+          priceUsd: 0.5,
+        }),
+      ).resolves.toBeUndefined();
+      expect(sumSpendNanoUsd.mock.calls.length).toBe(before + 1);
+    });
+  });
+});
+
+describe("given an organization on a paid plan with holds", () => {
+  describe("when a run reserves and releases", () => {
+    /** @scenario "A paid organization has no budget" */
+    it("holds nothing and refuses nothing", async () => {
+      const { service, reservations } = serviceWith({
+        isFree: false,
+        spentNanoUsd: 10 * NANO,
+      });
+
+      await service.reserve({
+        projectId: "proj_1",
+        reservationId: "run_a",
+        priceUsd: 50,
+      });
+      await service.release({ projectId: "proj_1", reservationId: "run_a" });
+
+      await expect(
+        reservations.heldNanoUsd({ organizationId: "org_1" }),
+      ).resolves.toBe(0);
     });
   });
 });
