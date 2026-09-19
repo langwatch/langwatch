@@ -3,7 +3,7 @@
  * page of conversations never loses a trace to the read's single ceiling.
  *
  * @see ../traceSource.ts
- * @see ../../../../../../specs/analytics/lwql-app-functions.feature
+ * @see ../../../../../../specs/lwql/app-functions.feature
  */
 
 import { describe, expect, it, vi } from "vitest";

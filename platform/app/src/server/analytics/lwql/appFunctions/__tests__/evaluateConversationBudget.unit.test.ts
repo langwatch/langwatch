@@ -8,7 +8,7 @@
  * than the classifier's byte cut, and the row still reports itself truncated.
  *
  * @see ../hydration/evaluate.ts
- * @see specs/analytics/lwql-eval-functions.feature
+ * @see specs/lwql/eval-functions.feature
  */
 import { describe, expect, it } from "vitest";
 
