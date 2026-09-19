@@ -73,6 +73,17 @@ Feature: Evaluator judge reasoning and tool compatibility
     Then the failure names the model and the setting to change
     And it does not repeat the provider's own wording
 
+  # On Azure the wire carries the deployment name, but nobody configured a
+  # deployment — they configured a model. The failure names the thing the
+  # reader can actually change.
+  @unit
+  Scenario: An Azure judge conflict names the configured model, not its deployment
+    Given an Azure evaluator model whose deployment name differs from the model
+    And the model refuses the judge's request over its reasoning setting
+    When the evaluator runs
+    Then the request leaves for the deployment
+    And the failure names the configured model and never the deployment
+
   # Every other refusal belongs to whoever has to read it, and arrives intact.
   @unit
   Scenario Outline: A refusal that is not this conflict reaches the caller untouched
