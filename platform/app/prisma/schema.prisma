@@ -1191,7 +1191,6 @@ enum CostType {
   GUARDRAIL
   CLUSTERING
   BATCH_EVALUATION
-  INSTANT_EVAL
 }
 
 enum CostReferenceType {
@@ -1199,7 +1198,6 @@ enum CostReferenceType {
   TRACE
   PROJECT
   BATCH
-  INSTANT_EVAL
 }
 
 model Cost {
