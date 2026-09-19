@@ -39,7 +39,7 @@ Input tokens are the text the judge reads plus the questions asked about it. One
 
 `POST /api/v1/instant-evals/estimate` returns the price of a run before it starts, from the rows the statement matches and a sample of their size. See [Running an Instant Eval](/api-reference/instant-evals/running-an-instant-eval).
 
-Organizations without a paid plan have a **$3 free budget** for Instant Evals in total, across all their projects. Past it, a new run or a judged query is refused until the organization upgrades. Paid plans have no such limit and are billed monthly for what was judged.
+Organizations without a paid plan have a **$1 free budget** for Instant Evals in total, across all their projects. Past it, a new run or a judged query is refused until the organization upgrades. Paid plans have no such limit and are billed monthly for what was judged.
 
 Every judged query and run is one spend event on the [billing events](/ai-gateway/billing-events) ledger, so a [gateway budget](/ai-gateway/budgets) set on a project or an organization caps Instant Evals the same way it caps gateway traffic.
 

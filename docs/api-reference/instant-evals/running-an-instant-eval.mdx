@@ -49,7 +49,7 @@ GROUP BY TraceId, ConversationId
 
 `priceUsd` is what the run costs you and `costUsd` is what it costs us. One classification is made per row, carrying every question the statement asks, so a statement with four eval columns still sends one request per row.
 
-An organization without a paid plan also gets `freeBudgetRemainingUsd`, what is left of its $3 free budget. Once that is spent, a new run and a judged query answer `402` with `instant_eval_free_budget_exhausted`, carrying `spentUsd` and `budgetUsd` in `meta`, until the organization upgrades. The rate is on [Pricing](/pricing#instant-evals).
+An organization without a paid plan also gets `freeBudgetRemainingUsd`, what is left of its $1 free budget. Once that is spent, a new run and a judged query answer `402` with `instant_eval_free_budget_exhausted`, carrying `spentUsd` and `budgetUsd` in `meta`, until the organization upgrades. The rate is on [Pricing](/pricing#instant-evals).
 
 ## Row Limits
 
