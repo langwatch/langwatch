@@ -57,7 +57,7 @@ import {
   instantEvalShorthandColumns,
   instantEvalShorthandQuestionSchema,
 } from "./questions";
-import { clickHouseDateTime, sqlInteger } from "./sql";
+import { clickHouseDateTime64, sqlInteger } from "./sql";
 
 /** What one judged row is. */
 export const INSTANT_EVAL_TARGETS = ["traces", "threads", "llm_spans"] as const;
@@ -293,16 +293,23 @@ function windowFor({
     );
   }
   return {
-    startAt: clickHouseDateTime(start),
-    endAt: clickHouseDateTime(end),
+    startAt: clickHouseDateTime64(start),
+    endAt: clickHouseDateTime64(end),
   };
 }
 
-/** `<column> >= {start_at:DateTime} AND <column> < {end_at:DateTime}`. */
+/**
+ * The type the window is bound as: the precision of the views' time columns,
+ * in UTC by name, because the bound text carries no offset and a bare
+ * `DateTime64` would be read in the server's own zone.
+ */
+const WINDOW_PARAMETER_TYPE = "DateTime64(3, 'UTC')";
+
+/** `<column> >= {start_at:DateTime64(3, 'UTC')} AND <column> < {end_at:DateTime64(3, 'UTC')}`. */
 function windowConditions(timeColumn: string): readonly string[] {
   return [
-    `${timeColumn} >= {start_at:DateTime}`,
-    `${timeColumn} < {end_at:DateTime}`,
+    `${timeColumn} >= {start_at:${WINDOW_PARAMETER_TYPE}}`,
+    `${timeColumn} < {end_at:${WINDOW_PARAMETER_TYPE}}`,
   ];
 }
 

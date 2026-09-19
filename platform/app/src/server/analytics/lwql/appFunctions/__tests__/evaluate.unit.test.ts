@@ -32,7 +32,10 @@ describe("given one eval over an extracted conversation", () => {
 
       const result = await hydrate({
         calls: [
-          evalOverConversation("annoyed", ["The customer sounds annoyed"]),
+          evalOverConversation({
+            column: "annoyed",
+            options: ["The customer sounds annoyed"],
+          }),
         ],
         columns: [{ name: "annoyed", type: "Nullable(String)" }],
         rows: [{ annoyed: THREAD }],
@@ -63,17 +66,20 @@ describe("given three questions over the same conversation expression", () => {
 
       const result = await hydrate({
         calls: [
-          evalOverConversation("annoyed", ["Annoyed"]),
-          evalOverConversation(
-            "satisfaction",
-            ["How satisfied", 1, 5],
-            "eval_score",
-          ),
-          evalOverConversation(
-            "intent",
-            ["What is asked for", ["refund: money back", "bug: broken"]],
-            "eval_category",
-          ),
+          evalOverConversation({ column: "annoyed", options: ["Annoyed"] }),
+          evalOverConversation({
+            column: "satisfaction",
+            options: ["How satisfied", 1, 5],
+            fn: "eval_score",
+          }),
+          evalOverConversation({
+            column: "intent",
+            options: [
+              "What is asked for",
+              ["refund: money back", "bug: broken"],
+            ],
+            fn: "eval_category",
+          }),
         ],
         columns: [
           { name: "annoyed", type: "Nullable(String)" },
@@ -113,7 +119,7 @@ describe("given two evals over two different expressions", () => {
 
       await hydrate({
         calls: [
-          evalOverConversation("whole", ["Annoyed"]),
+          evalOverConversation({ column: "whole", options: ["Annoyed"] }),
           {
             column: "bounded",
             function: "eval",
@@ -155,7 +161,7 @@ describe("given an eval over a plain column", () => {
       });
 
       expect(classifier.requests[0]?.text).toBe("we are sorry for the delay");
-      expect(traceSource.askedTraceIds).toEqual([[]]);
+      expect(traceSource.askedTraceIds).toEqual([]);
       expect(result.rows).toEqual([{ apology: 0.2 }]);
     });
   });
@@ -186,12 +192,32 @@ describe("given one verdict read four different ways", () => {
 
       const result = await hydrate({
         calls: [
-          evalOverConversation("probability", ["Annoyed"]),
-          evalOverConversation("over", ["Annoyed", 0.7], "eval_passed"),
-          evalOverConversation("under", ["Annoyed", 0.9], "eval_passed"),
-          evalOverConversation("score", ["How satisfied", 1, 5], "eval_score"),
-          evalOverConversation("label", options, "eval_category"),
-          evalOverConversation("distribution", options, "eval_category_probs"),
+          evalOverConversation({ column: "probability", options: ["Annoyed"] }),
+          evalOverConversation({
+            column: "over",
+            options: ["Annoyed", 0.7],
+            fn: "eval_passed",
+          }),
+          evalOverConversation({
+            column: "under",
+            options: ["Annoyed", 0.9],
+            fn: "eval_passed",
+          }),
+          evalOverConversation({
+            column: "score",
+            options: ["How satisfied", 1, 5],
+            fn: "eval_score",
+          }),
+          evalOverConversation({
+            column: "label",
+            options: options,
+            fn: "eval_category",
+          }),
+          evalOverConversation({
+            column: "distribution",
+            options: options,
+            fn: "eval_category_probs",
+          }),
         ],
         columns: [
           { name: "probability", type: "Nullable(String)" },

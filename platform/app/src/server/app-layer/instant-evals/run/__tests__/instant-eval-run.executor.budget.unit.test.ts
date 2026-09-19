@@ -7,7 +7,7 @@
  * covers that gap: it hands the budget what this run has judged so far, priced
  * the way the finish will price it.
  *
- * @see ../instant-eval-run.executor.ts
+ * @see ../instant-eval-run.judge-page.ts
  * @see ../../../../../../specs/instant-evals/instant-eval-billing.feature
  */
 
@@ -24,6 +24,7 @@ const PAGE = {
   pageSize: 500,
   remaining: 1_000,
   keyColumns: ["ThreadId"],
+  deadlineAt: null,
 };
 
 describe("given a run whose organization is on the free budget", () => {

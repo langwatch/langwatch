@@ -34,6 +34,10 @@ import { InstantEvalNotEnabledError } from "~/server/app-layer/instant-evals/run
 import { prisma } from "~/server/db";
 import type { Protections } from "~/server/traces/protections";
 import {
+  canonicalConflictResponses,
+  canonicalNotFoundResponses,
+} from "../../shared/base-responses";
+import {
   CANCEL_RUN_DESCRIPTION,
   CREATE_RUN_DESCRIPTION,
   ESTIMATE_RUN_DESCRIPTION,
@@ -190,7 +194,11 @@ const registerItemEndpoints = (v: InstantEvalsVersion): void => {
       params: instantEvalIdParamsSchema,
       output: instantEvalRunSchema,
       description: GET_RUN_DESCRIPTION,
-      docs: { operationId: "getInstantEvalRun", tags: TAGS },
+      docs: {
+        operationId: "getInstantEvalRun",
+        tags: TAGS,
+        responses: { ...canonicalNotFoundResponses },
+      },
     },
     async (_c, { params, app }: { params: IdParams; app: InstantEvalsApp }) =>
       toInstantEvalRunWire(
@@ -209,6 +217,10 @@ const registerItemEndpoints = (v: InstantEvalsVersion): void => {
         summary: "Cancel a run",
         operationId: "cancelInstantEvalRun",
         tags: TAGS,
+        responses: {
+          ...canonicalNotFoundResponses,
+          ...canonicalConflictResponses,
+        },
       },
     },
     async (c, { params, app }: { params: IdParams; app: InstantEvalsApp }) => {

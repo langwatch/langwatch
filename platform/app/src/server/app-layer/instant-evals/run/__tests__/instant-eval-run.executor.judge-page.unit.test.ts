@@ -6,7 +6,7 @@
  * deployment a self-hosted install without a key gets, and a page of skips must
  * still be a recorded page rather than a failure the queue redelivers forever.
  *
- * @see ../instant-eval-run.executor.ts
+ * @see ../instant-eval-run.judge-page.ts
  * @see ../../../../../../specs/instant-evals/instant-eval-pipeline.feature
  */
 
@@ -29,6 +29,7 @@ describe("given a page of a run", () => {
         pageSize: 500,
         remaining: 1_000,
         keyColumns: ["ThreadId"],
+        deadlineAt: null,
       });
 
       expect(inserted[0]).toHaveLength(2);
@@ -50,6 +51,7 @@ describe("given a page of a run", () => {
         pageSize: 500,
         remaining: 1_000,
         keyColumns: [],
+        deadlineAt: null,
       });
 
       expect(outcome.cursor).toBe("t2");
@@ -68,6 +70,7 @@ describe("given a page of a run", () => {
         pageSize: 500,
         remaining: 1_000,
         keyColumns: [],
+        deadlineAt: null,
       });
       const last = await exhausted.executor.judgePage({
         runId: RUN_ID,
@@ -78,6 +81,7 @@ describe("given a page of a run", () => {
         pageSize: 500,
         remaining: 2,
         keyColumns: [],
+        deadlineAt: null,
       });
 
       expect(more.hasNextPage).toBe(true);
@@ -96,6 +100,7 @@ describe("given a page of a run", () => {
         pageSize: 500,
         remaining: 1_000,
         keyColumns: [],
+        deadlineAt: null,
       });
 
       expect(outcome).toMatchObject({ inputTokens: 1_200, requests: 2 });
@@ -119,6 +124,7 @@ describe("given a page of a run", () => {
         pageSize: 500,
         remaining: 1_000,
         keyColumns: [],
+        deadlineAt: null,
       });
 
       expect(outcome).toMatchObject({ rows: 2, skipped: 2, failed: 0 });
@@ -146,6 +152,7 @@ describe("given a page of a run", () => {
           pageSize: 500,
           remaining: 1_000,
           keyColumns: [],
+          deadlineAt: null,
         }),
       ).rejects.toThrow(/page 3/);
       expect(inserted).toEqual([]);
@@ -166,6 +173,7 @@ describe("given a page of a run", () => {
         pageSize: 500,
         remaining: 500,
         keyColumns: [],
+        deadlineAt: null,
       });
 
       expect(rowSource.read).not.toHaveBeenCalled();

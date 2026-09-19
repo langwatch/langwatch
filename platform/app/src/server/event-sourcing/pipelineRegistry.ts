@@ -70,6 +70,7 @@ import { createStoredObjectsService } from "~/server/stored-objects/stored-objec
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import { queryInstantEvalSpendTotal } from "../../../ee/billing/services/instantEvalSpendQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
+import { meters } from "../../../ee/billing/stripe/stripePriceCatalog";
 import type { TriggerService } from "../app-layer/automations/trigger.service";
 import type { BillingCheckpointService } from "../app-layer/billing/billingCheckpoint.service";
 import type { BroadcastService } from "../app-layer/broadcast/broadcast.service";
@@ -2024,6 +2025,8 @@ export class PipelineRegistry {
       getUsageReportingService: () => this.deps.usageReportingService,
       queryBillableEventsTotal,
       queryInstantEvalSpendTotal,
+      isInstantEvalMeterProvisioned: () =>
+        meters.INSTANT_EVAL_USD !== undefined,
       selfDispatch: (data) => {
         const pipeline = this.deps.eventSourcing.getPipeline(
           BILLING_REPORTING_PIPELINE_NAME,

@@ -61,6 +61,21 @@ describe("compileInstantEvalShorthandFilter, given a filter", () => {
       expect(compiled.parameters).toEqual({ model_0: "gpt-5%" });
     });
 
+    /** @scenario "A wildcard model value keeps its literal LIKE characters" */
+    it("escapes the pattern's own wildcards in a wildcard model value", () => {
+      const compiled = compileInstantEvalShorthandFilter(
+        'model:"gpt_5*100%*C:\\\\v*"',
+      )!;
+
+      // `_`, `%` and `\` are wildcards to LIKE, so each is escaped and only
+      // the caller's `*` becomes one: without this `gpt_5*` also matches
+      // `gptA5`.
+      expect(compiled.sql).toContain("arrayExists(m -> m LIKE");
+      expect(compiled.parameters).toEqual({
+        model_0: "gpt\\_5%100\\%%C:\\\\v%",
+      });
+    });
+
     it("compiles a label through the encoded label list", () => {
       const compiled = compileInstantEvalShorthandFilter("label:beta")!;
 
@@ -139,6 +154,19 @@ describe("compileInstantEvalShorthandFilter, given a filter", () => {
       expect(compiled.sql).toContain("CapturedInput ILIKE");
       expect(compiled.sql).toContain("CapturedOutput ILIKE");
       expect(compiled.parameters).toEqual({ text_0: "%timeout%" });
+    });
+
+    /** @scenario "Free text keeps its literal LIKE characters" */
+    it("escapes the pattern's own wildcards in the text", () => {
+      const compiled = compileInstantEvalShorthandFilter(
+        '"50%_off C:\\\\tmp"',
+      )!;
+
+      // Only the two `%` the compiler adds are wildcards: a caller looking
+      // for `50%_off` must not match `50 off` or `500off`.
+      expect(compiled.parameters).toEqual({
+        text_0: "%50\\%\\_off C:\\\\tmp%",
+      });
     });
   });
 

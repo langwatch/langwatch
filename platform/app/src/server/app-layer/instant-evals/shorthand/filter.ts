@@ -208,13 +208,24 @@ const statusHandler: FilterTagTranslator = (tag, negated) => {
   return wrap(STATUS_ERROR_EXPRESSION, negated);
 };
 
+/**
+ * The caller's text as a `LIKE` pattern that matches it and nothing else.
+ *
+ * `%` and `_` are wildcards to `LIKE`, and a backslash is what escapes them,
+ * so all three are escaped before any wildcard of the filter language's own is
+ * written in. Without this `model:gpt_5*` also matches `gptA5`.
+ */
+function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, "\\$&");
+}
+
 /** `model:<value>`, with `*` wildcards, over the hoisted model list. */
 const modelHandler: FilterTagTranslator = (tag, negated, ctx) => {
   const value = extractStringValue(tag);
   validateValueLength(value);
   const param = nextParam(ctx, "model");
   if (value.includes("*")) {
-    ctx.params[param] = value.replace(/\*/g, "%");
+    ctx.params[param] = escapeLikePattern(value).replace(/\*/g, "%");
     return wrap(`arrayExists(m -> m LIKE {${param}:String}, Models)`, negated);
   }
   ctx.params[param] = value;
@@ -317,7 +328,7 @@ function translateFreeText({
   const value = extractStringValue(tag);
   validateValueLength(value);
   const param = nextParam(ctx, "text");
-  ctx.params[param] = `%${value}%`;
+  ctx.params[param] = `%${escapeLikePattern(value)}%`;
   const bound = `{${param}:String}`;
   const clause =
     `(CapturedInput ILIKE ${bound} OR CapturedOutput ILIKE ${bound}` +

@@ -81,7 +81,7 @@ export const INSTANT_EVAL_PAGE_ROW_CEILING = 5_000;
 /**
  * What one pass read, with the fact every pass has to check before trusting it.
  *
- * `truncated` is decided here rather than by the executor, which returns every
+ * `isTruncated` is decided here rather than by the executor, which returns every
  * row the database gave it: a pass asks for a bounded number of rows and a
  * result above that bound means the selection outgrew what the pass can own.
  * Reading a cut page as if it were whole is the one failure a run cannot
@@ -89,7 +89,7 @@ export const INSTANT_EVAL_PAGE_ROW_CEILING = 5_000;
  */
 export type InstantEvalPassExecution = Awaited<
   ReturnType<LangWatchQLExecutor["execute"]>
-> & { readonly truncated: boolean };
+> & { readonly isTruncated: boolean };
 
 /**
  * The three operations every pass is built from, closed over one caller's
@@ -149,7 +149,7 @@ export async function countPass(
     ...(parameters ? { parameters } : {}),
     maxRows: 1,
   });
-  if (execution.truncated) throw new InstantEvalResultTruncatedError("count");
+  if (execution.isTruncated) throw new InstantEvalResultTruncatedError("count");
   const total = execution.rows[0]?.total;
   if (typeof total === "number") return total;
   // ClickHouse renders a UInt64 as a decimal string in JSON, which is what a
@@ -195,7 +195,7 @@ export async function keyPass(
     },
     maxRows: probeLimit,
   });
-  if (execution.truncated) throw new InstantEvalResultTruncatedError("key");
+  if (execution.isTruncated) throw new InstantEvalResultTruncatedError("key");
   return {
     keys: execution.rows.slice(0, limit).map(toRowKey),
     hasMore: execution.rows.length > limit,
@@ -252,7 +252,7 @@ export async function readPass(
     maxRows: INSTANT_EVAL_PAGE_ROW_CEILING,
   });
   const queryMs = Date.now() - startedQuery;
-  if (execution.truncated) throw new InstantEvalResultTruncatedError("page");
+  if (execution.isTruncated) throw new InstantEvalResultTruncatedError("page");
 
   // Rows of a trace the page shares with its neighbour are dropped here: the
   // predicate could only name the trace, so the page read them and does not
@@ -301,6 +301,7 @@ export async function judgePreparedPass(
       computeMs: hydration.timings?.computeMs ?? 0,
       judgeMs: hydration.timings?.judgeMs ?? 0,
     },
+    ...(hydration.cancellation ? { cancellation: hydration.cancellation } : {}),
   };
 }
 
@@ -369,7 +370,7 @@ export async function textPass(
   // high fan-out trace can return far more rows than the traces asked for, and
   // extracting all of them is work nobody asked for over an answer that was
   // already cut.
-  if (execution.truncated) throw new InstantEvalResultTruncatedError("text");
+  if (execution.isTruncated) throw new InstantEvalResultTruncatedError("text");
   const hydration = await passes.judge({
     prepared: await passes.prepare({
       caller,

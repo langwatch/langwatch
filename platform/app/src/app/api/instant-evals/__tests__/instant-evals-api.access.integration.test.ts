@@ -19,7 +19,7 @@ import {
   setupInstantEvalsApiHarness,
 } from "./instantEvalsApiHarness";
 
-const flagIsOn = vi.hoisted(() => ({ value: true }));
+const flagIsOn = vi.hoisted(() => ({ isEnabled: true }));
 
 vi.mock("~/server/app-layer/instant-evals/access", async (importOriginal) => {
   const original =
@@ -28,7 +28,7 @@ vi.mock("~/server/app-layer/instant-evals/access", async (importOriginal) => {
     >();
   return {
     ...original,
-    instantEvalsEnabled: async () => flagIsOn.value,
+    instantEvalsEnabled: async () => flagIsOn.isEnabled,
   };
 });
 
@@ -98,7 +98,7 @@ describe("Feature: The Instant Eval run over REST", () => {
     describe("when a run is requested", () => {
       /** @scenario "A project without the flag cannot reach the family" */
       it("answers 403 instant_eval_not_enabled and never reaches the service", async () => {
-        flagIsOn.value = false;
+        flagIsOn.isEnabled = false;
 
         const res = await api.post(BASE, { sql: SQL });
         const body = await res.json();

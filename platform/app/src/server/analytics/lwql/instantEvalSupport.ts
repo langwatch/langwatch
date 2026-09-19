@@ -62,11 +62,21 @@ export interface LangWatchQLInstantEvalSupport {
   readonly maxConcurrency: number;
   readonly queryTokenBudget: number;
   /**
-   * Refuses a statement that judges when the organization has spent its free
-   * allowance. Called before anything is sent, so the budget bounds what was
-   * spent rather than what will be billed.
+   * Holds the query's ceiling price against the free budget, or refuses when
+   * the organization has spent its allowance. Called before anything is sent,
+   * so the budget bounds what was spent rather than what will be billed, and
+   * so two queries judging at once share the budget between them.
    */
-  assertFreeBudget(args: { projectId: string }): Promise<void>;
+  reserveFreeBudget(args: {
+    projectId: string;
+    reservationId: string;
+    priceUsd: number;
+  }): Promise<void>;
+  /** Drops the hold once the query's spend has been recorded. */
+  releaseFreeBudget(args: {
+    projectId: string;
+    reservationId: string;
+  }): Promise<void>;
   recordSpend(record: InstantEvalSpendRecord): Promise<void>;
 }
 
@@ -108,8 +118,10 @@ export function createLangWatchQLInstantEvalSupport({
     maxConcurrency: DEFAULT_MAX_CONCURRENCY,
     queryTokenBudget:
       env.INSTANT_EVAL_QUERY_TOKEN_BUDGET ?? DEFAULT_QUERY_TOKEN_BUDGET,
-    assertFreeBudget: ({ projectId }) =>
-      budget.assertWithinBudget({ projectId }),
+    reserveFreeBudget: ({ projectId, reservationId, priceUsd }) =>
+      budget.reserve({ projectId, reservationId, priceUsd }),
+    releaseFreeBudget: ({ projectId, reservationId }) =>
+      budget.release({ projectId, reservationId }),
     recordSpend: async (record) => {
       const bound = recorder ?? tryGetApp()?.instantEvals.spend ?? fallback;
       await bound.recordSpend(record);

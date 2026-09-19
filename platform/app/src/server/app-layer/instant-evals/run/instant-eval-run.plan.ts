@@ -15,12 +15,14 @@ import type {
 } from "~/server/event-sourcing/pipelines/instant-eval-processing/process-manager";
 import {
   type InstantEvalRunExecutorDependencies,
-  instantEvalAverageTextBytes,
   instantEvalHydrationPlan,
-  instantEvalKeyCapFor,
-  instantEvalPageSizeFor,
   loadRun,
 } from "./instant-eval-run.executor";
+import {
+  instantEvalAverageTextBytes,
+  instantEvalKeyCapFor,
+  instantEvalPageSizeFor,
+} from "./instant-eval-run.sizing";
 import { instantEvalKeyColumns } from "./row-source";
 
 /** Rows a plan measures the text size of. */
@@ -80,10 +82,10 @@ export async function planRun(
 
   return {
     total: Math.min(total, row.rowLimit),
-    pageSize: instantEvalPageSizeFor(
+    pageSize: instantEvalPageSizeFor({
       averageTextBytes,
-      instantEvalKeyCapFor(instantEvalHydrationPlan(row.plan)),
-    ),
+      keyCap: instantEvalKeyCapFor(instantEvalHydrationPlan(row.plan)),
+    }),
     isCapped,
     keyColumns,
   };

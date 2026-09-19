@@ -145,6 +145,13 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
     Then it is accepted
 
   @unit
+  Scenario: A call in the parametric form is refused
+    Given a statement projecting conversation(1)(ConversationId) AS c
+    When the statement is validated
+    Then it is refused with APP_FUNCTION_ARGUMENT naming conversation
+    And the same form on an extraction nested inside an eval is refused the same way
+
+  @unit
   Scenario: A gated column inside a key expression is still refused
     Given a caller without the captured-input permission
     And a statement projecting thread_traces(CapturedInput) AS ids
@@ -221,7 +228,7 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
   Scenario: A single value past the per-value ceiling is cut and reported
     Given one hydrated value larger than the per-value ceiling
     When hydration runs
-    Then that value is cut to the ceiling
+    Then that value is cut on a character boundary so its encoded length is at or under the ceiling
     And the result carries APP_FUNCTION_VALUE_TRUNCATED naming the function and how many values were cut
 
   @unit
@@ -258,6 +265,19 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
     Then the rendered conversation holds the text from those messages
 
   @unit
+  Scenario: Questions that leave no room for text are refused before anything is judged
+    Given eval questions that alone fill the judge's state
+    When the statement is hydrated
+    Then it fails with instant_eval_questions_too_long and nothing is sent to the judge
+
+  @unit
+  Scenario: A conversation over the judge's budget is measured with the judge's own ratio
+    Given a conversation that fits four bytes a token but not the judge's denser ratio
+    When the statement is hydrated
+    Then it is re-rendered under the judge's budget before it is sent
+    And the row is reported truncated
+
+  @unit
   Scenario: A bounded conversation keeps both ends and names what it dropped
     Given a thread whose turns do not fit the requested token budget
     When conversation_bounded hydrates
@@ -267,6 +287,26 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
   # ---------------------------------------------------------------------------
   # Failure
   # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: A cancelled query keeps the judgements it made
+    Given a judged query whose caller cancels after one row was answered
+    When hydration returns
+    Then the answered verdict and its usage are kept
+    And the result names the rows that were never judged
+
+  @unit
+  Scenario: A read past the byte budget is refused, not completed
+    Given a page whose traces together hold more bytes than one read may fetch
+    When their traces are read for hydration
+    Then the read stops at the budget and fails with lwql_app_function_read_budget
+    And the error names the budget and how much had been read
+
+  @unit
+  Scenario: A cancelled read stops between chunks
+    Given a page of traces read in chunks
+    When the caller cancels after the first chunk
+    Then no further chunk is read
 
   @unit
   Scenario: A failed fetch is a platform failure, not a wrong answer
@@ -341,6 +381,19 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
     Given a chart-managed ClickHouse rendered in replicated mode with a LangWatchQL password
     When the LangWatchQL server config is rendered
     Then it declares a user_defined_zookeeper_path so one create reaches every replica
+
+  @unit
+  Scenario: A multi-replica server without a shared function store is provisioned without the functions
+    Given a self-hosted ClickHouse with three replicas and no user_defined_zookeeper_path
+    When self-provisioning runs
+    Then the app functions are left out and the log names the setting to declare
+    And the rest of the access model is provisioned
+
+  @unit
+  Scenario: A single-node server is provisioned with the functions
+    Given a self-hosted ClickHouse with no replicated tables
+    When self-provisioning runs
+    Then the app functions are created on its local store
 
   @unit
   Scenario: A single-node server stores them on local disk

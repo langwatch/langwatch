@@ -205,8 +205,11 @@
                 "group": "Instant Evals",
                 "pages": [
                   "features/instant-evals/overview",
-                  "features/instant-evals/cli",
-                  "features/instant-evals/shorthand"
+                  "features/instant-evals/questions",
+                  "features/instant-evals/targets",
+                  "features/instant-evals/results",
+                  "features/instant-evals/limits-and-cost",
+                  "features/instant-evals/cli"
                 ]
               },
               {
@@ -1694,6 +1697,10 @@
     }
   },
   "redirects": [
+    {
+      "source": "/features/instant-evals/shorthand",
+      "destination": "/features/instant-evals/targets"
+    },
     {
       "source": "/ci/cache/busted/1789807595",
       "destination": "/introduction"

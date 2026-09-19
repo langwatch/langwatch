@@ -145,6 +145,27 @@ Feature: The Instant Eval run over REST, one LWQL statement, judged as a job
     Then every matched row had its text measured
 
   @unit
+  Scenario: A selection only just larger than the sample is still spread
+    Given a statement matching seventy five rows
+    When an estimate is requested
+    Then the sample is drawn from at least two buckets
+    And it is not the first fifty rows the statement returns
+
+  @unit
+  Scenario: A sample over spans is spread over spans, not over whole traces
+    Given a statement whose rows are the spans of each trace
+    When the sample statement is composed
+    Then the bucket is chosen from the trace and span pair together
+    And the spans of one trace do not all land in one bucket
+
+  @unit
+  Scenario: Half of the list's cursor is refused, naming the missing half
+    Given a list request carrying before without beforeId, or the reverse
+    When the request is validated
+    Then it is refused
+    And the refusal names the half that is missing
+
+  @unit
   Scenario: Judged text is priced at the classifier's own published byte ratio
     Given a judged text of known length
     When its input tokens are estimated

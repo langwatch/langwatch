@@ -53,6 +53,7 @@
  * @see ./provisioning/accessModel.ts — the isolation this composes over
  */
 
+import { randomUUID } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
 import type { InstantEvalClassifier } from "~/server/app-layer/instant-evals/classifier/classifier";
 import {
@@ -702,16 +703,10 @@ export class LangWatchQLService {
    *   {@link LangWatchQLUnavailableError} when no LangWatchQL identity
    *   is provisioned.
    */
-  async execute({
-    projects,
-    protections,
-    sql,
-    parameters,
-    timeWindow,
-    granularitySeconds,
-    onBudgetOverflow,
-    signal,
-  }: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
+  async execute(
+    input: LangWatchQLExecuteInput,
+  ): Promise<LangWatchQLQueryResult> {
+    const { projects, protections, sql, parameters, timeWindow } = input;
     // Only logging reads this; the database resolves the tenant set itself.
     const scopeLabel =
       projects.map((project) => project.id).join(",") || "(none)";
@@ -734,7 +729,36 @@ export class LangWatchQLService {
       ...(parameters ? { parameters } : {}),
       ...(timeWindow ? { timeWindow } : {}),
     });
-    await this.assertJudgingWithinFreeBudget({ projects, validation });
+    const hold = await this.reserveJudgingBudget({
+      projects,
+      validation,
+    });
+    try {
+      return await this.executeReserved({ input, validation, hold });
+    } finally {
+      await hold?.settle();
+    }
+  }
+
+  /** The half of {@link execute} that runs under the budget hold. */
+  private async executeReserved({
+    input: {
+      projects,
+      protections,
+      sql,
+      parameters,
+      timeWindow,
+      granularitySeconds,
+      onBudgetOverflow,
+      signal,
+    },
+    validation,
+    hold,
+  }: {
+    readonly input: LangWatchQLExecuteInput;
+    readonly validation: ValidatedLangWatchQL;
+    readonly hold: JudgingBudgetHold | null;
+  }): Promise<LangWatchQLQueryResult> {
     const granularity = resolveRunGranularityOrRefuseUnfilled({
       declared: validation.parameters,
       ...(parameters ? { parameters } : {}),
@@ -764,6 +788,7 @@ export class LangWatchQLService {
       sql,
       validation,
       granularity,
+      hold,
       ...(signal ? { signal } : {}),
     });
   }
@@ -865,12 +890,14 @@ export class LangWatchQLService {
     protections,
     validation,
     execution,
+    hold,
     signal,
   }: {
     readonly projects: readonly LangWatchQLCaller[];
     readonly protections: Protections;
     readonly validation: ValidatedLangWatchQL;
     readonly execution: Awaited<ReturnType<LangWatchQLExecutor["execute"]>>;
+    readonly hold: JudgingBudgetHold | null;
     readonly signal?: AbortSignal;
   }): Promise<LangWatchQLHydrationResult> {
     // Only a statement that judges something builds the classifier: a query
@@ -905,36 +932,82 @@ export class LangWatchQLService {
     });
 
     if (judging && billedProject) {
-      await recordInstantEvalSpend({
+      const isRecorded = await recordInstantEvalSpend({
         projectId: billedProject.id,
         usage: hydration.evalUsage,
         classifier: judging.classifier(),
         recordSpend: judging.recordSpend,
       });
+      // A spend that never reached the ledger is a spend the budget cannot
+      // see, so the hold stands in for it until it lapses.
+      if (!isRecorded) hold?.keep();
+    }
+    // Recorded first, refused second: the judgements made before the caller
+    // walked away were paid for, and a query that stops judging must still
+    // fail as cancelled rather than answer with null columns.
+    if (hydration.cancellation) {
+      throw signal?.reason instanceof Error
+        ? signal.reason
+        : new DOMException("The query was cancelled", "AbortError");
     }
     return hydration;
   }
 
   /**
-   * Refuses a statement that judges once the organization has spent its free
-   * allowance.
+   * Holds the query's ceiling price against the free budget, or refuses a
+   * statement that judges once the organization has spent its allowance.
    *
    * Before the database runs, so the budget bounds what was spent rather than
-   * what will be billed: nothing reaches the classifier past it. The scope is
-   * one project wherever an eval call was admitted, which is what the
-   * validator enforces and what gives the spend an owner.
+   * what will be billed: nothing reaches the classifier past it. The ceiling
+   * is the price of the whole query token budget, which is the most the query
+   * can spend; the hold is released once the spend it stood for is recorded,
+   * or when the query fails before judging. The scope is one project wherever
+   * an eval call was admitted, which is what the validator enforces and what
+   * gives the spend an owner.
    */
-  private async assertJudgingWithinFreeBudget({
+  private async reserveJudgingBudget({
     projects,
     validation,
   }: {
     readonly projects: readonly LangWatchQLCaller[];
     readonly validation: ReturnType<LangWatchQLService["validate"]>;
-  }): Promise<void> {
-    if (!callsEvalFunction(validation.appFunctions)) return;
+  }): Promise<JudgingBudgetHold | null> {
+    if (!callsEvalFunction(validation.appFunctions)) return null;
     const judging = projects.length === 1 ? projects[0] : undefined;
-    if (!judging) return;
-    await this.instantEvals().assertFreeBudget({ projectId: judging.id });
+    if (!judging) return null;
+    const support = this.instantEvals();
+    const reservationId = `query:${randomUUID()}`;
+    const costUsd = instantEvalCostUsd({
+      inputTokens: support.queryTokenBudget,
+      pricing: support.classifier().pricing,
+    });
+    await support.reserveFreeBudget({
+      projectId: judging.id,
+      reservationId,
+      priceUsd: instantEvalPriceUsd({
+        costUsd,
+        pricing: support.classifier().pricing,
+      }),
+    });
+    let isKept = false;
+    return {
+      keep: () => {
+        isKept = true;
+      },
+      settle: async () => {
+        if (isKept) {
+          logger.warn(
+            { projectId: judging.id, reservationId },
+            "Instant Evals spend was not recorded; its hold on the free budget stays until it lapses",
+          );
+          return;
+        }
+        await support.releaseFreeBudget({
+          projectId: judging.id,
+          reservationId,
+        });
+      },
+    };
   }
 
   /**
@@ -952,6 +1025,7 @@ export class LangWatchQLService {
     sql,
     validation,
     granularity,
+    hold,
     signal,
   }: {
     readonly executor: LangWatchQLExecutor;
@@ -960,6 +1034,7 @@ export class LangWatchQLService {
     readonly sql: string;
     readonly validation: ValidatedLangWatchQL;
     readonly granularity: LangWatchQLGranularityResolution;
+    readonly hold: JudgingBudgetHold | null;
     readonly signal?: AbortSignal;
   }): Promise<LangWatchQLQueryResult> {
     const execution = await this.runStatement({
@@ -975,6 +1050,7 @@ export class LangWatchQLService {
       protections,
       validation,
       execution,
+      hold,
       ...(signal ? { signal } : {}),
     });
 
@@ -1220,8 +1296,8 @@ async function recordInstantEvalSpend({
   usage: LangWatchQLEvalUsage | undefined;
   classifier: InstantEvalClassifier;
   recordSpend: LangWatchQLInstantEvalSupport["recordSpend"];
-}): Promise<void> {
-  if (!usage || usage.inputTokens <= 0) return;
+}): Promise<boolean> {
+  if (!usage || usage.inputTokens <= 0) return true;
   const costUsd = instantEvalCostUsd({
     inputTokens: usage.inputTokens,
     pricing: classifier.pricing,
@@ -1235,10 +1311,22 @@ async function recordInstantEvalSpend({
       priceUsd: instantEvalPriceUsd({ costUsd, pricing: classifier.pricing }),
       occurredAt: new Date(),
     });
+    return true;
   } catch (error) {
     logger.error(
       { projectId, error },
       "Instant Evals spend could not be recorded",
     );
+    return false;
   }
+}
+
+/**
+ * The hold a judged query takes on the free budget: released once its spend
+ * is on the ledger, kept when the record failed so the budget still counts
+ * what was judged.
+ */
+interface JudgingBudgetHold {
+  keep(): void;
+  settle(): Promise<void>;
 }

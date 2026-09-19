@@ -2,31 +2,36 @@
  * The executor's pure helpers: the page size a sample of texts earns, the
  * average size of those texts, and the hydration plan read back off a run.
  *
+ * @see ../instant-eval-run.sizing.ts
  * @see ../instant-eval-run.executor.ts
  * @see ../../../../../../specs/instant-evals/instant-eval-pipeline.feature
  */
 
 import { describe, expect, it } from "vitest";
 
+import { instantEvalHydrationPlan } from "../instant-eval-run.executor";
 import {
   INSTANT_EVAL_LARGE_TEXT_BYTES,
   INSTANT_EVAL_PAGE_SIZE,
   INSTANT_EVAL_SMALL_PAGE_SIZE,
   instantEvalAverageTextBytes,
-  instantEvalHydrationPlan,
   instantEvalKeyCapFor,
   instantEvalPageSizeFor,
-} from "../instant-eval-run.executor";
+} from "../instant-eval-run.sizing";
 import { calls } from "./instantEvalRunExecutorFakes";
 
 describe("given a sample of a page's texts", () => {
   describe("when the page size is chosen from them", () => {
     /** @scenario "A page of large texts is smaller than a page of small ones" */
     it("cuts the page to a fifth past the large-text mark", () => {
-      expect(instantEvalPageSizeFor(1_000)).toBe(INSTANT_EVAL_PAGE_SIZE);
-      expect(instantEvalPageSizeFor(INSTANT_EVAL_LARGE_TEXT_BYTES + 1)).toBe(
-        INSTANT_EVAL_SMALL_PAGE_SIZE,
+      expect(instantEvalPageSizeFor({ averageTextBytes: 1_000 })).toBe(
+        INSTANT_EVAL_PAGE_SIZE,
       );
+      expect(
+        instantEvalPageSizeFor({
+          averageTextBytes: INSTANT_EVAL_LARGE_TEXT_BYTES + 1,
+        }),
+      ).toBe(INSTANT_EVAL_SMALL_PAGE_SIZE);
     });
   });
 
@@ -48,7 +53,10 @@ describe("given a sample of a page's texts", () => {
 
       expect(instantEvalKeyCapFor(threadCalls)).toBe(200);
       expect(
-        instantEvalPageSizeFor(1_000, instantEvalKeyCapFor(threadCalls)),
+        instantEvalPageSizeFor({
+          averageTextBytes: 1_000,
+          keyCap: instantEvalKeyCapFor(threadCalls),
+        }),
       ).toBe(200);
     });
 
@@ -64,14 +72,20 @@ describe("given a sample of a page's texts", () => {
       ] as never;
 
       expect(
-        instantEvalPageSizeFor(1_000, instantEvalKeyCapFor(traceCalls)),
+        instantEvalPageSizeFor({
+          averageTextBytes: 1_000,
+          keyCap: instantEvalKeyCapFor(traceCalls),
+        }),
       ).toBe(INSTANT_EVAL_PAGE_SIZE);
     });
 
     /** @scenario "A large-text page stays small even when the cap is higher" */
     it("keeps the smaller of the two bounds", () => {
       expect(
-        instantEvalPageSizeFor(INSTANT_EVAL_LARGE_TEXT_BYTES + 1, 1_000),
+        instantEvalPageSizeFor({
+          averageTextBytes: INSTANT_EVAL_LARGE_TEXT_BYTES + 1,
+          keyCap: 1_000,
+        }),
       ).toBe(INSTANT_EVAL_SMALL_PAGE_SIZE);
     });
   });
@@ -139,7 +153,10 @@ describe("given the statement's own functions", () => {
 
       expect(instantEvalKeyCapFor(threadCalls)).toBe(200);
       expect(
-        instantEvalPageSizeFor(1_000, instantEvalKeyCapFor(threadCalls)),
+        instantEvalPageSizeFor({
+          averageTextBytes: 1_000,
+          keyCap: instantEvalKeyCapFor(threadCalls),
+        }),
       ).toBe(200);
     });
 
@@ -155,14 +172,20 @@ describe("given the statement's own functions", () => {
       ] as never;
 
       expect(
-        instantEvalPageSizeFor(1_000, instantEvalKeyCapFor(traceCalls)),
+        instantEvalPageSizeFor({
+          averageTextBytes: 1_000,
+          keyCap: instantEvalKeyCapFor(traceCalls),
+        }),
       ).toBe(INSTANT_EVAL_PAGE_SIZE);
     });
 
     /** @scenario "A large-text page stays small even when the cap is higher" */
     it("keeps the smaller of the two bounds", () => {
       expect(
-        instantEvalPageSizeFor(INSTANT_EVAL_LARGE_TEXT_BYTES + 1, 1_000),
+        instantEvalPageSizeFor({
+          averageTextBytes: INSTANT_EVAL_LARGE_TEXT_BYTES + 1,
+          keyCap: 1_000,
+        }),
       ).toBe(INSTANT_EVAL_SMALL_PAGE_SIZE);
     });
   });

@@ -50,11 +50,15 @@ export function support(
   return { classifier, maxConcurrency: 4, queryTokenBudget: 4_000_000 };
 }
 
-export const evalOverConversation = (
-  column: string,
-  options: LangWatchQLAppFunctionCall["options"],
+export const evalOverConversation = ({
+  column,
+  options,
   fn = "eval",
-): LangWatchQLAppFunctionCall => ({
+}: {
+  column: string;
+  options: LangWatchQLAppFunctionCall["options"];
+  fn?: string;
+}): LangWatchQLAppFunctionCall => ({
   column,
   function: fn,
   options,

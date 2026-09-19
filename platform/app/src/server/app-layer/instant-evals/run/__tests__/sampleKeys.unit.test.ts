@@ -78,12 +78,38 @@ describe("given a selection to sample", () => {
       expect(sql).toContain("q.ThreadId AS ThreadId");
       expect(sql).not.toContain("SpanId");
     });
+
+    /** @scenario "A sample over spans is spread over spans, not over whole traces" */
+    it("hashes the trace and span pair when the rows are spans", () => {
+      const sql = instantEvalSampleKeysSql({
+        sql: SQL,
+        keyColumns: ["SpanId", "OccurredAt"],
+        limit: 50,
+      });
+
+      // Every span of one trace shares its TraceId, so a hash of that alone
+      // would land them all in one bucket and the sample would be a few whole
+      // traces rather than fifty rows drawn from across the selection.
+      expect(sql).toContain("cityHash64(q.TraceId, q.SpanId) %");
+      expect(sql).not.toContain("cityHash64(q.TraceId) %");
+    });
   });
 
   describe("when the bucket count is chosen", () => {
     it("draws one row in every total-over-limit", () => {
       expect(instantEvalSampleBuckets({ total: 10_000, limit: 50 })).toBe(200);
       expect(instantEvalSampleBuckets({ total: 500, limit: 50 })).toBe(10);
+    });
+
+    /** @scenario "A selection only just larger than the sample is still spread" */
+    it("never uses one bucket for a selection larger than the sample", () => {
+      // One bucket accepts every row, and the LIMIT then hands back the head
+      // of the statement's own order: the very sample the predicate exists to
+      // avoid. Anything between the limit and twice it gets two buckets.
+      expect(instantEvalSampleBuckets({ total: 75, limit: 50 })).toBe(2);
+      expect(instantEvalSampleBuckets({ total: 51, limit: 50 })).toBe(2);
+      expect(instantEvalSampleBuckets({ total: 99, limit: 50 })).toBe(2);
+      expect(instantEvalSampleBuckets({ total: 100, limit: 50 })).toBe(2);
     });
 
     /** @scenario "A selection smaller than the sample has every row sampled" */

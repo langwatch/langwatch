@@ -19,6 +19,7 @@ import { prisma } from "~/server/db";
 import { BILLING_REPORTING_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/billing-reporting/pipeline";
 import { GATEWAY_SPEND_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
 import { getBillingMonth } from "../../../../../ee/billing/services/billableEventsQuery";
+import { createInstantEvalBudgetReservations } from "../../usage/instant-eval-budget-reservations";
 import {
   type InstantEvalFreeBudget,
   InstantEvalFreeBudgetService,
@@ -138,5 +139,24 @@ export function createInstantEvalFreeBudgetFromEnv(): InstantEvalFreeBudget {
         requestType,
       });
     },
+    reservations: createInstantEvalBudgetReservations({
+      redis: saasRedisOrRefuse(),
+    }),
   });
+}
+
+/**
+ * The connection the holds are kept on. SaaS runs several processes, and a
+ * hold one of them keeps to itself admits the same organization's runs on
+ * every other, so a missing connection refuses Instant Evals here rather
+ * than falling back to a process-local store.
+ */
+function saasRedisOrRefuse() {
+  const redis = tryGetApp()?.redis;
+  if (!redis) {
+    throw new Error(
+      "Instant Evals on SaaS needs a Redis connection for the free budget holds, and the application has none",
+    );
+  }
+  return redis;
 }

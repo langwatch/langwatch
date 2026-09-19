@@ -271,10 +271,8 @@ import { SsoConnectionTeardownDispatcher } from "./identity/sso-connection-teard
 import { LoggingInstantEvalSpendRecorder } from "./instant-evals/instant-eval-spend.recorder";
 import { createInstantEvalRunPortFromEnv } from "./instant-evals/run";
 import { ClickHouseInstantEvalJudgmentsRepository } from "./instant-evals/run/instant-eval-judgments.repository";
-import {
-  ClickHouseInstantEvalRunProjectionStore,
-  ClickHouseInstantEvalRunRepository,
-} from "./instant-evals/run/instant-eval-run.repository";
+import { ClickHouseInstantEvalRunProjectionStore } from "./instant-evals/run/instant-eval-run.projection-store";
+import { ClickHouseInstantEvalRunRepository } from "./instant-evals/run/instant-eval-run.repository";
 import { createInstantEvalSpendRecorderFromEnv } from "./instant-evals/spend";
 import { LangyConversationService } from "./langy/langy-conversation.service";
 import {

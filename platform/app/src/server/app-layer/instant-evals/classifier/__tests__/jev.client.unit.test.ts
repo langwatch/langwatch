@@ -15,10 +15,18 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { estimateTokensFromBytes } from "~/shared/traces/tokenBudget";
 import { InstantEvalClassifierUnavailableError } from "../../errors";
 import type { InstantEvalQuestion } from "../classifier";
-import { UnlimitedInstantEvalRateLimiter } from "../globalRateLimiter";
+import {
+  type InstantEvalPermit,
+  type InstantEvalRateLimiter,
+  UnlimitedInstantEvalRateLimiter,
+} from "../globalRateLimiter";
 import { JEV_DEFAULT_BASE_URL, JevInstantEvalClassifier } from "../jev.client";
 import { NullInstantEvalClassifier } from "../null.client";
-import { instantEvalTextBudget } from "../token-budget";
+import {
+  estimateJudgedTextTokens,
+  instantEvalQuestionTokens,
+  instantEvalTextBudget,
+} from "../token-budget";
 
 const QUESTION: InstantEvalQuestion = {
   id: "annoyed",
@@ -37,10 +45,12 @@ const TOO_LARGE = { detail: { error_type: "max_tokens_exceeded" } };
 let agent: MockAgent;
 let waits: number[];
 
-function classifier() {
+function classifier(
+  limiter: InstantEvalRateLimiter = new UnlimitedInstantEvalRateLimiter(),
+) {
   return new JevInstantEvalClassifier({
     apiKey: "test-key",
-    limiter: new UnlimitedInstantEvalRateLimiter(),
+    limiter,
     dispatcher: agent,
     sleep: async (ms) => {
       waits.push(ms);
@@ -165,6 +175,63 @@ describe("given a classifier that is rate limiting", () => {
       expect(attempts).toBe(5);
       expect(judgement.skippedReason).toBe("classifier_rate_limited");
       expect(judgement.verdicts).toEqual([]);
+    });
+  });
+});
+
+describe("given a classifier that keeps failing with no Retry-After", () => {
+  describe("when every attempt answers 500", () => {
+    /** @scenario "A failing request backs off longer on each attempt" */
+    it("doubles the wait between attempts", async () => {
+      endpoint()
+        .intercept({ path: "/v1/systemone", method: "POST" })
+        .reply(500, "upstream down")
+        .times(5);
+
+      const judgement = await classifier().classify({
+        projectId: "project-1",
+        text: "text",
+        questions: [QUESTION],
+      });
+
+      expect(waits).toEqual([1_000, 2_000, 4_000, 8_000]);
+      expect(judgement.skippedReason).toBe("classifier_failed");
+    });
+  });
+});
+
+describe("given a limiter that records what each permit asks for", () => {
+  describe("when a text is classified", () => {
+    /** @scenario "A classification takes its estimated tokens from one bucket shared by every pod" */
+    it("takes the tokens the request will really carry, not the generic estimate", async () => {
+      const permits: InstantEvalPermit[] = [];
+      const limiter: InstantEvalRateLimiter = {
+        acquire: async (permit) => {
+          permits.push(permit);
+        },
+      };
+      endpoint()
+        .intercept({ path: "/v1/systemone", method: "POST" })
+        .reply(200, ANSWER);
+      const text = "User: where is my order\nAssistant: let me check\n".repeat(
+        40,
+      );
+
+      await classifier(limiter).classify({
+        projectId: "project-1",
+        text,
+        questions: [QUESTION],
+      });
+
+      const expected =
+        estimateJudgedTextTokens({ text }) +
+        instantEvalQuestionTokens([QUESTION]);
+      expect(permits).toEqual([{ tokens: expected, tenantId: "project-1" }]);
+      // The generic bytes-over-four rule would have asked for about a third
+      // less, which is the undercount the permit used to carry.
+      expect(expected).toBeGreaterThan(
+        estimateTokensFromBytes(text) + instantEvalQuestionTokens([QUESTION]),
+      );
     });
   });
 });

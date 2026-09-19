@@ -86,54 +86,77 @@ export function compileTraceFilter({
   try {
     const compiled =
       translateFilterToClickHouse(filter, tenantId, timeRange) ?? undefined;
-    if (
-      compiled &&
-      dateField === "updated" &&
-      compiled.sql.includes(SPAN_SCOPED_TABLE)
-    ) {
-      throw new RequestValidationError({
-        target: "json",
-        violations: [
-          {
-            field: FILTER_FIELD,
-            type: "filter_unsupported_on_updated_axis",
-            message:
-              'A span, event or free-text clause matches spans by when they started, and `dateField: "updated"` selects traces by when they were last modified. A trace modified inside the window can have spans older than it, so the two together would drop traces silently. Filter on trace-level fields instead, or pull on the `occurred` axis.',
-            received: filter,
-          },
-        ],
-      });
-    }
+    if (compiled) assertFilterFitsAxis({ compiled, dateField, filter });
     return compiled;
   } catch (error) {
-    if (error instanceof FilterFieldUnknownError) {
-      const field = error.meta?.field;
-      throw new RequestValidationError({
-        target: "json",
-        violations: [
-          {
-            field: FILTER_FIELD,
-            type: "unknown_filter_field",
-            message: `The filter names a field this language does not have: ${String(field)}. See GET /api/v1/query/reference for every field, and GET /api/traces/facets for the values one holds.`,
-            expected: KNOWN_FIELDS,
-            received: field,
-          },
-        ],
-      });
-    }
-    if (error instanceof FilterParseError) {
-      throw new RequestValidationError({
-        target: "json",
-        violations: [
-          {
-            field: FILTER_FIELD,
-            type: "invalid_filter_syntax",
-            message: `${error.message}. Operators must be uppercase (AND, OR, NOT), every clause needs a value, and a value with spaces must be quoted.`,
-            received: filter,
-          },
-        ],
-      });
-    }
-    throw error;
+    throw asRequestValidationError({ error, filter });
   }
+}
+
+function assertFilterFitsAxis({
+  compiled,
+  dateField,
+  filter,
+}: {
+  compiled: { sql: string };
+  dateField: "occurred" | "updated";
+  filter: string;
+}): void {
+  if (dateField !== "updated") return;
+  if (!compiled.sql.includes(SPAN_SCOPED_TABLE)) return;
+  throw new RequestValidationError({
+    target: "json",
+    violations: [
+      {
+        field: FILTER_FIELD,
+        type: "filter_unsupported_on_updated_axis",
+        message:
+          'A span, event or free-text clause matches spans by when they started, and `dateField: "updated"` selects traces by when they were last modified. A trace modified inside the window can have spans older than it, so the two together would drop traces silently. Filter on trace-level fields instead, or pull on the `occurred` axis.',
+        received: filter,
+      },
+    ],
+  });
+}
+
+/**
+ * The language's own refusals, restated as a rejection of the request body's
+ * `filter` field. Anything else is returned as it came, so the caller rethrows
+ * it unchanged.
+ */
+function asRequestValidationError({
+  error,
+  filter,
+}: {
+  error: unknown;
+  filter: string;
+}): unknown {
+  if (error instanceof FilterFieldUnknownError) {
+    const field = error.meta?.field;
+    return new RequestValidationError({
+      target: "json",
+      violations: [
+        {
+          field: FILTER_FIELD,
+          type: "unknown_filter_field",
+          message: `The filter names a field this language does not have: ${String(field)}. See GET /api/v1/query/reference for every field, and GET /api/traces/facets for the values one holds.`,
+          expected: KNOWN_FIELDS,
+          received: field,
+        },
+      ],
+    });
+  }
+  if (error instanceof FilterParseError) {
+    return new RequestValidationError({
+      target: "json",
+      violations: [
+        {
+          field: FILTER_FIELD,
+          type: "invalid_filter_syntax",
+          message: `${error.message}. Operators must be uppercase (AND, OR, NOT), every clause needs a value, and a value with spaces must be quoted.`,
+          received: filter,
+        },
+      ],
+    });
+  }
+  return error;
 }

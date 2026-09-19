@@ -187,11 +187,17 @@ export function printInstantEvalRows({
   const keyColumn = keyColumnOf(run);
   const table = rows.map((row) => {
     const traceId = typeof row.TraceId === "string" ? row.TraceId : "";
+    const spanId = typeof row.SpanId === "string" ? row.SpanId : "";
     const key = typeof row[keyColumn] === "string" ? row[keyColumn] : traceId;
     const answers: Record<string, string> = {};
     for (const id of questionIds) {
+      // A model-call run judges several spans of one trace, each with its own
+      // verdict, so a row naming its span is matched on the span as well.
       const judgment = judgments.find(
-        (one) => one.traceId === traceId && one.questionId === id,
+        (one) =>
+          one.traceId === traceId &&
+          one.questionId === id &&
+          (spanId === "" || one.spanId === spanId),
       );
       answers[id] = judgment ? verdictOf(judgment) : "";
     }

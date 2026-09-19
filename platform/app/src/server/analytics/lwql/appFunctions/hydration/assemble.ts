@@ -27,25 +27,21 @@ export function assembleResult({
   computed,
   evalUsage,
   timings,
+  isCancelled = false,
 }: {
   input: LangWatchQLHydrationInput;
   resolved: readonly ResolvedCall[];
   computed: ComputedValues;
   evalUsage?: LangWatchQLEvalUsage;
   timings?: LangWatchQLHydrationTimings;
+  /** Whether the judging stopped early, leaving some judged cells absent. */
+  isCancelled?: boolean;
 }): LangWatchQLHydrationResult {
-  const hydrated = input.rows.map((row) => {
-    const next: Record<string, unknown> = { ...row };
-    for (const entry of resolved) {
-      const parts = appFunctionKeyParts(row[entry.call.column]);
-      const value =
-        parts === null
-          ? null
-          : (computed.get(entry.call.column)?.get(appFunctionKeyId(parts))
-              ?.value ?? null);
-      next[entry.call.column] = value;
-    }
-    return next;
+  const { hydrated, unjudgedRows } = hydrateRows({
+    rows: input.rows,
+    resolved,
+    computed,
+    isCancelled,
   });
 
   const { rows, isTruncatedByBytes } = applyHydratedByteCeiling({
@@ -77,7 +73,64 @@ export function assembleResult({
       .filter((report) => report.keys > 0),
     ...(evalUsage ? { evalUsage } : {}),
     ...(timings ? { timings } : {}),
+    // The ceiling above may have dropped trailing rows; an index past them
+    // would name a row the caller cannot see.
+    ...(isCancelled
+      ? {
+          cancellation: {
+            unjudgedRows: unjudgedRows.filter((index) => index < rows.length),
+          },
+        }
+      : {}),
   };
+}
+
+/**
+ * Puts every computed value in its cell, and names the rows a cancellation
+ * left without one.
+ *
+ * An absent cell on a judged column is a unit the abort reached before the
+ * answer did, which is the one null a caller must not read as a verdict.
+ */
+function hydrateRows({
+  rows,
+  resolved,
+  computed,
+  isCancelled,
+}: {
+  rows: readonly Record<string, unknown>[];
+  resolved: readonly ResolvedCall[];
+  computed: ComputedValues;
+  isCancelled: boolean;
+}): { hydrated: Record<string, unknown>[]; unjudgedRows: number[] } {
+  const unjudgedRows: number[] = [];
+  const hydrated = rows.map((row, index) => {
+    const next: Record<string, unknown> = { ...row };
+    for (const entry of resolved) {
+      const cell = cellFor({ row, entry, computed });
+      if (isCancelled && cell === undefined && unjudgedRows.at(-1) !== index) {
+        unjudgedRows.push(index);
+      }
+      next[entry.call.column] = cell?.value ?? null;
+    }
+    return next;
+  });
+  return { hydrated, unjudgedRows };
+}
+
+/** The computed value for one cell: null for a null key, undefined when the key was never answered. */
+function cellFor({
+  row,
+  entry,
+  computed,
+}: {
+  row: Record<string, unknown>;
+  entry: ResolvedCall;
+  computed: ComputedValues;
+}): ComputedValue | null | undefined {
+  const parts = appFunctionKeyParts(row[entry.call.column]);
+  if (parts === null) return null;
+  return computed.get(entry.call.column)?.get(appFunctionKeyId(parts));
 }
 
 function countWhere({

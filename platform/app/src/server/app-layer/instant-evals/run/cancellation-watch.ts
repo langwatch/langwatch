@@ -11,7 +11,7 @@
  * classifications it has not begun. The rows already judged are still written
  * and still billed, which is the right outcome: they were paid for.
  *
- * @see ./instant-eval-run.executor.ts
+ * @see ./instant-eval-run.judge-page.ts
  * @see ./cancellation.ts: where the request is recorded
  */
 

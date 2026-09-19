@@ -528,11 +528,18 @@ export function lwqlClickHouseSetupStatements({
   lwqlTables,
   limits = DEFAULT_LWQL_RESOURCE_LIMITS,
   sourceDatabase,
+  includeAppFunctions = true,
 }: {
   names: LangWatchQLNames;
   password: string;
   lwqlTables: LangWatchQLTable[];
   limits?: LangWatchQLResourceLimits;
+  /**
+   * Whether the app functions' UDFs are created. Off only where a create
+   * would land on one replica of several; see `canProvisionAppFunctions` in
+   * `./selfProvisioning.ts`.
+   */
+  includeAppFunctions?: boolean;
   /**
    * Database the key-map table actually lives in. Defaults to
    * {@link LangWatchQLNames.database}, matching the test harness's convention
@@ -553,7 +560,7 @@ export function lwqlClickHouseSetupStatements({
     // and before the grants: they depend on nothing, and calling a SQL UDF
     // needs no grant, so nothing below refers back to them. See
     // `./appFunctionStatements.ts` for why they are SQL rather than config.
-    ...lwqlAppFunctionStatements(),
+    ...(includeAppFunctions ? lwqlAppFunctionStatements() : []),
     lwqlKeyMapTableStatement({ names, sourceDatabase }),
     lwqlSettingsProfileStatement({ names, limits }),
     lwqlRestrictedUserStatement({ names, password }),

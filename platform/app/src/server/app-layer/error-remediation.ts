@@ -217,6 +217,12 @@ const registry = {
       "Contact support to have it enabled for this workspace",
     ],
   },
+  instant_eval_questions_too_long: {
+    tips: [
+      "Read `meta.questionTokens` against `meta.stateTokens`; the questions alone fill the judge's state, so no text could be sent beside them",
+      "Shorten the question texts, or split them across several eval calls run as separate queries",
+    ],
+  },
   instant_eval_query_budget_exceeded: {
     tips: [
       "Read `meta.estimatedTokens` against `meta.budget`; that is the text the whole query would send to be judged, summed across its rows",
@@ -289,6 +295,13 @@ const registry = {
       "Lower the query's LIMIT, or group more coarsely so fewer conversations, traces or spans are projected",
       "To read them all, page with a keyset predicate on the dataset's time column and trace id and run the query once per page",
       "`meta.keyKind` says which cap it was, and `meta.functions` which calls count against it; the schema endpoint publishes every cap",
+    ],
+  },
+  lwql_app_function_read_budget: {
+    tips: [
+      "Read `meta.budgetBytes` and `meta.readBytes`; the traces the query names weigh more than one run may read",
+      "Lower the query's LIMIT so each run names fewer traces, and page with a keyset predicate on the dataset's time column and trace id",
+      "The budget counts the traces' stored content, so a query over long conversations needs smaller pages than one over short ones",
     ],
   },
   lwql_app_function_hydration_failed: {

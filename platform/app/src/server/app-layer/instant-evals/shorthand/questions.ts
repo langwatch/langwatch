@@ -191,6 +191,23 @@ export function instantEvalShorthandColumns({
   return columns;
 }
 
+/** What every kind's call writer is handed. */
+interface EvalCallInput {
+  readonly question: InstantEvalShorthandQuestion;
+  readonly text: string;
+  /** The instructions, already written as a string literal. */
+  readonly instructions: string;
+}
+
+/** The call writer for each kind of question. */
+const EVAL_CALL_BY_KIND: Readonly<
+  Record<InstantEvalShorthandQuestion["kind"], (input: EvalCallInput) => string>
+> = {
+  boolean: booleanCall,
+  score: scoreCall,
+  category: categoryCall,
+};
+
 /** The eval call one question is asked by. */
 function evalCallFor({
   question,
@@ -200,25 +217,10 @@ function evalCallFor({
   readonly text: string;
 }): string {
   const instructions = sqlString(question.instructions);
-  switch (question.kind) {
-    case "score":
-      return scoreCall({ question, text, instructions });
-    case "category":
-      return categoryCall({ question, text, instructions });
-    default:
-      return booleanCall({ question, text, instructions });
-  }
+  return EVAL_CALL_BY_KIND[question.kind]({ question, text, instructions });
 }
 
-function booleanCall({
-  question,
-  text,
-  instructions,
-}: {
-  readonly question: InstantEvalShorthandQuestion;
-  readonly text: string;
-  readonly instructions: string;
-}): string {
+function booleanCall({ question, text, instructions }: EvalCallInput): string {
   refuseForeignFields({ question, allowed: ["criteria", "threshold"] });
   if (question.criteria && question.threshold !== undefined) {
     throw new InstantEvalShorthandError(
@@ -235,15 +237,7 @@ function booleanCall({
   return `eval(${text}, ${instructions})`;
 }
 
-function scoreCall({
-  question,
-  text,
-  instructions,
-}: {
-  readonly question: InstantEvalShorthandQuestion;
-  readonly text: string;
-  readonly instructions: string;
-}): string {
+function scoreCall({ question, text, instructions }: EvalCallInput): string {
   refuseForeignFields({ question, allowed: ["range"] });
   const range = question.range;
   if (!range) {
@@ -268,15 +262,7 @@ function scoreCall({
   return `eval_score(${text}, ${instructions}, ${sqlInteger(range.min)}, ${sqlInteger(range.max)})`;
 }
 
-function categoryCall({
-  question,
-  text,
-  instructions,
-}: {
-  readonly question: InstantEvalShorthandQuestion;
-  readonly text: string;
-  readonly instructions: string;
-}): string {
+function categoryCall({ question, text, instructions }: EvalCallInput): string {
   refuseForeignFields({ question, allowed: ["options"] });
   const options = question.options;
   if (!options || options.length < 2) {

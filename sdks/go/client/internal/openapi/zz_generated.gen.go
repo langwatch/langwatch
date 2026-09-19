@@ -107813,6 +107813,16 @@ type GetInstantEvalRunResponse struct {
 		// UpdatedAt When the run was last written to.
 		UpdatedAt string `json:"updatedAt"`
 	}
+	JSON404 *struct {
+		Error struct {
+			Code    string                  `json:"code"`
+			Message string                  `json:"message"`
+			Meta    *map[string]interface{} `json:"meta,omitempty"`
+			SpanId  *string                 `json:"span_id,omitempty"`
+			TraceId *string                 `json:"trace_id,omitempty"`
+			Type    string                  `json:"type"`
+		} `json:"error"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -107917,6 +107927,26 @@ type CancelInstantEvalRunResponse struct {
 
 		// UpdatedAt When the run was last written to.
 		UpdatedAt string `json:"updatedAt"`
+	}
+	JSON404 *struct {
+		Error struct {
+			Code    string                  `json:"code"`
+			Message string                  `json:"message"`
+			Meta    *map[string]interface{} `json:"meta,omitempty"`
+			SpanId  *string                 `json:"span_id,omitempty"`
+			TraceId *string                 `json:"trace_id,omitempty"`
+			Type    string                  `json:"type"`
+		} `json:"error"`
+	}
+	JSON409 *struct {
+		Error struct {
+			Code    string                  `json:"code"`
+			Message string                  `json:"message"`
+			Meta    *map[string]interface{} `json:"meta,omitempty"`
+			SpanId  *string                 `json:"span_id,omitempty"`
+			TraceId *string                 `json:"trace_id,omitempty"`
+			Type    string                  `json:"type"`
+		} `json:"error"`
 	}
 }
 
@@ -134492,6 +134522,22 @@ func ParseGetInstantEvalRunResponse(rsp *http.Response) (*GetInstantEvalRunRespo
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest struct {
+			Error struct {
+				Code    string                  `json:"code"`
+				Message string                  `json:"message"`
+				Meta    *map[string]interface{} `json:"meta,omitempty"`
+				SpanId  *string                 `json:"span_id,omitempty"`
+				TraceId *string                 `json:"trace_id,omitempty"`
+				Type    string                  `json:"type"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
 	}
 
 	return response, nil
@@ -134592,6 +134638,38 @@ func ParseCancelInstantEvalRunResponse(rsp *http.Response) (*CancelInstantEvalRu
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest struct {
+			Error struct {
+				Code    string                  `json:"code"`
+				Message string                  `json:"message"`
+				Meta    *map[string]interface{} `json:"meta,omitempty"`
+				SpanId  *string                 `json:"span_id,omitempty"`
+				TraceId *string                 `json:"trace_id,omitempty"`
+				Type    string                  `json:"type"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest struct {
+			Error struct {
+				Code    string                  `json:"code"`
+				Message string                  `json:"message"`
+				Meta    *map[string]interface{} `json:"meta,omitempty"`
+				SpanId  *string                 `json:"span_id,omitempty"`
+				TraceId *string                 `json:"trace_id,omitempty"`
+				Type    string                  `json:"type"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
 
 	}
 

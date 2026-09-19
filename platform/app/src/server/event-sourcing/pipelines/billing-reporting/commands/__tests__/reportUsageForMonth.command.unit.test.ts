@@ -159,9 +159,13 @@ async function createHandler() {
     }),
     queryBillableEventsTotal: mockQueryBillableEventsTotal,
     queryInstantEvalSpendTotal: mockQueryInstantEvalSpendTotal,
+    isInstantEvalMeterProvisioned: () => isInstantEvalMeterProvisioned,
     selfDispatch: mockSelfDispatch,
   });
 }
+
+/** Whether the catalog maps the Instant Evals meter; cases flip it. */
+let isInstantEvalMeterProvisioned = true;
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -704,6 +708,33 @@ describe("ReportUsageForMonthCommand", () => {
         "org-1:2026-02:from:0:to:50",
         `org-1:2026-02:${INSTANT_EVAL_METER}:from:0:to:20000`,
       ]);
+    });
+
+    /** @scenario "The Instant Eval meter is reported only once Stripe holds it" */
+    it("leaves the month unreported and its checkpoint untouched while the meter is unmapped", async () => {
+      isInstantEvalMeterProvisioned = false;
+      try {
+        mockQueryBillableEventsTotal.mockResolvedValue(50);
+        mockQueryInstantEvalSpendTotal.mockResolvedValue(20_000);
+        const handler = await createHandler();
+
+        await handler.handle(makeCommand());
+
+        expect(mockReportUsageDelta).toHaveBeenCalledTimes(1);
+        expect(mockReportUsageDelta).toHaveBeenCalledWith(
+          expect.objectContaining({
+            events: [expect.objectContaining({ eventName: EVENTS_METER })],
+          }),
+        );
+        // No intent and no read: the whole total waits for the mapping, so
+        // the first report after it lands carries the month from zero.
+        expect(mockQueryInstantEvalSpendTotal).not.toHaveBeenCalled();
+        expect(mockBillingCheckpoints.writeIntent).not.toHaveBeenCalledWith(
+          expect.objectContaining({ meter: INSTANT_EVAL_METER }),
+        );
+      } finally {
+        isInstantEvalMeterProvisioned = true;
+      }
     });
 
     /** @scenario "A month with no Instant Eval spend reports nothing on that meter" */

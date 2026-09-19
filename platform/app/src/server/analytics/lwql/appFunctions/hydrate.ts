@@ -171,6 +171,7 @@ export async function judgeLangWatchQLHydration({
     computed: merge([extracted, judged.values]),
     ...(judged.usage ? { evalUsage: judged.usage } : {}),
     timings: { ...prepared.timings, judgeMs: finished - startedJudge },
+    isCancelled: judged.isCancelled,
   });
 }
 
@@ -210,12 +211,18 @@ async function judgeCalls({
   input: LangWatchQLHydrationInput;
   resolved: readonly ResolvedCall[];
   traces: Awaited<ReturnType<typeof readTraces>>;
-}): Promise<{ values: ComputedValues; usage?: LangWatchQLEvalUsage }> {
+}): Promise<{
+  values: ComputedValues;
+  usage?: LangWatchQLEvalUsage;
+  isCancelled: boolean;
+}> {
   const support = input.instantEvals;
   const hasEvalCalls = resolved.some(
     (entry) => entry.definition.kind === "eval",
   );
-  if (!support || !hasEvalCalls) return { values: new Map() };
+  if (!support || !hasEvalCalls) {
+    return { values: new Map(), isCancelled: false };
+  }
 
   try {
     const outcome = await evaluateCalls({
@@ -225,7 +232,11 @@ async function judgeCalls({
       support,
       ...(input.signal ? { signal: input.signal } : {}),
     });
-    return { values: outcome.values, usage: outcome.usage };
+    return {
+      values: outcome.values,
+      usage: outcome.usage,
+      isCancelled: outcome.isCancelled,
+    };
   } catch (error) {
     if (error instanceof ClassifierAnsweredNothingError) {
       throw new InstantEvalClassifierUnavailableError({ reasons: [error] });

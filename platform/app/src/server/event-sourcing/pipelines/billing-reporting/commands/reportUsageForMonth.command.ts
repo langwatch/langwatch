@@ -60,6 +60,16 @@ export interface ReportUsageForMonthCommandDeps {
   getUsageReportingService: () => UsageReportingService | undefined;
   queryBillableEventsTotal: typeof QueryBillableEventsTotalFn;
   queryInstantEvalSpendTotal: typeof QueryInstantEvalSpendTotalFn;
+  /**
+   * Whether Stripe has a meter for the Instant Evals event name in this mode.
+   *
+   * Stripe accepts a meter event whose name matches no meter with a 200 and
+   * drops it asynchronously, so a report sent before the meter exists would
+   * advance the checkpoint past usage that was never aggregated. Until the
+   * catalog maps a meter id, the month's total stays in ClickHouse and the
+   * first tick after the mapping lands reports it whole.
+   */
+  isInstantEvalMeterProvisioned: () => boolean;
   selfDispatch: (data: ReportUsageForMonthCommandData) => Promise<void>;
 }
 
@@ -79,6 +89,8 @@ const SCHEMA = defineCommandSchema(
  */
 interface BillingMeter {
   readonly eventName: string;
+  /** Whether Stripe holds a meter under this name, so an event sent is aggregated. */
+  readonly isProvisioned: () => boolean;
   /** The month's running total in the meter's own integer unit. */
   readonly queryTotal: (args: {
     organizationId: string;
@@ -153,12 +165,15 @@ export class ReportUsageForMonthCommand
     this.meters = [
       {
         eventName: BILLABLE_EVENTS_EVENT_NAME,
+        // The events meter predates the catalog check and every mode maps it.
+        isProvisioned: () => true,
         queryTotal: (args) => deps.queryBillableEventsTotal(args),
         toValue: (delta) => delta,
         identifier: billableEventsIdentifier,
       },
       {
         eventName: INSTANT_EVAL_USD_EVENT_NAME,
+        isProvisioned: deps.isInstantEvalMeterProvisioned,
         queryTotal: (args) => deps.queryInstantEvalSpendTotal(args),
         toValue: instantEvalMeterUnitsToUsd,
         identifier: instantEvalIdentifier,
@@ -278,13 +293,6 @@ export class ReportUsageForMonthCommand
   }
 
   /**
-   * Two-phase checkpoint protocol, for one meter:
-   * 1. Write `pendingReportedTotal` before calling Stripe (intent).
-   * 2. On success, promote to `lastReportedTotal` and clear pending.
-   *
-   * Returns true if self-dispatch should fire (delta was reported successfully).
-   */
-  /**
    * One meter's report, with its failure kept to itself.
    *
    * Its own method rather than a try inside the loop because a throw from one
@@ -327,6 +335,13 @@ export class ReportUsageForMonthCommand
     }
   }
 
+  /**
+   * Two-phase checkpoint protocol, for one meter:
+   * 1. Write `pendingReportedTotal` before calling Stripe (intent).
+   * 2. On success, promote to `lastReportedTotal` and clear pending.
+   *
+   * Returns true if self-dispatch should fire (delta was reported successfully).
+   */
   private async reportForBillingMonth({
     meter,
     organizationId,
@@ -338,6 +353,15 @@ export class ReportUsageForMonthCommand
     billingMonth: string;
     stripeCustomerId: string;
   }): Promise<boolean> {
+    if (!meter.isProvisioned()) {
+      // Nothing is read or written: the checkpoint stays where it is, so the
+      // whole month is reported by the first tick after the meter is mapped.
+      logger.debug(
+        { organizationId, billingMonth, meter: meter.eventName },
+        "Stripe meter is not mapped for this mode; leaving the month's usage unreported until it is",
+      );
+      return false;
+    }
     const key = { organizationId, billingMonth, meter: meter.eventName };
     const checkpoint = await this.deps.billingCheckpoints.getCheckpoint(key);
 

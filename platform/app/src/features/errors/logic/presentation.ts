@@ -472,6 +472,11 @@ const presentations = {
     describe: () =>
       "Ask for fewer rows, or extract less text from each one. To judge the whole selection, run it as a job instead.",
   },
+  instant_eval_questions_too_long: {
+    title: "Those questions leave no room for the text",
+    describe: () =>
+      "The questions alone fill what the judge can read at once. Shorten them, or ask fewer of them in one query.",
+  },
   instant_eval_classifier_unavailable: {
     title: "The judgements couldn't be made right now",
     describe: () =>
@@ -502,7 +507,7 @@ const presentations = {
   instant_eval_query_missing_columns: {
     title: "That query is missing what a run needs",
     describe: (error) =>
-      error.meta.needsEvalFunction === true
+      error.meta.isEvalFunctionMissing === true
         ? "Add an eval function to the query's SELECT list, such as eval(...) over the text you want judged."
         : "Add TraceId to the query's SELECT list so each judgement can be tied back to its trace.",
   },
@@ -570,10 +575,21 @@ const presentations = {
       return `${capped} Lower the row limit, group the query more coarsely, or run it in pages.`;
     },
   },
+  lwql_app_function_read_budget: {
+    title: "That's too much trace content to read at once",
+    describe: (error) => {
+      const budget = error.meta.budgetBytes;
+      const sized =
+        typeof budget === "number"
+          ? `A single run can read ${Math.round(budget / 1_000_000).toLocaleString()} MB of trace content.`
+          : "A single run can only read so much trace content.";
+      return `${sized} Lower the row limit, or run the query in pages.`;
+    },
+  },
   lwql_app_function_hydration_failed: {
     // Deliberately says nothing about retrying a different way: the query
     // itself was fine, so there is nothing for the reader to change.
-    title: "We couldn't read the conversation content",
+    title: "We couldn't read the trace content",
     describe: () =>
       "The query ran, but we couldn't load the conversations or traces it asked for. This is a temporary problem on our side. Try again shortly, or contact support if it persists.",
   },
