@@ -158,6 +158,18 @@ Feature: langwatch instant-eval, asking one question of a whole production histo
     When the user runs instant-eval estimate "annoyed" --target threads --last 30d
     Then the estimate endpoint is called with the same body a run would have sent
 
+  @unit
+  Scenario: estimate prints what is left of the free budget
+    Given an estimate carrying sixty cents of free budget remaining
+    When the user runs instant-eval estimate "annoyed" --target threads --last 30d
+    Then the printed estimate says sixty cents of free budget is left
+
+  @unit
+  Scenario: estimate prints no free budget line for a paid organization
+    Given an estimate carrying no free budget figure
+    When the user runs instant-eval estimate "annoyed" --target threads --last 30d
+    Then the printed estimate has no free budget line
+
   # ---------------------------------------------------------------------------
   # Waiting, reading, stopping
   # ---------------------------------------------------------------------------
