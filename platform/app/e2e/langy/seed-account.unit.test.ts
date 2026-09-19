@@ -107,18 +107,27 @@ describe("seeding a scenario's own account", () => {
 
   describe("given something that is not on this machine", () => {
     /** @scenario "An account is never seeded outside this machine" */
-    it("refuses a remote app and names it", () => {
-      expect(() =>
+    it("refuses a remote app and names its host alone", () => {
+      let message = "";
+      try {
         resolveSeedDatabaseUrl({
-          appBase: "https://langwatch.acme.test",
+          appBase: "https://riley:hunter2@langwatch.acme.test/?token=tok_1",
           env: { DATABASE_URL: LOCAL_DB },
           readDotenv: () => undefined,
-        }),
-      ).toThrow(/https:\/\/langwatch\.acme\.test/);
+        });
+      } catch (error) {
+        message = (error as Error).message;
+      }
+
+      expect(message).toContain("langwatch.acme.test");
+      expect(message).not.toContain("hunter2");
+      expect(message).not.toContain("tok_1");
     });
 
-    it("refuses a remote database and names it without its credentials", () => {
-      const remote = "postgresql://user:secret@db.acme.test:5432/langwatch";
+    /** @scenario "An account is never seeded outside this machine" */
+    it("refuses a remote database and names its host alone, with no credential or query", () => {
+      const remote =
+        "postgresql://user:secret@db.acme.test:5432/langwatch?sslpassword=hunter2";
 
       let message = "";
       try {
@@ -133,6 +142,18 @@ describe("seeding a scenario's own account", () => {
 
       expect(message).toContain("db.acme.test");
       expect(message).not.toContain("secret");
+      expect(message).not.toContain("hunter2");
+      expect(message).not.toContain("langwatch?");
+    });
+
+    it("names no part of an address that does not parse", () => {
+      expect(() =>
+        resolveSeedDatabaseUrl({
+          appBase: LOCAL_APP,
+          env: { DATABASE_URL: "not an address with secret" },
+          readDotenv: () => undefined,
+        }),
+      ).toThrow(/points at an address that does not parse\.$/);
     });
 
     it("does not take a loopback word inside the credentials for the host", () => {

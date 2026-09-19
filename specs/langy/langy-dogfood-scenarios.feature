@@ -238,7 +238,8 @@ Feature: Langy is tested with LangWatch's own scenario and evaluation tooling
   Scenario: An account is never seeded outside this machine
     Given the app under test or its database is not on this machine
     When the harness seeds an account
-    Then it refuses and names the address it would not write to
+    Then it refuses and names the host it would not write to
+    And the refusal carries no user, password, path or query of that address
 
   # ---------------------------------------------------------------------------
   # The judge rubric grades outcomes, never the prompt restated

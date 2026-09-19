@@ -25,8 +25,13 @@ const hostOf = (address: string): string | null => {
   }
 };
 
-const withoutCredentials = (address: string): string =>
-  address.replace(/\/\/[^@/]*@/, "//");
+/**
+ * How an error names an address: its host and nothing else. A user, a
+ * password or a token can sit in the authority, the path or the query of a
+ * database address, and an error ends up in a CI log.
+ */
+const hostForError = (host: string | null): string =>
+  host ?? "an address that does not parse";
 
 /** `DATABASE_URL` as the app's own `.env` spells it, or undefined. */
 export function databaseUrlFromDotenv(dotenv: string): string | undefined {
@@ -38,7 +43,7 @@ export function databaseUrlFromDotenv(dotenv: string): string | undefined {
 /**
  * The database a scenario may seed an account into: the one the environment
  * names, or the one in the app's own `.env`. Throws when the app under test
- * or that database is not on this machine, naming the address.
+ * or that database is not on this machine, naming the host.
  */
 export function resolveSeedDatabaseUrl({
   appBase,
@@ -52,7 +57,7 @@ export function resolveSeedDatabaseUrl({
   const appHost = hostOf(appBase);
   if (!appHost || !LOOPBACK_HOSTS.has(appHost)) {
     throw new Error(
-      `A scenario's own account is only seeded on a local stack, and the app under test is ${appBase}.`,
+      `A scenario's own account is only seeded on a local stack, and the app under test is on ${hostForError(appHost)}.`,
     );
   }
   const dotenv = env.DATABASE_URL ? undefined : readDotenv();
@@ -66,7 +71,7 @@ export function resolveSeedDatabaseUrl({
   const databaseHost = hostOf(databaseUrl);
   if (!databaseHost || !LOOPBACK_HOSTS.has(databaseHost)) {
     throw new Error(
-      `A scenario's own account is only seeded in a database on this machine, and DATABASE_URL points at ${withoutCredentials(databaseUrl)}.`,
+      `A scenario's own account is only seeded in a database on this machine, and DATABASE_URL points at ${hostForError(databaseHost)}.`,
     );
   }
   return databaseUrl;
