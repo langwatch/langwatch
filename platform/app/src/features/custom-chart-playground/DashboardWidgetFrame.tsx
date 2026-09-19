@@ -21,17 +21,18 @@ import { Box, Text } from "@chakra-ui/react";
 import { useMemo } from "react";
 
 import { useDashboardRefreshedAt } from "~/components/analytics/useDashboardAutoRefresh";
-import { usePeriodSelector } from "~/components/PeriodSelector";
 import { useColorMode } from "~/components/ui/color-mode";
 import { dashboardWidgetDefinitionSchema } from "~/server/analytics/dashboardWidgetDefinition";
 
 import type { ChartFrameDashboardContext } from "./bridge/bridgeProtocol";
 import { FrameDiagnosticBadge } from "./FrameDiagnosticBadge";
 import { declaredParamDefaults } from "./paramsSnapshot";
+import { useWidgetRenderReceiptPublisher } from "./renderReceipt/useWidgetRenderReceiptPublisher";
 import { SandboxedChartFrame } from "./SandboxedChartFrame";
 import { useDashboardWidgetChartNavigate } from "./useDashboardWidgetChartNavigate";
 import { useDashboardWidgetExecutor } from "./useDashboardWidgetExecutor";
 import { useFrameDiagnostic } from "./useFrameDiagnostic";
+import { useWidgetTimeWindow } from "./useWidgetTimeWindow";
 
 export interface DashboardWidgetFrameProps {
   readonly id: string;
@@ -57,21 +58,9 @@ export function DashboardWidgetFrame({
   widgetName,
 }: DashboardWidgetFrameProps) {
   const { colorMode } = useColorMode();
-  const { period } = usePeriodSelector();
   const refreshedAt = useDashboardRefreshedAt();
   const onNavigate = useDashboardWidgetChartNavigate(projectSlug);
-
-  // Epoch milliseconds, not the `Date` objects `usePeriodSelector` hands
-  // back: two `Date`s for the same instant are never `Object.is`-equal, so a
-  // dependency built on them would re-run the query on every render — the
-  // same reasoning `LangWatchQLDashboardWidget` applies to its own run hook.
-  const timeWindow = useMemo(
-    () => ({
-      start: period.startDate.getTime(),
-      end: period.endDate.getTime(),
-    }),
-    [period.startDate, period.endDate],
-  );
+  const timeWindow = useWidgetTimeWindow();
 
   // A row this build never wrote — an old shape, a hand-edited one — fails
   // safeParse and degrades to an empty file with no queries rather than
@@ -126,6 +115,16 @@ export function DashboardWidgetFrame({
     resetKey: definition.code,
   });
 
+  // Publish render receipts and clean up on unmount.
+  const onRenderReceipt = useWidgetRenderReceiptPublisher({
+    id,
+    widgetName,
+    dashboardId,
+    theme: dashboardContext.theme,
+    timeWindow: dashboardContext.timeWindow,
+    isRendered: parsed.success,
+  });
+
   if (!parsed.success) {
     return (
       <Text fontSize="13px" color="fg.muted" padding={4}>
@@ -144,6 +143,7 @@ export function DashboardWidgetFrame({
         params={paramsSnapshot}
         onLog={onLog}
         onNavigate={onNavigate}
+        onRenderReceipt={onRenderReceipt}
         maxHeight={maxHeight}
       />
       <FrameDiagnosticBadge diagnostic={diagnostic} />

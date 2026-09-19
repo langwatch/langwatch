@@ -20,6 +20,7 @@ import { resolveWorkbenchTargetNames } from "~/server/experiments-v3/workbenchTa
 import {
   LangyUiExperimentRequiredError,
   LangyUiHandlerFailedError,
+  LangyUiNoBrowserError,
 } from "./errors";
 import type { PageActionDefinition } from "./pageManifests";
 
@@ -53,6 +54,15 @@ export async function executeBackendAction({
   definition: PageActionDefinition;
   payload: unknown;
 }): Promise<unknown> {
+  // The away fallback only knows the workbench's saved-state seam. A
+  // `dashboard.` action (a render receipt) has no saved state to answer from —
+  // a receipt is what a widget painted in a tab that has the dashboard open,
+  // and there is none when no tab is attached — so it refuses rather than
+  // guessing. Anything outside `workbench.` is in the same position.
+  if (!kind.startsWith("workbench.")) {
+    throw new LangyUiNoBrowserError(kind);
+  }
+
   const slug = context.experimentSlug;
   if (!slug) throw new LangyUiExperimentRequiredError(kind);
 
