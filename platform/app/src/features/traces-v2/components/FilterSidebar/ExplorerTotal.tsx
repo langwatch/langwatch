@@ -7,8 +7,7 @@ import { useExplorerCounts } from "../../hooks/useExplorerCounts";
  * header show, from the same read (`useExplorerCounts`).
  */
 export const ExplorerTotal: React.FC = () => {
-  const { totalHits, itemNoun, isLoading, isPlaceholderData } =
-    useExplorerCounts();
+  const { summary, isLoading, isPlaceholderData } = useExplorerCounts();
   if (isLoading) return null;
   return (
     <Text
@@ -20,7 +19,7 @@ export const ExplorerTotal: React.FC = () => {
       transition="opacity 120ms ease"
       whiteSpace="nowrap"
     >
-      {totalHits.toLocaleString()} {itemNoun}
+      {summary}
     </Text>
   );
 };

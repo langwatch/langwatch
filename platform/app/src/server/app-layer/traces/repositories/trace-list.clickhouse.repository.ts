@@ -459,6 +459,43 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     return Number(rows[0]?.cnt ?? 0);
   }
 
+  async findTraceIds(params: {
+    tenantId: string;
+    timeRange: { from: number; to: number; live?: boolean };
+    filterWhere?: { sql: string; params: Record<string, unknown> };
+    limit: number;
+  }): Promise<string[]> {
+    EventUtils.validateTenantId(
+      { tenantId: params.tenantId },
+      "TraceListClickHouseRepository.findTraceIds",
+    );
+    const {
+      sql: whereClause,
+      baseSql: baseWhereClause,
+      params: queryParams,
+    } = buildWhereClause(params.tenantId, params.timeRange, params.filterWhere);
+
+    const client = await this.resolveClient(params.tenantId);
+    const result = await client.query({
+      query: `
+        SELECT TraceId
+        FROM ${TABLE_NAME}
+        WHERE ${whereClause}
+          AND (TenantId, TraceId, UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM ${TABLE_NAME}
+            WHERE ${baseWhereClause}
+            GROUP BY TenantId, TraceId
+          )
+        ORDER BY OccurredAt DESC, TraceId
+        LIMIT {limit:UInt32}
+      `,
+      query_params: { ...queryParams, limit: params.limit },
+      format: "JSONEachRow",
+    });
+    return (await result.json<{ TraceId: string }>()).map((row) => row.TraceId);
+  }
+
   async findDistinctValues(params: {
     tenantId: string;
     column: string;

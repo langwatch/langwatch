@@ -123,6 +123,18 @@ export interface TraceListRepository {
     filterWhere?: { sql: string; params: Record<string, unknown> };
   }): Promise<number>;
 
+  /**
+   * The ids of the traces a filter selects in the window, newest first, at
+   * most `limit` of them. What an Instant Eval run judges when its filter
+   * names a field only this repository's compiler can answer.
+   */
+  findTraceIds(params: {
+    tenantId: string;
+    timeRange: { from: number; to: number; live?: boolean };
+    filterWhere?: { sql: string; params: Record<string, unknown> };
+    limit: number;
+  }): Promise<string[]>;
+
   findDistinctValues(params: {
     tenantId: string;
     column: string;
@@ -243,6 +255,9 @@ export class NullTraceListRepository implements TraceListRepository {
   }
   async findCount(): Promise<number> {
     return 0;
+  }
+  async findTraceIds(): Promise<string[]> {
+    return [];
   }
   async findDistinctValues(): Promise<string[]> {
     return [];

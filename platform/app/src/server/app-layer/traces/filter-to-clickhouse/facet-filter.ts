@@ -2,6 +2,7 @@ import type { LiqeQuery } from "liqe";
 import { isEmptyAST, parse, serialize } from "../query-language/parse";
 import { filterAST } from "../query-language/walk";
 import { translateFilterToClickHouse } from "./ast";
+import type { ResolvedInstantEvalRun } from "./instant-eval-field";
 
 export interface FacetFilterWhere {
   sql: string;
@@ -76,13 +77,18 @@ export function createFacetFilterCompiler({
   queryText,
   tenantId,
   timeRange,
+  evalRuns,
 }: {
   queryText: string;
   tenantId: string;
   timeRange: { from: number; to: number };
+  /** The Instant Eval runs registered for the query's `eval` chips. */
+  evalRuns?: readonly ResolvedInstantEvalRun[];
 }): { forFacet: (facetKey: string) => FacetFilterWhere | undefined } {
   const compile = (text: string) =>
-    translateFilterToClickHouse(text, tenantId, timeRange) ?? undefined;
+    translateFilterToClickHouse(text, tenantId, timeRange, {
+      ...(evalRuns ? { evalRuns } : {}),
+    }) ?? undefined;
   const whole = compile(queryText);
   const byFacet = new Map<string, FacetFilterWhere | undefined>();
   return {

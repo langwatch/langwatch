@@ -13,6 +13,7 @@ import {
 } from "../errors";
 import { MAX_FILTER_NODE_COUNT } from "../query-language/queries";
 import { FIELD_DEF_BY_NAME, KNOWN_FIELDS } from "./build-handlers";
+import type { ResolvedInstantEvalRun } from "./instant-eval-field";
 import { boundedSubquery } from "./subqueries";
 import {
   EVENT_ATTRIBUTE_PREFIX,
@@ -70,6 +71,10 @@ export function translateFilterToClickHouse(
   queryText: string,
   tenantId: string,
   timeRange: { from: number; to: number },
+  options: {
+    /** The Instant Eval runs registered for the query's `eval` chips. */
+    evalRuns?: readonly ResolvedInstantEvalRun[];
+  } = {},
 ): { sql: string; params: Record<string, unknown> } | null {
   const ctx: TranslationContext = {
     paramCounter: 0,
@@ -81,6 +86,7 @@ export function translateFilterToClickHouse(
     },
     tenantId,
     timeRange,
+    ...(options.evalRuns ? { evalRuns: options.evalRuns } : {}),
   };
 
   const sql = translateFilterAst({ queryText, ctx, translateTag });

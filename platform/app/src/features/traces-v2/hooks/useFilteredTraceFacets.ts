@@ -4,6 +4,7 @@ import { api } from "~/utils/api";
 import { usePreviewTracesActive } from "../onboarding/hooks/usePreviewTracesActive";
 import { useFilterStore } from "../stores/filterStore";
 import type { DiscoverDescriptors } from "./discoverCache";
+import { useInstantEvalRuns } from "./useInstantEvalRuns";
 
 export interface FilteredTraceFacetsResult {
   /** Descriptors counted under the active query, or none until the first lands. */
@@ -30,6 +31,7 @@ export function useFilteredTraceFacets(): FilteredTraceFacetsResult {
   const timeRange = useFilterStore((s) => s.debouncedTimeRange);
   const queryText = useFilterStore((s) => s.debouncedQueryText);
   const isSamplePreview = usePreviewTracesActive();
+  const { evalRuns } = useInstantEvalRuns();
 
   const query = api.tracesV2.facets.useQuery(
     {
@@ -40,6 +42,7 @@ export function useFilteredTraceFacets(): FilteredTraceFacetsResult {
         live: !!timeRange.label,
       },
       query: queryText || undefined,
+      ...(evalRuns ? { evalRuns } : {}),
     },
     {
       enabled: !!projectId && !isSamplePreview,

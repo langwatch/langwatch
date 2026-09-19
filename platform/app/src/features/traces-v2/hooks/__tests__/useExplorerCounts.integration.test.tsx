@@ -58,6 +58,8 @@ describe("useExplorerCounts", () => {
         isLoading: false,
         isFetching: false,
         isPlaceholderData: false,
+        instantEval: null,
+        summary: "1,234 traces",
       });
     });
   });
@@ -73,6 +75,8 @@ describe("useExplorerCounts", () => {
         isLoading: false,
         isFetching: true,
         isPlaceholderData: true,
+        instantEval: null,
+        summary: "7 conversations",
       });
     });
   });

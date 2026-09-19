@@ -1,0 +1,134 @@
+/**
+ * The Instant Eval run as the Trace Explorer drives it: an estimate, a start,
+ * a cancel and a poll, all over the same run service the REST family exposes.
+ *
+ * The Explorer never writes a statement. It sends the search bar's own
+ * vocabulary (a target, the other chips as the filter, the exact window and
+ * one yes-or-no question) and the shorthand writes the statement, so a run
+ * started here is the same run a CLI caller would start with `--target`.
+ *
+ * Permissions match the REST family: `analytics:manage` to spend, and
+ * `analytics:view` to read a run back.
+ *
+ * @see ~/server/app-layer/instant-evals/run
+ * @see ../../../app/api/instant-evals/[[...route]]/app.ts: the REST family
+ * @see ../../../../../specs/traces-v2/instant-eval-search.feature
+ */
+
+import { z } from "zod";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { getUserProtectionsForProject } from "~/server/api/utils";
+import {
+  getInstantEvalRunService,
+  type InstantEvalRunInput,
+  toInstantEvalExplorerRun,
+} from "~/server/app-layer/instant-evals/run";
+import { INSTANT_EVAL_TARGETS } from "~/server/app-layer/instant-evals/shorthand";
+
+/** What the Explorer asks to judge: the shorthand, in the search bar's words. */
+export const explorerInstantEvalRunSchema = z.object({
+  projectId: z.string(),
+  target: z.enum(INSTANT_EVAL_TARGETS),
+  /** The other chips of the query, as the filter narrowing what is judged. */
+  filter: z.string().max(4_000).default(""),
+  /** The exact bounds the search ran in, frozen for the run's life. */
+  window: z.object({ from: z.number().int(), to: z.number().int() }),
+  question: z.object({
+    instructions: z.string().min(1).max(2_000),
+    /** What counts as yes, then what counts as no. */
+    criteria: z
+      .tuple([z.string().min(1).max(500), z.string().min(1).max(500)])
+      .optional(),
+  }),
+  /** Rows the run may judge. Absent means the default cap. */
+  limit: z.number().int().positive().optional(),
+});
+
+export type ExplorerInstantEvalRunInput = z.infer<
+  typeof explorerInstantEvalRunSchema
+>;
+
+/** The run service's input for what the Explorer asked. */
+export function toExplorerRunInput(
+  input: ExplorerInstantEvalRunInput,
+): InstantEvalRunInput {
+  return {
+    shorthand: {
+      target: input.target,
+      ...(input.filter.trim() ? { filter: input.filter.trim() } : {}),
+      start: new Date(input.window.from).toISOString(),
+      end: new Date(input.window.to).toISOString(),
+      questions: [
+        {
+          id: "matched",
+          kind: "boolean",
+          instructions: input.question.instructions,
+          ...(input.question.criteria
+            ? { criteria: [...input.question.criteria] }
+            : {}),
+        },
+      ],
+    },
+    ...(input.limit === undefined ? {} : { limit: input.limit }),
+  };
+}
+
+const runIdSchema = z.object({
+  projectId: z.string(),
+  runId: z.string().min(1).max(200),
+});
+
+export const tracesV2InstantEvalRouter = createTRPCRouter({
+  estimate: protectedProcedure
+    .input(explorerInstantEvalRunSchema)
+    .permission("analytics:manage")
+    .mutation(async ({ input, ctx }) => {
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
+      return await getInstantEvalRunService().estimate({
+        projectId: input.projectId,
+        protections,
+        input: toExplorerRunInput(input),
+      });
+    }),
+
+  start: protectedProcedure
+    .input(explorerInstantEvalRunSchema)
+    .permission("analytics:manage")
+    .mutation(async ({ input, ctx }) => {
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
+      const row = await getInstantEvalRunService().create({
+        projectId: input.projectId,
+        protections,
+        input: toExplorerRunInput(input),
+      });
+      return toInstantEvalExplorerRun(row);
+    }),
+
+  cancel: protectedProcedure
+    .input(runIdSchema)
+    .permission("analytics:manage")
+    .mutation(async ({ input, ctx }) => {
+      const requestedByUserId = ctx.session?.user?.id;
+      const row = await getInstantEvalRunService().cancel({
+        projectId: input.projectId,
+        runId: input.runId,
+        ...(requestedByUserId ? { requestedByUserId } : {}),
+      });
+      return toInstantEvalExplorerRun(row);
+    }),
+
+  get: protectedProcedure
+    .input(runIdSchema)
+    .permission("analytics:view")
+    .query(async ({ input }) => {
+      const row = await getInstantEvalRunService().get({
+        projectId: input.projectId,
+        runId: input.runId,
+      });
+      return toInstantEvalExplorerRun(row);
+    }),
+});

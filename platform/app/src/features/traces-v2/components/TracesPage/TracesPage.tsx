@@ -11,6 +11,7 @@ import { useTracesV2Presence } from "~/features/presence/hooks/useTracesV2Presen
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useExplorerCounts } from "../../hooks/useExplorerCounts";
 import { useFirstTraceWatch } from "../../hooks/useFirstTraceWatch";
+import { useInstantEvalRunWatch } from "../../hooks/useInstantEvalRunWatch";
 import { useLensFilterDirtySync } from "../../hooks/useLensFilterDirtySync";
 import { useLensSync } from "../../hooks/useLensSync";
 import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
@@ -47,6 +48,7 @@ import { TraceV2DrawerShell } from "../TraceDrawer";
 import { TraceTable } from "../TraceTable/TraceTable";
 import { AuroraSvg } from "./AuroraSvg";
 import { EmptyResultsPane } from "./EmptyResultsPane";
+import { InstantEvalProgressMount } from "./InstantEvalProgressMount";
 import { IntegratePane } from "./IntegratePane";
 import { PageKeyboardShortcuts } from "./PageKeyboardShortcuts";
 import { useDebouncedFilterCommit } from "./useDebouncedFilterCommit";
@@ -89,6 +91,9 @@ export const TracesPage: React.FC = () => {
   useDebouncedFilterCommit();
   useLensFilterDirtySync();
   useLensSync();
+  // Polls the Instant Eval runs behind the query's `eval` chips while they
+  // judge, and refetches the table and the sidebar as pages of verdicts land.
+  useInstantEvalRunWatch();
   // URL → drawer store sync so a deep link / browser-back still opens
   // the drawer. The actual mount decision is in this component (see
   // `traceDrawerMounted` below), so the click → render path doesn't
@@ -533,6 +538,9 @@ const ResultsPane: React.FC = React.memo(() => {
             triggered by the toolbar "See sample data" toggle instead of an
             auto-play state machine. */}
         {showAurora && <AuroraOverlay />}
+        {/* A judging run replaces the aurora with a determinate bar: what has
+            been judged, what matched, and a Stop. */}
+        <InstantEvalProgressMount />
         <FindBar />
         <Box
           position="absolute"

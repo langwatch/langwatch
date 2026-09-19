@@ -1387,12 +1387,13 @@ Rule: Enter routes a sentence
     Then the result is the filter "evaluator:ragas/faithfulness AND evaluatorVerdict:fail"
     And it carries the reason the evaluator was chosen
 
-  @unimplemented
+  @integration
   Scenario: An Instant Eval route starts a run
     Given the router answered "instant_eval"
     When the Explorer receives the payload through `useInstantEvalRoute`
     Then an `eval:"<question>"` chip is applied and a run starts under the cost rule
-    # Pending: until then the Explorer applies `fallbackQuery`, the phrase search.
+    # The cost rule, the progress bar and the refusals are specified in
+    # specs/traces-v2/instant-eval-search.feature.
 
   @unit
   Scenario: A literal phrase is searched as one phrase

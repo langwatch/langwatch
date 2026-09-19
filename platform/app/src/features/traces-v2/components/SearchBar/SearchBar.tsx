@@ -19,17 +19,25 @@ import { explainAnyError } from "~/features/errors";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import {
+  type InstantEvalExplorerStatus,
+  isInstantEvalRunActive,
+} from "~/server/app-layer/instant-evals/run/instant-eval-explorer";
 import type { AiActionError } from "~/server/app-layer/traces/ai-query";
 import { SEARCH_FIELDS } from "~/server/app-layer/traces/query-language/metadata";
+import { useInstantEvalRuns } from "../../hooks/useInstantEvalRuns";
 import { useTraceFacets } from "../../hooks/useTraceFacets";
 import { usePreviewTracesActive } from "../../onboarding/hooks/usePreviewTracesActive";
 import { useFacetHoverStore } from "../../stores/facetHoverStore";
 import { useFilterStore } from "../../stores/filterStore";
+import { useInstantEvalRunStore } from "../../stores/instantEvalRunStore";
 import { AskAiButton } from "../ai/AskAiButton";
 import {
   ProviderPrimerPopover,
   SMARTER_SEARCH_PRIMER_COPY,
 } from "../ai/ProviderPrimerPopover";
+import { InstantEvalConfirmDialog } from "../TracesPage/InstantEvalConfirmDialog";
+import { InstantEvalRefusalPopover } from "../TracesPage/InstantEvalRefusalPopover";
 import { useInstantEvalRoute } from "../TracesPage/useInstantEvalRoute";
 import { ActiveSearchEditor } from "./ActiveSearchEditor";
 import { AiErrorDetails, hasAiErrorDetails } from "./ErrorBannerDetail";
@@ -287,7 +295,8 @@ export const SearchBar: React.FC = () => {
   // attached, and a `free_text` answer with no model behind it opens the
   // primer once so the reader knows what a model would add.
   const [smarterSearchPrimerOpen, setSmarterSearchPrimerOpen] = useState(false);
-  const { onInstantEvalRoute } = useInstantEvalRoute();
+  const instantEval = useInstantEvalRoute();
+  const { onInstantEvalRoute } = instantEval;
   const handleModelUnavailable = useCallback(() => {
     if (smarterSearchPrimerShown) return;
     smarterSearchPrimerShown = true;
@@ -319,6 +328,29 @@ export const SearchBar: React.FC = () => {
     return map;
   }, [facets]);
 
+  // An `eval` chip wears its run's state: pending until a run is registered
+  // for it, partial once a run stopped short of its total. The mark rides on
+  // the same overlay label the facet labels use, so the chip stays one chip.
+  // Spec: specs/traces-v2/instant-eval-search.feature ("Stop cancels the run
+  // and keeps the chip as partial", "A chip with no registered run is pending").
+  const { chips: evalChips } = useInstantEvalRuns();
+  const evalRuns = useInstantEvalRunStore((s) => s.runs);
+  const evalChipMarks = useMemo(() => {
+    const marks: Record<string, Record<string, string>> = {};
+    for (const chip of evalChips) {
+      const mark = instantEvalChipMark({
+        run: chip.runId ? evalRuns[chip.runId] : undefined,
+        hasRun: chip.runId !== null,
+      });
+      if (!mark) continue;
+      marks[chip.field] = {
+        ...(marks[chip.field] ?? {}),
+        [chip.question]: `${chip.question} ${mark}`,
+      };
+    }
+    return marks;
+  }, [evalChips, evalRuns]);
+
   // Publish the (field → value → label) lookup the chip overlay reads
   // from. The editor's FilterHighlight plugin watches this via a
   // module-level ref; we ping it with a LABEL_REFRESH meta so chips
@@ -335,8 +367,11 @@ export const SearchBar: React.FC = () => {
       }
       if (Object.keys(fieldMap).length > 0) map[facet.key] = fieldMap;
     }
+    for (const [field, values] of Object.entries(evalChipMarks)) {
+      map[field] = { ...(map[field] ?? {}), ...values };
+    }
     setFilterChipLabels(map);
-  }, [facets]);
+  }, [facets, evalChipMarks]);
   const valueResolver = useCallback<ValueResolver>(
     (field, query) => {
       const meta = SEARCH_FIELDS[field];
@@ -490,6 +525,29 @@ export const SearchBar: React.FC = () => {
               />
             </Flex>
           </ProviderPrimerPopover>
+          {/* Anchored to a point at the bar's bottom-left rather than to the
+              bar itself: the bar already anchors the primer popover, and a
+              second anchor nested around the editor would remount it. */}
+          <InstantEvalRefusalPopover
+            refusal={instantEval.refusal}
+            onClose={instantEval.dismissRefusal}
+          >
+            <Box
+              position="absolute"
+              left={3}
+              bottom={0}
+              width="1px"
+              height="1px"
+              aria-hidden="true"
+            />
+          </InstantEvalRefusalPopover>
+          <InstantEvalConfirmDialog
+            confirmation={instantEval.confirmation}
+            isStarting={instantEval.isStarting}
+            onRun={instantEval.confirmRun}
+            onSearchWords={instantEval.searchWordsInstead}
+            onClose={instantEval.searchWordsInstead}
+          />
           <SearchedAsNotice />
           {/* Unified error banner — handles both parse errors and AI errors.
               AI error takes priority when both are present (AI mode is the
@@ -506,6 +564,36 @@ export const SearchBar: React.FC = () => {
     </Box>
   );
 };
+
+/**
+ * What an `eval` chip wears beside its question: "(pending)" until a run is
+ * registered for it, "(partial)" once the run ended short of its total, and
+ * nothing while it judges or after it finished whole.
+ */
+export function instantEvalChipMark({
+  run,
+  hasRun,
+}: {
+  run:
+    | {
+        status: InstantEvalExplorerStatus;
+        progress: number;
+        total: number | null;
+      }
+    | undefined;
+  hasRun: boolean;
+}): string | null {
+  if (!hasRun) return "(pending)";
+  if (!run) return null;
+  if (isInstantEvalRunActive(run.status)) return null;
+  const ended = run.status === "cancelled" || run.status === "failed";
+  if (ended && (run.total === null || run.progress < run.total)) {
+    const judged = run.progress.toLocaleString();
+    const total = run.total === null ? "?" : run.total.toLocaleString();
+    return `(partial: ${judged} of ${total} judged)`;
+  }
+  return null;
+}
 
 /**
  * Unified error banner rendered flush below the search bar.

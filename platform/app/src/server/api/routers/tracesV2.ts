@@ -23,6 +23,8 @@ import {
 
 const logger = createLogger("langwatch:api:traces-v2");
 
+import { getInstantEvalRunService } from "~/server/app-layer/instant-evals/run";
+import { INSTANT_EVAL_TARGETS } from "~/server/app-layer/instant-evals/shorthand";
 import {
   buildCodingAgentTranscript,
   type CodingAgentTranscript,
@@ -32,6 +34,7 @@ import { deriveTraceTimestamp } from "~/server/app-layer/traces/derive-trace-tim
 import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
 import {
   extractFreeTextTerms,
+  type ResolvedInstantEvalRun,
   translateFilterToClickHouse,
 } from "~/server/app-layer/traces/filter-to-clickhouse";
 import { explorerHiddenOrigins } from "~/server/app-layer/traces/hidden-origins";
@@ -40,6 +43,7 @@ import {
   DERIVED_OUTPUT_ATTR_PREFIX,
 } from "~/server/app-layer/traces/log-content-derivation";
 import { deriveUnmappedCostSuggestion } from "~/server/app-layer/traces/model-cost-span-preview.service";
+import type { InstantEvalRunReference } from "~/server/app-layer/traces/query-language/instantEvalChips";
 import type {
   SpanSummaryPage,
   SpanSummaryRow,
@@ -106,6 +110,7 @@ import {
   gateSessionTitle,
   gateTreeCost,
 } from "./tracesV2.gates";
+import { tracesV2InstantEvalRouter } from "./tracesV2.instantEval";
 import { withoutHiddenResourceAttrs } from "./tracesV2.resourceAttrs";
 import type {
   ContentPrivacy,
@@ -148,20 +153,57 @@ function occurredAtFromInput(input: {
 }
 
 /**
+ * The Instant Eval runs the Explorer registered for the query's `eval`
+ * chips: one entry per chip key, naming the question, the unit judged and
+ * the run. Checked against the project before the compiler reads them.
+ * Spec: specs/traces-v2/instant-eval-search.feature.
+ */
+const evalRunsSchema = z
+  .record(
+    z.string().min(1).max(64),
+    z.object({
+      question: z.string().min(1).max(2_000),
+      target: z.enum(INSTANT_EVAL_TARGETS),
+      runId: z.string().min(1).max(200),
+    }),
+  )
+  .refine((runs) => Object.keys(runs).length <= 8, {
+    message: "At most eight Instant Eval runs may be registered on one query.",
+  })
+  .optional();
+
+/** The registered runs resolved against the project, or none. */
+async function resolveEvalRuns(input: {
+  projectId: string;
+  evalRuns?: Record<string, InstantEvalRunReference>;
+}): Promise<readonly ResolvedInstantEvalRun[] | undefined> {
+  if (!input.evalRuns || Object.keys(input.evalRuns).length === 0) {
+    return undefined;
+  }
+  return await getInstantEvalRunService().resolveForExplorer({
+    projectId: input.projectId,
+    evalRuns: input.evalRuns,
+  });
+}
+
+/**
  * Shared filter-translation step for the list/facets/newCount procedures.
  * Each one accepts the same `query` text + `projectId` + `timeRange` and
  * needs the same null-coalesce → call → ?? undefined sequence.
  */
-function buildFilterWhere(input: {
+async function buildFilterWhere(input: {
   projectId: string;
   timeRange: { from: number; to: number; live?: boolean };
   query?: string | null;
+  evalRuns?: Record<string, InstantEvalRunReference>;
 }) {
+  const evalRuns = await resolveEvalRuns(input);
   return (
     translateFilterToClickHouse(
       input.query ?? "",
       input.projectId,
       input.timeRange,
+      { ...(evalRuns ? { evalRuns } : {}) },
     ) ?? undefined
   );
 }
@@ -1156,6 +1198,7 @@ export const tracesV2Router = createTRPCRouter({
           })
           .optional(),
         query: z.string().nullish(),
+        evalRuns: evalRunsSchema,
       }),
     )
     .permission("traces:view")
@@ -1171,7 +1214,7 @@ export const tracesV2Router = createTRPCRouter({
         page: input.page,
         pageSize: input.pageSize,
         cursor: input.cursor,
-        filterWhere: buildFilterWhere(input),
+        filterWhere: await buildFilterWhere(input),
         hiddenOrigins: explorerHiddenOrigins(input.query),
         visibilityCutoffMs: await getVisibilityCutoffMsForProject(
           input.projectId,
@@ -1201,6 +1244,7 @@ export const tracesV2Router = createTRPCRouter({
         pageSize: z.number().int().min(1).max(100).default(50),
         cursor: z.string().optional(),
         query: z.string().nullish(),
+        evalRuns: evalRunsSchema,
       }),
     )
     .permission("traces:view")
@@ -1215,7 +1259,7 @@ export const tracesV2Router = createTRPCRouter({
         sort: input.sort,
         pageSize: input.pageSize,
         cursor: input.cursor,
-        filterWhere: buildFilterWhere(input),
+        filterWhere: await buildFilterWhere(input),
         hiddenOrigins: explorerHiddenOrigins(input.query),
         contentTerms: contentSearchTermsForViewer({
           terms: extractFreeTextTerms(input.query ?? ""),
@@ -1282,16 +1326,19 @@ export const tracesV2Router = createTRPCRouter({
         projectId: z.string(),
         timeRange: timeRangeSchema,
         query: z.string().nullish(),
+        evalRuns: evalRunsSchema,
       }),
     )
     .permission("traces:view")
     .query(async ({ input }) => {
       const app = getApp();
+      const evalRuns = await resolveEvalRuns(input);
       return app.traces.list.getFacets({
         tenantId: input.projectId,
         timeRange: input.timeRange,
         query: input.query,
         hiddenOrigins: explorerHiddenOrigins(input.query),
+        ...(evalRuns ? { evalRuns } : {}),
       });
     }),
 
@@ -1302,6 +1349,7 @@ export const tracesV2Router = createTRPCRouter({
         timeRange: timeRangeSchema,
         since: z.number(),
         query: z.string().nullish(),
+        evalRuns: evalRunsSchema,
       }),
     )
     .permission("traces:view")
@@ -1311,11 +1359,15 @@ export const tracesV2Router = createTRPCRouter({
         tenantId: input.projectId,
         timeRange: input.timeRange,
         since: input.since,
-        filterWhere: buildFilterWhere(input),
+        filterWhere: await buildFilterWhere(input),
         hiddenOrigins: explorerHiddenOrigins(input.query),
       });
       return { count };
     }),
+
+  // The Instant Eval run behind an `eval:"question"` chip.
+  // Spec: specs/traces-v2/instant-eval-search.feature.
+  instantEval: tracesV2InstantEvalRouter,
 
   suggest: protectedProcedure
     .input(

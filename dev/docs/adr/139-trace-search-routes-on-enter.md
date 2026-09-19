@@ -19,7 +19,7 @@ Enter is the only path a typed text takes out of the search bar. Typing, pausing
 A text made of `field:value` terms is applied as typed, with no request. A text with bare words is a sentence, and a new tRPC procedure, `tracesV2.routeSearch`, decides what it is. The router (`server/app-layer/traces/search-router/route-search.ts`) answers one of four kinds:
 
 - `filter`: the FAST model builds the query through `generateTraceAction`, the same prompt and catalogue the composer uses, and the result is merged with the explicit terms the user typed next to the sentence. The bar shows the query as chips and a strip under it reads "Searched as: ...", with the words offered back as one phrase.
-- `instant_eval`: the FAST model rewrites the sentence into a judge question with yes and no criteria (`generateInstantEvalQuestion`), unless an evaluator or event the project already records answers it, in which case the route is a filter naming it. The target is `threads` on the Conversations lens and `traces` on every other lens. The Explorer receives the payload through `useInstantEvalRoute`; the run itself is the next part of this feature.
+- `instant_eval`: the FAST model rewrites the sentence into a judge question with yes and no criteria (`generateInstantEvalQuestion`), unless an evaluator or event the project already records answers it, in which case the route is a filter naming it. The target is `threads` on the Conversations lens and `traces` on every other lens. The Explorer receives the payload through `useInstantEvalRoute`, which starts the run and applies the `eval` chip (see "The `eval` field" below).
 - `free_text`: the sentence is quoted as one phrase and merged with the explicit terms.
 - `langy`: the whole text is the question, and it takes the same door as the Ask Langy button.
 
@@ -33,6 +33,14 @@ The translator's node ceiling gets its own handled code, `filter_too_complex`, w
 
 Cmd+Enter is removed. The Ask Langy button stays as the explicit route and now attaches the whole trace-view chip (time range, lens, grouping, sort, the applied search) before the filter chip, so the explicit route sends at least what the passive page context sends.
 
+## The `eval` field
+
+An `instant_eval` route ends as one chip, `eval:"<question>"`, whose value is the question the judge reads. `eval:` judges what the lens shows (conversations on the Conversations lens, traces on every other lens); `eval.trace:`, `eval.conversation:` and `eval.llm:` force the unit judged, so a lens change cannot change what a saved chip means. The run behind the chip is not in the query text. The client registers it under a key over the question, the unit judged, the other chips and the window (`instantEvalRunKey`, a rolling preset keyed by its id so the bounds moving every tick do not start a run every tick), keeps the key to run id map in the filter store, writes it into the URL fragment as `run=<key>:<runId>`, and sends the registered runs as `evalRuns` with every list, sessions, facets and new-count read. The server resolves each run against the project through the run service and drops the ones it does not own, and the compiler reads the resolution off the translation context. A chip with a run compiles to `TraceId IN (SELECT TraceId FROM instant_eval_judgments WHERE TenantId = ... AND RunId = ... AND CreatedAt in the run's own write window GROUP BY TraceId, SpanId, QuestionId HAVING argMax(Passed, UpdatedAt) = 1)`, a conversation chip compares the trace's conversation id to the matched `ThreadId`s instead, and a forcing spelling with no run compiles to no rows. The bare field with no run keeps the evaluator-name lookup it was before, so saved queries spelling `eval:<name>` still work.
+
+The run starts through `tracesV2.instantEval.{estimate,start,cancel,get}`, which wraps the run service with the shorthand the CLI already speaks: the target, the other chips as the filter, the exact window and one boolean question. Under 0.50 USD the run starts on the estimate alone; at or over it a dialog shows the question as understood, the rows and the cost. A spent free budget or a missing judge is a closable popover on the search bar, and every refusal ends in the phrase search. The shorthand dialect cannot compile the half of the filter language that lives outside the trace row (evaluator verdicts, events, span attributes); when it refuses a field by name the run service resolves the trace ids once with the Explorer's own compiler, capped at the row limit, and the statement binds them as `instant_eval_selection_ids` instead of the filter text.
+
+While the run judges, the page polls `get` every second, a determinate bar over the table reads the run's counters with a Stop, and every change of progress refetches the list and the facets so matches appear as pages finish. The counts read the run's counters during the run and the plain total after. Stop cancels the run; the chip stays, marked partial with what was judged.
+
 ## Rationale / Trade-offs
 
 Enter costs the user one keystroke they already pressed for a sentence and saves a request per pause, a half-typed query hitting ClickHouse, and a table that re-renders under their hands. The 600 ms query debounce existed for keystrokes and is now a 300 ms coalescer for bursts of facet clicks.
@@ -43,9 +51,11 @@ What is compromised: a single bare word ("timeout") also goes through the router
 
 ## Consequences
 
-`tracesV2.routeSearch` is a new procedure with no migration. It reads facet values for the context line and calls the classifier and the FAST model; the FAST model uses the project's own keys under the `traces.ai_search` feature. The `instant_eval` kind has a typed payload and a hook the Explorer implements next; until then it applies the phrase search. The route metric is the only trace routing leaves.
+`tracesV2.routeSearch` is a new procedure with no migration. It reads facet values for the context line and calls the classifier and the FAST model; the FAST model uses the project's own keys under the `traces.ai_search` feature. The `instant_eval` kind has a typed payload the Explorer turns into a run through `tracesV2.instantEval`, a nested family with no migration of its own: it reads and writes the Instant Eval tables the REST family already uses, and the `eval` chip reads `instant_eval_judgments` through the filter compiler. The route metric is the only trace routing leaves.
 
 ## References
 
 - Related ADRs: ADR-045 (handled errors), ADR-137 (Instant Eval runs), ADR-138 (the query reference)
 - Spec: `specs/traces-v2/search.feature`, rule "Enter routes a sentence"
+- Spec: `specs/traces-v2/instant-eval-search.feature`, the `eval` chip, the cost rule, the progress and the refusals
+- Spec: `specs/instant-evals/instant-eval-shorthand.feature`, the selection fallback

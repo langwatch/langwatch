@@ -26,6 +26,7 @@ import type {
 } from "./facet-registry";
 import { FACET_REGISTRY, TABLE_TIME_COLUMNS } from "./facet-registry";
 import { createFacetFilterCompiler } from "./filter-to-clickhouse/facet-filter";
+import type { ResolvedInstantEvalRun } from "./filter-to-clickhouse/instant-eval-field";
 import { type FilterWhere, withHiddenOrigins } from "./hidden-origins";
 import type {
   BatchedFacetResult,
@@ -144,10 +145,20 @@ interface FacetParams {
    * them so they stay there to pick.
    */
   hiddenOrigins?: readonly string[];
+  /** The Instant Eval runs registered for the query's `eval` chips. */
+  evalRuns?: readonly ResolvedInstantEvalRun[];
 }
 
 export interface FacetsResult {
   facets: FacetDescriptor[];
+}
+
+interface TraceIdsParams {
+  tenantId: string;
+  timeRange: { from: number; to: number };
+  filterWhere?: { sql: string; params: Record<string, unknown> };
+  hiddenOrigins?: readonly string[];
+  limit: number;
 }
 
 interface NewCountParams {
@@ -611,6 +622,7 @@ export class TraceListService {
       queryText: params.query ?? "",
       tenantId: params.tenantId,
       timeRange: params.timeRange,
+      ...(params.evalRuns ? { evalRuns: params.evalRuns } : {}),
     });
     // One object per distinct predicate, so facets that share a predicate
     // share a batched read below.
@@ -635,6 +647,20 @@ export class TraceListService {
       includeDynamicKeys: false,
     });
     return { facets };
+  }
+
+  /**
+   * The trace ids a filter selects, newest first, capped. What an Instant
+   * Eval run started from the Explorer judges when its filter names a field
+   * the shorthand dialect cannot answer.
+   */
+  async getTraceIds(params: TraceIdsParams): Promise<string[]> {
+    return this.repository.findTraceIds({
+      tenantId: params.tenantId,
+      timeRange: params.timeRange,
+      filterWhere: withHiddenOrigins(params.filterWhere, params.hiddenOrigins),
+      limit: params.limit,
+    });
   }
 
   async getNewCount(params: NewCountParams): Promise<number> {

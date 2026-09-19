@@ -24,3 +24,4 @@ export {
   type InMemoryTrace,
   UNSUPPORTED,
 } from "./field-def";
+export type { ResolvedInstantEvalRun } from "./instant-eval-field";

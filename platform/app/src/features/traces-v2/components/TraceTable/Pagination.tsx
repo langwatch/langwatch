@@ -73,7 +73,7 @@ export const Pagination: React.FC<PaginationProps> = ({
   isTransitioning = false,
   maxPageSize,
 }) => {
-  const { totalHits, itemNoun } = useExplorerCounts();
+  const { totalHits, itemNoun, instantEval, summary } = useExplorerCounts();
   const page = useFilterStore((s) => s.page);
   const pageSize = useFilterStore((s) => s.pageSize);
   const pageCursors = useFilterStore((s) => s.pageCursors);
@@ -117,6 +117,7 @@ export const Pagination: React.FC<PaginationProps> = ({
       pageSize={effectivePageSize}
       totalCount={totalHits}
       unitLabel={itemNoun}
+      {...(instantEval ? { totalSummary: summary } : {})}
       visibleCount={visibleCount}
       pageSizeOptions={sizeOptions}
       isLoading={isLoading}

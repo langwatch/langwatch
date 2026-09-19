@@ -69,6 +69,18 @@ interface FilterState {
   debouncedTimeRange: TimeRange;
 
   /**
+   * The Instant Eval runs behind the query's `eval` chips, keyed by the run
+   * key (`instantEvalRunKey`: the question, the unit judged, the other chips
+   * and the window) to the run id. A chip whose key has no entry is pending.
+   * Serialised into the URL fragment as `run=<key>:<runId>`.
+   */
+  evalRuns: Record<string, string>;
+  /** Register the run started for a chip's key. */
+  registerEvalRun: (args: { key: string; runId: string }) => void;
+  /** Replace the whole registry, which is what a URL apply does. */
+  setEvalRuns: (runs: Record<string, string>) => void;
+
+  /**
    * Structured error from the most recent Ask AI attempt. Persists until
    * the user explicitly dismisses it, types a new query, submits a new AI
    * prompt, or calls `clearAll`. Set by `AiQueryComposer` via `setAiError`
@@ -283,6 +295,11 @@ export const useFilterStore = create<FilterState>((set, get) => ({
   debouncedQueryText: "",
   debouncedTimeRange: INITIAL_TIME_RANGE,
   lastAiTranslation: null,
+  evalRuns: {},
+
+  registerEvalRun: ({ key, runId }) =>
+    set((state) => ({ evalRuns: { ...state.evalRuns, [key]: runId } })),
+  setEvalRuns: (runs) => set({ evalRuns: runs }),
 
   setAiError: (err) => set({ aiError: err }),
   dismissParseError: () => set({ parseError: null }),
@@ -528,6 +545,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
       page: 1,
       pageCursors: { 1: null },
       lastAiTranslation: null,
+      evalRuns: {},
     }),
 
   commitDebounced: () => {

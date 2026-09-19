@@ -52,6 +52,14 @@ vi.mock("~/utils/api", () => ({
       routeSearch: {
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
+      instantEval: {
+        estimate: {
+          useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+        },
+        start: {
+          useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+        },
+      },
     },
   },
 }));
