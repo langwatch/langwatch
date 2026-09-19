@@ -71,7 +71,8 @@ Feature: License sync
   Scenario: A sync records the reported seats and answers with a lease
     When the install syncs reporting 53 full member seats in use
     Then LangWatch records 53 seats reported for that license and the time of the sync
-    And the response carries a signed lease with the entitled services, the seat overage allowance and an expiry 14 days out
+    And the response carries a signed lease with the entitled services and the seat overage allowance
+    And the lease says to warn after 14 days and expires after 30
 
   @unit @unimplemented
   Scenario: The highest seat count of the quarter is what is kept for billing
@@ -143,18 +144,34 @@ Feature: License sync
     And the members page shows 50 licensed, 51 in use and 1 to be invoiced
 
   @unit @unimplemented
-  Scenario: When the lease expires the allowance is withdrawn
-    Given the last lease expired because sync has failed for more than 14 days
+  Scenario: The allowance is kept while sync has failed for less than 14 days
+    Given sync has been failing for 10 days
+    And 52 full member seats are in use on a license for 50 with an allowance of 5
+    When an admin invites another full member
+    Then the invitation is accepted
+    And no seat warning is shown
+
+  @unit @unimplemented
+  Scenario: Between day 14 and day 30 the allowance is kept and admins are warned
+    Given sync has been failing for 20 days
+    And 52 full member seats are in use on a license for 50 with an allowance of 5
+    When an admin invites another full member
+    Then the invitation is accepted
+    And admins see a warning that names the day the seat allowance will be withdrawn
+
+  @unit @unimplemented
+  Scenario: After day 30 the allowance is withdrawn
+    Given the last lease expired because sync has failed for more than 30 days
     And 53 full member seats are in use
     When an admin invites another full member
     Then the invitation is refused for exceeding the licensed seats
     But every existing member keeps working
 
   @integration @unimplemented
-  Scenario: Admins are warned before the lease runs out
-    Given sync has been failing for 3 days
+  Scenario: A failing sync is visible from the first failure
+    Given sync has been failing for 1 day
     When an admin opens Settings, Connect
-    Then the page shows when sync last succeeded, why it is failing and when the seat allowance will be withdrawn
+    Then the page shows when sync last succeeded and why it is failing
 
   @unit @unimplemented
   Scenario: A sync that succeeds again restores the allowance

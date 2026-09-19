@@ -5,8 +5,8 @@ Feature: License registry
   billed to the right account, without changing the license format an install
   already holds.
 
-  The registry does not store the token an install presents. It stores a keyed
-  hash of that token, so reading the registry table does not yield a working
+  The registry does not store the token an install presents. It stores a hash
+  of that token, so reading the registry table does not yield a working
   credential. The one license text it ever holds is a reissued license waiting
   to be delivered to its install, encrypted, and erased once delivered.
 
@@ -40,10 +40,11 @@ Feature: License registry
     Then the registry holds a row for that license
 
   @unit @unimplemented
-  Scenario: The registry stores a keyed hash, not the token
+  Scenario: The registry stores a hash of the token, not the token
     When a license is issued and recorded
-    Then the row holds a keyed hash of the token the install will present
-    And neither the license key nor the bare token appears in the row
+    Then the row holds a hash of the token the install will present
+    And neither the license key nor the token itself appears in the row
+    And the token cannot be computed from what the row holds
 
   @unit @unimplemented
   Scenario: A reissued license is held encrypted only until it is delivered
@@ -154,6 +155,11 @@ Feature: License registry
   Scenario: Commercial terms are set on the registry row
     When an operator sets a seat overage allowance of 5, a seat rate of 600 USD per year, a prepaid commit of 1000 USD and on-demand overage up to 500 USD
     Then the row records the allowance, the seat rate, the commit, that overage is enabled and its maximum
+
+  @unit @unimplemented
+  Scenario: The seat overage allowance defaults to a fifth of the seats, rounded up
+    When an operator issues a license for 52 seats without setting an allowance
+    Then its seat overage allowance is 11
 
   @unit @unimplemented
   Scenario: An overage maximum without overage enabled is refused

@@ -81,8 +81,12 @@ The token is `lwl_` plus the SHA-256 of the canonical license, which is
 on the re-serialized payload, so hashing the same form means line wrapping or a
 trailing newline in a pasted license can not split an install from its row.
 
-The registry stores `HMAC-SHA256(LW_VIRTUAL_KEY_PEPPER, token)`, the same scheme
-virtual keys use. A read of the table does not yield a working credential.
+The registry never stores the bearer value. It stores `sha256(token)`, a second
+hash, and looks a presented token up by it, so read access to the registry is
+not credential access. The token has 256 bits of entropy, so the second hash can
+not be reversed and a pepper would add nothing. Leaving the pepper out also
+means the issue script needs no extra secret, and an operator can compute a
+lookup by hand from a license.
 
 The one license text the registry holds is a reissued license waiting for
 delivery over sync. It is encrypted at rest and erased when the install first
@@ -169,9 +173,18 @@ plus the overage maximum when overage is enabled. Only a license may call it.
 
 `POST /v1/license/sync` sends the token, the instance id, the version and the
 two seat counts. It answers with a lease:
-`{licenseId, instanceId, services, seatOverageAllowance, issuedAt, validUntil}`,
-signed with the license key pair and verified with the public key the install
-already embeds. `validUntil` is 14 days out.
+`{licenseId, instanceId, services, seatOverageAllowance, issuedAt, warnAfter,
+validUntil}`, signed with the license key pair and verified with the public key
+the install already embeds. `warnAfter` is 14 days out and `validUntil` is 30.
+
+When sync fails, the allowance is kept without comment for 14 days. From day 14
+to day 30 it is still kept, and admins see a warning that names the day it will
+be withdrawn. After day 30 the install is back on the hard licensed cap. A sync
+failure is shown in Settings, Connect from the first failure, so the cause can
+be fixed long before the warning.
+
+The default allowance is 20% of the licensed seats, rounded up. A license can
+override it on its registry row.
 
 The install applies the allowance where plan limits are resolved, so every
 caller of the seat guard sees it: licensed seats plus the allowance while a
@@ -180,10 +193,10 @@ locked out, which keeps the rule in `specs/licensing/seat-reconciliation.feature
 
 A "last successful sync" timestamp in the install's own database was rejected.
 An admin of a self-hosted install can edit a row. A lease that expires needs no
-local clock to be trusted, and the allowance can not be forged without changing
-code. 14 days survives an outage, a holiday and a firewall ticket, and is short
-enough that an install can not take the allowance and stop reporting for a
-quarter.
+local clock to be trusted, and neither the allowance nor the two dates can be
+forged without changing code. 30 days survives an outage, a holiday and a
+firewall ticket, and is short enough that an install can not take the allowance
+and stop reporting for a quarter.
 
 Going over the licensed seats costs money later, so the install says so when it
 happens: on the invitation and on the members page.
@@ -206,15 +219,28 @@ Verified against the Stripe documentation and in Stripe test mode on 2026-09-19.
   credit a customer sees therefore come from LangWatch's own budget ledger.
 - Credit grants never apply to one-off invoice items. Seat lines can not draw
   down the usage commit.
-- A grant applies only when the invoice `period_end` is before `expires_at`. A
-  grant expiring at the end of the term would give the last quarter no credit.
-  The grant expires 7 days after the term ends. The term itself is enforced by
-  the budget and the license.
-- Bank transfer on invoices requires `collection_method=send_invoice`. The
-  transfer type depends on the customer: `us_bank_transfer` for a customer in
-  the United States, `eu_bank_transfer` with a country for EUR. It is an
-  onboarding input. A customer who can use neither is invoiced without bank
-  transfer instructions and finance marks the invoice paid out of band.
+- A credit grant invoices nothing. The commit is charged as a line on the annual
+  one-off invoice, next to the seats, and the grant is created separately.
+- A grant applies only when the invoice `period_end` is strictly before
+  `expires_at`. A grant expiring at the end of the term would give the last
+  quarter no credit. The grant expires 14 days after the term ends. The term
+  itself is enforced by the budget and the license.
+- A renewal grant is created only after the last usage invoice of the old term
+  is finalized. Created earlier, it would absorb that term's overage.
+- A customer can not hold two active subscriptions in different currencies.
+  The usage subscription is USD only. Seats and the commit go on one-off
+  invoices, which may be in another currency. One usage subscription is kept
+  across terms. Its price is `interval: month, interval_count: 3`.
+- Meter events are accepted only with a timestamp inside the last 35 days.
+- Bank transfer on invoices requires `collection_method=send_invoice`. On a
+  Dutch Stripe account, automatic matching covers EUR over SEPA and USD from
+  banks in the United States. The transfer type is an onboarding input. Every
+  other customer pays to LangWatch's own bank account, the invoice shows those
+  instructions, and finance marks it paid out of band from the backoffice.
+- Stripe has no setting that skips a small invoice and rolls it forward. Billing
+  thresholds do the opposite. Roll-forward under 50 USD is an explicit command:
+  a credit note on the small invoice, then a pending invoice item on the
+  subscription for the same amount.
 - The repository pins `stripe@15.12.0` at API version `2024-04-10`, which has no
   credit grants. A global bump would change subscriptions, checkout and webhooks
   for every Cloud customer, so it is not part of this change. A small adapter
@@ -229,14 +255,18 @@ organization budget equal to the commit with window `MANUAL` and breach action
 resumes.
 
 The seat true-up runs on a daily worker tick and dispatches a checkpointed
-command per license and term quarter. Added seats are the quarter's highest
-reported count minus the seats already invoiced. The amount is
-`added seats * annual seat rate * days remaining / term days`, rounded to the
-cent. It creates pending invoice items, which Stripe adds to the next quarterly
-invoice, so a customer receives one invoice per quarter. A quarter closes one
-day before its boundary so the items land on that quarter's invoice. Seats are
+command per license and term quarter, after the quarter has closed. Added seats
+are the quarter's highest reported count minus the seats already invoiced. The
+amount is `added seats * annual seat rate * days remaining / term days`, rounded
+to the cent, where the days remaining start the day after the quarter closes.
+Nothing is backdated. It is its own one-off invoice in the currency of the seat
+contract, because seat lines can not ride a USD usage subscription. Seats are
 not credited back mid-term. A license that never synced in a quarter is flagged
 and not invoiced on a guess.
+
+`reportUsageForMonth` skips organizations that are not on `SEAT_EVENT` pricing.
+A connected customer organization is not, so it is admitted explicitly through
+its `selfHostedCustomer` mark, or its hosted usage would never reach the meter.
 
 ### 8. The `langwatch` provider
 
@@ -256,7 +286,7 @@ Routing by evaluation results is not built.
 | The token and instance id are replayed from another network | Both travel only under TLS to the two hosts. They are bearer secrets; replay with both succeeds. | The budget cap, per-license spend rows that make the use visible, and revocation in seconds. |
 | A revoked license with a cached gateway credential | Revoking revokes the managed key; the change feed evicts the cache entry on the next poll. The 15 minute JWT expiry is the backstop. | While the control plane is unreachable the gateway serves stale entries for up to its 6 hour hard grace. Exposure is capped by the budget. |
 | Hash enumeration | The token is the SHA-256 of a payload that contains a 2048-bit RSA signature. It can not be guessed. The shape check and the negative cache keep a flood of unknown tokens off Postgres. | Refusals never include customer name, seats or term. |
-| A read of the registry table | Rows hold a peppered HMAC of the token, not the token. A held reissued license is encrypted. | The pepper and the encryption key live outside the database. |
+| A read of the registry table | Rows hold `sha256(token)`, never the token, and a SHA-256 of a 256-bit value can not be reversed. A held reissued license is encrypted. | The encryption key lives outside the database. |
 | A self-hosted admin tampers with the client | They can forge nothing LangWatch signs: not a license, not a lease. They can patch the seat guard out of their own build, as they always could. Hosted usage can not be under-reported because LangWatch meters it. Seats can be under-reported by a patched build. | A license that stops syncing is flagged in the backoffice, and the contract's audit clause covers the rest. |
 | A customer changes its own cap | `PUT /v1/budget` is bounded by the contract maximum on the registry row. | The install only offers it to organization admins. |
 
@@ -264,7 +294,7 @@ Routing by evaluation results is not built.
 
 | Kind | Name |
 |---|---|
-| Env (Cloud) | `LANGWATCH_LICENSE_PRIVATE_KEY`, `LW_VIRTUAL_KEY_PEPPER`, `STRIPE_SECRET_KEY` |
+| Env (Cloud) | `LANGWATCH_LICENSE_PRIVATE_KEY`, `STRIPE_SECRET_KEY` |
 | Env (install) | `LANGWATCH_CONNECT_ENABLED`, `LANGWATCH_CONNECT_LICENSE_ENDPOINT`, `LANGWATCH_CONNECT_GATEWAY_ENDPOINT`, `DISABLE_USAGE_STATS`, `HTTPS_PROXY` |
 | Helm | `connect.enabled`, `connect.licenseEndpoint`, `connect.gatewayEndpoint` |
 | Gateway host | `POST /v1/instant-evals/classify`, `GET /v1/usage`, `PUT /v1/budget` |
