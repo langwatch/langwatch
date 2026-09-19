@@ -97,7 +97,7 @@ describe("the device login", () => {
   describe("when it runs as a step of another command", () => {
     /** @scenario "The sign-in inside the command prints only what signing in needs" */
     it("prints the address, the code and who signed in, and nothing of the ceremony", async () => {
-      await runDeviceFlowLogin({ quiet: true });
+      await runDeviceFlowLogin({ isQuiet: true });
 
       const text = printed.join("\n");
       expect(text).toContain("https://langwatch.acme.test/cli/auth?user_code=WDJB-MJHT");
@@ -118,7 +118,7 @@ describe("the device login", () => {
         labels: ["claude settings"],
       });
 
-      await runDeviceFlowLogin({ quiet: true });
+      await runDeviceFlowLogin({ isQuiet: true });
 
       expect(printed.join("\n")).toContain("claude settings");
     });

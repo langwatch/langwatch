@@ -65,7 +65,7 @@ export interface RunUnifiedLoginOptions {
 	 * change to the machine's tool wiring. The header, the AI tools, the model
 	 * providers, the budgets and the dashboard line are left to `langwatch login`.
 	 */
-	quiet?: boolean;
+	isQuiet?: boolean;
 }
 
 export type RunDeviceFlowLoginOptions = Omit<RunUnifiedLoginOptions, "kind">;
@@ -82,9 +82,9 @@ export async function runUnifiedLoginFlow(
 	const kind: CredentialType = opts.kind ?? "device_session";
 	const cfg = opts.cfg ?? loadConfig();
 	const baseUrl = cfg.control_plane_url;
-	const quiet = opts.quiet === true;
+	const isQuiet = opts.isQuiet === true;
 
-	if (!quiet) {
+	if (!isQuiet) {
 		console.log(chalk.blue("🔐 LangWatch login"));
 		console.log(chalk.gray(`Control plane: ${baseUrl}`));
 		console.log(
@@ -231,7 +231,7 @@ export async function runUnifiedLoginFlow(
 				// Wiring refresh is best-effort; the session itself is already saved.
 			}
 
-			if (quiet) return cfg;
+			if (isQuiet) return cfg;
 
 			// Per-budget epilogue data. Every budget that binds this key,
 			// labelled with its scope, so the ceremony never presents the

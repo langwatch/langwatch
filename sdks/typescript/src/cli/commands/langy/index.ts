@@ -90,7 +90,7 @@ async function shareControl(root: string): Promise<void> {
     // The flow itself rather than `langwatch login`: a failed sign-in comes
     // back as an error this command words, not as an exit.
     login: async () => {
-      await runDeviceFlowLogin({ quiet: true });
+      await runDeviceFlowLogin({ isQuiet: true });
     },
     isAccepted: platformTakesTheKey,
   });

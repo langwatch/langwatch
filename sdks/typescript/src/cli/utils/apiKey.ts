@@ -166,7 +166,7 @@ export const resolveCredentials = async (
   const session = await resolveFromSession({
     project: opts.project,
     endpoint,
-    asPerson: false,
+    isLoginKeyRequired: false,
   });
   if (session) return session;
 
@@ -196,23 +196,23 @@ export const resolvePersonCredentials = async (): Promise<
   loadEnvFileScoped();
   const endpoint = getEndpoint();
   process.env.LANGWATCH_ENDPOINT ??= endpoint;
-  return resolveFromSession({ endpoint, asPerson: true });
+  return resolveFromSession({ endpoint, isLoginKeyRequired: true });
 };
 
 /**
  * The device session's credential, published into the request-scoped store,
- * or nothing when the machine holds no live session. `asPerson` accepts the
- * user-scoped login key only, since the personal project's key carries no
- * person.
+ * or nothing when the machine holds no live session. `isLoginKeyRequired`
+ * accepts the user-scoped login key only, since the personal project's key
+ * carries no person.
  */
 async function resolveFromSession({
   project,
   endpoint,
-  asPerson,
+  isLoginKeyRequired,
 }: {
   project?: string;
   endpoint: string;
-  asPerson: boolean;
+  isLoginKeyRequired: boolean;
 }): Promise<ResolvedCredentials | undefined> {
   // Stored state. Re-read from disk on every call, never cached in-process
   // (the daemon identity boundary again; loadConfig is built for this).
@@ -225,7 +225,7 @@ async function resolveFromSession({
   if (!cfg || !isLoggedIn(cfg)) return undefined;
   const session = await resolveSessionCredential(cfg);
   if (!session) return undefined;
-  if (asPerson && !session.isLoginKey) return undefined;
+  if (isLoginKeyRequired && !session.isLoginKey) return undefined;
 
   setResolvedApiKey(session.apiKey);
   // `--project` decides the target BEFORE anything is published: the
@@ -238,7 +238,7 @@ async function resolveFromSession({
   // there is nothing implicit left to warn about. A command that acts as
   // the person reads no project either way, so the notice about which
   // project it reads would be wrong; that command names its own login.
-  if (project === undefined && !asPerson) {
+  if (project === undefined && !isLoginKeyRequired) {
     await maybePrintIdentityNotice({
       mode: session.isLoginKey ? "device-login-key" : "device",
       apiKey: session.apiKey,
