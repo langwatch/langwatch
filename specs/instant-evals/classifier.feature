@@ -124,6 +124,13 @@ Feature: The Instant Evals classifier interface — one judged question, priced 
     Then the wait is capped
 
   @unit
+  Scenario: A failing request backs off longer on each attempt
+    Given a classifier answering 500 with no Retry-After to every attempt
+    When a question is asked
+    Then the waits between the five attempts are one, two, four and eight seconds
+    And the row is skipped with the failed reason
+
+  @unit
   Scenario: A request gives up after the fifth attempt
     Given a classifier answering 429 to every attempt
     When a question is asked
@@ -165,6 +172,7 @@ Feature: The Instant Evals classifier interface — one judged question, priced 
   Scenario: A classification takes its estimated tokens from one bucket shared by every pod
     Given a global bucket refilling at three hundred thousand tokens a second
     And a classification estimated at four thousand two hundred tokens
+    And the estimate measures the text with the classifier's own bytes-per-token ratio, the same one the price uses, plus the questions
     When it takes its tokens
     Then the global bucket is debited by four thousand two hundred
     And the tenant's own bucket is debited by the same amount
@@ -189,6 +197,13 @@ Feature: The Instant Evals classifier interface — one judged question, priced 
     Given an idle bucket
     When a long time passes
     Then at most its capacity is available
+
+  @unit
+  Scenario: Both buckets share one Redis Cluster hash tag
+    Given a classification taking its tokens
+    When the two bucket keys are handed to Redis
+    Then both carry the same hash tag
+    And one atomic call may take from both on a cluster
 
   @unit
   Scenario: A Redis that cannot be reached falls back to a local token rate

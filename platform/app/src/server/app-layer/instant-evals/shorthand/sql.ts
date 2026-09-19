@@ -58,13 +58,14 @@ export function sqlNumber(value: number): string {
 }
 
 /**
- * How an instant is written for a `DateTime` parameter.
+ * How an instant is written for a `DateTime64(3)` parameter.
  *
- * Seconds, in UTC, in the spelling ClickHouse parses for a bound `DateTime`.
- * Sub-second precision is dropped on purpose: the window a caller asks for is
- * a day or a week, and a parameter that carried milliseconds would be refused
- * by the driver rather than rounded.
+ * Milliseconds, in UTC, in the spelling ClickHouse parses for a bound
+ * `DateTime64(3)`. The precision matches the views' own time columns, so a
+ * window narrower than a second keeps both of its ends: bound as a plain
+ * `DateTime` the two instants would round to the same second and select
+ * nothing.
  */
-export function clickHouseDateTime(at: Date): string {
-  return at.toISOString().slice(0, 19).replace("T", " ");
+export function clickHouseDateTime64(at: Date): string {
+  return at.toISOString().slice(0, 23).replace("T", " ");
 }

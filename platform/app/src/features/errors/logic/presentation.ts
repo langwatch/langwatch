@@ -502,7 +502,7 @@ const presentations = {
   instant_eval_query_missing_columns: {
     title: "That query is missing what a run needs",
     describe: (error) =>
-      error.meta.needsEvalFunction === true
+      error.meta.isEvalFunctionMissing === true
         ? "Add an eval function to the query's SELECT list, such as eval(...) over the text you want judged."
         : "Add TraceId to the query's SELECT list so each judgement can be tied back to its trace.",
   },
@@ -573,7 +573,7 @@ const presentations = {
   lwql_app_function_hydration_failed: {
     // Deliberately says nothing about retrying a different way: the query
     // itself was fine, so there is nothing for the reader to change.
-    title: "We couldn't read the conversation content",
+    title: "We couldn't read the trace content",
     describe: () =>
       "The query ran, but we couldn't load the conversations or traces it asked for. This is a temporary problem on our side. Try again shortly, or contact support if it persists.",
   },

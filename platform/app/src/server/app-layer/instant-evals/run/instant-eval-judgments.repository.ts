@@ -99,7 +99,7 @@ export interface InstantEvalJudgmentSampleQuery {
    * question they meant to ask, and the rows that carry that answer are the
    * ones that matched. A run with no boolean question has none to prefer.
    */
-  readonly preferMatched: boolean;
+  readonly shouldPreferMatched: boolean;
   /** Varies which traces a repeated call picks. */
   readonly seed: number;
 }
@@ -232,7 +232,7 @@ export class ClickHouseInstantEvalJudgmentsRepository
     // given seed, so paging the same sample twice agrees, and different for
     // the next call, so the caller is not shown the same corner of the run
     // over and over.
-    const order = query.preferMatched
+    const order = query.shouldPreferMatched
       ? "max(Passed) DESC, cityHash64(TraceId, {seed:UInt64})"
       : "cityHash64(TraceId, {seed:UInt64})";
 

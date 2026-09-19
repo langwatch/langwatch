@@ -59,12 +59,20 @@ import type { RedisConnection } from "@langwatch/redis-client";
 
 const logger = createLogger("langwatch:instant-evals:rate-limiter");
 
+/**
+ * The braces are a Redis Cluster hash tag: the script takes from both buckets
+ * in one EVAL, which the cluster only allows when every key hashes to one
+ * slot. Without the tag it answers CROSSSLOT and the limiter falls back to the
+ * local rate on every call, pacing each pod on its own.
+ */
+const BUCKET_KEY_PREFIX = "langwatch:{instant-evals:classifier-tokens}";
+
 /** One bucket for the whole deployment. */
-const GLOBAL_BUCKET_KEY = "langwatch:instant-evals:classifier-tokens";
+const GLOBAL_BUCKET_KEY = BUCKET_KEY_PREFIX;
 
 /** One bucket per tenant, keyed by the project. */
 function tenantBucketKey(tenantId: string): string {
-  return `langwatch:instant-evals:classifier-tokens:tenant:${tenantId}`;
+  return `${BUCKET_KEY_PREFIX}:tenant:${tenantId}`;
 }
 
 /** Long enough that an idle bucket survives a quiet hour, short enough to expire. */

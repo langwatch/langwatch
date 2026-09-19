@@ -200,6 +200,11 @@ export function instantEvalKeyPassSql({
  * and it does it uniformly rather than evenly, so a selection whose length
  * varies periodically cannot line up with the stride.
  *
+ * The hash is over the whole row key. A statement keyed by the trace and span
+ * pair has every span of one trace share a `TraceId`, so hashing that alone
+ * would put a trace's spans in one bucket together and the sample would be a
+ * few whole traces rather than a spread of rows.
+ *
  * The caller's statement is untouched inside the subquery, exactly as the page
  * pass leaves it (ADR-082/084/101): the bucket predicate is the wrapper's.
  */
@@ -216,9 +221,12 @@ export function instantEvalSampleKeysSql({
   const projection = [INSTANT_EVAL_TRACE_COLUMN, ...keyColumns]
     .map((column) => `q.${column} AS ${column}`)
     .join(", ");
+  const hashed = instantEvalPagesBySpan(keyColumns)
+    ? `q.${INSTANT_EVAL_TRACE_COLUMN}, q.${INSTANT_EVAL_SPAN_COLUMN}`
+    : `q.${INSTANT_EVAL_TRACE_COLUMN}`;
   return (
     `SELECT ${projection}\nFROM (\n${sql}\n) AS q` +
-    `\nWHERE cityHash64(q.${INSTANT_EVAL_TRACE_COLUMN}) % ` +
+    `\nWHERE cityHash64(${hashed}) % ` +
     `{${INSTANT_EVAL_SAMPLE_BUCKET_PARAMETER}:UInt64} = 0` +
     `\nORDER BY q.${INSTANT_EVAL_TRACE_COLUMN}\nLIMIT ${limit}`
   );
@@ -228,8 +236,12 @@ export function instantEvalSampleKeysSql({
  * How many buckets a selection of this size is divided into to sample it.
  *
  * One in every `total / limit` rows, so a selection of ten thousand sampled
- * fifty at a time draws one row in two hundred. Never below one, which is the
- * sample-everything case a selection smaller than the sample needs.
+ * fifty at a time draws one row in two hundred. One bucket is the
+ * sample-everything case a selection no larger than the sample needs, and it
+ * is never used for a larger one: with one bucket the predicate accepts every
+ * row and the `LIMIT` hands back the head of the statement's own order, which
+ * is the sample this whole statement exists to avoid. So a selection larger
+ * than the sample always gets at least two.
  */
 export function instantEvalSampleBuckets({
   total,
@@ -239,7 +251,7 @@ export function instantEvalSampleBuckets({
   readonly limit: number;
 }): number {
   if (total <= limit || limit <= 0) return 1;
-  return Math.max(1, Math.floor(total / limit));
+  return Math.max(2, Math.floor(total / limit));
 }
 
 export function instantEvalPagePassSql(sql: string): string {

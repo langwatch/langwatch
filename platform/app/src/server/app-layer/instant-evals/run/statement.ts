@@ -114,6 +114,80 @@ function judgesSomething(plan: readonly LangWatchQLAppFunctionCall[]): boolean {
   return plan.some((call) => lwqlAppFunction(call.function)?.kind === "eval");
 }
 
+/**
+ * The policy's verdict on the statement.
+ *
+ * A refusal is re-raised under the run's code so the family answers one code
+ * for "this statement cannot be a run", with the policy's own violations
+ * carried so the caller still learns which clause to change.
+ */
+function validateForRun({
+  query,
+  caller,
+  protections,
+  sql,
+  parameters,
+}: {
+  readonly query: LangWatchQLService;
+  readonly caller: InstantEvalRunCaller;
+  readonly protections: Protections;
+  readonly sql: string;
+  readonly parameters?: Readonly<Record<string, unknown>>;
+}): ReturnType<LangWatchQLService["validate"]> {
+  try {
+    return query.validate({
+      projectId: caller.id,
+      protections,
+      sql,
+      ...(parameters ? { parameters } : {}),
+      // A run only exists because the project may judge, and the service
+      // checked that before it got here.
+      instantEvalsEnabled: true,
+    });
+  } catch (error) {
+    if (!(error instanceof HandledError)) throw error;
+    throw new InstantEvalQueryInvalidError({
+      reason: error.message,
+      violations: error.meta.violations,
+      reasons: [error],
+    });
+  }
+}
+
+/** Refuses a declared parameter the run binds itself or a surface would fill. */
+function refuseUnfillableParameters(declared: readonly string[]): void {
+  const reserved = reservedNamesIn({ declared, supplied: [] });
+  if (reserved.length > 0) refuseReservedParameters(reserved);
+
+  const surfaceOwned = declared
+    .filter((name) => isLangWatchQLSurfaceParameter(name))
+    .sort();
+  if (surfaceOwned.length > 0) refuseSurfaceParameters(surfaceOwned);
+}
+
+/** Refuses a projection with nothing to judge, or nothing to tie it to. */
+function refuseIncompleteProjection({
+  plan,
+  columns,
+}: {
+  readonly plan: readonly LangWatchQLAppFunctionCall[];
+  readonly columns: readonly LangWatchQLColumn[];
+}): void {
+  if (!judgesSomething(plan)) {
+    throw new InstantEvalQueryMissingColumnsError({
+      missing: [],
+      isEvalFunctionMissing: true,
+    });
+  }
+  const missing = missingColumnsIn(columns);
+  if (missing.length > 0) {
+    throw new InstantEvalQueryMissingColumnsError({
+      missing,
+      isEvalFunctionMissing: false,
+    });
+  }
+}
+
 export async function acceptInstantEvalStatement({
   query,
   rowSource,
@@ -133,63 +207,24 @@ export async function acceptInstantEvalStatement({
   const suppliedReserved = reservedNamesIn({ declared: [], supplied });
   if (suppliedReserved.length > 0) refuseReservedParameters(suppliedReserved);
 
-  const validated = (() => {
-    try {
-      return query.validate({
-        projectId: caller.id,
-        protections,
-        sql,
-        ...(parameters ? { parameters } : {}),
-        // A run only exists because the project may judge, and the service
-        // checked that before it got here.
-        instantEvalsEnabled: true,
-      });
-    } catch (error) {
-      if (!(error instanceof HandledError)) throw error;
-      // Re-raised under the run's code so the family answers one code for
-      // "this statement cannot be a run", with the policy's own violations
-      // carried so the caller still learns which clause to change.
-      throw new InstantEvalQueryInvalidError({
-        reason: error.message,
-        violations: error.meta.violations,
-        reasons: [error],
-      });
-    }
-  })();
-
-  const declaredReserved = reservedNamesIn({
-    declared: validated.parameters.map((parameter) => parameter.name),
-    supplied: [],
+  const validated = validateForRun({
+    query,
+    caller,
+    protections,
+    sql,
+    ...(parameters ? { parameters } : {}),
   });
-  if (declaredReserved.length > 0) refuseReservedParameters(declaredReserved);
-
-  const surfaceOwned = validated.parameters
-    .map((parameter) => parameter.name)
-    .filter((name) => isLangWatchQLSurfaceParameter(name))
-    .sort();
-  if (surfaceOwned.length > 0) refuseSurfaceParameters(surfaceOwned);
+  refuseUnfillableParameters(
+    validated.parameters.map((parameter) => parameter.name),
+  );
 
   const columns = await rowSource.probe({
     caller,
     sql,
     ...(parameters ? { parameters } : {}),
   });
-
   const plan = validated.appFunctions;
-  if (!judgesSomething(plan)) {
-    throw new InstantEvalQueryMissingColumnsError({
-      missing: [],
-      needsEvalFunction: true,
-    });
-  }
-
-  const missing = missingColumnsIn(columns);
-  if (missing.length > 0) {
-    throw new InstantEvalQueryMissingColumnsError({
-      missing,
-      needsEvalFunction: false,
-    });
-  }
+  refuseIncompleteProjection({ plan, columns });
 
   return {
     sql,

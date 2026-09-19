@@ -16,9 +16,52 @@ import {
   INSTANT_EVAL_SAMPLE_CEILING,
 } from "~/server/app-layer/instant-evals/run";
 import {
+  instantEvalListQuerySchema,
   instantEvalResultsQuerySchema,
   instantEvalSampleQuerySchema,
 } from "../schemas";
+
+describe("given a list requested with a cursor", () => {
+  describe("when both halves of the cursor are given", () => {
+    it("accepts them together", () => {
+      const parsed = instantEvalListQuerySchema.safeParse({
+        before: "2026-09-18T10:00:00.000Z",
+        beforeId: "instant_eval_abc",
+      });
+
+      expect(parsed.success).toBe(true);
+    });
+  });
+
+  describe("when neither half is given", () => {
+    it("lists from the newest run", () => {
+      expect(instantEvalListQuerySchema.safeParse({}).success).toBe(true);
+    });
+  });
+
+  describe("when only one half is given", () => {
+    /** @scenario "Half of the list's cursor is refused, naming the missing half" */
+    it("refuses it and names the missing half", () => {
+      const withoutId = instantEvalListQuerySchema.safeParse({
+        before: "2026-09-18T10:00:00.000Z",
+      });
+      const withoutInstant = instantEvalListQuerySchema.safeParse({
+        beforeId: "instant_eval_abc",
+      });
+
+      expect(withoutId.success).toBe(false);
+      expect(withoutInstant.success).toBe(false);
+      if (withoutId.success || withoutInstant.success) return;
+      expect(withoutId.error.issues.map((issue) => issue.path)).toEqual([
+        ["beforeId"],
+      ]);
+      expect(withoutInstant.error.issues.map((issue) => issue.path)).toEqual([
+        ["before"],
+      ]);
+      expect(withoutId.error.issues[0]?.message).toContain("beforeId");
+    });
+  });
+});
 
 describe("given a sample requested for a hundred rows", () => {
   describe("when the request is validated", () => {

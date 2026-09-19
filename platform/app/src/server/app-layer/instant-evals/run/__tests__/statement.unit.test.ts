@@ -217,7 +217,7 @@ describe("given a statement missing what a run needs", () => {
 
       await expect(accept({ query, rowSource })).rejects.toMatchObject({
         code: "instant_eval_query_missing_columns",
-        meta: { needsEvalFunction: true },
+        meta: { isEvalFunctionMissing: true },
       });
     });
   });
@@ -231,7 +231,7 @@ describe("given a statement missing what a run needs", () => {
 
       await expect(accept({ query, rowSource })).rejects.toMatchObject({
         code: "instant_eval_query_missing_columns",
-        meta: { missing: ["TraceId"], needsEvalFunction: false },
+        meta: { missing: ["TraceId"], isEvalFunctionMissing: false },
       });
     });
   });

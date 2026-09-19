@@ -113,16 +113,16 @@ export class InstantEvalQueryMissingColumnsError extends HandledError {
 
   constructor({
     missing,
-    needsEvalFunction,
+    isEvalFunctionMissing,
   }: {
     /** Columns a run requires that the statement does not project. */
     readonly missing: readonly string[];
     /** Whether the statement projects no eval function at all. */
-    readonly needsEvalFunction: boolean;
+    readonly isEvalFunctionMissing: boolean;
   }) {
     super(
       "instant_eval_query_missing_columns",
-      needsEvalFunction
+      isEvalFunctionMissing
         ? "An Instant Eval run needs a statement that projects TraceId and at least one eval function."
         : `An Instant Eval run needs a statement that projects ${missing.join(", ")}.`,
       {
@@ -130,7 +130,7 @@ export class InstantEvalQueryMissingColumnsError extends HandledError {
         fault: "customer",
         // Named consumer: the agent that wrote the statement, which adds the
         // named columns to its projection.
-        meta: { missing, needsEvalFunction },
+        meta: { missing, isEvalFunctionMissing },
         ...remediation("instant_eval_query_missing_columns"),
       },
     );
