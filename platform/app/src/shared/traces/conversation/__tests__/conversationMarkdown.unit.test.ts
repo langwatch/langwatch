@@ -206,6 +206,37 @@ describe("renderConversationMarkdown", () => {
       expect(result.text).toContain("question 3");
       expect(result.text).toContain("truncated to fit the token budget");
     });
+
+    it("counts only the turns that were dropped whole as omitted", () => {
+      const turns = manyTurns(4);
+      const oneTurn = renderConversationMarkdown({
+        turns: [turns[3]!],
+      }).estimatedTokens;
+      const result = renderConversationMarkdown({
+        conversationId: "conv-1",
+        turns,
+        maxTokens: oneTurn,
+      });
+      // The final turn is on the page, cut mid-turn; the three before it are
+      // the ones that went missing.
+      expect(result.text).toContain("question 3");
+      expect(result.omittedTurns).toBe(3);
+    });
+
+    it("stays inside the budget at every budget between the marker and one turn", () => {
+      const turns = manyTurns(4);
+      const oneTurn = renderConversationMarkdown({
+        turns: [turns[3]!],
+      }).estimatedTokens;
+      for (let maxTokens = 12; maxTokens <= oneTurn; maxTokens++) {
+        const result = renderConversationMarkdown({
+          conversationId: "conv-1",
+          turns,
+          maxTokens,
+        });
+        expect(result.estimatedTokens).toBeLessThanOrEqual(maxTokens);
+      }
+    });
   });
 
   describe("given a budget too small to hold even the marker", () => {

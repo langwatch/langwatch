@@ -291,11 +291,13 @@ function renderFinalTurnCut({
   turnGroups: TurnChunkGroup[];
   maxTokens: number;
 }): RenderedConversationMarkdown {
-  const omittedTurns = turnGroups.length;
   const preambleText = joinConversationMarkdown(preamble);
+  // The separator before the opening is part of the render, so it is reserved
+  // alongside the preamble and the marker or the result overshoots by a token.
   const spare =
     maxTokens -
     estimateTokensFromBytes(preambleText) -
+    estimateTokensFromBytes("\n\n") -
     estimateTokensFromBytes(`\n\n${TRUNCATED_MARKER}`);
   const finalTurn = turnGroups[turnGroups.length - 1]!;
   const opening =
@@ -306,14 +308,20 @@ function renderFinalTurnCut({
         }).trimEnd()
       : "";
   if (!opening) {
-    return cutWholeText({ text: preambleText, maxTokens, omittedTurns });
+    return cutWholeText({
+      text: preambleText,
+      maxTokens,
+      omittedTurns: turnGroups.length,
+    });
   }
   const text = `${preambleText}\n\n${opening}\n\n${TRUNCATED_MARKER}`;
   return {
     text,
     truncated: true,
     estimatedTokens: estimateTokensFromBytes(text),
-    omittedTurns,
+    // The final turn is on the page, cut rather than dropped, so it is not
+    // among the whole turns that went missing from the middle.
+    omittedTurns: turnGroups.length - 1,
   };
 }
 
