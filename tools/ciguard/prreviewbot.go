@@ -2,8 +2,6 @@ package ciguard
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"sort"
@@ -31,15 +29,9 @@ var prReviewBotGateClauses = map[string]string{
 // the gate above) can run a review.
 var prReviewBotTriggerTypes = []string{"opened", "synchronize", "reopened", "ready_for_review"}
 
-var (
-	// usesCommentPattern recovers the trailing `# <version>` comment on a
-	// `uses:` line. The workflow is read structurally through ciscan; this raw
-	// scan exists only for the comment, which yaml drops. `[ \t]*` — not
-	// `\s*` — so the comment must sit on the same line as the pin it
-	// documents, never on a following line.
-	usesCommentPattern = regexp.MustCompile(`(?m)^[ \t]*-?[ \t]*uses:[ \t]*(\S+)[ \t]*(#.*)?$`)
-	fullSHAPattern     = regexp.MustCompile(`^[0-9a-f]{40}$`)
-)
+// fullSHAPattern matches a full 40-character commit SHA, the only ref this
+// workflow's pins are allowed to carry.
+var fullSHAPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 // PRReviewBot reports every way the PR Review Bot workflow has drifted from
 // the invariants specs/ci/pr-review-bot.feature describes: the three-clause
@@ -51,16 +43,11 @@ func PRReviewBot(repoRoot string) ([]string, error) {
 		return nil, err
 	}
 
-	raw, err := os.ReadFile(filepath.Join(repoRoot, PRReviewBotWorkflow))
-	if err != nil {
-		return nil, fmt.Errorf("read %s: %w", PRReviewBotWorkflow, err)
-	}
-
 	var problems []string
 	problems = append(problems, prReviewBotGates(workflow)...)
 	problems = append(problems, prReviewBotTriggers(workflow)...)
 	problems = append(problems, prReviewBotConcurrency(workflow)...)
-	problems = append(problems, prReviewBotPinning(workflow, string(raw))...)
+	problems = append(problems, prReviewBotPinning(workflow)...)
 
 	return problems, nil
 }
@@ -143,19 +130,19 @@ func prReviewBotConcurrency(workflow *ciscan.Workflow) []string {
 
 // prReviewBotPinning enforces the pinning invariant every `uses:` step in this
 // workflow must meet: a full 40-character commit SHA, never a floating tag or
-// branch, with a trailing comment recording what it means. The action and ref
-// come from ciscan; the comment comes from the raw scan, since yaml drops it.
-func prReviewBotPinning(workflow *ciscan.Workflow, raw string) []string {
-	uses := workflowUses(workflow)
-	if len(uses) == 0 {
+// branch, with a trailing comment recording what it means. Both the ref and
+// its trailing comment come from ciscan's decoded step, so a quoted value or a
+// `uses:` line inside a run: script cannot fool the check the way a raw text
+// scan could.
+func prReviewBotPinning(workflow *ciscan.Workflow) []string {
+	steps := usesSteps(workflow)
+	if len(steps) == 0 {
 		return []string{fmt.Sprintf("%s has no `uses:` steps, so this guard is watching nothing", PRReviewBotWorkflow)}
 	}
 
-	commented := commentedUses(raw)
-
 	var problems []string
-	for _, use := range uses {
-		if problem, bad := pinProblem(use, commented); bad {
+	for _, step := range steps {
+		if problem, bad := pinProblem(step); bad {
 			problems = append(problems, problem)
 		}
 	}
@@ -163,24 +150,25 @@ func prReviewBotPinning(workflow *ciscan.Workflow, raw string) []string {
 	return problems
 }
 
-// workflowUses collects every non-empty `uses:` value across the workflow's
-// jobs, in sorted-job order so guard output is stable.
-func workflowUses(workflow *ciscan.Workflow) []string {
-	var uses []string
+// usesSteps collects every step with a non-empty `uses:` value across the
+// workflow's jobs, in sorted-job order so guard output is stable.
+func usesSteps(workflow *ciscan.Workflow) []ciscan.Step {
+	var steps []ciscan.Step
 	for _, job := range workflow.JobNames() {
 		for _, step := range workflow.Jobs[job].Steps {
 			if step.Uses != "" {
-				uses = append(uses, step.Uses)
+				steps = append(steps, step)
 			}
 		}
 	}
 
-	return uses
+	return steps
 }
 
-// pinProblem reports the single pinning problem a `uses:` value has, if any: a
+// pinProblem reports the single pinning problem a `uses:` step has, if any: a
 // ref that is not a full commit SHA, or a full-SHA pin with no version comment.
-func pinProblem(use string, commented map[string]bool) (problem string, bad bool) {
+func pinProblem(step ciscan.Step) (problem string, bad bool) {
+	use := step.Uses
 	if strings.HasPrefix(use, "./") {
 		// Local composite/reusable actions resolve from the checked-out repo,
 		// not a registry ref, so there is nothing to pin.
@@ -193,23 +181,10 @@ func pinProblem(use string, commented map[string]bool) (problem string, bad bool
 			"%s pins %s to %q, which is not a full 40-character commit SHA", PRReviewBotWorkflow, action, ref), true
 	}
 
-	if !commented[use] {
+	if step.UsesComment == "" {
 		return fmt.Sprintf(
 			"%s pins %s to a SHA with no version comment", PRReviewBotWorkflow, action), true
 	}
 
 	return "", false
-}
-
-// commentedUses maps each `uses:` value to whether its line carries a trailing
-// `#` comment. A value can appear on more than one step; a single documented
-// occurrence is enough to treat that pin as commented.
-func commentedUses(raw string) map[string]bool {
-	commented := make(map[string]bool)
-	for _, match := range usesCommentPattern.FindAllStringSubmatch(raw, -1) {
-		use := match[1]
-		commented[use] = commented[use] || strings.TrimSpace(match[2]) != ""
-	}
-
-	return commented
 }
