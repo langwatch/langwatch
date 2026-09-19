@@ -8,6 +8,7 @@
   // this config emits the JavaScript used by the server processes.
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "noEmit": false,
     "outDir": "dist",
     "rootDir": "src",
     "paths": {
