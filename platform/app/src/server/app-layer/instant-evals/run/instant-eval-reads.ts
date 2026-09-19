@@ -124,7 +124,9 @@ export async function readInstantEvalSample({
     runId,
     ...writtenWindow(row, now),
     traces: count,
-    preferMatched: questions.some((question) => question.kind === "boolean"),
+    shouldPreferMatched: questions.some(
+      (question) => question.kind === "boolean",
+    ),
     seed,
   });
   const traceIds = [...new Set(judged.map((judgment) => judgment.traceId))];

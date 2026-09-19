@@ -24,13 +24,13 @@
  * here would make one function's output depend on which tier it silently
  * reached.
  *
- * @see ~/shared/traces/conversation/conversationMarkdown.ts — the renderer
+ * @see ~/shared/traces/conversation/conversationMarkdownBounded.ts — the renderer
  * @see ./hydrate.ts
  */
 
 import type { Span, Trace } from "~/server/tracer/types";
 import { llmMessagesForTrace } from "~/server/traces/llmSpanMessages";
-import { renderConversationMarkdown } from "~/shared/traces/conversation/conversationMarkdown";
+import { renderConversationMarkdown } from "~/shared/traces/conversation/conversationMarkdownBounded";
 import {
   buildParsedTurns,
   type ConversationTurnSource,

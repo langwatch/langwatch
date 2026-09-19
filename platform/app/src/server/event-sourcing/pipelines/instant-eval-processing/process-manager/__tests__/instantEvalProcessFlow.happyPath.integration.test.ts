@@ -79,6 +79,27 @@ describe("given a requested run", () => {
         expect.objectContaining({ page: 1, afterTraceId: null, pageSize: 500 }),
       );
     });
+
+    /** @scenario "A page judges under a deadline inside its lease" */
+    it("hands the page the instant its lease lapses", async () => {
+      const { manager, dispatcher, port } = harness();
+
+      await manager.handleEvent({
+        envelope: toEnvelope(requested),
+        now: 10_000,
+      });
+      await manager.handleEvent({
+        envelope: toEnvelope(planned()),
+        now: 11_000,
+      });
+
+      await dispatcher.runOnce({ now: 11_001 });
+
+      const input = (port.judgePage as ReturnType<typeof vi.fn>).mock
+        .calls[0]?.[0] as { deadlineAt: number | null };
+      // The dispatcher's default lease is thirty seconds from the drain.
+      expect(input.deadlineAt).toBe(11_001 + 30_000);
+    });
   });
 
   describe("when a page reports more to do", () => {

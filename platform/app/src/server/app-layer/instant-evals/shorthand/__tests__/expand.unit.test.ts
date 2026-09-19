@@ -1,12 +1,14 @@
 /**
- * The statement each shorthand becomes: the template per target, the eval call
- * per question, the window, and every refusal that happens before a statement
+ * The statement each shorthand becomes: the template per target, the window,
+ * how questions are named, and every refusal that happens before a statement
  * is written at all.
  *
  * Text assertions on the generated SQL, which is what a caller reads on the
  * run and edits. Whether the query policy ACCEPTS what is written is the
  * sibling suite's question (`./expandValidates.unit.test.ts`), against the
- * real parser.
+ * real parser. The call each kind of question becomes is in
+ * `./question-expansion.unit.test.ts`, and where the filter lands is in
+ * `./filter-expansion.unit.test.ts`.
  *
  * @see specs/instant-evals/instant-eval-shorthand.feature
  */
@@ -95,11 +97,11 @@ describe("expandInstantEvalShorthand, given a target and some questions", () => 
     it("bounds the time column between two instants covering the last week", () => {
       const { sql, parameters } = expand();
 
-      expect(sql).toContain("OccurredAt >= {start_at:DateTime}");
-      expect(sql).toContain("OccurredAt < {end_at:DateTime}");
+      expect(sql).toContain("OccurredAt >= {start_at:DateTime64(3, 'UTC')}");
+      expect(sql).toContain("OccurredAt < {end_at:DateTime64(3, 'UTC')}");
       expect(parameters).toMatchObject({
-        start_at: "2026-09-11 12:00:00",
-        end_at: "2026-09-18 12:00:00",
+        start_at: "2026-09-11 12:00:00.000",
+        end_at: "2026-09-18 12:00:00.000",
       });
       expect(sql).not.toContain("now()");
     });
@@ -113,9 +115,23 @@ describe("expandInstantEvalShorthand, given a target and some questions", () => 
       });
 
       expect(parameters).toMatchObject({
-        start_at: "2026-09-01 00:00:00",
-        end_at: "2026-09-02 00:00:00",
+        start_at: "2026-09-01 00:00:00.000",
+        end_at: "2026-09-02 00:00:00.000",
       });
+    });
+
+    /** @scenario "A window narrower than a second keeps both of its ends" */
+    it("keeps the milliseconds, so a sub-second window is not two equal bounds", () => {
+      const { parameters } = expand({
+        start: "2026-09-01T00:00:00.100Z",
+        end: "2026-09-01T00:00:00.900Z",
+      });
+
+      expect(parameters).toMatchObject({
+        start_at: "2026-09-01 00:00:00.100",
+        end_at: "2026-09-01 00:00:00.900",
+      });
+      expect(parameters.start_at).not.toBe(parameters.end_at);
     });
 
     it("refuses a window that runs backwards", () => {
@@ -161,145 +177,6 @@ describe("expandInstantEvalShorthand, given a target and some questions", () => 
     /** @scenario "A shorthand with no question is refused before anything is expanded" */
     it("refuses before anything is written", () => {
       expect(() => expand({ questions: [] })).toThrow(/at least one question/i);
-    });
-  });
-});
-
-describe("expandInstantEvalShorthand, given one question of each kind", () => {
-  describe("when the question is a plain yes or no", () => {
-    /** @scenario "A boolean question becomes an eval call" */
-    it("calls eval", () => {
-      expect(expand().sql).toContain(
-        "eval(llm_readable_trace(TraceId, 8000), 'The customer sounds annoyed') AS q1",
-      );
-    });
-  });
-
-  describe("when the question carries two criteria", () => {
-    /** @scenario "A boolean question with two criteria becomes an eval_criteria call" */
-    it("calls eval_criteria with both, in order", () => {
-      const { sql } = expand({
-        questions: [
-          ask({ criteria: ["sarcasm counts", "a calm complaint does not"] }),
-        ],
-      });
-
-      expect(sql).toContain(
-        "eval_criteria(llm_readable_trace(TraceId, 8000), 'The customer sounds annoyed', ['sarcasm counts', 'a calm complaint does not'])",
-      );
-    });
-  });
-
-  describe("when the question carries a threshold", () => {
-    /** @scenario "A boolean question with a threshold becomes an eval_passed call" */
-    it("calls eval_passed with it", () => {
-      const { sql } = expand({ questions: [ask({ threshold: 0.7 })] });
-
-      expect(sql).toContain(
-        "eval_passed(llm_readable_trace(TraceId, 8000), 'The customer sounds annoyed', 0.7)",
-      );
-    });
-
-    it("writes a whole threshold with a decimal point", () => {
-      const { sql } = expand({ questions: [ask({ threshold: 1 })] });
-
-      expect(sql).toContain(", 1.0)");
-    });
-  });
-
-  describe("when the question carries criteria and a threshold together", () => {
-    /** @scenario "A boolean question carrying both criteria and a threshold is refused" */
-    it("refuses and names both forms", () => {
-      expect(() =>
-        expand({
-          questions: [ask({ criteria: ["yes", "no"], threshold: 0.7 })],
-        }),
-      ).toThrow(/criteria or a threshold, not both/);
-    });
-  });
-
-  describe("when the question is a score", () => {
-    /** @scenario "A score question becomes an eval_score call over its range" */
-    it("calls eval_score over both ends of the range", () => {
-      const { sql } = expand({
-        questions: [
-          ask({
-            kind: "score",
-            instructions: "How satisfied is the customer",
-            range: { min: 1, max: 5 },
-          }),
-        ],
-      });
-
-      expect(sql).toContain(
-        "eval_score(llm_readable_trace(TraceId, 8000), 'How satisfied is the customer', 1, 5)",
-      );
-    });
-
-    it("refuses a range with too many levels", () => {
-      expect(() =>
-        expand({
-          questions: [ask({ kind: "score", range: { min: 0, max: 20 } })],
-        }),
-      ).toThrow(/at most 10 levels/);
-    });
-
-    it("refuses a range that runs backwards", () => {
-      expect(() =>
-        expand({
-          questions: [ask({ kind: "score", range: { min: 5, max: 1 } })],
-        }),
-      ).toThrow(/runs upwards/);
-    });
-  });
-
-  describe("when the question is a category", () => {
-    /** @scenario "A category question becomes an eval_category call over its options" */
-    it("calls eval_category with each option as a name and a meaning", () => {
-      const { sql } = expand({
-        questions: [
-          ask({
-            kind: "category",
-            instructions: "What is being asked for",
-            options: [
-              { name: "refund", description: "wants money back" },
-              { name: "bug", description: "something is broken" },
-            ],
-          }),
-        ],
-      });
-
-      expect(sql).toContain(
-        "eval_category(llm_readable_trace(TraceId, 8000), 'What is being asked for', ['refund: wants money back', 'bug: something is broken'])",
-      );
-    });
-
-    it("refuses an option whose name carries a colon", () => {
-      expect(() =>
-        expand({
-          questions: [
-            ask({
-              kind: "category",
-              options: [
-                { name: "a:b", description: "one" },
-                { name: "c", description: "two" },
-              ],
-            }),
-          ],
-        }),
-      ).toThrow(/cannot name an option/);
-    });
-  });
-
-  describe("when a question carries a field of another kind", () => {
-    it("refuses rather than expanding a question the caller did not write", () => {
-      expect(() =>
-        expand({
-          questions: [
-            ask({ kind: "score", range: { min: 1, max: 5 }, threshold: 0.5 }),
-          ],
-        }),
-      ).toThrow(/no use for threshold/);
     });
   });
 });
@@ -380,62 +257,6 @@ describe("instantEvalShorthandSchema, given a question list", () => {
       });
 
       expect(parsed.success).toBe(false);
-    });
-  });
-});
-
-describe("expandInstantEvalShorthand, given a filter", () => {
-  describe("when the target is traces", () => {
-    /** @scenario "A supported filter field is compiled into the statement's WHERE" */
-    it("writes the condition into the statement's own WHERE", () => {
-      const { sql, parameters } = expand({ filter: "service:checkout" });
-
-      expect(sql).toContain("Attributes['service.name'] = {service_0:String}");
-      expect(parameters.service_0).toBe("checkout");
-      expect(sql).not.toContain("TraceId IN (");
-    });
-  });
-
-  describe("when the target reads another view", () => {
-    /** @scenario "A filter on a target other than traces is applied through a trace subquery" */
-    it("applies the filter through a time-bounded subquery on the trace view", () => {
-      const { sql } = expand({ target: "threads", filter: "service:checkout" });
-
-      expect(sql).toContain("TraceId IN (");
-      expect(sql).toContain("FROM analytics.traces");
-      expect(sql).toContain("OccurredAt >= {start_at:DateTime}");
-    });
-
-    /** @scenario "A filtered threads statement names the view's own trace column" */
-    it("names the view's own trace column, not the aggregate the statement projects", () => {
-      const { sql } = expand({ target: "threads", filter: "service:checkout" });
-
-      // ClickHouse resolves a WHERE identifier against the SELECT aliases
-      // first, and `threads` projects TraceId as argMax(...), which it refuses
-      // in a WHERE. The subquery must therefore read the view's own column.
-      expect(sql).toContain("m.TraceId IN (");
-      expect(sql).not.toContain("\n  AND TraceId IN (");
-    });
-
-    /** @scenario "A filtered llm-spans statement reads its own plain trace column" */
-    it("reads the plain trace column when the projection is not an aggregate", () => {
-      const { sql } = expand({
-        target: "llm_spans",
-        filter: "service:checkout",
-      });
-
-      expect(sql).toContain("TraceId IN (");
-      expect(sql).not.toContain("m.TraceId IN (");
-    });
-  });
-
-  describe("when there is no filter", () => {
-    /** @scenario "A shorthand with no filter writes no filter condition" */
-    it("writes the window and nothing else", () => {
-      const { sql, parameters } = expand();
-
-      expect(sql).not.toContain("TraceId IN (");
-      expect(Object.keys(parameters).sort()).toEqual(["end_at", "start_at"]);
     });
   });
 });

@@ -60,7 +60,9 @@ describe("given a key that resolves to no text at all", () => {
       const classifier = classifierAnswering(() => judged([]));
 
       const result = await hydrate({
-        calls: [evalOverConversation("annoyed", ["Annoyed"])],
+        calls: [
+          evalOverConversation({ column: "annoyed", options: ["Annoyed"] }),
+        ],
         columns: [{ name: "annoyed", type: "Nullable(String)" }],
         rows: [{ annoyed: "conversation-that-does-not-exist" }],
         traceSource: sourceOf(),
@@ -79,7 +81,7 @@ describe("given a key that resolves to no text at all", () => {
 describe("given a caller that cancels mid-query", () => {
   describe("when the statement is being judged", () => {
     /** @scenario "A cancelled query stops judging instead of paying out the rest" */
-    it("stops sending and propagates the cancellation", async () => {
+    it("stops sending and hands back what was judged, naming the rest", async () => {
       const controller = new AbortController();
       let asked = 0;
       const classifier = classifierAnswering(() => {
@@ -106,10 +108,15 @@ describe("given a caller that cancels mid-query", () => {
         signal: controller.signal,
       });
 
-      await expect(run).rejects.toThrow();
-      // The first unit was in flight when the cancellation landed; the three
-      // behind it were never sent.
+      const result = await run;
+      // The first unit was in flight when the cancellation landed and its
+      // answer is kept; the three behind it were never sent, and the result
+      // says which rows they are so the service can fail the query as
+      // cancelled after recording the one that was paid for.
       expect(asked).toBe(1);
+      expect(result.rows[0]?.annoyed).toBe(0.5);
+      expect(result.cancellation).toEqual({ unjudgedRows: [1, 2, 3] });
+      expect(result.evalUsage).toMatchObject({ requests: 1 });
     });
 
     it("hands the classifier the signal, so a request in flight is dropped too", async () => {

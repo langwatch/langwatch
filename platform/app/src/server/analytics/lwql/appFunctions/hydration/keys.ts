@@ -159,9 +159,30 @@ export function assertKeyCaps(resolved: readonly ResolvedCall[]): void {
       keyKind,
       cap,
       distinct,
-      functions: resolved
-        .filter((entry) => entry.keyKind === keyKind)
-        .map((entry) => entry.definition.name),
+      functions: functionsCountedAgainst({ keyKind, resolved }),
     });
   }
+}
+
+/**
+ * The functions whose keys were counted against one cap, each named once.
+ *
+ * A span-keyed call reads its trace, so its trace ids sit in the trace count
+ * (see {@link addCallKeys}); leaving it out of the trace-cap error would name
+ * only some of the calls that cost it.
+ */
+function functionsCountedAgainst({
+  keyKind,
+  resolved,
+}: {
+  keyKind: LangWatchQLAppFunctionKeyKind;
+  resolved: readonly ResolvedCall[];
+}): string[] {
+  const isCounted = (entry: ResolvedCall) =>
+    entry.keyKind === keyKind ||
+    (keyKind === "trace" && entry.keyKind === "span");
+  const names = new Set(
+    resolved.filter(isCounted).map((entry) => entry.definition.name),
+  );
+  return [...names].sort();
 }

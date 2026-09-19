@@ -15,6 +15,13 @@
  * A paid organization has no budget here at all: its judgements are metered
  * and billed, and the row cap is the only ceiling a run has.
  *
+ * The ledger learns about a run when the run finishes, so a check that read
+ * it alone would admit any number of runs while none had landed a row. A run
+ * therefore reserves its estimated price when it is accepted, a judged query
+ * reserves its ceiling before it judges, and the check counts what is held
+ * beside what was spent until the spend lands and the hold is released.
+ *
+ * @see ./instant-eval-budget-reservations.ts
  * @see ../instant-evals/spend/instant-eval-spend.outcome.ts
  * @see ../../../../../specs/instant-evals/instant-eval-billing.feature
  */
@@ -23,6 +30,7 @@ import { NANO_USD_PER_USD } from "~/server/event-sourcing/pipelines/gateway-spen
 import { TtlCache } from "../../utils/ttlCache";
 import { InstantEvalFreeBudgetExhaustedError } from "../instant-evals/errors";
 import { INSTANT_EVAL_REQUEST_TYPE } from "../instant-evals/spend/request-type";
+import type { InstantEvalBudgetReservations } from "./instant-eval-budget-reservations";
 
 /** What an organization without a paid plan may spend on Instant Evals, in USD. */
 export const INSTANT_EVAL_FREE_BUDGET_USD = 1;
@@ -31,6 +39,13 @@ const INSTANT_EVAL_FREE_BUDGET_NANO_USD =
   INSTANT_EVAL_FREE_BUDGET_USD * NANO_USD_PER_USD;
 
 const CACHE_TTL_MS = 60_000;
+
+/**
+ * How long a reservation outlives its owner. Long enough for any run to
+ * finish and land its spend; short enough that a run whose process died
+ * without releasing does not hold the budget for good.
+ */
+export const INSTANT_EVAL_RESERVATION_TTL_MS = 24 * 60 * 60 * 1000;
 
 /** Where the budget stands for one organization. */
 export interface InstantEvalFreeBudgetStanding {
@@ -54,6 +69,8 @@ export interface InstantEvalFreeBudgetServiceDependencies {
     tenantIds: string[];
     requestType: string;
   }) => Promise<number>;
+  /** Where accepted work that has not reached the ledger yet is held. */
+  readonly reservations: InstantEvalBudgetReservations;
 }
 
 export class InstantEvalFreeBudgetService {
@@ -100,22 +117,97 @@ export class InstantEvalFreeBudgetService {
    * would let one accepted run judge every row it was given no matter how far
    * past the budget that took it. Counting what the caller is holding is what
    * bounds a single run to one page of overshoot.
+   *
+   * The other reservations of the organization count too, so a run under way
+   * is stopped by the runs accepted beside it. `reservationId` names the
+   * caller's own hold, which is left out: its own spend is `inFlightUsd`.
    */
   async assertWithinBudget({
     projectId,
     inFlightUsd = 0,
+    reservationId,
   }: {
     projectId: string;
     inFlightUsd?: number;
+    reservationId?: string;
   }): Promise<void> {
-    const standing = await this.standing({ projectId });
-    if (!standing.isFree) return;
-    if (standing.remainingUsd !== null && standing.remainingUsd > inFlightUsd)
-      return;
-    throw new InstantEvalFreeBudgetExhaustedError({
-      spentUsd: standing.spentUsd + inFlightUsd,
-      budgetUsd: standing.budgetUsd,
+    const organizationId = await this.freeOrganizationOf(projectId);
+    if (!organizationId) return;
+    const spentNanoUsd = await this.spentNanoUsd(organizationId);
+    const heldNanoUsd = await this.deps.reservations.heldNanoUsd({
+      organizationId,
+      ...(reservationId === undefined ? {} : { except: reservationId }),
     });
+    const committedUsd = (spentNanoUsd + heldNanoUsd) / NANO_USD_PER_USD;
+    if (INSTANT_EVAL_FREE_BUDGET_USD > committedUsd + inFlightUsd) return;
+    throw new InstantEvalFreeBudgetExhaustedError({
+      spentUsd: committedUsd + inFlightUsd,
+      budgetUsd: INSTANT_EVAL_FREE_BUDGET_USD,
+    });
+  }
+
+  /**
+   * Holds `priceUsd` under `reservationId` until {@link release}, or refuses
+   * when it does not fit beside the spend and the other reservations.
+   *
+   * The hold is taken atomically against the others, which is what makes two
+   * runs accepted in the same instant share the budget rather than each
+   * being admitted against a ledger that knows about neither.
+   */
+  async reserve({
+    projectId,
+    reservationId,
+    priceUsd,
+  }: {
+    projectId: string;
+    reservationId: string;
+    priceUsd: number;
+  }): Promise<void> {
+    const organizationId = await this.freeOrganizationOf(projectId);
+    if (!organizationId) return;
+    const spentNanoUsd = await this.spentNanoUsd(organizationId);
+    const outcome = await this.deps.reservations.reserve({
+      organizationId,
+      reservationId,
+      nanoUsd: Math.round(priceUsd * NANO_USD_PER_USD),
+      limitNanoUsd: Math.max(
+        0,
+        INSTANT_EVAL_FREE_BUDGET_NANO_USD - spentNanoUsd,
+      ),
+      ttlMs: INSTANT_EVAL_RESERVATION_TTL_MS,
+    });
+    if (outcome.isReserved) return;
+    throw new InstantEvalFreeBudgetExhaustedError({
+      spentUsd: (spentNanoUsd + outcome.heldNanoUsd) / NANO_USD_PER_USD,
+      budgetUsd: INSTANT_EVAL_FREE_BUDGET_USD,
+    });
+  }
+
+  /**
+   * Drops the hold once the spend it stood for has been recorded, and
+   * forgets the cached ledger read so the next check sees the spend.
+   */
+  async release({
+    projectId,
+    reservationId,
+  }: {
+    projectId: string;
+    reservationId: string;
+  }): Promise<void> {
+    const organizationId = await this.deps.organizationOf(projectId);
+    if (!organizationId) return;
+    // The cache goes first: a check that runs between the two steps then
+    // reads the ledger, which already carries the spend the hold stood for,
+    // rather than a cached total from before it beside a hold already gone.
+    await this.spentCache.delete(organizationId);
+    await this.deps.reservations.release({ organizationId, reservationId });
+  }
+
+  /** The project's organization when the free budget bounds it, else null. */
+  private async freeOrganizationOf(projectId: string): Promise<string | null> {
+    const organizationId = await this.deps.organizationOf(projectId);
+    if (!organizationId) return null;
+    return (await this.deps.isFreePlan(organizationId)) ? organizationId : null;
   }
 
   private async spentNanoUsd(organizationId: string): Promise<number> {
@@ -141,16 +233,15 @@ function paidStanding(): InstantEvalFreeBudgetStanding {
 }
 
 /** The budget everything not on SaaS has: none. */
-export const UNBOUNDED_INSTANT_EVAL_BUDGET: Pick<
-  InstantEvalFreeBudgetService,
-  "standing" | "assertWithinBudget"
-> = {
+export const UNBOUNDED_INSTANT_EVAL_BUDGET: InstantEvalFreeBudget = {
   standing: async () => paidStanding(),
   assertWithinBudget: async () => undefined,
+  reserve: async () => undefined,
+  release: async () => undefined,
 };
 
-/** The two reads the run service and the query service depend on. */
+/** What the run service and the query service depend on. */
 export type InstantEvalFreeBudget = Pick<
   InstantEvalFreeBudgetService,
-  "standing" | "assertWithinBudget"
+  "standing" | "assertWithinBudget" | "reserve" | "release"
 >;

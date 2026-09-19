@@ -295,7 +295,7 @@ function appFunctionDiagnostics({
     diagnostics.push({
       code: "APP_FUNCTION_UNRESOLVED_KEYS",
       message:
-        "Some rows are null because their conversation or trace id matched nothing. Check the ids, and that the rows are inside the retention window.",
+        "Some rows are null because their conversation, trace or span key matched nothing. Check the ids, and that the rows are inside the retention window.",
       meta: { columns: appFunctions.unresolvedKeys },
     });
   }

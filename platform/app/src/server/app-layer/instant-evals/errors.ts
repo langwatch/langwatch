@@ -58,6 +58,44 @@ export class InstantEvalQueryBudgetExceededError extends HandledError {
 }
 
 /**
+ * The statement's questions alone fill the judge's state, leaving no room for
+ * any text to judge.
+ *
+ * `customer` fault and a 422: the questions are the caller's, and shortening
+ * them or asking fewer at once is the whole remedy. Refused before anything
+ * is sent, because the alternative is every row skipped and the query then
+ * reported as the judge being unavailable, which it is not.
+ */
+export class InstantEvalQuestionsTooLongError extends HandledError {
+  declare readonly code: "instant_eval_questions_too_long";
+
+  constructor({
+    questionTokens,
+    stateTokens,
+  }: {
+    /** What the questions weigh, in the judge's input tokens. */
+    readonly questionTokens: number;
+    /** The judge's whole state, which the questions and the text share. */
+    readonly stateTokens: number;
+  }) {
+    super(
+      "instant_eval_questions_too_long",
+      "The questions are too long to leave room for any text to judge. Shorten them, or ask fewer of them at once.",
+      {
+        httpStatus: 422,
+        fault: "customer",
+        // Named consumer: the agent that wrote the questions, which needs to
+        // know how far over they are. Both numbers are about the caller's own
+        // statement and the published judge limits.
+        meta: { questionTokens, stateTokens },
+        ...remediation("instant_eval_questions_too_long"),
+      },
+    );
+    this.name = "InstantEvalQuestionsTooLongError";
+  }
+}
+
+/**
  * The classifier answered nothing for the whole query.
  *
  * `provider` fault and a 503. Not `platform`, because the failing component is

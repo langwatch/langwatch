@@ -14,6 +14,7 @@ const MODEL = "jev-latest";
 const PRICE_PER_MTOK = 0.042; // USD per million input tokens, output is free
 const TOKEN_BUDGET = 30000; // state cap is 32k tokens, text and questions together
 const MAX_CHOICE_OPTIONS = 255;
+const REQUEST_TIMEOUT_MS = 120000;
 
 // ---------- args ----------
 
@@ -38,12 +39,12 @@ function parseArgs(argv) {
     if (a === "--rules") opts.rules = next();
     else if (a === "--section-level") opts.sectionLevel = Number(next());
     else if (a === "--json") opts.json = true;
-    else if (a === "--threshold") opts.threshold = Number(next());
-    else if (a === "--min") opts.min = Number(next());
-    else if (a === "--locate") opts.locate = Number(next());
+    else if (a === "--threshold") opts.threshold = probability(a, next());
+    else if (a === "--min") opts.min = probability(a, next());
+    else if (a === "--locate") opts.locate = probability(a, next());
     else if (a === "--no-locate") opts.noLocate = true;
     else if (a === "--context") opts.context = true;
-    else if (a === "--concurrency") opts.concurrency = Number(next());
+    else if (a === "--concurrency") opts.concurrency = positiveInteger(a, next());
     else if (a === "--only") opts.only = new Set(next().split(","));
     else if (a === "--skip") opts.skip = new Set(next().split(","));
     else if (a === "-h" || a === "--help") {
@@ -62,6 +63,26 @@ function parseArgs(argv) {
   return opts;
 }
 
+// A flag that takes a probability: a finite number from 0 to 1. Anything else
+// would silently make every rule fire, or none, so it is refused up front.
+function probability(flag, raw) {
+  const value = Number(raw);
+  if (raw === undefined || raw === "" || !Number.isFinite(value) || value < 0 || value > 1) {
+    console.error(`${flag} takes a number from 0 to 1, got ${raw === undefined ? "nothing" : JSON.stringify(raw)}`);
+    process.exit(2);
+  }
+  return value;
+}
+
+function positiveInteger(flag, raw) {
+  const value = Number(raw);
+  if (raw === undefined || raw === "" || !Number.isInteger(value) || value < 1) {
+    console.error(`${flag} takes a whole number of 1 or more, got ${raw === undefined ? "nothing" : JSON.stringify(raw)}`);
+    process.exit(2);
+  }
+  return value;
+}
+
 function usage() {
   console.error(`usage: node lint.mjs <file.md|mdx> [more files] [options]
   --rules docs|writing|both|landing   rule set (default docs; landing loads landing-page-writing plus writing)
@@ -71,7 +92,7 @@ function usage() {
   --min P                     report rules at or above P (default 0.5)
   --locate P                  ask which sentence for rules at or above P (default 0.6)
   --no-locate                 skip the sentence-locating request
-  --context                   give the judge every section above the one it reads, for rules marked "context" (landing rule 2)
+  --context                   give the judge every section above the one it reads, for rules marked "context" (landing rules 2 and 9)
   --concurrency N             sections judged in parallel (default 4)
   --only a,b,c                run only these rule ids
   --skip a,b,c                skip these rule ids`);
@@ -117,19 +138,52 @@ function loadRules(which, only, skip) {
   const sets = which === "both" ? ["docs", "writing"] : which === "landing" ? ["landing", "writing"] : [which];
   const out = [];
   const seen = new Set();
+  const amend = {};
   for (const set of sets) {
     const file = join(HERE, "rules", `${set}.json`);
     const doc = JSON.parse(readFileSync(file, "utf8"));
+    Object.assign(amend, doc.amend ?? {});
     for (const r of doc.rules) {
       if (seen.has(r.id)) continue; // shared rules (em-dash) run once
       seen.add(r.id);
       const key = `${set}/${r.id}`;
       if (only && !only.has(r.id) && !only.has(key)) continue;
       if (skip && (skip.has(r.id) || skip.has(key))) continue;
-      out.push({ ...r, set, key });
+      const extra = amend[r.id];
+      out.push(extra && r.kind === "judge" ? { ...r, set, key, instruction: `${r.instruction} ${extra}` } : { ...r, set, key });
     }
   }
   return out;
+}
+
+// A sentence the founder supplied verbatim is marked "[founder]" in the copy
+// file. Findings the judge locates on one are reported but never fail the run
+// (landing-page-writing rule 13); regex bans still apply to them.
+const FOUNDER_MARK = /\s*\[founder\]\s*$/;
+const isFounder = (sentence) => typeof sentence === "string" && FOUNDER_MARK.test(sentence.trim());
+
+// The mark sits at the end of the line the founder supplied, so every sentence
+// of that line is his, not only the one carrying the mark. Other lines of the
+// same block (the earlier items of a list, the line above in a paragraph) are
+// not covered by it.
+function founderUnitsIn(paragraphs) {
+  const marked = new Set();
+  const plain = new Set();
+  for (const p of paragraphs) {
+    const founderLines = p.text
+      .split("\n")
+      .map((l) => l.replace(/\s+/g, " ").trim())
+      .filter(isFounder);
+    for (const u of p.units) {
+      if (isFounder(u) || founderLines.some((l) => l.includes(u))) marked.add(u);
+      else plain.add(u);
+    }
+  }
+  // The judge answers with sentence text, so the same sentence on a marked and
+  // an unmarked line is one choice. It keeps failing: the exemption is the
+  // claim that needs proof.
+  for (const u of plain) marked.delete(u);
+  return marked;
 }
 
 // ---------- document parsing ----------
@@ -230,15 +284,20 @@ function classify(lines, kind) {
       if (/^\s*([-*+]|\d+[.)])\s/.test(l)) items.push(l.replace(/^\s*([-*+]|\d+[.)])\s+/, ""));
       else if (items.length) items[items.length - 1] += " " + l.trim();
     }
-    return { kind: "list", text, exempt, units: items.flatMap(splitSentences) };
+    return { kind: "list", text, exempt, units: items.map(stripMarkup).flatMap(splitSentences) };
   }
   if (lines.every((l) => /^\s*<\/?[A-Z][\w.]*[^>]*>\s*$/.test(l))) {
     return { kind: "tag", text, exempt, units: [] };
   }
-  const prose = lines
-    .map((l) => l.replace(/^\s*<\/?[A-Z][\w.]*[^>]*>\s*$/, "").trim())
-    .filter(Boolean)
-    .join(" ");
+  // Stripped over the whole paragraph rather than per sentence, so a comment
+  // or an image that spans a sentence boundary never leaks half of itself
+  // into a unit.
+  const prose = stripMarkup(
+    lines
+      .map((l) => l.replace(/^\s*<\/?[A-Z][\w.]*[^>]*>\s*$/, "").trim())
+      .filter(Boolean)
+      .join(" "),
+  );
   return { kind: "prose", text, exempt, units: splitSentences(prose), words: prose.split(/\s+/).length };
 }
 
@@ -251,8 +310,15 @@ function splitSentences(s) {
     .filter((x) => x.length > 0);
 }
 
+// Markup that is not prose and carries punctuation the regex rules would
+// otherwise count: an image's leading exclamation mark, a comment's arrow.
+// Both go entirely, so nothing is left for a rule to match.
+function stripMarkup(s) {
+  return s.replace(/<!--[\s\S]*?-->/g, "").replace(/!\[[^\]]*\]\([^)]*\)/g, "");
+}
+
 function stripInlineCode(s) {
-  return s.replace(/`[^`]*`/g, "`code`");
+  return stripMarkup(s).replace(/`[^`]*`/g, "`code`");
 }
 
 // ---------- regex and local rules ----------
@@ -269,7 +335,12 @@ function runRegexRules(rules, section, doc, docCounts) {
       const heads = [section.heading ? `${"#".repeat(section.level)} ${section.heading}` : ""].concat(
         section.paragraphs.filter((p) => p.kind === "heading").map((p) => p.text.trim()),
       );
-      for (const h of heads) if (h && re.test(h)) hits.push({ sentence: h, match: h });
+      for (const h of heads) {
+        // The pattern carries the g flag, so test() would resume from where
+        // the previous heading matched and skip a hit at the start of this one.
+        re.lastIndex = 0;
+        if (h && re.test(h)) hits.push({ sentence: h, match: h });
+      }
     } else {
       for (const p of section.paragraphs) {
         if (p.kind === "code" || p.kind === "tag" || p.exempt) continue;
@@ -356,6 +427,9 @@ async function jev(key, state, questions, usage) {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
         body,
+        // A hung request becomes a failed attempt and is retried like a
+        // dropped socket, instead of holding the section forever.
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
     } catch (e) {
       if (attempt >= 6) throw e;
@@ -421,11 +495,14 @@ async function askInBatches(key, state, questions, usage) {
 
 const hasContent = (section) => section.paragraphs.some((p) => p.kind === "code" || p.units.length > 0);
 
-function sectionState(section, doc) {
+// The state a section is judged in. `withAbove` adds everything the reader
+// has seen before this block, so a rule can ask whether the block is
+// understandable from the page above it alone. Only the rules marked
+// "context" get it: for every other rule the page above is tokens paid for
+// nothing, and a judge reading a whole page may answer about the wrong block.
+function sectionState(section, doc, { withAbove = false } = {}) {
   const state = { heading: section.heading || "(no heading)", text: section.text };
-  if (doc.context) {
-    // Everything the reader has seen before this block, so a rule can ask
-    // whether the block is understandable from the page above it alone.
+  if (withAbove) {
     const above = doc.sections.slice(0, section.index).map((s) => s.text).join("\n\n");
     state.above = above || "(nothing: this is the first block on the page)";
   }
@@ -436,15 +513,35 @@ function sectionState(section, doc) {
   return state;
 }
 
+// Sends one set of questions per kind of state: the ordinary rules over the
+// section alone, the contextual rules over the section plus the page above.
+// Returns every answer keyed by question, whichever request carried it.
+async function askByContext(key, section, doc, items, toQuestion, usage) {
+  const answers = {};
+  for (const withAbove of [false, true]) {
+    const batch = items.filter((item) => Boolean(item.rule.context) === withAbove);
+    if (batch.length === 0) continue;
+    const state = sectionState(section, doc, { withAbove });
+    const questions = Object.fromEntries(batch.map((item) => [item.rule.key, toQuestion(item)]));
+    Object.assign(answers, await askInBatches(key, state, questions, usage));
+  }
+  return answers;
+}
+
 async function judgeSection(key, rules, section, doc, opts, usage) {
   if (!hasContent(section)) return []; // a bare heading has nothing to judge
   const judge = rules.filter(
     (r) => r.kind === "judge" && (r.scope !== "first-section" || section.index === doc.firstContentIndex) && (!r.context || doc.context),
   );
   if (judge.length === 0) return [];
-  const state = sectionState(section, doc);
-  const questions = Object.fromEntries(judge.map((r) => [r.key, noul(r)]));
-  const answers = await askInBatches(key, state, questions, usage);
+  const answers = await askByContext(
+    key,
+    section,
+    doc,
+    judge.map((rule) => ({ rule })),
+    ({ rule }) => noul(rule),
+    usage,
+  );
   const findings = [];
   for (const r of judge) {
     const a = answers[r.key];
@@ -455,40 +552,56 @@ async function judgeSection(key, rules, section, doc, opts, usage) {
 }
 
 async function locateSentences(key, findings, section, doc, opts, usage) {
-  const fired = findings.filter((f) => f.rule.kind === "judge" && f.probability >= opts.locate);
-  const sentences = section.paragraphs.filter((p) => p.kind !== "code" && p.kind !== "tag").flatMap((p) => p.units);
+  // A finding that can fail the run is located even below --locate: without a
+  // sentence there is no way to tell whether it sits on a founder line.
+  const cutoff = Math.min(opts.locate, opts.threshold);
+  const fired = findings.filter((f) => f.rule.kind === "judge" && f.probability >= cutoff);
+  const prose = section.paragraphs.filter((p) => p.kind !== "code" && p.kind !== "tag");
+  const sentences = prose.flatMap((p) => p.units);
+  const founderUnits = founderUnitsIn(prose);
+  const markFounder = (f) => {
+    f.founder = isFounder(f.sentence) || founderUnits.has(f.sentence);
+  };
   const targets = [];
   for (const f of fired) {
     // rules about the heading or the opener need no second request
     if (f.rule.locate === "heading") f.sentence = section.heading ? `${"#".repeat(section.level)} ${section.heading}` : sentences[0];
     else if (f.rule.locate === "first-sentence") f.sentence = sentences[0];
-    else targets.push(f);
+    else {
+      targets.push(f);
+      continue;
+    }
+    markFounder(f);
   }
   if (targets.length === 0) return;
   const uniq = [...new Set(sentences)].slice(0, MAX_CHOICE_OPTIONS);
   if (uniq.length < 2) {
-    for (const f of targets) f.sentence = uniq[0];
+    for (const f of targets) {
+      f.sentence = uniq[0];
+      markFounder(f);
+    }
     return;
   }
   const criteria = Object.fromEntries(uniq.map((s, i) => [`s${i + 1}`, s.length > 400 ? s.slice(0, 400) + "..." : s]));
-  const state = sectionState(section, doc);
-  const questions = Object.fromEntries(
-    targets.map((f) => [
-      f.rule.key,
-      {
-        type: "choice",
-        instructions: `Which sentence of \`text\` is the clearest instance of the following? ${f.rule.instruction}`,
-        criteria,
-      },
-    ]),
+  const answers = await askByContext(
+    key,
+    section,
+    doc,
+    targets,
+    (f) => ({
+      type: "choice",
+      instructions: `Which sentence of \`text\` is the clearest instance of the following? ${f.rule.instruction}`,
+      criteria,
+    }),
+    usage,
   );
-  const answers = await askInBatches(key, state, questions, usage);
   for (const f of targets) {
     const a = answers[f.rule.key];
     if (!a) continue;
     const pick = a.choice;
     f.sentence = criteria[pick];
     f.sentenceProbability = a.probabilities?.[pick];
+    markFounder(f);
   }
 }
 
@@ -503,6 +616,8 @@ async function lintFile(file, rules, opts, key) {
   const doc = { file, frontmatter, firstHeading, firstContentIndex, context: opts.context, sections };
   const skipped = rules.filter((r) => r.context && !opts.context);
   if (skipped.length) console.error(`note: ${skipped.map((r) => r.key).join(", ")} need --context and were skipped`);
+  if (opts.noLocate && /\[founder\]/.test(src))
+    console.error("note: --no-locate skips the sentence-locating request, so [founder] lines are not recognised and can fail the run");
   const usage = { requests: 0, inputTokens: 0 };
   const docCounts = {};
   const results = new Array(sections.length);
@@ -548,11 +663,12 @@ async function lintFile(file, rules, opts, key) {
           sentence: f.sentence ?? null,
           match: f.match ?? null,
           count: f.count ?? null,
+          founder: f.rule.kind === "judge" && (f.founder ?? isFounder(f.sentence)),
         })),
     })),
     usage: { ...usage, usd: round((usage.inputTokens / 1e6) * PRICE_PER_MTOK, 6) },
   };
-  out.failed = out.sections.some((s) => s.findings.some((f) => f.probability >= opts.threshold));
+  out.failed = out.sections.some((s) => s.findings.some((f) => f.probability >= opts.threshold && !f.founder));
   return out;
 }
 
@@ -567,7 +683,7 @@ function printReport(rep, opts) {
     if (s.error) lines.push(`  error: ${s.error}`);
     if (s.findings.length === 0) lines.push("  clean");
     for (const f of s.findings) {
-      const flag = f.probability >= opts.threshold ? "!" : " ";
+      const flag = f.founder ? "f" : f.probability >= opts.threshold ? "!" : " ";
       const extra = f.count && f.count > 1 ? `  (${f.count} hits)` : "";
       lines.push(`${flag} ${f.probability.toFixed(2)}  ${f.rule}  ${f.name}${extra}`);
       if (f.sentence) lines.push(`        > ${f.sentence}`);

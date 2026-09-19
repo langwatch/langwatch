@@ -130,31 +130,45 @@ export const instantEvalIdParamsSchema = z.object({
   id: z.string().min(1).describe("The run id."),
 });
 
-export const instantEvalListQuerySchema = z.object({
-  limit: z.coerce
-    .number()
-    .int()
-    .min(1)
-    .max(100)
-    .optional()
-    .default(20)
-    .describe("Runs to list, at most one hundred."),
-  before: z
-    .string()
-    .datetime({ offset: true })
-    .optional()
-    .describe(
-      "List runs accepted strictly before this instant, as an ISO 8601 timestamp. Half of the list's cursor: pass `beforeId` with it.",
-    ),
-  beforeId: z
-    .string()
-    .min(1)
-    .max(200)
-    .optional()
-    .describe(
-      "The id of the last run of the previous page. Two runs can share an instant, so this is what keeps a page from skipping the others written in the same millisecond.",
-    ),
-});
+export const instantEvalListQuerySchema = z
+  .object({
+    limit: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .optional()
+      .default(20)
+      .describe("Runs to list, at most one hundred."),
+    before: z
+      .string()
+      .datetime({ offset: true })
+      .optional()
+      .describe(
+        "List runs accepted strictly before this instant, as an ISO 8601 timestamp. Half of the list's cursor: pass `beforeId` with it.",
+      ),
+    beforeId: z
+      .string()
+      .min(1)
+      .max(200)
+      .optional()
+      .describe(
+        "The id of the last run of the previous page. Two runs can share an instant, so this is what keeps a page from skipping the others written in the same millisecond.",
+      ),
+  })
+  // The two halves are one cursor. Half a cursor would page from an instant
+  // with no tie-break, or from an id with no instant to anchor it, and either
+  // way the page would skip or repeat rows without saying so.
+  .superRefine((query, ctx) => {
+    if ((query.before === undefined) === (query.beforeId === undefined)) return;
+    const missing = query.before === undefined ? "before" : "beforeId";
+    const given = missing === "before" ? "beforeId" : "before";
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: [missing],
+      message: `${missing} is required when ${given} is given: the two together are the list's cursor.`,
+    });
+  });
 
 export const instantEvalResultsQuerySchema = z.object({
   questionId: z

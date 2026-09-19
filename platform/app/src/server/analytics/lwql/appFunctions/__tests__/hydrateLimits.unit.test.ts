@@ -62,6 +62,40 @@ describe("given a finished LangWatchQL result", () => {
       });
     });
 
+    /** @scenario "More distinct trace keys than the cap allows is a refusal, not a partial answer" */
+    it("names the span function whose trace ids helped break the trace cap", async () => {
+      // 600 trace keys and 600 span pairs on other traces: under the span cap,
+      // but 1,200 distinct trace ids between them, so the refusal is the trace
+      // cap's and both calls are named as the ones that cost it.
+      const half = LWQL_APP_FUNCTION_KEY_CAPS.trace / 2 + 100;
+      const rows = Array.from({ length: half }, (_unused, index) => ({
+        j: `t${index}`,
+        m: [`t${index + half}`, "s1"],
+      }));
+
+      const failure = await hydrate({
+        calls: [
+          { column: "j", function: "trace_json", options: [] },
+          { column: "m", function: "llm_messages_span", options: [] },
+        ],
+        columns: [
+          { name: "j", type: "Nullable(String)" },
+          { name: "m", type: "Tuple(String, String)" },
+        ],
+        rows,
+        traceSource: sourceOf(),
+      }).catch((error: unknown) => error);
+
+      expect(failure).toMatchObject({
+        code: "lwql_app_function_key_cap",
+        meta: {
+          keyKind: "trace",
+          distinct: half * 2,
+          functions: ["llm_messages_span", "trace_json"],
+        },
+      });
+    });
+
     it("reads nothing at all, because the cap is checked before the fetch", async () => {
       const source = sourceOf();
       const rows = Array.from(
@@ -133,7 +167,7 @@ describe("given a finished LangWatchQL result", () => {
 
       expect(result.rows.map((row) => row.j)).toEqual([null, null]);
       expect(result.unresolvedKeys).toEqual([]);
-      expect(source.askedTraceIds).toEqual([[]]);
+      expect(source.askedTraceIds).toEqual([]);
     });
   });
 

@@ -1,71 +1,104 @@
 ---
 title: Instant Evals
 sidebarTitle: Overview
-description: Run an eval question over every trace, conversation or LLM call in your history, up to 100,000 rows in one run, and get the matches back in minutes.
+keywords: langwatch, instant evals, eval every trace, judge conversations, frustration rate, production history, langwatchql
+description: Ask up to ten questions of every conversation, trace or LLM call in your history and read the matches back in about a minute per 10,000 rows.
 ---
 
 ## What is an Instant Eval
 
-An Instant Eval is one eval question asked of every trace, conversation or LLM call you have already sent, at a low cost per row. For example, ask for "all conversations where the customer was frustrated" and LangWatch judges every conversation in parallel, up to 100,000 in one run. Minutes later you have the frustration rate and the matched conversations across your whole history, and because every conversation is judged, no edge case is skipped.
+An Instant Eval is a question in plain words, judged against every row in a time window of your history. For example, "the customer sounds frustrated" over the last 30 days of conversations comes back as a yes or no per conversation, with the probability behind it, and the count across all of them.
+
+Every row is judged rather than a sample, so the one conversation in ten thousand where the agent promised a refund it cannot give is in the result. The judge is a small calibrated model: 10,000 conversations take about a minute and cost well under a dollar, and 1,000 rows take about nine seconds.
+
+## Your first run
+
+Install the CLI and sign in to the project that holds your traces:
 
 ```bash
-langwatch instant-eval run "the customer sounds frustrated" --target threads --last 30d --limit 10000
+npm install -g langwatch
+langwatch login
 ```
 
-<Frame caption="One run over 10,000 conversations: the price before it starts, the statement it wrote, then the matches and the totals.">
-  <img src="/images/instant-evals/cli-run.png" alt="Terminal output of an Instant Eval run over 10,000 conversations" />
+Ask your question of the last week of conversations, on a hundred of them first:
+
+```bash
+langwatch instant-eval run "the customer sounds frustrated" --target threads --last 7d --limit 100
+```
+
+The command prints the LangWatchQL statement it wrote for you, then a progress line that updates in place, then the headline and the first twenty matches. Press Ctrl-C to stop watching: the run keeps going and the command prints the line that reads it back later.
+
+<Frame caption="The first run over 100 conversations: the statement it wrote, the progress line, then the headline with 32 matches in about 8 seconds and the first 20 of them.">
+  <img src="/images/instant-evals/cli-run.png" alt="Terminal output of an Instant Eval run over 100 conversations" />
 </Frame>
 
-## What you can ask
+## What comes back
 
-One run asks up to ten questions of each row, and the questions share one judge request per row, so ten questions cost about the same as one.
+In the headline you get how many rows matched, how long it took, how many tokens the judge read and what that cost. Under it, one line per matched row: the conversation, the answer with its probability, and the start of the text that was judged.
 
-| Question | Target | Answer |
-|---|---|---|
-| `"The customer sounds frustrated"` | `threads` | yes or no per conversation, plus the rate over the run |
-| `"The agent promised a refund it cannot give"` | `threads` | yes or no |
-| `"The agent called an external HTTP API"` | `traces` | yes or no |
-| `"The tests the agent ran failed"` | `traces` | yes or no, for coding agent sessions |
-| `--score 1..5 "How well the answer follows the retrieved context"` | `traces` | a score from 1 to 5 |
-| `--category billing=... shipping=... account=... other=...` | `threads` | the most likely category and its probability |
+Read every match, and check what the judge actually read, with the run id from the headline:
 
-Each question is written in plain words. The judge reads the row's text, answers with a calibrated probability, and the run turns that into a pass, a score or a label.
+```bash
+langwatch instant-eval results <run-id> --matched
+langwatch instant-eval sample <run-id> -n 5
+```
 
-## When to use it
+With `results` you page through the verdicts. With `sample` you read a few rows, the judged text beside each verdict, and check that you asked what you meant. Every verdict is also a row in the `judgments` dataset, so a LangWatchQL query can join it back to your traces. See [Reading the results](/features/instant-evals/results).
 
-- An incident report: find every conversation in the last month where the customer was told something wrong, and read them.
-- A new eval, applied backwards: you wrote a check today, run it over six months of production to see how often it would have fired.
-- A dataset: the matched rows of a run are the examples you want to test against, so read them with `instant-eval results <run-id> --matched -o json`.
-- A rate you cannot get from metrics: the share of conversations that ended without an answer, or with the user repeating themselves.
+## Sample, read, refine, then run wide
 
-## How it works
+1. Run the question on a hundred rows with `--limit 100`.
+2. Read what the judge saw with `sample`.
+3. Refine the question and run the same hundred again.
+4. Check the cost, then run wide.
 
-A run is a [LangWatchQL](/api-reference/query/overview) statement, and the `--target` shorthand writes it for you. Read the [target shorthand](/features/instant-evals/shorthand) page to see the statement each target expands into, and edit it when the shorthand is not enough.
+For example, if the judge said yes to a calm complaint, say what counts and what does not with `--criteria`:
 
-1. The statement selects the rows: conversations, traces or LLM calls, filtered by time and by anything the trace explorer can filter on.
-2. Each row is rendered to text: the conversation transcript, the trace as the evaluators read it, or the chat messages of one LLM call. A conversation is sent whole, so what the judge reads is what you would read in the drawer.
-3. Each row's text goes to the judge in one request with all your questions, in parallel across rows, and the run stores one verdict per row and question while it reports progress.
+```bash
+langwatch instant-eval run \
+  --ask "the customer sounds frustrated" \
+    --criteria "sarcasm, repetition or a raised voice count" \
+    --criteria "a calm complaint does not count" \
+  --target threads --last 7d --limit 100
+```
 
-## What it costs
+Once you are happy with the sample, check the cost of the wide run with `estimate`, then start it. A run over 1,000 rows prints its cost before it starts either way. Pass `--detach` to get the run id straight away instead of waiting, and follow it with `status --wait`:
 
-The price is 0.0546 USD per million input tokens judged, where the input is each row's text plus your questions. Long conversations therefore cost more than short ones, and the estimate prices your rows as they actually are rather than assuming an average. The run in the screenshot above judged 10,000 conversations in 2 minutes 26 seconds, read 11.4 million input tokens, and cost 0.62 USD. Its estimate beforehand said 11.87 million tokens and 0.65 USD.
+```bash
+langwatch instant-eval estimate "the customer sounds frustrated" --target threads --last 30d --limit 10000
+langwatch instant-eval run "the customer sounds frustrated" --target threads --last 30d --limit 10000 --detach
+langwatch instant-eval status <run-id> --wait
+```
 
-Run `langwatch instant-eval estimate` with the same arguments to see the row count and the price before you start. A run over more than 1,000 rows prints its price first. The count is exact, and the price comes from fifty rows sampled across the whole run.
+The [Questions](/features/instant-evals/questions) page covers criteria, thresholds, scores and categories, and asking up to ten questions of the same text in one run.
 
-## Where the answers go
-
-Every verdict is stored against its trace: passed or not, the probability behind it, the score or the label, and the full distribution for a category question. Read them with `langwatch instant-eval results <run-id> --matched`, or query the `judgments` view with LangWatchQL and join it to `traces`.
-
-## Also check
+## Three ways to run one
 
 <CardGroup cols={3}>
-  <Card title="CLI reference" icon="terminal" href="/features/instant-evals/cli">
-    Every command and flag of `langwatch instant-eval`.
+  <Card title="The CLI" icon="terminal" href="/features/instant-evals/cli">
+    `langwatch instant-eval run` waits for the run and prints the matches. Every flag and subcommand.
   </Card>
-  <Card title="Target shorthand" icon="code" href="/features/instant-evals/shorthand">
-    The LangWatchQL statement each target expands into.
+  <Card title="The REST API" icon="plug" href="/api-reference/instant-evals/running-an-instant-eval">
+    `POST /api/v1/instant-evals` answers 202 with a queued run. Poll it, page through its results, sample and cancel it.
   </Card>
-  <Card title="API reference" icon="plug" href="/api-reference/instant-evals/overview">
-    Create, poll and read runs over REST.
+  <Card title="Langy" icon="comments" href="/langy/chat">
+    Ask the question in the chat panel. Langy runs `langwatch instant-eval` in its sandbox and reads the matches back to you.
+  </Card>
+</CardGroup>
+
+## Reference
+
+<CardGroup cols={2}>
+  <Card title="Questions" icon="circle-question" href="/features/instant-evals/questions">
+    Yes or no, criteria, thresholds, scores, categories, several questions at once, and a questions file.
+  </Card>
+  <Card title="Targets and statements" icon="code" href="/features/instant-evals/targets">
+    What one row is, the time window, the trace filter, the statement each target writes, and writing your own.
+  </Card>
+  <Card title="Results" icon="table-list" href="/features/instant-evals/results">
+    Paging through verdicts, sampling the judged text, and the `judgments` dataset in LangWatchQL.
+  </Card>
+  <Card title="Limits and cost" icon="gauge" href="/features/instant-evals/limits-and-cost">
+    Row caps, the question cap, the text budget, speed, the rate per token, the free budget and billing.
   </Card>
 </CardGroup>

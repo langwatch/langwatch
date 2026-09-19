@@ -53,7 +53,10 @@ function lastTextBearingUserIndex(messages: ChatMessage[]): number {
   return -1;
 }
 
-/** Where the history ends: before the trailing run of assistant messages. */
+/**
+ * The trailing run of assistant messages is this turn's own reply, so the
+ * history the model was given stops right before it.
+ */
 function historyEndIndex(messages: ChatMessage[]): number {
   let end = messages.length;
   while (end > 0 && messages[end - 1]!.role === "assistant") {

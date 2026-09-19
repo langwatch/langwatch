@@ -47,7 +47,7 @@ describe("instantEvalStatementFor, given what a caller sent", () => {
 
       expect(statement.sql).toContain("FROM analytics.traces");
       expect(statement.parameters).toMatchObject({
-        start_at: "2026-09-11 12:00:00",
+        start_at: "2026-09-11 12:00:00.000",
       });
     });
 

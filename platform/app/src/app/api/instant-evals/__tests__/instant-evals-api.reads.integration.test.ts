@@ -20,7 +20,7 @@ import {
   setupInstantEvalsApiHarness,
 } from "./instantEvalsApiHarness";
 
-const flagIsOn = vi.hoisted(() => ({ value: true }));
+const flagIsOn = vi.hoisted(() => ({ isEnabled: true }));
 
 vi.mock("~/server/app-layer/instant-evals/access", async (importOriginal) => {
   const original =
@@ -29,7 +29,7 @@ vi.mock("~/server/app-layer/instant-evals/access", async (importOriginal) => {
     >();
   return {
     ...original,
-    instantEvalsEnabled: async () => flagIsOn.value,
+    instantEvalsEnabled: async () => flagIsOn.isEnabled,
   };
 });
 
@@ -71,6 +71,8 @@ describe("Feature: The Instant Eval run over REST", () => {
           requests: 400,
           priceUsd: 0.013541,
         });
+        // The raw judge cost stays internal; the wire carries the price.
+        expect(body).not.toHaveProperty("costUsd");
         // Pricing a run never starts one, so nothing was queued and nothing
         // was judged.
         expect(runs.create).not.toHaveBeenCalled();
@@ -112,8 +114,10 @@ describe("Feature: The Instant Eval run over REST", () => {
           tokens: 124_000,
           priceUsd: 0.00677,
         });
-        // The hydration plan is internal, so it is never published.
+        // The hydration plan and the raw judge cost are internal, so neither
+        // is published.
         expect(body).not.toHaveProperty("plan");
+        expect(body).not.toHaveProperty("costUsd");
         expect(body).not.toHaveProperty("rowLimit");
       });
     });

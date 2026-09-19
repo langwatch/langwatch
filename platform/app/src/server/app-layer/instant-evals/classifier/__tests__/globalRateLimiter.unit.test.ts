@@ -131,11 +131,35 @@ function limiterOn({
 const globalBucket = (redis: ReturnType<typeof bucketRedis>) =>
   [...redis.buckets.entries()].find(([key]) => !key.includes(":tenant:"))?.[1];
 const tenantBucket = (redis: ReturnType<typeof bucketRedis>, tenant: string) =>
-  redis.buckets.get(
-    `langwatch:instant-evals:classifier-tokens:tenant:${tenant}`,
-  );
+  [...redis.buckets.entries()].find(([key]) =>
+    key.endsWith(`:tenant:${tenant}`),
+  )?.[1];
+
+/** The `{...}` segment Redis Cluster hashes a key's slot from, if it has one. */
+const hashTagOf = (key: string): string | undefined =>
+  /\{[^}]+\}/.exec(key)?.[0];
 
 describe("given the shared buckets", () => {
+  describe("when the two buckets are keyed", () => {
+    /** @scenario "Both buckets share one Redis Cluster hash tag" */
+    it("puts both keys under one hash tag, so one EVAL may take from both", async () => {
+      const redis = bucketRedis();
+      const limiter = limiterOn({ redis, clock: { now: 1_000 } });
+
+      await limiter.acquire({ tokens: 100, tenantId: "project-a" });
+
+      // A multi-key EVAL on a cluster is refused with CROSSSLOT unless every
+      // key hashes to the same slot, and the tag is what makes that so.
+      // Refused, the limiter would fall back to the local rate on every call
+      // and each pod would pace itself alone.
+      const keys = [...redis.buckets.keys()];
+      expect(keys).toHaveLength(2);
+      const tags = keys.map(hashTagOf);
+      expect(tags[0]).toBeDefined();
+      expect(tags[1]).toBe(tags[0]);
+    });
+  });
+
   describe("when a classification takes its tokens", () => {
     /** @scenario "A classification takes its estimated tokens from one bucket shared by every pod" */
     it("debits the global bucket and the tenant's by exactly what it asked", async () => {

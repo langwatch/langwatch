@@ -24,7 +24,7 @@ import {
   setupInstantEvalsApiHarness,
 } from "./instantEvalsApiHarness";
 
-const flagIsOn = vi.hoisted(() => ({ value: true }));
+const flagIsOn = vi.hoisted(() => ({ isEnabled: true }));
 
 vi.mock("~/server/app-layer/instant-evals/access", async (importOriginal) => {
   const original =
@@ -33,7 +33,7 @@ vi.mock("~/server/app-layer/instant-evals/access", async (importOriginal) => {
     >();
   return {
     ...original,
-    instantEvalsEnabled: async () => flagIsOn.value,
+    instantEvalsEnabled: async () => flagIsOn.isEnabled,
   };
 });
 
@@ -121,7 +121,7 @@ describe("Feature: The Instant Eval run over REST", () => {
         runs.create.mockRejectedValue(
           new InstantEvalQueryMissingColumnsError({
             missing: ["TraceId"],
-            needsEvalFunction: false,
+            isEvalFunctionMissing: false,
           }),
         );
 
@@ -140,7 +140,7 @@ describe("Feature: The Instant Eval run over REST", () => {
         runs.create.mockRejectedValue(
           new InstantEvalQueryMissingColumnsError({
             missing: ["an eval function"],
-            needsEvalFunction: true,
+            isEvalFunctionMissing: true,
           }),
         );
 
@@ -151,7 +151,7 @@ describe("Feature: The Instant Eval run over REST", () => {
 
         expect(res.status).toBe(422);
         expect(body.code).toBe("instant_eval_query_missing_columns");
-        expect(body.meta.needsEvalFunction).toBe(true);
+        expect(body.meta.isEvalFunctionMissing).toBe(true);
       });
     });
   });

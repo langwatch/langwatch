@@ -98,6 +98,12 @@ export interface InstantEvalRunPort {
     pageSize: number;
     remaining: number;
     keyColumns: readonly string[];
+    /**
+     * The instant the delivery's outbox lease lapses, or null where nothing
+     * leased it. A page still judging past it would be judged a second time
+     * by whoever leases the message next, so the executor stops before it.
+     */
+    deadlineAt: number | null;
   }): Promise<InstantEvalPageOutcome>;
   /** Records the run's spend and returns what it came to. */
   finish(input: {
@@ -223,6 +229,7 @@ export function createInstantEvalJudgePageHandler(
       outcome = await deps.runPort.judgePage({
         ...payload,
         keyColumns: payload.keyColumns,
+        deadlineAt: intentContext.leaseExpiresAt ?? null,
       });
     } catch (error) {
       await handleIntentFailure({

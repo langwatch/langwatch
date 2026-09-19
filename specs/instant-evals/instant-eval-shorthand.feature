@@ -102,6 +102,13 @@ Feature: The Instant Eval shorthand, a target and a filter expanded into one sta
     And the parameters hold absolute instants rather than a relative expression
     And the window covers the last seven days
 
+  @unit
+  Scenario: A window narrower than a second keeps both of its ends
+    Given a shorthand whose start and end fall inside the same second
+    When it is expanded
+    Then the two bound instants keep their milliseconds
+    And they are not the same instant
+
   # ---------------------------------------------------------------------------
   # The questions
   # ---------------------------------------------------------------------------
@@ -188,6 +195,20 @@ Feature: The Instant Eval shorthand, a target and a filter expanded into one sta
     When the shorthand is expanded
     Then the statement's WHERE carries the service condition
     And the service name is a bound parameter rather than text in the statement
+
+  @unit
+  Scenario: A wildcard model value keeps its literal LIKE characters
+    Given a filter asking for a model whose name carries an underscore, a percent sign or a backslash, with a wildcard
+    When the filter is compiled
+    Then each of those characters is escaped in the bound pattern
+    And only the caller's wildcard matches anything
+
+  @unit
+  Scenario: Free text keeps its literal LIKE characters
+    Given a bare word carrying an underscore, a percent sign or a backslash
+    When the filter is compiled
+    Then each of those characters is escaped in the bound pattern
+    And only the surrounding wildcards the compiler adds match anything
 
   @unit
   Scenario: A filter field the trace view cannot answer is refused by name

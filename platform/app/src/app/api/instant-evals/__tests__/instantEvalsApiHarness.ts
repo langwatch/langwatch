@@ -12,12 +12,7 @@ import { nanoid } from "nanoid";
 import { afterEach, beforeEach, vi } from "vitest";
 
 import { projectFactory } from "~/factories/project.factory";
-import type {
-  Organization,
-  Project,
-  Team,
-  User,
-} from "~/generated/prisma/client";
+import type { Organization, Team, User } from "~/generated/prisma/client";
 import { generateApiKeyToken } from "~/server/api-key/api-key-token.utils";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import type {
@@ -57,35 +52,132 @@ export interface InstantEvalRunServiceFakes {
   sample: ReturnType<typeof vi.fn>;
 }
 
-/**
- * Seeds the project and the fake service around every test in the calling file,
- * and answers the request helpers and row builders the tests read.
- *
- * `flag` is the file's own hoisted feature-gate holder, and `allows` decides
- * what a scoped key's declared permission answers.
- */
-export function setupInstantEvalsApiHarness({
-  flag,
-  allows = () => true,
-}: {
-  flag: { value: boolean };
-  allows?: (permission: string) => boolean;
-}) {
-  let testApiKey: string;
-  let testProjectId: string;
-  let testOrganization: Organization;
-  let testTeam: Team;
-  let testProject: Project;
-  let testUserIds: string[];
-  let testApiKeyIds: string[];
-  let runs: InstantEvalRunServiceFakes;
+/** The rows one test owns, and the ids of what it created on the way. */
+interface SeededProject {
+  apiKey: string;
+  projectId: string;
+  organization: Organization;
+  team: Team;
+  userIds: string[];
+  apiKeyIds: string[];
+}
 
+/** A fresh organization, team and project around every test, gone after it. */
+function useSeededProject(): { readonly current: () => SeededProject } {
+  let seeded: SeededProject | null = null;
+
+  beforeEach(async () => {
+    const organization = await prisma.organization.create({
+      data: { name: "Test Organization", slug: `test-org-${nanoid()}` },
+    });
+    const team = await prisma.team.create({
+      data: {
+        name: "Test Team",
+        slug: `test-team-${nanoid()}`,
+        organizationId: organization.id,
+      },
+    });
+    const project = await prisma.project.create({
+      data: {
+        ...projectFactory.build({ slug: nanoid() }),
+        teamId: team.id,
+        personalFeatures: {},
+      },
+    });
+    seeded = {
+      apiKey: project.apiKey,
+      projectId: project.id,
+      organization,
+      team,
+      userIds: [],
+      apiKeyIds: [],
+    };
+  });
+
+  afterEach(async () => {
+    if (!seeded) return;
+    if (seeded.apiKeyIds.length > 0) {
+      await cleanupTestRows(prisma, [
+        ["apiKey", { id: { in: seeded.apiKeyIds } }],
+      ]);
+    }
+    await prisma.project.delete({ where: { id: seeded.projectId } });
+    await prisma.team.delete({ where: { id: seeded.team.id } });
+    await prisma.organization.delete({ where: { id: seeded.organization.id } });
+    if (seeded.userIds.length > 0) {
+      await cleanupTestRows(prisma, [["user", { id: { in: seeded.userIds } }]]);
+    }
+    seeded = null;
+  });
+
+  return {
+    current: () => {
+      if (!seeded)
+        throw new Error("the seeded project is only there inside a test");
+      return seeded;
+    },
+  };
+}
+
+/**
+ * The app on a permission fake and the run service on method fakes, around
+ * every test, torn down after it.
+ */
+function useFakeRunService({
+  flag,
+  allows,
+}: {
+  flag: { isEnabled: boolean };
+  allows: (permission: string) => boolean;
+}): { readonly current: () => InstantEvalRunServiceFakes } {
+  let runs: InstantEvalRunServiceFakes | null = null;
+
+  beforeEach(async () => {
+    await resetApp();
+    flag.isEnabled = true;
+    globalForApp.__langwatch_app = createTestApp({
+      // The ceiling has its own tests. What these need from it is only that a
+      // scoped key's declared permission decides whether it reaches the
+      // handler, which is what the read-only scenario reads.
+      permissions: {
+        hasApiKeyPermission: async ({ permission }: { permission: string }) =>
+          allows(permission),
+      },
+    } as unknown as Parameters<typeof createTestApp>[0]);
+    runs = {
+      create: vi.fn(),
+      estimate: vi.fn(),
+      list: vi.fn(),
+      get: vi.fn(),
+      cancel: vi.fn(),
+      results: vi.fn(),
+      sample: vi.fn(),
+    };
+    setInstantEvalRunService(runs as unknown as InstantEvalRunService);
+  });
+
+  afterEach(async () => {
+    setInstantEvalRunService(null);
+    runs = null;
+    await resetApp();
+  });
+
+  return {
+    current: () => {
+      if (!runs)
+        throw new Error("the fake run service is only there inside a test");
+      return runs;
+    },
+  };
+}
+
+/** Requests against the mounted family, authenticated as the seeded project. */
+function requestClient(apiKey: () => string) {
   const headers = (extra: Record<string, string> = {}) => ({
-    "X-Auth-Token": testApiKey,
+    "X-Auth-Token": apiKey(),
     "Content-Type": "application/json",
     ...extra,
   });
-
   const api = {
     get: (path: string, extra: Record<string, string> = {}) =>
       app.request(path, { headers: headers(extra) }),
@@ -96,14 +188,17 @@ export function setupInstantEvalsApiHarness({
         body: JSON.stringify(body),
       }),
   };
+  return { api, headers };
+}
 
-  /** One stored run row, in the shape the repository answers with. */
+/** The row shapes the repositories answer with, which the wire reads back. */
+function rowFactories(projectId: () => string) {
   function runRow(
     overrides: Partial<InstantEvalRunRow> = {},
   ): InstantEvalRunRow {
     return {
       id: `instant_eval_${nanoid(8)}`,
-      projectId: testProjectId,
+      projectId: projectId(),
       name: null,
       sql: SQL,
       parameters: {},
@@ -133,7 +228,6 @@ export function setupInstantEvalsApiHarness({
     };
   }
 
-  /** One judgement, in the shape the judgements repository answers with. */
   function judgment(
     overrides: Partial<InstantEvalJudgment> = {},
   ): InstantEvalJudgment {
@@ -155,100 +249,61 @@ export function setupInstantEvalsApiHarness({
     };
   }
 
-  beforeEach(async () => {
-    await resetApp();
-    flag.value = true;
-    globalForApp.__langwatch_app = createTestApp({
-      // The ceiling has its own tests. What these need from it is only that a
-      // scoped key's declared permission decides whether it reaches the
-      // handler, which is what the read-only scenario reads.
-      permissions: {
-        hasApiKeyPermission: async ({ permission }: { permission: string }) =>
-          allows(permission),
-      },
-    } as unknown as Parameters<typeof createTestApp>[0]);
+  return { runRow, judgment };
+}
 
-    runs = {
-      create: vi.fn(),
-      estimate: vi.fn(),
-      list: vi.fn(),
-      get: vi.fn(),
-      cancel: vi.fn(),
-      results: vi.fn(),
-      sample: vi.fn(),
-    };
-    setInstantEvalRunService(runs as unknown as InstantEvalRunService);
-
-    testOrganization = await prisma.organization.create({
-      data: { name: "Test Organization", slug: `test-org-${nanoid()}` },
-    });
-    testTeam = await prisma.team.create({
-      data: {
-        name: "Test Team",
-        slug: `test-team-${nanoid()}`,
-        organizationId: testOrganization.id,
-      },
-    });
-    testProject = await prisma.project.create({
-      data: {
-        ...projectFactory.build({ slug: nanoid() }),
-        teamId: testTeam.id,
-        personalFeatures: {},
-      },
-    });
-    testApiKey = testProject.apiKey;
-    testProjectId = testProject.id;
-    testUserIds = [];
-    testApiKeyIds = [];
+/** A key bound to a person, which is the only kind the ceiling checks. */
+async function createUserKey(
+  seeded: SeededProject,
+): Promise<{ user: User; token: string }> {
+  const user = await prisma.user.create({
+    data: { name: "Runner", email: `runner-${nanoid(6)}@example.com` },
   });
-
-  afterEach(async () => {
-    setInstantEvalRunService(null);
-    if (testApiKeyIds.length > 0) {
-      await cleanupTestRows(prisma, [
-        ["apiKey", { id: { in: testApiKeyIds } }],
-      ]);
-    }
-    await prisma.project.delete({ where: { id: testProjectId } });
-    await prisma.team.delete({ where: { id: testTeam.id } });
-    await prisma.organization.delete({ where: { id: testOrganization.id } });
-    if (testUserIds.length > 0) {
-      await cleanupTestRows(prisma, [["user", { id: { in: testUserIds } }]]);
-    }
-    await resetApp();
+  seeded.userIds.push(user.id);
+  const { token, lookupId, hashedSecret } = generateApiKeyToken();
+  const key = await prisma.apiKey.create({
+    data: {
+      name: `runner key ${nanoid(6)}`,
+      lookupId,
+      hashedSecret,
+      userId: user.id,
+      organizationId: seeded.organization.id,
+    },
   });
+  seeded.apiKeyIds.push(key.id);
+  return { user, token };
+}
 
-  /** A key bound to a person, which is the only kind the ceiling checks. */
-  async function createUserKey(): Promise<{ user: User; token: string }> {
-    const user = await prisma.user.create({
-      data: { name: "Runner", email: `runner-${nanoid(6)}@example.com` },
-    });
-    testUserIds.push(user.id);
-    const { token, lookupId, hashedSecret } = generateApiKeyToken();
-    const key = await prisma.apiKey.create({
-      data: {
-        name: `runner key ${nanoid(6)}`,
-        lookupId,
-        hashedSecret,
-        userId: user.id,
-        organizationId: testOrganization.id,
-      },
-    });
-    testApiKeyIds.push(key.id);
-    return { user, token };
-  }
+/**
+ * Seeds the project and the fake service around every test in the calling file,
+ * and answers the request helpers and row builders the tests read.
+ *
+ * `flag` is the file's own hoisted feature-gate holder, and `allows` decides
+ * what a scoped key's declared permission answers.
+ */
+export function setupInstantEvalsApiHarness({
+  flag,
+  allows = () => true,
+}: {
+  flag: { isEnabled: boolean };
+  allows?: (permission: string) => boolean;
+}) {
+  const runs = useFakeRunService({ flag, allows });
+  const seeded = useSeededProject();
+  const { api, headers } = requestClient(() => seeded.current().apiKey);
+  const { runRow, judgment } = rowFactories(() => seeded.current().projectId);
 
   return {
     api,
     headers,
     runRow,
     judgment,
-    createUserKey,
+    createUserKey: () => createUserKey(seeded.current()),
     get runs(): InstantEvalRunServiceFakes {
-      return runs;
+      return runs.current();
     },
     get projectId(): string {
-      return testProjectId;
+      return seeded.current().projectId;
     },
   };
 }

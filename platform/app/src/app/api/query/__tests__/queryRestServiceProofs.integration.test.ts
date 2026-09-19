@@ -642,6 +642,7 @@ async function seedTenant({
     "experiment_run_items",
     "simulation_run_metrics_rollup",
     "gateway_budget_scope_totals",
+    "instant_eval_judgments",
   ]);
   const remainingSourceTables = new Set(
     LWQL_VIEW_CATALOG.filter((view) => !isPostgresResident(view))

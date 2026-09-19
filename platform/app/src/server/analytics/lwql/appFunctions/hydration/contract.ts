@@ -36,6 +36,13 @@ export interface LangWatchQLHydrationLimits {
    * page of a hundred should cost that one cell, not the ninety-nine others.
    */
   readonly maxHydratedValueBytes: number;
+  /**
+   * Byte budget for what the trace reads may fetch before the result is
+   * assembled. Past it the read stops and the query is refused, because a
+   * result cut down to the hydrated ceiling afterwards would already have held
+   * every trace in memory. Defaults to the shipped budget when absent.
+   */
+  readonly maxReadBytes?: number;
 }
 
 /** One call's values that were cut at the per-value ceiling. */
@@ -136,6 +143,20 @@ export interface LangWatchQLHydrationResult {
   readonly evalUsage?: LangWatchQLEvalUsage;
   /** Where this hydration's own wall clock went. */
   readonly timings?: LangWatchQLHydrationTimings;
+  /**
+   * Present when the caller's signal stopped the judging part way.
+   *
+   * The rows are all still here, with the cells the judge answered filled in
+   * and the rest null, and `unjudgedRows` says which rows are null because
+   * they were never judged rather than because the judge declined them. What
+   * was judged was paid for, so it is handed back rather than thrown away.
+   */
+  readonly cancellation?: LangWatchQLHydrationCancellation;
+}
+
+export interface LangWatchQLHydrationCancellation {
+  /** Indexes into `rows` of the rows whose judgement never came back. */
+  readonly unjudgedRows: readonly number[];
 }
 
 /** A call, with the catalog entry it names. */

@@ -66,7 +66,10 @@ describe("given a conversation longer than the judge takes", () => {
 
       await hydrate({
         calls: [
-          evalOverConversation("annoyed", ["The customer sounds annoyed"]),
+          evalOverConversation({
+            column: "annoyed",
+            options: ["The customer sounds annoyed"],
+          }),
         ],
         columns: [{ name: "annoyed", type: "Nullable(String)" }],
         rows: [{ annoyed: THREAD }],
@@ -94,7 +97,10 @@ describe("given a conversation longer than the judge takes", () => {
 
       const result = await hydrate({
         calls: [
-          evalOverConversation("annoyed", ["The customer sounds annoyed"]),
+          evalOverConversation({
+            column: "annoyed",
+            options: ["The customer sounds annoyed"],
+          }),
         ],
         columns: [{ name: "annoyed", type: "Nullable(String)" }],
         rows: [{ annoyed: THREAD }],
@@ -115,7 +121,10 @@ describe("given a conversation longer than the judge takes", () => {
 
       const result = await hydrate({
         calls: [
-          evalOverConversation("annoyed", ["The customer sounds annoyed"]),
+          evalOverConversation({
+            column: "annoyed",
+            options: ["The customer sounds annoyed"],
+          }),
         ],
         columns: [{ name: "annoyed", type: "Nullable(String)" }],
         rows: [{ annoyed: THREAD }],

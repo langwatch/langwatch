@@ -96,6 +96,8 @@ node lint.mjs page-copy.md --rules landing --context --threshold 0.6
 
 `--context` is what makes rule 2 mean anything: each block is judged together with everything above it, the way a first-time visitor meets it.
 
+Label what is not prose so the judge reads the page the way a visitor sees it: `Search box:`, `Counters:`, `Chart:`, `Footnote:`, `Tiles:`, `Note:`, `Form:`, and `Q:` / `A:` for a FAQ. The landing rules exempt product views and footnotes from the rules meant for titles and body copy. A line the founder supplied verbatim ends with `[founder]`: a judge finding located on it prints with an `f` flag and never fails the run (rule 13 of the guide); the word bans still apply to it. `landing.json` also carries an `amend` map that appends a landing-aware clause to two writing rules (keynote-closer, round-number-flex), because a button at the end of a card is the card's action and a counter under a search box is the product's output.
+
 ## Cost
 
 Jev charges 0.042 USD per million input tokens and nothing for output. Every judge question costs roughly 100 tokens of question text on top of the section text, and the sentence locator sends the section again with the fired rules as choice questions.
