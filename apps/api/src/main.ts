@@ -6,6 +6,7 @@ import { processMetrics, processTelemetry } from "@langwatch/observability/node"
 import { processConfig, Server, type ProcessServer } from "@langwatch/process-server";
 
 import { apiHealthRoute } from "./api-health-route.ts";
+import { discoveryOpenapiRoute } from "./discovery-openapi-route.ts";
 
 /**
  * The local launcher hosts both halves in one Node process: only the owner may
@@ -32,6 +33,7 @@ export async function startApi(options: ApiStartOptions = {}): Promise<ProcessSe
       : preamble
   ).start();
   server.with(apiHealthRoute);
+  server.with(discoveryOpenapiRoute);
 
   const app = await server
     .composeProcess("api")
