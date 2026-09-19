@@ -110,7 +110,8 @@ function applyResourceAttributes(
   const remove = new Set(policy?.resourceAttributeKeysToRemove ?? []);
 
   for (let index = attributes.length - 1; index >= 0; index -= 1) {
-    if (remove.has(attributes[index]?.key)) {
+    const attribute = attributes[index];
+    if (attribute && remove.has(attribute.key)) {
       attributes.splice(index, 1);
     }
   }
