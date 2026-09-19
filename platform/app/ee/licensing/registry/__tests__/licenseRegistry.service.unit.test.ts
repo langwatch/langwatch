@@ -420,6 +420,7 @@ describe("LicenseRegistryService", () => {
       it("carries the entitlements, terms and instance binding over", async () => {
         await context.service.updateTerms({
           id: licenseId,
+          operatorId: OPERATOR,
           services: ["instant_evals"],
           seatRateCents: 60_000,
           seatCurrency: "USD",
@@ -488,6 +489,8 @@ describe("LicenseRegistryService", () => {
         const later = new LicenseRegistryService({
           repository: context.repository,
           organizations: context.organizations,
+          managedKeys: context.managedKeys,
+          contractBudgets: context.contractBudgets,
           signingKey: () => langwatchKeys.privateKey,
           publicKey: langwatchKeys.publicKey,
           encrypt: (plain) => plain,
@@ -503,6 +506,8 @@ describe("LicenseRegistryService", () => {
         const later = new LicenseRegistryService({
           repository: context.repository,
           organizations: context.organizations,
+          managedKeys: context.managedKeys,
+          contractBudgets: context.contractBudgets,
           signingKey: () => langwatchKeys.privateKey,
           publicKey: langwatchKeys.publicKey,
           encrypt: (plain) => plain,
@@ -589,6 +594,7 @@ describe("LicenseRegistryService", () => {
 
         const updated = await context.service.updateTerms({
           id: licenseId,
+          operatorId: OPERATOR,
           services: ["instant_evals"],
         });
 
@@ -603,6 +609,7 @@ describe("LicenseRegistryService", () => {
       it("records the allowance, seat rate, commit, overage switch and maximum", async () => {
         const updated = await context.service.updateTerms({
           id: licenseId,
+          operatorId: OPERATOR,
           seatOverageAllowance: 5,
           seatRateCents: 60_000,
           seatCurrency: "USD",
@@ -627,6 +634,7 @@ describe("LicenseRegistryService", () => {
         await expect(
           context.service.updateTerms({
             id: licenseId,
+            operatorId: OPERATOR,
             overageEnabled: false,
             overageMaxUsdCents: 50_000,
           }),
@@ -639,6 +647,7 @@ describe("LicenseRegistryService", () => {
         await expect(
           context.service.updateTerms({
             id: licenseId,
+            operatorId: OPERATOR,
             overageMaxUsdCents: 50_000,
           }),
         ).rejects.toMatchObject({
@@ -649,12 +658,14 @@ describe("LicenseRegistryService", () => {
       it("clears the overage maximum when overage is switched off", async () => {
         await context.service.updateTerms({
           id: licenseId,
+          operatorId: OPERATOR,
           overageEnabled: true,
           overageMaxUsdCents: 50_000,
         });
 
         const updated = await context.service.updateTerms({
           id: licenseId,
+          operatorId: OPERATOR,
           overageEnabled: false,
         });
 

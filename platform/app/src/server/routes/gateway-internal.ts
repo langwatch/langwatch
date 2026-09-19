@@ -16,19 +16,13 @@
 
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
 
-import { createHostedServicesService } from "@ee/licensing/connect/connect.prisma";
-import type {
-  HostedCaller,
-  HostedServicesService,
-} from "@ee/licensing/connect/hostedServices.service";
+import { hostedServiceRoute } from "@ee/licensing/connect/hostedServices.route";
 import { LICENSE_TOKEN_PREFIX } from "@ee/licensing/licenseToken";
 import { createConnectCredentialService } from "@ee/licensing/registry/composition";
 import { CONNECT_CREDENTIAL_REFUSALS } from "@ee/licensing/registry/connectCredential.service";
-import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import type { Context, Next } from "hono";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import type { GatewayBudget } from "~/generated/prisma/client";
@@ -1626,82 +1620,6 @@ secured
 
 secured.access(gatewayPolicy()).get("/bootstrap", (c) => notImplemented(c));
 
-/**
- * Hosted services for a self-hosted license (ADR-139). The gateway has
- * authenticated the caller and applied the budget stop; it sends who the caller
- * resolved to beside the caller's own JSON, which stays inside `payload` and
- * can therefore never name another key or organization.
- *
- * The answer is relayed to the caller as it is, so a refusal is written in the
- * gateway's error envelope and not in this app's own.
- */
-const hostedServiceEnvelopeSchema = z.object({
-  virtual_key_id: z.string().min(1),
-  organization_id: z.string().min(1),
-  project_id: z.string(),
-  payload: z.unknown(),
-});
-
-type HostedServiceCall = (args: {
-  service: HostedServicesService;
-  caller: HostedCaller;
-  payload: unknown;
-  signal: AbortSignal;
-}) => Promise<object>;
-
-const HOSTED_SERVICE_CALLS: Record<string, HostedServiceCall> = {
-  "instant-evals-classify": ({ service, caller, payload, signal }) =>
-    service.classify({ caller, payload, signal }),
-  usage: ({ service, caller }) => service.usage({ caller }),
-  budget: ({ service, caller, payload }) =>
-    service.setBudget({ caller, payload }),
-};
-
-secured.access(gatewayPolicy()).post("/connect/:operation", async (c) => {
-  const call = HOSTED_SERVICE_CALLS[c.req.param("operation")];
-  const envelope = hostedServiceEnvelopeSchema.safeParse(
-    await c.req.json().catch(() => null),
-  );
-  if (!call || !envelope.success) {
-    return c.json(
-      {
-        error: {
-          type: "bad_request",
-          code: "bad_request",
-          message: "unknown hosted service call",
-        },
-      },
-      400,
-    );
-  }
-  try {
-    const answer = await call({
-      service: createHostedServicesService(prisma),
-      caller: {
-        virtualKeyId: envelope.data.virtual_key_id,
-        organizationId: envelope.data.organization_id,
-        projectId: envelope.data.project_id || null,
-      },
-      payload: envelope.data.payload,
-      signal: c.req.raw.signal,
-    });
-    return c.json(answer);
-  } catch (error) {
-    // Anything that is not a named refusal stays an ordinary error: the
-    // gateway reports a 5xx from here as its own outage, never as an answer.
-    if (!HandledError.isHandled(error) || error.httpStatus >= 500) throw error;
-    return c.json(
-      {
-        error: {
-          type: error.code,
-          code: error.code,
-          message: error.message,
-          ...(error.meta ? { meta: error.meta } : {}),
-        },
-      },
-      error.httpStatus as ContentfulStatusCode,
-    );
-  }
-});
+secured.access(gatewayPolicy()).post("/connect/:operation", hostedServiceRoute);
 
 export const app = secured.hono;

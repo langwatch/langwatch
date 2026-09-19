@@ -56,7 +56,6 @@ describe("Feature: The Instant Eval run over REST", () => {
           avgTokens: 620,
           totalTokens: 248_000,
           requests: 400,
-          costUsd: 0.010416,
           priceUsd: 0.013541,
         });
 
@@ -70,7 +69,6 @@ describe("Feature: The Instant Eval run over REST", () => {
           avgTokens: 620,
           totalTokens: 248_000,
           requests: 400,
-          costUsd: 0.010416,
           priceUsd: 0.013541,
         });
         // Pricing a run never starts one, so nothing was queued and nothing
@@ -94,7 +92,6 @@ describe("Feature: The Instant Eval run over REST", () => {
             failed: 2,
             skipped: 1,
             tokens: 124_000,
-            costUsd: 0.005208,
             priceUsd: 0.00677,
             startedAt: new Date("2026-09-18T10:00:05.000Z"),
           }),
@@ -113,7 +110,6 @@ describe("Feature: The Instant Eval run over REST", () => {
           failed: 2,
           skipped: 1,
           tokens: 124_000,
-          costUsd: 0.005208,
           priceUsd: 0.00677,
         });
         // The hydration plan is internal, so it is never published.

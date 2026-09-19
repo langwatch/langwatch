@@ -140,7 +140,9 @@ describe("a license token on resolve-key (real PG + internal route)", () => {
       where: { virtualKeyId: { in: keys.map((key) => key.id) } },
     });
     await prisma.virtualKey.deleteMany({ where: inOrganizations });
-    await prisma.modelProvider.deleteMany({ where: inOrganizations });
+    for (const organizationId of organizationIds) {
+      await prisma.modelProvider.deleteMany({ where: { organizationId } });
+    }
     await prisma.auditLog.deleteMany({ where: inOrganizations });
     await prisma.project.deleteMany({ where: { team: inOrganizations } });
     await prisma.team.deleteMany({ where: inOrganizations });
