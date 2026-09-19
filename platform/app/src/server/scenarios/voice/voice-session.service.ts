@@ -246,6 +246,11 @@ export interface VoiceSessionPorts {
     record: CallRecord;
     scenario: { scenarioId: string; scenarioSetId: string };
     turnTraceIds: readonly string[];
+    /** True when a half-written run is being completed on a retry (#7973
+     *  AC2). The started event is first-wins on metadata, so this attempt's
+     *  `source` / `audioUrl` reach the run through a refresh event rather than
+     *  the ignored second started (#8032). */
+    isRedrive: boolean;
   }): Promise<void>;
   /** The set a scenario's runs are listed under, so a "Call it myself" run
    *  lands beside that scenario's simulated runs. Null when the scenario is
@@ -806,6 +811,11 @@ export async function finishVoiceSession(input: {
     record,
     turnTraceIds,
     scenario: scenarioContext,
+    // A run already existed for this conversation (half-written, cancelled or
+    // errored): this is the retry that completes it (#7973 AC2), so the run's
+    // metadata is refreshed to this attempt's rather than kept at the first's
+    // (#8032). A fresh finish has nothing to refresh over.
+    isRedrive: existing !== null,
   });
 
   return {

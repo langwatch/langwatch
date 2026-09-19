@@ -2570,6 +2570,7 @@ export function createTestApp(overrides?: TestAppOverrides): App {
         recordEvaluations: noop,
         recordAgentInstance: noop,
         recordCutAtLimit: noop,
+        refreshMetadata: noop,
         cancelRun: noop,
         deleteRun: noop,
         computeRunMetrics: noop,
