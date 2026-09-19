@@ -7,9 +7,9 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
-// AuthResolver resolves a bearer token into a Bundle.
+// AuthResolver resolves the credential a caller presented into a Bundle.
 type AuthResolver interface {
-	Resolve(ctx context.Context, token string) (*domain.Bundle, error)
+	Resolve(ctx context.Context, key domain.PresentedKey) (*domain.Bundle, error)
 }
 
 // ProviderRouter dispatches requests to the correct provider.

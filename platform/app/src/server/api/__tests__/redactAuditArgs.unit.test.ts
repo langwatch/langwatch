@@ -216,4 +216,32 @@ describe("redactAuditArgs", () => {
       });
     });
   });
+
+  describe("given input carrying a license key", () => {
+    describe("when it is recorded in the audit trail", () => {
+      /** @scenario A license key is never kept in the audit trail */
+      it("replaces the key on every action that carries one, and keeps the rest", () => {
+        for (const action of [
+          "license.upload",
+          "licenseRegistry.registerLegacy",
+          undefined,
+        ]) {
+          const redacted = redactAuditArgs({
+            input: { organizationId: "org-1", licenseKey: "eyJkYXRhIjp7fX0=" },
+            action,
+          }) as Record<string, unknown>;
+
+          expect(JSON.stringify(redacted)).not.toContain("eyJkYXRhIjp7fX0=");
+          expect(redacted.licenseKey).toBe("[redacted]");
+          expect(redacted.organizationId).toBe("org-1");
+        }
+      });
+
+      it("returns input with no license key as the same object", () => {
+        const input = { organizationId: "org-1", licenseKey: "" };
+
+        expect(redactAuditArgs({ input })).toBe(input);
+      });
+    });
+  });
 });

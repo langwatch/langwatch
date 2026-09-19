@@ -34,7 +34,9 @@ export const ORGANIZATION_SAFE_SELECT = {
   stripeCustomerId: true,
   currency: true,
   pricingModel: true,
-  license: true,
+  // `license` is omitted on purpose: a connected install derives its hosted
+  // services credential from the license key (ADR-139), so the key is
+  // credential material and, like the S3 fields, write-only over the wire.
   licenseExpiresAt: true,
   licenseLastValidatedAt: true,
 } as const satisfies Prisma.OrganizationSelect;

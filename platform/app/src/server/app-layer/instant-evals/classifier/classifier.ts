@@ -230,6 +230,16 @@ export interface InstantEvalClassifier {
     request: InstantEvalClassifyRequest,
     signal?: AbortSignal,
   ): Promise<InstantEvalJudgement>;
+  /**
+   * Whether this classifier can judge for one organization.
+   *
+   * Absent means always, which is what a deployment-wide key gives: every
+   * organization on the install judges with it. An implementation that is
+   * switched on per organization declares this, and an organization that has
+   * not switched it on sees the eval functions published as unavailable
+   * rather than every judgement skipped.
+   */
+  isAvailableForOrganization?(organizationId: string): Promise<boolean>;
   /** Releases the transport, where the implementation holds one. */
   close?(): Promise<void>;
 }

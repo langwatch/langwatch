@@ -22,6 +22,8 @@ export type WorkerStageName =
   | "anomaly"
   | "spend-spike-anomaly"
   | "usage-stats"
+  | "license-sync"
+  | "connected-billing"
   | "realtime-session-poller"
   | "metrics";
 
@@ -65,6 +67,8 @@ export function resolveWorkerBootPlan(params: {
     "anomaly",
     "spend-spike-anomaly",
     "usage-stats",
+    "license-sync",
+    "connected-billing",
     "realtime-session-poller",
   ];
 }

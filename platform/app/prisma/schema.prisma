@@ -773,6 +773,28 @@ model Organization {
   license                String?                        @db.Text
   licenseExpiresAt       DateTime?
   licenseLastValidatedAt DateTime?
+  /// A customer that runs LangWatch self-hosted. The hosted usage, budgets and
+  /// invoices of its connected installs attach to this organization (ADR-139).
+  selfHostedCustomer     Boolean                        @default(false)
+  /// LangWatch-hosted services this organization has switched on, named the
+  /// way its license names them ("instant_evals"). Empty is the default and
+  /// the whole opt-in: with nothing here an install sends nothing, whatever
+  /// its license is entitled to (ADR-139).
+  connectServices        String[]                       @default([])
+  /// The signed lease the last successful license sync answered with (ADR-139,
+  /// section 6). Written only after it verified against the public key the
+  /// install embeds, for this license and this install, so a lease that was
+  /// edited or minted elsewhere never lands here. It carries the seat overage
+  /// allowance and the two dates that withdraw it, which is why no timestamp
+  /// in this database decides how long the allowance lasts.
+  connectLease           Json?
+  /// When the last license sync succeeded.
+  connectLastSyncAt      DateTime?
+  /// The code of the failure the last sync ended on, cleared on the next
+  /// success. Settings, Connect renders the copy for it.
+  connectLastSyncError   String?
+  issuedLicenses         IssuedLicense[]
+  connectedBilling       ConnectedBillingAccount?
   gatewayChangeEvents    GatewayChangeEvent[]
   routingPolicies        RoutingPolicy[]
   ingestionSources       IngestionSource[]
@@ -785,6 +807,234 @@ model Organization {
   githubBranchPrChecks   GithubBranchPullRequestCheck[]
 
   @@index([ssoProvider])
+}
+
+/// Where a license in the registry came from.
+enum IssuedLicenseSource {
+  /// Issued by a LangWatch operator in the backoffice.
+  BACKOFFICE
+  /// Minted by the payment link purchase flow.
+  PURCHASE
+  /// Minted by scripts/generate-license.ts.
+  SCRIPT
+  /// Signed before the registry existed, registered later by pasting it.
+  LEGACY_IMPORT
+}
+
+/// The registry of licenses LangWatch has issued (ADR-139). It lives on
+/// LangWatch Cloud; a self-hosted install has the table and no rows.
+///
+/// The row never holds the token an install presents. `tokenHash` is the
+/// SHA-256 of that token, so read access to this table is not credential
+/// access. Status is derived: revoked, superseded, past `expiresAt`, else active.
+model IssuedLicense {
+  id             String       @id @default(nanoid())
+  /// The `licenseId` inside the signed license (`lic-<uuid>`).
+  licenseId      String       @unique
+  /// SHA-256 of the `lwl_` token. Looked up on every credential resolution.
+  tokenHash      String       @unique
+  /// The customer organization on LangWatch Cloud. Null for a license that is
+  /// recorded but not linked to a customer yet, such as a self-serve purchase:
+  /// it resolves to nothing until an operator links it.
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  /// As signed into the license.
+  organizationName String
+  email            String
+  planType         String
+  maxMembers       Int
+  maxMembersLite   Int
+  issuedAt         DateTime
+  expiresAt        DateTime
+
+  source     IssuedLicenseSource
+  /// The operator who issued or registered it. Null for the purchase flow and the script.
+  issuedById String?
+
+  revokedAt     DateTime?
+  revokedById   String?
+  revokedReason String?
+
+  /// Set when the install first presents the license that replaced this one.
+  supersededAt DateTime?
+  /// The id of the IssuedLicense this one replaces, when it was reissued. A
+  /// plain column ref (relationMode="prisma" cannot declare a self-relation on
+  /// Postgres); the registry service validates it. Unique, so a license is
+  /// replaced by one license at most.
+  replacesId   String?   @unique
+  /// A reissued license waiting to be delivered over sync, encrypted. Erased
+  /// when the install first presents it. The only license text the registry holds.
+  pendingDeliveryLicense String? @db.Text
+
+  /// Hosted services this license may call, such as `instant_evals`.
+  services             String[] @default([])
+  /// Seats the install may go over by. Null means a fifth of `maxMembers`, rounded up.
+  seatOverageAllowance Int?
+  /// The annual rate of one seat, in cents of `seatCurrency`. Needed to prorate added seats.
+  seatRateCents        Int?
+  seatCurrency         Currency?
+  /// The prepaid usage commit for the term, in USD cents.
+  commitUsdCents       Int      @default(0)
+  /// Whether usage may continue past the commit, up to `overageMaxUsdCents`.
+  overageEnabled       Boolean  @default(false)
+  overageMaxUsdCents   Int?
+
+  /// The install this license is bound to. Set on first use, cleared by an operator.
+  instanceId      String?
+  instanceBoundAt DateTime?
+
+  /// The last license sync this install reported: when it arrived, the
+  /// LangWatch version that sent it, and the seats in use at that moment.
+  /// Null until the install syncs for the first time.
+  lastSyncAt          DateTime?
+  lastSyncVersion     String?
+  reportedMembers     Int?
+  reportedMembersLite Int?
+
+  /// The managed gateway key (purpose CONNECT) that hosted-service traffic of
+  /// this license runs under. One per license, so spend rows name the install.
+  /// Created when the license first resolves. A plain column, not a relation.
+  virtualKeyId String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([expiresAt])
+}
+
+/// The seats one license reported in one quarter of its term, kept at the
+/// highest figure reported. The quarterly seat true-up invoices from this, so
+/// a customer that adds seats for a week pays for them even if the install
+/// drops back before the quarter ends.
+model LicenseSeatReport {
+  id String @id @default(nanoid())
+  /// The `IssuedLicense` row. A plain column ref, like `replacesId`:
+  /// relationMode="prisma" carries no foreign keys.
+  licenseId String
+  /// Start of the term quarter, counted in three-month steps from the
+  /// license's own `issuedAt` rather than from the calendar year.
+  quarterStartsAt DateTime
+  peakMembers     Int
+  peakMembersLite Int
+  firstReportedAt DateTime
+  lastReportedAt  DateTime
+
+  @@unique([licenseId, quarterStartsAt])
+  @@index([licenseId])
+}
+
+/// How a connected customer is invoiced (ADR-139, section 7): one payment
+/// provider customer, one quarterly usage subscription in USD, and the
+/// commercial terms the annual invoice was raised from.
+///
+/// One row per organization. Every write through it is addressed by a stored
+/// provider id, so running onboarding or a renewal twice changes nothing.
+model ConnectedBillingAccount {
+  id             String       @id @default(nanoid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  /// The customer at the payment provider. Invoiced, never charged.
+  stripeCustomerId        String  @unique
+  /// The one metered subscription, and the item hosted usage is reported on.
+  /// Null between the customer being created and the subscription existing,
+  /// which is where a half-finished onboarding resumes from.
+  usageSubscriptionId     String?
+  usageSubscriptionItemId String?
+
+  termStartsAt DateTime
+  termEndsAt   DateTime
+  /// Prepaid usage for the term, in USD cents. The credit grants add up to it.
+  commitUsdCents Int @default(0)
+
+  /// The seat contract, which may be in another currency than hosted usage.
+  seatCurrency  Currency
+  seatRateCents Int
+  seats         Int
+
+  /// `us_bank_transfer` or `eu_bank_transfer` when the customer pays into a
+  /// virtual bank account at the provider. Null when it wires to LangWatch's
+  /// own account and finance marks the invoice paid.
+  bankTransferType    String?
+  bankTransferCountry String?
+  billingEmail        String
+
+  /// A renewal whose credit is waiting for the last usage invoice of the old
+  /// term to be finalized: the new term's end and commit, and who asked.
+  pendingRenewal Json?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+}
+
+/// Why a credit was granted. The amount is always prepaid, never promotional.
+enum ConnectedCreditGrantKind {
+  /// The commit agreed for the term, granted at onboarding.
+  commit
+  /// More commit bought mid-term.
+  added
+  /// The commit of a new term, granted once the old term's last invoice closed.
+  renewal
+}
+
+/// A paid credit at the payment provider, which only metered usage draws down.
+/// Kept here so a grant is created once per reason and the backoffice can show
+/// what the customer holds without asking the provider.
+model ConnectedCreditGrant {
+  id String @id @default(nanoid())
+  /// The `ConnectedBillingAccount` row. A plain column ref, like
+  /// `LicenseSeatReport.licenseId`: relationMode="prisma" carries no foreign keys.
+  accountId String
+  /// The grant at the payment provider. Unique, so a retry records one row.
+  stripeCreditGrantId String                   @unique
+  amountUsdCents      Int
+  kind                ConnectedCreditGrantKind
+  /// The term this credit was granted for, and when the provider lets it lapse:
+  /// after the last invoice of that term has been finalized, never on the day
+  /// the term ends.
+  termEndsAt DateTime
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([accountId])
+}
+
+/// What an invoice of a connected customer is for.
+enum ConnectedInvoiceKind {
+  /// The one-off invoice raised at onboarding or renewal: seats and commit.
+  annual
+  /// Seats added during a quarter, prorated to the end of the term.
+  seat_trueup
+  /// A quarter of metered hosted usage.
+  usage
+}
+
+/// An invoice LangWatch raised for a connected customer, as the backoffice
+/// reads it and as roll-forward decides whether it already acted on one.
+model ConnectedInvoice {
+  id String @id @default(nanoid())
+  /// The `ConnectedBillingAccount` row, as a plain column ref.
+  accountId       String
+  stripeInvoiceId String               @unique
+  kind            ConnectedInvoiceKind
+  currency        Currency
+  amountCents     Int
+  /// The provider's own status: `draft`, `open`, `paid`, `void` or `uncollectible`.
+  status          String
+  /// The pending invoice item a small usage invoice was carried into. Set once,
+  /// so the same invoice is never rolled forward twice.
+  rolledForwardTo String?
+  paidOutOfBandAt DateTime?
+  /// Which quarter a seat true-up invoice settles.
+  quarterStartsAt DateTime?
+  termStartsAt    DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now()) @updatedAt
+
+  @@index([accountId])
 }
 
 model ScimToken {
@@ -3472,9 +3722,13 @@ enum VirtualKeyStatus {
 // LANGY = auto-provisioned by the Langy in-product assistant; UI surfaces it
 // as a managed row and forbids edit/revoke. Filtering by `purpose` replaces
 // the legacy `name == "Langy" && principalUserId IS NULL` heuristic.
+// CONNECT = the key a self-hosted license resolves to on LangWatch Cloud
+// (ADR-139). Its secret is discarded at creation: the license token is the
+// credential, so the key is only ever reached through the license registry.
 enum VirtualKeyPurpose {
   USER
   LANGY
+  CONNECT
 }
 
 // Rotation policy for gateway provider credentials.
@@ -5465,4 +5719,67 @@ model IdentityMatchSuggestion {
   @@unique([organizationId, discoveredPersonId, userId])
   // The review surface reads one organization's candidates, strongest first.
   @@index([organizationId, score])
+}
+
+/// What the quarterly seat true-up of one connected license decided for one
+/// term quarter (ADR-139, section 7).
+///
+/// The row is written before the payment provider is called and completed
+/// after it, so a call that failed halfway is retried without inventing a
+/// second invoice. The unique pair keeps one quarter to one decision.
+model ConnectedSeatTrueUp {
+  id String @id @default(nanoid())
+  /// The `IssuedLicense` row. A plain column ref, like `LicenseSeatReport`:
+  /// relationMode="prisma" carries no foreign keys.
+  licenseId String
+  /// Start of the term quarter, counted in three-month steps from the
+  /// license's own `issuedAt`.
+  quarterStartsAt DateTime
+  /// The highest seat count the license reported in that quarter.
+  peakSeats Int
+  /// The peak minus the seats already invoiced for this term.
+  addedSeats Int
+  /// The prorated amount, in cents of `currency`. Zero when nothing is owed.
+  amountCents Int
+  currency    Currency
+  /// The one-off invoice the added seats were billed on.
+  stripeInvoiceId String?
+  state           ConnectedSeatTrueUpState
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([licenseId, quarterStartsAt])
+  @@index([state])
+}
+
+/// How the quarterly seat true-up ended for one license quarter.
+enum ConnectedSeatTrueUpState {
+  /// Recorded before the payment provider was called. A retry resumes here.
+  intent
+  /// The added seats were invoiced.
+  invoiced
+  /// The quarter closed with no seats to add.
+  nothing_to_invoice
+  /// The license did not sync during the quarter, so its peak is not known.
+  /// Shown in the backoffice for an operator to follow up.
+  flagged
+  /// A license with no seat overage allowance that never synced. It is
+  /// settled by the annual true-up instead.
+  skipped
+}
+
+/// The monthly usage statement one connected customer was sent (ADR-139,
+/// section 7). One row per account per month keeps the statement to one send,
+/// whatever runs the tick.
+model ConnectedStatement {
+  id String @id @default(nanoid())
+  /// The `ConnectedBillingAccount` row. A plain column ref.
+  accountId String
+  /// First day of the month the statement covers, in UTC.
+  month  DateTime
+  sentAt DateTime
+
+  @@unique([accountId, month])
+  @@index([accountId])
 }

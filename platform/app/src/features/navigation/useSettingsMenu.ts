@@ -7,6 +7,7 @@ import {
   Brain,
   Bug,
   Building2,
+  Cloud,
   Coins,
   CreditCard,
   DatabaseZap,
@@ -159,7 +160,10 @@ function organizationGroup({
           ]
         : []),
       ...(!isLiteMember && !isSaaS
-        ? [{ label: "License", href: "/settings/license", icon: BadgeCheck }]
+        ? [
+            { label: "License", href: "/settings/license", icon: BadgeCheck },
+            { label: "Connect", href: "/settings/connect", icon: Cloud },
+          ]
         : []),
     ],
   };
@@ -363,6 +367,7 @@ export function backofficeGroup(): SettingsMenuGroup {
         href: "/ops/backoffice/sso-connections",
         icon: ShieldCheck,
       },
+      { label: "Licenses", href: "/ops/backoffice/licenses", icon: KeyRound },
       {
         label: "Identity Lookup",
         href: "/ops/backoffice/identity-lookup",

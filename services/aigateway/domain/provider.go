@@ -43,6 +43,13 @@ const (
 	// chat-family calls against an ElevenLabs credential surface the
 	// provider's reject directly, same policy as Anthropic embeddings.
 	ProviderElevenLabs ProviderID = "elevenlabs"
+	// ProviderLangWatch is another LangWatch gateway reached as an upstream
+	// provider: a connected self-hosted install forwarding OpenAI-compatible
+	// calls to LangWatch-managed models with its license token as the
+	// credential. Both sides speak the same wire, so the gateway proxies
+	// directly (no Bifrost enum). See adapters/providers/langwatch.go and
+	// ADR-139 section 8.
+	ProviderLangWatch ProviderID = "langwatch"
 	// OpenAICodex is the user's own ChatGPT subscription, reached through
 	// OpenAI's codex backend (chatgpt.com/backend-api/codex) with an OAuth
 	// access token instead of an API key. Responses-API + SSE only; the
@@ -123,6 +130,7 @@ var knownProviderFamilies = map[string]struct{}{
 	"custom":                {},
 	"elevenlabs":            {},
 	"cloudflare":            {},
+	"langwatch":             {},
 }
 
 // KnownProviderFamily reports whether a model string's first segment names a

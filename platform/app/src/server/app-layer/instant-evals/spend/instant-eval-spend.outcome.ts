@@ -43,6 +43,12 @@ export interface InstantEvalSpendOutcomeInput {
   readonly teamId: string;
   /** Absent for a synchronous query. */
   readonly runId?: string;
+  /**
+   * The gateway key the judgements were made under. Set for a hosted call,
+   * where the key is the managed key of a self-hosted license and names the
+   * install. Absent for a query or a run inside LangWatch Cloud.
+   */
+  readonly virtualKeyId?: string;
   readonly inputTokens: number;
   readonly requests: number;
   /** What the classifier charged us, in USD. */
@@ -123,7 +129,7 @@ export function instantEvalSpendOutcome({
     rate_version: instantEvalRateVersion(pricing),
     duration_ms: 0,
     organization_id: input.organizationId,
-    virtual_key_id: "",
+    virtual_key_id: input.virtualKeyId ?? "",
     end_user_id: "",
     trace_id: "",
     request_type: INSTANT_EVAL_REQUEST_TYPE,

@@ -46,7 +46,7 @@ type resolverReturn struct {
 	err    error
 }
 
-func (f *fakeResolver) ResolveKey(_ context.Context, _ string) (*domain.Bundle, error) {
+func (f *fakeResolver) ResolveKey(_ context.Context, _ domain.PresentedKey) (*domain.Bundle, error) {
 	f.calls.Add(1)
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -133,7 +133,7 @@ func freshBundle(vkID string, exp time.Time) *domain.Bundle {
 func seedExpiredEntry(t *testing.T, svc *Service, rawKey, vkID string, staleness time.Duration) {
 	t.Helper()
 	originalExp := time.Now().Add(-staleness)
-	svc.storeL1(hashKey(rawKey), freshBundle(vkID, originalExp), "")
+	svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), freshBundle(vkID, originalExp), "")
 }
 
 // --- AuthRejection class -----------------------------------------------------
@@ -146,14 +146,14 @@ func TestResolve_StaleEntry_AuthRejection_401_EvictsAndRejects(t *testing.T) {
 	rawKey := "vk-lw-test_001"
 	seedExpiredEntry(t, svc, rawKey, "vk_001", 30*time.Second)
 
-	_, err := svc.Resolve(context.Background(), rawKey)
+	_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	if err == nil {
 		t.Fatal("expected error from auth-rejection path")
 	}
 	if !errors.Is(err, domain.ErrInvalidAPIKey) {
 		t.Fatalf("expected ErrInvalidAPIKey, got %v", err)
 	}
-	if _, ok := svc.l1.Get(hashKey(rawKey)); ok {
+	if _, ok := svc.l1.Get(hashKey(domain.PresentedKey{Token: rawKey})); ok {
 		t.Fatal("entry should have been evicted")
 	}
 }
@@ -166,11 +166,11 @@ func TestResolve_StaleEntry_AuthRejection_403Revoked_EvictsAndRejects(t *testing
 	rawKey := "vk-lw-test_002"
 	seedExpiredEntry(t, svc, rawKey, "vk_002", 30*time.Second)
 
-	_, err := svc.Resolve(context.Background(), rawKey)
+	_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	if !errors.Is(err, domain.ErrKeyRevoked) {
 		t.Fatalf("expected ErrKeyRevoked, got %v", err)
 	}
-	if _, ok := svc.l1.Get(hashKey(rawKey)); ok {
+	if _, ok := svc.l1.Get(hashKey(domain.PresentedKey{Token: rawKey})); ok {
 		t.Fatal("entry should have been evicted on revoked")
 	}
 }
@@ -197,12 +197,12 @@ func TestResolve_StaleEntry_TransportFailure_ServesStaleAndBumpsSoft(t *testing.
 			seedExpiredEntry(t, svc, rawKey, vkID, 30*time.Second)
 
 			beforeSoft := func() time.Time {
-				e, _ := svc.l1.Get(hashKey(rawKey))
+				e, _ := svc.l1.Get(hashKey(domain.PresentedKey{Token: rawKey}))
 				_, soft, _ := e.snapshot()
 				return soft
 			}()
 
-			bundle, err := svc.Resolve(context.Background(), rawKey)
+			bundle, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 			if err != nil {
 				t.Fatalf("expected stale-serve, got error: %v", err)
 			}
@@ -210,7 +210,7 @@ func TestResolve_StaleEntry_TransportFailure_ServesStaleAndBumpsSoft(t *testing.
 				t.Fatalf("expected stale bundle for %s, got %+v", vkID, bundle)
 			}
 
-			e, ok := svc.l1.Get(hashKey(rawKey))
+			e, ok := svc.l1.Get(hashKey(domain.PresentedKey{Token: rawKey}))
 			if !ok {
 				t.Fatal("entry should still be present after transport-class failure")
 			}
@@ -254,14 +254,14 @@ func TestResolve_StaleEntry_HardCapExceeded_EvictsAndRejects(t *testing.T) {
 	// (staleness > HardGrace).
 	seedExpiredEntry(t, svc, rawKey, "vk_hardcap", 10*time.Second)
 
-	_, err := svc.Resolve(context.Background(), rawKey)
+	_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	if err == nil {
 		t.Fatal("expected hard-cap eviction to reject the request")
 	}
 	if !errors.Is(err, domain.ErrAuthUpstream) {
 		t.Fatalf("expected the upstream transport error to surface, got %v", err)
 	}
-	if _, ok := svc.l1.Get(hashKey(rawKey)); ok {
+	if _, ok := svc.l1.Get(hashKey(domain.PresentedKey{Token: rawKey})); ok {
 		t.Fatal("entry should have been evicted at hard cap")
 	}
 
@@ -288,7 +288,7 @@ func TestResolve_StaleEntry_RecoveryReplacesEntryWithFreshBundle(t *testing.T) {
 	rawKey := "vk-lw-recover"
 	seedExpiredEntry(t, svc, rawKey, "vk_recovered", 30*time.Second)
 
-	bundle, err := svc.Resolve(context.Background(), rawKey)
+	bundle, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	if err != nil {
 		t.Fatalf("expected recovery to succeed, got %v", err)
 	}
@@ -296,7 +296,7 @@ func TestResolve_StaleEntry_RecoveryReplacesEntryWithFreshBundle(t *testing.T) {
 		t.Fatalf("expected fresh bundle, got %+v", bundle)
 	}
 
-	e, ok := svc.l1.Get(hashKey(rawKey))
+	e, ok := svc.l1.Get(hashKey(domain.PresentedKey{Token: rawKey}))
 	if !ok {
 		t.Fatal("entry should be present after recovery")
 	}
@@ -314,8 +314,8 @@ func TestApplyChange_ModelProviderUpdatedEvictsMatchingModelProvider(t *testing.
 	resolver := &fakeResolver{}
 	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
 
-	matchingKey := hashKey("vk-lw-matching-provider")
-	otherKey := hashKey("vk-lw-other-provider")
+	matchingKey := hashKey(domain.PresentedKey{Token: "vk-lw-matching-provider"})
+	otherKey := hashKey(domain.PresentedKey{Token: "vk-lw-other-provider"})
 	svc.storeL1(matchingKey, &domain.Bundle{
 		VirtualKeyID: "vk-matching",
 		Config: domain.BundleConfig{Credentials: []domain.Credential{{
@@ -356,8 +356,8 @@ func TestApplyChange_BudgetMutationWithoutProjectIDEvictsOrganization(t *testing
 		ChangeKindBudgetDeleted,
 	} {
 		t.Run(kind, func(t *testing.T) {
-			matchingKey := hashKey("vk-lw-budget-matching-" + kind)
-			otherKey := hashKey("vk-lw-budget-other-" + kind)
+			matchingKey := hashKey(domain.PresentedKey{Token: "vk-lw-budget-matching-" + kind})
+			otherKey := hashKey(domain.PresentedKey{Token: "vk-lw-budget-other-" + kind})
 			svc.storeL1(matchingKey, &domain.Bundle{OrganizationID: "org-1"}, "")
 			svc.storeL1(otherKey, &domain.Bundle{OrganizationID: "org-2"}, "")
 
@@ -381,8 +381,8 @@ func TestApplyChange_VkDisableAndEnableEvictTheKey(t *testing.T) {
 		ChangeKindVirtualKeyEnabled,
 	} {
 		t.Run(kind, func(t *testing.T) {
-			matchingKey := hashKey("vk-lw-lifecycle-matching-" + kind)
-			otherKey := hashKey("vk-lw-lifecycle-other-" + kind)
+			matchingKey := hashKey(domain.PresentedKey{Token: "vk-lw-lifecycle-matching-" + kind})
+			otherKey := hashKey(domain.PresentedKey{Token: "vk-lw-lifecycle-other-" + kind})
 			svc.storeL1(matchingKey, &domain.Bundle{VirtualKeyID: "vk-flipped"}, "")
 			svc.storeL1(otherKey, &domain.Bundle{VirtualKeyID: "vk-untouched"}, "")
 
@@ -401,8 +401,8 @@ func TestApplyChange_RoutingPolicyUpdatedEvictsOrganization(t *testing.T) {
 	resolver := &fakeResolver{}
 	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
 
-	matchingKey := hashKey("vk-lw-policy-matching")
-	otherKey := hashKey("vk-lw-policy-other")
+	matchingKey := hashKey(domain.PresentedKey{Token: "vk-lw-policy-matching"})
+	otherKey := hashKey(domain.PresentedKey{Token: "vk-lw-policy-other"})
 	svc.storeL1(matchingKey, &domain.Bundle{OrganizationID: "org-1"}, "")
 	svc.storeL1(otherKey, &domain.Bundle{OrganizationID: "org-2"}, "")
 
@@ -419,8 +419,8 @@ func TestApplyChange_RoutingPolicyDeletedEvictsOrganization(t *testing.T) {
 	resolver := &fakeResolver{}
 	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
 
-	matchingKey := hashKey("vk-lw-policy-deleted-matching")
-	otherKey := hashKey("vk-lw-policy-deleted-other")
+	matchingKey := hashKey(domain.PresentedKey{Token: "vk-lw-policy-deleted-matching"})
+	otherKey := hashKey(domain.PresentedKey{Token: "vk-lw-policy-deleted-other"})
 	svc.storeL1(matchingKey, &domain.Bundle{OrganizationID: "org-1"}, "")
 	svc.storeL1(otherKey, &domain.Bundle{OrganizationID: "org-2"}, "")
 
@@ -443,8 +443,8 @@ func TestApplyChange_CacheRuleMutationEvictsOrganization(t *testing.T) {
 		ChangeKindCacheRuleDeleted,
 	} {
 		t.Run(kind, func(t *testing.T) {
-			matchingKey := hashKey("vk-lw-cache-rule-matching-" + kind)
-			otherKey := hashKey("vk-lw-cache-rule-other-" + kind)
+			matchingKey := hashKey(domain.PresentedKey{Token: "vk-lw-cache-rule-matching-" + kind})
+			otherKey := hashKey(domain.PresentedKey{Token: "vk-lw-cache-rule-other-" + kind})
 			svc.storeL1(matchingKey, &domain.Bundle{OrganizationID: "org-1"}, "")
 			svc.storeL1(otherKey, &domain.Bundle{OrganizationID: "org-2"}, "")
 
@@ -500,9 +500,9 @@ func TestResolve_HardGrace_MovesTheCapNotTheExpiry(t *testing.T) {
 			rawKey := "vk-lw-grace-" + tc.name
 			cached := freshBundle("vk_cached", time.Now().Add(tc.expiresIn))
 			cached.Credentials = []domain.Credential{{ID: cachedCred}}
-			svc.storeL1(hashKey(rawKey), cached, "")
+			svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), cached, "")
 
-			got, err := svc.Resolve(context.Background(), rawKey)
+			got, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 
 			require.NoError(t, err)
 			require.NotNil(t, got)
@@ -523,7 +523,7 @@ func TestApplyChange_EveryKindTheControlPlaneCanEmitIsAccountedFor(t *testing.T)
 			svc, _ := newService(t, Options{
 				Resolver: resolver, ConfigFetcher: resolver, Logger: zap.New(core),
 			})
-			svc.storeL1(hashKey("vk-lw-accounted-"+kind), &domain.Bundle{
+			svc.storeL1(hashKey(domain.PresentedKey{Token: "vk-lw-accounted-" + kind}), &domain.Bundle{
 				OrganizationID: "org-1",
 				VirtualKeyID:   "vk-accounted",
 			}, "")
@@ -558,7 +558,7 @@ func TestApplyChange_EvictLogNamesTheChangeKind(t *testing.T) {
 			svc, _ := newService(t, Options{
 				Resolver: resolver, ConfigFetcher: resolver, Logger: zap.New(core),
 			})
-			svc.storeL1(hashKey("vk-lw-reason-"+tc.kind), &domain.Bundle{
+			svc.storeL1(hashKey(domain.PresentedKey{Token: "vk-lw-reason-" + tc.kind}), &domain.Bundle{
 				OrganizationID: "org-1",
 				VirtualKeyID:   "vk-reason",
 			}, "")
@@ -582,14 +582,14 @@ func TestRefreshBackground_TransportFailure_BumpsSoft(t *testing.T) {
 	rawKey := "vk-lw-bgtransport"
 	// Seed an entry near soft expiry but not past it (so background path is invoked).
 	originalExp := time.Now().Add(30 * time.Second)
-	svc.storeL1(hashKey(rawKey), freshBundle("vk_bgtransport", originalExp), "")
+	svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), freshBundle("vk_bgtransport", originalExp), "")
 
-	beforeE, _ := svc.l1.Get(hashKey(rawKey))
+	beforeE, _ := svc.l1.Get(hashKey(domain.PresentedKey{Token: rawKey}))
 	_, beforeSoft, _ := beforeE.snapshot()
 
-	svc.refreshBackground(rawKey, hashKey(rawKey))
+	svc.refreshBackground(domain.PresentedKey{Token: rawKey}, hashKey(domain.PresentedKey{Token: rawKey}))
 
-	afterE, ok := svc.l1.Get(hashKey(rawKey))
+	afterE, ok := svc.l1.Get(hashKey(domain.PresentedKey{Token: rawKey}))
 	if !ok {
 		t.Fatal("entry should remain on background transport failure")
 	}
@@ -617,11 +617,11 @@ func TestRefreshBackground_AuthRejection_EvictsEntry(t *testing.T) {
 	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
 	rawKey := "vk-lw-bgrevoked"
 	originalExp := time.Now().Add(30 * time.Second)
-	svc.storeL1(hashKey(rawKey), freshBundle("vk_bgrevoked", originalExp), "")
+	svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), freshBundle("vk_bgrevoked", originalExp), "")
 
-	svc.refreshBackground(rawKey, hashKey(rawKey))
+	svc.refreshBackground(domain.PresentedKey{Token: rawKey}, hashKey(domain.PresentedKey{Token: rawKey}))
 
-	if _, ok := svc.l1.Get(hashKey(rawKey)); ok {
+	if _, ok := svc.l1.Get(hashKey(domain.PresentedKey{Token: rawKey})); ok {
 		t.Fatal("entry should be evicted on background auth-rejection")
 	}
 }
@@ -682,7 +682,7 @@ func TestResolve_StaleEntry_NegativeHardGrace_DisablesStaleWhileError(t *testing
 	rawKey := "vk-lw-legacy"
 	seedExpiredEntry(t, svc, rawKey, "vk_legacy", 30*time.Second)
 
-	_, err := svc.Resolve(context.Background(), rawKey)
+	_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	if err == nil {
 		t.Fatal("legacy-mode (no grace) should hard-fail when CP is down")
 	}
@@ -776,7 +776,7 @@ func (f *fakeConfigFetcher) FetchConfig(_ context.Context, _, _ string) (domain.
 // backdateConfig makes the L1 entry's config look older than the TTL.
 func backdateConfig(t *testing.T, svc *Service, rawKey string, age time.Duration) *entry {
 	t.Helper()
-	e, ok := svc.l1.Get(hashKey(rawKey))
+	e, ok := svc.l1.Get(hashKey(domain.PresentedKey{Token: rawKey}))
 	if !ok {
 		t.Fatal("expected L1 entry")
 	}
@@ -805,10 +805,10 @@ func TestResolve_FreshEntry_ConfigPastTTL_RefreshesConfigInBackground(t *testing
 	rawKey := "vk-lw-cfgttl_001"
 	bundle := freshBundle("vk_cfg_001", time.Now().Add(1*time.Hour))
 	bundle.Credentials = []domain.Credential{{ID: "cred-old"}}
-	svc.storeL1(hashKey(rawKey), bundle, "")
+	svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), bundle, "")
 	backdateConfig(t, svc, rawKey, 2*time.Minute)
 
-	got, err := svc.Resolve(context.Background(), rawKey)
+	got, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
 	}
@@ -819,7 +819,7 @@ func TestResolve_FreshEntry_ConfigPastTTL_RefreshesConfigInBackground(t *testing
 
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		if e, ok := svc.l1.Get(hashKey(rawKey)); ok {
+		if e, ok := svc.l1.Get(hashKey(domain.PresentedKey{Token: rawKey})); ok {
 			b, _, _ := e.snapshot()
 			// The whole Config is refreshed, not just the mirrored Credentials:
 			// the top-level Credentials mirror and a non-Credentials Config
@@ -846,10 +846,10 @@ func TestResolve_FreshEntry_ConfigTTLDisabled_NeverRefreshes(t *testing.T) {
 	})
 
 	rawKey := "vk-lw-cfgttl_002"
-	svc.storeL1(hashKey(rawKey), freshBundle("vk_cfg_002", time.Now().Add(1*time.Hour)), "")
+	svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), freshBundle("vk_cfg_002", time.Now().Add(1*time.Hour)), "")
 	backdateConfig(t, svc, rawKey, 10*time.Minute)
 
-	if _, err := svc.Resolve(context.Background(), rawKey); err != nil {
+	if _, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey}); err != nil {
 		t.Fatalf("Resolve: %v", err)
 	}
 	time.Sleep(50 * time.Millisecond)
@@ -871,10 +871,10 @@ func TestResolve_FreshEntry_ConfigRefreshFailure_KeepsStaleAndWaitsFullTTL(t *te
 	rawKey := "vk-lw-cfgttl_003"
 	bundle := freshBundle("vk_cfg_003", time.Now().Add(1*time.Hour))
 	bundle.Credentials = []domain.Credential{{ID: "cred-old"}}
-	svc.storeL1(hashKey(rawKey), bundle, "")
+	svc.storeL1(hashKey(domain.PresentedKey{Token: rawKey}), bundle, "")
 	e := backdateConfig(t, svc, rawKey, 2*time.Minute)
 
-	if _, err := svc.Resolve(context.Background(), rawKey); err != nil {
+	if _, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey}); err != nil {
 		t.Fatalf("Resolve: %v", err)
 	}
 
@@ -898,7 +898,7 @@ func TestResolve_FreshEntry_ConfigRefreshFailure_KeepsStaleAndWaitsFullTTL(t *te
 
 	// Stale config keeps serving and the failed attempt stamped
 	// configFetchedAt, so the next request must NOT re-fetch.
-	got, err := svc.Resolve(context.Background(), rawKey)
+	got, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	if err != nil {
 		t.Fatalf("Resolve after failure: %v", err)
 	}
@@ -954,14 +954,14 @@ func TestResolve_ConfigRefresh_EvictedMidFetch_NotResurrected(t *testing.T) {
 	})
 
 	rawKey := "vk-lw-cfgttl_race"
-	h := hashKey(rawKey)
+	h := hashKey(domain.PresentedKey{Token: rawKey})
 	bundle := freshBundle("vk_cfg_race", time.Now().Add(1*time.Hour))
 	bundle.Credentials = []domain.Credential{{ID: "cred-old"}}
 	svc.storeL1(h, bundle, "")
 	e := backdateConfig(t, svc, rawKey, 2*time.Minute)
 
 	// Triggering request serves the stale bundle and kicks off the refresh.
-	if _, err := svc.Resolve(context.Background(), rawKey); err != nil {
+	if _, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey}); err != nil {
 		t.Fatalf("Resolve: %v", err)
 	}
 
@@ -1006,7 +1006,7 @@ func TestApplyChange_UnhandledKindIsReported(t *testing.T) {
 	resolver := &fakeResolver{}
 	svc, logs := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
 
-	key := hashKey("vk-lw-unhandled-kind")
+	key := hashKey(domain.PresentedKey{Token: "vk-lw-unhandled-kind"})
 	svc.storeL1(key, &domain.Bundle{OrganizationID: "org-1"}, "")
 
 	svc.applyChange("org-1", CacheChange{Kind: "SOMETHING_THIS_BUILD_PREDATES"})
@@ -1106,9 +1106,9 @@ func newETagService(t *testing.T, fetcher *etagConfigFetcher, rawKey string) (*S
 		ConfigTTL:        60 * time.Second,
 		RefreshThreshold: time.Second,
 	})
-	_, err := svc.Resolve(context.Background(), rawKey)
+	_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	require.NoError(t, err)
-	e, ok := svc.l1.Peek(hashKey(rawKey))
+	e, ok := svc.l1.Peek(hashKey(domain.PresentedKey{Token: rawKey}))
 	require.True(t, ok, "the cold resolve must leave an entry behind")
 	return svc, e
 }
@@ -1121,14 +1121,14 @@ func TestResolve_ConfigTTLRefresh_IsConditional(t *testing.T) {
 		svc, e := newETagService(t, fetcher, rawKey)
 
 		backdateConfig(t, svc, rawKey, 2*time.Minute)
-		got, err := svc.Resolve(context.Background(), rawKey)
+		got, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 		require.NoError(t, err)
 		awaitConfigRefresh(t, e)
 
 		assert.Equal(t, []string{"", "42"}, fetcher.conditionals(),
 			"the cold fetch has nothing to offer; the safety-net refresh offers the revision that fetch came back with")
 		assert.Equal(t, "cred-current", got.Credentials[0].ID)
-		live, ok := svc.l1.Peek(hashKey(rawKey))
+		live, ok := svc.l1.Peek(hashKey(domain.PresentedKey{Token: rawKey}))
 		require.True(t, ok)
 		assert.Same(t, e, live, "a confirmation replaces nothing; the entry that was serving keeps serving")
 		assert.Equal(t, "cred-current", live.bundle.Credentials[0].ID)
@@ -1147,11 +1147,11 @@ func TestResolve_ConfigTTLRefresh_IsConditional(t *testing.T) {
 
 		fetcher.edit("43", "cred-new")
 		backdateConfig(t, svc, rawKey, 2*time.Minute)
-		_, err := svc.Resolve(context.Background(), rawKey)
+		_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 		require.NoError(t, err)
 		awaitConfigRefresh(t, e)
 
-		live, ok := svc.l1.Peek(hashKey(rawKey))
+		live, ok := svc.l1.Peek(hashKey(domain.PresentedKey{Token: rawKey}))
 		require.True(t, ok)
 		assert.Equal(t, "cred-new", live.bundle.Credentials[0].ID,
 			"a revision the control plane has moved past must bring the new config in")
@@ -1160,7 +1160,7 @@ func TestResolve_ConfigTTLRefresh_IsConditional(t *testing.T) {
 
 		// Third pass: the new revision is what gets offered from here on.
 		backdateConfig(t, svc, rawKey, 2*time.Minute)
-		_, err = svc.Resolve(context.Background(), rawKey)
+		_, err = svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 		require.NoError(t, err)
 		awaitConfigRefresh(t, live)
 		assert.Equal(t, []string{"", "42", "43"}, fetcher.conditionals())
@@ -1181,14 +1181,14 @@ func TestResolve_ConfigTTLRefresh_IsConditional(t *testing.T) {
 
 		for range 3 {
 			backdateConfig(t, svc, rawKey, 2*time.Minute)
-			_, err := svc.Resolve(context.Background(), rawKey)
+			_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 			require.NoError(t, err)
 			awaitConfigRefresh(t, e)
 		}
 
 		assert.Equal(t, []string{"", "42", "42", "42"}, fetcher.conditionals(),
 			"every refresh offers the token it holds and the control plane keeps confirming it")
-		live, ok := svc.l1.Peek(hashKey(rawKey))
+		live, ok := svc.l1.Peek(hashKey(domain.PresentedKey{Token: rawKey}))
 		require.True(t, ok)
 		assert.Equal(t, "cred-old", live.bundle.Credentials[0].ID,
 			"a frozen token pins the replaced credential in cache for as long as the process runs")
@@ -1202,13 +1202,13 @@ func TestResolve_ConfigTTLRefresh_IsConditional(t *testing.T) {
 		assert.Empty(t, e.currentConfigETag(), "there is no token to remember")
 
 		backdateConfig(t, svc, rawKey, 2*time.Minute)
-		_, err := svc.Resolve(context.Background(), rawKey)
+		_, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 		require.NoError(t, err)
 		awaitConfigRefresh(t, e)
 
 		assert.Equal(t, []string{"", ""}, fetcher.conditionals(),
 			"with no token to offer, the refresh goes out unconditional rather than inventing one")
-		live, ok := svc.l1.Peek(hashKey(rawKey))
+		live, ok := svc.l1.Peek(hashKey(domain.PresentedKey{Token: rawKey}))
 		require.True(t, ok)
 		assert.Equal(t, "cred-current", live.bundle.Credentials[0].ID,
 			"and it comes back with the config, so the entry is never left without one")

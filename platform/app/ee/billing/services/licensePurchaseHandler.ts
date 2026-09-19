@@ -2,6 +2,10 @@ import { createLogger } from "@langwatch/observability";
 import type Stripe from "stripe";
 import { getApp } from "../../../src/server/app-layer/app";
 import { sendLicenseEmail } from "../../../src/server/mailer/licenseEmail";
+import {
+  captureException,
+  toError,
+} from "../../../src/utils/posthogErrorCapture";
 import { generateLicenseKey } from "../../licensing/licenseGenerationService";
 
 const logger = createLogger("langwatch:billing:licensePurchaseHandler");
@@ -10,12 +14,18 @@ interface HandleLicensePurchaseParams {
   checkoutSession: Stripe.Checkout.Session;
   stripe: Stripe;
   privateKey: string;
+  /**
+   * Writes the minted license to the license registry (ADR-139). Required, so
+   * no caller can mint a license that the registry never hears about.
+   */
+  recordLicense: (params: { licenseKey: string }) => Promise<void>;
 }
 
 export async function handleLicensePurchase({
   checkoutSession,
   stripe,
   privateKey,
+  recordLicense,
 }: HandleLicensePurchaseParams): Promise<void> {
   const email = checkoutSession.customer_details?.email;
   if (!email) {
@@ -47,6 +57,19 @@ export async function handleLicensePurchase({
     },
     "[licensePurchaseHandler] License generated",
   );
+
+  // The buyer has paid. A registry that cannot be written must not stand
+  // between them and their license, so the failure is reported and the email
+  // still goes out. The license can be registered afterwards by pasting it.
+  try {
+    await recordLicense({ licenseKey });
+  } catch (error) {
+    logger.error(
+      { licenseId: licenseData.licenseId, error },
+      "[licensePurchaseHandler] License could not be recorded in the registry",
+    );
+    captureException(toError(error));
+  }
 
   await sendLicenseEmail({
     email,

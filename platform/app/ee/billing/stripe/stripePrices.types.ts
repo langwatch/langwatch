@@ -26,6 +26,7 @@ export const STRIPE_PRICE_NAMES = [
   "GROWTH_EVENTS_USD_MONTHLY_UNTIL_MAR_2026",
   "GROWTH_EVENTS_USD_ANNUAL_UNTIL_MAR_2026",
   "GROWTH_INSTANT_EVAL_USD",
+  "CONNECTED_HOSTED_USAGE_QUARTERLY",
 ] as const;
 
 /**
@@ -40,6 +41,7 @@ export const STRIPE_PRICE_NAMES = [
  */
 export const OPTIONAL_STRIPE_PRICE_NAMES: readonly StripePriceName[] = [
   "GROWTH_INSTANT_EVAL_USD",
+  "CONNECTED_HOSTED_USAGE_QUARTERLY",
 ];
 
 export type StripePriceName = (typeof STRIPE_PRICE_NAMES)[number];
@@ -65,7 +67,7 @@ export type StripePriceDetail = {
 
 export type StripePriceMapping = Record<
   StripePriceName,
-  Record<StripeEnvironment, string> | undefined
+  Partial<Record<StripeEnvironment, string>> | undefined
 >;
 
 export const STRIPE_METER_NAMES = [
@@ -96,7 +98,13 @@ export type StripePricesFile = {
 
 /** Resolved ids; an optional price is absent until its mode is provisioned. */
 export type StripePriceMap = Partial<Record<StripePriceName, string>> &
-  Record<Exclude<StripePriceName, "GROWTH_INSTANT_EVAL_USD">, string>;
+  Record<
+    Exclude<
+      StripePriceName,
+      "GROWTH_INSTANT_EVAL_USD" | "CONNECTED_HOSTED_USAGE_QUARTERLY"
+    >,
+    string
+  >;
 
 import { z } from "zod";
 
@@ -124,12 +132,22 @@ const stripeEnvironmentMappingSchema = z.object({
   live: z.string(),
 });
 
+/**
+ * An optional name may be mapped in one mode and not the other: its price is
+ * provisioned per mode by hand, and the surface that reads it already checks
+ * whether it resolved. A required name still has to carry both.
+ */
+const stripeOptionalEnvironmentMappingSchema = z.object({
+  test: z.string().optional(),
+  live: z.string().optional(),
+});
+
 export const stripePriceMappingSchema = z.object(
   Object.fromEntries(
     STRIPE_PRICE_NAMES.map((key) => [
       key,
       OPTIONAL_STRIPE_PRICE_NAMES.includes(key)
-        ? stripeEnvironmentMappingSchema.optional()
+        ? stripeOptionalEnvironmentMappingSchema.optional()
         : stripeEnvironmentMappingSchema,
     ]),
   ) as Record<StripePriceName, typeof stripeEnvironmentMappingSchema>,

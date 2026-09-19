@@ -76,13 +76,26 @@ export interface OrganizationWithAdmins {
 }
 
 /**
+ * Which contract an organization's hosted usage is invoiced under.
+ *
+ * `cloud` is a SEAT_EVENT organization with an active GROWTH subscription, and
+ * is invoiced monthly. `connected` is a self-hosted customer with a
+ * `ConnectedBillingAccount` (ADR-139, section 7): it buys no Cloud plan, so it
+ * is not on SEAT_EVENT pricing at all, and its usage rides the quarterly
+ * subscription that account names.
+ */
+export type UsageBillingContract = "cloud" | "connected";
+
+/**
  * Organization data needed by billing usage reporting.
- * Only returned for SEAT_EVENT pricing orgs with active GROWTH subscriptions.
+ * Only returned for organizations that buy usage under one of the two
+ * contracts above.
  */
 export interface OrganizationForBilling {
   id: string;
   stripeCustomerId: string | null;
   subscriptions: { id: string }[];
+  contract: UsageBillingContract;
 }
 
 /**

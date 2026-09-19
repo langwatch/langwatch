@@ -23,6 +23,8 @@ import { automationRouter } from "./routers/automations";
 import { batchRecordRouter } from "./routers/batchRecord";
 import { bugReportsRouter } from "./routers/bugReports";
 import { codingAgentsRouter } from "./routers/codingAgents";
+import { connectRouter } from "./routers/connect";
+import { connectedBillingRouter } from "./routers/connectedBilling";
 import { costsRouter } from "./routers/costs";
 import { currencyRouter } from "./routers/currency";
 import { dashboardsRouter } from "./routers/dashboards";
@@ -56,6 +58,7 @@ import { langyRouter } from "./routers/langy";
 import { langyEgressRouter } from "./routers/langyEgress";
 import { licenseRouter } from "./routers/license";
 import { licenseEnforcementRouter } from "./routers/licenseEnforcement";
+import { licenseRegistryRouter } from "./routers/licenseRegistry";
 import { limitsRouter } from "./routers/limits";
 import { llmModelCostsRouter } from "./routers/llmModelCosts";
 import { modelProviderRouter } from "./routers/modelProviders";
@@ -166,7 +169,10 @@ const coreRouters = {
   savedViews: savedViewsRouter,
   secrets: secretsRouter,
   license: licenseRouter,
+  licenseRegistry: licenseRegistryRouter,
   licenseEnforcement: licenseEnforcementRouter,
+  connect: connectRouter,
+  connectedBilling: connectedBillingRouter,
   scimToken: scimTokenRouter,
   roleBinding: roleBindingRouter,
   apiKey: apiKeyRouter,

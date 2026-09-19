@@ -100,6 +100,34 @@ description = "Signed license test fixtures, verifiable only against the checked
 targetRules = ["generic-api-key"]
 paths = ['''platform/app/ee/licensing/__tests__/fixtures/testLicenses\.ts''']
 
+# The offline license compatibility fixture (ADR-139): one license minted with
+# the licensing code of main before connected self-hosted landed, so a test can
+# pin that it still verifies and enforces the same way. It was signed with a
+# keypair generated for that one mint whose private half was discarded, and the
+# file holds only public keys beside it. No deployment accepts it, because the
+# production verifier reads its key from `LANGWATCH_LICENSE_PUBLIC_KEY`.
+#
+# Scoped to `generic-api-key` and to this one file, so a real credential pasted
+# into it is still caught by every provider-specific rule.
+[[allowlists]]
+description = "Offline license compatibility fixture, signed by a discarded one-off keypair"
+targetRules = ["generic-api-key"]
+paths = ['''platform/app/ee/licensing/__tests__/fixtures/offline-license-from-main\.json''']
+
+# The stand-in license key in the audit redaction test. It is the base64 of
+# `{"data":{}}`, so it holds no signature and no license, and it cannot be a
+# credential. The test needs a value shaped like a license key to
+# prove that the audit trail drops it.
+#
+# Scoped by VALUE as well as path, matched with AND and anchored, so any other
+# high-entropy string in that test file is still reported.
+[[allowlists]]
+description = "Base64 of an empty license payload, used to prove audit redaction"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''platform/app/src/server/api/__tests__/redactAuditArgs\.unit\.test\.ts''']
+regexes = ['''^eyJkYXRhIjp7fX0=$''']
+
 # gitleaks scans the branch's whole commit range, not just its tip, so a value
 # removed in a later commit is still found in the commit that added it. This one
 # is the sequential-hex placeholder `0123456789abcdef...` that briefly stood in

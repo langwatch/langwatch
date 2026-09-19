@@ -90,6 +90,7 @@ export class SpendPipelineInstantEvalSpendRecorder
           organizationId: attribution.organizationId,
           teamId: attribution.teamId,
           ...(record.runId ? { runId: record.runId } : {}),
+          ...(record.virtualKeyId ? { virtualKeyId: record.virtualKeyId } : {}),
           inputTokens: record.inputTokens,
           requests: record.requests,
           costUsd: record.costUsd,

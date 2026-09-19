@@ -96,6 +96,10 @@ import { createRunModelsResolver } from "~/server/scenarios/run-models.resolver"
 import { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { getSaaSPlanProvider } from "../../../ee/billing";
+import {
+  createConnectedBillingService,
+  PrismaConnectedBillingStore,
+} from "../../../ee/billing/connected/connectedBilling.prisma";
 import { NotificationService } from "../../../ee/billing/notifications/notification.service";
 import { NotificationRepository } from "../../../ee/billing/notifications/repositories/notification.repository";
 import { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
@@ -112,6 +116,7 @@ import {
 import { createStripeClient } from "../../../ee/billing/stripe/stripeClient";
 import { meters } from "../../../ee/billing/stripe/stripePriceCatalog";
 import { FREE_PLAN } from "../../../ee/licensing/constants";
+import { createLicenseRegistryService } from "../../../ee/licensing/registry/composition";
 import { StorageMeterService } from "../data-retention/metering/storageMeter.service";
 import { PinnedTraceRepository } from "../data-retention/pinning/pinnedTrace.repository";
 import { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.service";
@@ -776,10 +781,35 @@ export function initializeDefaultApp(options?: {
       // getApp().planProvider, but we're still inside initializeDefaultApp
       // so the App singleton isn't available yet.
       inviteApprover: InviteService.create(prisma, { planProvider }),
-      licensePurchaseHandler: { handle: handleLicensePurchase },
+      // A purchased license is recorded in the license registry, unlinked: a
+      // checkout names no customer organization on LangWatch Cloud (ADR-139).
+      licensePurchaseHandler: {
+        handle: (params) =>
+          handleLicensePurchase({
+            ...params,
+            recordLicense: async ({ licenseKey }) => {
+              await createLicenseRegistryService(prisma).record({
+                licenseKey,
+                source: "PURCHASE",
+              });
+            },
+          }),
+      },
       licensePaymentLinkId: env.STRIPE_LICENSE_PAYMENT_LINK_ID,
       licensePrivateKey: env.LANGWATCH_LICENSE_PRIVATE_KEY,
       getPostHog: () => getPostHogInstance(),
+      // A finalized invoice of a connected self-hosted customer (ADR-139):
+      // small usage invoices roll forward and a waiting renewal completes.
+      connectedBilling: {
+        accountFor: (stripeCustomerId) =>
+          new PrismaConnectedBillingStore(prisma).findAccountByCustomer(
+            stripeCustomerId,
+          ),
+        rollForwardSmallInvoice: (input) =>
+          createConnectedBillingService(prisma).rollForwardSmallInvoice(input),
+        completeRenewalIfDue: (input) =>
+          createConnectedBillingService(prisma).completeRenewalIfDue(input),
+      },
     });
   }
 

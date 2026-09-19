@@ -5,15 +5,22 @@ import {
   toError,
   withScope,
 } from "~/utils/posthogErrorCapture";
-import type { queryBillableEventsTotal as QueryBillableEventsTotalFn } from "../../../../../../ee/billing/services/billableEventsQuery";
+import {
+  billingMonthDateRange,
+  type queryBillableEventsTotal as QueryBillableEventsTotalFn,
+} from "../../../../../../ee/billing/services/billableEventsQuery";
 import {
   instantEvalMeterUnitsToUsd,
   type queryInstantEvalSpendTotal as QueryInstantEvalSpendTotalFn,
 } from "../../../../../../ee/billing/services/instantEvalSpendQuery";
+import { meterEventTimestampSeconds } from "../../../../../../ee/billing/services/meterEventTimestamp";
 import type { UsageReportingService } from "../../../../../../ee/billing/services/usageReportingService";
 import type { BillingCheckpointService } from "../../../../app-layer/billing/billingCheckpoint.service";
 import type { OrganizationService } from "../../../../app-layer/organizations/organization.service";
-import type { BillingOrganizationLookup } from "../../../../app-layer/organizations/repositories/organization.repository";
+import type {
+  BillingOrganizationLookup,
+  UsageBillingContract,
+} from "../../../../app-layer/organizations/repositories/organization.repository";
 import type { Command, CommandHandler } from "../../../";
 import { defineCommandSchema } from "../../../";
 import type { Event } from "../../../domain/types";
@@ -124,6 +131,38 @@ function billableEventsIdentifier({
   targetTotal: number;
 }): string {
   return `${organizationId}:${billingMonth}:from:${lastReportedTotal}:to:${targetTotal}`;
+}
+
+/** When the billing month ended, in epoch milliseconds. */
+function billingMonthEndMs(billingMonth: string): number {
+  const [, end] = billingMonthDateRange(billingMonth);
+  return Date.parse(`${end.replace(" ", "T")}Z`);
+}
+
+/**
+ * The timestamp the month's meter event carries.
+ *
+ * A Cloud customer is invoiced monthly, so dating an event inside a month
+ * whose invoice may already be finalized would put the amount behind a closed
+ * period. Its events therefore stay at the time of reporting, which is what
+ * they have always done. A connected customer is invoiced quarterly (ADR-139,
+ * section 7), so the month it belongs to is still open and the event is dated
+ * there, subject to the meter's own 35-day floor.
+ */
+function meterTimestampFor({
+  contract,
+  billingMonth,
+  nowMs,
+}: {
+  contract: UsageBillingContract;
+  billingMonth: string;
+  nowMs: number;
+}): number {
+  return meterEventTimestampSeconds({
+    periodEndMs:
+      contract === "connected" ? billingMonthEndMs(billingMonth) : nowMs,
+    nowMs,
+  });
 }
 
 function instantEvalIdentifier({
@@ -262,6 +301,7 @@ export class ReportUsageForMonthCommand
             organizationId,
             billingMonth,
             stripeCustomerId: org.stripeCustomerId,
+            contract: org.contract,
           })) || shouldSelfDispatch;
       }
     } catch (error) {
@@ -306,11 +346,13 @@ export class ReportUsageForMonthCommand
     organizationId,
     billingMonth,
     stripeCustomerId,
+    contract,
   }: {
     meter: BillingMeter;
     organizationId: string;
     billingMonth: string;
     stripeCustomerId: string;
+    contract: UsageBillingContract;
   }): Promise<boolean> {
     try {
       return await this.reportForBillingMonth({
@@ -318,6 +360,7 @@ export class ReportUsageForMonthCommand
         organizationId,
         billingMonth,
         stripeCustomerId,
+        contract,
       });
     } catch (error) {
       logger.error(
@@ -347,11 +390,13 @@ export class ReportUsageForMonthCommand
     organizationId,
     billingMonth,
     stripeCustomerId,
+    contract,
   }: {
     meter: BillingMeter;
     organizationId: string;
     billingMonth: string;
     stripeCustomerId: string;
+    contract: UsageBillingContract;
   }): Promise<boolean> {
     if (!meter.isProvisioned()) {
       // Nothing is read or written: the checkpoint stays where it is, so the
@@ -474,7 +519,11 @@ export class ReportUsageForMonthCommand
           {
             eventName: meter.eventName,
             identifier,
-            timestamp: Math.floor(Date.now() / 1000),
+            timestamp: meterTimestampFor({
+              contract,
+              billingMonth,
+              nowMs: Date.now(),
+            }),
             value: meter.toValue(delta),
           },
         ],
