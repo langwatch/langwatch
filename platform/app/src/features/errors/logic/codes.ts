@@ -99,9 +99,12 @@ export const APP_ERROR_CODES = [
   "clickhouse_unavailable",
   "codex_auth_failed",
   "connect_budget_above_contract_maximum",
+  "connect_budget_exhausted",
   "connect_budget_not_set",
+  "connect_disabled",
   "connect_license_required",
   "connect_service_not_entitled",
+  "connect_unreachable",
   "contested_credentials",
   "credential_class_mismatch",
   "custom_chart_playground_not_enabled",
@@ -163,6 +166,9 @@ export const APP_ERROR_CODES = [
   "guardrail_attach_forbidden",
   "guided_onboarding_path_unknown",
   "health_check_failed",
+  // Raised by the Go gateway and, on a connected install, by the install side
+  // of Connect when the host answers something that is not a result.
+  "hosted_service_unavailable",
   "idempotency_error",
   "identity_already_linked",
   "identity_detach_strands_user",

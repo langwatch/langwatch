@@ -1380,6 +1380,29 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_KEY" "fieldValues" .Values.app.license.key) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_PUBLIC_KEY" "fieldValues" .Values.app.license.publicKey) }}
 
+{{- /* LangWatch-hosted services. Nothing is emitted unless an operator
+       switched this on, so an install that upgrades and changes no value
+       carries no LANGWATCH_CONNECT_ variable and calls nothing. In sharedEnv
+       beside the license because the workers judge too, and an app and a
+       worker disagreeing about which services are reachable would make the
+       same query behave differently depending on which one ran it. */}}
+{{- if .Values.app.connect.enabled }}
+- name: LANGWATCH_CONNECT_ENABLED
+  value: "true"
+{{- if .Values.app.connect.gatewayEndpoint }}
+- name: LANGWATCH_CONNECT_GATEWAY_ENDPOINT
+  value: {{ .Values.app.connect.gatewayEndpoint | quote }}
+{{- end }}
+{{- if .Values.app.connect.licenseEndpoint }}
+- name: LANGWATCH_CONNECT_LICENSE_ENDPOINT
+  value: {{ .Values.app.connect.licenseEndpoint | quote }}
+{{- end }}
+{{- if .Values.app.connect.instanceId }}
+- name: LANGWATCH_CONNECT_INSTANCE_ID
+  value: {{ .Values.app.connect.instanceId | quote }}
+{{- end }}
+{{- end }}
+
 # Email gateway. Naming a provider is what turns email on. In sharedEnv rather
 # than the app Deployment because scheduled reports and alert notifications are
 # dispatched by the workers, so a workers pod without a gateway configured

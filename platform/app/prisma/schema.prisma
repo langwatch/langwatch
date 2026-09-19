@@ -776,6 +776,11 @@ model Organization {
   /// A customer that runs LangWatch self-hosted. The hosted usage, budgets and
   /// invoices of its connected installs attach to this organization (ADR-139).
   selfHostedCustomer     Boolean                        @default(false)
+  /// LangWatch-hosted services this organization has switched on, named the
+  /// way its license names them ("instant_evals"). Empty is the default and
+  /// the whole opt-in: with nothing here an install sends nothing, whatever
+  /// its license is entitled to (ADR-139).
+  connectServices        String[]                       @default([])
   issuedLicenses         IssuedLicense[]
   gatewayChangeEvents    GatewayChangeEvent[]
   routingPolicies        RoutingPolicy[]

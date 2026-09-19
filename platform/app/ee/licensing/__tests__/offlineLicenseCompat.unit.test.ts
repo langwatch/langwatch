@@ -240,6 +240,83 @@ describe("a license minted by main before this change", () => {
 });
 
 /**
+ * The upgrade guarantee for Connect: an install that sets none of the new
+ * variables keeps the behaviour it had and opens no connection.
+ */
+describe("an install upgraded with no Connect configuration", () => {
+  const CONNECT_VARIABLES = [
+    "LANGWATCH_CONNECT_ENABLED",
+    "LANGWATCH_CONNECT_GATEWAY_ENDPOINT",
+    "LANGWATCH_CONNECT_LICENSE_ENDPOINT",
+    "LANGWATCH_CONNECT_INSTANCE_ID",
+  ] as const;
+
+  describe("when its environment is parsed", () => {
+    it("parses with every Connect variable absent, and resolves them all to off", async () => {
+      for (const name of CONNECT_VARIABLES) {
+        expect(process.env[name]).toBeUndefined();
+      }
+
+      const { env } = await import("~/env.mjs");
+
+      expect(env.LANGWATCH_CONNECT_ENABLED).toBe(false);
+      expect(env.LANGWATCH_CONNECT_GATEWAY_ENDPOINT).toBeUndefined();
+      expect(env.LANGWATCH_CONNECT_LICENSE_ENDPOINT).toBeUndefined();
+      expect(env.LANGWATCH_CONNECT_INSTANCE_ID).toBeUndefined();
+    });
+  });
+
+  describe("when it judges an eval function", () => {
+    /** @scenario "An install that sets nothing new keeps the classifier it had" */
+    it("uses the classifier for an install with no judge key, and calls nothing", async () => {
+      const globalFetch = vi.fn(() => {
+        throw new Error("an install with nothing configured called out");
+      });
+      vi.stubGlobal("fetch", globalFetch);
+      const undiciFetch = vi.fn(() => {
+        throw new Error("an install with nothing configured called out");
+      });
+      vi.resetModules();
+      // Stated rather than inherited: the deployment here is one with no judge
+      // key and no Connect configuration, whatever this machine's own .env has.
+      vi.doMock("~/env.mjs", () => ({ env: { NODE_ENV: "test" } }));
+      vi.doMock("~/server/db", () => ({ prisma: {} }));
+      vi.doMock("undici", async (importOriginal) => ({
+        ...(await importOriginal<typeof import("undici")>()),
+        fetch: undiciFetch,
+      }));
+
+      const { NullInstantEvalClassifier } = await import(
+        "~/server/app-layer/instant-evals/classifier/null.client"
+      );
+      const { getInstantEvalClassifier, resetInstantEvalClassifier } =
+        await import("~/server/app-layer/instant-evals/classifier");
+
+      const classifier = getInstantEvalClassifier();
+      const judgement = await classifier.classify({
+        projectId: "project-of-an-offline-install",
+        text: "the customer wrote in",
+        questions: [
+          { id: "annoyed", kind: "boolean", instructions: "sounds annoyed" },
+        ],
+      });
+      await resetInstantEvalClassifier();
+
+      expect(classifier).toBeInstanceOf(NullInstantEvalClassifier);
+      expect(judgement.skippedReason).toBe("classifier_not_configured");
+      expect(globalFetch).not.toHaveBeenCalled();
+      expect(undiciFetch).not.toHaveBeenCalled();
+
+      vi.doUnmock("undici");
+      vi.doUnmock("~/server/db");
+      vi.doUnmock("~/env.mjs");
+      vi.resetModules();
+      vi.unstubAllGlobals();
+    });
+  });
+});
+
+/**
  * What runs when an install validates its license and enforces its seats: the
  * licensing modules themselves and the enforcement layer. None of it may reach
  * the license registry, which lives in its own folder and exists only for

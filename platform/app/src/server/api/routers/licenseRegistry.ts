@@ -3,8 +3,8 @@ import { z } from "zod";
 import { prisma } from "~/server/db";
 import { adminSurfaceHidden } from "../../../../ee/admin/adminSurfaceHidden";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
+import { CONNECT_SERVICES } from "../../../../ee/licensing/connect/services";
 import { createLicenseRegistryService } from "../../../../ee/licensing/registry/composition";
-import { CONNECT_SERVICES } from "../../../../ee/licensing/registry/licenseRegistry.service";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**

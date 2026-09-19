@@ -13,6 +13,7 @@
  * Prisma bindings live in `./issuedLicense.prisma.ts`.
  */
 
+import type { ConnectService } from "../connect/services";
 import { LicenseKeyInvalidError, OrganizationNotFoundError } from "../errors";
 import { generateLicenseKey } from "../licenseGenerationService";
 import { licenseTokenFromKey, registryHashForToken } from "../licenseToken";
@@ -26,10 +27,6 @@ import {
   LicenseOverageMaxRequiresOverageError,
   LicenseSigningNotConfiguredError,
 } from "./errors";
-
-/** Hosted services a license can be entitled to. */
-export const CONNECT_SERVICES = ["instant_evals", "managed_models"] as const;
-export type ConnectService = (typeof CONNECT_SERVICES)[number];
 
 export type IssuedLicenseSource =
   | "BACKOFFICE"

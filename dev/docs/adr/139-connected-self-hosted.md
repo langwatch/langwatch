@@ -212,8 +212,8 @@ calls worth a few cents; they are summed per managed key and written every five
 seconds, or every 500 calls under one key, as one `instant_eval` spend row with
 `requests` set and `virtual_key_id` naming the install. A failed write is kept
 and merged into the next window. The process flushes on shutdown
-(`connect-spend` phase). The cost of this trade is stated: a crash loses at most
-one window, and the budget sees spend up to one window late.
+(`connect-spend` phase). The cost of this trade is stated: a crash loses no more
+than one window, and the budget sees spend up to one window late.
 
 The hosted handler does not consult the free Instant Evals allowance. A customer
 organization has no Cloud subscription, reads as a free plan and would be cut
@@ -349,6 +349,41 @@ families; without that, `langwatch/gpt-5-mini` would be read as a model name
 and match no credential without an error. The entitlement is `managed_models`.
 Routing by evaluation results is not built.
 
+### 9. What the install decides, and where
+
+The install side lives in `platform/app/ee/licensing/connect/install/`. Four
+decisions:
+
+**Which classifier judges.** Three in order: the install's own `JEV_API_KEY`,
+then Connect when `LANGWATCH_CONNECT_ENABLED` is set, then the null classifier.
+An install that configured a judge of its own keeps judging with it and sends
+nothing to LangWatch, whatever else is switched on.
+
+**Which organization may judge through it.** Hosted judging is switched on per
+organization, stored in `Organization.connectServices` and empty by default, so
+one organization on a shared install can use it while another does not. The
+access gate (`src/server/app-layer/instant-evals/access.ts`) already resolves
+the project's organization for the feature flag, so it asks the classifier
+whether it can judge for that organization: one that has not switched the
+service on sees the eval functions published as unavailable rather than queries
+whose judged columns all come back null. The opt-in and the credential are held
+per project and per organization for 30 seconds, so a run of ten thousand
+judgements reads the row once and an admin's decision takes effect without a
+restart.
+
+**What identifies the install.** The instance id is the organization id of the
+organization whose license is used, unless `LANGWATCH_CONNECT_INSTANCE_ID`
+names one. It survives restarts, backups and hostname changes: a restore of the
+same database keeps the identity, while a second install with a database of its
+own presents another id and is refused as `connect_wrong_instance`.
+
+**Two refusals the host cannot name.** `connect_unreachable` carries the host
+and port an outbound rule has to allow, and `connect_budget_exhausted` says the
+cap is the customer's own and is raised in Settings, Connect. Every other
+refusal crosses the wire as the code the host wrote, so one piece of copy
+covers both sides. Outbound calls use undici's `EnvHttpProxyAgent` when any of
+`HTTPS_PROXY`, `HTTP_PROXY` or `NO_PROXY` is set.
+
 ## Existing offline licenses
 
 A customer on an offline license must notice nothing when they upgrade. Where a
@@ -361,7 +396,9 @@ the test that pins it.
 | The embedded production public key is unchanged. | same file, "is still verified against the production public key main shipped" |
 | With no `connect.*` value set, seat enforcement is the same hard cap: the seat past the licensed count is refused, the one within it is admitted. | same file, "keeps the hard seat cap" and "keeps admitting a seat within the licensed count" |
 | Validating and enforcing an offline license makes no network call and never reads the registry. | same file, "makes no network call and never reads the registry": `fetch` is stubbed to throw, and the database stub throws on any model but `Organization` |
-| No new required environment variable or Helm value. `connect.enabled` defaults to off, and every `LANGWATCH_CONNECT_*` variable is optional. | the env schema declares them optional; an install boots with none set |
+| No new required environment variable or Helm value. `connect.enabled` defaults to off, and every `LANGWATCH_CONNECT_*` variable is optional. | `offlineLicenseCompat.unit.test.ts`, "parses with every Connect variable absent, and resolves them all to off" |
+| With no `LANGWATCH_CONNECT_*` set and no judge key, the deployment gets the null classifier and neither `fetch` nor undici is called. | same file, "uses the classifier for an install with no judge key, and calls nothing" |
+| A chart render that changes no value carries no `LANGWATCH_CONNECT_` variable at all. | `charts/langwatch/tests/connect-env.sh` |
 | The migration is additive and needs only the normal `prisma migrate deploy`: one enum, one empty table, one column with a default. | `20260919120000_issued_license_registry`, replayed on a scratch database |
 | The usage statistics worker behaves as before and `/api/track_usage` stays. | `track-usage-security.integration.test.ts` stays green; the worker only gains a separate sync when Connect is enabled |
 | The license page of an install is unchanged. The one control removed, "New License", was only ever rendered on LangWatch Cloud. | `LicenseStatus.integration.test.tsx` |
@@ -386,13 +423,14 @@ side. `validateLicense`, `LicenseHandler` and the seat guard import neither.
 | Kind | Name |
 |---|---|
 | Env (Cloud) | `LANGWATCH_LICENSE_PRIVATE_KEY`, `STRIPE_SECRET_KEY` |
-| Env (install) | `LANGWATCH_CONNECT_ENABLED`, `LANGWATCH_CONNECT_LICENSE_ENDPOINT`, `LANGWATCH_CONNECT_GATEWAY_ENDPOINT`, `DISABLE_USAGE_STATS`, `HTTPS_PROXY` |
-| Helm | `connect.enabled`, `connect.licenseEndpoint`, `connect.gatewayEndpoint` |
+| Env (install) | `LANGWATCH_CONNECT_ENABLED`, `LANGWATCH_CONNECT_LICENSE_ENDPOINT`, `LANGWATCH_CONNECT_GATEWAY_ENDPOINT`, `LANGWATCH_CONNECT_INSTANCE_ID`, `DISABLE_USAGE_STATS`, `HTTPS_PROXY` |
+| Helm | `app.connect.enabled`, `app.connect.licenseEndpoint`, `app.connect.gatewayEndpoint`, `app.connect.instanceId` |
+| Install opt-in | `Organization.connectServices` (empty by default) |
 | Gateway host | `POST /v1/instant-evals/classify`, `GET /v1/usage`, `PUT /v1/budget` |
 | Control plane, gateway only | `POST /api/internal/gateway/connect/:operation` (HMAC signed) |
 | Connect host | `POST /v1/license/sync`, `POST /v1/stats` |
 | Contract budget | `GatewayBudget.externalId = connect-contract`, metadata `connect_cap_set_by` |
-| Error codes | `connect_service_not_entitled`, `connect_license_required`, `connect_budget_not_set`, `connect_budget_above_contract_maximum`, `hosted_service_unavailable` |
+| Error codes | `connect_service_not_entitled`, `connect_license_required`, `connect_budget_not_set`, `connect_budget_above_contract_maximum`, `connect_budget_exhausted`, `connect_disabled`, `connect_unreachable`, `hosted_service_unavailable` |
 
 ## Consequences
 

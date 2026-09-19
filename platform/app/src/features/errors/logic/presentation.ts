@@ -3367,6 +3367,34 @@ const presentations = {
         : "Contact LangWatch to raise the maximum.";
     },
   },
+  connect_budget_exhausted: {
+    title: "The hosted usage budget is spent",
+    describe: (error) => {
+      const cap = num(error, "capUsd", 0);
+      const raise =
+        "An organization admin can raise the cap in Settings, Connect.";
+      return cap > 0
+        ? `The cap is ${cap.toFixed(2)} USD and it has been reached. ${raise}`
+        : `The cap for hosted services has been reached. ${raise}`;
+    },
+  },
+  connect_disabled: {
+    title: "Connect is switched off for this deployment",
+    describe: () =>
+      "An operator turns it on in the deployment configuration. Until then this install calls no hosted service.",
+  },
+  connect_unreachable: {
+    // The reader runs the network this install sits in, so the sentence names
+    // what an outbound rule has to allow rather than describing the failure.
+    title: "LangWatch could not be reached",
+    describe: (error) => {
+      const host = str(error, "host", "");
+      const port = num(error, "port", 0);
+      return host && port > 0
+        ? `Allow outbound traffic to ${host} on port ${port}, then try again.`
+        : "Allow outbound traffic to LangWatch from this install, then try again.";
+    },
+  },
   hosted_service_unavailable: {
     title: "The hosted service did not answer",
     describe: () =>

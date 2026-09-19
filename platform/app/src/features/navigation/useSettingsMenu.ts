@@ -7,6 +7,7 @@ import {
   Brain,
   Bug,
   Building2,
+  Cloud,
   Coins,
   CreditCard,
   DatabaseZap,
@@ -159,7 +160,10 @@ function organizationGroup({
           ]
         : []),
       ...(!isLiteMember && !isSaaS
-        ? [{ label: "License", href: "/settings/license", icon: BadgeCheck }]
+        ? [
+            { label: "License", href: "/settings/license", icon: BadgeCheck },
+            { label: "Connect", href: "/settings/connect", icon: Cloud },
+          ]
         : []),
     ],
   };
