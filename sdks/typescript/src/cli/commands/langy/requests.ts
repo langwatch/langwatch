@@ -21,6 +21,8 @@ import { buildAuthHeaders } from "../../../internal/api/auth";
 import { LANGWATCH_SDK_VERSION } from "../../../internal/constants";
 import { langwatchFetch } from "../../../internal/http/langwatchFetch";
 import {
+  type LoginElsewhere,
+  loginElsewhereMessage as sessionElsewhereMessage,
   loginMadeElsewhere,
   resolvePersonCredentials,
 } from "../../utils/apiKey";
@@ -326,15 +328,16 @@ export function hasDeviceSession(): boolean {
 export const SIGN_IN_FAILED_MESSAGE =
   "Could not sign you in, so this folder is not shared. Run `langwatch login --device`, then run `langwatch langy --share-control` again.";
 
-/** What the command says when the login belongs to another address. */
-export const loginElsewhereMessage = ({
-  loginEndpoint,
-  endpoint,
-}: {
-  loginEndpoint: string;
-  endpoint: string;
-}): string =>
-  `The login on this machine is for ${loginEndpoint}, and LANGWATCH_ENDPOINT (in the shell or in this folder's .env) points this command at ${endpoint}. A login's key is only sent to the address that issued it, so this folder is not shared. Run \`langwatch login --device\` here to sign in to ${endpoint}, or unset LANGWATCH_ENDPOINT to use the login you have.`;
+/**
+ * What the command says when the login belongs to another address. A project
+ * key is no way out here, since the command acts as a person.
+ */
+export const loginElsewhereMessage = (elsewhere: LoginElsewhere): string =>
+  sessionElsewhereMessage({
+    ...elsewhere,
+    outcome: ", so this folder is not shared",
+    canUseApiKey: false,
+  });
 
 export type PersonCredentials = {
   apiKey: string;

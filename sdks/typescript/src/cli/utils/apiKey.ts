@@ -164,6 +164,12 @@ export const resolveCredentials = async (
     return { apiKey: envKey, source: "env", endpoint, projectId };
   }
 
+  // A key given by flag or by LANGWATCH_API_KEY belongs to the address the
+  // command targets, so it was used above whatever the login says. The login's
+  // own key is different: see `loginMadeElsewhere`.
+  const elsewhere = loginMadeElsewhere();
+  if (elsewhere) return reportLoginMadeElsewhere(elsewhere);
+
   const session = await resolveFromSession({
     project: opts.project,
     endpoint,
@@ -198,32 +204,62 @@ export const resolvePersonCredentials = async (): Promise<
   loadEnvFileScoped();
   const endpoint = getEndpoint();
   process.env.LANGWATCH_ENDPOINT ??= endpoint;
-  if (loginMadeElsewhere()) return undefined;
   return resolveFromSession({ endpoint, isLoginKeyRequired: true });
 };
 
-/** One address in one spelling, or nothing when it is not an address. */
-const endpointIdentity = (endpoint: string): string | undefined => {
+/**
+ * An address as its origin: scheme, host in lower case and port, so a trailing
+ * slash, a capital letter or a spelled-out default port do not make two
+ * addresses out of one. `localhost` and `127.0.0.1` stay two addresses: what
+ * answers on each is for the machine to decide, not for a string comparison.
+ */
+const originOf = (endpoint: string): string | undefined => {
   try {
-    const url = new URL(normalizeEndpoint(endpoint));
-    return `${url.origin}${url.pathname.replace(/\/+$/, "")}`;
+    return new URL(normalizeEndpoint(endpoint)).origin;
   } catch {
     return undefined;
   }
+};
+
+export interface LoginElsewhere {
+  /** The address the login on this machine was made against. */
+  loginEndpoint: string;
+  /** The address the command targets. */
+  endpoint: string;
+}
+
+/**
+ * The two addresses, when the login in `cfg` was made against one and the
+ * command targets another. Nothing when there is no login, or when both are
+ * one address.
+ */
+const loginElsewhere = ({
+  cfg,
+  endpoint,
+}: {
+  cfg: GovernanceConfig | undefined;
+  endpoint: string;
+}): LoginElsewhere | undefined => {
+  if (!cfg || !isLoggedIn(cfg)) return undefined;
+  const loginEndpoint = normalizeEndpoint(cfg.control_plane_url);
+  const loginOrigin = originOf(loginEndpoint);
+  const isSameAddress =
+    loginOrigin !== undefined && loginOrigin === originOf(endpoint);
+  return isSameAddress ? undefined : { loginEndpoint, endpoint };
 };
 
 /**
  * The two addresses, when the login on this machine was made against one and
  * the command targets another.
  *
- * `LANGWATCH_ENDPOINT` decides the target, and a folder's .env can set it. A
- * person's login key opens everything that person can reach, so it is only
- * ever sent to the address that issued it: a folder that names another
- * address gets no key, whoever wrote its .env.
+ * `LANGWATCH_ENDPOINT` decides the target, and a folder's .env can set it. The
+ * device session's key, whether the login key or the personal project's, was
+ * issued by one address and is only ever sent there: a folder that names
+ * another address gets no key from the login, whoever wrote its .env. A key
+ * given by flag or in `LANGWATCH_API_KEY` is that address's own and is used
+ * as given.
  */
-export const loginMadeElsewhere = ():
-  | { loginEndpoint: string; endpoint: string }
-  | undefined => {
+export const loginMadeElsewhere = (): LoginElsewhere | undefined => {
   loadEnvFileScoped();
   let cfg: GovernanceConfig | undefined;
   try {
@@ -231,14 +267,29 @@ export const loginMadeElsewhere = ():
   } catch {
     cfg = undefined;
   }
-  if (!cfg || !isLoggedIn(cfg)) return undefined;
-  const loginEndpoint = normalizeEndpoint(cfg.control_plane_url);
-  const endpoint = getEndpoint();
-  const isSameAddress =
-    endpointIdentity(loginEndpoint) !== undefined &&
-    endpointIdentity(loginEndpoint) === endpointIdentity(endpoint);
-  return isSameAddress ? undefined : { loginEndpoint, endpoint };
+  return loginElsewhere({ cfg, endpoint: getEndpoint() });
 };
+
+/**
+ * What a command says when the login belongs to another address. `outcome`
+ * finishes the sentence about the key for a command with something of its own
+ * to say, and `canUseApiKey` is off for a command that acts as a person, where
+ * a project key is no way out.
+ */
+export const loginElsewhereMessage = ({
+  loginEndpoint,
+  endpoint,
+  outcome = "",
+  canUseApiKey = true,
+}: LoginElsewhere & { outcome?: string; canUseApiKey?: boolean }): string =>
+  [
+    `The login on this machine is for ${loginEndpoint}, and LANGWATCH_ENDPOINT (in the shell or in this folder's .env) points this command at ${endpoint}.`,
+    `A login's key is only sent to the address that issued it${outcome}.`,
+    `Run \`langwatch login --device\` here to sign in to ${endpoint}, or unset LANGWATCH_ENDPOINT to use the login you have.`,
+    ...(canUseApiKey
+      ? [`A key of ${endpoint} in LANGWATCH_API_KEY or --api-key works too.`]
+      : []),
+  ].join(" ");
 
 /**
  * The device session's credential, published into the request-scoped store,
@@ -264,6 +315,9 @@ async function resolveFromSession({
     cfg = undefined;
   }
   if (!cfg || !isLoggedIn(cfg)) return undefined;
+  // Every key the session holds goes through here, so this is the one place
+  // that keeps it with the address that issued it.
+  if (loginElsewhere({ cfg, endpoint })) return undefined;
   const session = await resolveSessionCredential(cfg);
   if (!session) return undefined;
   if (isLoginKeyRequired && !session.isLoginKey) return undefined;
@@ -504,6 +558,28 @@ export const missingCredentialsLines = (authUrl: string): string[] => [
   "",
   "For agents: don't reuse keys outside the project folder, check more options with `langwatch login --help` to help the user",
 ];
+
+/**
+ * Ends the command when the login's key would go to another address than its
+ * own: structured on stdout for machine callers, prose on stderr for people.
+ */
+function reportLoginMadeElsewhere(elsewhere: LoginElsewhere): never {
+  const message = loginElsewhereMessage(elsewhere);
+  if (getOutputFormat() !== "text") {
+    console.log(
+      renderErrorAsJson({
+        code: "login_endpoint_mismatch",
+        kind: "login_endpoint_mismatch",
+        message,
+        httpStatus: 0,
+        meta: { ...elsewhere },
+        isHandled: true,
+      }),
+    );
+  }
+  console.error(chalk.red(`Error: ${message}`));
+  process.exit(1);
+}
 
 function reportMissingCredentials(endpoint: string): never {
   const authUrl = `${endpoint}/authorize`;
