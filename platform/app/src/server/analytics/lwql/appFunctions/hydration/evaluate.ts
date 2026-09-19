@@ -63,6 +63,14 @@ interface JudgementUnit {
 export interface EvaluationOutcome {
   readonly values: ComputedValues;
   readonly usage: LangWatchQLEvalUsage;
+  /**
+   * Whether the caller's signal stopped the judging before every unit ran.
+   *
+   * When it did, `values` holds only the units that came back and the rest
+   * are absent rather than unresolved: they found their text and were never
+   * asked, which the caller reports as its own kind of null.
+   */
+  readonly isCancelled: boolean;
 }
 
 export async function evaluateCalls({
@@ -86,6 +94,7 @@ export async function evaluateCalls({
     return {
       values,
       usage: { requests: 0, inputTokens: 0, skipped: {}, limiterWaitMs: 0 },
+      isCancelled: false,
     };
   }
 
@@ -111,7 +120,7 @@ export async function evaluateCalls({
   };
   let failures = 0;
 
-  await inParallel({
+  const { isCancelled } = await inParallel({
     items: units,
     limit: support.maxConcurrency,
     ...(signal ? { signal } : {}),
@@ -150,8 +159,10 @@ export async function evaluateCalls({
   if (failures > 0 && failures === units.length) {
     throw new ClassifierAnsweredNothingError();
   }
-  fillUnjudged({ evalCalls, values });
-  return { values, usage };
+  // A cancelled run leaves the units it never asked absent, so the caller can
+  // tell them from a key that named nothing.
+  if (!isCancelled) fillUnjudged({ evalCalls, values });
+  return { values, usage, isCancelled };
 }
 
 /**
@@ -476,6 +487,12 @@ function emptyValues(evalCalls: readonly ResolvedCall[]): MutableValues {
  * A fixed ceiling rather than all at once: the global limiter already paces the
  * deployment, and firing a thousand requests at it would leave a thousand
  * promises parked on it holding their texts in memory.
+ *
+ * An abort stops the scheduling and settles what is in flight rather than
+ * throwing: a unit already answered was paid for, and throwing here would
+ * lose its verdict and its usage together. A unit whose request the abort
+ * interrupted is simply not recorded, which the caller reads off the absent
+ * cell.
  */
 async function inParallel<T>({
   items,
@@ -487,7 +504,7 @@ async function inParallel<T>({
   limit: number;
   run: (item: T) => Promise<void>;
   signal?: AbortSignal;
-}): Promise<void> {
+}): Promise<{ isCancelled: boolean }> {
   let next = 0;
   const workers = Array.from(
     { length: Math.max(1, Math.min(limit, items.length)) },
@@ -496,13 +513,19 @@ async function inParallel<T>({
         // Checked between units as well as inside the request, so a query the
         // caller walked away from stops before the next classification rather
         // than after the last one.
-        signal?.throwIfAborted();
+        if (signal?.aborted) return;
         const index = next++;
         const item = items[index];
         if (item === undefined) return;
-        await run(item);
+        try {
+          await run(item);
+        } catch (error) {
+          if (signal?.aborted || isAbortError(error)) return;
+          throw error;
+        }
       }
     },
   );
   await Promise.all(workers);
+  return { isCancelled: signal?.aborted === true };
 }

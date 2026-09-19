@@ -912,6 +912,14 @@ export class LangWatchQLService {
         recordSpend: judging.recordSpend,
       });
     }
+    // Recorded first, refused second: the judgements made before the caller
+    // walked away were paid for, and a query that stops judging must still
+    // fail as cancelled rather than answer with null columns.
+    if (hydration.cancellation) {
+      throw signal?.reason instanceof Error
+        ? signal.reason
+        : new DOMException("The query was cancelled", "AbortError");
+    }
     return hydration;
   }
 

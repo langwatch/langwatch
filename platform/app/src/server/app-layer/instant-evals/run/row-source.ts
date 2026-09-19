@@ -121,6 +121,11 @@ export interface InstantEvalJudgedPage {
   readonly usage: LangWatchQLEvalUsage;
   /** Where the page's own wall clock went. */
   readonly timings: InstantEvalPageTimings;
+  /**
+   * Present when the signal stopped the judging part way: which rows never
+   * got their answer. Absent for a page judged to the end.
+   */
+  readonly cancellation?: { readonly unjudgedRows: readonly number[] };
 }
 
 /**

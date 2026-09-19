@@ -64,6 +64,12 @@ export function fakes(options?: {
     projectId: string;
     inFlightUsd: number;
   }) => Promise<void>;
+  /**
+   * Makes the judged page stop part way, naming the rows left unjudged.
+   * With `onSignal`, the page waits for the executor's signal to fire first,
+   * the way a deadline or a cancel reaches a page still judging.
+   */
+  stopMidPage?: { unjudgedRows: number[]; onSignal?: boolean };
 }) {
   const inserted: InstantEvalJudgmentRecord[][] = [];
   const spends: InstantEvalSpendRecord[] = [];
@@ -93,7 +99,27 @@ export function fakes(options?: {
         hydration: { keys } as unknown as InstantEvalPreparedPage["hydration"],
       }),
     ),
-    judgePrepared: vi.fn(async (): Promise<InstantEvalJudgedPage> => judged()),
+    judgePrepared: vi.fn(
+      async ({ signal }): Promise<InstantEvalJudgedPage> => {
+        const stop = options?.stopMidPage;
+        if (!stop) return judged();
+        if (stop.onSignal && signal && !signal.aborted) {
+          await new Promise<void>((resolve) =>
+            signal.addEventListener("abort", () => resolve(), { once: true }),
+          );
+        }
+        // A row the stop reached has no verdict, the same null a declined
+        // judgement leaves, which is why the page has to name it.
+        const page = judged();
+        return {
+          ...page,
+          rows: page.rows.map((row, index) =>
+            stop.unjudgedRows.includes(index) ? { ...row, annoyed: null } : row,
+          ),
+          cancellation: { unjudgedRows: stop.unjudgedRows },
+        };
+      },
+    ),
     judge: vi.fn(async () => judged()),
     texts: vi.fn(async () => options?.texts ?? []),
   };

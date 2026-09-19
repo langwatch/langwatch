@@ -181,6 +181,42 @@ Feature: The Instant Eval run on the queue, plan, judge page by page, finish
     Then the next page is not judged
     And the run finishes as cancelled with the progress it reached
 
+  @unit
+  Scenario: A page stopped part way keeps the judgements it made
+    Given a page whose judging is stopped after some rows answered
+    When the page is written
+    Then the rows that answered are written with their verdicts
+    And a row the stop reached before its answer is written as skipped, naming the stop
+    And the rows after the last judged one are not written
+    And the page's tokens are the tokens of the rows that answered
+    # A stop used to throw the whole page away, verdicts and usage together,
+    # so a caller could start and cancel first pages without the free
+    # allowance ever seeing what was judged.
+
+  @unit
+  Scenario: A page judges under a deadline inside its lease
+    Given a page intent leased for ten minutes
+    When the page is judged
+    Then the judging stops before the lease lapses, with a margin to write what was judged
+    And the page reports the last judged key as its cursor and that more is left
+    And the next intent asks for the rows after that key
+    # Past the lease another dispatcher may lease the same intent and judge
+    # the page again, paying for it twice.
+
+  @unit
+  Scenario: A page with no lease left is not started
+    Given a page intent whose lease has less than the margin left
+    When the page is judged
+    Then nothing is read or judged
+    And the intent fails so the outbox delivers it again under a fresh lease
+
+  @unit
+  Scenario: A page cancelled part way ends the run where it got to
+    Given a page whose judging is stopped by a cancellation
+    When the page is written
+    Then the rows that answered are written
+    And the page reports no next page, because the run is finishing
+
   @integration
   Scenario: A run whose pages stop arriving is failed by the watchdog
     Given a run whose last page landed more than fifteen minutes ago

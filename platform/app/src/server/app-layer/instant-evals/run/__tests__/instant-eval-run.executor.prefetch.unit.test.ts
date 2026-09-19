@@ -178,6 +178,7 @@ function harness({
       pageSize: 2,
       remaining: 5 - 2 * (page - 1),
       keyColumns: ["ThreadId"],
+      deadlineAt: null,
     });
 
   return {

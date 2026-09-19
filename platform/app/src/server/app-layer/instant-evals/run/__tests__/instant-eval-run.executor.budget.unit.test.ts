@@ -24,6 +24,7 @@ const PAGE = {
   pageSize: 500,
   remaining: 1_000,
   keyColumns: ["ThreadId"],
+  deadlineAt: null,
 };
 
 describe("given a run whose organization is on the free budget", () => {

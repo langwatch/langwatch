@@ -301,6 +301,9 @@ export async function judgePreparedPass(
       computeMs: hydration.timings?.computeMs ?? 0,
       judgeMs: hydration.timings?.judgeMs ?? 0,
     },
+    ...(hydration.cancellation
+      ? { cancellation: hydration.cancellation }
+      : {}),
   };
 }
 

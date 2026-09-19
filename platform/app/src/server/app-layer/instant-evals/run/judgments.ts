@@ -148,6 +148,7 @@ export function mapInstantEvalPage({
   rows,
   keys,
   skipReason,
+  unjudgedRows,
   now,
 }: {
   readonly tenantId: string;
@@ -158,17 +159,28 @@ export function mapInstantEvalPage({
   readonly keys: readonly InstantEvalRowKey[];
   /** Why unanswered cells of this page went unjudged, when the page knows. */
   readonly skipReason: string;
+  /**
+   * Rows a stop reached before their answer did, and the reason to write on
+   * them. Their cells are null the same way a declined judgement's are, and
+   * without this they would be written as the page's dominant skip.
+   */
+  readonly unjudgedRows?: {
+    readonly indexes: ReadonlySet<number>;
+    readonly reason: string;
+  };
   readonly now: number;
 }): InstantEvalPageMapping {
   const keysByRow = instantEvalKeyIndex(keys);
-  const judged = rows.flatMap((row) =>
+  const judged = rows.flatMap((row, index) =>
     judgementsForRow({
       tenantId,
       runId,
       questions,
       row,
       keysByRow,
-      skipReason,
+      skipReason: unjudgedRows?.indexes.has(index)
+        ? unjudgedRows.reason
+        : skipReason,
       now,
     }),
   );
@@ -250,6 +262,19 @@ function rowAddress(traceId: string, spanId: string): string {
   return `${traceId}\u0000${spanId}`;
 }
 
+/** The page key a judged row belongs to, by the pair first and the trace alone second. */
+export function instantEvalRowKeyFor({
+  row,
+  keysByRow,
+}: {
+  readonly row: Record<string, unknown>;
+  readonly keysByRow: ReadonlyMap<string, InstantEvalRowKey>;
+}): InstantEvalRowKey | undefined {
+  const traceId = String(row[INSTANT_EVAL_TRACE_COLUMN] ?? "");
+  const spanId = String(row[INSTANT_EVAL_SPAN_COLUMN] ?? "");
+  return keysByRow.get(rowAddress(traceId, spanId)) ?? keysByRow.get(traceId);
+}
+
 /** One row's cells as the judgement rows they are written as. */
 function judgementsForRow({
   tenantId,
@@ -273,8 +298,7 @@ function judgementsForRow({
   // impossible and the composition does not rely on.
   if (traceId === "") return [];
   const spanId = String(row[INSTANT_EVAL_SPAN_COLUMN] ?? "");
-  const key =
-    keysByRow.get(rowAddress(traceId, spanId)) ?? keysByRow.get(traceId);
+  const key = instantEvalRowKeyFor({ row, keysByRow });
 
   return questions.map((question) =>
     judgementFor({

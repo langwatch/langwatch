@@ -27,23 +27,32 @@ export function assembleResult({
   computed,
   evalUsage,
   timings,
+  isCancelled = false,
 }: {
   input: LangWatchQLHydrationInput;
   resolved: readonly ResolvedCall[];
   computed: ComputedValues;
   evalUsage?: LangWatchQLEvalUsage;
   timings?: LangWatchQLHydrationTimings;
+  /** Whether the judging stopped early, leaving some judged cells absent. */
+  isCancelled?: boolean;
 }): LangWatchQLHydrationResult {
-  const hydrated = input.rows.map((row) => {
+  const unjudgedRows: number[] = [];
+  const hydrated = input.rows.map((row, index) => {
     const next: Record<string, unknown> = { ...row };
     for (const entry of resolved) {
       const parts = appFunctionKeyParts(row[entry.call.column]);
-      const value =
+      const cell =
         parts === null
           ? null
-          : (computed.get(entry.call.column)?.get(appFunctionKeyId(parts))
-              ?.value ?? null);
-      next[entry.call.column] = value;
+          : computed.get(entry.call.column)?.get(appFunctionKeyId(parts));
+      // An absent cell on a judged column is a unit the abort reached before
+      // the answer did, which is the one null a caller must not read as a
+      // verdict.
+      if (isCancelled && parts !== null && cell === undefined) {
+        if (unjudgedRows.at(-1) !== index) unjudgedRows.push(index);
+      }
+      next[entry.call.column] = cell?.value ?? null;
     }
     return next;
   });
@@ -77,6 +86,7 @@ export function assembleResult({
       .filter((report) => report.keys > 0),
     ...(evalUsage ? { evalUsage } : {}),
     ...(timings ? { timings } : {}),
+    ...(isCancelled ? { cancellation: { unjudgedRows } } : {}),
   };
 }
 

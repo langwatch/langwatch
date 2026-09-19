@@ -136,6 +136,20 @@ export interface LangWatchQLHydrationResult {
   readonly evalUsage?: LangWatchQLEvalUsage;
   /** Where this hydration's own wall clock went. */
   readonly timings?: LangWatchQLHydrationTimings;
+  /**
+   * Present when the caller's signal stopped the judging part way.
+   *
+   * The rows are all still here, with the cells the judge answered filled in
+   * and the rest null, and `unjudgedRows` says which rows are null because
+   * they were never judged rather than because the judge declined them. What
+   * was judged was paid for, so it is handed back rather than thrown away.
+   */
+  readonly cancellation?: LangWatchQLHydrationCancellation;
+}
+
+export interface LangWatchQLHydrationCancellation {
+  /** Indexes into `rows` of the rows whose judgement never came back. */
+  readonly unjudgedRows: readonly number[];
 }
 
 /** A call, with the catalog entry it names. */
