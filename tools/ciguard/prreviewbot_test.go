@@ -289,6 +289,61 @@ func TestPRReviewBotReportsAWorkflowWithNoUsesSteps(t *testing.T) {
 	assert.Contains(t, strings.Join(problems, "\n"), "has no `uses:` steps")
 }
 
+// A quoted `uses:` value carries its version comment just as an unquoted one
+// does. A raw text scan keyed the comment by the quoted string while ciscan
+// decoded the unquoted value, so the two never matched and the pin read as
+// undocumented; reading the comment from the decoded node fixes that.
+func TestPRReviewBotAcceptsAQuotedUsesValue(t *testing.T) {
+	quoted := strings.Replace(goodPRReviewBotWorkflow,
+		"- uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1",
+		`- uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1`, 1)
+	root := writePRReviewBotWorkflow(t, quoted)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	assert.Empty(t, problems)
+}
+
+// The same action pinned twice, each occurrence documented, is fine. Each step
+// is judged on its own decoded comment rather than on a text key shared across
+// occurrences.
+func TestPRReviewBotAcceptsARepeatedIdenticalStep(t *testing.T) {
+	repeated := strings.Replace(goodPRReviewBotWorkflow,
+		"      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n",
+		"      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n"+
+			"      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n", 1)
+	root := writePRReviewBotWorkflow(t, repeated)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	assert.Empty(t, problems)
+}
+
+// A `uses:` line inside a run: script is script text, not a step, and must not
+// document a real pin. Here the real checkout pin has its comment stripped and
+// a run: script mentions the same action WITH a comment; a raw text scan let
+// the script line mask the undocumented real pin, so the guard must still
+// report the missing version comment.
+func TestPRReviewBotIgnoresAUsesLineInsideARunScript(t *testing.T) {
+	uncommented := strings.Replace(goodPRReviewBotWorkflow,
+		"actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1",
+		"actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1", 1)
+	withScript := strings.Replace(uncommented, "    steps:\n",
+		"    steps:\n"+
+			"      - run: |\n"+
+			"          echo documenting the pin\n"+
+			"          uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n", 1)
+	root := writePRReviewBotWorkflow(t, withScript)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), "no version comment")
+}
+
 func TestPRReviewBotHoldsInTheLiveRepo(t *testing.T) {
 	root, err := ciscan.RepoRoot(".")
 	require.NoError(t, err)

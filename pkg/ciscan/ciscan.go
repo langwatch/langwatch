@@ -20,11 +20,56 @@ import (
 
 // Step is one entry in a job's `steps:` list. Only the fields the guards read
 // are modeled; everything else in a workflow is deliberately ignored.
-type Step struct {
+type Step struct { //nolint:recvcheck // UnmarshalYAML must take a pointer receiver to populate the value; the read-only accessors stay value receivers.
 	Name string            `yaml:"name"`
 	Uses string            `yaml:"uses"`
 	With map[string]any    `yaml:"with"`
 	Env  map[string]string `yaml:"env"`
+
+	// UsesComment is the trailing `# <version>` comment on the `uses:` line.
+	// yaml keeps it on the node but drops it from Uses, and the pin guard needs
+	// it to assert every SHA pin documents the version it points at. Empty when
+	// the line carries no comment. Populated by UnmarshalYAML from the decoded
+	// node, so — unlike a raw text scan — it is immune to a quoted value and to
+	// `uses:` text that appears inside a run: script rather than as a real step.
+	UsesComment string `yaml:"-"`
+}
+
+// UnmarshalYAML decodes the modeled step fields, then separately recovers the
+// trailing comment on the `uses:` line so the pin guard can read it.
+func (s *Step) UnmarshalYAML(node *yaml.Node) error {
+	type plainStep Step
+	var plain plainStep
+	if err := node.Decode(&plain); err != nil {
+		return err
+	}
+	*s = Step(plain)
+	s.UsesComment = usesLineComment(node)
+
+	return nil
+}
+
+// usesLineComment returns the trailing comment on the mapping's `uses:` entry,
+// with the leading `#` and surrounding space stripped, or "" when there is
+// none. yaml attaches a same-line trailing comment to the value node; some
+// shapes leave it on the key, so both are checked.
+func usesLineComment(mapping *yaml.Node) string {
+	if mapping.Kind != yaml.MappingNode {
+		return ""
+	}
+	for i := 0; i+1 < len(mapping.Content); i += 2 {
+		key, value := mapping.Content[i], mapping.Content[i+1]
+		if key.Value != "uses" {
+			continue
+		}
+		for _, raw := range []string{value.LineComment, key.LineComment} {
+			if comment := strings.TrimSpace(strings.TrimPrefix(raw, "#")); comment != "" {
+				return comment
+			}
+		}
+	}
+
+	return ""
 }
 
 // Job is one entry under `jobs:`. If is the job-level `if:` condition, read as
@@ -48,11 +93,48 @@ type On struct {
 	PullRequest PullRequest `yaml:"pull_request"`
 }
 
+// UnmarshalYAML decodes the mapping form of `on:` and tolerates GitHub's
+// shorthand forms — `on: [push]` (a sequence) and `on: push` (a scalar) — by
+// yielding no trigger data instead of an error. LoadAll parses every workflow
+// in the repo, so a single file written in shorthand must not fail the guards
+// that only read some other workflow.
+func (o *On) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind != yaml.MappingNode {
+		return nil
+	}
+	type plainOn On
+	var plain plainOn
+	if err := node.Decode(&plain); err != nil {
+		return err
+	}
+	*o = On(plain)
+
+	return nil
+}
+
 // Concurrency models the workflow-level `concurrency:` block: the group runs
 // share, and whether a superseded run is canceled.
-type Concurrency struct {
+type Concurrency struct { //nolint:recvcheck // UnmarshalYAML must take a pointer receiver to populate the value; CancelsInProgress stays a value receiver.
 	Group            string `yaml:"group"`
 	CancelInProgress any    `yaml:"cancel-in-progress"`
+}
+
+// UnmarshalYAML decodes the mapping form of `concurrency:` and tolerates the
+// scalar shorthand — `concurrency: some-group` — by yielding no data instead
+// of an error, so a workflow written that way does not fail a LoadAll that
+// only needs some other file.
+func (c *Concurrency) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind != yaml.MappingNode {
+		return nil
+	}
+	type plainConcurrency Concurrency
+	var plain plainConcurrency
+	if err := node.Decode(&plain); err != nil {
+		return err
+	}
+	*c = Concurrency(plain)
+
+	return nil
 }
 
 // CancelsInProgress reports whether cancel-in-progress is set to true,
