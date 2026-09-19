@@ -33,6 +33,7 @@
 import { createLogger } from "@langwatch/observability";
 import { type Dispatcher, Pool, fetch as undiciFetch } from "undici";
 
+import { estimateTokensFromBytes } from "~/shared/traces/tokenBudget";
 import { InstantEvalClassifierUnavailableError } from "../errors";
 import {
   type InstantEvalClassifier,
@@ -49,6 +50,7 @@ import {
 } from "./questions";
 import {
   INSTANT_EVAL_CLASSIFIER_LIMITS,
+  instantEvalQuestionTokens,
   instantEvalTextBudget,
   prepareInstantEvalText,
 } from "./token-budget";
@@ -79,8 +81,13 @@ const REQUEST_TIMEOUT_MS = 120_000;
 /** How much of a text is kept when the classifier refuses it as too large. */
 const TOO_LARGE_RETRY_FRACTION = 0.75;
 
-/** Connections the pool keeps to the classifier. */
-const POOL_CONNECTIONS = 48;
+/**
+ * Connections the pool keeps to the classifier.
+ *
+ * At least the classifications one page keeps in flight, or the pool queues
+ * behind itself before the limiter ever gets a say.
+ */
+const POOL_CONNECTIONS = 128;
 
 export interface JevClassifierOptions {
   readonly apiKey: string;
@@ -174,8 +181,18 @@ export class JevInstantEvalClassifier implements InstantEvalClassifier {
       isCutForSize: false,
     };
 
+    // The questions cost the same on every attempt; the text may be cut
+    // between them, so it is measured per send.
+    const questionTokens = instantEvalQuestionTokens(request.questions);
+
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      await this.options.limiter.acquire(signal);
+      await this.options.limiter.acquire(
+        {
+          tokens: estimateTokensFromBytes(state.text) + questionTokens,
+          tenantId: request.projectId,
+        },
+        signal,
+      );
       const outcome = await this.send({
         text: state.text,
         request,

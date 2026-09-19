@@ -2633,6 +2633,255 @@
 			]
 		},
 		{
+			"name": "instant_eval_judgments",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, RunId, TraceId, SpanId, QuestionId",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "RunId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "TraceId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "QuestionId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ThreadId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "SpanId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Kind",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "Status",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "Passed",
+					"type": "Nullable(UInt8)",
+					"comment": ""
+				},
+				{
+					"name": "Score",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "Label",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Probability",
+					"type": "Nullable(Float64)",
+					"comment": ""
+				},
+				{
+					"name": "Probabilities",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Error",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "OccurredAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "CreatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "UpdatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "UInt16",
+					"comment": ""
+				}
+			]
+		},
+		{
+			"name": "instant_eval_runs",
+			"engine": "ReplacingMergeTree",
+			"sortingKey": "TenantId, RunId",
+			"columns": [
+				{
+					"name": "TenantId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "RunId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Name",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "Sql",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Parameters",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Questions",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Plan",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "RowLimit",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "Status",
+					"type": "LowCardinality(String)",
+					"comment": ""
+				},
+				{
+					"name": "Total",
+					"type": "Nullable(UInt32)",
+					"comment": ""
+				},
+				{
+					"name": "Progress",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "Matched",
+					"type": "Nullable(UInt32)",
+					"comment": ""
+				},
+				{
+					"name": "MatchedByQuestion",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "Failed",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "Skipped",
+					"type": "UInt32",
+					"comment": ""
+				},
+				{
+					"name": "Tokens",
+					"type": "UInt64",
+					"comment": ""
+				},
+				{
+					"name": "CostUsd",
+					"type": "Float64",
+					"comment": ""
+				},
+				{
+					"name": "PriceUsd",
+					"type": "Float64",
+					"comment": ""
+				},
+				{
+					"name": "Error",
+					"type": "Nullable(String)",
+					"comment": ""
+				},
+				{
+					"name": "CreatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "UpdatedAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "StartedAt",
+					"type": "Nullable(DateTime64(3))",
+					"comment": ""
+				},
+				{
+					"name": "FinishedAt",
+					"type": "Nullable(DateTime64(3))",
+					"comment": ""
+				},
+				{
+					"name": "OccurredAt",
+					"type": "Nullable(DateTime64(3))",
+					"comment": ""
+				},
+				{
+					"name": "AcceptedAt",
+					"type": "Nullable(DateTime64(3))",
+					"comment": ""
+				},
+				{
+					"name": "LastEventId",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "ProjectionVersion",
+					"type": "String",
+					"comment": ""
+				},
+				{
+					"name": "WrittenAt",
+					"type": "DateTime64(3)",
+					"comment": ""
+				},
+				{
+					"name": "_retention_days",
+					"type": "UInt16",
+					"comment": ""
+				}
+			]
+		},
+		{
 			"name": "langy_analytics_events",
 			"engine": "ReplacingMergeTree",
 			"sortingKey": "TenantId, OccurredAt, EventId",

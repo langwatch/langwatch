@@ -230,6 +230,53 @@ const registry = {
       "Retry shortly; if it persists, the judgements can be made later by running the same statement as a job",
     ],
   },
+  instant_eval_not_enabled: {
+    tips: [
+      "Instant Evals are behind a release flag; ask LangWatch to enable them for this project",
+    ],
+  },
+  instant_eval_not_found: {
+    tips: [
+      "Read `meta.runId`; no run of the authenticated project carries that id",
+      "List the project's runs to find the id you meant",
+    ],
+  },
+  instant_eval_query_invalid: {
+    tips: [
+      "Read `meta.parameters`; those names are set by whichever surface shows a chart, and a job has no surface to fill them",
+      "Write the period into the statement's own WHERE clause instead of declaring the dashboard parameters",
+    ],
+  },
+  instant_eval_query_missing_columns: {
+    tips: [
+      "Read `meta.missing`; a run needs TraceId so every judgement can be tied back to its trace",
+      "Project at least one eval function, such as `eval(conversation_bounded(ConversationId, 8000, ''), '…') AS annoyed`",
+      "ThreadId, SpanId and OccurredAt are optional and are carried onto the judgements when the statement projects them",
+    ],
+  },
+  instant_eval_row_cap_exceeded: {
+    tips: [
+      "Read `meta.cap` against `meta.maxCap`; the first is what this plan judges in one run and the second is the ceiling any plan offers",
+      "Lower the requested limit, or split the selection across more than one run with a keyset predicate on TraceId",
+    ],
+  },
+  instant_eval_already_finished: {
+    tips: [
+      "Read `meta.status`; the run reached that state before the cancel arrived",
+    ],
+  },
+  instant_eval_estimate_unavailable: {
+    tips: [
+      "The statement was accepted; working out how many rows it matches is what failed",
+      "Retry shortly, or start the run without an estimate and read its total once it is planned",
+    ],
+  },
+  instant_eval_stalled: {
+    tips: [
+      "The run went fifteen minutes without a judged page and was stopped",
+      "Run it again; if it stalls repeatedly, narrow the statement so each page reads less",
+    ],
+  },
   lwql_app_function_key_cap: {
     tips: [
       "Read `meta.cap` and `meta.distinct`; the query needs more distinct keys than one run may read",

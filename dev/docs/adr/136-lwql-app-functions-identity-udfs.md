@@ -330,7 +330,9 @@ key, never a customer's; a deployment with no key gets a null implementation
 that skips every question rather than failing every query. Requests are paced by
 a Redis token bucket shared by every pod, because the quota belongs to the
 platform's key rather than to a process, and it falls back to a low local rate
-when Redis cannot be reached — a slowdown, not an outage.
+when Redis cannot be reached, a slowdown, not an outage. The bucket holds input
+tokens rather than requests, with a second bucket per tenant as one project's
+share of the ceiling (ADR-137 §9).
 
 Two ceilings are new and both are refusals rather than partial answers, for the
 reason §5 already gives. `instant_eval_query_budget_exceeded` (422) refuses a

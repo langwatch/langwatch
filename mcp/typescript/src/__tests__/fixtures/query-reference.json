@@ -3062,6 +3062,148 @@
           "exampleSql": "SELECT TraceId, SpanId, StartTime\nFROM analytics.coding_tool_results\nWHERE StartTime >= subtractDays(now(), 7)\nORDER BY StartTime DESC\nLIMIT 100"
         },
         {
+          "name": "analytics.judgments",
+          "description": "One row per Instant Eval run, trace and question, with the verdict the judge gave.",
+          "grain": "one row per (TenantId, RunId, TraceId, SpanId, QuestionId), latest version only",
+          "joinKeys": [
+            "TenantId",
+            "TraceId"
+          ],
+          "timeColumn": "CreatedAt",
+          "freshness": "seconds behind ingestion",
+          "columns": [
+            {
+              "name": "TenantId",
+              "type": "String",
+              "description": "Project the judgement belongs to.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "RunId",
+              "type": "String",
+              "description": "The Instant Eval run that asked the question.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TraceId",
+              "type": "String",
+              "description": "Trace whose text was judged.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "QuestionId",
+              "type": "String",
+              "description": "The question, named by the output column the run's statement aliased it to.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ThreadId",
+              "type": "String",
+              "description": "Conversation the judged text came from, empty when the statement judged a trace rather than a thread.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "SpanId",
+              "type": "String",
+              "description": "Span the judged text came from, empty unless the statement judged one span.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Kind",
+              "type": "LowCardinality(String)",
+              "description": "What was asked: boolean, score or category.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Status",
+              "type": "LowCardinality(String)",
+              "description": "Whether it was answered: judged, skipped or failed. A skip is an answer of `we did not judge this`.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Passed",
+              "type": "Nullable(UInt8)",
+              "description": "Whether a boolean question's probability cleared its threshold. Null for the other kinds.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Score",
+              "type": "Nullable(Float64)",
+              "description": "The probability-weighted mean inside the declared range, for a score question.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Label",
+              "type": "String",
+              "description": "The most likely option, for a category question.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Probability",
+              "type": "Nullable(Float64)",
+              "description": "Probability of yes for a boolean question, or of the chosen label for a category one. The judge is calibrated, so 0.9 means nine times in ten.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Probabilities",
+              "type": "String",
+              "description": "Every option's probability for a category question, as a JSON object of option name to probability. Empty for the other kinds.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "OccurredAt",
+              "type": "DateTime64(3)",
+              "description": "When the judged row happened, carried from the statement so a judgement can be joined to a trace inside a bounded period.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CreatedAt",
+              "type": "DateTime64(3)",
+              "description": "When the judgement was written. Filter on this to prune partitions.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "UpdatedAt",
+              "type": "DateTime64(3)",
+              "description": "When this version of the judgement was written.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            }
+          ],
+          "exampleSql": "SELECT RunId, TraceId, QuestionId\nFROM analytics.judgments\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+        },
+        {
           "name": "analytics.automation_events",
           "description": "Audit log of automation trigger executions and actions",
           "grain": "one row per EventId",

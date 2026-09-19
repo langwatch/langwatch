@@ -18,7 +18,7 @@ import type {
 } from "~/server/app-layer/instant-evals/classifier/classifier";
 import { INSTANT_EVAL_PRICING } from "~/server/app-layer/instant-evals/classifier/pricing";
 import { INSTANT_EVAL_CLASSIFIER_LIMITS } from "~/server/app-layer/instant-evals/classifier/token-budget";
-import type { InstantEvalCostRecord } from "~/server/app-layer/instant-evals/instant-eval-cost.recorder";
+import type { InstantEvalSpendRecord } from "~/server/app-layer/instant-evals/instant-eval-spend.recorder";
 import type { Protections } from "../../../traces/protections";
 import { recordingExecutor } from "../executor.testFakes";
 import { LangWatchQLService } from "../lwql.service";
@@ -55,12 +55,12 @@ function classifierAnswering(
 function serviceJudgingWith({
   classifier,
   queryTokenBudget = 4_000_000,
-  costs = [],
+  spends = [],
   rows = [{ annoyed: "the agent said sorry" }],
 }: {
   classifier: InstantEvalClassifier;
   queryTokenBudget?: number;
-  costs?: InstantEvalCostRecord[];
+  spends?: InstantEvalSpendRecord[];
   rows?: Record<string, unknown>[];
 }): LangWatchQLService {
   return new LangWatchQLService({
@@ -74,8 +74,8 @@ function serviceJudgingWith({
       classifier: () => classifier,
       maxConcurrency: 4,
       queryTokenBudget,
-      recordCost: async (record) => {
-        costs.push(record);
+      recordSpend: async (record) => {
+        spends.push(record);
       },
     },
   });
@@ -154,11 +154,11 @@ describe("given a classifier that answers nothing at all", () => {
 
 describe("given a query that judged some text", () => {
   describe("when it finishes", () => {
-    /** @scenario "One cost row is recorded per query" */
-    it("records one cost row carrying the tokens, the cost and the price", async () => {
-      const costs: InstantEvalCostRecord[] = [];
+    /** @scenario "One spend record is reported per query" */
+    it("reports one spend record carrying the tokens, the cost and the price", async () => {
+      const spends: InstantEvalSpendRecord[] = [];
       const service = serviceJudgingWith({
-        costs,
+        spends,
         rows: [{ annoyed: "one" }, { annoyed: "two" }],
         classifier: classifierAnswering(async () => ({
           verdicts: [{ questionId: "annoyed", probability: 0.5 }],
@@ -169,17 +169,19 @@ describe("given a query that judged some text", () => {
 
       await run(service);
 
-      expect(costs).toHaveLength(1);
-      expect(costs[0]).toMatchObject({
+      expect(spends).toHaveLength(1);
+      expect(spends[0]).toMatchObject({
         projectId: PROJECT.id,
         inputTokens: 1_000_000,
         requests: 2,
       });
-      expect(costs[0]?.costUsd).toBeCloseTo(
+      expect(spends[0]?.runId).toBeUndefined();
+      expect(spends[0]?.occurredAt).toBeInstanceOf(Date);
+      expect(spends[0]?.costUsd).toBeCloseTo(
         INSTANT_EVAL_PRICING.usdPerMillionInputTokens,
         10,
       );
-      expect(costs[0]?.priceUsd).toBeCloseTo(
+      expect(spends[0]?.priceUsd).toBeCloseTo(
         INSTANT_EVAL_PRICING.usdPerMillionInputTokens *
           INSTANT_EVAL_PRICING.markup,
         10,
@@ -190,11 +192,11 @@ describe("given a query that judged some text", () => {
 
 describe("given a query whose judgements were all skipped", () => {
   describe("when it finishes", () => {
-    /** @scenario "A query that judged nothing records no cost" */
-    it("records no cost row", async () => {
-      const costs: InstantEvalCostRecord[] = [];
+    /** @scenario "A query that judged nothing reports no spend" */
+    it("reports no spend", async () => {
+      const spends: InstantEvalSpendRecord[] = [];
       const service = serviceJudgingWith({
-        costs,
+        spends,
         classifier: classifierAnswering(async () => ({
           verdicts: [],
           skippedReason: "classifier_not_configured",
@@ -205,7 +207,7 @@ describe("given a query whose judgements were all skipped", () => {
 
       const result = await run(service);
 
-      expect(costs).toEqual([]);
+      expect(spends).toEqual([]);
       expect(result.rows).toEqual([{ annoyed: null }]);
       expect(result.diagnostics.map((entry) => entry.code)).toContain(
         "INSTANT_EVAL_SKIPPED",
@@ -275,7 +277,7 @@ describe("given a statement that calls no eval function", () => {
           },
           maxConcurrency: 4,
           queryTokenBudget: 4_000_000,
-          recordCost: async () => {},
+          recordSpend: async () => {},
         },
       });
 

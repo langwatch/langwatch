@@ -64253,6 +64253,1500 @@
         ]
       }
     },
+    "/api/v1/instant-evals": {
+      "post": {
+        "operationId": "createInstantEvalRun",
+        "responses": {
+          "202": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The run id."
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "What the run was called, if anything."
+                    },
+                    "sql": {
+                      "type": "string",
+                      "description": "The statement, exactly as submitted."
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "description": "The values the statement's parameters were filled with."
+                    },
+                    "questions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "The statement's own output column, which is the name this question is addressed by everywhere else."
+                          },
+                          "function": {
+                            "type": "string",
+                            "description": "The eval function that asked it."
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "boolean",
+                              "score",
+                              "category"
+                            ],
+                            "description": "What kind of answer the question takes."
+                          },
+                          "reads": {
+                            "type": "string",
+                            "description": "Which part of the verdict the statement's column carries."
+                          },
+                          "threshold": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "Where a boolean question's probability becomes a pass. Null for a question that is not a boolean."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "function",
+                          "kind",
+                          "reads",
+                          "threshold"
+                        ]
+                      },
+                      "description": "One entry per eval function the statement projects, derived from it when the run was accepted."
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "description": "Rows this run may judge."
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "planning",
+                        "running",
+                        "finished",
+                        "failed",
+                        "cancelled"
+                      ],
+                      "description": "Where the run is in its life."
+                    },
+                    "total": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Rows the run found, bounded by its limit. Null until it has looked."
+                    },
+                    "progress": {
+                      "type": "integer",
+                      "description": "Rows judged so far."
+                    },
+                    "matched": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Judgements that matched, across this run's boolean questions. Null when the run asked none: a score or a category question has no match to count."
+                    },
+                    "matchedByQuestion": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "number"
+                      },
+                      "description": "Per question: matches for a boolean question, judged rows for a score or a category one."
+                    },
+                    "failed": {
+                      "type": "integer",
+                      "description": "Rows the judge could not answer."
+                    },
+                    "skipped": {
+                      "type": "integer",
+                      "description": "Rows the judge declined to answer."
+                    },
+                    "tokens": {
+                      "type": "integer",
+                      "description": "Input tokens the judge billed for."
+                    },
+                    "costUsd": {
+                      "type": "number",
+                      "description": "What the judging cost us, in United States dollars."
+                    },
+                    "priceUsd": {
+                      "type": "number",
+                      "description": "What the judging costs you, in United States dollars."
+                    },
+                    "error": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The code of the failure that ended the run, when one did."
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "description": "When the run was accepted."
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "description": "When the run was last written to."
+                    },
+                    "startedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "When the run began reading rows."
+                    },
+                    "finishedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "When the run ended."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "sql",
+                    "parameters",
+                    "questions",
+                    "limit",
+                    "status",
+                    "total",
+                    "progress",
+                    "matched",
+                    "matchedByQuestion",
+                    "failed",
+                    "skipped",
+                    "tokens",
+                    "costUsd",
+                    "priceUsd",
+                    "error",
+                    "createdAt",
+                    "updatedAt",
+                    "startedAt",
+                    "finishedAt"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Start a run. The statement is accepted, its questions are derived from the eval functions it projects, and the judging happens on the queue: the answer is the queued run, and its progress is read back from the run endpoint. A statement the query policy refuses, one that projects no TraceId, one that projects no eval function, and a row limit past what the plan allows are all refused before anything is judged.",
+        "tags": [
+          "Instant Evals"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sql": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 50000,
+                    "description": "The LangWatchQL statement to judge. It must project TraceId and at least one eval function column."
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "description": "Values for the parameters the statement declares."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200,
+                    "description": "What to call the run. Yours to choose."
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 100000,
+                    "description": "Rows the run may judge. Ten thousand by default on every plan, up to one hundred thousand on a plan that lifts the cap."
+                  }
+                },
+                "required": [
+                  "sql"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      },
+      "get": {
+        "operationId": "listInstantEvalRuns",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "runs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "The run id."
+                          },
+                          "name": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "What the run was called, if anything."
+                          },
+                          "sql": {
+                            "type": "string",
+                            "description": "The statement, exactly as submitted."
+                          },
+                          "parameters": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "description": "The values the statement's parameters were filled with."
+                          },
+                          "questions": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "description": "The statement's own output column, which is the name this question is addressed by everywhere else."
+                                },
+                                "function": {
+                                  "type": "string",
+                                  "description": "The eval function that asked it."
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "boolean",
+                                    "score",
+                                    "category"
+                                  ],
+                                  "description": "What kind of answer the question takes."
+                                },
+                                "reads": {
+                                  "type": "string",
+                                  "description": "Which part of the verdict the statement's column carries."
+                                },
+                                "threshold": {
+                                  "type": [
+                                    "number",
+                                    "null"
+                                  ],
+                                  "description": "Where a boolean question's probability becomes a pass. Null for a question that is not a boolean."
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "function",
+                                "kind",
+                                "reads",
+                                "threshold"
+                              ]
+                            },
+                            "description": "One entry per eval function the statement projects, derived from it when the run was accepted."
+                          },
+                          "limit": {
+                            "type": "integer",
+                            "description": "Rows this run may judge."
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "queued",
+                              "planning",
+                              "running",
+                              "finished",
+                              "failed",
+                              "cancelled"
+                            ],
+                            "description": "Where the run is in its life."
+                          },
+                          "total": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": "Rows the run found, bounded by its limit. Null until it has looked."
+                          },
+                          "progress": {
+                            "type": "integer",
+                            "description": "Rows judged so far."
+                          },
+                          "matched": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": "Judgements that matched, across this run's boolean questions. Null when the run asked none: a score or a category question has no match to count."
+                          },
+                          "matchedByQuestion": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "number"
+                            },
+                            "description": "Per question: matches for a boolean question, judged rows for a score or a category one."
+                          },
+                          "failed": {
+                            "type": "integer",
+                            "description": "Rows the judge could not answer."
+                          },
+                          "skipped": {
+                            "type": "integer",
+                            "description": "Rows the judge declined to answer."
+                          },
+                          "tokens": {
+                            "type": "integer",
+                            "description": "Input tokens the judge billed for."
+                          },
+                          "costUsd": {
+                            "type": "number",
+                            "description": "What the judging cost us, in United States dollars."
+                          },
+                          "priceUsd": {
+                            "type": "number",
+                            "description": "What the judging costs you, in United States dollars."
+                          },
+                          "error": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "The code of the failure that ended the run, when one did."
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "description": "When the run was accepted."
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "description": "When the run was last written to."
+                          },
+                          "startedAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "When the run began reading rows."
+                          },
+                          "finishedAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "When the run ended."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "sql",
+                          "parameters",
+                          "questions",
+                          "limit",
+                          "status",
+                          "total",
+                          "progress",
+                          "matched",
+                          "matchedByQuestion",
+                          "failed",
+                          "skipped",
+                          "tokens",
+                          "costUsd",
+                          "priceUsd",
+                          "error",
+                          "createdAt",
+                          "updatedAt",
+                          "startedAt",
+                          "finishedAt"
+                        ]
+                      },
+                      "description": "The project's runs, newest first."
+                    }
+                  },
+                  "required": [
+                    "runs"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "List the project's runs, newest first. The project comes from the credential, so a run of another project is never listed. Page through them with before, which takes the created time of the oldest run the previous page carried.",
+        "tags": [
+          "Instant Evals"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "description": "Runs to list, at most one hundred."
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "List runs accepted strictly before this instant, as an ISO 8601 timestamp. Half of the list's cursor: pass `beforeId` with it."
+          },
+          {
+            "in": "query",
+            "name": "beforeId",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "description": "The id of the last run of the previous page. Two runs can share an instant, so this is what keeps a page from skipping the others written in the same millisecond."
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/v1/instant-evals/estimate": {
+      "post": {
+        "operationId": "estimateInstantEvalRun",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "rows": {
+                      "type": "integer",
+                      "description": "Rows the statement matches, bounded by the run's limit."
+                    },
+                    "isRowsCapped": {
+                      "type": "boolean",
+                      "description": "Whether the statement matches more rows than the run may judge."
+                    },
+                    "avgTokens": {
+                      "type": "integer",
+                      "description": "Input tokens one judged row sends, measured from a sample."
+                    },
+                    "totalTokens": {
+                      "type": "integer",
+                      "description": "Input tokens the whole run would send."
+                    },
+                    "requests": {
+                      "type": "integer",
+                      "description": "Classifications the run would make, one per judged row."
+                    },
+                    "costUsd": {
+                      "type": "number",
+                      "description": "What the run would cost us, in United States dollars."
+                    },
+                    "priceUsd": {
+                      "type": "number",
+                      "description": "What the run would cost you, in United States dollars."
+                    }
+                  },
+                  "required": [
+                    "rows",
+                    "isRowsCapped",
+                    "avgTokens",
+                    "totalTokens",
+                    "requests",
+                    "costUsd",
+                    "priceUsd"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Price a run without starting it. The rows are counted, a sample of their texts is measured, and the cost is worked out from that. Nothing is judged and nothing is charged.",
+        "summary": "Estimate a run",
+        "tags": [
+          "Instant Evals"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sql": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 50000,
+                    "description": "The LangWatchQL statement to judge. It must project TraceId and at least one eval function column."
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "description": "Values for the parameters the statement declares."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200,
+                    "description": "What to call the run. Yours to choose."
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 100000,
+                    "description": "Rows the run may judge. Ten thousand by default on every plan, up to one hundred thousand on a plan that lifts the cap."
+                  }
+                },
+                "required": [
+                  "sql"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/v1/instant-evals/{id}": {
+      "get": {
+        "operationId": "getInstantEvalRun",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The run id."
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "What the run was called, if anything."
+                    },
+                    "sql": {
+                      "type": "string",
+                      "description": "The statement, exactly as submitted."
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "description": "The values the statement's parameters were filled with."
+                    },
+                    "questions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "The statement's own output column, which is the name this question is addressed by everywhere else."
+                          },
+                          "function": {
+                            "type": "string",
+                            "description": "The eval function that asked it."
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "boolean",
+                              "score",
+                              "category"
+                            ],
+                            "description": "What kind of answer the question takes."
+                          },
+                          "reads": {
+                            "type": "string",
+                            "description": "Which part of the verdict the statement's column carries."
+                          },
+                          "threshold": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "Where a boolean question's probability becomes a pass. Null for a question that is not a boolean."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "function",
+                          "kind",
+                          "reads",
+                          "threshold"
+                        ]
+                      },
+                      "description": "One entry per eval function the statement projects, derived from it when the run was accepted."
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "description": "Rows this run may judge."
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "planning",
+                        "running",
+                        "finished",
+                        "failed",
+                        "cancelled"
+                      ],
+                      "description": "Where the run is in its life."
+                    },
+                    "total": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Rows the run found, bounded by its limit. Null until it has looked."
+                    },
+                    "progress": {
+                      "type": "integer",
+                      "description": "Rows judged so far."
+                    },
+                    "matched": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Judgements that matched, across this run's boolean questions. Null when the run asked none: a score or a category question has no match to count."
+                    },
+                    "matchedByQuestion": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "number"
+                      },
+                      "description": "Per question: matches for a boolean question, judged rows for a score or a category one."
+                    },
+                    "failed": {
+                      "type": "integer",
+                      "description": "Rows the judge could not answer."
+                    },
+                    "skipped": {
+                      "type": "integer",
+                      "description": "Rows the judge declined to answer."
+                    },
+                    "tokens": {
+                      "type": "integer",
+                      "description": "Input tokens the judge billed for."
+                    },
+                    "costUsd": {
+                      "type": "number",
+                      "description": "What the judging cost us, in United States dollars."
+                    },
+                    "priceUsd": {
+                      "type": "number",
+                      "description": "What the judging costs you, in United States dollars."
+                    },
+                    "error": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The code of the failure that ended the run, when one did."
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "description": "When the run was accepted."
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "description": "When the run was last written to."
+                    },
+                    "startedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "When the run began reading rows."
+                    },
+                    "finishedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "When the run ended."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "sql",
+                    "parameters",
+                    "questions",
+                    "limit",
+                    "status",
+                    "total",
+                    "progress",
+                    "matched",
+                    "matchedByQuestion",
+                    "failed",
+                    "skipped",
+                    "tokens",
+                    "costUsd",
+                    "priceUsd",
+                    "error",
+                    "createdAt",
+                    "updatedAt",
+                    "startedAt",
+                    "finishedAt"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Read one run: its status, how many rows it found and judged, how many matched in total and per question, what it could not answer, and the tokens, cost and price the judging came to. An id this project does not hold answers 404 instant_eval_not_found.",
+        "tags": [
+          "Instant Evals"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The run id."
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/v1/instant-evals/{id}/cancel": {
+      "post": {
+        "operationId": "cancelInstantEvalRun",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The run id."
+                    },
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "What the run was called, if anything."
+                    },
+                    "sql": {
+                      "type": "string",
+                      "description": "The statement, exactly as submitted."
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "description": "The values the statement's parameters were filled with."
+                    },
+                    "questions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "The statement's own output column, which is the name this question is addressed by everywhere else."
+                          },
+                          "function": {
+                            "type": "string",
+                            "description": "The eval function that asked it."
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "boolean",
+                              "score",
+                              "category"
+                            ],
+                            "description": "What kind of answer the question takes."
+                          },
+                          "reads": {
+                            "type": "string",
+                            "description": "Which part of the verdict the statement's column carries."
+                          },
+                          "threshold": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "Where a boolean question's probability becomes a pass. Null for a question that is not a boolean."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "function",
+                          "kind",
+                          "reads",
+                          "threshold"
+                        ]
+                      },
+                      "description": "One entry per eval function the statement projects, derived from it when the run was accepted."
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "description": "Rows this run may judge."
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "planning",
+                        "running",
+                        "finished",
+                        "failed",
+                        "cancelled"
+                      ],
+                      "description": "Where the run is in its life."
+                    },
+                    "total": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Rows the run found, bounded by its limit. Null until it has looked."
+                    },
+                    "progress": {
+                      "type": "integer",
+                      "description": "Rows judged so far."
+                    },
+                    "matched": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Judgements that matched, across this run's boolean questions. Null when the run asked none: a score or a category question has no match to count."
+                    },
+                    "matchedByQuestion": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "number"
+                      },
+                      "description": "Per question: matches for a boolean question, judged rows for a score or a category one."
+                    },
+                    "failed": {
+                      "type": "integer",
+                      "description": "Rows the judge could not answer."
+                    },
+                    "skipped": {
+                      "type": "integer",
+                      "description": "Rows the judge declined to answer."
+                    },
+                    "tokens": {
+                      "type": "integer",
+                      "description": "Input tokens the judge billed for."
+                    },
+                    "costUsd": {
+                      "type": "number",
+                      "description": "What the judging cost us, in United States dollars."
+                    },
+                    "priceUsd": {
+                      "type": "number",
+                      "description": "What the judging costs you, in United States dollars."
+                    },
+                    "error": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The code of the failure that ended the run, when one did."
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "description": "When the run was accepted."
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "description": "When the run was last written to."
+                    },
+                    "startedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "When the run began reading rows."
+                    },
+                    "finishedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "When the run ended."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "sql",
+                    "parameters",
+                    "questions",
+                    "limit",
+                    "status",
+                    "total",
+                    "progress",
+                    "matched",
+                    "matchedByQuestion",
+                    "failed",
+                    "skipped",
+                    "tokens",
+                    "costUsd",
+                    "priceUsd",
+                    "error",
+                    "createdAt",
+                    "updatedAt",
+                    "startedAt",
+                    "finishedAt"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Ask a run to stop. The run stops before its next page, so the pages it already judged keep their judgements and are still readable. A run that has already finished, failed or been cancelled answers 409 instant_eval_already_finished.",
+        "summary": "Cancel a run",
+        "tags": [
+          "Instant Evals"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The run id."
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/v1/instant-evals/{id}/results": {
+      "get": {
+        "operationId": "listInstantEvalRunResults",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "judgments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "traceId": {
+                            "type": "string",
+                            "description": "The trace the judgement is about."
+                          },
+                          "questionId": {
+                            "type": "string",
+                            "description": "The question it answers, named by its output column."
+                          },
+                          "threadId": {
+                            "type": "string",
+                            "description": "The conversation the trace belongs to."
+                          },
+                          "spanId": {
+                            "type": "string",
+                            "description": "The span the judged text was read from."
+                          },
+                          "kind": {
+                            "type": "string",
+                            "description": "What kind of question was asked."
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "judged",
+                              "skipped",
+                              "failed"
+                            ],
+                            "description": "Whether the judge answered, declined, or could not answer."
+                          },
+                          "passed": {
+                            "type": [
+                              "boolean",
+                              "null"
+                            ],
+                            "description": "Whether a boolean question passed its threshold."
+                          },
+                          "score": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "A score question's answer."
+                          },
+                          "label": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "A category question's answer."
+                          },
+                          "probability": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "How likely the judge found a boolean question's answer to be true."
+                          },
+                          "probabilities": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "additionalProperties": {
+                              "type": "number"
+                            },
+                            "description": "The full distribution behind a category answer."
+                          },
+                          "error": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "Why the judge could not answer, when it could not."
+                          },
+                          "occurredAt": {
+                            "type": "string",
+                            "description": "When the judgement was made."
+                          }
+                        },
+                        "required": [
+                          "traceId",
+                          "questionId",
+                          "threadId",
+                          "spanId",
+                          "kind",
+                          "status",
+                          "passed",
+                          "score",
+                          "label",
+                          "probability",
+                          "probabilities",
+                          "error",
+                          "occurredAt"
+                        ]
+                      },
+                      "description": "One page of the run's judgements."
+                    },
+                    "nextCursor": {
+                      "type": "string",
+                      "description": "Pass as cursor to read the page after this one. Absent on the last page."
+                    }
+                  },
+                  "required": [
+                    "judgments"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Read the run's judgements, one page at a time. Pass the cursor a page answers with to read the page after it; the last page carries no cursor, and no judgement is ever carried by two pages. Narrow the page with questionId, matched and status.",
+        "summary": "Read a run's results",
+        "tags": [
+          "Instant Evals"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The run id."
+          },
+          {
+            "in": "query",
+            "name": "questionId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Only this question's judgements."
+          },
+          {
+            "in": "query",
+            "name": "matched",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "1",
+                "yes",
+                "false",
+                "0",
+                "no"
+              ]
+            },
+            "description": "Only judgements that matched, or only those that did not. Omit for both."
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "judged",
+                "skipped",
+                "failed"
+              ]
+            },
+            "description": "Only judgements in this state."
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 100
+            },
+            "description": "Judgements per page, at most one thousand."
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "description": "The cursor the previous page answered with."
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/v1/instant-evals/{id}/sample": {
+      "get": {
+        "operationId": "sampleInstantEvalRun",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      },
+                      "description": "The statement's own rows, with each judged column holding the text that was judged rather than the verdict."
+                    },
+                    "judgments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "traceId": {
+                            "type": "string",
+                            "description": "The trace the judgement is about."
+                          },
+                          "questionId": {
+                            "type": "string",
+                            "description": "The question it answers, named by its output column."
+                          },
+                          "threadId": {
+                            "type": "string",
+                            "description": "The conversation the trace belongs to."
+                          },
+                          "spanId": {
+                            "type": "string",
+                            "description": "The span the judged text was read from."
+                          },
+                          "kind": {
+                            "type": "string",
+                            "description": "What kind of question was asked."
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "judged",
+                              "skipped",
+                              "failed"
+                            ],
+                            "description": "Whether the judge answered, declined, or could not answer."
+                          },
+                          "passed": {
+                            "type": [
+                              "boolean",
+                              "null"
+                            ],
+                            "description": "Whether a boolean question passed its threshold."
+                          },
+                          "score": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "A score question's answer."
+                          },
+                          "label": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "A category question's answer."
+                          },
+                          "probability": {
+                            "type": [
+                              "number",
+                              "null"
+                            ],
+                            "description": "How likely the judge found a boolean question's answer to be true."
+                          },
+                          "probabilities": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "additionalProperties": {
+                              "type": "number"
+                            },
+                            "description": "The full distribution behind a category answer."
+                          },
+                          "error": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "Why the judge could not answer, when it could not."
+                          },
+                          "occurredAt": {
+                            "type": "string",
+                            "description": "When the judgement was made."
+                          }
+                        },
+                        "required": [
+                          "traceId",
+                          "questionId",
+                          "threadId",
+                          "spanId",
+                          "kind",
+                          "status",
+                          "passed",
+                          "score",
+                          "label",
+                          "probability",
+                          "probabilities",
+                          "error",
+                          "occurredAt"
+                        ]
+                      },
+                      "description": "The verdicts those rows received."
+                    }
+                  },
+                  "required": [
+                    "rows",
+                    "judgments"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Read a few of the run's rows with the text that was judged beside the verdict it received. The text is re-read through the statement's own extraction functions, so nothing is judged again and reading a sample is free.",
+        "summary": "Sample a run",
+        "tags": [
+          "Instant Evals"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "description": "The run id."
+          },
+          {
+            "in": "query",
+            "name": "n",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 25,
+              "default": 5
+            },
+            "description": "Rows to re-read, at most twenty five."
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
     "/api/v1/run-plans": {
       "get": {
         "operationId": "listRunPlans",

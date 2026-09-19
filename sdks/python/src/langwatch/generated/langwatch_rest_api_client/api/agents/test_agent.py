@@ -43,6 +43,10 @@ def _parse_response(
         response_422 = cast(Any, None)
         return response_422
 
+    if response.status_code == 503:
+        response_503 = cast(Any, None)
+        return response_503
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:

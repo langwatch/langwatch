@@ -3690,6 +3690,121 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/instant-evals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the project's runs, newest first. The project comes from the credential, so a run of another project is never listed. Page through them with before, which takes the created time of the oldest run the previous page carried. */
+        get: operations["listInstantEvalRuns"];
+        put?: never;
+        /** @description Start a run. The statement is accepted, its questions are derived from the eval functions it projects, and the judging happens on the queue: the answer is the queued run, and its progress is read back from the run endpoint. A statement the query policy refuses, one that projects no TraceId, one that projects no eval function, and a row limit past what the plan allows are all refused before anything is judged. */
+        post: operations["createInstantEvalRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/instant-evals/estimate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Estimate a run
+         * @description Price a run without starting it. The rows are counted, a sample of their texts is measured, and the cost is worked out from that. Nothing is judged and nothing is charged.
+         */
+        post: operations["estimateInstantEvalRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/instant-evals/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read one run: its status, how many rows it found and judged, how many matched in total and per question, what it could not answer, and the tokens, cost and price the judging came to. An id this project does not hold answers 404 instant_eval_not_found. */
+        get: operations["getInstantEvalRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/instant-evals/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel a run
+         * @description Ask a run to stop. The run stops before its next page, so the pages it already judged keep their judgements and are still readable. A run that has already finished, failed or been cancelled answers 409 instant_eval_already_finished.
+         */
+        post: operations["cancelInstantEvalRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/instant-evals/{id}/results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a run's results
+         * @description Read the run's judgements, one page at a time. Pass the cursor a page answers with to read the page after it; the last page carries no cursor, and no judgement is ever carried by two pages. Narrow the page with questionId, matched and status.
+         */
+        get: operations["listInstantEvalRunResults"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/instant-evals/{id}/sample": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sample a run
+         * @description Read a few of the run's rows with the text that was judged beside the verdict it received. The text is re-read through the statement's own extraction functions, so nothing is judged again and reading a sample is free.
+         */
+        get: operations["sampleInstantEvalRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/run-plans": {
         parameters: {
             query?: never;
@@ -29099,6 +29214,559 @@ export interface operations {
                     "application/json": {
                         error: string;
                         message?: string;
+                    };
+                };
+            };
+        };
+    };
+    listInstantEvalRuns: {
+        parameters: {
+            query?: {
+                /** @description Runs to list, at most one hundred. */
+                limit?: number;
+                /** @description List runs accepted strictly before this instant, as an ISO 8601 timestamp. Half of the list's cursor: pass `beforeId` with it. */
+                before?: string;
+                /** @description The id of the last run of the previous page. Two runs can share an instant, so this is what keeps a page from skipping the others written in the same millisecond. */
+                beforeId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The project's runs, newest first. */
+                        runs: {
+                            /** @description The run id. */
+                            id: string;
+                            /** @description What the run was called, if anything. */
+                            name: string | null;
+                            /** @description The statement, exactly as submitted. */
+                            sql: string;
+                            /** @description The values the statement's parameters were filled with. */
+                            parameters: {
+                                [key: string]: string | number | boolean | null;
+                            };
+                            /** @description One entry per eval function the statement projects, derived from it when the run was accepted. */
+                            questions: {
+                                /** @description The statement's own output column, which is the name this question is addressed by everywhere else. */
+                                id: string;
+                                /** @description The eval function that asked it. */
+                                function: string;
+                                /**
+                                 * @description What kind of answer the question takes.
+                                 * @enum {string}
+                                 */
+                                kind: "boolean" | "score" | "category";
+                                /** @description Which part of the verdict the statement's column carries. */
+                                reads: string;
+                                /** @description Where a boolean question's probability becomes a pass. Null for a question that is not a boolean. */
+                                threshold: number | null;
+                            }[];
+                            /** @description Rows this run may judge. */
+                            limit: number;
+                            /**
+                             * @description Where the run is in its life.
+                             * @enum {string}
+                             */
+                            status: "queued" | "planning" | "running" | "finished" | "failed" | "cancelled";
+                            /** @description Rows the run found, bounded by its limit. Null until it has looked. */
+                            total: number | null;
+                            /** @description Rows judged so far. */
+                            progress: number;
+                            /** @description Judgements that matched, across this run's boolean questions. Null when the run asked none: a score or a category question has no match to count. */
+                            matched: number | null;
+                            /** @description Per question: matches for a boolean question, judged rows for a score or a category one. */
+                            matchedByQuestion: {
+                                [key: string]: number;
+                            };
+                            /** @description Rows the judge could not answer. */
+                            failed: number;
+                            /** @description Rows the judge declined to answer. */
+                            skipped: number;
+                            /** @description Input tokens the judge billed for. */
+                            tokens: number;
+                            /** @description What the judging cost us, in United States dollars. */
+                            costUsd: number;
+                            /** @description What the judging costs you, in United States dollars. */
+                            priceUsd: number;
+                            /** @description The code of the failure that ended the run, when one did. */
+                            error: string | null;
+                            /** @description When the run was accepted. */
+                            createdAt: string;
+                            /** @description When the run was last written to. */
+                            updatedAt: string;
+                            /** @description When the run began reading rows. */
+                            startedAt: string | null;
+                            /** @description When the run ended. */
+                            finishedAt: string | null;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    createInstantEvalRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The LangWatchQL statement to judge. It must project TraceId and at least one eval function column. */
+                    sql: string;
+                    /** @description Values for the parameters the statement declares. */
+                    parameters?: {
+                        [key: string]: string | number | boolean | null;
+                    };
+                    /** @description What to call the run. Yours to choose. */
+                    name?: string;
+                    /** @description Rows the run may judge. Ten thousand by default on every plan, up to one hundred thousand on a plan that lifts the cap. */
+                    limit?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The run id. */
+                        id: string;
+                        /** @description What the run was called, if anything. */
+                        name: string | null;
+                        /** @description The statement, exactly as submitted. */
+                        sql: string;
+                        /** @description The values the statement's parameters were filled with. */
+                        parameters: {
+                            [key: string]: string | number | boolean | null;
+                        };
+                        /** @description One entry per eval function the statement projects, derived from it when the run was accepted. */
+                        questions: {
+                            /** @description The statement's own output column, which is the name this question is addressed by everywhere else. */
+                            id: string;
+                            /** @description The eval function that asked it. */
+                            function: string;
+                            /**
+                             * @description What kind of answer the question takes.
+                             * @enum {string}
+                             */
+                            kind: "boolean" | "score" | "category";
+                            /** @description Which part of the verdict the statement's column carries. */
+                            reads: string;
+                            /** @description Where a boolean question's probability becomes a pass. Null for a question that is not a boolean. */
+                            threshold: number | null;
+                        }[];
+                        /** @description Rows this run may judge. */
+                        limit: number;
+                        /**
+                         * @description Where the run is in its life.
+                         * @enum {string}
+                         */
+                        status: "queued" | "planning" | "running" | "finished" | "failed" | "cancelled";
+                        /** @description Rows the run found, bounded by its limit. Null until it has looked. */
+                        total: number | null;
+                        /** @description Rows judged so far. */
+                        progress: number;
+                        /** @description Judgements that matched, across this run's boolean questions. Null when the run asked none: a score or a category question has no match to count. */
+                        matched: number | null;
+                        /** @description Per question: matches for a boolean question, judged rows for a score or a category one. */
+                        matchedByQuestion: {
+                            [key: string]: number;
+                        };
+                        /** @description Rows the judge could not answer. */
+                        failed: number;
+                        /** @description Rows the judge declined to answer. */
+                        skipped: number;
+                        /** @description Input tokens the judge billed for. */
+                        tokens: number;
+                        /** @description What the judging cost us, in United States dollars. */
+                        costUsd: number;
+                        /** @description What the judging costs you, in United States dollars. */
+                        priceUsd: number;
+                        /** @description The code of the failure that ended the run, when one did. */
+                        error: string | null;
+                        /** @description When the run was accepted. */
+                        createdAt: string;
+                        /** @description When the run was last written to. */
+                        updatedAt: string;
+                        /** @description When the run began reading rows. */
+                        startedAt: string | null;
+                        /** @description When the run ended. */
+                        finishedAt: string | null;
+                    };
+                };
+            };
+        };
+    };
+    estimateInstantEvalRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The LangWatchQL statement to judge. It must project TraceId and at least one eval function column. */
+                    sql: string;
+                    /** @description Values for the parameters the statement declares. */
+                    parameters?: {
+                        [key: string]: string | number | boolean | null;
+                    };
+                    /** @description What to call the run. Yours to choose. */
+                    name?: string;
+                    /** @description Rows the run may judge. Ten thousand by default on every plan, up to one hundred thousand on a plan that lifts the cap. */
+                    limit?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Rows the statement matches, bounded by the run's limit. */
+                        rows: number;
+                        /** @description Whether the statement matches more rows than the run may judge. */
+                        isRowsCapped: boolean;
+                        /** @description Input tokens one judged row sends, measured from a sample. */
+                        avgTokens: number;
+                        /** @description Input tokens the whole run would send. */
+                        totalTokens: number;
+                        /** @description Classifications the run would make, one per judged row. */
+                        requests: number;
+                        /** @description What the run would cost us, in United States dollars. */
+                        costUsd: number;
+                        /** @description What the run would cost you, in United States dollars. */
+                        priceUsd: number;
+                    };
+                };
+            };
+        };
+    };
+    getInstantEvalRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The run id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The run id. */
+                        id: string;
+                        /** @description What the run was called, if anything. */
+                        name: string | null;
+                        /** @description The statement, exactly as submitted. */
+                        sql: string;
+                        /** @description The values the statement's parameters were filled with. */
+                        parameters: {
+                            [key: string]: string | number | boolean | null;
+                        };
+                        /** @description One entry per eval function the statement projects, derived from it when the run was accepted. */
+                        questions: {
+                            /** @description The statement's own output column, which is the name this question is addressed by everywhere else. */
+                            id: string;
+                            /** @description The eval function that asked it. */
+                            function: string;
+                            /**
+                             * @description What kind of answer the question takes.
+                             * @enum {string}
+                             */
+                            kind: "boolean" | "score" | "category";
+                            /** @description Which part of the verdict the statement's column carries. */
+                            reads: string;
+                            /** @description Where a boolean question's probability becomes a pass. Null for a question that is not a boolean. */
+                            threshold: number | null;
+                        }[];
+                        /** @description Rows this run may judge. */
+                        limit: number;
+                        /**
+                         * @description Where the run is in its life.
+                         * @enum {string}
+                         */
+                        status: "queued" | "planning" | "running" | "finished" | "failed" | "cancelled";
+                        /** @description Rows the run found, bounded by its limit. Null until it has looked. */
+                        total: number | null;
+                        /** @description Rows judged so far. */
+                        progress: number;
+                        /** @description Judgements that matched, across this run's boolean questions. Null when the run asked none: a score or a category question has no match to count. */
+                        matched: number | null;
+                        /** @description Per question: matches for a boolean question, judged rows for a score or a category one. */
+                        matchedByQuestion: {
+                            [key: string]: number;
+                        };
+                        /** @description Rows the judge could not answer. */
+                        failed: number;
+                        /** @description Rows the judge declined to answer. */
+                        skipped: number;
+                        /** @description Input tokens the judge billed for. */
+                        tokens: number;
+                        /** @description What the judging cost us, in United States dollars. */
+                        costUsd: number;
+                        /** @description What the judging costs you, in United States dollars. */
+                        priceUsd: number;
+                        /** @description The code of the failure that ended the run, when one did. */
+                        error: string | null;
+                        /** @description When the run was accepted. */
+                        createdAt: string;
+                        /** @description When the run was last written to. */
+                        updatedAt: string;
+                        /** @description When the run began reading rows. */
+                        startedAt: string | null;
+                        /** @description When the run ended. */
+                        finishedAt: string | null;
+                    };
+                };
+            };
+        };
+    };
+    cancelInstantEvalRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The run id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The run id. */
+                        id: string;
+                        /** @description What the run was called, if anything. */
+                        name: string | null;
+                        /** @description The statement, exactly as submitted. */
+                        sql: string;
+                        /** @description The values the statement's parameters were filled with. */
+                        parameters: {
+                            [key: string]: string | number | boolean | null;
+                        };
+                        /** @description One entry per eval function the statement projects, derived from it when the run was accepted. */
+                        questions: {
+                            /** @description The statement's own output column, which is the name this question is addressed by everywhere else. */
+                            id: string;
+                            /** @description The eval function that asked it. */
+                            function: string;
+                            /**
+                             * @description What kind of answer the question takes.
+                             * @enum {string}
+                             */
+                            kind: "boolean" | "score" | "category";
+                            /** @description Which part of the verdict the statement's column carries. */
+                            reads: string;
+                            /** @description Where a boolean question's probability becomes a pass. Null for a question that is not a boolean. */
+                            threshold: number | null;
+                        }[];
+                        /** @description Rows this run may judge. */
+                        limit: number;
+                        /**
+                         * @description Where the run is in its life.
+                         * @enum {string}
+                         */
+                        status: "queued" | "planning" | "running" | "finished" | "failed" | "cancelled";
+                        /** @description Rows the run found, bounded by its limit. Null until it has looked. */
+                        total: number | null;
+                        /** @description Rows judged so far. */
+                        progress: number;
+                        /** @description Judgements that matched, across this run's boolean questions. Null when the run asked none: a score or a category question has no match to count. */
+                        matched: number | null;
+                        /** @description Per question: matches for a boolean question, judged rows for a score or a category one. */
+                        matchedByQuestion: {
+                            [key: string]: number;
+                        };
+                        /** @description Rows the judge could not answer. */
+                        failed: number;
+                        /** @description Rows the judge declined to answer. */
+                        skipped: number;
+                        /** @description Input tokens the judge billed for. */
+                        tokens: number;
+                        /** @description What the judging cost us, in United States dollars. */
+                        costUsd: number;
+                        /** @description What the judging costs you, in United States dollars. */
+                        priceUsd: number;
+                        /** @description The code of the failure that ended the run, when one did. */
+                        error: string | null;
+                        /** @description When the run was accepted. */
+                        createdAt: string;
+                        /** @description When the run was last written to. */
+                        updatedAt: string;
+                        /** @description When the run began reading rows. */
+                        startedAt: string | null;
+                        /** @description When the run ended. */
+                        finishedAt: string | null;
+                    };
+                };
+            };
+        };
+    };
+    listInstantEvalRunResults: {
+        parameters: {
+            query?: {
+                /** @description Only this question's judgements. */
+                questionId?: string;
+                /** @description Only judgements that matched, or only those that did not. Omit for both. */
+                matched?: "true" | "1" | "yes" | "false" | "0" | "no";
+                /** @description Only judgements in this state. */
+                status?: "judged" | "skipped" | "failed";
+                /** @description Judgements per page, at most one thousand. */
+                limit?: number;
+                /** @description The cursor the previous page answered with. */
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                /** @description The run id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description One page of the run's judgements. */
+                        judgments: {
+                            /** @description The trace the judgement is about. */
+                            traceId: string;
+                            /** @description The question it answers, named by its output column. */
+                            questionId: string;
+                            /** @description The conversation the trace belongs to. */
+                            threadId: string;
+                            /** @description The span the judged text was read from. */
+                            spanId: string;
+                            /** @description What kind of question was asked. */
+                            kind: string;
+                            /**
+                             * @description Whether the judge answered, declined, or could not answer.
+                             * @enum {string}
+                             */
+                            status: "judged" | "skipped" | "failed";
+                            /** @description Whether a boolean question passed its threshold. */
+                            passed: boolean | null;
+                            /** @description A score question's answer. */
+                            score: number | null;
+                            /** @description A category question's answer. */
+                            label: string | null;
+                            /** @description How likely the judge found a boolean question's answer to be true. */
+                            probability: number | null;
+                            /** @description The full distribution behind a category answer. */
+                            probabilities: {
+                                [key: string]: number;
+                            } | null;
+                            /** @description Why the judge could not answer, when it could not. */
+                            error: string | null;
+                            /** @description When the judgement was made. */
+                            occurredAt: string;
+                        }[];
+                        /** @description Pass as cursor to read the page after this one. Absent on the last page. */
+                        nextCursor?: string;
+                    };
+                };
+            };
+        };
+    };
+    sampleInstantEvalRun: {
+        parameters: {
+            query?: {
+                /** @description Rows to re-read, at most twenty five. */
+                n?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The run id. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The statement's own rows, with each judged column holding the text that was judged rather than the verdict. */
+                        rows: {
+                            [key: string]: unknown;
+                        }[];
+                        /** @description The verdicts those rows received. */
+                        judgments: {
+                            /** @description The trace the judgement is about. */
+                            traceId: string;
+                            /** @description The question it answers, named by its output column. */
+                            questionId: string;
+                            /** @description The conversation the trace belongs to. */
+                            threadId: string;
+                            /** @description The span the judged text was read from. */
+                            spanId: string;
+                            /** @description What kind of question was asked. */
+                            kind: string;
+                            /**
+                             * @description Whether the judge answered, declined, or could not answer.
+                             * @enum {string}
+                             */
+                            status: "judged" | "skipped" | "failed";
+                            /** @description Whether a boolean question passed its threshold. */
+                            passed: boolean | null;
+                            /** @description A score question's answer. */
+                            score: number | null;
+                            /** @description A category question's answer. */
+                            label: string | null;
+                            /** @description How likely the judge found a boolean question's answer to be true. */
+                            probability: number | null;
+                            /** @description The full distribution behind a category answer. */
+                            probabilities: {
+                                [key: string]: number;
+                            } | null;
+                            /** @description Why the judge could not answer, when it could not. */
+                            error: string | null;
+                            /** @description When the judgement was made. */
+                            occurredAt: string;
+                        }[];
                     };
                 };
             };

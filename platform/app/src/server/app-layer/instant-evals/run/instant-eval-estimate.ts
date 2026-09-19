@@ -1,0 +1,139 @@
+/**
+ * What a run would read, and what judging it would cost, without judging any
+ * of it.
+ *
+ * A separate module from the service because it is the only operation that has
+ * to model the run rather than perform it: the count bounds the rows, a sample
+ * of texts measures what one row sends, and the classifier's own published
+ * rate turns that into a price. The service holds the surface; the arithmetic
+ * lives here.
+ *
+ * @see ../classifier/pricing.ts
+ * @see ./caps.ts
+ * @see ../../../../../specs/instant-evals/instant-eval-api.feature
+ */
+
+import { createLogger } from "@langwatch/observability";
+
+import type { Protections } from "~/server/traces/protections";
+import type { InstantEvalClassifier } from "../classifier/classifier";
+import { instantEvalCostUsd, instantEvalPriceUsd } from "../classifier/pricing";
+import { estimateInstantEvalRequestTokens } from "../classifier/token-budget";
+import {
+  InstantEvalEstimateUnavailableError,
+  InstantEvalRowCapExceededError,
+} from "./errors";
+import { instantEvalAverageTextBytes } from "./instant-eval-run.executor";
+import type { InstantEvalRowSource, InstantEvalRunCaller } from "./row-source";
+import type { AcceptedInstantEvalStatement } from "./statement";
+
+const logger = createLogger("langwatch:instant-evals:estimate");
+
+/** Rows an estimate measures the text size of. */
+export const INSTANT_EVAL_ESTIMATE_SAMPLE = 50;
+
+/** What a run would read, and what judging it would cost. */
+export interface InstantEvalEstimate {
+  /** Rows the statement matches, bounded by the run's own limit. */
+  readonly rows: number;
+  /** Whether the statement matched more rows than the run may judge. */
+  readonly isRowsCapped: boolean;
+  /** Input tokens one judged row sends, measured from a sample. */
+  readonly avgTokens: number;
+  readonly totalTokens: number;
+  /** Classifications the run would make, one per judged row. */
+  readonly requests: number;
+  readonly costUsd: number;
+  readonly priceUsd: number;
+}
+
+export async function estimateInstantEvalRun({
+  projectId,
+  protections,
+  caller,
+  accepted,
+  rowLimit,
+  rowSource,
+  classifier,
+}: {
+  projectId: string;
+  protections: Protections;
+  caller: InstantEvalRunCaller;
+  accepted: AcceptedInstantEvalStatement;
+  rowLimit: number;
+  rowSource: InstantEvalRowSource;
+  classifier: InstantEvalClassifier;
+}): Promise<InstantEvalEstimate> {
+  try {
+    // A count rather than a read of every key: a hundred thousand keys is past
+    // the executor's byte ceiling, and that ceiling truncates silently, so the
+    // price a caller reads before spending would be the price of a smaller run
+    // than the one they are about to start.
+    const total = await rowSource.count({
+      caller,
+      sql: accepted.sql,
+      parameters: accepted.parameters,
+      limit: rowLimit + 1,
+    });
+    const isRowsCapped = total > rowLimit;
+
+    const keyPage =
+      total === 0
+        ? { keys: [] as const }
+        : await rowSource.keys({
+            caller,
+            sql: accepted.sql,
+            parameters: accepted.parameters,
+            keyColumns: accepted.keyColumns,
+            limit: INSTANT_EVAL_ESTIMATE_SAMPLE,
+          });
+
+    const sampleIds = [...new Set(keyPage.keys.map((key) => key.traceId))];
+    const sample =
+      sampleIds.length === 0
+        ? []
+        : await rowSource.texts({
+            caller,
+            protections,
+            sql: accepted.sql,
+            parameters: accepted.parameters,
+            calls: accepted.plan,
+            traceIds: sampleIds,
+          });
+
+    const questions = accepted.questions.map((question) => question.question);
+    const averageBytes = instantEvalAverageTextBytes({
+      rows: sample,
+      questionIds: accepted.questions.map((question) => question.id),
+    });
+    // Priced at what one request of the average text would send, because one
+    // request carries every question about one text: that is the whole reason a
+    // three-question statement costs about what a one-question one does.
+    const avgTokens = estimateInstantEvalRequestTokens({
+      text: "x".repeat(averageBytes),
+      questions,
+      limits: classifier.limits,
+    });
+    const rows = Math.min(total, rowLimit);
+    const totalTokens = avgTokens * rows;
+    const costUsd = instantEvalCostUsd({
+      inputTokens: totalTokens,
+      pricing: classifier.pricing,
+    });
+    return {
+      rows,
+      isRowsCapped,
+      avgTokens,
+      totalTokens,
+      requests: rows,
+      costUsd,
+      priceUsd: instantEvalPriceUsd({ costUsd, pricing: classifier.pricing }),
+    };
+  } catch (error) {
+    if (error instanceof InstantEvalRowCapExceededError) throw error;
+    logger.error({ projectId, error }, "Instant Eval estimate failed");
+    throw new InstantEvalEstimateUnavailableError({
+      reasons: [error instanceof Error ? error : new Error(String(error))],
+    });
+  }
+}

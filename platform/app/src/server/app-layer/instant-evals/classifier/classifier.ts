@@ -172,6 +172,14 @@ export interface InstantEvalPricing {
 
 export interface InstantEvalClassifyRequest {
   /**
+   * The project the text is judged for.
+   *
+   * Not for the judgement, which never sees it, but for the rate: the shared
+   * limiter gives each project a share of the deployment's ceiling, and this
+   * is what names the share the request draws on.
+   */
+  readonly projectId: string;
+  /**
    * The text to judge, as long as the caller has it.
    *
    * Deliberately not pre-cut. The budget is a property of the classifier, and

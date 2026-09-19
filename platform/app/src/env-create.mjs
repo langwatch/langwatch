@@ -309,7 +309,16 @@ export function createEnvConfig() {
         .optional(),
       JEV_MODEL: z.string().optional(),
       INSTANT_EVAL_CLASSIFIER: z.enum(["jev", "null"]).optional(),
-      INSTANT_EVAL_GLOBAL_RPS: z.coerce.number().int().positive().optional(),
+      INSTANT_EVAL_GLOBAL_TOKENS_PER_SECOND: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional(),
+      INSTANT_EVAL_TENANT_TOKENS_PER_SECOND: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional(),
       INSTANT_EVAL_QUERY_TOKEN_BUDGET: z.coerce
         .number()
         .int()
@@ -762,7 +771,10 @@ export function createEnvConfig() {
       JEV_BASE_URL: process.env.JEV_BASE_URL,
       JEV_MODEL: process.env.JEV_MODEL,
       INSTANT_EVAL_CLASSIFIER: process.env.INSTANT_EVAL_CLASSIFIER,
-      INSTANT_EVAL_GLOBAL_RPS: process.env.INSTANT_EVAL_GLOBAL_RPS,
+      INSTANT_EVAL_GLOBAL_TOKENS_PER_SECOND:
+        process.env.INSTANT_EVAL_GLOBAL_TOKENS_PER_SECOND,
+      INSTANT_EVAL_TENANT_TOKENS_PER_SECOND:
+        process.env.INSTANT_EVAL_TENANT_TOKENS_PER_SECOND,
       INSTANT_EVAL_QUERY_TOKEN_BUDGET:
         process.env.INSTANT_EVAL_QUERY_TOKEN_BUDGET,
       LANGEVALS_STAGING_THRESHOLD_BYTES:

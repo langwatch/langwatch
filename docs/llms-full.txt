@@ -66682,6 +66682,195 @@ openapi: "PATCH /api/groups/{id}"
 
 ---
 
+# FILE: ./api-reference/instant-evals/cancel-a-run.mdx
+
+---
+title: "Cancel a run"
+openapi: "POST /api/v1/instant-evals/{id}/cancel"
+---
+
+---
+
+# FILE: ./api-reference/instant-evals/create-instant-evals.mdx
+
+---
+title: "Start a run"
+openapi: "POST /api/v1/instant-evals"
+---
+
+---
+
+# FILE: ./api-reference/instant-evals/estimate-a-run.mdx
+
+---
+title: "Estimate a run"
+openapi: "POST /api/v1/instant-evals/estimate"
+---
+
+---
+
+# FILE: ./api-reference/instant-evals/get-instant-evals.mdx
+
+---
+title: "Get Instant Evals"
+openapi: "GET /api/v1/instant-evals/{id}"
+---
+
+---
+
+# FILE: ./api-reference/instant-evals/list-instant-evals.mdx
+
+---
+title: "List the project's runs, newest first"
+openapi: "GET /api/v1/instant-evals"
+---
+
+---
+
+# FILE: ./api-reference/instant-evals/overview.mdx
+
+---
+title: "Overview"
+description: "Judge a LangWatchQL statement across your whole production history as a job. Start a run, price one before you start it, poll its progress, read its judgements page by page, sample the text that was judged, and cancel a run that is still going."
+---
+
+## Intro
+
+Judge a LangWatchQL statement across your whole production history as a job. Start a run, price one before you start it, poll its progress, read its judgements page by page, sample the text that was judged, and cancel a run that is still going.
+
+---
+
+# FILE: ./api-reference/instant-evals/read-a-run-s-results.mdx
+
+---
+title: "Read a run's results"
+openapi: "GET /api/v1/instant-evals/{id}/results"
+---
+
+---
+
+# FILE: ./api-reference/instant-evals/running-an-instant-eval.mdx
+
+---
+title: "Running An Instant Eval"
+description: "Take a LangWatchQL statement that judges rows and run it as a job across your history, with progress, judgements you can page through, and a price you can see before you start."
+---
+
+## What A Run Is
+
+An Instant Eval run takes one LangWatchQL statement and judges every row it matches. The statement is the same kind you send to `POST /api/v1/query`, with one or more eval function columns in its `SELECT` list. The query endpoint answers a page at a time; a run keeps going until it reaches the end of the statement or its row limit.
+
+The statement is stored as submitted and handed back on every read, so an agent can fetch a run, change one predicate and submit the next one.
+
+## The Statement A Run Accepts
+
+Two things are required beyond what the query family already validates:
+
+- The statement must project `TraceId`, because that is how a judgement is addressed.
+- It must project at least one eval function column, such as `eval_passed(...) AS refused`.
+
+Anything else the query validator refuses is refused here too, with the code `instant_eval_query_invalid` and the same violations in `meta`. A statement that validates but projects neither of the two required columns answers `instant_eval_query_missing_columns`, naming what is absent.
+
+Project `SpanId` as well when your statement has one row per span rather than one per trace. That is what tells the run to address a judgement by the trace and the span together, so the spans of one trace come back as separate verdicts.
+
+Add an `ORDER BY` when your statement carries a `LIMIT`. The run reads your statement once to count it and twice per page, and a `LIMIT` with no order lets the database return a different set of rows each time, so the pages are not guaranteed to cover one fixed set.
+
+```sql
+SELECT
+  TraceId,
+  eval_passed(conversation(ConversationId), 'Did the agent refuse the request?') AS refused
+FROM analytics.trace_metrics
+WHERE OccurredAt >= subtractDays(now(), 30) AND ConversationId != ''
+GROUP BY TraceId, ConversationId
+```
+
+## Pricing A Run Before You Start It
+
+`POST /api/v1/instant-evals/estimate` takes the same body as a run and answers without judging anything. It counts the rows the statement matches, reads a sample of them to measure how much text a row carries, and multiplies:
+
+```json
+{
+  "rows": 8421,
+  "rowsCapped": false,
+  "avgTokens": 612,
+  "totalTokens": 5153652,
+  "requests": 8421,
+  "costUsd": 0.216,
+  "priceUsd": 0.281
+}
+```
+
+`priceUsd` is what the run costs you and `costUsd` is what it costs us. One classification is made per row, carrying every question the statement asks, so a statement with four eval columns still sends one request per row.
+
+## Row Limits
+
+A run judges at most 10,000 rows by default. Pass `limit` to ask for fewer, or for up to 100,000 on a plan that lifts the cap. A `limit` above what your plan allows answers `instant_eval_row_cap_exceeded` with the cap and the plan in `meta`.
+
+When the statement matches more rows than the limit, the run judges the first page-ordered rows up to the limit and reports `isCapped` as true. Narrow the statement rather than raising the limit when the answer has to cover everything.
+
+## Starting A Run And Watching It
+
+`POST /api/v1/instant-evals` accepts the statement and answers `202` with the run, whose `status` is `QUEUED`. Poll `GET /api/v1/instant-evals/{id}` for progress:
+
+| Field | What it says |
+|---|---|
+| `status` | `QUEUED`, `PLANNING`, `RUNNING`, `FINISHED`, `FAILED` or `CANCELLED` |
+| `total` | Rows the statement matched, once the run has counted them |
+| `progress` | Rows judged so far |
+| `matched` | Judgements that matched, across the boolean questions. Null when the run asked none |
+| `matchedByQuestion` | Matches for a boolean question, judged rows for a score or a category one |
+| `failed` | Rows the judge could not answer |
+| `skipped` | Rows the judge declined, for instance because the text was too large |
+| `tokens` | Input tokens billed so far |
+| `priceUsd` | What the run has cost you, written when it finishes |
+
+`GET /api/v1/instant-evals` lists the project's runs newest first, paged with `before` as an ISO 8601 cursor.
+
+## Reading The Judgements
+
+`GET /api/v1/instant-evals/{id}/results` pages through what the run wrote, keyset-paged with a `cursor`. Filter with `questionId`, `matched` and `status`:
+
+```
+GET /api/v1/instant-evals/run_123/results?questionId=refused&matched=true&limit=200
+```
+
+A judgement names the trace, the span, the question, the verdict and when it was made. Boolean questions carry `passed` and `probability`, score questions carry `score`, category questions carry `label` and the distribution in `probabilities`. A row the judge declined carries a `skippedReason` instead.
+
+The judged text is not stored. `GET /api/v1/instant-evals/{id}/sample?n=5` re-reads a few rows through the original statement and returns them next to their verdicts, which is how you check a run answered the question you meant to ask. The rows differ between calls, and a run with a boolean question shows the rows that matched first.
+
+## Cancelling
+
+`POST /api/v1/instant-evals/{id}/cancel` stops a run that is still going. The page in flight finishes its current chunk, then the run ends as `CANCELLED` and is billed for what it judged. Cancelling a run that already ended answers `instant_eval_already_finished`.
+
+## Querying Judgements Alongside Your Traces
+
+Every judgement is also a row in the `judgments` analytics dataset, so a later query can join verdicts back to the traces that produced them:
+
+```sql
+SELECT j.Label AS verdict, count() AS traces
+FROM analytics.judgments AS j
+WHERE j.RunId = {run:String} AND j.CreatedAt >= subtractDays(now(), 7)
+GROUP BY verdict
+ORDER BY traces DESC
+```
+
+`GET /api/v1/query/schema` lists the dataset's columns. Judgements are kept until you delete the project, because a retention window measured in weeks would remove the answer to a question asked about last quarter.
+
+## Permissions
+
+Reading runs and their results needs `analytics:view`. Starting or cancelling one needs `analytics:manage`.
+
+---
+
+# FILE: ./api-reference/instant-evals/sample-a-run.mdx
+
+---
+title: "Sample a run"
+openapi: "GET /api/v1/instant-evals/{id}/sample"
+---
+
+---
+
 # FILE: ./api-reference/invites/create-invites.mdx
 
 ---
@@ -67748,6 +67937,7 @@ Two column families are gated rather than freely selectable: free-text carriers 
 | `coding_session_events` | One row per coding-agent session event: model calls, compactions, rate limits, tool runs and more, in event order. | `costs` | one row per (TenantId, SessionId, TimeUnixMs, RecordId) | `TimeUnixMs` |
 | `coding_trace_sessions` | Correlates a trace to the coding-agent session it belongs to. | None | one row per (TenantId, TraceId) | `OccurredAt` |
 | `coding_tool_results` | One row per coding-agent tool call, with the text it printed back to the agent. | `output` | one row per (TenantId, TraceId, SpanId), latest version only | `StartTime` |
+| `judgments` | One row per Instant Eval run, trace and question, with the verdict the judge gave. | None | one row per (TenantId, RunId, TraceId, SpanId, QuestionId), latest version only | `CreatedAt` |
 
 `coding_tool_results.OutputText` is what the tool printed back to the agent. Read it to answer "what did this failed tool call print":
 

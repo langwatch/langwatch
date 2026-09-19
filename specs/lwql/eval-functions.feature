@@ -252,17 +252,18 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     And the query fails as cancelled rather than answering with null columns
 
   @unit
-  Scenario: A query that judged nothing records no cost
+  Scenario: A query that judged nothing reports no spend
     Given a statement whose every key resolved to no text
     When it is executed
-    Then no cost row is written
+    Then no spend record is reported
 
   @unit
-  Scenario: One cost row is recorded per query
+  Scenario: One spend record is reported per query
     Given a statement that judged three conversations
     When it is executed
-    Then one cost row is written for the project with the classifier's input tokens
-    And its amount is the classifier's own cost
+    Then one spend record is reported for the project with the classifier's input tokens
+    And it names no run, because a synchronous query has none
+    And its cost is the classifier's own cost
     And the customer price carries the platform markup
 
   # ---------------------------------------------------------------------------

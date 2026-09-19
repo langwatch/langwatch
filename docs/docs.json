@@ -1261,6 +1261,20 @@
             ]
           },
           {
+            "group": "Instant Evals",
+            "pages": [
+              "api-reference/instant-evals/overview",
+              "api-reference/instant-evals/estimate-a-run",
+              "api-reference/instant-evals/create-instant-evals",
+              "api-reference/instant-evals/list-instant-evals",
+              "api-reference/instant-evals/get-instant-evals",
+              "api-reference/instant-evals/read-a-run-s-results",
+              "api-reference/instant-evals/sample-a-run",
+              "api-reference/instant-evals/cancel-a-run",
+              "api-reference/instant-evals/running-an-instant-eval"
+            ]
+          },
+          {
             "group": "Run Plans",
             "pages": [
               "api-reference/run-plans/overview",

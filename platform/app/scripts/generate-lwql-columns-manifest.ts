@@ -53,12 +53,56 @@ const OUTPUT_PATH = fileURLToPath(
   ),
 );
 
-async function main(): Promise<void> {
+/**
+ * Where the migrations are run to read their output back.
+ *
+ * A container by default, and the server `LANGWATCH_TEST_CLICKHOUSE_URL` names
+ * when it is set — the same variable the integration lane uses to run against
+ * native services on a machine with no container runtime. The dump is of the
+ * migrations' own output either way, because the scratch database is dropped
+ * and recreated by the migration run.
+ */
+async function clickHouseForDump(): Promise<{
+  httpUrl: string;
+  connectionUrl: string;
+  username: string;
+  password: string;
+  stop: () => Promise<void>;
+}> {
+  const existing = process.env.LANGWATCH_TEST_CLICKHOUSE_URL;
+  if (existing) {
+    const url = new URL(existing);
+    const username = decodeURIComponent(url.username) || "default";
+    const password = decodeURIComponent(url.password);
+    return {
+      httpUrl: `${url.protocol}//${url.host}`,
+      connectionUrl: `${url.protocol}//${username}:${password}@${url.host}/${MANIFEST_DATABASE}`,
+      username,
+      password,
+      stop: async () => {
+        // The server is not ours to stop.
+      },
+    };
+  }
+
   const container = await new ClickHouseContainer(CLICKHOUSE_IMAGE)
     .withUsername(ADMIN_USER)
     .withPassword(ADMIN_PASSWORD)
     .withStartupTimeout(120_000)
     .start();
+  return {
+    httpUrl: container.getHttpUrl(),
+    connectionUrl: container.getConnectionUrl(),
+    username: ADMIN_USER,
+    password: ADMIN_PASSWORD,
+    stop: async () => {
+      await container.stop();
+    },
+  };
+}
+
+async function main(): Promise<void> {
+  const server = await clickHouseForDump();
 
   // CLICKHOUSE_CLUSTER is a deployment fact that switches every engine to its
   // Replicated form, which needs a Keeper the container has not got. Unset it
@@ -67,14 +111,19 @@ async function main(): Promise<void> {
   delete process.env.CLICKHOUSE_CLUSTER;
 
   const client = createClient({
-    url: container.getHttpUrl(),
-    username: ADMIN_USER,
-    password: ADMIN_PASSWORD,
+    url: server.httpUrl,
+    username: server.username,
+    password: server.password,
   });
 
   try {
+    // Dropped first, so a reused server dumps this run's migrations rather
+    // than whatever a previous run left in the scratch database.
+    await client.command({
+      query: `DROP DATABASE IF EXISTS ${MANIFEST_DATABASE}`,
+    });
     await migrateUp({
-      connectionUrl: container.getConnectionUrl(),
+      connectionUrl: server.connectionUrl,
       database: MANIFEST_DATABASE,
     });
     const manifest = await buildColumnsManifestFromDatabase({
@@ -88,7 +137,7 @@ async function main(): Promise<void> {
       process.env.CLICKHOUSE_CLUSTER = previousCluster;
     }
     await client.close();
-    await container.stop();
+    await server.stop();
   }
 }
 

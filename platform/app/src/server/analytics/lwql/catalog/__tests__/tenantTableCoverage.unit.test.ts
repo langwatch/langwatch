@@ -46,9 +46,9 @@ const handWritten: readonly string[] = LWQL_HAND_WRITTEN_SOURCE_TABLES;
 const derived = LWQL_DERIVED_CATALOG;
 const derivedSourceTables = new Set(derived.map((view) => view.sourceTable));
 
-const HAND_WRITTEN_TABLE_COUNT = 10;
+const HAND_WRITTEN_TABLE_COUNT = 11;
 const DERIVED_TABLE_COUNT = 29;
-const SKIPPED_TABLE_COUNT = 4;
+const SKIPPED_TABLE_COUNT = 5;
 
 describe("given every table in the committed ClickHouse columns manifest", () => {
   it("is hand-written, derived, or skipped-with-a-reason — exactly once", () => {

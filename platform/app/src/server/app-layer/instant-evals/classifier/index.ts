@@ -24,17 +24,32 @@ import { NullInstantEvalClassifier } from "./null.client";
 
 const logger = createLogger("langwatch:instant-evals:classifier");
 
-/** Requests a second the deployment may send when nothing says otherwise. */
-const DEFAULT_GLOBAL_RPS = 100;
+/**
+ * Input tokens a second the deployment may send when nothing says otherwise.
+ *
+ * Just under the ceiling the provider sustained in the September 2026 bench,
+ * about 315k input tokens a second, so the bucket is the thing that governs
+ * throughput and the provider's own 429 is the backstop rather than the norm.
+ */
+const DEFAULT_GLOBAL_TOKENS_PER_SECOND = 300_000;
 
 /**
- * Burst the shared bucket holds.
+ * Input tokens a second one tenant may send when nothing says otherwise.
  *
- * Twice the default rate: enough that a query's first wave of parallel
- * classifications starts immediately, and small enough that the burst is over
- * in two seconds at the sustained rate the provider measured.
+ * Half the global rate: one project can never hold the whole ceiling, and two
+ * busy ones split it, which is what keeps a hundred-thousand-row run from
+ * queueing every other project's synchronous query behind it.
  */
-const GLOBAL_BUCKET_CAPACITY = 200;
+const DEFAULT_TENANT_TOKENS_PER_SECOND = 150_000;
+
+/**
+ * Seconds of refill a bucket holds as burst.
+ *
+ * Two: enough that a query's first wave of parallel classifications starts
+ * immediately, and small enough that the burst is over in two seconds at the
+ * sustained rate the provider measured.
+ */
+const BUCKET_BURST_SECONDS = 2;
 
 let cached: InstantEvalClassifier | undefined;
 
@@ -71,14 +86,29 @@ function createInstantEvalClassifier(): InstantEvalClassifier {
     // a deployment can pin whatever concrete name the provider later publishes
     // without a release.
     ...(env.JEV_MODEL ? { model: env.JEV_MODEL } : {}),
-    limiter: new RedisInstantEvalRateLimiter({
-      // Read inside the factory, never at module scope: the container is built
-      // during boot and a module-scope read would capture `null` for the life
-      // of the process (ADR-093).
-      redis: tryGetApp()?.redis ?? null,
-      requestsPerSecond: env.INSTANT_EVAL_GLOBAL_RPS ?? DEFAULT_GLOBAL_RPS,
-      capacity: GLOBAL_BUCKET_CAPACITY,
-    }),
+    limiter: createInstantEvalRateLimiter(),
+  });
+}
+
+/** The shared limiter, sized from the environment. */
+function createInstantEvalRateLimiter(): RedisInstantEvalRateLimiter {
+  const tokensPerSecond =
+    env.INSTANT_EVAL_GLOBAL_TOKENS_PER_SECOND ??
+    DEFAULT_GLOBAL_TOKENS_PER_SECOND;
+  const tenantTokensPerSecond = Math.min(
+    tokensPerSecond,
+    env.INSTANT_EVAL_TENANT_TOKENS_PER_SECOND ??
+      DEFAULT_TENANT_TOKENS_PER_SECOND,
+  );
+  return new RedisInstantEvalRateLimiter({
+    // Read inside the factory, never at module scope: the container is built
+    // during boot and a module-scope read would capture `null` for the life
+    // of the process (ADR-093).
+    redis: tryGetApp()?.redis ?? null,
+    tokensPerSecond,
+    capacity: tokensPerSecond * BUCKET_BURST_SECONDS,
+    tenantTokensPerSecond,
+    tenantCapacity: tenantTokensPerSecond * BUCKET_BURST_SECONDS,
   });
 }
 

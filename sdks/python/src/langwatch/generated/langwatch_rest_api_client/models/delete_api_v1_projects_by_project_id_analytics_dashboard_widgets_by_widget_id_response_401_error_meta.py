@@ -6,43 +6,29 @@ from typing import Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-T = TypeVar("T", bound="GetProjectApiKeyResponse200")
+T = TypeVar("T", bound="DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse401ErrorMeta")
 
 
 @_attrs_define
-class GetProjectApiKeyResponse200:
-    """
-    Attributes:
-        api_key (str): Send as X-Auth-Token, Bearer, or Basic
-    """
+class DeleteApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse401ErrorMeta:
+    """ """
 
-    api_key: str
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        api_key = self.api_key
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update(
-            {
-                "apiKey": api_key,
-            }
-        )
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        api_key = d.pop("apiKey")
+        delete_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_401_error_meta = cls()
 
-        get_project_api_key_response_200 = cls(
-            api_key=api_key,
-        )
-
-        get_project_api_key_response_200.additional_properties = d
-        return get_project_api_key_response_200
+        delete_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_401_error_meta.additional_properties = d
+        return delete_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_401_error_meta
 
     @property
     def additional_keys(self) -> list[str]:

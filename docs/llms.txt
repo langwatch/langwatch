@@ -904,6 +904,18 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Get a single simulation run by its ID](https://langwatch.ai/docs/api-reference/simulation-runs/get-simulation-runs.md)
 - [Get Batches](https://langwatch.ai/docs/api-reference/simulation-runs/get-batches.md)
 
+## Instant Evals
+
+- [Overview](https://langwatch.ai/docs/api-reference/instant-evals/overview.md): Judge a LangWatchQL statement across your whole production history as a job. Start a run, price one before you start it, poll its progress, read its judgements page by page, sample the text that was judged, and cancel a run that is still going.
+- [Estimate a run](https://langwatch.ai/docs/api-reference/instant-evals/estimate-a-run.md)
+- [Start a run](https://langwatch.ai/docs/api-reference/instant-evals/create-instant-evals.md)
+- [List the project's runs, newest first](https://langwatch.ai/docs/api-reference/instant-evals/list-instant-evals.md)
+- [Get Instant Evals](https://langwatch.ai/docs/api-reference/instant-evals/get-instant-evals.md)
+- [Read a run's results](https://langwatch.ai/docs/api-reference/instant-evals/read-a-run-s-results.md)
+- [Sample a run](https://langwatch.ai/docs/api-reference/instant-evals/sample-a-run.md)
+- [Cancel a run](https://langwatch.ai/docs/api-reference/instant-evals/cancel-a-run.md)
+- [Running An Instant Eval](https://langwatch.ai/docs/api-reference/instant-evals/running-an-instant-eval.md): Take a LangWatchQL statement that judges rows and run it as a job across your history, with progress, judgements you can page through, and a price you can see before you start.
+
 ## Run Plans
 
 - [Overview](https://langwatch.ai/docs/api-reference/run-plans/overview.md): Run agent tests. A run plan is identified by its name: a run started under a name joins that plan and replaces its configuration, or creates the plan when no plan holds that name. List, read, run and archive run plans.

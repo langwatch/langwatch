@@ -1,10 +1,19 @@
 /**
- * The rate at which this whole deployment may ask the classifier anything.
+ * How many input tokens this whole deployment may send the classifier per
+ * second, and how much of that one tenant may take.
+ *
+ * The classifier's ceiling is token-bound, not request-bound: measured against
+ * the live API in September 2026 it sustains about 315k input tokens a second
+ * whether that is five hundred small conversations or ten large ones. A bucket
+ * of requests would either refuse small texts long before the ceiling or let
+ * large ones sail past it, so the bucket holds tokens and every classification
+ * takes its estimated input tokens, text plus questions, the same estimate the
+ * token budget sizes a request with.
  *
  * The quota being spent belongs to LangWatch's own key, not to a pod and not to
- * a project, so the limiter has to be shared: four pods each pacing themselves
- * at the published rate would send four times it. The bucket therefore lives in
- * Redis, and a permit is taken before every request.
+ * a project, so the bucket has to be shared: four pods each pacing themselves
+ * at the published rate would send four times it. It therefore lives in Redis,
+ * and a permit is taken before every request.
  *
  * A token bucket rather than the fixed window in `~/server/rateLimit.ts`,
  * because the failure modes differ. A fixed window lets a burst through at the
@@ -13,13 +22,26 @@
  * every waiting caller a time to come back at, so the query is slower rather
  * than wrong.
  *
+ * Two buckets, one script:
+ *
+ *  - **The global bucket** is the deployment's ceiling.
+ *  - **The tenant bucket** is one project's share of it. Without it, one
+ *    hundred-thousand-row run would hold the global bucket empty for the
+ *    seventeen minutes it takes, and every other project's synchronous query
+ *    would queue behind it. The tenant refills at a fraction of the global
+ *    rate, so a single project can never take the whole ceiling and two busy
+ *    ones split it.
+ *
+ *  Both are taken from in one Lua call, atomically: either both buckets have
+ *  the tokens and both are debited, or neither is touched and the caller is
+ *  told how long until both do.
+ *
  * Three details that are decisions rather than details:
  *
- *  - **Permits are drawn in chunks.** A round trip to Redis per classification
- *    would add its own latency to a call that takes 250 ms, so a caller asking
- *    for one permit takes a chunk and spends the rest locally. The cost is that
- *    a pod can hold up to a chunk of unspent permits when it stops, which the
- *    bucket refills past in under a tenth of a second.
+ *  - **One round trip per classification.** A classification is about 250 ms
+ *    and a Redis call is about a millisecond, so drawing per request costs
+ *    nothing measurable, and it is what lets each request take exactly what
+ *    it sends rather than a chunk sized for an average.
  *  - **The clock is the caller's.** `redis.call('TIME')` is not allowed in a
  *    replicated script, so the current time is an argument. Two pods with
  *    skewed clocks can each refill slightly early, which is bounded by the
@@ -38,82 +60,118 @@ import type { RedisConnection } from "@langwatch/redis-client";
 const logger = createLogger("langwatch:instant-evals:rate-limiter");
 
 /** One bucket for the whole deployment. */
-const BUCKET_KEY = "langwatch:instant-evals:classifier-rate";
+const GLOBAL_BUCKET_KEY = "langwatch:instant-evals:classifier-tokens";
+
+/** One bucket per tenant, keyed by the project. */
+function tenantBucketKey(tenantId: string): string {
+  return `langwatch:instant-evals:classifier-tokens:tenant:${tenantId}`;
+}
 
 /** Long enough that an idle bucket survives a quiet hour, short enough to expire. */
 const BUCKET_TTL_MS = 3_600_000;
 
-/** How many permits one round trip to Redis draws. */
-const PERMIT_CHUNK = 8;
-
-/** Requests per second a pod allows itself when Redis cannot be reached. */
-const LOCAL_FALLBACK_RPS = 20;
+/**
+ * Input tokens a second a pod allows itself when Redis cannot be reached.
+ *
+ * A fifth of the default global rate: slower than the real limit, and safe to
+ * multiply by the handful of pods a deployment runs.
+ */
+export const LOCAL_FALLBACK_TOKENS_PER_SECOND = 60_000;
 
 /** Never sleep longer than this in one go, so a cancelled query notices. */
 const MAX_SLEEP_MS = 250;
 
+/** What one classification asks the limiter for. */
+export interface InstantEvalPermit {
+  /** Estimated input tokens the request will send, text and questions. */
+  readonly tokens: number;
+  /** The project the request judges for, whose share of the rate it draws on. */
+  readonly tenantId: string;
+}
+
 /**
- * Take a permit, or wait for one.
+ * Take the tokens a request needs, or wait until they are there.
  *
  * Deliberately one method: everything above this cares about being allowed to
  * send, not about how many tokens are left.
  */
 export interface InstantEvalRateLimiter {
-  acquire(signal?: AbortSignal): Promise<void>;
+  acquire(permit: InstantEvalPermit, signal?: AbortSignal): Promise<void>;
 }
 
 /**
- * Atomically refills the bucket and takes from it.
+ * Refills both buckets and takes from both, or from neither.
  *
- * Returns the permits granted and, when none were, how long to wait before the
- * bucket holds enough. One key, so nothing here depends on Redis Cluster slot
- * placement.
+ * KEYS[1] is the global bucket, KEYS[2] the tenant's. Each bucket is a hash of
+ * `tokens` and `at` (the last refill, epoch milliseconds). Returns the tokens
+ * granted and, when none were, how long to wait before both buckets hold
+ * enough. Two keys, so under Redis Cluster the caller has to hash-tag them or
+ * run a single node; this deployment runs a single node.
  */
-const TAKE_PERMITS_SCRIPT = `
-local capacity = tonumber(ARGV[1])
-local refill = tonumber(ARGV[2])
-local now = tonumber(ARGV[3])
-local wanted = tonumber(ARGV[4])
-local ttl = tonumber(ARGV[5])
-local state = redis.call('HMGET', KEYS[1], 'tokens', 'at')
-local tokens = tonumber(state[1])
-local at = tonumber(state[2])
-if tokens == nil or at == nil then
-  tokens = capacity
-  at = now
+const TAKE_TOKENS_SCRIPT = `
+local now = tonumber(ARGV[1])
+local wanted = tonumber(ARGV[2])
+local ttl = tonumber(ARGV[3])
+local global_capacity = tonumber(ARGV[4])
+local global_refill = tonumber(ARGV[5])
+local tenant_capacity = tonumber(ARGV[6])
+local tenant_refill = tonumber(ARGV[7])
+
+local function refilled(key, capacity, refill)
+  local state = redis.call('HMGET', key, 'tokens', 'at')
+  local tokens = tonumber(state[1])
+  local at = tonumber(state[2])
+  if tokens == nil or at == nil then
+    tokens = capacity
+    at = now
+  end
+  local elapsed = math.max(0, now - at) / 1000
+  return math.min(capacity, tokens + elapsed * refill)
 end
-local elapsed = math.max(0, now - at) / 1000
-tokens = math.min(capacity, tokens + elapsed * refill)
+
+local function wait_for(tokens, refill)
+  if tokens >= wanted then return 0 end
+  return math.ceil(((wanted - tokens) / refill) * 1000)
+end
+
+local global_tokens = refilled(KEYS[1], global_capacity, global_refill)
+local tenant_tokens = refilled(KEYS[2], tenant_capacity, tenant_refill)
+
+local wait = math.max(
+  wait_for(global_tokens, global_refill),
+  wait_for(tenant_tokens, tenant_refill)
+)
 local granted = 0
-local wait = 0
-if tokens >= wanted then
+if wait == 0 then
   granted = wanted
-  tokens = tokens - wanted
-elseif tokens >= 1 then
-  granted = math.floor(tokens)
-  tokens = tokens - granted
-else
-  wait = math.ceil(((1 - tokens) / refill) * 1000)
+  global_tokens = global_tokens - wanted
+  tenant_tokens = tenant_tokens - wanted
 end
-redis.call('HSET', KEYS[1], 'tokens', tokens, 'at', now)
+
+redis.call('HSET', KEYS[1], 'tokens', global_tokens, 'at', now)
 redis.call('PEXPIRE', KEYS[1], ttl)
+redis.call('HSET', KEYS[2], 'tokens', tenant_tokens, 'at', now)
+redis.call('PEXPIRE', KEYS[2], ttl)
 return {granted, wait}
 `;
 
 export interface InstantEvalRateLimiterOptions {
   /** The process's Redis connection, or `null` to run on the local fallback. */
   readonly redis: RedisConnection | null;
-  /** Requests per second the deployment may send. */
-  readonly requestsPerSecond: number;
-  /** Burst the bucket may hold. Above the rate, so a skewed clock cannot stall it. */
+  /** Input tokens a second the whole deployment may send. */
+  readonly tokensPerSecond: number;
+  /** Burst the global bucket may hold. Above the rate, so a skewed clock cannot stall it. */
   readonly capacity: number;
+  /** Input tokens a second one tenant may send. */
+  readonly tenantTokensPerSecond: number;
+  /** Burst one tenant's bucket may hold. */
+  readonly tenantCapacity: number;
   /** Injected so a suite can drive the bucket without sleeping. */
   readonly now?: () => number;
   readonly sleep?: (ms: number) => Promise<void>;
 }
 
 export class RedisInstantEvalRateLimiter implements InstantEvalRateLimiter {
-  private permitsInHand = 0;
   private localTokens: number;
   private localAt: number;
   private readonly now: () => number;
@@ -122,69 +180,84 @@ export class RedisInstantEvalRateLimiter implements InstantEvalRateLimiter {
   constructor(private readonly options: InstantEvalRateLimiterOptions) {
     this.now = options.now ?? (() => Date.now());
     this.sleep = options.sleep ?? defaultSleep;
-    this.localTokens = LOCAL_FALLBACK_RPS;
+    this.localTokens = LOCAL_FALLBACK_TOKENS_PER_SECOND;
     this.localAt = this.now();
   }
 
-  async acquire(signal?: AbortSignal): Promise<void> {
+  async acquire(
+    permit: InstantEvalPermit,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    // Never more than the bucket can hold, or the request could wait forever
+    // for a fill that never comes. A request past the capacity is one the
+    // classifier will refuse anyway, so it is let through to be refused.
+    const wanted = Math.max(
+      1,
+      Math.min(
+        Math.ceil(permit.tokens),
+        this.options.capacity,
+        this.options.tenantCapacity,
+      ),
+    );
     for (;;) {
       signal?.throwIfAborted();
-      if (this.permitsInHand > 0) {
-        this.permitsInHand -= 1;
-        return;
-      }
-      const waitMs = await this.draw();
-      if (waitMs === 0) continue;
+      const waitMs = await this.draw({ wanted, tenantId: permit.tenantId });
+      if (waitMs === 0) return;
       await this.sleep(Math.min(waitMs, MAX_SLEEP_MS));
     }
   }
 
-  /** Draws a chunk into hand, or answers with how long the bucket needs. */
-  private async draw(): Promise<number> {
+  /** Takes the tokens, or answers with how long the buckets need. */
+  private async draw({
+    wanted,
+    tenantId,
+  }: {
+    wanted: number;
+    tenantId: string;
+  }): Promise<number> {
     const { redis } = this.options;
-    if (!redis) return this.drawLocally();
+    if (!redis) return this.drawLocally(wanted);
     try {
-      const granted = await this.takeFromBucket(redis);
-      if (granted.permits > 0) {
-        // Added, never assigned: two `acquire` calls can be awaiting their own
-        // draw at once, Redis has already deducted both chunks, and assigning
-        // would throw away whichever landed first.
-        this.permitsInHand += granted.permits;
-        return 0;
-      }
-      return granted.waitMs;
+      return await this.takeFromBuckets({ redis, wanted, tenantId });
     } catch (error) {
       logger.warn(
         { error },
         "Instant Evals rate limiter could not reach Redis; falling back to the local rate",
       );
-      return this.drawLocally();
+      return this.drawLocally(wanted);
     }
   }
 
-  private async takeFromBucket(
-    redis: RedisConnection,
-  ): Promise<{ permits: number; waitMs: number }> {
+  private async takeFromBuckets({
+    redis,
+    wanted,
+    tenantId,
+  }: {
+    redis: RedisConnection;
+    wanted: number;
+    tenantId: string;
+  }): Promise<number> {
     const reply = (await redis.eval(
-      TAKE_PERMITS_SCRIPT,
-      1,
-      BUCKET_KEY,
-      String(this.options.capacity),
-      String(this.options.requestsPerSecond),
+      TAKE_TOKENS_SCRIPT,
+      2,
+      GLOBAL_BUCKET_KEY,
+      tenantBucketKey(tenantId),
       String(this.now()),
-      String(PERMIT_CHUNK),
+      String(wanted),
       String(BUCKET_TTL_MS),
+      String(this.options.capacity),
+      String(this.options.tokensPerSecond),
+      String(this.options.tenantCapacity),
+      String(this.options.tenantTokensPerSecond),
     )) as [number | string, number | string];
-    const permits = Number(reply[0]);
+    const granted = Number(reply[0]);
     const waitMs = Number(reply[1]);
     // A reply that is not two numbers would otherwise become `NaN`, and a
     // `NaN` wait is a loop that never sleeps and never gives up. Treated as
     // "come back in a moment", which is the safe reading of an answer we
     // cannot parse.
-    return {
-      permits: Number.isFinite(permits) ? permits : 0,
-      waitMs: Number.isFinite(waitMs) && waitMs > 0 ? waitMs : MAX_SLEEP_MS,
-    };
+    if (Number.isFinite(granted) && granted >= wanted) return 0;
+    return Number.isFinite(waitMs) && waitMs > 0 ? waitMs : MAX_SLEEP_MS;
   }
 
   /**
@@ -193,20 +266,22 @@ export class RedisInstantEvalRateLimiter implements InstantEvalRateLimiter {
    * Refilled the same way as the shared one so the two behave alike, which is
    * what keeps a Redis outage a slowdown rather than a different feature.
    */
-  private drawLocally(): number {
+  private drawLocally(wanted: number): number {
     const now = this.now();
     const elapsedSeconds = Math.max(0, now - this.localAt) / 1000;
     this.localTokens = Math.min(
-      LOCAL_FALLBACK_RPS,
-      this.localTokens + elapsedSeconds * LOCAL_FALLBACK_RPS,
+      LOCAL_FALLBACK_TOKENS_PER_SECOND,
+      this.localTokens + elapsedSeconds * LOCAL_FALLBACK_TOKENS_PER_SECOND,
     );
     this.localAt = now;
-    if (this.localTokens >= 1) {
-      this.localTokens -= 1;
-      this.permitsInHand += 1;
+    const needed = Math.min(wanted, LOCAL_FALLBACK_TOKENS_PER_SECOND);
+    if (this.localTokens >= needed) {
+      this.localTokens -= needed;
       return 0;
     }
-    return Math.ceil(((1 - this.localTokens) / LOCAL_FALLBACK_RPS) * 1000);
+    return Math.ceil(
+      ((needed - this.localTokens) / LOCAL_FALLBACK_TOKENS_PER_SECOND) * 1000,
+    );
   }
 }
 
