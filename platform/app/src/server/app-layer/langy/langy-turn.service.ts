@@ -1438,7 +1438,7 @@ export class LangyTurnService {
           { error, projectId, conversationId: conversation.id, turnId },
           "failed to commit langy AcceptAgentTurn",
         );
-        throw new LangyAgentUnavailableError("Agent request failed");
+        throw error;
       }
 
       // Idempotency wins over the last few milliseconds: do not eagerly launch

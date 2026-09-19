@@ -547,15 +547,17 @@ describe("LangyTurnService.startConversationTurn", () => {
     expect(mocks.claim).not.toHaveBeenCalled();
   });
 
-  it("revokes the key, releases the permit, and aborts when acceptance fails", async () => {
+  /** @scenario An unexpected turn-acceptance failure stays unknown */
+  it("propagates an unexpected acceptance failure after cleaning up the attempted turn", async () => {
     (
       deps.credentials.getOrProvision as ReturnType<typeof vi.fn>
     ).mockResolvedValue({ organizationId: "org-1", githubToken: "gh-token" });
-    mocks.acceptTurn.mockRejectedValue(new Error("event store failed"));
+    const acceptanceFailure = new Error("event store failed");
+    mocks.acceptTurn.mockRejectedValue(acceptanceFailure);
 
     await expect(
       LangyTurnService.create(deps).startConversationTurn(input()),
-    ).rejects.toThrow();
+    ).rejects.toBe(acceptanceFailure);
 
     expect(mocks.dispatch).not.toHaveBeenCalled();
     expect(mocks.revokeSessionKey).toHaveBeenCalledWith({
@@ -564,6 +566,7 @@ describe("LangyTurnService.startConversationTurn", () => {
     });
     expect(mocks.releasePermit).toHaveBeenCalledWith({ userId: "user-1" });
     expect(mocks.abort).toHaveBeenCalledOnce();
+    expect(mocks.commit).not.toHaveBeenCalled();
   });
 
   it("does not fast-dispatch until the durable replay receipt commits", async () => {
