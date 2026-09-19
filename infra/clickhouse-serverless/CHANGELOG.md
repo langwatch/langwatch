@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.0](https://github.com/langwatch/langwatch/compare/clickhouse-serverless-image@v0.4.0...clickhouse-serverless-image@v0.5.0) (2026-09-19)
+
+
+### Features
+
+* **instant-evals:** the Instant Eval run, a judgment job over an LWQL statement with progress and persisted judgments ([#8208](https://github.com/langwatch/langwatch/issues/8208)) ([e337419](https://github.com/langwatch/langwatch/commit/e33741926479c94f6d0b6d2b80d76e886dc1e109))
+* **lwql:** app-side extraction functions as identity UDFs with a hydration stage ([#8196](https://github.com/langwatch/langwatch/issues/8196)) ([ad1bc9e](https://github.com/langwatch/langwatch/commit/ad1bc9eddf8f1c30e79b213cbd7fdbcb4563f990))
+* **query:** self-describing LangWatchQL door + whoami --json ([#8085](https://github.com/langwatch/langwatch/issues/8085)) ([#8113](https://github.com/langwatch/langwatch/issues/8113)) ([5b17bde](https://github.com/langwatch/langwatch/commit/5b17bde8e2497714d489504d13d8306393be429c))
+
 ## [0.4.0](https://github.com/langwatch/langwatch/compare/clickhouse-serverless-image@v0.3.0...clickhouse-serverless-image@v0.4.0) (2026-09-12)
 
 
