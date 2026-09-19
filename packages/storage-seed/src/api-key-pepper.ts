@@ -2,10 +2,13 @@ import { SecretsChain } from "@langwatch/secrets";
 
 /**
  * The pepper seeded API-key hashes and encrypted credentials are keyed
- * under. `dev: optional`, so an absent value is a configured state, not
- * broken — never minted here, since a random one would write unverifiable rows.
+ * under — the same name modules/api-key/contract/src/api-key.config.ts
+ * declares (`c.env("API_KEY_PEPPER", ...)`), since a seed hash the running
+ * process reads under a different name never verifies. `dev: optional`, so
+ * an absent value is a configured state, not broken — never minted here,
+ * since a random one would write unverifiable rows.
  */
-export const API_KEY_PEPPER_KEYS = ["CREDENTIALS_SECRET", "NEXTAUTH_SECRET"] as const;
+export const API_KEY_PEPPER_KEYS = ["API_KEY_PEPPER"] as const;
 
 /** The pepper, or the keys that were absent when there was none. */
 export type ApiKeyPepperResolution = Readonly<

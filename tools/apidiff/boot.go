@@ -34,9 +34,11 @@ const (
 	chUser = "default"
 	chPass = "langwatch"
 
-	// throwawayCredentialsSecret matches the cipher's 32-bytes-of-hex rule
-	// (apps/api/src/platform/config/api.config.ts). Both instances share it;
-	// each hashes and verifies its own seeded keys under the same pepper.
+	// throwawayCredentialsSecret matches the cipher's 32-bytes-of-hex rule.
+	// Both instances share it; each hashes and verifies its own seeded keys
+	// under the same value, also injected as API_KEY_PEPPER below — the
+	// branch's storage-seed and modules/api-key/contract's config.ts read
+	// the pepper under that name, not this one.
 	throwawayCredentialsSecret = "0000000000000000000000000000000000000000000000000000000000000000"
 	throwawayNextAuthSecret    = "apidiff-throwaway-nextauth-secret"
 
@@ -235,6 +237,7 @@ var managedEnvKeys = []string{
 	"API_PORT", "PORT", "LANGWATCH_API_PORT",
 	"DATABASE_URL", "CLICKHOUSE_URL", "REDIS_URL", "REDIS_DB_INDEX",
 	"CREDENTIALS_SECRET", "NEXTAUTH_SECRET", "NEXTAUTH_URL", "BASE_HOST",
+	"API_KEY_PEPPER",
 	"NODE_ENV",
 	"API_TOKEN_JWT_SECRET", "LANGWATCH_NLP_SERVICE", "LANGWATCH_ENDPOINT",
 	"LANGWATCH_INSTANCE_ADMIN_API_KEY",
@@ -276,6 +279,7 @@ func instanceEnv(inherit []string, spec instanceEnvSpec) []string {
 		"REDIS_DB_INDEX="+spec.redisDBIndex,
 		"CREDENTIALS_SECRET="+throwawayCredentialsSecret,
 		"NEXTAUTH_SECRET="+throwawayNextAuthSecret,
+		"API_KEY_PEPPER="+throwawayCredentialsSecret,
 		"LANGWATCH_INSTANCE_ADMIN_API_KEY="+throwawayInstanceAdminKey,
 		"LW_GATEWAY_INTERNAL_SECRET="+throwawayGatewayInternalSecret,
 		"LW_GATEWAY_JWT_SECRET="+throwawayGatewayJWTSecret,
