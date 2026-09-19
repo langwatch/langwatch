@@ -188,6 +188,7 @@ export function selfHostedClickHouseProvisioningStatements({
   restrictedPassword,
   sourceDatabase,
   postgres,
+  includeAppFunctions = true,
 }: {
   names: LangWatchQLNames;
   restrictedPassword: string;
@@ -196,6 +197,8 @@ export function selfHostedClickHouseProvisioningStatements({
     endpoint: LwqlPostgresEndpoint;
     readerPassword: string;
   };
+  /** See {@link canProvisionAppFunctions}. */
+  includeAppFunctions?: boolean;
 }): string[] {
   if (names.database !== sourceDatabase) {
     throw new Error(
@@ -211,6 +214,7 @@ export function selfHostedClickHouseProvisioningStatements({
       names,
       password: restrictedPassword,
       lwqlTables: [],
+      includeAppFunctions,
     }),
     ...postgresNamedCollectionStatements({
       connection: {
@@ -255,4 +259,66 @@ export function selfHostedPostgresReaderStatements({
       statementTimeout: DEFAULT_POSTGRES_READER_LIMITS.statementTimeout,
     },
   });
+}
+
+/** What the server says about where a `CREATE FUNCTION` would land. */
+export interface AppFunctionStoreProbe {
+  /** The widest replica set of any replicated table; 0 on a plain server. */
+  readonly maxTotalReplicas: number;
+  /** The Keeper path the SQL UDF store is moved to, or empty for local disk. */
+  readonly userDefinedZookeeperPath: string;
+}
+
+/**
+ * Whether the app functions can be created so every replica sees them.
+ *
+ * A `CREATE FUNCTION` writes the local disk store of the replica that ran it.
+ * A single node keeps them there and every query finds them. A server with
+ * more than one replica needs `user_defined_zookeeper_path` set, which moves
+ * the store into Keeper; without it the create reaches one replica and the
+ * others answer UNKNOWN_FUNCTION, so the statements are left out and the gap
+ * is logged rather than half provisioned.
+ *
+ * @see ./appFunctionStatements.ts
+ * @see dev/docs/adr/136-lwql-app-functions-identity-udfs.md
+ */
+export function canProvisionAppFunctions(probe: AppFunctionStoreProbe): boolean {
+  return (
+    probe.maxTotalReplicas <= 1 || probe.userDefinedZookeeperPath.trim() !== ""
+  );
+}
+
+/**
+ * Reads the two facts {@link canProvisionAppFunctions} decides on.
+ *
+ * A server that cannot answer (an older release without
+ * `system.server_settings`, or an admin without access to `system.replicas`)
+ * is read as a single node: that is the shipped behaviour, and the ADR names
+ * the setting an operator of a replicated server has to declare.
+ */
+export async function probeAppFunctionStore({
+  query,
+}: {
+  query: (sql: string) => Promise<Record<string, string>[]>;
+}): Promise<AppFunctionStoreProbe> {
+  try {
+    const [replicas, setting] = await Promise.all([
+      query(
+        "SELECT toString(max(total_replicas)) AS max_total_replicas FROM system.replicas",
+      ),
+      query(
+        "SELECT value FROM system.server_settings WHERE name = 'user_defined_zookeeper_path'",
+      ),
+    ]);
+    return {
+      maxTotalReplicas: Number(replicas[0]?.max_total_replicas ?? "0") || 0,
+      userDefinedZookeeperPath: setting[0]?.value ?? "",
+    };
+  } catch (error) {
+    logger.warn(
+      { error },
+      "lwql self-provisioning could not read the replica layout; treating the server as a single node",
+    );
+    return { maxTotalReplicas: 0, userDefinedZookeeperPath: "" };
+  }
 }

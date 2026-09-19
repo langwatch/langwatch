@@ -383,6 +383,19 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
     Then it declares a user_defined_zookeeper_path so one create reaches every replica
 
   @unit
+  Scenario: A multi-replica server without a shared function store is provisioned without the functions
+    Given a self-hosted ClickHouse with three replicas and no user_defined_zookeeper_path
+    When self-provisioning runs
+    Then the app functions are left out and the log names the setting to declare
+    And the rest of the access model is provisioned
+
+  @unit
+  Scenario: A single-node server is provisioned with the functions
+    Given a self-hosted ClickHouse with no replicated tables
+    When self-provisioning runs
+    Then the app functions are created on its local store
+
+  @unit
   Scenario: A single-node server stores them on local disk
     Given a chart-managed ClickHouse rendered without replication
     When the LangWatchQL server config is rendered

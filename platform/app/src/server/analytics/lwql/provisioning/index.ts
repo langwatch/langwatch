@@ -44,12 +44,14 @@ export {
   withTenancyOptOut,
 } from "./productionProvisioning";
 export {
-  type LwqlPostgresReaderMode,
-  type LwqlSelfProvisionEnv,
+  canProvisionAppFunctions,
   lwqlPostgresEndpointFromDatabaseUrl,
   lwqlPostgresReaderModeFromEnv,
   lwqlSelfProvisionFromEnv,
+  probeAppFunctionStore,
   selfHostedClickHouseProvisioningStatements,
   selfHostedPostgresReaderStatements,
+  type LwqlPostgresReaderMode,
+  type LwqlSelfProvisionEnv,
 } from "./selfProvisioning";
 export { withLwqlSelfProvisionLock } from "./selfProvisionLock";
