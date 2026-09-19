@@ -241,34 +241,13 @@ export class ReportUsageForMonthCommand
       // own breaker, and the events meter is not made late by a Stripe
       // rejection on the Instant Evals one.
       for (const meter of this.meters) {
-        try {
-          const reported = await this.reportForBillingMonth({
+        shouldSelfDispatch =
+          (await this.reportOneMeter({
             meter,
             organizationId,
             billingMonth,
             stripeCustomerId: org.stripeCustomerId,
-          });
-          shouldSelfDispatch = shouldSelfDispatch || reported;
-        } catch (error) {
-          // The catch is per meter rather than around the loop: a throw from
-          // one meter's checkpoint read, total query or intent write would
-          // otherwise skip every meter after it, and the skipped ones get no
-          // self-dispatch either, so their usage waits for the next tick with
-          // nothing recording that it was missed.
-          logger.error(
-            { organizationId, billingMonth, meter: meter.eventName, error },
-            "usage reporting failed for one meter, continuing with the rest",
-          );
-          await withScope(async (scope) => {
-            scope.setTag?.("handler", "reportUsageForMonth");
-            scope.setTag?.("meter", meter.eventName);
-            scope.setExtra?.("organizationId", organizationId);
-            scope.setExtra?.("billingMonth", billingMonth);
-            captureException(toError(error));
-          });
-          // Another tick has to come back for what this meter did not report.
-          shouldSelfDispatch = true;
-        }
+          })) || shouldSelfDispatch;
       }
     } catch (error) {
       // Never propagate to framework — log and return empty events
@@ -305,6 +284,49 @@ export class ReportUsageForMonthCommand
    *
    * Returns true if self-dispatch should fire (delta was reported successfully).
    */
+  /**
+   * One meter's report, with its failure kept to itself.
+   *
+   * Its own method rather than a try inside the loop because a throw from one
+   * meter's checkpoint read, total query or intent write would otherwise skip
+   * every meter after it, and the skipped ones get no self-dispatch either, so
+   * their usage waits for the next tick with nothing recording that it was
+   * missed. Answers whether another tick is owed, which a failure always is.
+   */
+  private async reportOneMeter({
+    meter,
+    organizationId,
+    billingMonth,
+    stripeCustomerId,
+  }: {
+    meter: BillingMeter;
+    organizationId: string;
+    billingMonth: string;
+    stripeCustomerId: string;
+  }): Promise<boolean> {
+    try {
+      return await this.reportForBillingMonth({
+        meter,
+        organizationId,
+        billingMonth,
+        stripeCustomerId,
+      });
+    } catch (error) {
+      logger.error(
+        { organizationId, billingMonth, meter: meter.eventName, error },
+        "usage reporting failed for one meter, continuing with the rest",
+      );
+      await withScope(async (scope) => {
+        scope.setTag?.("handler", "reportUsageForMonth");
+        scope.setTag?.("meter", meter.eventName);
+        scope.setExtra?.("organizationId", organizationId);
+        scope.setExtra?.("billingMonth", billingMonth);
+        captureException(toError(error));
+      });
+      return true;
+    }
+  }
+
   private async reportForBillingMonth({
     meter,
     organizationId,
