@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.2.0](https://github.com/langwatch/langwatch/compare/mcp-server@v2.1.0...mcp-server@v2.2.0) (2026-09-19)
+
+
+### Features
+
+* **instant-evals:** the Instant Eval run, a judgment job over an LWQL statement with progress and persisted judgments ([#8208](https://github.com/langwatch/langwatch/issues/8208)) ([e337419](https://github.com/langwatch/langwatch/commit/e33741926479c94f6d0b6d2b80d76e886dc1e109))
+* **lwql:** app-side extraction functions as identity UDFs with a hydration stage ([#8196](https://github.com/langwatch/langwatch/issues/8196)) ([ad1bc9e](https://github.com/langwatch/langwatch/commit/ad1bc9eddf8f1c30e79b213cbd7fdbcb4563f990))
+* **lwql:** eval functions judged by the classifier interface (Instant Evals) ([#8201](https://github.com/langwatch/langwatch/issues/8201)) ([1eb6dfe](https://github.com/langwatch/langwatch/commit/1eb6dfe76206df168df94c443319760dc4bc4591))
+* **query:** one reference door for LWQL and trace filters, filter and facets on the traces API, langwatch query CLI, MCP run_query ([#8198](https://github.com/langwatch/langwatch/issues/8198)) ([0b5f4d0](https://github.com/langwatch/langwatch/commit/0b5f4d0add6cdc6c6483264f1ff4847f44410eb5))
+
 ## [2.1.0](https://github.com/langwatch/langwatch/compare/mcp-server@v2.0.0...mcp-server@v2.1.0) (2026-09-12)
 
 
