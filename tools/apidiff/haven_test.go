@@ -359,9 +359,12 @@ func TestTheInstanceURLIsTheStacksAPIAddress(t *testing.T) {
 				}
 			}
 			// The /api prefix every probed path carries is served there: that
-			// is the same address the spec fetch and the health probe use.
-			if !strings.HasPrefix(SpecPath, "/api/") || !strings.HasPrefix(healthPath, "/api/") {
-				t.Errorf("the probed paths must carry the /api prefix, got %q and %q", SpecPath, healthPath)
+			// is the same address the spec fetch uses. The health path is
+			// profile-specific (monolith: /api/health, modular: /healthz —
+			// process-server's own reserved built-in door) and asserted where
+			// each profile is defined, not here.
+			if !strings.HasPrefix(SpecPath, "/api/") {
+				t.Errorf("the probed spec path must carry the /api prefix, got %q", SpecPath)
 			}
 		})
 

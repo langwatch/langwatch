@@ -82,6 +82,18 @@ func TestProfilePortEnv(t *testing.T) {
 	}
 }
 
+func TestProfileHealthPath(t *testing.T) {
+	// apps/api has no /api/health route of its own; /healthz is
+	// process-server's reserved, always-mounted built-in door.
+	if modularProfile.healthPath != "/healthz" {
+		t.Fatalf("modular healthPath = %q, want /healthz", modularProfile.healthPath)
+	}
+	// platform/app/src/server/routes/health.ts mounts the Hono liveness probe here.
+	if monolithProfile.healthPath != "/api/health" {
+		t.Fatalf("monolith healthPath = %q, want /api/health", monolithProfile.healthPath)
+	}
+}
+
 func TestProfileExtraEnv(t *testing.T) {
 	monolith := monolithProfile.extraEnv("http://127.0.0.1:6560")
 	joined := strings.Join(monolith, "\n")

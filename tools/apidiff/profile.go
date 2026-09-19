@@ -38,7 +38,8 @@ type bootProfile struct {
 	clickhouseMigrateArgv []string
 	seedArgv              []string
 	startArgv             []string
-	overlay               bool // write the composed env to overlayEnvFile
+	overlay               bool   // write the composed env to overlayEnvFile
+	healthPath            string // the liveness path apidiff polls after start
 }
 
 var (
@@ -59,6 +60,11 @@ var (
 		clickhouseMigrateArgv: []string{"run", "clickhouse:migrate"},
 		seedArgv:              []string{"run", "prisma:seed"},
 		startArgv:             []string{"--filter", "@langwatch/platform-api", "start"},
+		// The modular api has no /api/health route of its own; /healthz is
+		// process-server's own built-in liveness door, mounted on the same
+		// listener as the app (server.ts's `serve()`) and reserved by name,
+		// answering 200 unconditionally once startComponents() has bound it.
+		healthPath: "/healthz",
 	}
 	monolithProfile = bootProfile{
 		name: profileMonolith,
@@ -72,6 +78,9 @@ var (
 		seedArgv:              []string{"run", "prisma:seed"},
 		startArgv:             []string{"--filter", "@langwatch/web", "start:app:dev"},
 		overlay:               true,
+		// platform/app/src/server/routes/health.ts: a Hono liveness/readiness
+		// probe mounted at "/api/health", replacing the old pages/api/health.ts.
+		healthPath: "/api/health",
 	}
 )
 

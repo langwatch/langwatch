@@ -64,8 +64,6 @@ const (
 	// (branch adds a nullable connectionId, which stays NULL).
 	scimProbeToken   = "apidiff-scim-token-value"
 	scimProbeTokenID = "apidiff-scim-token"
-
-	healthPath = "/api/health"
 )
 
 // Seeded credential defaults from packages/prisma-client/prisma/seed.ts.
@@ -1221,7 +1219,7 @@ func (state *bootState) startAPI(ctx context.Context, instance *Instance) error 
 	}
 	state.processes = append(state.processes, command)
 	state.logf("start %s on :%d (pid %d, log %s); waiting for health", instance.Name, instance.Port, command.Process.Pid, logPath)
-	if err := state.waitHealthy(ctx, instance.URL); err != nil {
+	if err := state.waitHealthy(ctx, instance.URL, instance.Profile.healthPath); err != nil {
 		return fmt.Errorf("health %s: %w (see %s)", instance.Name, err, logPath)
 	}
 	return nil
@@ -1229,12 +1227,13 @@ func (state *bootState) startAPI(ctx context.Context, instance *Instance) error 
 
 // waitHealthy polls the health endpoint until it answers or the boot timeout
 // elapses.
-func (state *bootState) waitHealthy(ctx context.Context, baseURL string) error {
+func (state *bootState) waitHealthy(ctx context.Context, baseURL, healthPath string) error {
 	timeout := state.bootTimeout()
 	deadline := time.Now().Add(timeout)
 	client := &http.Client{Timeout: 5 * time.Second}
+	healthURL := baseURL + healthPath
 	for {
-		if healthy(ctx, client, baseURL) {
+		if healthy(ctx, client, healthURL) {
 			return nil
 		}
 		if time.Now().After(deadline) {
@@ -1249,8 +1248,8 @@ func (state *bootState) waitHealthy(ctx context.Context, baseURL string) error {
 }
 
 // healthy performs one health-check attempt.
-func healthy(ctx context.Context, client *http.Client, baseURL string) bool {
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+healthPath, nil)
+func healthy(ctx context.Context, client *http.Client, healthURL string) bool {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, healthURL, nil)
 	if err != nil {
 		return false
 	}
