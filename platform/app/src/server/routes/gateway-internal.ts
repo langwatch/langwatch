@@ -16,6 +16,9 @@
 
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
 
+import { LICENSE_TOKEN_PREFIX } from "@ee/licensing/licenseToken";
+import { CONNECT_CREDENTIAL_REFUSALS } from "@ee/licensing/registry/connectCredential.service";
+import { createConnectCredentialService } from "@ee/licensing/registry/issuedLicense.prisma";
 import { createLogger } from "@langwatch/observability";
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import type { Context, Next } from "hono";
@@ -59,7 +62,10 @@ import {
   parseVirtualKey,
   VirtualKeyCryptoError,
 } from "~/server/gateway/virtualKey.crypto";
-import { ROUTING_POLICY_SELECT } from "~/server/gateway/virtualKey.repository";
+import {
+  ROUTING_POLICY_SELECT,
+  type VirtualKeyWithScopes,
+} from "~/server/gateway/virtualKey.repository";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 import { CodexGatewayRefreshService } from "~/server/modelProviders/codexAccount.service";
 import { ModelProviderRepository } from "~/server/modelProviders/modelProvider.repository";
@@ -315,7 +321,7 @@ secured.access(gatewayPolicy()).get("/health", (c) => {
  */
 /** A refusal to resolve a presented key, in the contract's error shape. */
 interface KeyAuthRejection {
-  status: 401 | 403;
+  status: 400 | 401 | 403;
   type: string;
   code: string;
   message: string;
@@ -395,9 +401,108 @@ function virtualKeyStatusRejection({
   return null;
 }
 
+/**
+ * Resolve a license token (ADR-139) to the managed key it runs under. The
+ * registry decides; from there the key is checked and signed for exactly like
+ * a presented virtual key, so budgets, spend and the change feed need no second
+ * path. The token ends with the license term when that comes first.
+ */
+async function resolveLicenseToken(
+  c: Context,
+  { token, instanceId }: { token: string; instanceId: string | undefined },
+) {
+  const resolution = await createConnectCredentialService(prisma).resolve({
+    token,
+    instanceId,
+  });
+  if (!resolution.ok) {
+    const refusal = CONNECT_CREDENTIAL_REFUSALS[resolution.code];
+    logAuthDecision(c, resolution.code, refusal.status);
+    return c.json(
+      rejectionBody({
+        status: refusal.status,
+        type: resolution.code,
+        code: resolution.code,
+        message: refusal.message,
+      }),
+      refusal.status,
+    );
+  }
+
+  const { license, virtualKeyId } = resolution;
+  const service = VirtualKeyService.create(prisma);
+  const vk = await service.getManagedByIdInternal(
+    virtualKeyId,
+    license.organizationId,
+  );
+  // A license whose key is gone or ended is mid-revocation: the key ends
+  // before the registry row does. Refuse the same way the finished state will.
+  if (vk?.status !== "ACTIVE") {
+    const refusal = CONNECT_CREDENTIAL_REFUSALS.connect_license_revoked;
+    logAuthDecision(c, "connect_license_revoked", refusal.status, {
+      vkId: virtualKeyId,
+    });
+    return c.json(
+      rejectionBody({
+        status: refusal.status,
+        type: "connect_license_revoked",
+        code: "connect_license_revoked",
+        message: refusal.message,
+      }),
+      refusal.status,
+    );
+  }
+  return keyResolutionResponse(c, { service, vk, notAfter: license.expiresAt });
+}
+
+/** Sign for a key that may serve, and answer the gateway. */
+async function keyResolutionResponse(
+  c: Context,
+  {
+    service,
+    vk,
+    notAfter,
+  }: {
+    service: VirtualKeyService;
+    vk: VirtualKeyWithScopes;
+    notAfter: Date | null;
+  },
+) {
+  // Where this key's traces land, read off the key. Null for a key written
+  // before the destination was stored in an organization with no governance
+  // project to fall back to; the gateway then skips span export rather than
+  // failing the auth handshake.
+  const traceProject = await traceProjectFor(prisma, vk.traceProjectId);
+
+  // notAfter ends the token at the key's expiration date when that arrives
+  // before the ordinary 15 minute TTL, and travels on as the vk_expires_at
+  // claim. Without it the gateway holds a token that outlives the key, and its
+  // auth cache keeps serving that key while the control plane is unreachable.
+  const { jwt } = signGatewayJwt({
+    vk_id: vk.id,
+    project_id: traceProject?.id ?? null,
+    team_id: traceProject?.teamId ?? null,
+    org_id: vk.organizationId,
+    principal_id: vk.principalUserId,
+    revision: vk.revision.toString(),
+    notAfter,
+  });
+
+  // Fire-and-forget last-used bump. Failures here must not deny the request.
+  void service.touchUsage(vk.id).catch(() => {});
+
+  return c.json({
+    jwt,
+    revision: vk.revision.toString(),
+    key_id: vk.id,
+    display_prefix: vk.displayPrefix,
+  });
+}
+
 secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as {
     key_presented?: string;
+    instance_id?: string;
     gateway_node_id?: string;
   };
   const presented = body.key_presented;
@@ -412,6 +517,14 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
       },
       400,
     );
+  }
+
+  if (presented.startsWith(LICENSE_TOKEN_PREFIX)) {
+    return resolveLicenseToken(c, {
+      token: presented,
+      instanceId:
+        typeof body.instance_id === "string" ? body.instance_id : undefined,
+    });
   }
 
   const parseRejection = virtualKeyParseRejection(presented);
@@ -448,35 +561,7 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
     return c.json(rejectionBody(statusRejection), statusRejection.status);
   }
 
-  // Where this key's traces land, read off the key. Null for a key written
-  // before the destination was stored in an organization with no governance
-  // project to fall back to; the gateway then skips span export rather than
-  // failing the auth handshake.
-  const traceProject = await traceProjectFor(prisma, vk.traceProjectId);
-
-  // notAfter ends the token at the key's expiration date when that arrives
-  // before the ordinary 15 minute TTL, and travels on as the vk_expires_at
-  // claim. Without it the gateway holds a token that outlives the key, and its
-  // auth cache keeps serving that key while the control plane is unreachable.
-  const { jwt } = signGatewayJwt({
-    vk_id: vk.id,
-    project_id: traceProject?.id ?? null,
-    team_id: traceProject?.teamId ?? null,
-    org_id: vk.organizationId,
-    principal_id: vk.principalUserId,
-    revision: vk.revision.toString(),
-    notAfter: vk.expiresAt,
-  });
-
-  // Fire-and-forget last-used bump. Failures here must not deny the request.
-  void service.touchUsage(vk.id).catch(() => {});
-
-  return c.json({
-    jwt,
-    revision: vk.revision.toString(),
-    key_id: vk.id,
-    display_prefix: vk.displayPrefix,
-  });
+  return keyResolutionResponse(c, { service, vk, notAfter: vk.expiresAt });
 });
 
 /**

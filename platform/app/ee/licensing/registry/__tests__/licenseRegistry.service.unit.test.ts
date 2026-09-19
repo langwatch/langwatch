@@ -3,12 +3,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { generateLicenseKey } from "../../licenseGenerationService";
 import { licenseTokenFromKey, registryHashForToken } from "../../licenseToken";
 import { parseLicenseKey, validateLicense } from "../../validation";
+import { LicenseRegistryService } from "../licenseRegistry.service";
 import {
-  type CustomerOrganizationPort,
-  type IssuedLicenseRecord,
-  type IssuedLicenseRepository,
-  LicenseRegistryService,
-} from "../licenseRegistry.service";
+  InMemoryConnectManagedKeys,
+  InMemoryCustomerOrganizations,
+  InMemoryIssuedLicenseRepository,
+} from "./registryFakes";
 
 const NOW = new Date("2026-09-19T12:00:00.000Z");
 const NEXT_YEAR = new Date("2027-09-19T12:00:00.000Z");
@@ -25,83 +25,6 @@ function makeKeyPair() {
 const langwatchKeys = makeKeyPair();
 const strangerKeys = makeKeyPair();
 
-class InMemoryIssuedLicenseRepository implements IssuedLicenseRepository {
-  rows: IssuedLicenseRecord[] = [];
-  private sequence = 0;
-
-  async create(
-    data: Omit<IssuedLicenseRecord, "id" | "createdAt" | "updatedAt">,
-  ): Promise<IssuedLicenseRecord> {
-    // The same unique columns the table has.
-    const clashes = this.rows.some(
-      (row) =>
-        row.tokenHash === data.tokenHash ||
-        row.licenseId === data.licenseId ||
-        (data.replacesId !== null && row.replacesId === data.replacesId),
-    );
-    if (clashes) {
-      throw Object.assign(new Error("unique violation"), { code: "P2002" });
-    }
-    const row: IssuedLicenseRecord = {
-      ...data,
-      id: `il_${++this.sequence}`,
-      createdAt: NOW,
-      updatedAt: NOW,
-    };
-    this.rows.push(row);
-    return row;
-  }
-
-  async findById(id: string) {
-    return this.rows.find((row) => row.id === id) ?? null;
-  }
-
-  async findByTokenHash(tokenHash: string) {
-    return this.rows.find((row) => row.tokenHash === tokenHash) ?? null;
-  }
-
-  async findAll() {
-    return { rows: [...this.rows], total: this.rows.length };
-  }
-
-  async update(id: string, data: Partial<IssuedLicenseRecord>) {
-    const row = this.rows.find((candidate) => candidate.id === id);
-    if (!row) throw new Error("row not found");
-    Object.assign(row, data);
-    return row;
-  }
-}
-
-class InMemoryCustomerOrganizations implements CustomerOrganizationPort {
-  organizations = new Map<
-    string,
-    { id: string; name: string; selfHostedCustomer: boolean }
-  >();
-  private sequence = 0;
-
-  seed(name: string) {
-    const id = `org_${++this.sequence}`;
-    this.organizations.set(id, { id, name, selfHostedCustomer: false });
-    return id;
-  }
-
-  async findById(id: string) {
-    return this.organizations.get(id) ?? null;
-  }
-
-  async createSelfHostedCustomer({ name }: { name: string }) {
-    const id = `org_${++this.sequence}`;
-    const organization = { id, name, selfHostedCustomer: true };
-    this.organizations.set(id, organization);
-    return organization;
-  }
-
-  async markSelfHostedCustomer(id: string) {
-    const organization = this.organizations.get(id);
-    if (organization) organization.selfHostedCustomer = true;
-  }
-}
-
 /**
  * `signing: "unconfigured"` rather than `privateKey: undefined`: a destructuring
  * default would replace an explicit undefined with the real key, and the
@@ -112,18 +35,20 @@ function buildService({
 }: {
   signing?: "configured" | "unconfigured";
 } = {}) {
-  const repository = new InMemoryIssuedLicenseRepository();
+  const repository = new InMemoryIssuedLicenseRepository(NOW);
   const organizations = new InMemoryCustomerOrganizations();
+  const managedKeys = new InMemoryConnectManagedKeys();
   const service = new LicenseRegistryService({
     repository,
     organizations,
+    managedKeys,
     signingKey: () =>
       signing === "configured" ? langwatchKeys.privateKey : undefined,
     publicKey: langwatchKeys.publicKey,
     encrypt: (plain) => `enc(${Buffer.from(plain).toString("base64")})`,
     now: () => NOW,
   });
-  return { service, repository, organizations };
+  return { service, repository, organizations, managedKeys };
 }
 
 const issueInput = (organizationId: string) => ({
@@ -411,6 +336,28 @@ describe("LicenseRegistryService", () => {
       });
     });
 
+    describe("when an operator revokes it after it resolved to a managed key", () => {
+      /** @scenario Revoking a license revokes its managed key */
+      it("ends the managed key, which is what tells every gateway to drop the credential", async () => {
+        const { id: virtualKeyId } = await context.managedKeys.provision({
+          organizationId: acme,
+          licenseId: "lic",
+        });
+        await context.repository.update(licenseId, { virtualKeyId });
+
+        await context.service.revoke({
+          id: licenseId,
+          operatorId: OPERATOR,
+          reason: "leaked",
+        });
+
+        expect(context.managedKeys.keys.get(virtualKeyId)?.retiredBy).toBe(
+          OPERATOR,
+        );
+        expect(context.managedKeys.active()).toEqual([]);
+      });
+    });
+
     describe("when an operator reissues it with 80 seats and a new term", () => {
       const NEW_TERM = new Date("2028-09-19T12:00:00.000Z");
 
@@ -587,6 +534,45 @@ describe("LicenseRegistryService", () => {
           instanceBoundAt: null,
         });
       });
+
+      it("tells every gateway to resolve the license again", async () => {
+        const { id: virtualKeyId } = await context.managedKeys.provision({
+          organizationId: acme,
+          licenseId: "lic",
+        });
+        await context.repository.update(licenseId, {
+          instanceId: "instance-a",
+          instanceBoundAt: NOW,
+          virtualKeyId,
+        });
+
+        await context.service.resetInstanceBinding({ id: licenseId });
+
+        expect(context.managedKeys.invalidated).toEqual([virtualKeyId]);
+      });
+    });
+
+    describe("when an operator links it to another customer organization", () => {
+      it("ends the managed key it had on the first organization", async () => {
+        const other = context.organizations.seed("ACME Europe");
+        const { id: virtualKeyId } = await context.managedKeys.provision({
+          organizationId: acme,
+          licenseId: "lic",
+        });
+        await context.repository.update(licenseId, { virtualKeyId });
+
+        const linked = await context.service.linkToOrganization({
+          id: licenseId,
+          organizationId: other,
+          operatorId: OPERATOR,
+        });
+
+        expect(linked).toMatchObject({
+          organizationId: other,
+          virtualKeyId: null,
+        });
+        expect(context.managedKeys.active()).toEqual([]);
+      });
     });
 
     describe("when an operator switches on a hosted service", () => {
@@ -739,6 +725,7 @@ describe("LicenseRegistryService", () => {
         const linked = await context.service.linkToOrganization({
           id: license.id,
           organizationId: acme,
+          operatorId: OPERATOR,
         });
 
         expect(linked.organizationId).toBe(acme);

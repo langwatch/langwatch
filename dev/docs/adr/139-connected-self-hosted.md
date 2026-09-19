@@ -95,21 +95,46 @@ to the backoffice, because license text is now credential material.
 
 ### 3. One managed key per license
 
-Each license resolves to its own virtual key with `purpose: CONNECT`, on a
-dedicated Connect project of the customer organization. Spend rows name a
-virtual key and nothing else, so a key per organization would make two installs
-of one customer indistinguishable in a usage dispute.
+Each license resolves to its own virtual key with `purpose: CONNECT`, created
+the first time the license resolves. Spend rows name a virtual key and nothing
+else, so a key per organization would make two installs of one customer
+indistinguishable in a usage dispute.
 
-Revoking a license revokes its key in the same transaction. The gateway's
-existing change feed then evicts the cached credential. No new revocation
-channel is built. The budget stays at organization scope, so it spans licenses.
+The key is scoped to the customer organization, and its spend lands on the
+organization's hidden governance project. That project is already the home of
+organization-scoped keys and is already filtered out of every customer-facing
+project list. A dedicated project kind was considered and dropped: more than
+twenty queries filter on `kind != internal_governance`, and a second hidden kind
+would have to be added to each. A customer organization created from the
+backoffice has no team, so one is created when the key is.
+
+The key's secret is discarded when it is minted. The license token is the
+credential, so the key can only be reached through the registry. It is hidden
+from customer-facing reads and refuses customer-facing mutations, like the
+Langy key. It reaches none of the customer organization's own model providers:
+hosted services run on LangWatch's providers, and a license token must not spend
+a customer's provider credentials.
+
+Revoking a license ends its key first and then marks the row. If the second
+step fails, the license reads as active with a dead key, which resolves to a
+refusal, and revoking again completes it. The other order could leave a revoked
+license whose cached credential no gateway was told to drop. The gateway's
+existing change feed evicts the cached credential. No new revocation channel is
+built. Resetting the instance binding writes a change for the key as well,
+because a gateway caches the credential per instance. The budget stays at
+organization scope, so it spans licenses.
 
 ### 4. Resolving the credential
 
 The Go gateway did no shape validation and had no negative cache: an unknown
 token was a signed round trip into Postgres every time. For license tokens only,
-the gateway now checks the shape (prefix, 64 hex characters) and keeps a short
-negative cache. Virtual key behaviour is unchanged.
+the gateway now checks the shape (prefix, 64 lowercase hex characters) and keeps
+a negative cache of 30 seconds (`LicenseRefusalTTL`). Only final refusals enter
+it. A control plane that could not answer has refused nothing. The cost is that a
+fix, such as a license linked or a binding reset, takes up to 30 seconds to be
+noticed by a gateway that just refused the token. Virtual key behaviour is
+unchanged: the instance header is not read for a virtual key, its cache key is
+the token hash as before, and it never enters the negative cache.
 
 The auth cache was keyed on the token alone, and background refresh runs on a
 detached context. The resolver signatures take a struct with the token and the
@@ -128,6 +153,15 @@ retryable 503.
 | `connect_wrong_instance` | 403 | bound to another instance |
 | `connect_instance_required` | 400 | no `X-LangWatch-Instance` |
 | `connect_service_not_entitled` | 403 | the license does not include the service |
+
+The first five are declared in the Go gateway, so `herrgen` carries them into the
+app's error registry and each has customer copy. Entitlement is checked by the
+hosted route, not by the credential: a license with no hosted service still
+authenticates, which is what the license sync needs. An unlinked license, one
+recorded by a purchase that named no customer, answers as not registered.
+
+A refusal names a code and nothing else. The caller may hold a token it should
+not have, so no answer carries the customer, the seats or the term.
 
 Binding on first use is one conditional update (`WHERE instanceId IS NULL`), so
 two instances racing leave exactly one bound.

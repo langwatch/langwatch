@@ -3,12 +3,15 @@
  * service with the server's signing key (ADR-139).
  */
 
+import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { nanoid } from "nanoid";
 import { env } from "~/env.mjs";
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import { encrypt } from "~/utils/encryption";
 import { slugify } from "~/utils/slugify";
 import { PUBLIC_KEY } from "../constants";
+import { ConnectCredentialService } from "./connectCredential.service";
+import { PrismaConnectManagedKeys } from "./connectManagedKey.prisma";
 import {
   type CustomerOrganizationPort,
   type IssuedLicenseRecord,
@@ -72,6 +75,37 @@ export class PrismaIssuedLicenseRepository implements IssuedLicenseRepository {
   ): Promise<IssuedLicenseRecord> {
     return this.prisma.issuedLicense.update({ where: { id }, data });
   }
+
+  async bindInstance({
+    id,
+    instanceId,
+    at,
+  }: {
+    id: string;
+    instanceId: string;
+    at: Date;
+  }): Promise<boolean> {
+    // One conditional write, so the database decides which install wins.
+    const { count } = await this.prisma.issuedLicense.updateMany({
+      where: { id, instanceId: null },
+      data: { instanceId, instanceBoundAt: at },
+    });
+    return count === 1;
+  }
+
+  async attachVirtualKey({
+    id,
+    virtualKeyId,
+  }: {
+    id: string;
+    virtualKeyId: string;
+  }): Promise<boolean> {
+    const { count } = await this.prisma.issuedLicense.updateMany({
+      where: { id, virtualKeyId: null },
+      data: { virtualKeyId },
+    });
+    return count === 1;
+  }
 }
 
 export class PrismaCustomerOrganizations implements CustomerOrganizationPort {
@@ -119,9 +153,21 @@ export function createLicenseRegistryService(
   return new LicenseRegistryService({
     repository: new PrismaIssuedLicenseRepository(prisma),
     organizations: new PrismaCustomerOrganizations(prisma),
+    managedKeys: new PrismaConnectManagedKeys(prisma),
     // Read per call, so a rotated secret needs no rebuild of the service.
     signingKey: () => env.LANGWATCH_LICENSE_PRIVATE_KEY,
     publicKey: PUBLIC_KEY,
     encrypt,
+  });
+}
+
+/** What the gateway's key resolution asks when it is handed a license token. */
+export function createConnectCredentialService(
+  prisma: PrismaClient,
+): ConnectCredentialService {
+  return new ConnectCredentialService({
+    repository: new PrismaIssuedLicenseRepository(prisma),
+    managedKeys: new PrismaConnectManagedKeys(prisma),
+    systemActorId: SYSTEM_ACTORS.connectLicense,
   });
 }

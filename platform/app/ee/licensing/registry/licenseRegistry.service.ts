@@ -69,6 +69,7 @@ export interface IssuedLicenseRecord {
   overageMaxUsdCents: number | null;
   instanceId: string | null;
   instanceBoundAt: Date | null;
+  virtualKeyId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -109,6 +110,43 @@ export interface IssuedLicenseRepository {
     id: string,
     data: Partial<Omit<IssuedLicenseRecord, "id" | "createdAt" | "updatedAt">>,
   ): Promise<IssuedLicenseRecord>;
+  /**
+   * Binds the license to an install only while it has none. Answers whether
+   * this call was the one that bound it, so two installs racing leave one bound.
+   */
+  bindInstance(params: {
+    id: string;
+    instanceId: string;
+    at: Date;
+  }): Promise<boolean>;
+  /** Records the managed key only while the license has none. Same answer. */
+  attachVirtualKey(params: {
+    id: string;
+    virtualKeyId: string;
+  }): Promise<boolean>;
+}
+
+/**
+ * The managed gateway key a license resolves to. Ending or invalidating it is
+ * what reaches a gateway that already cached the credential: both write to the
+ * change feed every gateway polls.
+ */
+export interface ConnectManagedKeyPort {
+  provision(params: {
+    organizationId: string;
+    licenseId: string;
+  }): Promise<{ id: string }>;
+  /** Ends the key for good. Safe to repeat. */
+  retire(params: {
+    virtualKeyId: string;
+    organizationId: string;
+    actorId: string;
+  }): Promise<void>;
+  /** Makes every gateway resolve the license again on its next call. */
+  invalidate(params: {
+    virtualKeyId: string;
+    organizationId: string;
+  }): Promise<void>;
 }
 
 export interface CustomerOrganizationPort {
@@ -122,6 +160,7 @@ export interface CustomerOrganizationPort {
 export interface LicenseRegistryDependencies {
   repository: IssuedLicenseRepository;
   organizations: CustomerOrganizationPort;
+  managedKeys: ConnectManagedKeyPort;
   /** The signing key from the server secret, or undefined when none is set. */
   signingKey: () => string | undefined;
   /** The key licenses are verified against. */
@@ -275,6 +314,11 @@ export class LicenseRegistryService {
     if (status === "revoked" || status === "superseded") {
       throw new IssuedLicenseNotActiveError(status);
     }
+    // The key ends first. If the row update then fails, the license reads as
+    // active with a dead key, which resolves to a refusal, and revoking again
+    // finishes the job. The other order could leave a revoked license whose
+    // cached credential no gateway was told to drop.
+    await this.retireManagedKey(row, input.operatorId);
     const updated = await this.deps.repository.update(row.id, {
       revokedAt: this.now(),
       revokedById: input.operatorId,
@@ -357,6 +401,14 @@ export class LicenseRegistryService {
       instanceId: null,
       instanceBoundAt: null,
     });
+    // A gateway caches the credential per instance. Without this the install
+    // that was just unbound keeps its cached entry until the token runs out.
+    if (row.virtualKeyId && row.organizationId) {
+      await this.deps.managedKeys.invalidate({
+        virtualKeyId: row.virtualKeyId,
+        organizationId: row.organizationId,
+      });
+    }
     return this.toView(updated);
   }
 
@@ -374,6 +426,7 @@ export class LicenseRegistryService {
   async linkToOrganization(input: {
     id: string;
     organizationId: string;
+    operatorId: string;
   }): Promise<IssuedLicenseView> {
     const row = await this.requireRow(input.id);
     const organization = await this.deps.organizations.findById(
@@ -381,8 +434,15 @@ export class LicenseRegistryService {
     );
     if (!organization) throw new OrganizationNotFoundError();
 
+    // A managed key belongs to the organization it was created on. Moving the
+    // license ends it, and the next call creates one on the new organization.
+    const moves =
+      row.organizationId !== null && row.organizationId !== organization.id;
+    if (moves) await this.retireManagedKey(row, input.operatorId);
+
     const updated = await this.deps.repository.update(row.id, {
       organizationId: organization.id,
+      ...(moves ? { virtualKeyId: null } : {}),
     });
     await this.deps.organizations.markSelfHostedCustomer(organization.id);
     return this.toView(updated);
@@ -399,6 +459,18 @@ export class LicenseRegistryService {
   }): Promise<{ licenses: IssuedLicenseView[]; total: number }> {
     const { rows, total } = await this.deps.repository.findAll(input);
     return { licenses: rows.map((row) => this.toView(row)), total };
+  }
+
+  private async retireManagedKey(
+    row: IssuedLicenseRecord,
+    actorId: string,
+  ): Promise<void> {
+    if (!row.virtualKeyId || !row.organizationId) return;
+    await this.deps.managedKeys.retire({
+      virtualKeyId: row.virtualKeyId,
+      organizationId: row.organizationId,
+      actorId,
+    });
   }
 
   private requireSigningKey(): string {
@@ -497,6 +569,7 @@ export class LicenseRegistryService {
       overageMaxUsdCents: null,
       instanceId: null,
       instanceBoundAt: null,
+      virtualKeyId: null,
       ...overrides,
     });
   }

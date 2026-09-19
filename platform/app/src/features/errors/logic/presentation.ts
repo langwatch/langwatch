@@ -3318,6 +3318,32 @@ const presentations = {
     describe: () =>
       "Extend its expiration date in settings, or create a new key.",
   },
+  // Refusals of a self-hosted license on LangWatch-hosted services. The reader
+  // is the administrator of the install, in its own Settings.
+  connect_instance_required: {
+    title: "This install did not identify itself",
+    describe: () =>
+      "Hosted services need the install's instance id with every call. Upgrade LangWatch, then try again.",
+  },
+  connect_license_not_registered: {
+    title: "This license is not set up for hosted services",
+    describe: () =>
+      "Contact LangWatch to have hosted services enabled for your license.",
+  },
+  connect_license_revoked: {
+    title: "This license is no longer active",
+    describe: () =>
+      "Hosted services are closed to it. Contact LangWatch for a new license.",
+  },
+  connect_license_expired: {
+    title: "This license has expired",
+    describe: () => "Renew the license to use hosted services again.",
+  },
+  connect_wrong_instance: {
+    title: "This license is in use by another install",
+    describe: () =>
+      "A license works with one install. If you rebuilt or moved this one, ask LangWatch to reset the license binding.",
+  },
   rate_limited: {
     title: "Too many requests",
     describe: () => "Slow down for a moment, then try again.",

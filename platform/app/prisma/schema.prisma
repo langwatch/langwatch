@@ -866,6 +866,11 @@ model IssuedLicense {
   instanceId      String?
   instanceBoundAt DateTime?
 
+  /// The managed gateway key (purpose CONNECT) that hosted-service traffic of
+  /// this license runs under. One per license, so spend rows name the install.
+  /// Created when the license first resolves. A plain column, not a relation.
+  virtualKeyId String? @unique
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -3558,9 +3563,13 @@ enum VirtualKeyStatus {
 // LANGY = auto-provisioned by the Langy in-product assistant; UI surfaces it
 // as a managed row and forbids edit/revoke. Filtering by `purpose` replaces
 // the legacy `name == "Langy" && principalUserId IS NULL` heuristic.
+// CONNECT = the key a self-hosted license resolves to on LangWatch Cloud
+// (ADR-139). Its secret is discarded at creation: the license token is the
+// credential, so the key is only ever reached through the license registry.
 enum VirtualKeyPurpose {
   USER
   LANGY
+  CONNECT
 }
 
 // Rotation policy for gateway provider credentials.

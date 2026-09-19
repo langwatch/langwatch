@@ -85,6 +85,10 @@ export async function eligibleModelProvidersForVk(
 ): Promise<EligibleModelProvider[]> {
   const client = tx ?? prisma;
 
+  // A license token never reaches the customer organization's own provider
+  // credentials: hosted services run on LangWatch's providers (ADR-139).
+  if (vk.purpose === "CONNECT") return [];
+
   const candidates = await scopeReachableModelProvidersForVk(prisma, vk, tx);
   if (candidates.length === 0) return [];
 

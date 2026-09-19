@@ -274,7 +274,10 @@ export const licenseRegistryRouter = createTRPCRouter({
       const operator = requireOperator(
         ctx.session.user.impersonator ?? ctx.session.user,
       );
-      const license = await service().linkToOrganization(input);
+      const license = await service().linkToOrganization({
+        ...input,
+        operatorId: operator.userId,
+      });
       await auditLog({
         userId: operator.userId,
         action: "licenseRegistry.linkToOrganization",

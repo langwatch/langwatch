@@ -99,9 +99,14 @@ func NewClient(opts ClientOptions) *Client {
 	}
 }
 
-// ResolveKey exchanges a raw virtual key for a domain.Bundle.
-func (c *Client) ResolveKey(ctx context.Context, rawKey string) (*domain.Bundle, error) {
-	payload, _ := json.Marshal(map[string]string{"key_presented": rawKey})
+// ResolveKey exchanges a presented credential for a domain.Bundle: a raw
+// virtual key, or a license token with the id of the install presenting it.
+func (c *Client) ResolveKey(ctx context.Context, key domain.PresentedKey) (*domain.Bundle, error) {
+	body := map[string]string{"key_presented": key.Token}
+	if key.InstanceID != "" {
+		body["instance_id"] = key.InstanceID
+	}
+	payload, _ := json.Marshal(body)
 	endpoint, _ := url.JoinPath(c.baseURL, "/api/internal/gateway/resolve-key")
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
 	if err != nil {
@@ -117,6 +122,10 @@ func (c *Client) ResolveKey(ctx context.Context, rawKey string) (*domain.Bundle,
 	}
 	defer func() { _ = resp.Body.Close() }()
 	respBody, _ := io.ReadAll(resp.Body)
+
+	if refusal, ok := connectRefusal(resp.StatusCode, respBody); ok {
+		return nil, herr.New(ctx, refusal, nil)
+	}
 
 	switch {
 	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusUnauthorized:
@@ -164,6 +173,36 @@ func (c *Client) ResolveKey(ctx context.Context, rawKey string) (*domain.Bundle,
 	}
 
 	return claimsToBundle(extractClaims(mapClaims)), nil
+}
+
+// connectRefusals are the control plane's refusals of a license token. Each is
+// final for the token as presented, so it has to reach the caller under its own
+// code: folded into the generic mapping, a wrong instance would read as a
+// revoked key and a missing instance id as a retryable upstream failure.
+var connectRefusals = map[string]herr.Code{
+	string(domain.ErrConnectInstanceRequired):     domain.ErrConnectInstanceRequired,
+	string(domain.ErrConnectLicenseNotRegistered): domain.ErrConnectLicenseNotRegistered,
+	string(domain.ErrConnectLicenseRevoked):       domain.ErrConnectLicenseRevoked,
+	string(domain.ErrConnectLicenseExpired):       domain.ErrConnectLicenseExpired,
+	string(domain.ErrConnectWrongInstance):        domain.ErrConnectWrongInstance,
+}
+
+// connectRefusal decodes a license token refusal from a 4xx answer. The decoded
+// code decides it, never a substring of the body.
+func connectRefusal(status int, body []byte) (herr.Code, bool) {
+	if status < http.StatusBadRequest || status >= http.StatusInternalServerError {
+		return "", false
+	}
+	var rejection struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(body, &rejection); err != nil {
+		return "", false
+	}
+	code, ok := connectRefusals[rejection.Error.Code]
+	return code, ok
 }
 
 // Change is one mutation observed by the control plane that the gateway

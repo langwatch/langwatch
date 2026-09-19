@@ -34,9 +34,10 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
-// KeyResolver resolves a raw API key into a Bundle via an upstream source.
+// KeyResolver resolves a presented credential into a Bundle via an upstream
+// source.
 type KeyResolver interface {
-	ResolveKey(ctx context.Context, rawKey string) (*domain.Bundle, error)
+	ResolveKey(ctx context.Context, key domain.PresentedKey) (*domain.Bundle, error)
 }
 
 // ConfigFetcher retrieves configuration for a virtual key. ifNoneMatch is the
@@ -104,7 +105,12 @@ const tierL1 = "l1"
 // Service is the auth resolver: one in-memory LRU in front of the control
 // plane.
 type Service struct {
-	l1            *lru.Cache[[64]byte, *entry]
+	l1 *lru.Cache[[64]byte, *entry]
+	// licenseRefusals remembers, briefly, that the control plane refused a
+	// license token. Virtual keys never enter it.
+	licenseRefusals   *lru.Cache[[64]byte, licenseRefusal]
+	licenseRefusalTTL time.Duration
+
 	resolver      KeyResolver
 	configFetcher ConfigFetcher
 	changePoller  ChangePoller
@@ -417,7 +423,8 @@ func classifyRefreshError(err error) refreshErrorClass {
 	if errors.Is(err, domain.ErrInvalidAPIKey) ||
 		errors.Is(err, domain.ErrKeyRevoked) ||
 		errors.Is(err, domain.ErrKeyDisabled) ||
-		errors.Is(err, domain.ErrKeyExpired) {
+		errors.Is(err, domain.ErrKeyExpired) ||
+		isLicenseRefusal(err) {
 		return classAuthRejection
 	}
 	return classTransportFailure
@@ -456,6 +463,12 @@ type Options struct {
 	// or single-process dev environments where stale-window-up-to-15min
 	// is tolerable.
 	ChangePoller ChangePoller
+	// LicenseRefusalTTL is how long a refused license token is answered from
+	// memory before the control plane is asked again. It bounds both the
+	// registry load a bad token can cause and how long a fix (a license
+	// linked, a binding reset) takes to be noticed. Default 30s. Negative
+	// disables.
+	LicenseRefusalTTL time.Duration
 }
 
 // New creates the auth service.
@@ -483,7 +496,15 @@ func New(opts Options) (*Service, error) {
 		opts.ConfigTTL = 0 // disabled
 	}
 
+	if opts.LicenseRefusalTTL == 0 {
+		opts.LicenseRefusalTTL = 30 * time.Second
+	}
+
 	l1, err := lru.New[[64]byte, *entry](opts.LRUSize)
+	if err != nil {
+		return nil, err
+	}
+	licenseRefusals, err := lru.New[[64]byte, licenseRefusal](licenseRefusalLRUSize)
 	if err != nil {
 		return nil, err
 	}
@@ -494,7 +515,10 @@ func New(opts Options) (*Service, error) {
 	}
 
 	return &Service{
-		l1:               l1,
+		l1:                l1,
+		licenseRefusals:   licenseRefusals,
+		licenseRefusalTTL: opts.LicenseRefusalTTL,
+
 		resolver:         opts.Resolver,
 		configFetcher:    opts.ConfigFetcher,
 		changePoller:     opts.ChangePoller,
@@ -508,18 +532,23 @@ func New(opts Options) (*Service, error) {
 	}, nil
 }
 
-// Resolve returns a Bundle for the raw bearer token.
+// Resolve returns a Bundle for the presented credential.
 // Checks L1, then the upstream resolver, caching what the latter answers.
 //
 // On L1 hit past softExpiresAt but within hardExpiresAt, attempts a
 // foreground refresh; on transport-class failure serves the stale bundle
 // and bumps soft expiry. On auth-class failure evicts and rejects.
-func (s *Service) Resolve(ctx context.Context, rawKey string) (*domain.Bundle, error) {
-	if rawKey == "" {
+func (s *Service) Resolve(ctx context.Context, key domain.PresentedKey) (*domain.Bundle, error) {
+	if key.Token == "" {
 		return nil, herr.New(ctx, domain.ErrInvalidAPIKey, nil)
 	}
 
-	h := hashKey(rawKey)
+	h := hashKey(key)
+	if key.IsLicenseToken() {
+		if err := s.admitLicenseToken(ctx, key, h); err != nil {
+			return nil, err
+		}
+	}
 	s.recordLookup()
 
 	// L1: in-memory
@@ -529,7 +558,7 @@ func (s *Service) Resolve(ctx context.Context, rawKey string) (*domain.Bundle, e
 			// Serve, maybe trigger background refresh on near-expiry.
 			s.recordHit()
 			if e.nearSoftExpiry(s.refreshThreshold) {
-				go s.refreshBackground(rawKey, h) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
+				go s.refreshBackground(key, h) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
 			} else if e.configStale(s.configTTL) && e.tryBeginConfigRefresh() {
 				go s.refreshConfigBackground(h, e) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
 			}
@@ -540,7 +569,7 @@ func (s *Service) Resolve(ctx context.Context, rawKey string) (*domain.Bundle, e
 			// needed before the entry can serve, so it counts as a miss
 			// even when stale-while-error ends up serving the old bundle.
 			s.recordMiss()
-			return s.refreshOrServeStale(ctx, rawKey, h, e)
+			return s.refreshOrServeStale(ctx, key, h, e)
 
 		case entryKeyExpired:
 			// The key ran out. Fail closed with the key's own error and skip
@@ -570,7 +599,7 @@ func (s *Service) Resolve(ctx context.Context, rawKey string) (*domain.Bundle, e
 		s.recordMiss()
 	}
 
-	return s.resolveFresh(ctx, rawKey, h)
+	return s.resolveFresh(ctx, key, h)
 }
 
 // CacheLen reports how many virtual keys L1 is currently holding, so the
@@ -601,9 +630,10 @@ func (s *Service) recordMiss() {
 // resolveFresh calls the upstream resolver and caches the result.
 // Used for cold misses; not on stale-entry refresh paths (those use
 // refreshOrServeStale for the served-stale fallback).
-func (s *Service) resolveFresh(ctx context.Context, rawKey string, h [64]byte) (*domain.Bundle, error) {
-	bundle, err := s.resolver.ResolveKey(ctx, rawKey)
+func (s *Service) resolveFresh(ctx context.Context, key domain.PresentedKey, h [64]byte) (*domain.Bundle, error) {
+	bundle, err := s.resolver.ResolveKey(ctx, key)
 	if err != nil {
+		s.rememberLicenseRefusal(key, h, err)
 		return nil, err
 	}
 	etag, cfgErr := s.populateConfig(ctx, bundle)
@@ -620,8 +650,8 @@ func (s *Service) resolveFresh(ctx context.Context, rawKey string, h [64]byte) (
 // On success replaces the L1 entry. On transport-class failure bumps the
 // stale entry's soft expiry by SoftBump and serves the stale bundle. On
 // auth-class failure evicts the entry and returns the rejection.
-func (s *Service) refreshOrServeStale(ctx context.Context, rawKey string, h [64]byte, stale *entry) (*domain.Bundle, error) {
-	bundle, err := s.resolver.ResolveKey(ctx, rawKey)
+func (s *Service) refreshOrServeStale(ctx context.Context, key domain.PresentedKey, h [64]byte, stale *entry) (*domain.Bundle, error) {
+	bundle, err := s.resolver.ResolveKey(ctx, key)
 	cls := classifyRefreshError(err)
 
 	staleBundle, _, hardExpiresAt := stale.snapshot()
@@ -993,10 +1023,10 @@ func (s *Service) evictWhere(match func(*domain.Bundle) bool, reason, target str
 // fire-and-forget when the entry has less than RefreshThreshold left
 // before softExpiresAt. Same classification as foreground:
 // AuthRejection evicts; TransportFailure bumps the existing entry.
-func (s *Service) refreshBackground(rawKey string, h [64]byte) {
+func (s *Service) refreshBackground(key domain.PresentedKey, h [64]byte) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	bundle, err := s.resolver.ResolveKey(ctx, rawKey)
+	bundle, err := s.resolver.ResolveKey(ctx, key)
 	cls := classifyRefreshError(err)
 
 	switch cls {
@@ -1145,7 +1175,15 @@ func (s *Service) loop(ctx context.Context) {
 	}
 }
 
-func hashKey(raw string) [64]byte {
+// hashKey is the cache key of a presented credential. A virtual key hashes as
+// the token alone. A license token hashes together with the install that
+// presented it, so an entry cached for one install cannot be hit by another.
+// The separator cannot occur in either part.
+func hashKey(key domain.PresentedKey) [64]byte {
+	raw := key.Token
+	if key.InstanceID != "" {
+		raw += "\x00" + key.InstanceID
+	}
 	sum := sha256.Sum256([]byte(raw))
 	var dst [64]byte
 	hex.Encode(dst[:], sum[:])

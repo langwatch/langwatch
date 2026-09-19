@@ -344,6 +344,9 @@ func TestFaultForCodeAttributesEveryCodeTheGatewayAuthors(t *testing.T) {
 		domain.ErrProviderConfigInvalid, domain.ErrProviderConnectionFailed,
 		domain.ErrRequestAbandoned,
 		domain.ErrChainExhausted, domain.ErrCircuitOpen,
+		domain.ErrConnectInstanceRequired, domain.ErrConnectLicenseNotRegistered,
+		domain.ErrConnectLicenseRevoked, domain.ErrConnectLicenseExpired,
+		domain.ErrConnectWrongInstance,
 	}
 	for _, code := range notOurFault {
 		t.Run(string(code), func(t *testing.T) {

@@ -42,7 +42,7 @@ Feature: License registry
     Then the buyer still receives the license by email
     And the failure to record it is reported to LangWatch
 
-  @unit @unimplemented
+  @unit
   Scenario: An unlinked license resolves to nothing
     Given a license in the registry that is not linked to a customer organization
     When it is presented as a credential

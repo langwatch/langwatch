@@ -6,7 +6,7 @@
  * here must hold with no connect configuration, no registry and no network:
  * a self-hosted install that upgrades and sets nothing new behaves as before.
  */
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ILicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
 import { assertMemberTypeLimitNotExceeded } from "~/server/license-enforcement/license-limit-guard";
@@ -219,5 +219,33 @@ describe("a license minted by main before this change", () => {
 
       expect(fetchSpy).not.toHaveBeenCalled();
     });
+
+    it("keeps the registry out of every module that validates or enforces a license", () => {
+      const modules = OFFLINE_LICENSE_DIRECTORIES.flatMap((directory) => {
+        const url = new URL(directory, import.meta.url);
+        return readdirSync(url)
+          .filter((name) => name.endsWith(".ts"))
+          .map((name) => new URL(name, url));
+      });
+      const offenders = modules
+        .filter((module) =>
+          /from\s+"[^"]*\/registry(\/|")/.test(readFileSync(module, "utf8")),
+        )
+        .map((module) => module.pathname);
+
+      expect(modules.length).toBeGreaterThan(20);
+      expect(offenders).toEqual([]);
+    });
   });
 });
+
+/**
+ * What runs when an install validates its license and enforces its seats: the
+ * licensing modules themselves and the enforcement layer. None of it may reach
+ * the license registry, which lives in its own folder and exists only for
+ * LangWatch Cloud.
+ */
+const OFFLINE_LICENSE_DIRECTORIES = [
+  "../",
+  "../../../src/server/license-enforcement/",
+];

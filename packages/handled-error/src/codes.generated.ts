@@ -103,6 +103,45 @@ export const goErrorCodes = {
    */
   config_invalid: { service: "config" },
   /**
+   * ErrConnectInstanceRequired — means a license token arrived without the
+   * X-LangWatch-Instance header. A license is bound to one install, so the
+   * token alone identifies nothing.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  connect_instance_required: { service: "aigateway", httpStatus: 400 },
+  /**
+   * ErrConnectLicenseExpired — means the license term ended. A renewed license
+   * opens hosted services again.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  connect_license_expired: { service: "aigateway", httpStatus: 403 },
+  /**
+   * ErrConnectLicenseNotRegistered — means the license behind the token is not
+   * in the registry, or is recorded there without a customer. The install's
+   * operator has to contact LangWatch; retrying changes nothing.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  connect_license_not_registered: { service: "aigateway", httpStatus: 401 },
+  /**
+   * ErrConnectLicenseRevoked — means the license was revoked or replaced. The
+   * install keeps working offline on the license it holds, but hosted services
+   * are closed to it for good.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  connect_license_revoked: { service: "aigateway", httpStatus: 403 },
+  /**
+   * ErrConnectWrongInstance — means the license is bound to another install.
+   * Either the token leaked, or the install was rebuilt and an operator has to
+   * reset the binding.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  connect_wrong_instance: { service: "aigateway", httpStatus: 403 },
+  /**
    * ErrConversationBusy — signals a second concurrent turn for a conversation
    * whose single-stream agent session is already answering. The control plane
    * shows a "still answering — wait" notice. Maps to 409.

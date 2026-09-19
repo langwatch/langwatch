@@ -747,6 +747,14 @@ function redactHeaderValues(headers: readonly unknown[]): unknown[] {
   });
 }
 
+/** The credential string fields this input carries a value for. */
+function credentialStringFieldsIn(record: Record<string, unknown>): string[] {
+  return CREDENTIAL_STRING_FIELDS.filter((field) => {
+    const value = record[field];
+    return typeof value === "string" && value !== "";
+  });
+}
+
 /**
  * Strips credential values out of what the audit trail persists.
  *
@@ -787,11 +795,8 @@ export function redactAuditArgs({
     replace("extraHeaders", redactHeaderValues(record.extraHeaders));
   }
 
-  for (const field of CREDENTIAL_STRING_FIELDS) {
-    const value = record[field];
-    if (typeof value === "string" && value !== "") {
-      replace(field, "[redacted]");
-    }
+  for (const field of credentialStringFieldsIn(record)) {
+    replace(field, "[redacted]");
   }
 
   return redacted ?? input;
