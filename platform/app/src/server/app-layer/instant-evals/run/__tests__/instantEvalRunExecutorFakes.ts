@@ -57,6 +57,13 @@ export function fakes(options?: {
   texts?: Record<string, unknown>[];
   /** What the count pass answers, which is what a plan's total comes from. */
   total?: number;
+  /** Input tokens the run row already carries, which is its spend so far. */
+  tokens?: number;
+  /** Refuses the next page, standing in for an exhausted free budget. */
+  assertWithinBudget?: (input: {
+    projectId: string;
+    inFlightUsd: number;
+  }) => Promise<void>;
 }) {
   const inserted: InstantEvalJudgmentRecord[][] = [];
   const spends: InstantEvalSpendRecord[] = [];
@@ -119,6 +126,7 @@ export function fakes(options?: {
         questions: JSON.parse(JSON.stringify(questions)) as unknown,
         plan: JSON.parse(JSON.stringify(calls)) as unknown,
         rowLimit: options?.rowLimit ?? 10_000,
+        tokens: options?.tokens ?? 0,
       })),
     } as never,
     judgments: {
@@ -139,6 +147,9 @@ export function fakes(options?: {
     maxConcurrency: 4,
     protections: async () => ({}) as never,
     isCancelled: async () => options?.isCancelled === true,
+    ...(options?.assertWithinBudget
+      ? { assertWithinBudget: options.assertWithinBudget }
+      : {}),
     now: () => NOW,
   });
 

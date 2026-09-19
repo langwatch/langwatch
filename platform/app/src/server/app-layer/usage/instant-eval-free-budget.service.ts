@@ -91,17 +91,29 @@ export class InstantEvalFreeBudgetService {
     };
   }
 
-  /** Refuses when the organization is free and the budget is spent. */
+  /**
+   * Refuses when the organization is free and the budget is spent.
+   *
+   * `inFlightUsd` is spend that has happened but has not reached the ledger,
+   * which for a run is everything it judged before its current page: a run
+   * records its spend once, at the end, so a check that read the ledger alone
+   * would let one accepted run judge every row it was given no matter how far
+   * past the budget that took it. Counting what the caller is holding is what
+   * bounds a single run to one page of overshoot.
+   */
   async assertWithinBudget({
     projectId,
+    inFlightUsd = 0,
   }: {
     projectId: string;
+    inFlightUsd?: number;
   }): Promise<void> {
     const standing = await this.standing({ projectId });
     if (!standing.isFree) return;
-    if (standing.remainingUsd !== null && standing.remainingUsd > 0) return;
+    if (standing.remainingUsd !== null && standing.remainingUsd > inFlightUsd)
+      return;
     throw new InstantEvalFreeBudgetExhaustedError({
-      spentUsd: standing.spentUsd,
+      spentUsd: standing.spentUsd + inFlightUsd,
       budgetUsd: standing.budgetUsd,
     });
   }

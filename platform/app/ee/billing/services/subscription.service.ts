@@ -551,8 +551,9 @@ export class EESubscriptionService implements SubscriptionService {
     // Stripe Adaptive Pricing from offering unsupported currencies.
     const SUPPORTED_CHECKOUT_CURRENCIES = ["usd", "eur"] as const;
     const basePriceId = this.itemCalculator.prices[plan as StripePriceName];
-    const rawCurrency =
-      stripePricesFile.prices[basePriceId]?.currency?.toLowerCase();
+    const rawCurrency = basePriceId
+      ? stripePricesFile.prices[basePriceId]?.currency?.toLowerCase()
+      : undefined;
     const checkoutCurrency =
       rawCurrency &&
       SUPPORTED_CHECKOUT_CURRENCIES.includes(

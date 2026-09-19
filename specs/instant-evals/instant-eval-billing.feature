@@ -132,7 +132,7 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
 
     @unit
     Scenario: At the budget a run is refused
-      Given an organization with no paid plan that has spent 0.40 dollars on Instant Evals
+      Given an organization with no paid plan that has spent 1.00 dollars on Instant Evals
       When a run is requested
       Then it is refused with instant_eval_free_budget_exhausted
       And the refusal names what was spent and the budget
@@ -142,6 +142,18 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       Given an organization with no paid plan that has spent the budget
       When a statement calling an eval function is submitted
       Then it is refused with instant_eval_free_budget_exhausted before anything is judged
+
+    # A run records its spend once, when it finishes, so the ledger knows
+    # nothing about a run already under way. The page check counts what the run
+    # has judged so far, which is what stops one accepted run from judging its
+    # whole selection past the budget.
+    @unit
+    Scenario: A run under way stops when its own judging crosses the budget
+      Given a free organization whose ledger spend is under the budget
+      And a run whose judged rows have already taken it past the budget
+      When the next page is asked for
+      Then it is refused with instant_eval_free_budget_exhausted
+      And the refusal counts the run's own spend alongside the ledger's
 
     @unit
     Scenario: A paid organization has no budget

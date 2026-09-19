@@ -108,6 +108,11 @@ export function createInstantEvalRunPortFromEnv({
     maxConcurrency: INSTANT_EVAL_PAGE_CONCURRENCY,
     protections: (projectId) => getProtectionsForProject(prisma, { projectId }),
     isCancelled: ({ runId }) => cancellations().isRequested({ runId }),
+    assertWithinBudget: ({ projectId, inFlightUsd }) =>
+      createInstantEvalFreeBudgetFromEnv().assertWithinBudget({
+        projectId,
+        inFlightUsd,
+      }),
   });
 }
 
