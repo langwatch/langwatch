@@ -229,21 +229,18 @@ describe("given a query whose judgements were all skipped", () => {
       const spends: InstantEvalSpendRecord[] = [];
       const service = serviceJudgingWith({
         spends,
-        classifier: classifierAnswering(async () => ({
-          verdicts: [],
-          skippedReason: "classifier_not_configured",
-          inputTokens: 0,
-          isTextTruncated: false,
-        })),
+        // The judged column carries no text, so nothing is ever classified.
+        rows: [{ annoyed: null }],
+        classifier: classifierAnswering(async () => {
+          throw new Error("nothing should have been sent");
+        }),
       });
 
       const result = await run(service);
 
       expect(spends).toEqual([]);
       expect(result.rows).toEqual([{ annoyed: null }]);
-      expect(result.diagnostics.map((entry) => entry.code)).toContain(
-        "INSTANT_EVAL_SKIPPED",
-      );
+      expect(result.diagnostics.map((entry) => entry.code)).toEqual([]);
     });
   });
 });

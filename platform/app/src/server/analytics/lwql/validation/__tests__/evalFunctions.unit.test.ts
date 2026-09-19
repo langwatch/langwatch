@@ -114,7 +114,9 @@ describe("given a call outside the projection", () => {
       expect(messagesOf(refused)).toContain(
         "there is no column in this statement to filter on",
       );
-      expect(messagesOf(refused)).toContain("instant-eval results --matched");
+      expect(messagesOf(refused)).toContain(
+        "instant-eval results <run-id> --matched",
+      );
     });
   });
 

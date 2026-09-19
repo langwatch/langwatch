@@ -50,6 +50,29 @@ function messagesOf(result: LangWatchQLValidation): string {
 }
 
 describe("given a statement that calls a LangWatchQL app function", () => {
+  describe("when the call is written in the parametric form", () => {
+    /** @scenario "A call in the parametric form is refused" */
+    it("refuses it, naming the function, rather than letting the parameter list through", () => {
+      const result = validate(
+        "SELECT conversation(1)(ConversationId) AS c FROM analytics.traces",
+      );
+
+      expect(codesOf(result)).toEqual(["APP_FUNCTION_ARGUMENT"]);
+      expect(messagesOf(result)).toContain('"conversation"');
+      expect(result.ok).toBe(false);
+    });
+
+    /** @scenario "A call in the parametric form is refused" */
+    it("refuses the parametric form on the extraction nested inside an eval", () => {
+      const result = validate(
+        "SELECT eval(conversation(1)(ConversationId), 'annoyed') AS c FROM analytics.traces",
+      );
+
+      expect(codesOf(result)).toContain("APP_FUNCTION_ARGUMENT");
+      expect(messagesOf(result)).toContain('"conversation"');
+    });
+  });
+
   describe("when the call is an aliased element of the top-level SELECT list", () => {
     /** @scenario "A conversation is projected under an alias and hydrated into the result" */
     it("accepts it and records the column, the function and its options", () => {

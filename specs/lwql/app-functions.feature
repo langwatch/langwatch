@@ -145,6 +145,13 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
     Then it is accepted
 
   @unit
+  Scenario: A call in the parametric form is refused
+    Given a statement projecting conversation(1)(ConversationId) AS c
+    When the statement is validated
+    Then it is refused with APP_FUNCTION_ARGUMENT naming conversation
+    And the same form on an extraction nested inside an eval is refused the same way
+
+  @unit
   Scenario: A gated column inside a key expression is still refused
     Given a caller without the captured-input permission
     And a statement projecting thread_traces(CapturedInput) AS ids
@@ -221,7 +228,7 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
   Scenario: A single value past the per-value ceiling is cut and reported
     Given one hydrated value larger than the per-value ceiling
     When hydration runs
-    Then that value is cut to the ceiling
+    Then that value is cut on a character boundary so its encoded length is at or under the ceiling
     And the result carries APP_FUNCTION_VALUE_TRUNCATED naming the function and how many values were cut
 
   @unit

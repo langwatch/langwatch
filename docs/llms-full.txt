@@ -68621,7 +68621,7 @@ A text longer than the judge takes is cut before it is sent, keeping the start. 
 
 Judged columns are `Nullable`. A null means the row was not judged, and the response says why:
 
-- `INSTANT_EVAL_SKIPPED` means the text reached the judge and came back unanswered. The reasons ride in `meta`: rate limited, too large even after being cut, or no judge configured on this deployment.
+- `INSTANT_EVAL_SKIPPED` means the row had text but was not judged, before or during classification. The reason rides in `meta`: rate limited, too large even after being cut, no judge configured on this deployment, or the judge was asked and did not answer (`classifier_failed`).
 - `APP_FUNCTION_UNRESOLVED_KEYS` means the extraction produced no text at all, so the row was never sent to the judge.
 
 `GET /api/v1/query/schema` lists every eval function with `kind` set to `eval` and `available` saying whether this project may call one. A call made while it may not is refused with `APP_FUNCTION_GATED`.
