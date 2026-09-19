@@ -84,7 +84,12 @@ async function serviceWith({
     isEnabled: async () => true,
     caller: async () => ({ id: "proj_1", lwqlKey: "key" }) as never,
     plan: async () => ({ name: "free", isFree: standing.isFree }),
-    budget: { standing: async () => standing, assertWithinBudget, reserve, release },
+    budget: {
+      standing: async () => standing,
+      assertWithinBudget,
+      reserve,
+      release,
+    },
   });
   return { service, assertWithinBudget, reserve, release };
 }

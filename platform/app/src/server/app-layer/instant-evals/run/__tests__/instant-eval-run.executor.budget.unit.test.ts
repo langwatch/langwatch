@@ -7,7 +7,7 @@
  * covers that gap: it hands the budget what this run has judged so far, priced
  * the way the finish will price it.
  *
- * @see ../instant-eval-run.executor.ts
+ * @see ../instant-eval-run.judge-page.ts
  * @see ../../../../../../specs/instant-evals/instant-eval-billing.feature
  */
 

@@ -1,7 +1,7 @@
 /**
  * A page stopped part way: by a cancellation, or by the lease it judges under.
  *
- * @see ../instant-eval-run.executor.ts
+ * @see ../instant-eval-run.judge-page.ts
  * @see ../page-stop.ts
  * @see specs/instant-evals/instant-eval-pipeline.feature
  */
@@ -25,7 +25,9 @@ const PAGE = {
 
 /** A lease with `judgeMs` of judging left once the margins are kept back. */
 function leaseLeaving(judgeMs: number): number {
-  return NOW + INSTANT_EVAL_PAGE_SETTLE_MS + INSTANT_EVAL_CANCEL_POLL_MS + judgeMs;
+  return (
+    NOW + INSTANT_EVAL_PAGE_SETTLE_MS + INSTANT_EVAL_CANCEL_POLL_MS + judgeMs
+  );
 }
 
 describe("given a page whose judging stops part way", () => {
@@ -61,7 +63,9 @@ describe("given a page whose judging stops part way", () => {
         deadlineAt: leaseLeaving(20),
       });
 
-      expect(inserted[0]?.map((record) => [record.TraceId, record.Status])).toEqual([
+      expect(
+        inserted[0]?.map((record) => [record.TraceId, record.Status]),
+      ).toEqual([
         ["t1", "skipped"],
         ["t2", "judged"],
       ]);

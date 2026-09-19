@@ -6,7 +6,7 @@
  * deployment a self-hosted install without a key gets, and a page of skips must
  * still be a recorded page rather than a failure the queue redelivers forever.
  *
- * @see ../instant-eval-run.executor.ts
+ * @see ../instant-eval-run.judge-page.ts
  * @see ../../../../../../specs/instant-evals/instant-eval-pipeline.feature
  */
 

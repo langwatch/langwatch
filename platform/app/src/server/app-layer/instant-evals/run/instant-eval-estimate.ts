@@ -23,7 +23,7 @@ import {
   InstantEvalEstimateUnavailableError,
   InstantEvalRowCapExceededError,
 } from "./errors";
-import { instantEvalAverageTextBytes } from "./instant-eval-run.executor";
+import { instantEvalAverageTextBytes } from "./instant-eval-run.sizing";
 import type { InstantEvalRowSource, InstantEvalRunCaller } from "./row-source";
 import type { AcceptedInstantEvalStatement } from "./statement";
 

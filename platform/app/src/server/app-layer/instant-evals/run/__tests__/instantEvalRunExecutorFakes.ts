@@ -13,7 +13,10 @@ import { vi } from "vitest";
 import type { LangWatchQLAppFunctionCall } from "~/server/analytics/lwql";
 import { NullInstantEvalClassifier } from "../../classifier/null.client";
 import type { InstantEvalSpendRecord } from "../../instant-eval-spend.recorder";
-import { createInstantEvalRunExecutor } from "../instant-eval-run.executor";
+import {
+  createInstantEvalRunExecutor,
+  type InstantEvalRunExecutorDependencies,
+} from "../instant-eval-run.executor";
 import type { InstantEvalJudgmentRecord } from "../judgments";
 import { instantEvalRunQuestions } from "../questions";
 import type {
@@ -47,7 +50,8 @@ export function rowKey(traceId: string): InstantEvalRowKey {
   };
 }
 
-export function fakes(options?: {
+/** What a suite varies about the run it drives. */
+export interface InstantEvalFakeOptions {
   keys?: InstantEvalRowKey[][];
   hasMore?: boolean[];
   judgedCells?: (unknown | null)[];
@@ -66,19 +70,50 @@ export function fakes(options?: {
     inFlightUsd: number;
   }) => Promise<void>;
   /** Records the run's hold being let go, once its spend is recorded. */
-  releaseBudget?: (input: { projectId: string; runId: string }) => Promise<void>;
+  releaseBudget?: (input: {
+    projectId: string;
+    runId: string;
+  }) => Promise<void>;
   /**
    * Makes the judged page stop part way, naming the rows left unjudged.
    * With `onSignal`, the page waits for the executor's signal to fire first,
    * the way a deadline or a cancel reaches a page still judging.
    */
   stopMidPage?: { unjudgedRows: number[]; onSignal?: boolean };
-}) {
+}
+
+export function fakes(options?: InstantEvalFakeOptions) {
   const inserted: InstantEvalJudgmentRecord[][] = [];
   const spends: InstantEvalSpendRecord[] = [];
-  let keyCall = 0;
+  const rowSource = fakeRowSource(options);
+  const executor = createInstantEvalRunExecutor(
+    fakeDependencies({ options, rowSource, inserted, spends }),
+  );
+  return { executor, rowSource, inserted, spends };
+}
 
-  const rowSource: InstantEvalRowSource = {
+/** The page every read of this row source hands back. */
+function judgedPage(options?: InstantEvalFakeOptions): InstantEvalJudgedPage {
+  return {
+    columns: [],
+    rows: (options?.judgedCells ?? [0.9, 0.1]).map((cell, index) => ({
+      TraceId: `t${index + 1}`,
+      annoyed: cell,
+    })),
+    usage: {
+      requests: 2,
+      inputTokens: 1_200,
+      skipped: options?.skipped ?? {},
+      limiterWaitMs: 0,
+    },
+    timings: { queryMs: 0, readMs: 0, computeMs: 0, judgeMs: 0 },
+  };
+}
+
+/** The four reads and the judging, answered from the suite's own options. */
+function fakeRowSource(options?: InstantEvalFakeOptions): InstantEvalRowSource {
+  let keyCall = 0;
+  return {
     probe: vi.fn(async () => [
       { name: "TraceId", type: "String" },
       { name: "ThreadId", type: "String" },
@@ -102,48 +137,43 @@ export function fakes(options?: {
         hydration: { keys } as unknown as InstantEvalPreparedPage["hydration"],
       }),
     ),
-    judgePrepared: vi.fn(
-      async ({ signal }): Promise<InstantEvalJudgedPage> => {
-        const stop = options?.stopMidPage;
-        if (!stop) return judged();
-        if (stop.onSignal && signal && !signal.aborted) {
-          await new Promise<void>((resolve) =>
-            signal.addEventListener("abort", () => resolve(), { once: true }),
-          );
-        }
-        // A row the stop reached has no verdict, the same null a declined
-        // judgement leaves, which is why the page has to name it.
-        const page = judged();
-        return {
-          ...page,
-          rows: page.rows.map((row, index) =>
-            stop.unjudgedRows.includes(index) ? { ...row, annoyed: null } : row,
-          ),
-          cancellation: { unjudgedRows: stop.unjudgedRows },
-        };
-      },
-    ),
-    judge: vi.fn(async () => judged()),
+    judgePrepared: vi.fn(async ({ signal }): Promise<InstantEvalJudgedPage> => {
+      const stop = options?.stopMidPage;
+      if (!stop) return judgedPage(options);
+      if (stop.onSignal && signal && !signal.aborted) {
+        await new Promise<void>((resolve) =>
+          signal.addEventListener("abort", () => resolve(), { once: true }),
+        );
+      }
+      // A row the stop reached has no verdict, the same null a declined
+      // judgement leaves, which is why the page has to name it.
+      const page = judgedPage(options);
+      return {
+        ...page,
+        rows: page.rows.map((row, index) =>
+          stop.unjudgedRows.includes(index) ? { ...row, annoyed: null } : row,
+        ),
+        cancellation: { unjudgedRows: stop.unjudgedRows },
+      };
+    }),
+    judge: vi.fn(async () => judgedPage(options)),
     texts: vi.fn(async () => options?.texts ?? []),
   };
-  function judged(): InstantEvalJudgedPage {
-    return {
-      columns: [],
-      rows: (options?.judgedCells ?? [0.9, 0.1]).map((cell, index) => ({
-        TraceId: `t${index + 1}`,
-        annoyed: cell,
-      })),
-      usage: {
-        requests: 2,
-        inputTokens: 1_200,
-        skipped: options?.skipped ?? {},
-        limiterWaitMs: 0,
-      },
-      timings: { queryMs: 0, readMs: 0, computeMs: 0, judgeMs: 0 },
-    };
-  }
+}
 
-  const executor = createInstantEvalRunExecutor({
+/** The run row, the two stores, and the budget hooks the executor is given. */
+function fakeDependencies({
+  options,
+  rowSource,
+  inserted,
+  spends,
+}: {
+  options?: InstantEvalFakeOptions;
+  rowSource: InstantEvalRowSource;
+  inserted: InstantEvalJudgmentRecord[][];
+  spends: InstantEvalSpendRecord[];
+}): InstantEvalRunExecutorDependencies {
+  return {
     runs: {
       create: vi.fn(),
       list: vi.fn(),
@@ -179,11 +209,7 @@ export function fakes(options?: {
     ...(options?.assertWithinBudget
       ? { assertWithinBudget: options.assertWithinBudget }
       : {}),
-    ...(options?.releaseBudget
-      ? { releaseBudget: options.releaseBudget }
-      : {}),
+    ...(options?.releaseBudget ? { releaseBudget: options.releaseBudget } : {}),
     now: () => NOW,
-  });
-
-  return { executor, rowSource, inserted, spends };
+  };
 }

@@ -14,7 +14,7 @@
  * the cursor can move past it without a hole in the accounting; the rows after
  * it are left for the next page, which starts from the last judged key.
  *
- * @see ./instant-eval-run.executor.ts
+ * @see ./instant-eval-run.judge-page.ts
  * @see ./cancellation-watch.ts
  */
 

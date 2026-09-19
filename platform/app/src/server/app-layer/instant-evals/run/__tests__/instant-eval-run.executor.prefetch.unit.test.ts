@@ -7,7 +7,7 @@
  * needs: what is proved is that the next page's read started before this
  * page's judging resolved.
  *
- * @see ../instant-eval-run.executor.ts
+ * @see ../instant-eval-run.prefetch.ts
  * @see ../../../../../../specs/instant-evals/instant-eval-pipeline.feature
  */
 

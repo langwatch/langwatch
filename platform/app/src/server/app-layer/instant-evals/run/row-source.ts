@@ -325,28 +325,44 @@ export function createInstantEvalRowSource(
     executor: instantEvalExecutorFromEnv(),
   },
 ): InstantEvalRowSource {
-  let cachedTraceSource: LangWatchQLAppFunctionTraceSource | undefined;
-  const traceSource = () =>
-    (cachedTraceSource ??=
-      dependencies.traceSource ?? createLangWatchQLAppFunctionTraceSource());
-
   const executorOrRefuse = (): LangWatchQLExecutor => {
     if (!dependencies.executor)
       throw new InstantEvalRowSourceUnavailableError();
     return dependencies.executor;
   };
 
-  const run = async ({
-    caller,
-    sql,
-    parameters,
-    maxRows,
-  }: {
-    caller: InstantEvalRunCaller;
-    sql: string;
-    parameters?: Readonly<Record<string, unknown>>;
-    maxRows: number;
-  }) =>
+  return instantEvalRowSourceOver({
+    run: boundedRunOver({ executorOrRefuse }),
+    prepare: hydrationPrepareOver({
+      traceSource: sharedTraceSource(dependencies),
+    }),
+    judge: hydrationJudge,
+  });
+}
+
+/**
+ * The trace source these passes hydrate through, built once per row source.
+ *
+ * Built lazily because a row source is constructed while the application
+ * container is: a deployment that never runs a job must not open the store on
+ * the way past.
+ */
+function sharedTraceSource(
+  dependencies: InstantEvalRowSourceDependencies,
+): () => LangWatchQLAppFunctionTraceSource {
+  let cached: LangWatchQLAppFunctionTraceSource | undefined;
+  return () =>
+    (cached ??=
+      dependencies.traceSource ?? createLangWatchQLAppFunctionTraceSource());
+}
+
+/** Runs one pass's statement as the caller, bounded by what the pass asked for. */
+function boundedRunOver({
+  executorOrRefuse,
+}: {
+  executorOrRefuse: () => LangWatchQLExecutor;
+}): InstantEvalPasses["run"] {
+  return async ({ caller, sql, parameters, maxRows }) =>
     await runBounded({
       execute: () =>
         executorOrRefuse().execute({
@@ -359,24 +375,15 @@ export function createInstantEvalRowSource(
         }),
       maxRows,
     });
+}
 
-  const prepare = async ({
-    caller,
-    protections,
-    calls,
-    execution,
-    instantEvals,
-  }: {
-    caller: InstantEvalRunCaller;
-    protections: Protections;
-    calls: readonly LangWatchQLAppFunctionCall[];
-    execution: Awaited<ReturnType<LangWatchQLExecutor["execute"]>>;
-    instantEvals?: {
-      classifier: InstantEvalClassifier;
-      maxConcurrency: number;
-      queryTokenBudget: number;
-    };
-  }) =>
+/** The read half of hydration: the traces a pass's rows name, extracted. */
+function hydrationPrepareOver({
+  traceSource,
+}: {
+  traceSource: () => LangWatchQLAppFunctionTraceSource;
+}): InstantEvalPasses["prepare"] {
+  return async ({ caller, protections, calls, execution, instantEvals }) =>
     await prepareLangWatchQLHydration({
       // A run belongs to one project, which is the scope every judgement in it
       // is rated and billed against.
@@ -389,23 +396,17 @@ export function createInstantEvalRowSource(
       traceSource: traceSource(),
       ...(instantEvals ? { instantEvals } : {}),
     });
-
-  const judge = async ({
-    prepared,
-    signal,
-  }: {
-    prepared: LangWatchQLPreparedHydration;
-    signal?: AbortSignal;
-  }) =>
-    await judgeLangWatchQLHydration({
-      prepared,
-      ...(signal ? { signal } : {}),
-    });
-
-  const passes: InstantEvalPasses = { run, prepare, judge };
-
-  return instantEvalRowSourceOver(passes);
 }
+
+/** The judge half: what a prepared hydration answers, stoppable by a signal. */
+const hydrationJudge: InstantEvalPasses["judge"] = async ({
+  prepared,
+  signal,
+}) =>
+  await judgeLangWatchQLHydration({
+    prepared,
+    ...(signal ? { signal } : {}),
+  });
 
 /** The row source's eight reads, each one pass composed over the three above. */
 function instantEvalRowSourceOver(
@@ -441,5 +442,5 @@ async function runBounded({
   maxRows: number;
 }): Promise<InstantEvalPassExecution> {
   const execution = await execute();
-  return { ...execution, truncated: execution.rows.length > maxRows };
+  return { ...execution, isTruncated: execution.rows.length > maxRows };
 }
