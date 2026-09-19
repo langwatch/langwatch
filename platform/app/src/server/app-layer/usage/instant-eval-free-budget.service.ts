@@ -196,8 +196,11 @@ export class InstantEvalFreeBudgetService {
   }): Promise<void> {
     const organizationId = await this.deps.organizationOf(projectId);
     if (!organizationId) return;
-    await this.deps.reservations.release({ organizationId, reservationId });
+    // The cache goes first: a check that runs between the two steps then
+    // reads the ledger, which already carries the spend the hold stood for,
+    // rather than a cached total from before it beside a hold already gone.
     await this.spentCache.delete(organizationId);
+    await this.deps.reservations.release({ organizationId, reservationId });
   }
 
   /** The project's organization when the free budget bounds it, else null. */

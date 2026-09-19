@@ -93,14 +93,16 @@ async function judgeRunPageOrThrow(
   });
 
   const startedPage = Date.now();
-  const { keyPage, prepared, keyMs, prefetched } = await takePageAndReadAhead({
-    deps,
-    prefetches,
-    input,
-    row,
-    caller,
-    parameters,
-  });
+  const { keyPage, prepared, keyMs, isPrefetched } = await takePageAndReadAhead(
+    {
+      deps,
+      prefetches,
+      input,
+      row,
+      caller,
+      parameters,
+    },
+  );
   if (keyPage.keys.length === 0 || prepared === null) return emptyPage();
 
   const { judged, stop } = await judgeUnderCancellation({
@@ -136,7 +138,7 @@ async function judgeRunPageOrThrow(
     page,
     rows: mapping.counters.rows,
     startedPage,
-    prefetched,
+    isPrefetched,
     keyMs,
     insertMs,
     judged,

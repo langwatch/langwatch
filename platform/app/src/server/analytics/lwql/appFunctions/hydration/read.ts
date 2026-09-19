@@ -71,6 +71,12 @@ export async function readTraces({
   const budget = createReadBudget({
     maxBytes: input.limits.maxReadBytes ?? LWQL_APP_FUNCTION_READ_BYTES_BUDGET,
   });
+  // One signal over every read: the caller's cancel, and the budget's own
+  // refusal, so a chunk that crosses the line stops the sibling readers too
+  // rather than letting them fetch on after the query is already refused.
+  const signal = input.signal
+    ? AbortSignal.any([input.signal, budget.stopped])
+    : budget.stopped;
 
   try {
     // One read per project per kind. The trace path filters on a single
@@ -85,7 +91,7 @@ export async function readTraces({
             keys: [...traceIds],
             chunkSize: LWQL_APP_FUNCTION_READ_CHUNK.traceIds,
             budget,
-            signal: input.signal,
+            signal,
             read: (chunk) =>
               input.traceSource.tracesByIds({
                 projectId,
@@ -101,7 +107,7 @@ export async function readTraces({
             keys: [...threadKeys],
             chunkSize: LWQL_APP_FUNCTION_READ_CHUNK.threadKeys,
             budget,
-            signal: input.signal,
+            signal,
             read: (chunk) =>
               input.traceSource.tracesByThreadKeys({
                 projectId,
@@ -137,23 +143,29 @@ export async function readTraces({
 /** The bytes one hydration has read so far, shared by every read it makes. */
 interface ReadBudget {
   readonly maxBytes: number;
+  /** Fires, with the refusal as its reason, once the budget is passed. */
+  readonly stopped: AbortSignal;
   /** Adds the traces' weight; throws the refusal once the budget is passed. */
   consume(input: { traces: readonly Trace[] }): void;
 }
 
 function createReadBudget({ maxBytes }: { maxBytes: number }): ReadBudget {
   let readBytes = 0;
+  const stop = new AbortController();
   return {
     maxBytes,
+    stopped: stop.signal,
     consume({ traces }) {
       for (const trace of traces) {
         readBytes += Buffer.byteLength(JSON.stringify(trace));
       }
       if (readBytes > maxBytes) {
-        throw new LangWatchQLAppFunctionReadBudgetError({
+        const refusal = new LangWatchQLAppFunctionReadBudgetError({
           budgetBytes: maxBytes,
           readBytes,
         });
+        stop.abort(refusal);
+        throw refusal;
       }
     },
   };

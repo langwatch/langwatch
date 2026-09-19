@@ -43,7 +43,7 @@ describe("expandInstantEvalShorthand, given a filter", () => {
 
       expect(sql).toContain("TraceId IN (");
       expect(sql).toContain("FROM analytics.traces");
-      expect(sql).toContain("OccurredAt >= {start_at:DateTime64(3)}");
+      expect(sql).toContain("OccurredAt >= {start_at:DateTime64(3, 'UTC')}");
     });
 
     /** @scenario "A filtered threads statement names the view's own trace column" */

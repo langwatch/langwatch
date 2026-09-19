@@ -356,7 +356,7 @@ export class ReportUsageForMonthCommand
     if (!meter.isProvisioned()) {
       // Nothing is read or written: the checkpoint stays where it is, so the
       // whole month is reported by the first tick after the meter is mapped.
-      logger.warn(
+      logger.debug(
         { organizationId, billingMonth, meter: meter.eventName },
         "Stripe meter is not mapped for this mode; leaving the month's usage unreported until it is",
       );

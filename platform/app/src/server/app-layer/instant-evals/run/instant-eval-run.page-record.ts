@@ -110,7 +110,7 @@ export async function writeJudgedPage({
  * `gapMs` is the part no step here owns: the time between the previous page of
  * this run finishing and this one starting, which is what the pipeline spent
  * delivering the page event and scheduling the next intent. `keyMs` and
- * `queryMs` are off this page's clock when `prefetched` is true, because the
+ * `queryMs` are off this page's clock when `isPrefetched` is true, because the
  * previous page paid for them while it was judging.
  */
 export function recordPageProfile({
@@ -119,7 +119,7 @@ export function recordPageProfile({
   page,
   rows,
   startedPage,
-  prefetched,
+  isPrefetched,
   keyMs,
   insertMs,
   judged,
@@ -129,7 +129,7 @@ export function recordPageProfile({
   page: number;
   rows: number;
   startedPage: number;
-  prefetched: boolean;
+  isPrefetched: boolean;
   keyMs: number;
   insertMs: number;
   judged: InstantEvalJudgedPage;
@@ -144,7 +144,7 @@ export function recordPageProfile({
       rows,
       inputTokens: judged.usage.inputTokens,
       gapMs: previous === undefined ? null : startedPage - previous,
-      prefetched,
+      isPrefetched,
       keyMs,
       queryMs: judged.timings.queryMs,
       readMs: judged.timings.readMs,

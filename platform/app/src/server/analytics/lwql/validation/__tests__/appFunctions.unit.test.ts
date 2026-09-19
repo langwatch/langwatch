@@ -63,6 +63,16 @@ describe("given a statement that calls a LangWatchQL app function", () => {
     });
 
     /** @scenario "A call in the parametric form is refused" */
+    it("refuses an empty parameter list the same way", () => {
+      const result = validate(
+        "SELECT conversation()(ConversationId) AS c FROM analytics.traces",
+      );
+
+      expect(codesOf(result)).toEqual(["APP_FUNCTION_ARGUMENT"]);
+      expect(result.ok).toBe(false);
+    });
+
+    /** @scenario "A call in the parametric form is refused" */
     it("refuses the parametric form on the extraction nested inside an eval", () => {
       const result = validate(
         "SELECT eval(conversation(1)(ConversationId), 'annoyed') AS c FROM analytics.traces",

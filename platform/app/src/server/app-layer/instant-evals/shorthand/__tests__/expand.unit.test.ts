@@ -97,8 +97,8 @@ describe("expandInstantEvalShorthand, given a target and some questions", () => 
     it("bounds the time column between two instants covering the last week", () => {
       const { sql, parameters } = expand();
 
-      expect(sql).toContain("OccurredAt >= {start_at:DateTime64(3)}");
-      expect(sql).toContain("OccurredAt < {end_at:DateTime64(3)}");
+      expect(sql).toContain("OccurredAt >= {start_at:DateTime64(3, 'UTC')}");
+      expect(sql).toContain("OccurredAt < {end_at:DateTime64(3, 'UTC')}");
       expect(parameters).toMatchObject({
         start_at: "2026-09-11 12:00:00.000",
         end_at: "2026-09-18 12:00:00.000",

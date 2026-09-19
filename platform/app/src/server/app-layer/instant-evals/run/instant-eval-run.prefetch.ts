@@ -70,6 +70,14 @@ interface PageCursor {
  * needs it. Nothing here is recorded anywhere, so nothing here changes what a
  * redelivery does.
  */
+/**
+ * Runs whose read-ahead one process keeps at once. A run whose next intent
+ * lands on another process never takes its page here, and without a bound
+ * every such run would hold a hydrated page for the life of the process; past
+ * the bound the oldest is dropped, which costs that run one page read.
+ */
+export const INSTANT_EVAL_PREFETCH_RUN_CAP = 64;
+
 export class InstantEvalPrefetches {
   private readonly byRun = new Map<
     string,
@@ -81,7 +89,19 @@ export class InstantEvalPrefetches {
     // A prefetch nobody consumes must not surface as an unhandled rejection;
     // its failure is observed, if at all, by the intent that takes it.
     page.catch(() => undefined);
+    // Re-set so the run moves to the back of the insertion order, which is
+    // what makes the eviction below drop the run touched longest ago.
+    this.byRun.delete(key.runId);
     this.byRun.set(key.runId, { key, page });
+    for (const runId of this.byRun.keys()) {
+      if (this.byRun.size <= INSTANT_EVAL_PREFETCH_RUN_CAP) break;
+      this.byRun.delete(runId);
+    }
+  }
+
+  /** How many runs hold a read-ahead here. */
+  get size(): number {
+    return this.byRun.size;
   }
 
   /** The page read for this key, or null when none was, or it was another page. */
@@ -206,7 +226,7 @@ function startNextPageRead({
  * The read-ahead is started here rather than after judging because the point
  * of it is to overlap the two: by the time this returns, the next page's key
  * pass and trace read are already under way against services the classifier
- * does not contend with. `prefetched` says whether this page came off that
+ * does not contend with. `isPrefetched` says whether this page came off that
  * read, which is what tells the profile its key and query time was paid before
  * the intent arrived.
  */
@@ -224,7 +244,7 @@ export async function takePageAndReadAhead({
   row: InstantEvalLoadedRun["row"];
   caller: InstantEvalLoadedRun["caller"];
   parameters: InstantEvalLoadedRun["parameters"];
-}): Promise<PrefetchedPage & { prefetched: boolean }> {
+}): Promise<PrefetchedPage & { isPrefetched: boolean }> {
   const { runId, projectId, afterTraceId, afterSpanId, pageSize, remaining } =
     input;
   const limit = Math.max(1, Math.min(pageSize, remaining));
@@ -255,5 +275,5 @@ export async function takePageAndReadAhead({
     remaining: remaining - current.keyPage.keys.length,
     pageSize,
   });
-  return { ...current, prefetched: taken !== null };
+  return { ...current, isPrefetched: taken !== null };
 }

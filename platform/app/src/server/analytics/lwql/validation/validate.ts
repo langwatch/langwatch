@@ -953,7 +953,7 @@ function reportAppFunctionPosition({
  * the second under `arguments`.
  */
 function isParametricCall(node: SqlAstNode): boolean {
-  return Array.isArray(node.parameters) && node.parameters.length > 0;
+  return Array.isArray(node.parameters);
 }
 
 /**

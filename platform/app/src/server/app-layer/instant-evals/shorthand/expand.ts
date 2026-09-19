@@ -298,10 +298,14 @@ function windowFor({
   };
 }
 
-/** The type the window is bound as: the precision of the views' time columns. */
-const WINDOW_PARAMETER_TYPE = "DateTime64(3)";
+/**
+ * The type the window is bound as: the precision of the views' time columns,
+ * in UTC by name, because the bound text carries no offset and a bare
+ * `DateTime64` would be read in the server's own zone.
+ */
+const WINDOW_PARAMETER_TYPE = "DateTime64(3, 'UTC')";
 
-/** `<column> >= {start_at:DateTime64(3)} AND <column> < {end_at:DateTime64(3)}`. */
+/** `<column> >= {start_at:DateTime64(3, 'UTC')} AND <column> < {end_at:DateTime64(3, 'UTC')}`. */
 function windowConditions(timeColumn: string): readonly string[] {
   return [
     `${timeColumn} >= {start_at:${WINDOW_PARAMETER_TYPE}}`,

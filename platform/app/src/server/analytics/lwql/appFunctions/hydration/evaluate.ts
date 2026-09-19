@@ -578,7 +578,12 @@ async function drain<T>({
   }
 }
 
-/** Runs one unit; true when an abort ended it, which ends the worker too. */
+/**
+ * Runs one unit; true when the caller's cancel ended it, which ends the
+ * worker too. Only the caller's signal is a stop: an abort or a timeout the
+ * classifier raised on its own is a failed unit, and swallowing it would turn
+ * a judge that stopped answering into a page of null verdicts.
+ */
 async function runOrStop<T>({
   item,
   run,
@@ -592,7 +597,7 @@ async function runOrStop<T>({
     await run(item);
     return false;
   } catch (error) {
-    if (signal?.aborted || isAbortError(error)) return true;
+    if (signal?.aborted) return true;
     throw error;
   }
 }

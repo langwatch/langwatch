@@ -729,14 +729,14 @@ export class LangWatchQLService {
       ...(parameters ? { parameters } : {}),
       ...(timeWindow ? { timeWindow } : {}),
     });
-    const reservation = await this.reserveJudgingBudget({
+    const hold = await this.reserveJudgingBudget({
       projects,
       validation,
     });
     try {
-      return await this.executeReserved({ input, validation });
+      return await this.executeReserved({ input, validation, hold });
     } finally {
-      await reservation?.release();
+      await hold?.settle();
     }
   }
 
@@ -753,9 +753,11 @@ export class LangWatchQLService {
       signal,
     },
     validation,
+    hold,
   }: {
     readonly input: LangWatchQLExecuteInput;
     readonly validation: ValidatedLangWatchQL;
+    readonly hold: JudgingBudgetHold | null;
   }): Promise<LangWatchQLQueryResult> {
     const granularity = resolveRunGranularityOrRefuseUnfilled({
       declared: validation.parameters,
@@ -786,6 +788,7 @@ export class LangWatchQLService {
       sql,
       validation,
       granularity,
+      hold,
       ...(signal ? { signal } : {}),
     });
   }
@@ -887,12 +890,14 @@ export class LangWatchQLService {
     protections,
     validation,
     execution,
+    hold,
     signal,
   }: {
     readonly projects: readonly LangWatchQLCaller[];
     readonly protections: Protections;
     readonly validation: ValidatedLangWatchQL;
     readonly execution: Awaited<ReturnType<LangWatchQLExecutor["execute"]>>;
+    readonly hold: JudgingBudgetHold | null;
     readonly signal?: AbortSignal;
   }): Promise<LangWatchQLHydrationResult> {
     // Only a statement that judges something builds the classifier: a query
@@ -927,12 +932,15 @@ export class LangWatchQLService {
     });
 
     if (judging && billedProject) {
-      await recordInstantEvalSpend({
+      const isRecorded = await recordInstantEvalSpend({
         projectId: billedProject.id,
         usage: hydration.evalUsage,
         classifier: judging.classifier(),
         recordSpend: judging.recordSpend,
       });
+      // A spend that never reached the ledger is a spend the budget cannot
+      // see, so the hold stands in for it until it lapses.
+      if (!isRecorded) hold?.keep();
     }
     // Recorded first, refused second: the judgements made before the caller
     // walked away were paid for, and a query that stops judging must still
@@ -963,7 +971,7 @@ export class LangWatchQLService {
   }: {
     readonly projects: readonly LangWatchQLCaller[];
     readonly validation: ReturnType<LangWatchQLService["validate"]>;
-  }): Promise<{ release(): Promise<void> } | null> {
+  }): Promise<JudgingBudgetHold | null> {
     if (!callsEvalFunction(validation.appFunctions)) return null;
     const judging = projects.length === 1 ? projects[0] : undefined;
     if (!judging) return null;
@@ -981,9 +989,24 @@ export class LangWatchQLService {
         pricing: support.classifier().pricing,
       }),
     });
+    let isKept = false;
     return {
-      release: () =>
-        support.releaseFreeBudget({ projectId: judging.id, reservationId }),
+      keep: () => {
+        isKept = true;
+      },
+      settle: async () => {
+        if (isKept) {
+          logger.warn(
+            { projectId: judging.id, reservationId },
+            "Instant Evals spend was not recorded; its hold on the free budget stays until it lapses",
+          );
+          return;
+        }
+        await support.releaseFreeBudget({
+          projectId: judging.id,
+          reservationId,
+        });
+      },
     };
   }
 
@@ -1002,6 +1025,7 @@ export class LangWatchQLService {
     sql,
     validation,
     granularity,
+    hold,
     signal,
   }: {
     readonly executor: LangWatchQLExecutor;
@@ -1010,6 +1034,7 @@ export class LangWatchQLService {
     readonly sql: string;
     readonly validation: ValidatedLangWatchQL;
     readonly granularity: LangWatchQLGranularityResolution;
+    readonly hold: JudgingBudgetHold | null;
     readonly signal?: AbortSignal;
   }): Promise<LangWatchQLQueryResult> {
     const execution = await this.runStatement({
@@ -1025,6 +1050,7 @@ export class LangWatchQLService {
       protections,
       validation,
       execution,
+      hold,
       ...(signal ? { signal } : {}),
     });
 
@@ -1270,8 +1296,8 @@ async function recordInstantEvalSpend({
   usage: LangWatchQLEvalUsage | undefined;
   classifier: InstantEvalClassifier;
   recordSpend: LangWatchQLInstantEvalSupport["recordSpend"];
-}): Promise<void> {
-  if (!usage || usage.inputTokens <= 0) return;
+}): Promise<boolean> {
+  if (!usage || usage.inputTokens <= 0) return true;
   const costUsd = instantEvalCostUsd({
     inputTokens: usage.inputTokens,
     pricing: classifier.pricing,
@@ -1285,10 +1311,22 @@ async function recordInstantEvalSpend({
       priceUsd: instantEvalPriceUsd({ costUsd, pricing: classifier.pricing }),
       occurredAt: new Date(),
     });
+    return true;
   } catch (error) {
     logger.error(
       { projectId, error },
       "Instant Evals spend could not be recorded",
     );
+    return false;
   }
+}
+
+/**
+ * The hold a judged query takes on the free budget: released once its spend
+ * is on the ledger, kept when the record failed so the budget still counts
+ * what was judged.
+ */
+interface JudgingBudgetHold {
+  keep(): void;
+  settle(): Promise<void>;
 }

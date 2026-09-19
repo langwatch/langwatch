@@ -73,7 +73,15 @@ export function assembleResult({
       .filter((report) => report.keys > 0),
     ...(evalUsage ? { evalUsage } : {}),
     ...(timings ? { timings } : {}),
-    ...(isCancelled ? { cancellation: { unjudgedRows } } : {}),
+    // The ceiling above may have dropped trailing rows; an index past them
+    // would name a row the caller cannot see.
+    ...(isCancelled
+      ? {
+          cancellation: {
+            unjudgedRows: unjudgedRows.filter((index) => index < rows.length),
+          },
+        }
+      : {}),
   };
 }
 

@@ -85,11 +85,14 @@ export interface InstantEvalFakeOptions {
 export function fakes(options?: InstantEvalFakeOptions) {
   const inserted: InstantEvalJudgmentRecord[][] = [];
   const spends: InstantEvalSpendRecord[] = [];
+  const recordSpend = vi.fn(async (record: InstantEvalSpendRecord) => {
+    spends.push(record);
+  });
   const rowSource = fakeRowSource(options);
   const executor = createInstantEvalRunExecutor(
-    fakeDependencies({ options, rowSource, inserted, spends }),
+    fakeDependencies({ options, rowSource, inserted, recordSpend }),
   );
-  return { executor, rowSource, inserted, spends };
+  return { executor, rowSource, inserted, spends, recordSpend };
 }
 
 /** The page every read of this row source hands back. */
@@ -140,10 +143,20 @@ function fakeRowSource(options?: InstantEvalFakeOptions): InstantEvalRowSource {
     judgePrepared: vi.fn(async ({ signal }): Promise<InstantEvalJudgedPage> => {
       const stop = options?.stopMidPage;
       if (!stop) return judgedPage(options);
-      if (stop.onSignal && signal && !signal.aborted) {
-        await new Promise<void>((resolve) =>
-          signal.addEventListener("abort", () => resolve(), { once: true }),
-        );
+      if (stop.onSignal) {
+        // A page that waits on the signal needs one: without it the fake
+        // would answer at once and a test could pass with the executor never
+        // handing its signal down.
+        if (!signal) {
+          throw new Error(
+            "the fake page was told to stop on the signal, but the executor passed none",
+          );
+        }
+        if (!signal.aborted) {
+          await new Promise<void>((resolve) =>
+            signal.addEventListener("abort", () => resolve(), { once: true }),
+          );
+        }
       }
       // A row the stop reached has no verdict, the same null a declined
       // judgement leaves, which is why the page has to name it.
@@ -166,12 +179,12 @@ function fakeDependencies({
   options,
   rowSource,
   inserted,
-  spends,
+  recordSpend,
 }: {
   options?: InstantEvalFakeOptions;
   rowSource: InstantEvalRowSource;
   inserted: InstantEvalJudgmentRecord[][];
-  spends: InstantEvalSpendRecord[];
+  recordSpend: (record: InstantEvalSpendRecord) => Promise<void>;
 }): InstantEvalRunExecutorDependencies {
   return {
     runs: {
@@ -197,11 +210,7 @@ function fakeDependencies({
     },
     rowSource,
     classifier: () => new NullInstantEvalClassifier(),
-    spendRecorder: {
-      recordSpend: vi.fn(async (record: InstantEvalSpendRecord) => {
-        spends.push(record);
-      }),
-    },
+    spendRecorder: { recordSpend },
     projectKey: async () => "lwql-secret",
     maxConcurrency: 4,
     protections: async () => ({}) as never,

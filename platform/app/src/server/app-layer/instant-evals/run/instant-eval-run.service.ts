@@ -231,7 +231,16 @@ export class InstantEvalRunService {
       });
     } catch (error) {
       // A run that was never queued spends nothing, so its hold goes with it.
-      await this.deps.budget.release({ projectId, reservationId: runId });
+      // A release that fails too is logged, not raised: the caller needs the
+      // reason the run was not queued, and the hold lapses on its own.
+      try {
+        await this.deps.budget.release({ projectId, reservationId: runId });
+      } catch (releaseError) {
+        logger.error(
+          { projectId, runId, error: releaseError },
+          "Instant Eval run was not queued and its free budget hold could not be released; it lapses on its own",
+        );
+      }
       throw error;
     }
   }

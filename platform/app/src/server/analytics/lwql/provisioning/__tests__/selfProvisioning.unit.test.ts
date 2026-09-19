@@ -516,14 +516,15 @@ describe("given a single-node ClickHouse", () => {
       ).toBe(true);
     });
 
-    it("reads a server that cannot answer as a single node", async () => {
+    it("leaves the functions out of a server that cannot answer", async () => {
       const probe = await probeAppFunctionStore({
         query: async () => {
           throw new Error("UNKNOWN_TABLE system.server_settings");
         },
       });
 
-      expect(canProvisionAppFunctions(probe)).toBe(true);
+      expect(probe).toBeNull();
+      expect(canProvisionAppFunctions(probe)).toBe(false);
     });
   });
 });

@@ -143,8 +143,8 @@ export function latestRowsQuery({
     FROM ${INSTANT_EVAL_RUNS_TABLE} AS t
     WHERE t.TenantId = {tenantId:String}
       ${outer}
-      AND (t.TenantId, t.RunId, t.WrittenAt) IN (
-        SELECT TenantId, RunId, max(WrittenAt)
+      AND (t.TenantId, t.RunId, (t.WrittenAt, ifNull(t.AcceptedAt, toDateTime64(0, 3)), t.LastEventId)) IN (
+        SELECT TenantId, RunId, max((WrittenAt, ifNull(AcceptedAt, toDateTime64(0, 3)), LastEventId))
         FROM ${INSTANT_EVAL_RUNS_TABLE}
         WHERE TenantId = {tenantId:String}
           ${inner}

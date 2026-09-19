@@ -266,13 +266,13 @@ function assembleKeptTurns({
   omittedTurns: number;
 }): ConversationMarkdownChunk[] {
   const assembled: ConversationMarkdownChunk[] = [...preamble];
-  let markerWritten = false;
+  let isMarkerWritten = false;
   for (let i = 0; i < turnGroups.length; i++) {
     if (kept.has(i)) {
       assembled.push(...turnGroups[i]!.chunks);
-    } else if (!markerWritten) {
+    } else if (!isMarkerWritten) {
       assembled.push({ id: "omitted", markdown: omittedMarker(omittedTurns) });
-      markerWritten = true;
+      isMarkerWritten = true;
     }
   }
   return assembled;

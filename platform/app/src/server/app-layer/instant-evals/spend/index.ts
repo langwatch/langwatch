@@ -140,7 +140,23 @@ export function createInstantEvalFreeBudgetFromEnv(): InstantEvalFreeBudget {
       });
     },
     reservations: createInstantEvalBudgetReservations({
-      redis: tryGetApp()?.redis,
+      redis: saasRedisOrRefuse(),
     }),
   });
+}
+
+/**
+ * The connection the holds are kept on. SaaS runs several processes, and a
+ * hold one of them keeps to itself admits the same organization's runs on
+ * every other, so a missing connection refuses Instant Evals here rather
+ * than falling back to a process-local store.
+ */
+function saasRedisOrRefuse() {
+  const redis = tryGetApp()?.redis;
+  if (!redis) {
+    throw new Error(
+      "Instant Evals on SaaS needs a Redis connection for the free budget holds, and the application has none",
+    );
+  }
+  return redis;
 }

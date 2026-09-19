@@ -277,14 +277,16 @@ export interface AppFunctionStoreProbe {
  * more than one replica needs `user_defined_zookeeper_path` set, which moves
  * the store into Keeper; without it the create reaches one replica and the
  * others answer UNKNOWN_FUNCTION, so the statements are left out and the gap
- * is logged rather than half provisioned.
+ * is logged rather than half provisioned. A layout that could not be read is
+ * treated the same way.
  *
  * @see ./appFunctionStatements.ts
  * @see dev/docs/adr/136-lwql-app-functions-identity-udfs.md
  */
 export function canProvisionAppFunctions(
-  probe: AppFunctionStoreProbe,
+  probe: AppFunctionStoreProbe | null,
 ): boolean {
+  if (probe === null) return false;
   return (
     probe.maxTotalReplicas <= 1 || probe.userDefinedZookeeperPath.trim() !== ""
   );
@@ -295,14 +297,14 @@ export function canProvisionAppFunctions(
  *
  * A server that cannot answer (an older release without
  * `system.server_settings`, or an admin without access to `system.replicas`)
- * is read as a single node: that is the shipped behaviour, and the ADR names
- * the setting an operator of a replicated server has to declare.
+ * answers null, and null is not provisionable: a replicated server that could
+ * not be recognised as one would otherwise get its functions on one replica.
  */
 export async function probeAppFunctionStore({
   query,
 }: {
   query: (sql: string) => Promise<Record<string, string>[]>;
-}): Promise<AppFunctionStoreProbe> {
+}): Promise<AppFunctionStoreProbe | null> {
   try {
     const [replicas, setting] = await Promise.all([
       query(
@@ -317,10 +319,10 @@ export async function probeAppFunctionStore({
       userDefinedZookeeperPath: setting[0]?.value ?? "",
     };
   } catch (error) {
-    logger.warn(
+    logger.error(
       { error },
-      "lwql self-provisioning could not read the replica layout; treating the server as a single node",
+      "lwql self-provisioning could not read the replica layout from system.replicas and system.server_settings; the app functions are left out until it can",
     );
-    return { maxTotalReplicas: 0, userDefinedZookeeperPath: "" };
+    return null;
   }
 }

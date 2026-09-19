@@ -46,7 +46,7 @@ describe("given a run that is finishing", () => {
     /** @scenario "A hold is released when the run's spend lands" */
     it("lets go of the run's hold, after the record and on every outcome", async () => {
       const releaseBudget = vi.fn(async () => undefined);
-      const { executor, spends } = fakes({ releaseBudget });
+      const { executor, spends, recordSpend } = fakes({ releaseBudget });
 
       for (const outcome of ["finished", "failed", "cancelled"] as const) {
         await executor.finish({
@@ -64,6 +64,17 @@ describe("given a run that is finishing", () => {
         runId: RUN_ID,
       });
       expect(spends).toHaveLength(3);
+      // The record lands first on every outcome: a hold let go ahead of a
+      // record that then fails would hand the budget to someone else.
+      for (const [
+        index,
+        releasedAt,
+      ] of releaseBudget.mock.invocationCallOrder.entries()) {
+        expect(releasedAt).toBeGreaterThan(
+          recordSpend.mock.invocationCallOrder[index] ??
+            Number.POSITIVE_INFINITY,
+        );
+      }
     });
 
     it("lets go of the hold of a run that judged nothing", async () => {
