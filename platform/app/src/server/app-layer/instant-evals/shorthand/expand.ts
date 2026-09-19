@@ -68,6 +68,16 @@ export type InstantEvalTarget = (typeof INSTANT_EVAL_TARGETS)[number];
 export const INSTANT_EVAL_WINDOW_PARAMETERS = ["start_at", "end_at"] as const;
 
 /**
+ * The parameter a resolved selection is bound under.
+ *
+ * Used when the filter names a field the trace view cannot answer: the caller
+ * resolves the trace ids with the explorer's own compiler and the statement
+ * keeps only those, instead of refusing the field. Bound, not written into the
+ * statement, so ten thousand ids are a parameter rather than a statement.
+ */
+export const INSTANT_EVAL_SELECTION_PARAMETER = "instant_eval_selection_ids";
+
+/**
  * The token budget the bounded extraction functions are called with.
  *
  * The same eight thousand the function catalog documents as its default, and
@@ -124,7 +134,9 @@ export type InstantEvalShorthandInput = z.infer<
 /** The statement a shorthand became, with the values it bound. */
 export interface ExpandedInstantEvalShorthand {
   readonly sql: string;
-  readonly parameters: Readonly<Record<string, string | number | boolean>>;
+  readonly parameters: Readonly<
+    Record<string, string | number | boolean | readonly string[]>
+  >;
 }
 
 /** How one target reads its rows. */
@@ -272,14 +284,14 @@ function textBudgetFor(
   return Math.min(INSTANT_EVAL_SHORTHAND_TEXT_BUDGET, available);
 }
 
-/** The window, resolved to two absolute instants. */
-function windowFor({
+/** The window a shorthand judges, resolved to two absolute instants. */
+export function instantEvalShorthandWindow({
   shorthand,
-  now,
+  now = new Date(),
 }: {
-  readonly shorthand: InstantEvalShorthandInput;
-  readonly now: Date;
-}): { readonly startAt: string; readonly endAt: string } {
+  readonly shorthand: Pick<InstantEvalShorthandInput, "start" | "end">;
+  readonly now?: Date;
+}): { readonly start: Date; readonly end: Date } {
   const end = shorthand.end ? new Date(shorthand.end) : now;
   const start = shorthand.start
     ? new Date(shorthand.start)
@@ -292,10 +304,27 @@ function windowFor({
       ["start", "end"],
     );
   }
+  return { start, end };
+}
+
+/** The window, as the two bound instants the statement reads. */
+function windowFor({
+  shorthand,
+  now,
+}: {
+  readonly shorthand: InstantEvalShorthandInput;
+  readonly now: Date;
+}): { readonly startAt: string; readonly endAt: string } {
+  const { start, end } = instantEvalShorthandWindow({ shorthand, now });
   return {
     startAt: clickHouseDateTime64(start),
     endAt: clickHouseDateTime64(end),
   };
+}
+
+/** The resolved selection as a membership test on the target's trace column. */
+function selectionCondition(traceColumn: string): string {
+  return `${traceColumn} IN ({${INSTANT_EVAL_SELECTION_PARAMETER}:Array(String)})`;
 }
 
 /**
@@ -339,11 +368,19 @@ export function expandInstantEvalShorthand({
   shorthand,
   database,
   now = new Date(),
+  selection,
 }: {
   readonly shorthand: InstantEvalShorthandInput;
   /** The database the LangWatchQL views live in. */
   readonly database: string;
   readonly now?: Date;
+  /**
+   * The trace ids the filter selects, resolved by the caller with the
+   * explorer's own compiler. When given, the filter text is not compiled: the
+   * statement keeps these ids and nothing else, bound under
+   * {@link INSTANT_EVAL_SELECTION_PARAMETER}.
+   */
+  readonly selection?: readonly string[];
 }): ExpandedInstantEvalShorthand {
   const template = TEMPLATES[shorthand.target];
   const budget = textBudgetFor(shorthand.questions);
@@ -354,13 +391,19 @@ export function expandInstantEvalShorthand({
   });
 
   const { startAt, endAt } = windowFor({ shorthand, now });
-  const filter = compileInstantEvalShorthandFilter(shorthand.filter);
+  const filter = selection
+    ? null
+    : compileInstantEvalShorthandFilter(shorthand.filter);
 
   const conditions = [
     ...windowConditions(template.timeColumn),
     ...template.conditions,
   ];
-  if (filter) {
+  if (selection) {
+    conditions.push(
+      selectionCondition(template.filterTraceColumn ?? "TraceId"),
+    );
+  } else if (filter) {
     conditions.push(
       template.filterPlacement === "inline"
         ? `(${filter.sql})`
@@ -378,6 +421,9 @@ export function expandInstantEvalShorthand({
       start_at: startAt,
       end_at: endAt,
       ...(filter?.parameters ?? {}),
+      ...(selection
+        ? { [INSTANT_EVAL_SELECTION_PARAMETER]: [...selection] }
+        : {}),
     },
   };
 }

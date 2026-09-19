@@ -57,8 +57,10 @@ vi.mock("../../stores/filterStore", () => ({
         label: "Last 30 days",
         presetId: "30d",
       },
+      evalRuns: {},
       applyQueryText: vi.fn(),
       setTimeRange: vi.fn(),
+      setEvalRuns: vi.fn(),
       resetPagination: vi.fn(),
     }),
 }));

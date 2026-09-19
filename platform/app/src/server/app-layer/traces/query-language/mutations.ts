@@ -474,3 +474,97 @@ export function escapeValue(value: string): string {
   }
   return value;
 }
+
+/**
+ * A sentence as one free-text clause. Several words become one quoted phrase
+ * (substring semantics, one AST node), a single safe word stays bare. Empty
+ * input yields an empty clause so the caller can append it without a check.
+ */
+export function quoteAsPhrase(sentence: string): string {
+  const collapsed = sentence.replace(/\s+/g, " ").trim();
+  if (!collapsed) return "";
+  return escapeValue(collapsed);
+}
+
+/**
+ * Two queries joined with AND, each parenthesised when it carries an OR so the
+ * join cannot rebind it (`a OR b` AND `c` must read `(a OR b) AND c`). Either
+ * side may be empty, in which case the other is returned untouched.
+ */
+export function combineQueries({
+  base,
+  addition,
+}: {
+  base: string;
+  addition: string;
+}): string {
+  const left = base.trim();
+  const right = addition.trim();
+  if (!left) return right;
+  if (!right) return left;
+  const guard = (query: string): string =>
+    /\bOR\b/.test(query) && !/^\(.*\)$/.test(query) ? `(${query})` : query;
+  return `${guard(left)} AND ${guard(right)}`;
+}
+
+/**
+ * The two halves of a typed search: the bare words in the order typed, as one
+ * sentence, and the explicit query left when they are taken out. A submit
+ * with a sentence is something the search router decides about; one without
+ * is a filter applied as typed.
+ *
+ * A quoted phrase (`"refund policy"`) and a negated word (`-refund`) both stay
+ * explicit: the writer already said how to search them, and a router turning
+ * either into a question would lose the quotes or the negation. Text that
+ * does not parse has no halves: the sentence is empty and the query is
+ * returned as it came, so the parse error surfaces where it always did.
+ */
+export function splitBareWords(currentQuery: string): {
+  sentence: string;
+  explicitQuery: string;
+} {
+  const trimmed = currentQuery.trim();
+  if (!trimmed) return { sentence: "", explicitQuery: "" };
+  try {
+    const ast = parse(trimmed);
+    // `filterAST` hands the predicate a negated word's operand with no sign of
+    // the negation, so the negated tags are marked first.
+    const negatedTags = new Set<LiqeQuery>();
+    walkAST(ast, (node, negated) => {
+      if (negated) negatedTags.add(node);
+    });
+    const bare: string[] = [];
+    const explicit = filterAST(ast, (node) => {
+      if (node.type !== "Tag") return true;
+      if (negatedTags.has(node)) return true;
+      if (node.field.type !== "ImplicitField") return true;
+      if (node.expression.type !== "LiteralExpression") return true;
+      if (node.expression.quoted) return true;
+      bare.push(String(node.expression.value));
+      return false;
+    });
+    if (bare.length === 0) return { sentence: "", explicitQuery: trimmed };
+    return {
+      sentence: bare.join(" "),
+      explicitQuery: isEmptyAST(explicit) ? "" : serialize(explicit),
+    };
+  } catch {
+    return { sentence: "", explicitQuery: trimmed };
+  }
+}
+
+/**
+ * The same query with its bare words collapsed into one quoted phrase, the
+ * explicit `field:value` terms kept as typed. This is what the "search it as
+ * one phrase" fix applies when a sentence trips the node ceiling, and what an
+ * undo restores after the router turned a sentence into a filter. Returns the
+ * input untouched when it does not parse or has no bare words.
+ */
+export function requoteBareTerms(currentQuery: string): string {
+  const { sentence, explicitQuery } = splitBareWords(currentQuery);
+  if (!sentence) return currentQuery;
+  return combineQueries({
+    base: explicitQuery,
+    addition: quoteAsPhrase(sentence),
+  });
+}

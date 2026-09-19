@@ -426,6 +426,7 @@ function shorthandFilterRefusal(error: unknown): never {
     throw new InstantEvalShorthandError(
       `A shorthand filter cannot ask for "${field}". It can ask for ${INSTANT_EVAL_SHORTHAND_FILTER_FIELDS.join(", ")} and for trace.attribute.<key>. Everything else the trace explorer filters on lives outside the trace row, so ask it with a statement instead.`,
       ["filter"],
+      "filter_field_unsupported",
     );
   }
   if (error instanceof FilterParseError) {
@@ -435,6 +436,14 @@ function shorthandFilterRefusal(error: unknown): never {
     );
   }
   throw error;
+}
+
+/** Whether a refusal is for a field the trace view cannot answer, and nothing else. */
+export function isShorthandFilterFieldUnsupported(error: unknown): boolean {
+  return (
+    error instanceof InstantEvalShorthandError &&
+    error.code === "filter_field_unsupported"
+  );
 }
 
 /**

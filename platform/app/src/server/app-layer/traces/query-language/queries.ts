@@ -9,13 +9,53 @@ import type { FacetState } from "./metadata";
 import { walkAST } from "./walk";
 
 /**
+ * The most AST nodes one filter may carry. The ClickHouse translator counts
+ * every node it visits (tags, boolean operators, negations, parentheses) and
+ * refuses past this ceiling, so the client checks the same count before the
+ * query leaves the browser. Eleven bare words is twenty-one nodes: ten
+ * implicit ANDs plus eleven terms.
+ */
+export const MAX_FILTER_NODE_COUNT = 20;
+
+/**
+ * The customer-facing message for a filter past the node ceiling. The server
+ * answers the same refusal with the `filter_too_complex` code; this is the
+ * client's local copy of it, shown before the request is sent.
+ */
+export const FILTER_TOO_COMPLEX_MESSAGE =
+  "Too many separate terms. Put the sentence in quotes to search it as one phrase.";
+
+/** Counts nodes the way the ClickHouse translator does: one per node visited. */
+export function countFilterNodes(ast: LiqeQuery): number {
+  switch (ast.type) {
+    case "LogicalExpression":
+      return 1 + countFilterNodes(ast.left) + countFilterNodes(ast.right);
+    case "UnaryOperator":
+      return 1 + countFilterNodes(ast.operand);
+    case "ParenthesizedExpression":
+      return 1 + countFilterNodes(ast.expression);
+    default:
+      return 1;
+  }
+}
+
+/**
  * Walk the AST after a successful syntactic parse and reject queries the
  * server can't execute. Catches `field:` (no value) — liqe parses it as a
  * `Tag` whose expression is `EmptyExpression`, but the backend rejects with a
- * 422. Returning the error here lets the SearchBar surface red-border feedback
- * and prevents the doomed query from being committed and re-fired by polling.
+ * 422 — and a query past the node ceiling, which the backend refuses with
+ * `filter_too_complex`. Returning the error here lets the SearchBar surface
+ * red-border feedback and prevents the doomed query from being committed and
+ * re-fired by polling.
  */
 export function validateAst(ast: LiqeQuery): string | null {
+  if (countFilterNodes(ast) > MAX_FILTER_NODE_COUNT) {
+    return FILTER_TOO_COMPLEX_MESSAGE;
+  }
+  return validateNode(ast);
+}
+
+function validateNode(ast: LiqeQuery): string | null {
   if (ast.type === "Tag") {
     if (ast.expression.type === "EmptyExpression") {
       const fieldName =
@@ -26,12 +66,12 @@ export function validateAst(ast: LiqeQuery): string | null {
     }
     return null;
   }
-  if (ast.type === "UnaryOperator") return validateAst(ast.operand);
+  if (ast.type === "UnaryOperator") return validateNode(ast.operand);
   if (ast.type === "LogicalExpression") {
-    return validateAst(ast.left) ?? validateAst(ast.right);
+    return validateNode(ast.left) ?? validateNode(ast.right);
   }
   if (ast.type === "ParenthesizedExpression") {
-    return validateAst(ast.expression);
+    return validateNode(ast.expression);
   }
   return null;
 }

@@ -22,7 +22,7 @@ import {
 import type { InstantEvalRunRow } from "~/server/app-layer/instant-evals/run/instant-eval-run.repository";
 import { readInstantEvalRunQuestions } from "~/server/app-layer/instant-evals/run/questions";
 import type { InstantEvalRunProjectedStatus } from "~/server/event-sourcing/pipelines/instant-eval-processing/projections/instantEvalRun.stateProjection";
-import { instantEvalParametersSchema } from "./schemas";
+import { instantEvalStoredParametersSchema } from "./schemas";
 
 /** The statuses a run reports, lowercase. */
 const INSTANT_EVAL_RUN_WIRE_STATUSES = [
@@ -59,7 +59,7 @@ export const instantEvalRunSchema = z.object({
   id: z.string().describe("The run id."),
   name: z.string().nullable().describe("What the run was called, if anything."),
   sql: z.string().describe("The statement, exactly as submitted."),
-  parameters: instantEvalParametersSchema.describe(
+  parameters: instantEvalStoredParametersSchema.describe(
     "The values the statement's parameters were filled with.",
   ),
   questions: z

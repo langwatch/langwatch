@@ -40,6 +40,17 @@ export const instantEvalParametersSchema = z.record(
   parameterValueSchema,
 );
 
+/**
+ * The parameters a stored run reads back. Scalars as a caller binds them,
+ * plus one list: a run started from the trace explorer with a filter the
+ * shorthand dialect cannot answer binds the trace ids it resolved as
+ * `instant_eval_selection_ids`, and the run hands that back as it was bound.
+ */
+export const instantEvalStoredParametersSchema = z.record(
+  z.string(),
+  z.union([parameterValueSchema, z.array(z.string())]),
+);
+
 const QUERY_BOOLEAN_SPELLINGS = [
   "true",
   "1",

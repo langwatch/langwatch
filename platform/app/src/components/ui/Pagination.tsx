@@ -41,6 +41,12 @@ export interface PaginationProps {
   /** Plural noun shown after the total, e.g. "records". Omit to hide the total. */
   unitLabel?: string;
   /**
+   * The totals segment written out, in place of `<total> <unitLabel>`. For a
+   * count that is still moving, such as a judgement run mid-way, where the
+   * caller has more to say than a number.
+   */
+  totalSummary?: string;
+  /**
    * Rows actually rendered on this page. Given, the range copy ends where the
    * data ends rather than where a full page would; omitted or zero (a count
    * nobody has taken yet), a full page is assumed and the range is capped by
@@ -102,6 +108,7 @@ function PageSizeField({
 function PageSummary({
   totalCount,
   unitLabel,
+  totalSummary,
   rangeStart,
   rangeEnd,
   pageSize,
@@ -111,6 +118,7 @@ function PageSummary({
 }: {
   totalCount: number;
   unitLabel?: string;
+  totalSummary?: string;
   rangeStart: number;
   rangeEnd: number;
   pageSize: number;
@@ -118,9 +126,11 @@ function PageSummary({
   disabled: boolean;
   onPageSizeChange?: (size: number) => void;
 }) {
-  const segments = unitLabel
-    ? [`${totalCount.toLocaleString()} ${unitLabel}`]
-    : [];
+  const segments = totalSummary
+    ? [totalSummary]
+    : unitLabel
+      ? [`${totalCount.toLocaleString()} ${unitLabel}`]
+      : [];
   segments.push(`showing ${rangeStart}–${rangeEnd}`);
   if (onPageSizeChange) segments.push("per page");
 
@@ -264,6 +274,7 @@ export function Pagination({
   isLoading = false,
   navDisabled = false,
   unitLabel,
+  totalSummary,
   visibleCount,
   isPageReachable,
   canGoNext = true,
@@ -302,6 +313,7 @@ export function Pagination({
         <PageSummary
           totalCount={totalCount}
           unitLabel={unitLabel}
+          totalSummary={totalSummary}
           rangeStart={rangeStart}
           rangeEnd={rangeEnd}
           pageSize={pageSize}

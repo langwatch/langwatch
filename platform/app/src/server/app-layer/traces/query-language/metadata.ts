@@ -314,8 +314,30 @@ export const SEARCH_FIELDS: Readonly<Record<string, SearchFieldMeta>> = {
     valueType: "text",
     group: "event",
   },
+  // An Instant Eval over what the lens shows: the value is the question the
+  // judge answers for each row, and the run behind it is registered by the
+  // Explorer when the chip is applied. A bare value with no run behind it is
+  // read as an evaluator name.
   eval: {
     label: "Eval",
+    hasSidebar: false,
+    valueType: "text",
+    group: "eval",
+  },
+  "eval.trace": {
+    label: "Eval each trace",
+    hasSidebar: false,
+    valueType: "text",
+    group: "eval",
+  },
+  "eval.conversation": {
+    label: "Eval each conversation",
+    hasSidebar: false,
+    valueType: "text",
+    group: "eval",
+  },
+  "eval.llm": {
+    label: "Eval each model call",
     hasSidebar: false,
     valueType: "text",
     group: "eval",

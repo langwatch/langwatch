@@ -5,6 +5,7 @@ import { api } from "~/utils/api";
 import { useFilterStore } from "../stores/filterStore";
 import { useRefreshUIStore } from "../stores/refreshUIStore";
 import { useSseStatusStore } from "../stores/sseStatusStore";
+import { useInstantEvalRuns } from "./useInstantEvalRuns";
 import { useTraceListRefresh } from "./useTraceListRefresh";
 
 const FAST_MS = 5_000;
@@ -87,6 +88,7 @@ export function useTraceNewCount(): TraceNewCountResult {
   }, [isVisible, refresh, trpcUtils]);
 
   const liveUpdatesMode = useSseStatusStore((s) => s.liveUpdatesMode);
+  const { evalRuns } = useInstantEvalRuns();
 
   // Aurora refresh pulse is now scoped to "trace about to appear" — fires
   // once when the count transitions from 0 to >0 in live mode, signalling
@@ -121,6 +123,7 @@ export function useTraceNewCount(): TraceNewCountResult {
       },
       since,
       query: queryText || undefined,
+      ...(evalRuns ? { evalRuns } : {}),
     },
     {
       // Honour the store contract: paused = "no updates, no pill, no

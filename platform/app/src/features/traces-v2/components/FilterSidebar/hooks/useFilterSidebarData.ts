@@ -5,7 +5,9 @@ import {
   buildFacetStateLookup,
   getFacetValues,
 } from "~/server/app-layer/traces/query-language/queries";
+import { useFilteredTraceFacets } from "../../../hooks/useFilteredTraceFacets";
 import { useTraceFacets } from "../../../hooks/useTraceFacets";
+import { usePreviewTracesActive } from "../../../onboarding/hooks/usePreviewTracesActive";
 import { useDensityStore } from "../../../stores/densityStore";
 import {
   applyLensOrder,
@@ -40,6 +42,10 @@ import {
   computeDiscreteEligible,
   resolveNumericModeByKey,
 } from "../discreteMode";
+import {
+  type FacetCountState,
+  mergeFacetDescriptors,
+} from "../mergeFacetDescriptors";
 import { routeToggleViaOrGroups } from "../routeToggleViaOrGroups";
 import type {
   AttributeKey,
@@ -113,7 +119,24 @@ export function useFilterSidebarData() {
     [storeRemoveRange],
   );
 
-  const { data: descriptors, isLoading: facetsLoading } = useTraceFacets();
+  // `discover` (value lists, attribute keys, the warm start) and the filtered
+  // read (the counts) are merged here: see `mergeFacetDescriptors`. The
+  // sample preview has no ClickHouse footprint, so its fixture descriptors
+  // are the counts.
+  const { data: discovered, isLoading: facetsLoading } = useTraceFacets();
+  const filtered = useFilteredTraceFacets();
+  const isSamplePreview = usePreviewTracesActive();
+  const { descriptors, countState } = useMemo(
+    () =>
+      isSamplePreview
+        ? { descriptors: discovered, countState: "settled" as const }
+        : mergeFacetDescriptors({
+            discovered,
+            filtered: filtered.data,
+            filteredIsPlaceholder: filtered.isPlaceholderData,
+          }),
+    [isSamplePreview, discovered, filtered.data, filtered.isPlaceholderData],
+  );
 
   const lensSectionOrder = useFacetLensStore((s) => s.lens.sectionOrder);
   const setSectionOrder = useFacetLensStore((s) => s.setSectionOrder);
@@ -324,6 +347,7 @@ export function useFilterSidebarData() {
       const baseItems = buildFacetItems({
         cat,
         isSynthetic: cat.synthetic ?? isSynthetic,
+        countState,
       });
       // Surface values that the user typed in the search bar but that
       // discover didn't return (rare value, custom label, paste from
@@ -356,10 +380,11 @@ export function useFilterSidebarData() {
     // Discrete numeric facets render through FacetSection too — build their
     // tick-list items from the descriptor's distinct values.
     for (const [key, range] of discreteEligible) {
-      const baseItems = buildDiscreteFacetItems(
+      const baseItems = buildDiscreteFacetItems({
         range,
-        range.synthetic ?? isSynthetic,
-      );
+        synthetic: range.synthetic ?? isSynthetic,
+        countState,
+      });
       // Same AST-extra handling as categoricals above: a selected discrete
       // value that discover dropped from the distinct set would otherwise
       // vanish from the sidebar while its filter stays active, leaving the
@@ -382,7 +407,7 @@ export function useFilterSidebarData() {
       map.set(key, [...extras, ...baseItems]);
     }
     return map;
-  }, [categoricals, discreteEligible, isSynthetic, ast]);
+  }, [categoricals, discreteEligible, isSynthetic, ast, countState]);
 
   const getValueStates = useMemo(() => {
     const map = new Map<string, (value: string) => FacetValueState>();
@@ -645,18 +670,24 @@ function synthesizeDefaultDescriptors(): Descriptors {
  * becomes a tickable row (value === label === the number), so the existing
  * categorical FacetSection renders the "Discrete" presentation unchanged.
  */
-function buildDiscreteFacetItems(
-  range: RangeSectionData,
-  synthetic: boolean,
-): FacetItem[] {
+function buildDiscreteFacetItems({
+  range,
+  synthetic,
+  countState,
+}: {
+  range: RangeSectionData;
+  synthetic: boolean;
+  countState: FacetCountState;
+}): FacetItem[] {
   const dimmed = !VIBRANT_FIELDS.has(range.key);
   return (range.discrete?.values ?? []).map((dv) => ({
     value: String(dv.value),
     label: String(dv.value),
-    count: dv.count,
+    count: countState === "pending" ? 0 : dv.count,
     dotColor: hashColor(String(dv.value)),
     dimmed,
     synthetic,
+    countState,
   }));
 }
 
@@ -669,9 +700,11 @@ function buildDiscreteFacetItems(
 export function buildFacetItems({
   cat,
   isSynthetic,
+  countState = "settled",
 }: {
   cat: CategoricalSection;
   isSynthetic: boolean;
+  countState?: FacetCountState;
 }): FacetItem[] {
   const curatedColors = FACET_COLORS[cat.key];
   const dimmed = !VIBRANT_FIELDS.has(cat.key);
@@ -707,10 +740,13 @@ export function buildFacetItems({
   return orderedValues.map((value) => ({
     value,
     label: labels.get(value) ?? facetLabel(value, cat.key),
-    count: counts.get(value) ?? 0,
+    // A warm-start row carries no count the user can read; see
+    // `mergeFacetDescriptors`.
+    count: countState === "pending" ? 0 : (counts.get(value) ?? 0),
     dotColor: dotColorFor(value),
     dimmed,
     synthetic: isSynthetic,
+    countState,
     aggregates: aggregates.get(value),
     eventMetrics: eventMetrics.get(value),
   }));

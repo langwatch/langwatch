@@ -29,7 +29,7 @@ const METRIC_VALUES_TOP_N = 10;
  * round-trip cleanly with the `event:` filter handler.
  */
 export function buildEventsFacetQuery(ctx: FacetQueryContext): FacetQuery {
-  const where = buildTimeWhere("StartTime");
+  const where = buildTimeWhere("StartTime", ctx);
   const prefixFilter = ctx.prefix
     ? "AND lower(name) ILIKE concat({prefix:String}, '%')"
     : "";

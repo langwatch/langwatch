@@ -8,20 +8,54 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import { LANGY_TRACE_ORIGIN } from "../derive-trace-origin";
+import { translateFilterToClickHouse } from "../filter-to-clickhouse";
 import { HIDDEN_ORIGINS_PARAM } from "../hidden-origins";
 import { SessionGroupsService } from "../session-groups.service";
 import { TraceListService } from "../trace-list.service";
 
 const timeRange = { from: 1_700_000_000_000, to: 1_700_086_400_000 };
 const filterWhere = { sql: "ContainsErrorStatus = 1", params: {} };
+const FACET_QUERY = "status:error";
+const facetFilterSql = translateFilterToClickHouse(
+  FACET_QUERY,
+  "tenant-1",
+  timeRange,
+)!.sql;
 
 function fakeRepository() {
   return {
     findAll: vi.fn().mockResolvedValue({ rows: [], totalHits: 0 }),
-    findFacetCounts: vi.fn().mockResolvedValue({ values: {} }),
-    findRangeStats: vi.fn().mockResolvedValue({ min: 0, max: 0 }),
     findCount: vi.fn().mockResolvedValue(0),
+    findBatchedFacets: vi
+      .fn()
+      .mockResolvedValue({ categoricals: {}, ranges: {} }),
+    findCategoricalFacet: vi
+      .fn()
+      .mockResolvedValue({ values: [], totalDistinct: 0 }),
+    findCategoricalFacetRaw: vi
+      .fn()
+      .mockResolvedValue({ values: [], totalDistinct: 0 }),
+    findRangeStatsForTable: vi.fn().mockResolvedValue({ min: 0, max: 0 }),
+    findDiscreteValues: vi
+      .fn()
+      .mockResolvedValue({ values: [], distinctCount: 0 }),
   };
+}
+
+type BatchCall = {
+  table: string;
+  categoricalSpecs: { key: string }[];
+  filterWhere?: { sql: string; params: Record<string, unknown> };
+};
+
+function summaryBatches(repository: ReturnType<typeof fakeRepository>) {
+  return repository.findBatchedFacets.mock.calls
+    .map(([params]) => params as BatchCall)
+    .filter((call) => call.table === "trace_summaries");
+}
+
+function carriesOrigin(call: BatchCall): boolean {
+  return call.categoricalSpecs.some((spec) => spec.key === "origin");
 }
 
 function serviceWith(repository: ReturnType<typeof fakeRepository>) {
@@ -83,25 +117,22 @@ describe("TraceListService with hidden origins", () => {
       await serviceWith(repository).getFacets({
         tenantId: "tenant-1",
         timeRange,
-        filterWhere,
+        query: FACET_QUERY,
         hiddenOrigins: [LANGY_TRACE_ORIGIN],
       });
 
-      const facetCalls = repository.findFacetCounts.mock.calls.map(
-        ([params]) => params,
-      );
-      const originCalls = facetCalls.filter((params) =>
-        params.facetExpression.includes("langwatch.origin"),
-      );
-      const otherCalls = facetCalls.filter(
-        (params) => !params.facetExpression.includes("langwatch.origin"),
-      );
-      expect(originCalls).toHaveLength(1);
-      expect(otherCalls.length).toBeGreaterThan(0);
-      for (const params of otherCalls) {
+      const batches = summaryBatches(repository);
+      const originBatches = batches.filter(carriesOrigin);
+      const otherBatches = batches.filter((call) => !carriesOrigin(call));
+      expect(originBatches).toHaveLength(1);
+      expect(otherBatches.length).toBeGreaterThan(0);
+      for (const call of otherBatches) {
+        expect(call).toEqual(hidesLangy);
+      }
+      for (const [params] of repository.findDiscreteValues.mock.calls) {
         expect(params).toEqual(hidesLangy);
       }
-      for (const [params] of repository.findRangeStats.mock.calls) {
+      for (const [params] of repository.findCategoricalFacet.mock.calls) {
         expect(params).toEqual(hidesLangy);
       }
     });
@@ -112,14 +143,15 @@ describe("TraceListService with hidden origins", () => {
       await serviceWith(repository).getFacets({
         tenantId: "tenant-1",
         timeRange,
-        filterWhere,
+        query: FACET_QUERY,
         hiddenOrigins: [LANGY_TRACE_ORIGIN],
       });
 
-      const originCall = repository.findFacetCounts.mock.calls
-        .map(([params]) => params)
-        .find((params) => params.facetExpression.includes("langwatch.origin"));
-      expect(originCall?.filterWhere).toBe(filterWhere);
+      const originBatch = summaryBatches(repository).find(carriesOrigin);
+      expect(originBatch?.filterWhere?.sql).toBe(facetFilterSql);
+      expect(originBatch?.filterWhere?.params).not.toHaveProperty(
+        HIDDEN_ORIGINS_PARAM,
+      );
     });
   });
 
@@ -146,7 +178,7 @@ describe("TraceListService with hidden origins", () => {
       await service.getFacets({
         tenantId: "tenant-1",
         timeRange,
-        filterWhere,
+        query: FACET_QUERY,
         hiddenOrigins: [],
       });
 
@@ -156,8 +188,16 @@ describe("TraceListService with hidden origins", () => {
       expect(repository.findCount.mock.calls[0]![0].filterWhere).toBe(
         filterWhere,
       );
-      for (const [params] of repository.findFacetCounts.mock.calls) {
-        expect(params.filterWhere).toBe(filterWhere);
+      // The status facet is counted without its own field, so with a query
+      // that only names status it reads unfiltered; every other batch reads
+      // the compiled query as it is.
+      for (const call of summaryBatches(repository)) {
+        const carriesStatus = call.categoricalSpecs.some(
+          (spec) => spec.key === "status",
+        );
+        expect(call.filterWhere?.sql).toBe(
+          carriesStatus ? undefined : facetFilterSql,
+        );
       }
     });
   });

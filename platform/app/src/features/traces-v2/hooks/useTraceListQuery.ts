@@ -1,6 +1,7 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type { InstantEvalRunReference } from "~/server/app-layer/traces/query-language/instantEvalChips";
 import { api } from "~/utils/api";
 import { useSamplePreview } from "../onboarding";
 import type { TraceListCursor } from "../stores/filterStore";
@@ -8,6 +9,7 @@ import { useFilterStore } from "../stores/filterStore";
 import { DEFAULT_SORT, useViewStore } from "../stores/viewStore";
 import type { TraceListItem } from "../types/trace";
 import { mapTraceListPayload } from "../utils/mapTraceListPayload";
+import { useInstantEvalRuns } from "./useInstantEvalRuns";
 
 export interface TraceListQueryResult {
   data: TraceListItem[];
@@ -48,6 +50,7 @@ function traceListQueryInput({
   pageSize,
   traceCursor,
   queryText,
+  evalRuns,
 }: {
   projectId: string;
   timeRange: { from: number; to: number; label?: string | null };
@@ -56,6 +59,7 @@ function traceListQueryInput({
   pageSize: number;
   traceCursor: TraceListCursor | undefined;
   queryText: string;
+  evalRuns?: Record<string, InstantEvalRunReference>;
 }) {
   const cursor = page > 1 ? traceCursor : undefined;
   return {
@@ -70,6 +74,7 @@ function traceListQueryInput({
     pageSize,
     ...(cursor ? { cursor } : {}),
     query: queryText || undefined,
+    ...(evalRuns ? { evalRuns } : {}),
   };
 }
 
@@ -83,6 +88,7 @@ export function useTraceListQuery(): TraceListQueryResult {
   const sort = useViewStore((s) => s.sort);
   const grouping = useViewStore((s) => s.grouping);
   const samplePreview = useSamplePreview();
+  const { evalRuns } = useInstantEvalRuns();
 
   // The sessions lens paginates with its own opaque string cursors through
   // the SAME shared page number (see useSessionGroups). While it is active,
@@ -117,6 +123,7 @@ export function useTraceListQuery(): TraceListQueryResult {
       pageSize,
       traceCursor,
       queryText,
+      ...(evalRuns ? { evalRuns } : {}),
     }),
     {
       enabled: !!project?.id && samplePreview === null,

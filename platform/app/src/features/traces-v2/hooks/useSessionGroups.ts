@@ -1,6 +1,7 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type { InstantEvalRunReference } from "~/server/app-layer/traces/query-language/instantEvalChips";
 import { api } from "~/utils/api";
 import type { ConversationGroup } from "../components/TraceTable/conversationGroups";
 import {
@@ -11,6 +12,7 @@ import { useSamplePreview } from "../onboarding";
 import { useFilterStore } from "../stores/filterStore";
 import { useViewStore } from "../stores/viewStore";
 import { mapSessionGroupsPayload } from "../utils/mapSessionGroupsPayload";
+import { useInstantEvalRuns } from "./useInstantEvalRuns";
 
 export interface SessionGroupsResult {
   groups: ConversationGroup[];
@@ -46,6 +48,7 @@ function sessionsQueryInput(args: {
   pageSize: number;
   sessionCursor: string | undefined;
   queryText: string;
+  evalRuns?: Record<string, InstantEvalRunReference>;
 }) {
   const serverSort = SERVER_SORTABLE.has(args.sort.columnId)
     ? { columnId: args.sort.columnId, direction: args.sort.direction }
@@ -62,6 +65,7 @@ function sessionsQueryInput(args: {
     pageSize: Math.min(args.pageSize, SESSIONS_MAX_PAGE_SIZE),
     ...(cursor ? { cursor } : {}),
     query: args.queryText || undefined,
+    ...(args.evalRuns ? { evalRuns: args.evalRuns } : {}),
   };
 }
 
@@ -138,6 +142,7 @@ export function useSessionGroups(): SessionGroupsResult {
     if (isActive && page > 1 && sessionCursor === undefined) setPage(1);
   }, [isActive, page, sessionCursor, setPage]);
 
+  const { evalRuns } = useInstantEvalRuns();
   const query = api.tracesV2.sessions.useQuery(
     sessionsQueryInput({
       projectId: project?.id ?? "",
@@ -147,6 +152,7 @@ export function useSessionGroups(): SessionGroupsResult {
       pageSize,
       sessionCursor,
       queryText,
+      ...(evalRuns ? { evalRuns } : {}),
     }),
     {
       enabled:
