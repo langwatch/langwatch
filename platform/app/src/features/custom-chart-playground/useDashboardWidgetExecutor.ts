@@ -74,9 +74,9 @@ export function useDashboardWidgetExecutor(
   overrides?: DashboardWidgetExecutorOverrides,
 ) {
   const utils = api.useUtils();
-  // The playground editor has no period control, so it defaults to a fixed
-  // window computed once at mount; a dashboard card passes its own via
-  // `overrides.timeWindow` instead, tracking the grid's period control.
+  // Fallback window for callers with no period control (e.g. tests,
+  // standalone usage). Dashboard cards and the create drawer pass their own
+  // period via `overrides.timeWindow`, tracking the grid's period control.
   const [mountWindow] = useState<{ start: number; end: number }>(() => {
     const end = Date.now();
     return { start: end - 24 * 60 * 60 * 1000, end };
