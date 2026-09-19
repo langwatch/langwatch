@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.1.1](https://github.com/langwatch/langwatch/compare/langevals@v3.1.0...langevals@v3.1.1) (2026-09-19)
+
+
+### Bug Fixes
+
+* **evaluators:** forward generation params on every path, Claude temperature/top_p rule in langevals, lift the ragas 16384 cap, skipped rows show as skipped ([#8154](https://github.com/langwatch/langwatch/issues/8154)) ([3d3dc10](https://github.com/langwatch/langwatch/commit/3d3dc1042097e8433e217ad88c833db7f46226be))
+
 ## [3.1.0](https://github.com/langwatch/langwatch/compare/langevals@v3.0.0...langevals@v3.1.0) (2026-09-12)
 
 
