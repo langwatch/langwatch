@@ -241,331 +241,342 @@ function parses(query: string): boolean {
   }
 }
 
-export function createSearchRouter(deps: SearchRouterDeps): {
-  route: (input: RouteSearchInput) => Promise<RouteSearchResult>;
-} {
-  const phraseSearch = ({
-    sentence,
-    explicitQuery,
-  }: {
-    sentence: string;
-    explicitQuery: string;
-  }): string =>
-    combineQueries({ base: explicitQuery, addition: quoteAsPhrase(sentence) });
+/** The sentence and the explicit terms as one shared context for the routes. */
+interface RouteContext {
+  deps: SearchRouterDeps;
+  input: RouteSearchInput;
+  sentence: string;
+  explicitQuery: string;
+  target: InstantEvalSearchTarget;
+  known: KnownProjectSignals;
+  langyAvailable: boolean;
+}
 
-  const freeText = ({
-    sentence,
-    explicitQuery,
+function phraseSearch({
+  sentence,
+  explicitQuery,
+}: {
+  sentence: string;
+  explicitQuery: string;
+}): string {
+  return combineQueries({
+    base: explicitQuery,
+    addition: quoteAsPhrase(sentence),
+  });
+}
+
+function freeText({
+  context,
+  decidedBy,
+  modelUnavailable = false,
+  fellBackFrom,
+}: {
+  context: RouteContext;
+  decidedBy: SearchRouteDecidedBy;
+  modelUnavailable?: boolean;
+  fellBackFrom?: SearchRouteKind | "routing";
+}): RouteSearchResult {
+  context.deps.recordDecision({ route: "free_text", decidedBy });
+  return {
+    kind: "free_text",
+    query: phraseSearch(context),
     decidedBy,
-    modelUnavailable = false,
-    fellBackFrom,
-  }: {
-    sentence: string;
-    explicitQuery: string;
-    decidedBy: SearchRouteDecidedBy;
-    modelUnavailable?: boolean;
-    fellBackFrom?: SearchRouteKind | "routing";
-  }): RouteSearchResult => {
-    deps.recordDecision({ route: "free_text", decidedBy });
-    return {
-      kind: "free_text",
-      query: phraseSearch({ sentence, explicitQuery }),
-      decidedBy,
-      modelUnavailable,
-      ...(fellBackFrom ? { fellBackFrom } : {}),
-    };
+    modelUnavailable,
+    ...(fellBackFrom ? { fellBackFrom } : {}),
   };
+}
 
-  const buildFilterRoute = async ({
-    input,
-    sentence,
-    explicitQuery,
+function finishFilter({
+  context,
+  generated,
+  decidedBy,
+  explanation,
+}: {
+  context: RouteContext;
+  generated: string;
+  decidedBy: SearchRouteDecidedBy;
+  explanation?: string;
+}): RouteSearchResult {
+  // The model's own escape hatch for a sentence it could not express.
+  if (!generated.trim()) {
+    return freeText({ context, decidedBy: "fallback", fellBackFrom: "filter" });
+  }
+  const merged = combineQueries({
+    base: context.explicitQuery,
+    addition: generated,
+  });
+  const query = parses(merged) ? merged : generated;
+  context.deps.recordDecision({ route: "filter", decidedBy });
+  return {
+    kind: "filter",
+    query,
     decidedBy,
-  }: {
-    input: RouteSearchInput;
-    sentence: string;
-    explicitQuery: string;
-    decidedBy: SearchRouteDecidedBy;
-  }): Promise<RouteSearchResult> => {
-    let built: AiActionResult;
-    try {
-      built = await deps.buildFilter({
-        projectId: input.projectId,
-        prompt: sentence,
-        timeRange: input.timeRange,
-      });
-    } catch (error) {
-      logger.warn(
-        { projectId: input.projectId, err: error },
-        "Filter route could not be built; searching the phrase instead",
-      );
-      return freeText({
-        sentence,
-        explicitQuery,
-        decidedBy: "fallback",
-        modelUnavailable: isModelUnavailable(error),
-        fellBackFrom: "filter",
-      });
-    }
-    return finishFilter({
-      generated: built.query,
-      sentence,
-      explicitQuery,
-      decidedBy,
+    ...(explanation ? { explanation } : {}),
+  };
+}
+
+function instantEval({
+  context,
+  question,
+  decidedBy,
+}: {
+  context: RouteContext;
+  question: { instructions: string; criteria: [string, string] };
+  decidedBy: SearchRouteDecidedBy;
+}): RouteSearchResult {
+  context.deps.recordDecision({ route: "instant_eval", decidedBy });
+  return {
+    kind: "instant_eval",
+    question,
+    target: context.target,
+    otherQuery: context.explicitQuery,
+    fallbackQuery: phraseSearch(context),
+    decidedBy,
+  };
+}
+
+function langy({
+  context,
+  decidedBy,
+}: {
+  context: RouteContext;
+  decidedBy: SearchRouteDecidedBy;
+}): RouteSearchResult {
+  context.deps.recordDecision({ route: "langy", decidedBy });
+  return { kind: "langy", question: context.input.text, decidedBy };
+}
+
+async function buildFilterRoute({
+  context,
+  decidedBy,
+}: {
+  context: RouteContext;
+  decidedBy: SearchRouteDecidedBy;
+}): Promise<RouteSearchResult> {
+  let built: AiActionResult;
+  try {
+    built = await context.deps.buildFilter({
+      projectId: context.input.projectId,
+      prompt: context.sentence,
+      timeRange: context.input.timeRange,
     });
-  };
+  } catch (error) {
+    logger.warn(
+      { projectId: context.input.projectId, err: error },
+      "Filter route could not be built; searching the phrase instead",
+    );
+    return freeText({
+      context,
+      decidedBy: "fallback",
+      modelUnavailable: isModelUnavailable(error),
+      fellBackFrom: "filter",
+    });
+  }
+  return finishFilter({ context, generated: built.query, decidedBy });
+}
 
-  const finishFilter = ({
-    generated,
-    sentence,
-    explicitQuery,
-    decidedBy,
-    explanation,
-  }: {
-    generated: string;
-    sentence: string;
-    explicitQuery: string;
-    decidedBy: SearchRouteDecidedBy;
-    explanation?: string;
-  }): RouteSearchResult => {
-    // The model's own escape hatch for a sentence it could not express.
-    if (!generated.trim()) {
-      return freeText({
-        sentence,
-        explicitQuery,
-        decidedBy: "fallback",
-        fellBackFrom: "filter",
-      });
-    }
-    const merged = combineQueries({ base: explicitQuery, addition: generated });
-    const query = parses(merged) ? merged : generated;
-    deps.recordDecision({ route: "filter", decidedBy });
-    return {
-      kind: "filter",
-      query,
+async function buildInstantEvalRoute({
+  context,
+  decidedBy,
+}: {
+  context: RouteContext;
+  decidedBy: SearchRouteDecidedBy;
+}): Promise<RouteSearchResult> {
+  let built: InstantEvalQuestionResult;
+  try {
+    built = await context.deps.buildQuestion({
+      projectId: context.input.projectId,
+      text: context.sentence,
+      target: context.target,
+      known: context.known,
+    });
+  } catch (error) {
+    logger.warn(
+      { projectId: context.input.projectId, err: error },
+      "Instant Eval question could not be written; searching the phrase instead",
+    );
+    return freeText({
+      context,
+      decidedBy: "fallback",
+      modelUnavailable: isModelUnavailable(error),
+      fellBackFrom: "instant_eval",
+    });
+  }
+  if (built.kind === "filter") {
+    return finishFilter({
+      context,
+      generated: built.query,
       decidedBy,
-      ...(explanation ? { explanation } : {}),
-    };
-  };
-
-  const buildInstantEvalRoute = async ({
-    input,
-    sentence,
-    explicitQuery,
-    target,
-    known,
+      explanation: built.reason,
+    });
+  }
+  return instantEval({
+    context,
+    question: { instructions: built.instructions, criteria: built.criteria },
     decidedBy,
-  }: {
-    input: RouteSearchInput;
-    sentence: string;
-    explicitQuery: string;
-    target: InstantEvalSearchTarget;
-    known: KnownProjectSignals;
-    decidedBy: SearchRouteDecidedBy;
-  }): Promise<RouteSearchResult> => {
-    let built: InstantEvalQuestionResult;
-    try {
-      built = await deps.buildQuestion({
-        projectId: input.projectId,
-        text: sentence,
-        target,
-        known,
-      });
-    } catch (error) {
-      logger.warn(
-        { projectId: input.projectId, err: error },
-        "Instant Eval question could not be written; searching the phrase instead",
-      );
-      return freeText({
-        sentence,
-        explicitQuery,
-        decidedBy: "fallback",
-        modelUnavailable: isModelUnavailable(error),
-        fellBackFrom: "instant_eval",
-      });
-    }
-    if (built.kind === "filter") {
-      return finishFilter({
-        generated: built.query,
-        sentence,
-        explicitQuery,
-        decidedBy,
-        explanation: built.reason,
-      });
-    }
-    deps.recordDecision({ route: "instant_eval", decidedBy });
-    return {
-      kind: "instant_eval",
-      question: { instructions: built.instructions, criteria: built.criteria },
-      target,
-      otherQuery: explicitQuery,
-      fallbackQuery: phraseSearch({ sentence, explicitQuery }),
-      decidedBy,
-    };
-  };
+  });
+}
 
-  const classify = async ({
-    input,
-    sentence,
-    explicitQuery,
-    known,
-    langyAvailable,
-  }: {
-    input: RouteSearchInput;
-    sentence: string;
-    explicitQuery: string;
-    known: KnownProjectSignals;
-    langyAvailable: boolean;
-  }): Promise<SearchRouteKind | null> => {
-    if (!deps.classifier) return null;
-    try {
-      const judgement = await deps.classifier.classify({
-        projectId: input.projectId,
-        text: buildRouteContext({
-          sentence,
-          explicitQuery,
-          activeQuery: input.activeQuery,
-          lensId: input.lensId,
-          timeRange: input.timeRange,
-          known,
-        }),
-        questions: [buildRouteQuestion({ langyAvailable })],
-      });
-      const label = judgement.verdicts.find(
-        (candidate) => candidate.questionId === ROUTE_QUESTION_ID,
-      )?.label;
-      if (judgement.skippedReason || !isRouteKind(label)) {
-        logger.info(
-          {
-            projectId: input.projectId,
-            skippedReason: judgement.skippedReason,
-          },
-          "Classifier did not route the search; the model decides",
-        );
-        return null;
-      }
-      return label;
-    } catch (error) {
-      logger.warn(
-        { projectId: input.projectId, err: error },
-        "Classifier failed to route the search; the model decides",
+/** The classifier's answer, or null when it had none and the model decides. */
+async function classify(
+  context: RouteContext,
+): Promise<SearchRouteKind | null> {
+  const { deps, input } = context;
+  if (!deps.classifier) return null;
+  try {
+    const judgement = await deps.classifier.classify({
+      projectId: input.projectId,
+      text: buildRouteContext({
+        sentence: context.sentence,
+        explicitQuery: context.explicitQuery,
+        activeQuery: input.activeQuery,
+        lensId: input.lensId,
+        timeRange: input.timeRange,
+        known: context.known,
+      }),
+      questions: [
+        buildRouteQuestion({ langyAvailable: context.langyAvailable }),
+      ],
+    });
+    const label = judgement.verdicts.find(
+      (candidate) => candidate.questionId === ROUTE_QUESTION_ID,
+    )?.label;
+    if (judgement.skippedReason || !isRouteKind(label)) {
+      logger.info(
+        { projectId: input.projectId, skippedReason: judgement.skippedReason },
+        "Classifier did not route the search; the model decides",
       );
       return null;
     }
-  };
+    return label;
+  } catch (error) {
+    logger.warn(
+      { projectId: input.projectId, err: error },
+      "Classifier failed to route the search; the model decides",
+    );
+    return null;
+  }
+}
 
-  const route = async (input: RouteSearchInput): Promise<RouteSearchResult> => {
-    const langyAvailable = input.langyAvailable ?? true;
-    const { sentence, explicitQuery } = splitBareWords(input.text);
-    if (!sentence) {
-      deps.recordDecision({ route: "filter", decidedBy: "fallback" });
-      return { kind: "filter", query: explicitQuery, decidedBy: "fallback" };
-    }
-    const target: InstantEvalSearchTarget =
-      input.lensId === CONVERSATIONS_LENS_ID ? "threads" : "traces";
+async function applyClassified({
+  context,
+  classified,
+}: {
+  context: RouteContext;
+  classified: SearchRouteKind;
+}): Promise<RouteSearchResult> {
+  const decidedBy = "classifier";
+  switch (classified) {
+    case "filter":
+      return buildFilterRoute({ context, decidedBy });
+    case "instant_eval":
+      return buildInstantEvalRoute({ context, decidedBy });
+    case "free_text":
+      return freeText({ context, decidedBy });
+    case "langy":
+      return langy({ context, decidedBy });
+  }
+}
 
-    let known: KnownProjectSignals = { evaluators: [], events: [] };
-    try {
-      known = await deps.listKnownSignals({
-        projectId: input.projectId,
-        timeRange: input.timeRange,
-      });
-    } catch (error) {
+/** The model both decides and builds when the classifier had no answer. */
+async function routeWithModel(
+  context: RouteContext,
+): Promise<RouteSearchResult> {
+  const { deps, input } = context;
+  let decision: SearchRouteDecision;
+  try {
+    decision = await deps.routeWithModel({
+      projectId: input.projectId,
+      text: context.sentence,
+      timeRange: input.timeRange,
+      target: context.target,
+      known: context.known,
+      langyAvailable: context.langyAvailable,
+    });
+  } catch (error) {
+    const modelUnavailable = isModelUnavailable(error);
+    if (!modelUnavailable) {
       logger.warn(
         { projectId: input.projectId, err: error },
-        "Known evaluators and events could not be listed; routing without them",
+        "Model could not route the search; searching the phrase instead",
       );
     }
-
-    const classified = await classify({
-      input,
-      sentence,
-      explicitQuery,
-      known,
-      langyAvailable,
+    return freeText({
+      context,
+      decidedBy: "fallback",
+      modelUnavailable,
+      fellBackFrom: "routing",
     });
+  }
+  const decidedBy = "model";
+  switch (decision.route) {
+    case "filter":
+      return finishFilter({ context, generated: decision.query, decidedBy });
+    case "instant_eval":
+      return instantEval({
+        context,
+        question: {
+          instructions: decision.instructions,
+          criteria: decision.criteria,
+        },
+        decidedBy,
+      });
+    case "langy":
+      return langy({ context, decidedBy });
+    case "free_text":
+      return freeText({ context, decidedBy });
+  }
+}
 
-    if (classified === "filter") {
-      return buildFilterRoute({
-        input,
-        sentence,
-        explicitQuery,
-        decidedBy: "classifier",
-      });
-    }
-    if (classified === "instant_eval") {
-      return buildInstantEvalRoute({
-        input,
-        sentence,
-        explicitQuery,
-        target,
-        known,
-        decidedBy: "classifier",
-      });
-    }
-    if (classified === "free_text") {
-      return freeText({ sentence, explicitQuery, decidedBy: "classifier" });
-    }
-    if (classified === "langy") {
-      deps.recordDecision({ route: "langy", decidedBy: "classifier" });
-      return { kind: "langy", question: input.text, decidedBy: "classifier" };
-    }
+async function listKnownSignals({
+  deps,
+  input,
+}: {
+  deps: SearchRouterDeps;
+  input: RouteSearchInput;
+}): Promise<KnownProjectSignals> {
+  try {
+    return await deps.listKnownSignals({
+      projectId: input.projectId,
+      timeRange: input.timeRange,
+    });
+  } catch (error) {
+    logger.warn(
+      { projectId: input.projectId, err: error },
+      "Known evaluators and events could not be listed; routing without them",
+    );
+    return { evaluators: [], events: [] };
+  }
+}
 
-    let decision: SearchRouteDecision;
-    try {
-      decision = await deps.routeWithModel({
-        projectId: input.projectId,
-        text: sentence,
-        timeRange: input.timeRange,
-        target,
-        known,
-        langyAvailable,
-      });
-    } catch (error) {
-      const modelUnavailable = isModelUnavailable(error);
-      if (!modelUnavailable) {
-        logger.warn(
-          { projectId: input.projectId, err: error },
-          "Model could not route the search; searching the phrase instead",
-        );
-      }
-      return freeText({
-        sentence,
-        explicitQuery,
-        decidedBy: "fallback",
-        modelUnavailable,
-        fellBackFrom: "routing",
-      });
-    }
-
-    switch (decision.route) {
-      case "filter":
-        return finishFilter({
-          generated: decision.query,
-          sentence,
-          explicitQuery,
-          decidedBy: "model",
-        });
-      case "instant_eval":
-        deps.recordDecision({ route: "instant_eval", decidedBy: "model" });
-        return {
-          kind: "instant_eval",
-          question: {
-            instructions: decision.instructions,
-            criteria: decision.criteria,
-          },
-          target,
-          otherQuery: explicitQuery,
-          fallbackQuery: phraseSearch({ sentence, explicitQuery }),
-          decidedBy: "model",
-        };
-      case "langy":
-        deps.recordDecision({ route: "langy", decidedBy: "model" });
-        return { kind: "langy", question: input.text, decidedBy: "model" };
-      case "free_text":
-        return freeText({ sentence, explicitQuery, decidedBy: "model" });
-    }
+async function routeSearch({
+  deps,
+  input,
+}: {
+  deps: SearchRouterDeps;
+  input: RouteSearchInput;
+}): Promise<RouteSearchResult> {
+  const { sentence, explicitQuery } = splitBareWords(input.text);
+  if (!sentence) {
+    deps.recordDecision({ route: "filter", decidedBy: "fallback" });
+    return { kind: "filter", query: explicitQuery, decidedBy: "fallback" };
+  }
+  const context: RouteContext = {
+    deps,
+    input,
+    sentence,
+    explicitQuery,
+    target: input.lensId === CONVERSATIONS_LENS_ID ? "threads" : "traces",
+    known: await listKnownSignals({ deps, input }),
+    langyAvailable: input.langyAvailable ?? true,
   };
+  const classified = await classify(context);
+  if (classified) return applyClassified({ context, classified });
+  return routeWithModel(context);
+}
 
-  return { route };
+export function createSearchRouter(deps: SearchRouterDeps): {
+  route: (input: RouteSearchInput) => Promise<RouteSearchResult>;
+} {
+  return { route: (input) => routeSearch({ deps, input }) };
 }

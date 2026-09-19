@@ -22,47 +22,26 @@ interface UseSubmitSearchOptions {
   onModelUnavailable: () => void;
 }
 
-/**
- * What Enter does with the text in the search bar.
- *
- * A text without bare words is a filter and is applied as typed. A text with
- * bare words is a sentence and goes to `tracesV2.routeSearch`, which answers
- * with one of four routes; each is applied here so the result is visible on
- * screen. A failure on the way is never an error state in the bar: the
- * sentence is searched as one quoted phrase instead.
- *
- * Spec: specs/traces-v2/search.feature ("Enter routes a sentence").
- */
-export function useSubmitSearch({
-  langyAvailable,
-  isSamplePreview,
+interface RoutedSubmit {
+  result: RouteSearchResult;
+  text: string;
+  projectId: string;
+  timeRange: { from: number; to: number };
+}
+
+/** Puts one router answer on screen: chips, a phrase, a question, or a run. */
+function useApplyRoute({
   onLangy,
   onInstantEval,
   onModelUnavailable,
-}: UseSubmitSearchOptions): {
-  submitSearch: (text: string) => void;
-  isRouting: boolean;
-} {
-  const { project } = useOrganizationTeamProject();
+}: Pick<
+  UseSubmitSearchOptions,
+  "onLangy" | "onInstantEval" | "onModelUnavailable"
+>): (submit: RoutedSubmit) => void {
   const applyQueryText = useFilterStore((s) => s.applyQueryText);
   const recordAiTranslation = useFilterStore((s) => s.recordAiTranslation);
-  const routeSearch = api.tracesV2.routeSearch.useMutation();
-  // A second Enter before the first answer arrives supersedes it: only the
-  // latest submit may touch the store.
-  const submitSeqRef = useRef(0);
-
-  const applyRoute = useCallback(
-    ({
-      result,
-      text,
-      projectId,
-      timeRange,
-    }: {
-      result: RouteSearchResult;
-      text: string;
-      projectId: string;
-      timeRange: { from: number; to: number };
-    }) => {
+  return useCallback(
+    ({ result, text, projectId, timeRange }: RoutedSubmit) => {
       switch (result.kind) {
         case "filter":
           applyQueryText(result.query);
@@ -99,6 +78,40 @@ export function useSubmitSearch({
       onModelUnavailable,
     ],
   );
+}
+
+/**
+ * What Enter does with the text in the search bar.
+ *
+ * A text without bare words is a filter and is applied as typed. A text with
+ * bare words is a sentence and goes to `tracesV2.routeSearch`, which answers
+ * with one of four routes; each is applied here so the result is visible on
+ * screen. A failure on the way is never an error state in the bar: the
+ * sentence is searched as one quoted phrase instead.
+ *
+ * Spec: specs/traces-v2/search.feature ("Enter routes a sentence").
+ */
+export function useSubmitSearch({
+  langyAvailable,
+  isSamplePreview,
+  onLangy,
+  onInstantEval,
+  onModelUnavailable,
+}: UseSubmitSearchOptions): {
+  submitSearch: (text: string) => void;
+  isRouting: boolean;
+} {
+  const { project } = useOrganizationTeamProject();
+  const applyQueryText = useFilterStore((s) => s.applyQueryText);
+  const routeSearch = api.tracesV2.routeSearch.useMutation();
+  // A second Enter before the first answer arrives supersedes it: only the
+  // latest submit may touch the store.
+  const submitSeqRef = useRef(0);
+  const applyRoute = useApplyRoute({
+    onLangy,
+    onInstantEval,
+    onModelUnavailable,
+  });
 
   const submitSearch = useCallback(
     (text: string) => {

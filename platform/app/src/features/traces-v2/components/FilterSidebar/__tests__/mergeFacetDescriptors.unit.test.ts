@@ -10,29 +10,31 @@ import { describe, expect, it } from "vitest";
 import type { DiscoverDescriptors } from "../../../hooks/discoverCache";
 import { mergeFacetDescriptors } from "../mergeFacetDescriptors";
 
-const statusUnfiltered = {
+type Descriptor = DiscoverDescriptors[number];
+
+const statusUnfiltered: Descriptor = {
   kind: "categorical",
   key: "status",
   label: "Status",
   group: "trace",
   topValues: [{ value: "error", count: 33 }],
   totalDistinct: 1,
-} as const;
-const statusFiltered = {
+};
+const statusFiltered: Descriptor = {
   ...statusUnfiltered,
   topValues: [{ value: "error", count: 4 }],
-} as const;
-const metadataKeys = {
+};
+const metadataKeys: Descriptor = {
   kind: "dynamic_keys",
   key: "metadataKeys",
   label: "Trace attribute keys",
   group: "metadata",
   topKeys: [{ value: "metadata.env", count: 10 }],
   totalDistinct: 1,
-} as const;
+};
 
-const discovered = [statusUnfiltered, metadataKeys] as DiscoverDescriptors;
-const filtered = [statusFiltered] as DiscoverDescriptors;
+const discovered: DiscoverDescriptors = [statusUnfiltered, metadataKeys];
+const filtered: DiscoverDescriptors = [statusFiltered];
 
 describe("mergeFacetDescriptors", () => {
   describe("given no filtered payload has landed yet", () => {
