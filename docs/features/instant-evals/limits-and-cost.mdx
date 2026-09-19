@@ -28,7 +28,9 @@ Judging 1,000 conversations takes about nine seconds, and 10,000 about a minute.
 
 ## What a run costs
 
-The rate is 0.0546 USD per million input tokens the judge reads, and output is free. The input is each row's text plus your questions, so you pay more for a long conversation than for a short one, and about the same for ten questions as for one, because the judge answers them all in one request. The run in the [overview](/features/instant-evals/overview) judged 10,000 conversations, read 11.4 million tokens and cost 0.62 USD.
+The rate is 0.0546 USD per million input tokens the judge reads, and output is free. You pay for each row's text plus your questions, in one judge request per row: more for a long conversation than for a short one, and about the same for ten questions as for one.
+
+For example, the first run on the [overview](/features/instant-evals/overview) judged 100 conversations, read 107,000 tokens and cost 0.0058 USD, so 10,000 conversations of the same size come to about 0.58 USD.
 
 ## Reading the cost before you start
 
@@ -45,7 +47,7 @@ langwatch instant-eval estimate "the customer sounds annoyed" --target threads -
   Nothing was judged and nothing was charged.
 ```
 
-The estimate counts the rows exactly, measures the text of fifty rows spread across the whole selection, and multiplies. The estimate above said 0.65 USD for a run that came to 0.62. When a few enormous rows sit among small ones, a sample of fifty can miss them, so check the `Tokens:` line of the finished run for what it actually read.
+The estimate counts the rows exactly, measures the text of fifty rows spread across the whole selection, and multiplies. When a few enormous rows sit among small ones, a sample of fifty can miss them, so check the `Tokens:` line of the finished run for what it actually read.
 
 `run --estimate` does the same and exits. A plain `run` over more than 1,000 rows prints the estimate before it starts.
 
