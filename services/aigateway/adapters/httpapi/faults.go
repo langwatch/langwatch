@@ -95,7 +95,14 @@ func faultForCode(code herr.Code) Fault {
 		return FaultCustomer
 	case domain.ErrProviderError, domain.ErrProviderTimeout,
 		domain.ErrProviderConnectionFailed,
-		domain.ErrChainExhausted, domain.ErrCircuitOpen:
+		domain.ErrChainExhausted, domain.ErrCircuitOpen,
+		// The provider row is missing a field only its owner can fill in, so
+		// it is theirs by the sense this attribution means — whose action
+		// fixes it. It is warn rather than info, and off the client-reject
+		// counter, because it is a slot that cannot serve any request rather
+		// than a caller being turned away: the same signal a provider outage
+		// gives, from a cause an operator can act on.
+		domain.ErrProviderMisconfigured:
 		return FaultProvider
 	case domain.ErrRequestAbandoned:
 		// Nobody's fault, and nothing to page for: the caller left. Info level,

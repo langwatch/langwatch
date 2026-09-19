@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"unicode/utf8"
 
@@ -244,10 +245,40 @@ func bfErrorCode(berr *bfschemas.BifrostError) herr.Code {
 		return code
 	}
 
-	// 4. Nothing identified it. Deliberately no status arm here: errFromBifrost
-	//    forwards every provider-answered error before classification, so an
-	//    error carrying a provider status never reaches this function, and a
-	//    status switch would be dead code that reads like a safety net.
+	// 4. A provider-answered error is forwarded verbatim by errFromBifrost
+	//    before classification runs, so a positive status reaches this function
+	//    only on a direct call — the code->status contract of AC19, exercised by
+	//    TestClassifyBifrostError_StatusBaseline — or when Bifrost synthesized
+	//    the status, and the synthesized ones (504/timeout, 499/canceled) are
+	//    already resolved by their type above.
+	if status := bfStatus(berr); status > 0 {
+		switch status {
+		case http.StatusGatewayTimeout:
+			return domain.ErrProviderTimeout
+		case http.StatusTooManyRequests:
+			return domain.ErrRateLimited
+		default:
+			return domain.ErrProviderError
+		}
+	}
+
+	// 5. A status-less error carrying neither a wrapped Go error nor a vendor
+	//    code is a request Bifrost rejected before dialing ("deployments not
+	//    set", "endpoint not set", core's own request-validation literals):
+	//    permanent and operator-fixable, so it is non-retryable and stops the
+	//    credential fallback chain. The exception is the transient faults core
+	//    raises in that same bare shape (an empty upstream body, a closing or
+	//    full provider queue), which stay retryable. Ported from the branch's
+	//    statuslessBifrostCode; the message-rule step above still wins for the
+	//    shapes it names, so a bare "no keys found" stays provider_config_invalid.
+	if berr.Error != nil && berr.Error.Error == nil && berr.Error.Code == nil {
+		if _, transient := bfTransientStatuslessMessages[berr.Error.Message]; transient {
+			return domain.ErrProviderError
+		}
+		return domain.ErrProviderMisconfigured
+	}
+
+	// 6. Nothing identified it.
 	return domain.ErrProviderError
 }
 
@@ -275,13 +306,13 @@ var bfMessageRules = []bfMessageRule{
 	{needle: "error getting token", code: domain.ErrProviderCredentialInvalid},
 	{needle: "vertex key config is not set", code: domain.ErrProviderCredentialInvalid},
 
-	// The provider slot is configured in a way that cannot serve THIS request:
-	// the key declares no such model, or a deployment map is missing.
+	// The provider slot declares no key that serves THIS request's model.
 	//   bifrost.go  "no keys found that support model[/deployment]: %s"
-	//   azure.go    NewConfigurationError("deployments not set")
+	// "deployments not set" / "endpoint not set" are deliberately NOT here:
+	// they are a provider row Bifrost rejects before dialing, classified by
+	// shape as provider_misconfigured in bfErrorCode (permanent, non-retryable),
+	// not by substring. Spec: azure-deployment-map-control-plane-path.feature §G.
 	{needle: "no keys found", code: domain.ErrProviderConfigInvalid},
-	{needle: "deployments not set", code: domain.ErrProviderConfigInvalid},
-	{needle: "endpoint not set", code: domain.ErrProviderConfigInvalid},
 
 	// Transport never reached the provider (DNS, connection refused).
 	//   schemas.ErrProviderNetworkError
@@ -331,6 +362,29 @@ const (
 	bfResponseDecompressMessage    = "failed to decompress provider's response"
 )
 
+// bfMsgProviderShuttingDown and bfMsgRequestDroppedQueueFull are core's own
+// literals for the transient faults it raises in the bare Message-only shape (a
+// closing or full provider queue). Named here so the shape classifier and the
+// vendor-drift check in bifrost_config_error_classification_test.go read the
+// same strings rather than two independently typed copies.
+const (
+	bfMsgProviderShuttingDown    = "provider is shutting down"
+	bfMsgRequestDroppedQueueFull = "request dropped: queue is full"
+)
+
+// bfTransientStatuslessMessages is the set the bare-shape arm of bfErrorCode
+// consults to exempt a Message-only error from the permanent (misconfigured)
+// bucket: each is a transient fault core raises in that same shape, so it must
+// stay retryable and keep the credential fallback chain alive. Excluding
+// ErrProviderResponseEmpty by the vendor's EXPORTED symbol means a rewording
+// moves this code with it or fails the build; the two vendor-internal literals
+// cannot do that, and are covered by the drift test in the classification file.
+var bfTransientStatuslessMessages = map[string]struct{}{
+	bfschemas.ErrProviderResponseEmpty: {},
+	bfMsgProviderShuttingDown:          {},
+	bfMsgRequestDroppedQueueFull:       {},
+}
+
 func bfCodeForMessage(msg string) (herr.Code, bool) {
 	if msg == "" {
 		return "", false
@@ -369,6 +423,14 @@ func bfCustomerMessage(code herr.Code, berr *bfschemas.BifrostError) string {
 			return fmt.Sprintf("This model provider is not configured to serve %q. Check the models and deployments configured for it in your model provider settings.", model)
 		}
 		return "This model provider is not configured to serve the requested model. Check the models and deployments configured for it in your model provider settings."
+	case domain.ErrProviderMisconfigured:
+		// AC20: the provider row was rejected before any call, and the vendor's
+		// own message ("deployments not set", "endpoint not set") is the
+		// operator's only clue to which field is unset. Unlike the codes above
+		// it is surfaced verbatim, because it names a field in the customer's own
+		// provider settings rather than anything internal — the bare shape that
+		// lands here carries no wrapped Go error or provider body to scrub.
+		return bfErrorMsg(berr)
 	case domain.ErrInternal:
 		return "The gateway could not build the upstream request."
 	case domain.ErrRequestAbandoned:

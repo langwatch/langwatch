@@ -981,7 +981,7 @@ func rawResponseBytesResp(resp *bfschemas.BifrostResponsesResponse) ([]byte, boo
 	return extractRawResponseBytes(resp.ExtraFields.RawResponse)
 }
 
-// extractRawResponseBytes normalises the various concrete types
+// extractRawResponseBytes normalizes the various concrete types
 // Bifrost may stash into ExtraFields.RawResponse (typed `interface{}`)
 // into a []byte suitable for writing to the HTTP response.
 //
@@ -1405,6 +1405,8 @@ func credentialToBifrostKey(cred domain.Credential, provider bfschemas.ModelProv
 		k.BedrockKeyConfig = cfg
 
 	case bfschemas.Vertex:
+		// bifrost v1.5 moved model->deployment mapping onto Key.Aliases (see Azure).
+		k.Aliases = bfschemas.KeyAliases(cred.DeploymentMap)
 		k.VertexKeyConfig = &bfschemas.VertexKeyConfig{
 			ProjectID:       envVar(cred.Extra["project_id"]),
 			ProjectNumber:   envVar(cred.Extra["project_number"]),
