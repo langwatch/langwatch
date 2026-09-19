@@ -5,6 +5,8 @@ import { serverModules as processModules } from "@langwatch/installed-server-mod
 import { processMetrics, processTelemetry } from "@langwatch/observability/node";
 import { processConfig, Server, type ProcessServer } from "@langwatch/process-server";
 
+import { apiHealthRoute } from "./api-health-route.ts";
+
 /**
  * The local launcher hosts both halves in one Node process: only the owner may
  * take signals or exit, and only one half may set the telemetry SDK up.
@@ -29,6 +31,7 @@ export async function startApi(options: ApiStartOptions = {}): Promise<ProcessSe
           .withMetrics(processMetrics("langwatch-api"))
       : preamble
   ).start();
+  server.with(apiHealthRoute);
 
   const app = await server
     .composeProcess("api")
