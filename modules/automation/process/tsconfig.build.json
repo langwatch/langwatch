@@ -6,7 +6,7 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
     "paths": {
       "@langwatch/automation-process": ["./src/index.ts"]
-    },
+    }
   },
   "files": ["./src/index.ts", "./src/testing.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
@@ -61,6 +61,9 @@
     },
     {
       "path": "../../../packages/ksuid/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/mail/tsconfig.declarations.json"
     },
     {
       "path": "../../monitor/contract/tsconfig.build.json"

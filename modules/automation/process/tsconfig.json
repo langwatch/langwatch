@@ -7,8 +7,7 @@
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "lib": ["es2023"],
     "noUncheckedIndexedAccess": true,
-    "verbatimModuleSyntax": true,
-
+    "verbatimModuleSyntax": true
   },
   "include": ["src/**/*.ts"],
   "references": [
@@ -53,6 +52,9 @@
     },
     {
       "path": "../../../packages/ksuid/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/mail/tsconfig.declarations.json"
     },
     {
       "path": "../../monitor/contract/tsconfig.build.json"
