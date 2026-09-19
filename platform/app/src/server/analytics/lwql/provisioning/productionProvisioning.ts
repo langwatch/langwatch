@@ -168,14 +168,22 @@ export function productionClickHouseObjectStatements({
 export function productionPostgresApprovedViewStatements({
   schema = LWQL_POSTGRES_SCHEMA,
   views = LWQL_VIEW_CATALOG,
+  readerRole,
 }: {
   /** From {@link lwqlPostgresSchemaFromDatabaseUrl} in a real deploy. */
   schema?: string;
   views?: readonly LangWatchQLViewDefinition[];
+  /**
+   * Forwarded to {@link lwqlPostgresApprovedViewStatements} — the reader role
+   * whichever mode this boot converges the role under (see
+   * `LWQL_POSTGRES_READER_ROLE` and `src/tasks/provisionLwql.ts`).
+   */
+  readerRole?: string;
 } = {}): string[] {
   return lwqlPostgresApprovedViewStatements({
     schema,
     views,
+    readerRole,
   });
 }
 

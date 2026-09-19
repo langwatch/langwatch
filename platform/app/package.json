@@ -79,6 +79,7 @@
 		"licenses": "pnpx license-checker --summary && pnpx license-checker --json > licenses.json && echo \"Full licenses report saved to licenses.json\"",
 		"generate:langy-skills": "tsx scripts/generate-langy-skills.ts",
 		"generate:lwql-columns-manifest": "tsx scripts/generate-lwql-columns-manifest.ts",
+		"generate:lwql-prisma-manifest": "tsx scripts/generate-lwql-prisma-manifest.ts",
 		"generate:setup-skill-bodies": "tsx scripts/generate-setup-skill-bodies.ts",
 		"generate:vega-validator": "tsx scripts/generate-vega-lite-validator.ts"
 	},

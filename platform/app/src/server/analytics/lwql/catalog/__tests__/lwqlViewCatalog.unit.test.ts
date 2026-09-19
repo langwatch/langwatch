@@ -311,6 +311,43 @@ describe("given the LangWatchQL view catalog", () => {
       expect(lwqlViewByName("trace_summaries")).toBeUndefined();
     });
 
+    /**
+     * The validator gates a column by its lowercased bare name across the whole
+     * catalog (see `validation/validate.ts` — `lwqlGatedColumns` keys on the
+     * name, not the view), so two views cannot disagree about a name: gating
+     * `Output` on one view withholds `Output` on every view that exposes it. A
+     * column whose gate differs between views is therefore either leaking (open
+     * where it should be gated) or unreadable (gated where it should be open) on
+     * one of them. This keeps the two halves of the catalog — ClickHouse, where a
+     * label is a `LowCardinality(String)`, and Postgres, where an enum or a
+     * label-named `String` must be recognised explicitly — from drifting apart.
+     */
+    it("gates a column name identically on every view that exposes it", () => {
+      const gatesByName = new Map<string, Map<string, string[]>>();
+      for (const view of LWQL_VIEW_CATALOG) {
+        for (const column of view.columns) {
+          const key = column.name.toLowerCase();
+          const gates = [...lwqlColumnGates({ view, column })].sort();
+          const perView = gatesByName.get(key) ?? new Map<string, string[]>();
+          perView.set(view.name, gates);
+          gatesByName.set(key, perView);
+        }
+      }
+      const conflicts: string[] = [];
+      for (const [name, perView] of gatesByName) {
+        const distinct = new Set(
+          [...perView.values()].map((gates) => gates.join("+") || "-"),
+        );
+        if (distinct.size > 1) {
+          const detail = [...perView]
+            .map(([view, gates]) => `${view}[${gates.join("+") || "-"}]`)
+            .join(", ");
+          conflicts.push(`${name}: ${detail}`);
+        }
+      }
+      expect(conflicts, conflicts.join("\n")).toEqual([]);
+    });
+
     it("qualifies allowed tables with the LangWatchQL database, never the physical one", () => {
       const allowed = lwqlAllowedTables({
         database: "analytics",
