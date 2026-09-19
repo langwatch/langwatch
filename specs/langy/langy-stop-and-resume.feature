@@ -57,6 +57,24 @@ Feature: Langy lets me stop a turn for real, continue where it left off, and rej
     Then the empty reply row says "Interrupted"
     And it does not say "No content", because the emptiness was my own doing
 
+  # The record keeps every reply, so a turn that ended with nothing to show and
+  # was then run again leaves an empty reply above the one that answered. The
+  # empty row only speaks for the end of the conversation: above a later
+  # message it would read as something missing from a reply that is right there.
+  @integration
+  Scenario: An empty reply with messages after it draws nothing
+    Given a guided conversation whose tour card is followed by a settled reply with nothing visible
+    And Langy's opener and its code access card come after that reply
+    When I open the conversation
+    Then nothing is drawn between the tour card and the opener
+    And no "No content" line shows anywhere in the conversation
+
+  @integration
+  Scenario: An empty reply at the end of the conversation still says so
+    Given the last message of a conversation is a settled reply with nothing visible
+    When I open the conversation
+    Then the empty reply row says "No content"
+
   # A reply with a card or a paragraph in it used to look exactly like a finished
   # one, so the reader had to remember pressing Stop to read the answer correctly.
   @unit

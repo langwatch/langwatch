@@ -149,6 +149,13 @@ Feature: Guided onboarding tour
     And the cursor stays where it was
 
   @unit
+  Scenario: the caption carries the LangWatch logo in the colour mode's own version
+    Given the llmops tour is on step 1
+    Then the caption shows the LangWatch logo
+    And on light it is the navigation's mark, white faces and navy lines
+    And on dark it is the lines alone in off-white, as the dark theme wordmark draws it
+
+  @unit
   Scenario: the step counter doubles as Back
     Given the llmops tour is on step 2
     When the user clicks the "2 of 4" counter

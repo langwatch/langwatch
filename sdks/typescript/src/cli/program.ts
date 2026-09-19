@@ -35,6 +35,17 @@ import {
 
 declare const __CLI_VERSION__: string;
 
+/** The `langwatch <tool>` commands that run a coding tool in its own terminal. */
+export const TOOL_WRAPPER_COMMANDS = [
+  "claude",
+  "codex",
+  "copilot",
+  "code",
+  "cursor",
+  "gemini",
+  "opencode",
+] as const;
+
 /**
  * Help for the repeatable `--param key=value` flag the run commands share.
  * Written here rather than imported so the command tree keeps its own boot
@@ -652,6 +663,15 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+
+  // A wrapper renders no result of its own, in any format: it hands the
+  // terminal to the tool it runs. Registered as such so the auto-detected
+  // agent mode (a coding agent sets CLAUDECODE in its children) prints no
+  // note about a table under a wrapper started from inside one.
+  for (const tool of TOOL_WRAPPER_COMMANDS) {
+    const wrapper = program.commands.find((command) => command.name() === tool);
+    if (wrapper) rendersOwnResult(wrapper);
+  }
 
   // 'after' (not 'afterAll') so the section only renders on `langwatch --help`,
   // not on every `langwatch <subcommand> --help` invocation.

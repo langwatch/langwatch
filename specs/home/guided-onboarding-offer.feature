@@ -15,6 +15,7 @@ Feature: Guided onboarding offer on the home pages
   Background:
     Given the organization is in the guided onboarding variant
     And the project has no traces yet
+    And the gateway, governance and personal homes have nothing in them yet
 
   # ============================================================================
   # Where and when the offer shows
@@ -79,8 +80,47 @@ Feature: Guided onboarding offer on the home pages
     Then there is no pill
 
   @unit
+  Scenario: a gateway with virtual keys is not offered the guided onboarding
+    Given the organization has a virtual key, active or revoked
+    When the gateway home renders
+    Then there is no pill
+
+  @unit
+  Scenario: a governance home with an ingestion source is not offered the guided onboarding
+    Given the organization has an ingestion source connected
+    When the governance home renders
+    Then there is no pill
+
+  @unit
+  Scenario: a personal home with a personal key or usage is not offered the guided onboarding
+    Given the user has a personal key, or usage this month
+    When the personal home renders
+    Then there is no pill
+
+  @unit
+  Scenario: the offer waits until it knows whether the space is in use
+    Given the gateway's virtual keys have not loaded yet
+    When the gateway home renders
+    Then there is no pill
+
+  # A failed refetch keeps the last list in the cache, and that list may be
+  # the empty one from before the space was used.
+  @unit
+  Scenario: a read that failed is not read as an empty space
+    Given the gateway's virtual keys failed to load over an empty list still in the cache
+    When the gateway home renders
+    Then there is no pill
+    And the same holds for governance's sources and for the personal home's keys and usage
+
+  @unit
+  Scenario: an organization outside the guided variant is never offered it on the gateway, governance or personal pages
+    Given the organization went through the classic onboarding, or predates the experiment
+    When the gateway, governance and personal homes render
+    Then there is no pill on any of them
+
+  @unit
   Scenario: the classic variant never shows the offer
-    Given the organization is not in the guided onboarding variant
+    Given the organization is not in the guided onboarding variant, or predates the experiment
     When the project home renders
     Then there is no pill
 

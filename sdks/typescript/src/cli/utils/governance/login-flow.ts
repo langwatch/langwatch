@@ -31,7 +31,12 @@ import {
 	getCliBootstrap,
 	listIngestionKeys,
 } from "./cli-api";
-import { type GovernanceConfig, loadConfig, saveConfig } from "./config";
+import {
+	type GovernanceConfig,
+	displayConfigPath,
+	loadConfig,
+	saveConfig,
+} from "./config";
 import {
 	type CredentialType,
 	DeviceFlowError,
@@ -42,7 +47,10 @@ import {
 } from "./device-flow";
 import { rememberProjectName } from "../identityNotice";
 import { formatLoginCeremony } from "./login-ceremony";
-import { refreshTelemetryWiringForLogin } from "./telemetry-refresh";
+import {
+	keptWiringLines,
+	refreshTelemetryWiringForLogin,
+} from "./telemetry-refresh";
 
 export interface RunUnifiedLoginOptions {
 	/** Credential type to request. Defaults to 'device_session' for back-compat. */
@@ -51,6 +59,13 @@ export interface RunUnifiedLoginOptions {
 	browser?: string;
 	/** Pre-loaded config to mutate; defaults to `loadConfig()`. */
 	cfg?: GovernanceConfig;
+	/**
+	 * The login runs as a step of another command, which words the sign-in
+	 * itself. Prints the address to open, the code and who signed in, plus any
+	 * change to the machine's tool wiring. The header, the AI tools, the model
+	 * providers, the budgets and the dashboard line are left to `langwatch login`.
+	 */
+	isQuiet?: boolean;
 }
 
 export type RunDeviceFlowLoginOptions = Omit<RunUnifiedLoginOptions, "kind">;
@@ -67,16 +82,19 @@ export async function runUnifiedLoginFlow(
 	const kind: CredentialType = opts.kind ?? "device_session";
 	const cfg = opts.cfg ?? loadConfig();
 	const baseUrl = cfg.control_plane_url;
+	const isQuiet = opts.isQuiet === true;
 
-	console.log(chalk.blue("🔐 LangWatch login"));
-	console.log(chalk.gray(`Control plane: ${baseUrl}`));
-	console.log(
-		chalk.gray(
-			kind === "project_api_key"
-				? "Mode: project SDK API key (will write .env)"
-				: "Mode: device session (will write ~/.langwatch/config.json)",
-		),
-	);
+	if (!isQuiet) {
+		console.log(chalk.blue("🔐 LangWatch login"));
+		console.log(chalk.gray(`Control plane: ${baseUrl}`));
+		console.log(
+			chalk.gray(
+				kind === "project_api_key"
+					? "Mode: project SDK API key (will write .env)"
+					: `Mode: device session (will write ${displayConfigPath()})`,
+			),
+		);
+	}
 
 	const dc = await startDeviceCode({ baseUrl }, { credentialType: kind });
 	const verifyURL =
@@ -203,9 +221,17 @@ export async function runUnifiedLoginFlow(
 				for (const warning of refresh.warnings ?? []) {
 					console.warn(chalk.yellow(`  ${warning}`));
 				}
+				if (refresh.kept) {
+					console.log();
+					for (const line of keptWiringLines(refresh.kept)) {
+						console.log(chalk.gray(`  ${line}`));
+					}
+				}
 			} catch {
 				// Wiring refresh is best-effort; the session itself is already saved.
 			}
+
+			if (isQuiet) return cfg;
 
 			// Per-budget epilogue data. Every budget that binds this key,
 			// labelled with its scope, so the ceremony never presents the
