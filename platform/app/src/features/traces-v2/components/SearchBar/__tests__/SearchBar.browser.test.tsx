@@ -17,6 +17,19 @@ vi.mock("../../../hooks/useTraceFacets", () => ({
   useTraceFacets: () => ({ data: [], isLoading: false }),
 }));
 
+// Enter on a sentence calls `tracesV2.routeSearch`; these tests only type
+// `field:value` queries, which are applied without a call, so the mutation
+// hook is stubbed out rather than mounting a tRPC provider.
+vi.mock("~/utils/api", () => ({
+  api: {
+    tracesV2: {
+      routeSearch: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+    },
+  },
+}));
+
 // SearchBar mounts TokenValuePicker, which now calls useFacetSearch (a tRPC
 // query) at the top level. This suite renders SearchBar without a tRPC
 // provider, so stub the hook out — server search has its own dedicated suite.
@@ -73,7 +86,8 @@ afterEach(() => {
 });
 
 describe("SearchBar wiring in real Chromium", () => {
-  describe("when the user types into the search bar", () => {
+  describe("when the user types into the search bar and presses Enter", () => {
+    /** @scenario "Pressing Enter applies the query" */
     it("commits the parsed query to the filterStore", async () => {
       renderSearchBar();
       // Cold mount → placeholder. Click activates the real editor.
@@ -84,6 +98,10 @@ describe("SearchBar wiring in real Chromium", () => {
       const editor = getEditor();
       await userEvent.click(editor);
       await userEvent.keyboard("status:error");
+      // Typing alone commits nothing.
+      expect(useFilterStore.getState().queryText).toBe("");
+      // The first Enter accepts the highlighted value, the second submits.
+      await userEvent.keyboard("[Enter][Enter]");
 
       await waitFor(() => {
         expect(useFilterStore.getState().queryText).toBe("status:error");
@@ -100,7 +118,7 @@ describe("SearchBar wiring in real Chromium", () => {
       );
       const editor = getEditor();
       await userEvent.click(editor);
-      await userEvent.keyboard('status:"unclosed');
+      await userEvent.keyboard('status:"unclosed[Enter]');
 
       await waitFor(() => {
         expect(useFilterStore.getState().parseError).toBeTruthy();
@@ -121,7 +139,7 @@ describe("SearchBar wiring in real Chromium", () => {
       );
       const editor = getEditor();
       await userEvent.click(editor);
-      await userEvent.keyboard("status:error");
+      await userEvent.keyboard("status:error[Enter][Enter]");
       await waitFor(() => {
         expect(useFilterStore.getState().queryText).toBe("status:error");
       });
@@ -153,7 +171,7 @@ describe("SearchBar wiring in real Chromium", () => {
       );
       const editor = getEditor();
       await userEvent.click(editor);
-      await userEvent.keyboard("status:error");
+      await userEvent.keyboard("status:error[Enter][Enter]");
 
       await waitFor(() => {
         expect(useFilterStore.getState().queryText).toBe("status:error");

@@ -20,7 +20,7 @@ import {
 import { FilterHighlight } from "./filterHighlight";
 import { getSuggestionState, type SuggestionState } from "./getSuggestionState";
 import { handleKey } from "./handleKey";
-import { searchBarPlaceholder } from "./PlaceholderEditor";
+import { SEARCH_BAR_PLACEHOLDER } from "./PlaceholderEditor";
 import {
   buildSuggestionUI,
   CLOSED_SUGGESTION,
@@ -39,12 +39,6 @@ const TRIGGER_PRECEDERS = new Set([" ", "\t", "\n", "("]);
 // the bar grow tall enough to push the page around even with the CSS
 // height cap as a safety net.
 const PASTE_MAX_CHARS = 2000;
-
-// How long to wait after the last keystroke before pushing the typed text
-// into the global filter store (which re-renders the sidebar + chips and
-// arms the network debounce). Keeps fluent typing entirely local to the
-// editor; the rest of the page catches up once the user pauses.
-const COMMIT_SETTLE_MS = 250;
 
 /**
  * Remove the chars at `[start, end)` from `text` and clean up any operator
@@ -151,7 +145,19 @@ export type ValueResolver = (
 
 interface UseFilterEditorParams {
   queryText: string;
+  /**
+   * Applies a query the editor produced by a deliberate edit of an existing
+   * chip: the X widget, the AND/OR swap. Those search at once, like a facet
+   * click; typing never reaches this.
+   */
   applyQueryText: (text: string) => void;
+  /**
+   * Enter with no highlighted suggestion. The only path a typed text takes
+   * out of the editor: the caller decides whether it is a filter to apply
+   * or a sentence to route. Blur is not a submit; the text stays where it
+   * was typed, unsearched, until Enter.
+   */
+  submitQueryText: (text: string) => void;
   /**
    * Notifies the parent when the editor's empty/non-empty state flips. Wired
    * through directly instead of via a return value + parent effect so the
@@ -179,21 +185,6 @@ interface UseFilterEditorParams {
     currentValue: string;
     location: { start: number; end: number };
   }) => void;
-  /**
-   * Fired when the user presses ⌘+⏎ / Ctrl+⏎ while typing. The caller
-   * routes the captured text to the ask affordance — asked to Langy
-   * outright, or auto-submitted into AI mode — so a typed free-text query
-   * becomes an ask in one keystroke instead of requiring a separate click
-   * on the ask button.
-   */
-  onAiShortcut?: (currentText: string) => void;
-  /**
-   * Placeholder shown while the editor is empty. Defaults to the Ask AI
-   * wording; the SearchBar passes the Ask Langy variant when Langy owns
-   * the ask affordance. Read through a ref by the Placeholder extension,
-   * so the current value applies without re-initialising the editor.
-   */
-  placeholder?: string;
 }
 
 interface FilterEditorApi {
@@ -209,10 +200,9 @@ interface FilterEditorApi {
   cursorAnchorX: number;
   /**
    * Pixel offset to the right edge of the rendered document content.
-   * Independent of the cursor — drives the inline "Press ⏎ to search,
-   * ⌘+⏎ to Ask AI" hint so the hint stays pinned to the end of the
-   * typed text even when the caret is mid-line or `⌘+A` selected
-   * everything.
+   * Independent of the cursor — drives the inline "Enter to search" hint
+   * so the hint stays pinned to the end of the typed text even when the
+   * caret is mid-line or `⌘+A` selected everything.
    */
   endAnchorX: number;
   /** Whether the editor currently holds focus. */
@@ -222,11 +212,10 @@ interface FilterEditorApi {
 export function useFilterEditor({
   queryText,
   applyQueryText,
+  submitQueryText,
   onHasContentChange,
   valueResolver,
   onTokenClick,
-  onAiShortcut,
-  placeholder,
 }: UseFilterEditorParams): FilterEditorApi {
   const [suggestion, setSuggestion] =
     useState<SuggestionUIState>(CLOSED_SUGGESTION);
@@ -246,58 +235,18 @@ export function useFilterEditor({
   const isProgrammaticRef = useRef(false);
   const triggerPosRef = useRef<number | null>(null);
   const applyQueryTextRef = useLatestRef(applyQueryText);
+  const submitQueryTextRef = useLatestRef(submitQueryText);
   const onHasContentChangeRef = useLatestRef(onHasContentChange);
   const suggestionRef = useLatestRef(suggestion);
   const dismissedRef = useLatestRef(dropdownDismissed);
   const valueResolverRef = useLatestRef(valueResolver);
-  const onAiShortcutRef = useLatestRef(onAiShortcut);
-  // Read by the Placeholder extension through a function, so the label keeps
-  // up with the caller (Ask AI ↔ Ask Langy) without re-initialising TipTap.
-  const placeholderRef = useLatestRef(
-    placeholder ?? searchBarPlaceholder("Ask AI"),
-  );
   // Tracks last reported hasContent so we only fire onHasContentChange when
   // it actually flips (not on every keystroke that keeps the state).
   const lastHasContentRef = useRef<boolean>(queryText.length > 0);
-  // Committing the typed text into the GLOBAL filter store (`applyQueryText`)
-  // re-parses + re-serialises AND re-renders every store subscriber — the
-  // whole facet sidebar, the query-breakdown chips, the page title, the URL
-  // sync. Doing that on every keystroke is what made typing lag. So we keep
-  // the ProseMirror editor as the source of truth while typing and DEBOUNCE
-  // the global commit to a short settle window: during fluent typing the
-  // store (and therefore the sidebar + network) stays put; it catches up once
-  // the user pauses. The sync-back effect below already no-ops while the
-  // editor is focused, so a stale store value never clobbers in-flight typing.
-  // Blur, Enter, and facet/chip mutations still commit immediately (they call
-  // `applyQueryText` directly), so nothing waits on this timer to settle.
-  const pendingCommitRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastCommittedTextRef = useRef<string>("");
-  const scheduleCommit = useCallback(
-    (_text: string) => {
-      if (pendingCommitRef.current !== null) {
-        clearTimeout(pendingCommitRef.current);
-      }
-      pendingCommitRef.current = setTimeout(() => {
-        pendingCommitRef.current = null;
-        // Read the current editor text rather than the captured one — typing
-        // after the timer armed will have produced more characters.
-        const fresh = editorRef.current?.getText() ?? "";
-        if (fresh === lastCommittedTextRef.current) return;
-        lastCommittedTextRef.current = fresh;
-        applyQueryTextRef.current(fresh);
-      }, COMMIT_SETTLE_MS);
-    },
-    [applyQueryTextRef],
-  );
-  // Cancel any pending commit on unmount so we don't write stale text.
-  useEffect(
-    () => () => {
-      if (pendingCommitRef.current !== null) {
-        clearTimeout(pendingCommitRef.current);
-      }
-    },
-    [],
-  );
+  // The ProseMirror editor is the source of truth while the user types. The
+  // global filter store (the sidebar, the chips, the URL, the network) only
+  // hears about the text on Enter, through `submitQueryText`. Nothing here
+  // commits on a timer or on blur, so typing and pausing never search.
 
   const refreshSuggestion = useCallback(
     (editor: Editor, prereadText?: string) => {
@@ -420,9 +369,7 @@ export function useFilterEditor({
       Paragraph,
       TiptapText,
       History,
-      Placeholder.configure({
-        placeholder: () => placeholderRef.current ?? "",
-      }),
+      Placeholder.configure({ placeholder: SEARCH_BAR_PLACEHOLDER }),
       FilterHighlight,
       AutoUppercaseOperators,
     ],
@@ -436,11 +383,6 @@ export function useFilterEditor({
         onHasContentChangeRef.current?.(next);
       }
       refreshSuggestion(ed, text);
-      // Live-commit, but deferred via rAF so the keystroke handler returns
-      // before liqe runs. Multiple keystrokes in one frame coalesce into a
-      // single parse+serialize pass. The sync effect below tolerates NBSP/
-      // trim differences so the editor's trailing NBSP isn't clobbered.
-      scheduleCommit(text);
     },
     onSelectionUpdate: ({ editor: ed }) => {
       if (isProgrammaticRef.current) return;
@@ -450,17 +392,12 @@ export function useFilterEditor({
       setIsFocused(true);
       refreshSuggestion(ed);
     },
-    onBlur: ({ editor: ed }) => {
+    onBlur: () => {
       setIsFocused(false);
-      // Blur is an authoritative settle — flush the typed text now and drop
-      // any pending debounced commit so it can't fire a stale follow-up.
-      if (pendingCommitRef.current !== null) {
-        clearTimeout(pendingCommitRef.current);
-        pendingCommitRef.current = null;
-      }
-      const finalText = ed.getText().trim();
-      lastCommittedTextRef.current = finalText;
-      applyQueryTextRef.current(finalText);
+      // Blur is not a submit. The typed text stays in the editor, unsearched,
+      // so a click elsewhere on the page never fires a search the user did
+      // not ask for. The next Enter takes it, and a store change from outside
+      // (a facet click, Clear) replaces it through the sync effect below.
       setSuggestion(CLOSED_SUGGESTION);
       setDropdownDismissed(false);
       triggerPosRef.current = null;
@@ -536,21 +473,6 @@ export function useFilterEditor({
         const text = view.state.doc.textContent;
         const cursorPos = view.state.selection.from - PARAGRAPH_OFFSET;
 
-        // ⌘+⏎ / Ctrl+⏎ → punt the current text into Ask AI. We intercept
-        // before any of the autocomplete or submit logic runs so a held
-        // modifier always wins, even mid-autocomplete. Without content
-        // the shortcut still opens AI mode but with an empty seed (same
-        // as clicking the Ask AI button).
-        if (
-          event.key === "Enter" &&
-          (event.metaKey || event.ctrlKey) &&
-          onAiShortcutRef.current
-        ) {
-          event.preventDefault();
-          onAiShortcutRef.current(text);
-          return true;
-        }
-
         // `@` is a virtual trigger: it never enters the document. We anchor
         // the autocomplete to the cursor position and let subsequent typing
         // grow the active token. If the cursor isn't at a clean token start,
@@ -604,15 +526,7 @@ export function useFilterEditor({
           case "submit": {
             event.preventDefault();
             triggerPosRef.current = null;
-            // Apply immediately and cancel any pending debounced commit so the
-            // settle timer doesn't fire a redundant second apply afterward.
-            if (pendingCommitRef.current !== null) {
-              clearTimeout(pendingCommitRef.current);
-              pendingCommitRef.current = null;
-            }
-            const committed = action.text.trim();
-            lastCommittedTextRef.current = committed;
-            applyQueryTextRef.current(committed);
+            submitQueryTextRef.current(action.text.trim());
             // Open a fresh clause so the next keystroke starts a NEW token
             // instead of gluing onto the just-completed one (`status:ok` + `x`
             // → `status:okx`, the "cursor stuck inside the chip" report). This
@@ -733,7 +647,6 @@ export function useFilterEditor({
         isProgrammaticRef.current = true;
         editor.commands.setContent(buildDocument(next));
         isProgrammaticRef.current = false;
-        lastCommittedTextRef.current = next;
         applyQueryTextRef.current(next);
         return;
       }
@@ -762,7 +675,6 @@ export function useFilterEditor({
       isProgrammaticRef.current = true;
       editor.commands.setContent(buildDocument(next));
       isProgrammaticRef.current = false;
-      lastCommittedTextRef.current = next;
       applyQueryTextRef.current(next);
     };
     dom.addEventListener("mousedown", handler);
@@ -773,8 +685,9 @@ export function useFilterEditor({
   // editor is NOT focused — while focused, the editor is the source of
   // truth and clobbering its content (via setContent) would race with
   // in-flight typing and drop characters. When the store changes from
-  // outside (URL load, clear button, X-widget delete), the editor is
-  // unfocused or the call is paired with a re-mount.
+  // outside (URL load, clear button, X-widget delete, a facet click, the
+  // router applying what Enter produced), the applied query wins over any
+  // text left unsent in the editor.
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
     if (editor.isFocused) return;

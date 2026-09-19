@@ -70,10 +70,12 @@ Rule: Search bar layout and behavior
     Given the user is authenticated with "traces:view" permission
     And the project has traces
 
+  @integration
   Scenario: Search bar renders with placeholder text
     When the Observe page loads
     Then the search bar spans the full width below the nav bar
-    And the placeholder text reads "Search filters, free text, or Ask AI…"
+    And the placeholder text reads "Search filters or type what you are looking for"
+    And the placeholder is the same whether or not Langy is available
 
   Scenario: Search bar shows the current active query
     Given the search bar contains "@status:error AND @model:gpt-4o"
@@ -85,15 +87,24 @@ Rule: Search bar layout and behavior
     Then the search bar is empty
     And all filter sidebar controls are reset to neutral
 
+  @integration
   Scenario: Pressing Enter applies the query
     When the user types "@status:error" in the search bar
     And presses Enter
     Then the trace table filters to show only error traces
+    And no request went out before Enter
 
+  @integration
   Scenario: Typing does not trigger live search
     When the user types "@status:err" without pressing Enter
     Then the trace table does not update
-    And only autocomplete suggestions update live
+    And the filter store does not change
+    And only autocomplete suggestions and chip highlighting update live
+
+  Scenario: The inline hint names Enter
+    Given the search bar is focused with text in it
+    Then the hint after the text reads "⏎ Enter to search"
+    And there is no other key that leaves the bar
 
   # Pasting a multi-line error message used to create one Paragraph node
   # per line, growing the editor vertically until it pushed the rest of
@@ -1244,6 +1255,153 @@ Rule: Performance
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# ENTER ROUTES A SENTENCE
+# ─────────────────────────────────────────────────────────────────────────────
+
+Rule: Enter routes a sentence
+  Enter is the only way a typed text leaves the search bar. A text made of
+  `field:value` terms is applied as typed, with no request. A text with bare
+  words is a sentence, and `tracesV2.routeSearch` decides what it is: a
+  filter the query language can express, a judgement each trace needs (an
+  Instant Eval), a literal phrase, or a question for Langy. The classifier
+  makes the call in one category question over the sentence and a line of
+  context (lens, window, the filter fields, the evaluators and events the
+  project has); a deployment without the classifier asks the FAST model to
+  decide and build in one call; a deployment with neither searches the
+  phrase and says why. Routing is counted on a metric and never metered.
+  A failure on the way is a phrase search, never an error state in the bar.
+  See dev/docs/adr/139-trace-search-routes-on-enter.md.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the project has traces
+
+  @integration
+  Scenario: Enter on a sentence asks the router
+    Given the search bar contains the applied query "model:gpt-4o"
+    When the user types "annoyed users" and presses Enter
+    Then `tracesV2.routeSearch` is called with the text, the visible time range, the applied query and the active lens
+    And nothing changes on screen until it answers
+    And a second Enter before the answer supersedes it
+
+  @unit
+  Scenario: A sentence the filter language can express becomes chips
+    Given the classifier answers "filter" for "errors from gpt-4 service:checkout"
+    When the router runs
+    Then the FAST model builds the filter for "errors from gpt-4" with the live field catalogue
+    And the result is merged with the explicit term: "service:checkout AND status:error"
+    And the bar shows the query as chips
+    And a strip under the bar reads "Searched as: <query>" with "Search the words instead"
+    And "Search the words instead" applies the sentence as one quoted phrase
+
+  @unit
+  Scenario: Explicit terms typed next to a sentence are kept
+    When the user types "annoyed users status:error asking refunds"
+    Then the sentence is "annoyed users asking refunds"
+    And the explicit query is "status:error"
+    And a quoted phrase or a negated word counts as explicit, not as part of the sentence
+
+  @unit
+  Scenario: A filter the model could not write becomes a phrase search
+    Given the classifier answers "filter"
+    And the FAST model answers an empty query
+    When the router runs
+    Then the sentence is searched as one quoted phrase
+    And the result says it fell back from the filter route
+
+  @unit
+  Scenario: A sentence that needs a judgement becomes an Instant Eval question
+    Given the classifier answers "instant_eval" for "annoyed users status:error" on the Conversations lens
+    When the router runs
+    Then the FAST model rewrites the sentence into a judge question with a yes and a no criterion
+    And the target is "threads" on the Conversations lens and "traces" on every other lens
+    And the result carries the explicit terms as `otherQuery` and the phrase search as `fallbackQuery`
+
+  @unit
+  Scenario: An existing evaluator answers the judgement as a filter
+    Given the classifier answers "instant_eval" for "hallucinated answers"
+    And the project has results from the evaluator "ragas/faithfulness"
+    When the FAST model prefers the evaluator
+    Then the result is the filter "evaluator:ragas/faithfulness AND evaluatorVerdict:fail"
+    And it carries the reason the evaluator was chosen
+
+  @unimplemented
+  Scenario: An Instant Eval route starts a run
+    Given the router answered "instant_eval"
+    When the Explorer receives the payload through `useInstantEvalRoute`
+    Then an `eval:"<question>"` chip is applied and a run starts under the cost rule
+    # Pending: until then the Explorer applies `fallbackQuery`, the phrase search.
+
+  @unit
+  Scenario: A literal phrase is searched as one phrase
+    Given the classifier answers "free_text" for "cannot connect to database service:api"
+    When the router runs
+    Then the query is `service:api AND "cannot connect to database"`
+    And no model is called
+
+  @unit
+  Scenario: A question for the assistant goes to Langy with the view attached
+    Given the classifier answers "langy" for "why did errors spike this morning"
+    When the router runs
+    Then the whole typed text is handed to Langy as the question
+    And the view and the applied search are attached, as the Ask Langy button attaches them
+    And the option is not offered to the classifier when Langy is not available to the user
+
+  @unit
+  Scenario: Without the classifier the model decides and builds in one call
+    Given the deployment has no classifier configured
+    When the user submits "failing calls model:gpt-4o"
+    Then the FAST model answers a route and, for a filter, the query in the same call
+    And a filter answer is merged with the explicit terms: "model:gpt-4o AND (status:error OR status:warning)"
+
+  @unit
+  Scenario: Without a classifier or a model the words are searched as a phrase
+    Given the deployment has no classifier configured
+    And the project has no FAST model configured
+    When the user submits "annoyed users"
+    Then the query `"annoyed users"` is applied
+    And the result says a model is unavailable
+    And the bar shows the "Connect a model for smarter search" popover once per session, closable
+    And the popover links to the model provider settings in a new tab
+
+  @unit
+  Scenario: A model failure is a phrase search, not an error
+    Given the FAST model fails on every attempt
+    When the user submits "annoyed users"
+    Then the query `"annoyed users"` is applied
+    And no error banner is shown
+    And the result does not say a model is unavailable
+
+  @unit
+  Scenario: The client refuses a sentence past the term ceiling before sending it
+    Given the user applies eleven bare words as a filter
+    Then the client's validation refuses it with "Too many separate terms. Put the sentence in quotes to search it as one phrase."
+    And ten bare words pass
+    And the same eleven words in quotes pass as one node
+    # Eleven bare words are twenty-one nodes: the translator's ceiling is twenty.
+
+  @unit
+  Scenario: The server refuses a sentence past the term ceiling with its own code
+    Given a filter with more than twenty nodes reaches the server
+    Then it is refused with the code `filter_too_complex`, a 422 and customer fault
+    And `meta.maxNodes` carries the ceiling
+    And the customer copy reads "Too many separate terms" and "Put the sentence in quotes to search it as one phrase."
+
+  @integration
+  Scenario: A sentence past the term ceiling offers to search it as one phrase
+    Given the table failed with `filter_too_complex`
+    Then the error state offers "Search it as one phrase"
+    And clicking it applies the query with its bare words as one quoted phrase and the explicit terms kept
+
+  @unit
+  Scenario: The fix quotes the sentence as one phrase
+    Given the query "status:error one two three four five six seven eight nine ten eleven"
+    When it is requoted
+    Then it reads `status:error AND "one two three four five six seven eight nine ten eleven"`
+    And a query with no bare words is returned untouched
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # AI QUERY COMPOSER
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -1262,11 +1420,13 @@ Rule: The search bar's ask affordance belongs to Langy when Langy is available
     And the project has traces
     And Langy is available to the user, with permission to start a conversation
 
+  @integration
   Scenario: The ask button reads Ask Langy
     When the Observe page loads
     Then the search bar's ask button reads "Ask Langy"
-    And the placeholder text reads "Search filters, free text, or Ask Langy…"
-    And the inline submit hint reads "Press ⌘ + Enter to Ask Langy"
+    And the placeholder and the inline hint are the same as without Langy
+    # The button is the way to Langy; typed text goes to the search router
+    # on Enter (see "Enter routes a sentence").
 
   Scenario: Clicking Ask Langy floats the ask surface over the search bar
     Given the Langy panel is closed
@@ -1288,6 +1448,15 @@ Rule: The search bar's ask affordance belongs to Langy when Langy is available
     And the Langy panel opens and asks "why are these failing?"
     And the active search rides along as attached context
 
+  @integration
+  Scenario: Ask Langy sends the whole view with the question
+    Given the search bar contains the applied query "status:error"
+    And the Conversations lens is active over the last 7 days
+    When the user asks "why are these failing?" through Ask Langy
+    Then the view is attached first: data source, time range, lens, grouping, sort and the search
+    And the search is attached second as the filter the agent applies
+    # The explicit route sends at least what the passive page context sends.
+
   Scenario: Escape closes the ask surface without sending anything
     Given the Langy ask surface is open
     When the user presses Escape
@@ -1306,16 +1475,20 @@ Rule: The search bar's ask affordance belongs to Langy when Langy is available
     When the Langy panel opens some other way
     Then the ask surface closes — two composers are never on screen
 
-  Scenario: ⌘+Enter hands the typed question straight to Langy
+  @integration
+  Scenario: Cmd+Enter is plain Enter
     Given the user typed "why are checkout traces failing" in the search bar
-    When the user presses ⌘+Enter / Ctrl+Enter
-    Then the Langy panel opens and asks "why are checkout traces failing"
+    When the user presses Cmd+Enter or Ctrl+Enter
+    Then the text is submitted the way plain Enter submits it
+    And the search router decides where it goes
+    # There is one path out of the bar. A sentence that is a question for
+    # the assistant reaches Langy through the router's `langy` route.
 
+  @unit
   Scenario: A question that is just the applied filter is not attached twice
     Given the search bar contains the applied query "status:error"
-    When the user presses ⌘+Enter / Ctrl+Enter on that same text
-    Then Langy is asked "status:error"
-    And no separate search attachment duplicates it
+    When Langy is asked "status:error" through the handoff
+    Then no separate search attachment duplicates it
 
   Scenario: No model provider setup is demanded on the way to Langy
     Given the project has no enabled model provider
@@ -1352,9 +1525,11 @@ Rule: AI query composer (Ask AI)
     And the project has traces
     And Langy is not available to the user
 
-  Scenario: Free-text in the structured bar stays free-text
+  Scenario: Free text in the structured bar goes through the router on Enter
     When the user types "show me all errors" in the structured search bar
-    Then it is treated as a free-text search clause; no NLP parsing runs
+    And presses Enter
+    Then the search router decides what it is (see "Enter routes a sentence")
+    And the inline composer is not opened
 
   Scenario: Ask AI button enters AI mode
     When the user clicks "Ask AI" (or presses ⌘I / Ctrl+I)
@@ -1557,7 +1732,7 @@ Rule: Chip labels are field-qualified and never resize on hover
 # active token of shape @partial, @field:, or @field:partial — meaning no
 # whitespace between the @ and the cursor. Whitespace closes it.
 # Enter is contextual: dropdown open → accept, dropdown closed → submit.
-# Blur always submits.
+# Blur keeps the text and searches nothing; Enter is the one way out.
 
 Rule: Dropdown open and close based on cursor position
   The autocomplete dropdown is bound to cursor context, not focus alone.
@@ -1645,11 +1820,14 @@ Rule: Enter is contextual based on dropdown state
     When the user presses Enter, Enter, and Enter in sequence
     Then a query of the form "@<first-field>:<first-value>" is submitted
 
+  @integration
   Scenario: Enter on free text submits
     Given the search bar contains "refund" and the dropdown is closed
     When the user presses Enter
-    Then the query "refund" is submitted
+    Then the text "refund" is submitted to the search router
+    And nothing is applied by the editor itself
 
+  @integration
   Scenario: Enter on empty input clears the AST
     Given the search bar is empty and focused
     When the user presses Enter
@@ -1685,7 +1863,7 @@ Rule: Tab and click mirror Enter for suggestion accept
     Given the search bar contains "status:error" and the dropdown is closed
     When the user presses Tab
     Then handleKey returns noop and the browser's native focus traversal runs
-    And any resulting blur submits via the blur path
+    And the text stays in the bar, unsearched, until Enter
 
 
 Rule: Escape is hierarchical
@@ -1702,11 +1880,11 @@ Rule: Escape is hierarchical
     And the editor is still focused
     And the text remains "@status:err"
 
-  Scenario: Escape with dropdown closed blurs the editor and submits
+  Scenario: Escape with dropdown closed blurs the editor without searching
     Given the search bar contains "@status:error" and the dropdown is closed
     When the user presses Escape
     Then the editor blurs
-    And the query "@status:error" is submitted
+    And the text "@status:error" stays in the bar, unsearched
 
   Scenario: Escape then Enter submits the literal typed text
     Given the search bar contains "@status:err" and the dropdown is open
@@ -1715,41 +1893,46 @@ Rule: Escape is hierarchical
     Then the query "@status:err" is submitted as typed
 
 
-Rule: Blur always submits
-  Any cause of blur — clicking out, tabbing out, programmatic focus change — submits the current text.
+Rule: Leaving the search bar is not a search
+  Blur, whatever caused it (clicking out, tabbing out, a programmatic focus
+  change), keeps the typed text where it is and searches nothing. Enter is
+  the one way out. A store change from outside while the bar is unfocused
+  (a facet click, Clear, the router applying what Enter produced) replaces
+  the unsent text with the applied query.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And the project has traces
 
-  Scenario: Clicking outside the search bar submits the query
-    Given the search bar contains "@status:error" and is focused
-    When the user clicks outside the search bar
-    Then the query "@status:error" is submitted
-
-  Scenario: Tabbing out of the search bar submits the query
-    Given the search bar contains "@status:error" and is focused
-    When the user presses Tab with the dropdown closed
-    Then the query "@status:error" is submitted
-
-  Scenario: Sidebar checkbox click after typing submits the typed text first
-    Given the search bar contains "@status:error" (unsubmitted) and is focused
-    When the user clicks a sidebar checkbox for "@model:gpt-4o"
-    Then the search bar text is committed first
-    And the resulting query contains both "@status:error" and "@model:gpt-4o"
-
-  Scenario: Blur with invalid syntax shows parse error but preserves text
-    Given the search bar contains "@status:" with no value
+  @integration
+  Scenario: Leaving the search bar keeps the text without searching
+    Given the search bar contains "annoyed users" and is focused
     When the user clicks outside the search bar
     Then the editor blurs
-    And the search bar shows a red outline with the parse error message
+    And the text "annoyed users" stays in the bar
+    And nothing is submitted or applied
+
+  Scenario: Tabbing out of the search bar keeps the text
+    Given the search bar contains "@status:error" and is focused
+    When the user presses Tab with the dropdown closed
+    Then the text stays in the bar, unsearched
+
+  Scenario: A sidebar click after typing applies the sidebar's query
+    Given the search bar contains "@status:error" (unsubmitted) and is focused
+    When the user clicks a sidebar checkbox for "@model:gpt-4o"
+    Then the applied query is "@model:gpt-4o"
+    And the bar shows "@model:gpt-4o": the unsent text is replaced by the applied query
+
+  Scenario: Enter with invalid syntax shows the parse error and preserves the text
+    Given the search bar contains "@status:" with no value
+    When the user presses Enter
+    Then the search bar shows a red outline with the parse error message
     And the text "@status:" is preserved for the user to fix
 
-  Scenario: Submit is idempotent across Enter and blur
+  Scenario: Enter is idempotent
     Given the search bar contains "@status:error" and is focused
-    When the user presses Enter
-    And then clicks outside the search bar
-    Then "applyQueryText" is invoked at most once with the same text
+    When the user presses Enter twice
+    Then the applied query is "@status:error" and the AST identity does not churn
 
 
 Rule: Suggestion accept replaces only the active token

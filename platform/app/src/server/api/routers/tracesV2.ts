@@ -45,6 +45,7 @@ import type {
   SpanSummaryRow,
   TraceEventRollup,
 } from "~/server/app-layer/traces/repositories/span-storage.repository";
+import { routeSearch } from "~/server/app-layer/traces/search-router";
 import type { TraceListItem } from "~/server/app-layer/traces/trace-list.service";
 import {
   traceMetadataUpdateSchema,
@@ -1480,6 +1481,32 @@ export const tracesV2Router = createTRPCRouter({
         projectId: input.projectId,
         prompt: input.prompt,
         timeRange: { from: input.timeRange.from, to: input.timeRange.to },
+      });
+    }),
+
+  // Enter on a sentence. The client calls this only when the submitted text
+  // has bare words; a pure `field:value` query is applied without a call.
+  // Spec: specs/traces-v2/search.feature ("Enter routes a sentence").
+  routeSearch: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        text: z.string().min(1).max(2000),
+        timeRange: timeRangeSchema,
+        activeQuery: z.string().max(2000).default(""),
+        lensId: z.string().max(200).optional(),
+        langyAvailable: z.boolean().optional(),
+      }),
+    )
+    .permission("traces:view")
+    .mutation(async ({ input }) => {
+      return routeSearch({
+        projectId: input.projectId,
+        text: input.text,
+        timeRange: { from: input.timeRange.from, to: input.timeRange.to },
+        activeQuery: input.activeQuery,
+        lensId: input.lensId,
+        langyAvailable: input.langyAvailable,
       });
     }),
 

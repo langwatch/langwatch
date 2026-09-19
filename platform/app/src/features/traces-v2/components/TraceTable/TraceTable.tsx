@@ -1,12 +1,14 @@
+import { Button } from "@chakra-ui/react";
 import type React from "react";
-import { HandledErrorState } from "~/features/errors";
+import { HandledErrorState, readHandledError } from "~/features/errors";
+import { requoteBareTerms } from "~/server/app-layer/traces/query-language/mutations";
 import {
   SESSIONS_MAX_PAGE_SIZE,
   type SessionGroupsResult,
   useSessionGroups,
 } from "../../hooks/useSessionGroups";
 import { useTraceList } from "../../hooks/useTraceList";
-import type { PageCursor } from "../../stores/filterStore";
+import { type PageCursor, useFilterStore } from "../../stores/filterStore";
 import {
   getEffectiveLens,
   rowKindForGrouping,
@@ -75,7 +77,11 @@ function shellPlaceholder(shell: TableShell): React.ReactNode | null {
       <HandledErrorState
         error={shell.error}
         fallbackTitle={`We could not load your ${shell.itemNoun}`}
-      />
+      >
+        {readHandledError(shell.error)?.code === "filter_too_complex" && (
+          <SearchAsOnePhraseAction />
+        )}
+      </HandledErrorState>
     );
   }
   const isEmpty =
@@ -85,6 +91,29 @@ function shellPlaceholder(shell: TableShell): React.ReactNode | null {
     shell.totalHits === 0;
   return isEmpty ? <EmptyFilterState /> : null;
 }
+
+/**
+ * The one-click fix for `filter_too_complex`: the bare words of the applied
+ * query become one quoted phrase, the explicit terms stay, and the search runs
+ * again. Spec: specs/traces-v2/search.feature ("A sentence past the term
+ * ceiling offers to search it as one phrase").
+ */
+const SearchAsOnePhraseAction: React.FC = () => {
+  const queryText = useFilterStore((s) => s.queryText);
+  const applyQueryText = useFilterStore((s) => s.applyQueryText);
+  const requoted = requoteBareTerms(queryText);
+  if (requoted === queryText) return null;
+  return (
+    <Button
+      size="sm"
+      variant="surface"
+      colorPalette="orange"
+      onClick={() => applyQueryText(requoted)}
+    >
+      Search it as one phrase
+    </Button>
+  );
+};
 
 export const TraceTable: React.FC = () => {
   const {

@@ -339,6 +339,12 @@ const presentations = {
     title: "This filter isn't valid",
     describe: () => "Check the syntax and try again.",
   },
+  filter_too_complex: {
+    // fault: customer. The ceiling is deliberate; a sentence typed as bare
+    // words is one node per word, and quoting it makes it one node.
+    title: "Too many separate terms",
+    describe: () => "Put the sentence in quotes to search it as one phrase.",
+  },
   filter_field_unknown: {
     title: "Unknown filter field",
     describe: (error) => {

@@ -6,7 +6,12 @@ import {
   type TagToken,
   type UnaryOperatorToken,
 } from "liqe";
-import { FilterFieldUnknownError, FilterParseError } from "../errors";
+import {
+  FilterFieldUnknownError,
+  FilterParseError,
+  FilterTooComplexError,
+} from "../errors";
+import { MAX_FILTER_NODE_COUNT } from "../query-language/queries";
 import { FIELD_DEF_BY_NAME, KNOWN_FIELDS } from "./build-handlers";
 import { boundedSubquery } from "./subqueries";
 import {
@@ -24,7 +29,6 @@ import {
   wrap,
 } from "./value-helpers";
 
-export const MAX_NODE_COUNT = 20;
 const MAX_PARAM_COUNT = 50;
 
 /**
@@ -314,8 +318,8 @@ function translateNode({
   translateTag: FilterTagTranslator;
 }): string {
   ctx.nodeCount++;
-  if (ctx.nodeCount > MAX_NODE_COUNT) {
-    throw new FilterParseError("Query too complex");
+  if (ctx.nodeCount > MAX_FILTER_NODE_COUNT) {
+    throw new FilterTooComplexError({ maxNodes: MAX_FILTER_NODE_COUNT });
   }
 
   switch (node.type) {

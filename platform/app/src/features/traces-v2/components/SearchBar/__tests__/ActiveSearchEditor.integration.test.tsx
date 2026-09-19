@@ -17,8 +17,8 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import { ActiveSearchEditor } from "../ActiveSearchEditor";
@@ -26,13 +26,14 @@ import { ActiveSearchEditor } from "../ActiveSearchEditor";
 afterEach(cleanup);
 
 function renderEditor(queryText: string) {
-  return render(
+  const applyQueryText = vi.fn();
+  const submitQueryText = vi.fn();
+  const utils = render(
     <ChakraProvider value={defaultSystem}>
       <ActiveSearchEditor
         queryText={queryText}
-        applyQueryText={() => {
-          /* no-op for static-render test */
-        }}
+        applyQueryText={applyQueryText}
+        submitQueryText={submitQueryText}
         autoFocus={false}
         onHasContentChange={() => {
           /* no-op */
@@ -40,6 +41,7 @@ function renderEditor(queryText: string) {
       />
     </ChakraProvider>,
   );
+  return { ...utils, applyQueryText, submitQueryText };
 }
 
 async function waitForEditor(): Promise<HTMLElement> {
@@ -49,6 +51,51 @@ async function waitForEditor(): Promise<HTMLElement> {
     return editor as HTMLElement;
   });
 }
+
+describe("ActiveSearchEditor keys", () => {
+  describe("given free text with the dropdown closed", () => {
+    /** @scenario "Enter on free text submits" */
+    it("submits on Enter and applies nothing on its own", async () => {
+      const { applyQueryText, submitQueryText } = renderEditor("annoyed users");
+      const editor = await waitForEditor();
+
+      fireEvent.keyDown(editor, { key: "Enter" });
+
+      expect(submitQueryText).toHaveBeenCalledTimes(1);
+      expect(submitQueryText).toHaveBeenCalledWith("annoyed users");
+      expect(applyQueryText).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Cmd+Enter is plain Enter" */
+    it("treats a held modifier as plain Enter: there is no second path out of the bar", async () => {
+      const { applyQueryText, submitQueryText } = renderEditor("annoyed users");
+      const editor = await waitForEditor();
+
+      fireEvent.keyDown(editor, { key: "Enter", metaKey: true });
+      fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
+
+      expect(submitQueryText).toHaveBeenCalledTimes(2);
+      expect(submitQueryText).toHaveBeenLastCalledWith("annoyed users");
+      expect(applyQueryText).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given text the user has not submitted", () => {
+    /** @scenario "Leaving the search bar keeps the text without searching" */
+    it("blurs without submitting or applying", async () => {
+      const { applyQueryText, submitQueryText } = renderEditor("annoyed users");
+      const editor = await waitForEditor();
+
+      fireEvent.focus(editor);
+      fireEvent.blur(editor);
+      fireEvent.keyDown(editor, { key: "Escape" });
+
+      expect(submitQueryText).not.toHaveBeenCalled();
+      expect(applyQueryText).not.toHaveBeenCalled();
+      expect(editor.textContent).toContain("annoyed users");
+    });
+  });
+});
 
 describe("ActiveSearchEditor rendered DOM", () => {
   describe("given a single wildcard query", () => {

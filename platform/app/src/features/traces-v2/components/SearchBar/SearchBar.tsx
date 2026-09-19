@@ -5,6 +5,7 @@ import {
   HStack,
   Icon,
   IconButton,
+  Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -25,13 +26,18 @@ import { usePreviewTracesActive } from "../../onboarding/hooks/usePreviewTracesA
 import { useFacetHoverStore } from "../../stores/facetHoverStore";
 import { useFilterStore } from "../../stores/filterStore";
 import { AskAiButton } from "../ai/AskAiButton";
+import {
+  ProviderPrimerPopover,
+  SMARTER_SEARCH_PRIMER_COPY,
+} from "../ai/ProviderPrimerPopover";
+import { useInstantEvalRoute } from "../TracesPage/useInstantEvalRoute";
 import { ActiveSearchEditor } from "./ActiveSearchEditor";
 import { AiErrorDetails, hasAiErrorDetails } from "./ErrorBannerDetail";
 import { editorStyles } from "./editorStyles";
 import { FloatingAiBar } from "./FloatingAiBar";
 import { FloatingLangyBar } from "./FloatingLangyBar";
 import { setFilterChipLabels } from "./filterHighlight";
-import { PlaceholderEditor, searchBarPlaceholder } from "./PlaceholderEditor";
+import { PlaceholderEditor } from "./PlaceholderEditor";
 import {
   ClearButton,
   type SearchBarStatus,
@@ -39,6 +45,7 @@ import {
   statusBackgroundColor,
   statusBorderColor,
 } from "./SearchBarIndicators";
+import { SearchedAsNotice } from "./SearchedAsNotice";
 import { SyntaxHelpDrawerHost } from "./SyntaxHelpDrawer";
 import {
   TokenValuePicker,
@@ -48,6 +55,14 @@ import { useAskLangyFromSearch } from "./useAskLangyFromSearch";
 import type { ValueResolver } from "./useFilterEditor";
 import { useFloatRect } from "./useFloatRect";
 import { useGlobalAiShortcut } from "./useGlobalAiShortcut";
+import { useSubmitSearch } from "./useSubmitSearch";
+
+/**
+ * The "connect a model for smarter search" primer shows once per page
+ * session: the phrase search still ran, and a popover on every Enter would
+ * be a nag rather than a pointer.
+ */
+let smarterSearchPrimerShown = false;
 
 const MAX_DYNAMIC_ITEMS = 10;
 
@@ -116,9 +131,9 @@ export const SearchBar: React.FC = () => {
     ? { kind: "error", message: parseError }
     : { kind: "ok" };
 
-  // For a user who has Langy, the ask affordance IS Langy: the button,
-  // ⌘I and ⌘+⏎ hand the question and the applied search to the panel
-  // instead of the inline AI composer. Everyone else keeps the composer.
+  // For a user who has Langy, the ask affordance IS Langy: the button and
+  // ⌘I hand the question and the view to the panel instead of the inline
+  // AI composer. Everyone else keeps the composer.
   // Spec: specs/traces-v2/search.feature ("The search bar's ask
   // affordance belongs to Langy when Langy is available").
   const { langyRoutesAsk, askLangyFromSearch } = useAskLangyFromSearch();
@@ -162,8 +177,8 @@ export const SearchBar: React.FC = () => {
   // AI query would error or hallucinate, and a search handed to Langy
   // would describe rows the project doesn't have. Surface the button as
   // gated with a one-line tooltip so the user knows the affordance is
-  // real, just unavailable here. The ⌘I / ⌘+⏎ shortcuts also bail in
-  // this mode so we don't dump them somewhere they can't submit from.
+  // real, just unavailable here. The ⌘I shortcut also bails in this mode
+  // so we don't dump them somewhere they can't submit from.
   const isSamplePreview = usePreviewTracesActive();
   const askAiSampleDisabledReason = isSamplePreview
     ? `${askLabel} works on your real traces — not on the sample data.`
@@ -177,12 +192,6 @@ export const SearchBar: React.FC = () => {
   const [suggestionOpen, setSuggestionOpen] = useState(false);
   const [cursorAnchorX, setCursorAnchorX] = useState(0);
   const [editorFocused, setEditorFocused] = useState(false);
-  // When the user fires ⌘+⏎ on a typed query, we punt the text into AI
-  // mode AND ask the composer to submit immediately. Tracked separately
-  // from `aiMode` because the same flag would otherwise re-fire on every
-  // subsequent AI-mode entry (e.g. clicking the Ask AI button to start
-  // fresh would auto-submit the now-applied filter as a prompt).
-  const [aiAutoSubmitSeed, setAiAutoSubmitSeed] = useState<string | null>(null);
   // Anchor info for the click-a-chip-to-edit-value popover. Lifted to
   // SearchBar so the popover can portal into document.body and share
   // the same instance whether the click came from PlaceholderEditor or
@@ -271,45 +280,26 @@ export const SearchBar: React.FC = () => {
   }, [askAiNeedsProviderPrimer, isSamplePreview, langyRoutesAsk, openLangyAsk]);
   useGlobalAiShortcut(handleAiShortcut);
 
-  // ⌘+⏎ / Ctrl+⏎ from inside the editor: punt the typed text to the ask
-  // affordance — asked to Langy outright, or auto-submitted into AI
-  // mode. Lets the operator triage "is this filter syntax or free text
-  // I want interpreted?" without taking their hands off the keyboard.
-  const handleEditorAiShortcut = useCallback(
-    (currentText: string) => {
-      if (isSamplePreview) return;
-      if (langyRoutesAsk) {
-        // Typed text is already the question — hand it straight off (the
-        // applied search rides along as attached context on the panel).
-        // Nothing typed yet falls back to a place to type: the floating
-        // ask bar, or the panel when it is already open.
-        if (currentText.trim()) {
-          askLangyFromSearch(currentText);
-        } else {
-          openLangyAsk();
-        }
-        return;
-      }
-      if (askAiNeedsProviderPrimer) return;
-      const trimmed = currentText.trim();
-      // Empty input still opens the composer (parity with the button),
-      // it just doesn't auto-submit a blank prompt.
-      setAiAutoSubmitSeed(trimmed.length > 0 ? trimmed : null);
-      setAiMode(true);
-    },
-    [
-      askAiNeedsProviderPrimer,
-      isSamplePreview,
-      langyRoutesAsk,
-      askLangyFromSearch,
-      openLangyAsk,
-    ],
-  );
+  const handleAiBarClose = useCallback(() => setAiMode(false), []);
 
-  const handleAiBarClose = useCallback(() => {
-    setAiMode(false);
-    setAiAutoSubmitSeed(null);
+  // Enter on a sentence. The router answers with what the sentence is; a
+  // `langy` answer takes the same door as the button, with the view
+  // attached, and a `free_text` answer with no model behind it opens the
+  // primer once so the reader knows what a model would add.
+  const [smarterSearchPrimerOpen, setSmarterSearchPrimerOpen] = useState(false);
+  const { onInstantEvalRoute } = useInstantEvalRoute();
+  const handleModelUnavailable = useCallback(() => {
+    if (smarterSearchPrimerShown) return;
+    smarterSearchPrimerShown = true;
+    setSmarterSearchPrimerOpen(true);
   }, []);
+  const { submitSearch, isRouting } = useSubmitSearch({
+    langyAvailable: langyRoutesAsk,
+    isSamplePreview,
+    onLangy: askLangyFromSearch,
+    onInstantEval: onInstantEvalRoute,
+    onModelUnavailable: handleModelUnavailable,
+  });
 
   // Reuse the discover payload that already powers the facets sidebar — its
   // `topValues` is exactly the autocomplete pool for `model:`, `service:`,
@@ -393,111 +383,114 @@ export const SearchBar: React.FC = () => {
             key="ai-bar"
             rect={floatRect}
             onClose={handleAiBarClose}
-            // If the ⌘+⏎ shortcut seeded a specific prompt, that wins
-            // outright (and the composer auto-submits below). Otherwise
-            // fall through to the same "re-show last natural-language
-            // prompt vs current query" logic the Ask AI button uses.
+            // Re-show the last natural-language prompt when the applied
+            // query is still the one it produced; otherwise seed the
+            // composer with the query itself.
             initialPrompt={
-              aiAutoSubmitSeed !== null
-                ? aiAutoSubmitSeed
-                : lastAiTranslation &&
-                    lastAiTranslation.projectId === project?.id &&
-                    lastAiTranslation.query === queryText
-                  ? lastAiTranslation.prompt
-                  : queryText
+              lastAiTranslation &&
+              lastAiTranslation.projectId === project?.id &&
+              lastAiTranslation.query === queryText
+                ? lastAiTranslation.prompt
+                : queryText
             }
-            autoSubmit={aiAutoSubmitSeed !== null}
+            autoSubmit={false}
           />
         )}
       </AnimatePresence>
       {!aiMode && !langyAskMode && (
         <>
-          <Flex
-            align="center"
-            width="full"
-            gap={2}
-            paddingX={3}
-            paddingY={1.5}
-            borderBottomWidth={status.kind === "error" ? "0" : "1px"}
-            borderColor={statusBorderColor(status)}
-            minHeight="38px"
-            bg={statusBackgroundColor(status)}
-            transition="background 120ms ease, border-color 120ms ease"
-            position="relative"
-            zIndex={1}
+          <ProviderPrimerPopover
+            mode="anchor"
+            open={smarterSearchPrimerOpen}
+            onOpenChange={setSmarterSearchPrimerOpen}
+            copy={SMARTER_SEARCH_PRIMER_COPY}
           >
-            <AskAiButton
-              label={askLabel}
-              ariaLabel={langyRoutesAsk ? "Ask Langy" : undefined}
-              tooltip={
-                langyRoutesAsk ? "Ask Langy about these traces" : undefined
-              }
-              onClick={langyRoutesAsk ? openLangyAsk : () => setAiMode(true)}
-              needsProviderPrimer={askAiNeedsProviderPrimer}
-              disabledReason={askAiSampleDisabledReason}
-            />
-            {/* The standalone search glyph is only an at-rest hint — the
-                placeholder ("Search filters, free text, or Ask AI…") already
-                says what the field is. Once focused or non-empty it reads as
-                clutter wedged between the ask button and the text, so it drops
-                out and the editor sits directly beside the ask button. */}
-            {!editorFocused && !hasContent && (
-              <Icon color="fg.subtle" flexShrink={0} boxSize="14px">
-                <Search />
-              </Icon>
-            )}
-
-            <Box flex={1} minWidth={0} position="relative" css={editorStyles}>
-              {editorMounted ? (
-                <ActiveSearchEditor
-                  queryText={queryText}
-                  applyQueryText={applyQueryText}
-                  autoFocus
-                  onHasContentChange={setEditorHasContent}
-                  valueResolver={valueResolver}
-                  onTokenClick={setTokenAnchor}
-                  onAiShortcut={handleEditorAiShortcut}
-                  onSuggestionOpenChange={setSuggestionOpen}
-                  onCursorAnchorChange={setCursorAnchorX}
-                  onFocusChange={setEditorFocused}
-                  placeholder={searchBarPlaceholder(askLabel)}
-                />
-              ) : (
-                <PlaceholderEditor
-                  queryText={queryText}
-                  onActivate={requestEditor}
-                  onApplyQueryText={applyQueryText}
-                  onTokenClick={setTokenAnchor}
-                  placeholderText={searchBarPlaceholder(askLabel)}
-                />
+            <Flex
+              align="center"
+              width="full"
+              gap={2}
+              paddingX={3}
+              paddingY={1.5}
+              borderBottomWidth={status.kind === "error" ? "0" : "1px"}
+              borderColor={statusBorderColor(status)}
+              minHeight="38px"
+              bg={statusBackgroundColor(status)}
+              transition="background 120ms ease, border-color 120ms ease"
+              position="relative"
+              zIndex={1}
+            >
+              <AskAiButton
+                label={askLabel}
+                ariaLabel={langyRoutesAsk ? "Ask Langy" : undefined}
+                tooltip={
+                  langyRoutesAsk ? "Ask Langy about these traces" : undefined
+                }
+                onClick={langyRoutesAsk ? openLangyAsk : () => setAiMode(true)}
+                needsProviderPrimer={askAiNeedsProviderPrimer}
+                disabledReason={askAiSampleDisabledReason}
+              />
+              {/* The standalone search glyph is only an at-rest hint — the
+                placeholder already says what the field is. Once focused or
+                non-empty it reads as clutter wedged between the ask button
+                and the text, so it drops out and the editor sits directly
+                beside the ask button. */}
+              {!editorFocused && !hasContent && (
+                <Icon color="fg.subtle" flexShrink={0} boxSize="14px">
+                  <Search />
+                </Icon>
               )}
-              {hasContent &&
-                editorFocused &&
-                !suggestionOpen &&
-                !askAiNeedsProviderPrimer && (
-                  <SearchSubmitHint
-                    anchorX={cursorAnchorX}
-                    askLabel={askLabel}
+
+              <Box flex={1} minWidth={0} position="relative" css={editorStyles}>
+                {editorMounted ? (
+                  <ActiveSearchEditor
+                    queryText={queryText}
+                    applyQueryText={applyQueryText}
+                    submitQueryText={submitSearch}
+                    autoFocus
+                    onHasContentChange={setEditorHasContent}
+                    valueResolver={valueResolver}
+                    onTokenClick={setTokenAnchor}
+                    onSuggestionOpenChange={setSuggestionOpen}
+                    onCursorAnchorChange={setCursorAnchorX}
+                    onFocusChange={setEditorFocused}
+                  />
+                ) : (
+                  <PlaceholderEditor
+                    queryText={queryText}
+                    onActivate={requestEditor}
+                    onApplyQueryText={applyQueryText}
+                    onTokenClick={setTokenAnchor}
                   />
                 )}
-            </Box>
+                {hasContent && editorFocused && !suggestionOpen && (
+                  <SearchSubmitHint anchorX={cursorAnchorX} />
+                )}
+              </Box>
 
-            {/* Only render the badge for non-error statuses — parse errors
+              {/* Only render the badge for non-error statuses — parse errors
                 get the full inline banner below, which is far more visible
                 and positioned right under the input where the user is
                 looking. Showing the badge *and* the banner would be
                 redundant and noisy. */}
-            {status.kind !== "error" && <StatusBadge status={status} />}
-            {hasContent ? (
-              <ClearButton onClear={handleClear} />
-            ) : (
-              <Kbd>{"/"}</Kbd>
-            )}
-            <TokenValuePicker
-              anchor={tokenAnchor}
-              onClose={() => setTokenAnchor(null)}
-            />
-          </Flex>
+              {status.kind !== "error" && <StatusBadge status={status} />}
+              {isRouting && (
+                <HStack gap={1.5} flexShrink={0} color="fg.subtle">
+                  <Spinner size="xs" />
+                  <Text textStyle="xs">Searching</Text>
+                </HStack>
+              )}
+              {hasContent ? (
+                <ClearButton onClear={handleClear} />
+              ) : (
+                <Kbd>{"/"}</Kbd>
+              )}
+              <TokenValuePicker
+                anchor={tokenAnchor}
+                onClose={() => setTokenAnchor(null)}
+              />
+            </Flex>
+          </ProviderPrimerPopover>
+          <SearchedAsNotice />
           {/* Unified error banner — handles both parse errors and AI errors.
               AI error takes priority when both are present (AI mode is the
               active flow). Rendered outside the Flex row so it spans the
@@ -620,10 +613,8 @@ const UnifiedErrorBanner: React.FC<{
   );
 };
 
-const IS_MAC =
-  typeof navigator !== "undefined" &&
-  /Mac|iPhone|iPad/.test(navigator.platform);
-const MOD_KEY_SYMBOL = IS_MAC ? "⌘" : "Ctrl";
+/** What the inline hint says: Enter is the one way to search. */
+export const SEARCH_SUBMIT_HINT = "⏎ Enter to search";
 
 /**
  * Plain one-liner hint that floats just after the typed content.
@@ -631,10 +622,7 @@ const MOD_KEY_SYMBOL = IS_MAC ? "⌘" : "Ctrl";
  * thing reads as a single faint hint and never competes with the
  * input for attention.
  */
-const SearchSubmitHint: React.FC<{ anchorX: number; askLabel: string }> = ({
-  anchorX,
-  askLabel,
-}) => (
+const SearchSubmitHint: React.FC<{ anchorX: number }> = ({ anchorX }) => (
   <chakra.span
     position="absolute"
     // Bigger gap (24px) so the hint doesn't crowd the last typed glyph.
@@ -654,6 +642,6 @@ const SearchSubmitHint: React.FC<{ anchorX: number; askLabel: string }> = ({
     pointerEvents="none"
     userSelect="none"
   >
-    {`Press ${MOD_KEY_SYMBOL} + Enter to ${askLabel}`}
+    {SEARCH_SUBMIT_HINT}
   </chakra.span>
 );

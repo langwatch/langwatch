@@ -44,6 +44,18 @@ vi.mock("../../../hooks/useFacetSearch", () => ({
   useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
 }));
 
+// Enter on a sentence calls `tracesV2.routeSearch`; nothing here presses
+// Enter, so the mutation hook is stubbed rather than mounting tRPC.
+vi.mock("~/utils/api", () => ({
+  api: {
+    tracesV2: {
+      routeSearch: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+    },
+  },
+}));
+
 vi.mock("@paper-design/shaders-react", () => ({
   MeshGradient: () => null,
 }));

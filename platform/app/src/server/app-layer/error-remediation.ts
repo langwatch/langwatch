@@ -82,6 +82,12 @@ const registry = {
       "Check the filter syntax near the indicated position; filters are field:value pairs combined with AND/OR",
     ],
   },
+  filter_too_complex: {
+    tips: [
+      "Wrap a sentence in double quotes so it counts as one phrase instead of one term per word",
+      "Keep the filter under meta.maxNodes terms and operators in total",
+    ],
+  },
   filter_field_unknown: {
     tips: [
       "Use one of the fields listed in meta.knownFields",
