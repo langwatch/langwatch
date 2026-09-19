@@ -343,6 +343,16 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
       (action === "findMany" && isCliLoginKeySweep(clause)),
   },
   RoutingPolicy: {},
+  // How a connected self-hosted customer is invoiced (ADR-139, section 7).
+  // One row per organization, so organizationId or the row id covers the
+  // operator surfaces. The two provider ids are the other way in: the webhook
+  // knows the customer an event names, and roll-forward knows the subscription
+  // an invoice rode on. Each names exactly one organization.
+  ConnectedBillingAccount: {
+    extraBound: ({ clause }) =>
+      typeof clauseField(clause, "stripeCustomerId") === "string" ||
+      typeof clauseField(clause, "usageSubscriptionId") === "string",
+  },
   // Governance identity (ADR-128 §11). Every read and write names its
   // organization: these are admin-curated rows about people a provider put on a
   // cost row, and there is no query shape that wants more than one tenant's.

@@ -471,6 +471,12 @@ type Claims struct {
 	// than the claim sees nothing at all; both decode to 0, which means the
 	// key never expires.
 	VirtualKeyExpiresAt int64
+	// ConnectServices is the connect_services claim: the hosted services the
+	// license behind the presented token is entitled to. Non-nil only when the
+	// control plane sent the claim, which it does for a license token and for
+	// nothing else, so an absent claim stays nil and a license entitled to
+	// nothing decodes to an empty non-nil slice.
+	ConnectServices []string
 }
 
 func extractClaims(m map[string]any) *Claims {
@@ -493,16 +499,33 @@ func extractClaims(m map[string]any) *Claims {
 	if v, ok := m["vk_expires_at"].(float64); ok {
 		c.VirtualKeyExpiresAt = int64(v)
 	}
+	if v, ok := m["connect_services"].([]any); ok {
+		c.ConnectServices = connectServicesClaim(v)
+	}
 	return c
+}
+
+// connectServicesClaim reads the claim's array as service names. Built with a
+// zero-length make rather than a nil slice so a license entitled to nothing
+// still reports as a license credential.
+func connectServicesClaim(raw []any) []string {
+	services := make([]string, 0, len(raw))
+	for _, entry := range raw {
+		if name, ok := entry.(string); ok && name != "" {
+			services = append(services, name)
+		}
+	}
+	return services
 }
 
 func claimsToBundle(c *Claims) *domain.Bundle {
 	b := &domain.Bundle{
-		VirtualKeyID:   c.VirtualKeyID,
-		ProjectID:      c.ProjectID,
-		TeamID:         c.TeamID,
-		OrganizationID: c.OrganizationID,
-		ExpiresAt:      time.Unix(c.ExpiresAt, 0),
+		VirtualKeyID:    c.VirtualKeyID,
+		ProjectID:       c.ProjectID,
+		TeamID:          c.TeamID,
+		OrganizationID:  c.OrganizationID,
+		ExpiresAt:       time.Unix(c.ExpiresAt, 0),
+		ConnectServices: c.ConnectServices,
 	}
 	// A zero claim stays the zero time rather than becoming 1970, which every
 	// clock comparison would read as an expired key.

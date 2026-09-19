@@ -24,6 +24,7 @@ import { batchRecordRouter } from "./routers/batchRecord";
 import { bugReportsRouter } from "./routers/bugReports";
 import { codingAgentsRouter } from "./routers/codingAgents";
 import { connectRouter } from "./routers/connect";
+import { connectedBillingRouter } from "./routers/connectedBilling";
 import { costsRouter } from "./routers/costs";
 import { currencyRouter } from "./routers/currency";
 import { dashboardsRouter } from "./routers/dashboards";
@@ -171,6 +172,7 @@ const coreRouters = {
   licenseRegistry: licenseRegistryRouter,
   licenseEnforcement: licenseEnforcementRouter,
   connect: connectRouter,
+  connectedBilling: connectedBillingRouter,
   scimToken: scimTokenRouter,
   roleBinding: roleBindingRouter,
   apiKey: apiKeyRouter,

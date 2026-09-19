@@ -3407,6 +3407,23 @@ const presentations = {
     describe: () =>
       "An operator turns it on in the deployment configuration. Until then this install calls no hosted service.",
   },
+  // Invoice billing for a connected customer. The reader is an operator in
+  // the backoffice, never the customer.
+  connected_billing_commit_mismatch: {
+    title: "The commit does not match the license",
+    describe: () =>
+      "Billing follows the commit agreed on the license. Set the license terms first, then run this with the same amount.",
+  },
+  connected_billing_not_onboarded: {
+    title: "This customer has no billing account yet",
+    describe: () =>
+      "Onboard the customer first: that creates the billing customer, the usage subscription and the commit.",
+  },
+  connected_billing_unavailable: {
+    title: "Billing is only available on LangWatch Cloud",
+    describe: () =>
+      "This deployment has no payment provider. Connected customers are billed from LangWatch Cloud.",
+  },
   connect_unreachable: {
     // The reader runs the network this install sits in, so the sentence names
     // what an outbound rule has to allow rather than describing the failure.

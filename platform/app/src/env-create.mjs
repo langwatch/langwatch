@@ -728,6 +728,10 @@ export function createEnvConfig() {
       STRIPE_WEBHOOK_SECRET: z.string().optional(),
       STRIPE_LICENSE_PAYMENT_LINK_ID: z.string().optional(),
       STRIPE_LICENSE_PAYMENT_LINK_URL: z.string().optional(),
+      /// Bank details printed on the invoices of a customer that wires the
+      /// money instead of paying into a virtual bank account. Empty means the
+      /// invoice carries no footer.
+      LANGWATCH_BILLING_BANK_DETAILS: z.string().optional(),
       ADMIN_EMAILS: z.string().optional(),
       HUBSPOT_PORTAL_ID: z.string().optional(),
       HUBSPOT_REACHED_LIMIT_FORM_ID: z.string().optional(),
@@ -943,6 +947,8 @@ export function createEnvConfig() {
         process.env.STRIPE_LICENSE_PAYMENT_LINK_ID,
       STRIPE_LICENSE_PAYMENT_LINK_URL:
         process.env.STRIPE_LICENSE_PAYMENT_LINK_URL,
+      LANGWATCH_BILLING_BANK_DETAILS:
+        process.env.LANGWATCH_BILLING_BANK_DETAILS,
       ADMIN_EMAILS: process.env.ADMIN_EMAILS,
       HUBSPOT_PORTAL_ID: process.env.HUBSPOT_PORTAL_ID,
       HUBSPOT_REACHED_LIMIT_FORM_ID: process.env.HUBSPOT_REACHED_LIMIT_FORM_ID,

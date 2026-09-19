@@ -794,6 +794,7 @@ model Organization {
   /// success. Settings, Connect renders the copy for it.
   connectLastSyncError   String?
   issuedLicenses         IssuedLicense[]
+  connectedBilling       ConnectedBillingAccount?
   gatewayChangeEvents    GatewayChangeEvent[]
   routingPolicies        RoutingPolicy[]
   ingestionSources       IngestionSource[]
@@ -922,6 +923,118 @@ model LicenseSeatReport {
 
   @@unique([licenseId, quarterStartsAt])
   @@index([licenseId])
+}
+
+/// How a connected customer is invoiced (ADR-139, section 7): one payment
+/// provider customer, one quarterly usage subscription in USD, and the
+/// commercial terms the annual invoice was raised from.
+///
+/// One row per organization. Every write through it is addressed by a stored
+/// provider id, so running onboarding or a renewal twice changes nothing.
+model ConnectedBillingAccount {
+  id             String       @id @default(nanoid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  /// The customer at the payment provider. Invoiced, never charged.
+  stripeCustomerId        String  @unique
+  /// The one metered subscription, and the item hosted usage is reported on.
+  /// Null between the customer being created and the subscription existing,
+  /// which is where a half-finished onboarding resumes from.
+  usageSubscriptionId     String?
+  usageSubscriptionItemId String?
+
+  termStartsAt DateTime
+  termEndsAt   DateTime
+  /// Prepaid usage for the term, in USD cents. The credit grants add up to it.
+  commitUsdCents Int @default(0)
+
+  /// The seat contract, which may be in another currency than hosted usage.
+  seatCurrency  Currency
+  seatRateCents Int
+  seats         Int
+
+  /// `us_bank_transfer` or `eu_bank_transfer` when the customer pays into a
+  /// virtual bank account at the provider. Null when it wires to LangWatch's
+  /// own account and finance marks the invoice paid.
+  bankTransferType    String?
+  bankTransferCountry String?
+  billingEmail        String
+
+  /// A renewal whose credit is waiting for the last usage invoice of the old
+  /// term to be finalized: the new term's end and commit, and who asked.
+  pendingRenewal Json?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+}
+
+/// Why a credit was granted. The amount is always prepaid, never promotional.
+enum ConnectedCreditGrantKind {
+  /// The commit agreed for the term, granted at onboarding.
+  commit
+  /// More commit bought mid-term.
+  added
+  /// The commit of a new term, granted once the old term's last invoice closed.
+  renewal
+}
+
+/// A paid credit at the payment provider, which only metered usage draws down.
+/// Kept here so a grant is created once per reason and the backoffice can show
+/// what the customer holds without asking the provider.
+model ConnectedCreditGrant {
+  id String @id @default(nanoid())
+  /// The `ConnectedBillingAccount` row. A plain column ref, like
+  /// `LicenseSeatReport.licenseId`: relationMode="prisma" carries no foreign keys.
+  accountId String
+  /// The grant at the payment provider. Unique, so a retry records one row.
+  stripeCreditGrantId String                   @unique
+  amountUsdCents      Int
+  kind                ConnectedCreditGrantKind
+  /// The term this credit was granted for, and when the provider lets it lapse:
+  /// after the last invoice of that term has been finalized, never on the day
+  /// the term ends.
+  termEndsAt DateTime
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([accountId])
+}
+
+/// What an invoice of a connected customer is for.
+enum ConnectedInvoiceKind {
+  /// The one-off invoice raised at onboarding or renewal: seats and commit.
+  annual
+  /// Seats added during a quarter, prorated to the end of the term.
+  seat_trueup
+  /// A quarter of metered hosted usage.
+  usage
+}
+
+/// An invoice LangWatch raised for a connected customer, as the backoffice
+/// reads it and as roll-forward decides whether it already acted on one.
+model ConnectedInvoice {
+  id String @id @default(nanoid())
+  /// The `ConnectedBillingAccount` row, as a plain column ref.
+  accountId       String
+  stripeInvoiceId String               @unique
+  kind            ConnectedInvoiceKind
+  currency        Currency
+  amountCents     Int
+  /// The provider's own status: `draft`, `open`, `paid`, `void` or `uncollectible`.
+  status          String
+  /// The pending invoice item a small usage invoice was carried into. Set once,
+  /// so the same invoice is never rolled forward twice.
+  rolledForwardTo String?
+  paidOutOfBandAt DateTime?
+  /// Which quarter a seat true-up invoice settles.
+  quarterStartsAt DateTime?
+  termStartsAt    DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now()) @updatedAt
+
+  @@index([accountId])
 }
 
 model ScimToken {
@@ -5606,4 +5719,67 @@ model IdentityMatchSuggestion {
   @@unique([organizationId, discoveredPersonId, userId])
   // The review surface reads one organization's candidates, strongest first.
   @@index([organizationId, score])
+}
+
+/// What the quarterly seat true-up of one connected license decided for one
+/// term quarter (ADR-139, section 7).
+///
+/// The row is written before the payment provider is called and completed
+/// after it, so a call that failed halfway is retried without inventing a
+/// second invoice. The unique pair keeps one quarter to one decision.
+model ConnectedSeatTrueUp {
+  id String @id @default(nanoid())
+  /// The `IssuedLicense` row. A plain column ref, like `LicenseSeatReport`:
+  /// relationMode="prisma" carries no foreign keys.
+  licenseId String
+  /// Start of the term quarter, counted in three-month steps from the
+  /// license's own `issuedAt`.
+  quarterStartsAt DateTime
+  /// The highest seat count the license reported in that quarter.
+  peakSeats Int
+  /// The peak minus the seats already invoiced for this term.
+  addedSeats Int
+  /// The prorated amount, in cents of `currency`. Zero when nothing is owed.
+  amountCents Int
+  currency    Currency
+  /// The one-off invoice the added seats were billed on.
+  stripeInvoiceId String?
+  state           ConnectedSeatTrueUpState
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([licenseId, quarterStartsAt])
+  @@index([state])
+}
+
+/// How the quarterly seat true-up ended for one license quarter.
+enum ConnectedSeatTrueUpState {
+  /// Recorded before the payment provider was called. A retry resumes here.
+  intent
+  /// The added seats were invoiced.
+  invoiced
+  /// The quarter closed with no seats to add.
+  nothing_to_invoice
+  /// The license did not sync during the quarter, so its peak is not known.
+  /// Shown in the backoffice for an operator to follow up.
+  flagged
+  /// A license with no seat overage allowance that never synced. It is
+  /// settled by the annual true-up instead.
+  skipped
+}
+
+/// The monthly usage statement one connected customer was sent (ADR-139,
+/// section 7). One row per account per month keeps the statement to one send,
+/// whatever runs the tick.
+model ConnectedStatement {
+  id String @id @default(nanoid())
+  /// The `ConnectedBillingAccount` row. A plain column ref.
+  accountId String
+  /// First day of the month the statement covers, in UTC.
+  month  DateTime
+  sentAt DateTime
+
+  @@unique([accountId, month])
+  @@index([accountId])
 }

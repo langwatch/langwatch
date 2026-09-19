@@ -158,6 +158,7 @@ describe("a license token on resolve-key (real PG + internal route)", () => {
   describe("given an active license registered to a customer with no team or project", () => {
     describe("when the install's token is resolved with its instance id", () => {
       /** @scenario A registered license resolves to the customer's managed key */
+      /** @scenario Forwarded calls are metered under the customer organization */
       it("is accepted and attributed to the customer organization", async () => {
         const license = await issue();
 

@@ -60593,6 +60593,171 @@ Used for dataset storage and ClickHouse cold storage/backups. See:
 
 ---
 
+# FILE: ./self-hosting/connect.mdx
+
+---
+title: "Connect: hosted services for a self-hosted install"
+description: "Let a licensed install call LangWatch-hosted services over one outbound connection, metered against your contract and capped from Settings"
+sidebarTitle: Connect
+keywords: connect, hosted services, self-hosted, license sync, seats, instant evals judge, managed models, metered usage
+---
+
+Connect is a deployment switch that opens one outbound connection from a licensed self-hosted install to LangWatch, for two hosted services: the Instant Evals judge and managed models. Everything else keeps running on your own infrastructure.
+
+Each hosted service starts off. An organization admin switches on the ones they want in **Settings → Connect**, and the same page shows what has been spent, the cap the install stops at, and the credit that is left.
+
+Connect is off unless an operator turns it on. An install that upgrades and changes no value opens no connection to LangWatch.
+
+<Info>
+**Also check:** [Editions and licensing](/self-hosting/licensing), [Instant Evals](/features/instant-evals/overview), [Environment variables](/self-hosting/configuration/environment-variables).
+</Info>
+
+## What leaves the install
+
+Each service states what it sends before you switch it on. Your traces, datasets, saved prompts and your own model provider keys stay on your infrastructure whichever services are on.
+
+| What is on | What this install sends to LangWatch |
+|---|---|
+| Instant Evals | The judged text and the questions asked about it. LangWatch judges them and does not keep them. |
+| Managed models | The prompts and completions of the calls you route to a `langwatch/` model. |
+| License sync, with Connect on | The license token, the instance id, the app version, and two counts: members and lite members. No organization name. |
+
+The daily usage statistics post keeps the payload it always had and travels to the connect host while Connect is on. `DISABLE_USAGE_STATS=true` still turns it off, as before.
+
+## Turn Connect on
+
+You need a license whose terms include the hosted services you want. Ask LangWatch for one before you switch anything on.
+
+On Helm, set the switch. The endpoints default to LangWatch's own hosts, so you name them only when LangWatch gave you different ones.
+
+```yaml
+app:
+  connect:
+    enabled: true
+    # Both optional, shown here as the values they default to.
+    gatewayEndpoint: "https://gateway.langwatch.ai"
+    licenseEndpoint: "https://connect.langwatch.ai"
+    # Set this only when you have a reason to name the identity yourself.
+    instanceId: ""
+```
+
+The chart writes these as environment variables on the app and the workers. Set them directly on any other deployment method:
+
+| Variable | Default | What it does |
+|---|---|---|
+| `LANGWATCH_CONNECT_ENABLED` | off | Turns Connect on. With it off, the install reads none of the variables below and opens no connection to LangWatch. |
+| `LANGWATCH_CONNECT_GATEWAY_ENDPOINT` | `https://gateway.langwatch.ai` | Where hosted services are called. |
+| `LANGWATCH_CONNECT_LICENSE_ENDPOINT` | `https://connect.langwatch.ai` | Where the daily license sync goes. |
+| `LANGWATCH_CONNECT_INSTANCE_ID` | the id of the organization whose license is used | The identity this install presents on both hosts. |
+
+Both endpoints must be `https`. Restart the app and the workers after changing any of them.
+
+### Outbound rules
+
+Connect needs two destinations open, both on port 443:
+
+```
+gateway.langwatch.ai:443
+connect.langwatch.ai:443
+```
+
+Behind a forward proxy, set `HTTPS_PROXY` (and `NO_PROXY` for the hosts that skip it) on the app and the worker pods. The install sends its hosted calls and its license sync through the proxy when any of `HTTPS_PROXY`, `HTTP_PROXY` or `NO_PROXY` is set.
+
+### The instance id
+
+The default instance id is the id of the organization whose license is used, so it survives restarts, backups and hostname changes. LangWatch binds your license to the first install that presents it.
+
+A second install running a copy of the database presents another id and is refused with `connect_wrong_instance`. If you rebuilt or moved an install on purpose, ask LangWatch to reset the binding.
+
+## What an admin sees in Settings, Connect
+
+**Settings → Connect** is on a self-hosted install only, next to **License**. Every member of the organization can open it; changing a service or the cap needs organization management rights.
+
+| Section | What it shows |
+|---|---|
+| Hosted services | One row per service, each off until you switch it on, with the sentences naming what leaves the install. A service your license does not include cannot be switched on. |
+| Spend | Spent, cap and remaining, and the day the current period started. A figure reads "Not available" while the spend ledger cannot be read. |
+| Spending cap in USD | The cap you set yourself, between zero and the maximum your contract allows. A higher number is refused and the message names the maximum. |
+| License sync | The last successful sync, the extra seats your lease allows, and any sync failure, from the first one. |
+
+Switching a service on or off takes effect within a minute, with no restart.
+
+## What does the license sync send
+
+Two minutes after boot and once a day after that, the install posts to `connect.langwatch.ai`: its license token, its instance id, the app version it runs, and two seat counts, members and lite members.
+
+LangWatch answers with a lease signed by the same key pair that signs your license, so the install verifies it with the public key it already carries. The lease names the services your license includes, the seats you may run over the licensed count, and the day the allowance runs out.
+
+## Seats over your license
+
+The lease lets you go over the licensed seat count by an allowance, 20% of your licensed seats rounded up by default, so you can add people mid-term without waiting for a new license. Your contract can name a different allowance.
+
+The members page shows the licensed count, the seats in use and the seats that will be invoiced at the next quarterly true-up, and the invitation flow says so when a seat goes over the license.
+
+### When sync fails
+
+The allowance holds for 14 days without comment. From day 14 the admins see a warning in Settings, Connect naming the day the extra seats are withdrawn, which is day 30. After day 30 the install is back on the licensed seat count as a hard cap.
+
+Existing members keep their access throughout. The extra seats come back on the next successful sync, and the failure itself is shown from the first one, so an outbound rule can be fixed long before the warning.
+
+## License renewal
+
+A renewed or reissued license reaches the install in the sync answer, and the install applies it through the same validation a pasted key gets. There is no key to receive by email and paste.
+
+A delivered license that does not verify is not applied. The install keeps the license it has and shows the failure in Settings, Connect.
+
+## Instant Evals through Connect
+
+An install with its own `JEV_API_KEY` judges with that key and is unchanged by Connect: its evaluations stay on your infrastructure whatever else is switched on.
+
+Without a judge key, switch **Instant Evals** on in Settings, Connect and the install judges through LangWatch. An organization that has not switched it on publishes the eval functions as unavailable, so a query never comes back with judged columns that are all empty.
+
+Judging is charged at the list rate, 0.0546 USD per million input tokens the judge reads, and counts against your cap. The 1 USD free budget of the Cloud free plan does not apply here: your commit and your cap govern instead. See [Limits and cost](/features/instant-evals/limits-and-cost) for what a run reads and costs.
+
+## Managed models
+
+With **Managed models** on, the LangWatch AI Gateway in your install can call a model LangWatch runs by spelling the model with a `langwatch/` prefix:
+
+```bash
+curl https://<your-gateway>/v1/chat/completions \
+  -H "Authorization: Bearer <your virtual key>" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "langwatch/gpt-5-mini", "messages": [{"role": "user", "content": "hi"}]}'
+```
+
+Your own providers are untouched: a model spelled without the prefix goes to your own credentials as before. Calls to a `langwatch/` model are metered against the same cap as every other hosted service.
+
+## Air-gapped installs
+
+With Connect off, which is the default, the install opens no connection to LangWatch: no sync, no hosted service, and the licensed seat count is enforced as a hard cap. Upgrading to a release that carries Connect changes none of that until an operator sets `app.connect.enabled`.
+
+## Errors an admin can meet
+
+| Code | What it means | What to do |
+|---|---|---|
+| `connect_disabled` | Connect is off in the deployment configuration. | Set `app.connect.enabled` (or `LANGWATCH_CONNECT_ENABLED`) and restart. |
+| `connect_unreachable` | The install could not reach LangWatch. | The message names the host and port an outbound rule has to allow. |
+| `connect_license_not_registered` | LangWatch has no record of this license for hosted services. | Contact LangWatch to have hosted services set up for your license. |
+| `connect_license_revoked` | The license is no longer active. | Contact LangWatch for a new license. |
+| `connect_license_expired` | The term has ended. | Renew the license. |
+| `connect_wrong_instance` | The license is bound to another install. | Ask LangWatch to reset the binding if you rebuilt or moved this install. |
+| `connect_service_not_entitled` | The service is not part of your license. | Contact LangWatch to add it. |
+| `connect_budget_exhausted` | The cap has been reached and hosted calls stop. | An organization admin raises the cap in Settings, Connect, up to the contract maximum. |
+| `license_sync_failed` | The daily sync did not complete. | It runs again in a day. Your seats are unchanged until the lease runs out. |
+| `hosted_service_unavailable` | LangWatch did not answer. | No text was judged and no charge was made. Try again in a moment. |
+
+## How hosted usage is billed
+
+You prepay a usage commit for the term. It is charged at list rates as a line on the annual invoice, next to the seats, and hosted usage draws it down.
+
+When the commit is spent, hosted calls stop. They keep running past it only when your contract enables overage, which carries a maximum you agreed, and the cap you set in Settings, Connect can be anywhere between zero and that maximum.
+
+Overage is invoiced quarterly in arrears. Seats added over your licensed count are invoiced the same way, prorated to the end of the term: the annual seat rate times the days left after the quarter closes, per added seat.
+
+For a month with hosted usage, LangWatch emails a statement to your billing contact.
+
+---
+
 # FILE: ./self-hosting/deployment/argocd.mdx
 
 ---
@@ -63006,7 +63171,7 @@ Seats come in two kinds, and which one a person occupies follows from what they 
 </Note>
 
 <Note>
-Volume is bounded by your own hardware, not by us. Self-hosted deployments are not metered and send no usage back to LangWatch.
+Volume is bounded by your own hardware, not by us. Self-hosted deployments are not metered and send no usage back to LangWatch, unless you switch on [Connect](/self-hosting/connect), which meters the hosted services you turn on there.
 </Note>
 
 ## What an Enterprise license adds
@@ -63021,6 +63186,8 @@ Volume is bounded by your own hardware, not by us. Self-hosted deployments are n
 | **AI Governance** | Multi-source ingestion, anomaly rules, OCSF and SIEM export, [no-spy mode](/ai-governance/no-spy-mode). |
 | **Extended retention** | Multi-class retention policies configured per category. |
 | **Support and SLA** | Named contact, response targets, upgrade guidance. |
+
+A licensed install can also call LangWatch-hosted services, the Instant Evals judge and managed models, over one outbound connection. It is off until an operator turns it on, each service is switched on per organization, and what you spend is metered and capped on the LangWatch side against your contract. See [Connect](/self-hosting/connect).
 
 The Apache 2.0 floor and the Enterprise line are drawn per directory in the repository: the implementations of these capabilities live under [`platform/app/ee/`](https://github.com/langwatch/langwatch/tree/main/platform/app/ee), covered by the [Enterprise license](https://github.com/langwatch/langwatch/blob/main/platform/app/ee/LICENSE.md). See [Open-core licensing](/ai-governance/open-core-licensing) for the file-level map.
 
@@ -63102,7 +63269,7 @@ The SSO gate is deployment-wide: one genuinely licensed organization enables SSO
 </Accordion>
 
 <Accordion title="Does self-hosted send usage data to LangWatch?">
-No. Self-hosted deployments are not metered. [Billable events](/pricing/billable-events) apply to LangWatch Cloud.
+No, unless you switch on [Connect](/self-hosting/connect) and turn a hosted service on: LangWatch then meters what that service judges or serves, and the daily license sync reports your seat counts. With Connect off, a self-hosted deployment is not metered. [Billable events](/pricing/billable-events) apply to LangWatch Cloud.
 </Accordion>
 </AccordionGroup>
 

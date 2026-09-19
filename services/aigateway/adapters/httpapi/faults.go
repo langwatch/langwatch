@@ -81,6 +81,9 @@ func faultForCode(code herr.Code) Fault {
 		domain.ErrConnectInstanceRequired, domain.ErrConnectLicenseNotRegistered,
 		domain.ErrConnectLicenseRevoked, domain.ErrConnectLicenseExpired,
 		domain.ErrConnectWrongInstance,
+		// The license is live; the service it asked for is outside the
+		// contract. Only the customer can widen that.
+		domain.ErrConnectServiceNotEntitled,
 		domain.ErrNoProviderConfigured,
 		domain.ErrEndUserRequired,
 		// The customer's own OpenAI sign-in died and only they can restore it,

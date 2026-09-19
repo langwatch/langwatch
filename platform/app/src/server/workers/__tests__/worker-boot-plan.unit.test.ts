@@ -20,8 +20,23 @@ describe("resolveWorkerBootPlan", () => {
       "spend-spike-anomaly",
       "usage-stats",
       "license-sync",
+      "connected-billing",
       "realtime-session-poller",
     ]);
+  });
+
+  describe("given a connected self-hosted customer is invoiced from Cloud", () => {
+    it("boots the connected billing tick after the license sync", () => {
+      // The sync is what writes the seat peaks the true-up invoices from, so
+      // a worker that booted the billing tick first would run it against a
+      // registry nothing had reported into yet on a cold start.
+      const plan = resolveWorkerBootPlan({ shouldStartMetricsServer: true });
+
+      expect(plan).toContain("connected-billing");
+      expect(plan.indexOf("license-sync")).toBeLessThan(
+        plan.indexOf("connected-billing"),
+      );
+    });
   });
 
   describe("given the scenario processor claims jobs as soon as it boots", () => {

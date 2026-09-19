@@ -370,6 +370,55 @@ and not invoiced on a guess.
 A connected customer organization is not, so it is admitted explicitly through
 its `selfHostedCustomer` mark, or its hosted usage would never reach the meter.
 
+How it is built (`ee/billing/connected/`):
+
+- The commit is agreed on the license, in the registry (`commitUsdCents`), and
+  that is the one number the organization budget follows. Billing never sets a
+  cap of its own: onboarding and renewal refuse a commit that differs from the
+  license terms (`connected_billing_commit_mismatch`), adding commit mid-term
+  raises the license commit through the registry, and after each of these the
+  budget is synced from the terms; renewal also resets the budget window.
+- `ConnectedBillingService` keeps a `ConnectedBillingAccount` per organization
+  and stores every provider id before the next step runs (customer, usage
+  subscription and its item, each credit grant, each invoice), so a run that
+  failed halfway resumes from the ids it has and a repeat with the same terms
+  creates nothing twice: one grant per kind and term end, one annual invoice
+  per term start. The provider is a port; the Stripe adapter and the credit
+  grant resource (`ee/billing/stripe/creditGrants.ts`, pinned to API version
+  `2025-02-24.acacia` per request while the rest of the app keeps the SDK's
+  own version) sit behind it, and the unit tests run against fakes. The
+  catalog price `connected_hosted_usage_quarterly` is optional and may be
+  mapped in one Stripe mode and not the other, because these prices are
+  provisioned by hand per mode; a required price still carries both.
+- The credit grant expires 14 days after the term ends. A renewal stores a
+  pending renewal naming the old term's end and creates the renewal grant only
+  once a finalized usage invoice covers that period; `invoice.finalized` and
+  the daily tick both try to complete it.
+- A usage invoice under 50 USD is credited in full and its amount becomes a
+  pending item on the subscription with `rolled_forward_from` naming the
+  invoice; the stored invoice row remembers the item, so a second run moves
+  nothing.
+- The seat true-up (`seatTrueUp.service.ts`) runs daily on LangWatch Cloud and
+  decides each closed term quarter once, keyed `(licenseId, quarterStartsAt)`:
+  added seats are the quarter's peak from `LicenseSeatReport` minus the seats
+  on the account plus the seats of earlier quarters already invoiced or in
+  flight; the per-seat amount is the annual rate times the days remaining after
+  the quarter closes over the term days, rounded to the cent, then multiplied
+  (50 seats at 600 USD, 8 added with 183 of 365 days left: 8 x 300.82 =
+  2,406.56 USD; per seat first, so the unit amount and the quantity on the
+  invoice line multiply back to the total); an `intent` row is written before the provider call, which
+  carries an idempotency key, so a retry invoices once; a quarter without a
+  report is `flagged`, or `skipped` for a license with no allowance that never
+  synced; seats that went down are not credited back.
+- A connected customer's meter event is dated at the end of the month it
+  covers, because the quarterly invoice for that month is still open; a Cloud
+  customer's stays at the time of reporting, because its monthly invoice may
+  already be finalized. Either way the timestamp falls back to the time of
+  reporting when the period is older than the 35 days the meter accepts, and
+  the identifier names the period so the line stays attributable.
+- A monthly statement goes to the billing contact only for a month with usage,
+  once, recorded in `ConnectedStatement`.
+
 ### 8. The `langwatch` provider
 
 A self-hosted gateway gets a provider type `langwatch` that forwards
@@ -379,6 +428,30 @@ token and the instance id. It reuses the OpenAI-compatible dispatch lane that
 families; without that, `langwatch/gpt-5-mini` would be read as a model name
 and match no credential without an error. The entitlement is `managed_models`.
 Routing by evaluation results is not built.
+
+How it is built: the install's gateway gets a direct HTTP lane
+(`adapters/providers/langwatch.go`, the shape of the Codex lane), no Bifrost
+translation, because both sides speak the same OpenAI-compatible wire; it
+forwards chat completions, embeddings, responses and messages with the bare
+model name, `Authorization: Bearer <license token>` and `X-LangWatch-Instance`,
+relays status, body and headers unchanged (a 402 from the hosted budget and a
+`connect_service_not_entitled` reach the caller as they are), streams chunk by
+chunk, refuses a plain `http://` endpoint except on loopback, and logs the
+model, the status and the duration only. The install's control plane
+synthesizes the provider slot at materialisation when Connect is on and the
+organization has `managed_models` switched on, reading the token through the
+same credential the classifier uses; nothing is stored in a `ModelProvider`
+row, and the slot is folded into the configuration digest so a gateway
+refreshes when the service is switched on. On LangWatch Cloud the signed bundle
+of a license token carries a `connect_services` claim; dispatch refuses
+`connect_service_not_entitled` before provider resolution when
+`managed_models` is missing, and the scope resolver hands an entitled managed
+key the platform's shared providers, the ones a Cloud organization inherits
+from the environment keys. The platform providers are gated by the license
+entitlement rather than by `IS_SAAS`, because only the registry can grant one
+and the registry runs on Cloud. Spend lands on the gateway spend spine under
+the managed key and the customer organization, so it counts against the same
+contract budget as Instant Evals.
 
 ### 9. What the install decides, and where
 

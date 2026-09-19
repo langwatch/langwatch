@@ -134,6 +134,15 @@ export const goErrorCodes = {
    */
   connect_license_revoked: { service: "aigateway", httpStatus: 403 },
   /**
+   * ErrConnectServiceNotEntitled — means the license authenticated but does
+   * not include the hosted service the call needs. Distinct from every refusal
+   * above: the license is live and its other services keep working, so the fix
+   * is a change to the contract rather than to the install.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  connect_service_not_entitled: { service: "aigateway", httpStatus: 403 },
+  /**
    * ErrConnectWrongInstance — means the license is bound to another install.
    * Either the token leaked, or the install was rebuilt and an operator has to
    * reset the binding.

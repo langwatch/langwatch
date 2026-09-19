@@ -165,6 +165,11 @@ const (
 	// Either the token leaked, or the install was rebuilt and an operator has
 	// to reset the binding.
 	ErrConnectWrongInstance = herr.Code("connect_wrong_instance")
+	// ErrConnectServiceNotEntitled means the license authenticated but does
+	// not include the hosted service the call needs. Distinct from every
+	// refusal above: the license is live and its other services keep working,
+	// so the fix is a change to the contract rather than to the install.
+	ErrConnectServiceNotEntitled = herr.Code("connect_service_not_entitled")
 	// ErrHostedServiceUnavailable means the gateway could not get an answer
 	// from the control plane for a hosted-service call. Nothing was judged and
 	// nothing was charged, so the caller can retry.

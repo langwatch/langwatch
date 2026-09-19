@@ -45,6 +45,17 @@ export const HOSTED_SERVICES = [
       "Traces, prompts and datasets are never sent.",
     ],
   },
+  {
+    id: "managed_models",
+    name: "Managed models",
+    description:
+      "Calls a model on LangWatch when you write it as langwatch/<model>, so this install needs no provider account for it.",
+    dataStatements: [
+      "The prompts and completions of calls you route to a langwatch model are sent to LangWatch.",
+      "Calls to your own providers are unaffected and are never sent.",
+      "Traces, prompts and datasets are never sent.",
+    ],
+  },
 ] as const satisfies readonly HostedService[];
 
 /** A figure in United States dollars, or a plain statement that we have none. */

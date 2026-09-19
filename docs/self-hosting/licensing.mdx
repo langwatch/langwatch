@@ -38,7 +38,7 @@ Seats come in two kinds, and which one a person occupies follows from what they 
 </Note>
 
 <Note>
-Volume is bounded by your own hardware, not by us. Self-hosted deployments are not metered and send no usage back to LangWatch.
+Volume is bounded by your own hardware, not by us. Self-hosted deployments are not metered and send no usage back to LangWatch, unless you switch on [Connect](/self-hosting/connect), which meters the hosted services you turn on there.
 </Note>
 
 ## What an Enterprise license adds
@@ -53,6 +53,8 @@ Volume is bounded by your own hardware, not by us. Self-hosted deployments are n
 | **AI Governance** | Multi-source ingestion, anomaly rules, OCSF and SIEM export, [no-spy mode](/ai-governance/no-spy-mode). |
 | **Extended retention** | Multi-class retention policies configured per category. |
 | **Support and SLA** | Named contact, response targets, upgrade guidance. |
+
+A licensed install can also call LangWatch-hosted services, the Instant Evals judge and managed models, over one outbound connection. It is off until an operator turns it on, each service is switched on per organization, and what you spend is metered and capped on the LangWatch side against your contract. See [Connect](/self-hosting/connect).
 
 The Apache 2.0 floor and the Enterprise line are drawn per directory in the repository: the implementations of these capabilities live under [`platform/app/ee/`](https://github.com/langwatch/langwatch/tree/main/platform/app/ee), covered by the [Enterprise license](https://github.com/langwatch/langwatch/blob/main/platform/app/ee/LICENSE.md). See [Open-core licensing](/ai-governance/open-core-licensing) for the file-level map.
 
@@ -134,6 +136,6 @@ The SSO gate is deployment-wide: one genuinely licensed organization enables SSO
 </Accordion>
 
 <Accordion title="Does self-hosted send usage data to LangWatch?">
-No. Self-hosted deployments are not metered. [Billable events](/pricing/billable-events) apply to LangWatch Cloud.
+No, unless you switch on [Connect](/self-hosting/connect) and turn a hosted service on: LangWatch then meters what that service judges or serves, and the daily license sync reports your seat counts. With Connect off, a self-hosted deployment is not metered. [Billable events](/pricing/billable-events) apply to LangWatch Cloud.
 </Accordion>
 </AccordionGroup>

@@ -322,6 +322,21 @@ async function bootLicenseSyncWorker(
   }
 }
 
+// The daily billing tick of a connected self-hosted customer (no-op off
+// LangWatch Cloud).
+async function bootConnectedBillingWorker(
+  shutdownHandles: ShutdownHandles,
+): Promise<void> {
+  const { startConnectedBillingWorker } = await import(
+    "~/server/connectedBillingWorker"
+  );
+  const connectedBillingWorker = startConnectedBillingWorker();
+  if (connectedBillingWorker) {
+    shutdownHandles.push(() => connectedBillingWorker.stop());
+    logger.info("connected billing worker ready");
+  }
+}
+
 /**
  * The worker's liveness path. Deliberately UNAUTHENTICATED and deliberately
  * not `/metrics`.
@@ -735,6 +750,9 @@ export async function startWorkers(
           break;
         case "license-sync":
           await bootLicenseSyncWorker(shutdownHandles);
+          break;
+        case "connected-billing":
+          await bootConnectedBillingWorker(shutdownHandles);
           break;
         case "realtime-session-poller":
           await bootRealtimeSessionPoller(shutdownHandles);

@@ -2014,6 +2014,7 @@ func registerErrorStatusesOnce() {
 	herr.RegisterStatus(domain.ErrConnectLicenseRevoked, http.StatusForbidden)
 	herr.RegisterStatus(domain.ErrConnectLicenseExpired, http.StatusForbidden)
 	herr.RegisterStatus(domain.ErrConnectWrongInstance, http.StatusForbidden)
+	herr.RegisterStatus(domain.ErrConnectServiceNotEntitled, http.StatusForbidden)
 	herr.RegisterStatus(domain.ErrHostedServiceUnavailable, http.StatusServiceUnavailable)
 	herr.RegisterStatus(domain.ErrRateLimited, http.StatusTooManyRequests)
 	herr.RegisterStatus(domain.ErrBudgetExceeded, http.StatusPaymentRequired)

@@ -67,6 +67,21 @@ export function licenseTermQuarterStart({
   return addMonths(issuedAt, Math.max(0, quarters) * MONTHS_PER_QUARTER);
 }
 
+/**
+ * The start of the term quarter at `index`, counted from the license's own
+ * `issuedAt`. Quarter 0 starts on the day the license was issued, and quarter
+ * `n` ends where quarter `n + 1` starts.
+ */
+export function licenseTermQuarterStartAt({
+  issuedAt,
+  index,
+}: {
+  issuedAt: Date;
+  index: number;
+}): Date {
+  return addMonths(issuedAt, index * MONTHS_PER_QUARTER);
+}
+
 /** The key a quarter's row is stored under. */
 export function seatQuarterKeyFor({
   licenseId,

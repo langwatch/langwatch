@@ -310,6 +310,132 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       return null;
     },
   },
+  // What the quarterly seat true-up decided for one license quarter
+  // (ADR-139). Scoped like `LicenseSeatReport` above and for the same reason:
+  // the parent `IssuedLicense` row names the customer. The backoffice reads it
+  // for the licenses it already listed, so it passes `licenseId: { in: [...] }`
+  // rather than filtering on `state` alone.
+  ConnectedSeatTrueUp: {
+    validateWhere: (where) => {
+      const reason = "requires a row id or licenseId in the where clause";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.licenseId === "string" ||
+          (c.licenseId &&
+            Array.isArray(c.licenseId.in) &&
+            c.licenseId.in.length > 0) ||
+          // The compound unique, as `findUnique` spells it.
+          typeof c.licenseId_quarterStartsAt?.licenseId === "string",
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const record of records) {
+        if (!record) return "create requires a data payload";
+        if (typeof record.licenseId !== "string") {
+          return "create requires a licenseId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
+  // A paid credit at the payment provider (ADR-139). Its parent
+  // `ConnectedBillingAccount` row carries the organizationId; a grant is
+  // otherwise addressed by the provider's own id, which names one customer.
+  ConnectedCreditGrant: {
+    validateWhere: (where) => {
+      const reason =
+        "requires a row id, accountId or stripeCreditGrantId in the where clause";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.accountId === "string" ||
+          (c.accountId &&
+            Array.isArray(c.accountId.in) &&
+            c.accountId.in.length > 0) ||
+          typeof c.stripeCreditGrantId === "string",
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const record of records) {
+        if (!record) return "create requires a data payload";
+        if (typeof record.accountId !== "string") {
+          return "create requires an accountId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
+  // An invoice raised for a connected customer (ADR-139). Scoped like the
+  // grants above; the provider's invoice id is the other bounded way in,
+  // which is how a webhook finds the row for the invoice it was told about.
+  ConnectedInvoice: {
+    validateWhere: (where) => {
+      const reason =
+        "requires a row id, accountId or stripeInvoiceId in the where clause";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.accountId === "string" ||
+          (c.accountId &&
+            Array.isArray(c.accountId.in) &&
+            c.accountId.in.length > 0) ||
+          typeof c.stripeInvoiceId === "string",
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const record of records) {
+        if (!record) return "create requires a data payload";
+        if (typeof record.accountId !== "string") {
+          return "create requires an accountId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
+  // The monthly statement one connected customer was sent (ADR-139). Its
+  // parent `ConnectedBillingAccount` row carries the organizationId, so every
+  // query here names the account.
+  ConnectedStatement: {
+    validateWhere: (where) => {
+      const reason = "requires a row id or accountId in the where clause";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          hasIdOrInPredicate(c) ||
+          typeof c.accountId === "string" ||
+          (c.accountId &&
+            Array.isArray(c.accountId.in) &&
+            c.accountId.in.length > 0) ||
+          // The compound unique, as `findUnique` spells it.
+          typeof c.accountId_month?.accountId === "string",
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const record of records) {
+        if (!record) return "create requires a data payload";
+        if (typeof record.accountId !== "string") {
+          return "create requires an accountId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
   // Idempotency receipts carry their tenancy on `scopeId` alone: the project
   // on the gateway platform's creates, the organization on the webhook
   // platform's. Every query names either the row id just claimed or the

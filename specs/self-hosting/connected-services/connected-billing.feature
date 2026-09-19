@@ -21,72 +21,72 @@ Feature: Billing a connected self-hosted customer
   # Onboarding
   # ============================================================================
 
-  @unit @unimplemented
+  @unit
   Scenario: Onboarding creates an invoice customer
     When an operator onboards "ACME" with a term of one year, a commit of 1000 USD and payment by bank transfer
     Then a billing customer exists for "ACME" that is invoiced rather than charged, with 30 days to pay
     And bank transfer is offered on its invoices
 
-  @unit @unimplemented
+  @unit
   Scenario: Onboarding subscribes the customer to metered usage invoiced quarterly
     When an operator onboards "ACME"
     Then "ACME" has a subscription whose only item is metered hosted usage
     And it is invoiced every three months from the start of the term
 
-  @unit @unimplemented
+  @unit
   Scenario: The prepaid commit becomes a credit that only applies to metered usage
     When an operator onboards "ACME" with a commit of 1000 USD
     Then "ACME" holds a paid credit of 1000 USD that applies to metered usage only
 
-  @unit @unimplemented
+  @unit
   Scenario: The commit is charged on the annual invoice, the credit charges nothing
     When an operator onboards "ACME" with 50 seats and a commit of 1000 USD
     Then the annual one-off invoice for "ACME" has a line for the seats and a line for the 1000 USD commit
     And creating the credit does not create an invoice of its own
 
-  @unit @unimplemented
+  @unit
   Scenario: The usage subscription is in USD whatever the seat currency
     When an operator onboards "ACME" with seats invoiced in EUR
     Then the annual invoice is in EUR
     And the usage subscription and the credit are in USD
 
-  @unit @unimplemented
+  @unit
   Scenario: The commit credit outlives the last invoice of the term
     When an operator onboards "ACME" with a term ending on a given day
     Then the credit expires after the invoice for the last quarter of the term has been finalized
     And use after the end of the term is stopped by the budget and the license, not by the credit
 
-  @unit @unimplemented
+  @unit
   Scenario: The organization budget equals the commit
     When an operator onboards "ACME" with a commit of 1000 USD
     Then "ACME" has an organization budget of 1000 USD that blocks when spent
     And the budget runs for the contract term rather than a calendar month
 
-  @unit @unimplemented
+  @unit
   Scenario: Onboarding twice does not create anything twice
     Given "ACME" was already onboarded
     When an operator runs onboarding for "ACME" again with the same terms
     Then there is still one billing customer, one subscription, one credit and one budget
 
-  @unit @unimplemented
+  @unit
   Scenario: Onboarding that fails halfway can be resumed
     Given onboarding created the billing customer and then failed
     When an operator runs onboarding for "ACME" again
     Then the existing billing customer is reused and the remaining steps complete
 
-  @unit @unimplemented
+  @unit
   Scenario: Onboarding without a commit gives no hosted usage
     When an operator onboards "ACME" with no commit and overage off
     Then "ACME" has a budget of zero
     And hosted services answer 402 until a commit is added
 
-  @unit @unimplemented
+  @unit
   Scenario: A customer who cannot pay through a virtual bank account is invoiced without one
     When an operator onboards "ACME" with payment by wire outside the payment provider
     Then its invoices are sent without bank transfer instructions from the payment provider
     And finance can mark them paid once the wire arrives
 
-  @unit @unimplemented
+  @unit
   Scenario: Onboarding is refused outside LangWatch Cloud
     Given a deployment that is not LangWatch Cloud
     When onboarding is attempted
@@ -96,7 +96,7 @@ Feature: Billing a connected self-hosted customer
   # Adding commit mid-term
   # ============================================================================
 
-  @unit @unimplemented
+  @unit
   Scenario: Adding commit raises the credit and the budget together
     Given "ACME" was onboarded with a commit of 1000 USD
     When an operator adds a commit of 500 USD
@@ -107,21 +107,21 @@ Feature: Billing a connected self-hosted customer
   # Renewal
   # ============================================================================
 
-  @unit @unimplemented
+  @unit
   Scenario: Renewal keeps the one usage subscription and resets the budget
     Given "ACME" was onboarded for a first term
     When an operator renews "ACME" for a second term with a commit of 2000 USD
     Then "ACME" still has one usage subscription
     And its budget is reset and set to 2000 USD for the new term
 
-  @unit @unimplemented
+  @unit
   Scenario: The renewal credit waits for the last usage invoice of the old term
     Given the last usage invoice of the old term has not been finalized
     When an operator renews "ACME"
     Then the credit for the new term is not created yet
     And it is created once that invoice is finalized
 
-  @unit @unimplemented
+  @unit
   Scenario: Overage from the old term is not absorbed by the new credit
     Given "ACME" ended its first term with 80 USD of overage
     When the renewal completes
@@ -132,32 +132,32 @@ Feature: Billing a connected self-hosted customer
   # Small invoices and payment
   # ============================================================================
 
-  @unit @unimplemented
+  @unit
   Scenario: A usage invoice under 50 USD is rolled forward
     Given a quarterly usage invoice for "ACME" of 12 USD
     When the roll-forward runs for that invoice
     Then the invoice is credited in full
     And 12 USD is added to the next quarterly invoice of "ACME"
 
-  @unit @unimplemented
+  @unit
   Scenario: A usage invoice of 50 USD or more is left alone
     Given a quarterly usage invoice for "ACME" of 50 USD
     When the roll-forward runs for that invoice
     Then nothing is changed
 
-  @unit @unimplemented
+  @unit
   Scenario: Rolling the same invoice forward twice moves the amount once
     Given a small usage invoice was already rolled forward
     When the roll-forward runs for it again
     Then no second credit and no second carried amount is created
 
-  @unit @unimplemented
+  @unit
   Scenario: An invoice shows the payment instructions that fit the customer
     Given "ACME" pays by wire to the LangWatch bank account
     When an invoice is created for "ACME"
     Then it shows the LangWatch bank details and no payment provider bank transfer instructions
 
-  @integration @unimplemented
+  @integration
   Scenario: Finance marks an invoice paid out of band from the backoffice
     Given an open invoice for "ACME" that was paid by wire
     When an operator marks it paid out of band
@@ -168,34 +168,34 @@ Feature: Billing a connected self-hosted customer
   # Usage metering
   # ============================================================================
 
-  @unit @unimplemented
+  @unit
   Scenario: Hosted usage of a connected customer reaches its metered subscription
     Given "ACME" was onboarded
     And hosted spend was recorded under "ACME"
     When usage is reported for the month
     Then the spend is reported to the hosted usage meter for the billing customer of "ACME"
 
-  @unit @unimplemented
+  @unit
   Scenario: A connected customer is not skipped for lacking a Cloud plan
     Given "ACME" is a self-hosted customer with no LangWatch Cloud plan
     And hosted spend was recorded under "ACME"
     When usage is reported for the month
     Then "ACME" is not skipped as an organization that is not billed for usage
 
-  @unit @unimplemented
+  @unit
   Scenario: An organization that is neither usage billed nor a self-hosted customer is still skipped
     Given an organization on a plan that is not billed for usage and that is not a self-hosted customer
     When usage is reported for the month
     Then it is skipped as before
 
-  @unit @unimplemented
+  @unit
   Scenario: Usage older than the meter accepts is not sent with a stale timestamp
     Given hosted spend from more than 35 days ago that was never reported
     When usage is reported
     Then the meter event carries a timestamp the meter accepts
     And the amount is still reported in full
 
-  @unit @unimplemented
+  @unit
   Scenario: Reporting the same usage twice does not double it
     Given usage for the month was already reported
     When usage is reported for the month again with no new spend
@@ -205,7 +205,7 @@ Feature: Billing a connected self-hosted customer
   # Quarterly seat true-up
   # ============================================================================
 
-  @unit @unimplemented
+  @unit
   Scenario: Seats added during a quarter are invoiced prorated to the end of the term
     Given "ACME" is licensed for 50 seats at 600 USD per seat per year, for a term of 365 days
     And the highest seat count it reported in the first quarter was 53
@@ -215,67 +215,67 @@ Feature: Billing a connected self-hosted customer
     And its amount is 3 seats at 600 USD, times 274 over 365, rounded to the cent
     And nothing is charged for days before the quarter closed
 
-  @unit @unimplemented
+  @unit
   Scenario: The seat true-up is its own invoice in the currency of the seat contract
     Given "ACME" pays for seats in EUR and for hosted usage in USD
     When the seat true-up runs for a quarter with added seats
     Then a one-off invoice in EUR is created for the added seats
     And the USD usage subscription is untouched
 
-  @unit @unimplemented
+  @unit
   Scenario: The true-up only runs for a quarter that has closed
     Given the current quarter of the term has not closed
     When the seat true-up runs
     Then nothing is invoiced for the current quarter
 
-  @unit @unimplemented
+  @unit
   Scenario: Seats already invoiced are not invoiced again
     Given the first quarter true-up invoiced "ACME" for 3 added seats
     And the highest seat count it reported in the second quarter was 54
     When the seat true-up runs for the second quarter
     Then an invoice line for 1 added seat is created
 
-  @unit @unimplemented
+  @unit
   Scenario: A quarter with no added seats creates nothing
     Given the highest seat count "ACME" reported in the quarter was 50
     When the seat true-up runs for that quarter
     Then no invoice line is created
     And the quarter is recorded as done
 
-  @unit @unimplemented
+  @unit
   Scenario: Seats that went down are not credited back mid-term
     Given the first quarter true-up invoiced "ACME" for 3 added seats
     And the highest seat count it reported in the second quarter was 51
     When the seat true-up runs for the second quarter
     Then no invoice line and no credit is created
 
-  @unit @unimplemented
+  @unit
   Scenario: Running the true-up twice for one quarter invoices once
     Given the seat true-up already ran for the quarter
     When it runs again for the same quarter
     Then no second invoice line is created
 
-  @unit @unimplemented
+  @unit
   Scenario: A true-up that failed at the payment provider is retried without doubling
     Given the seat true-up recorded its intent and the payment provider call then failed
     When the true-up runs again
     Then the invoice line is created once
 
-  @unit @unimplemented
+  @unit
   Scenario: Seat invoices are never paid from the usage commit
     Given "ACME" has unspent usage commit
     When a seat true-up invoice is finalized
     Then it is owed in full
     And the usage commit is untouched by it
 
-  @unit @unimplemented
+  @unit
   Scenario: A customer that never synced is flagged, not invoiced on a guess
     Given "ACME" has a connected license that has not synced in the quarter
     When the seat true-up runs for that quarter
     Then no invoice line is created
     And the customer is flagged for follow-up in the backoffice
 
-  @unit @unimplemented
+  @unit
   Scenario: An air-gapped license is left to the annual true-up
     Given a license with no seat overage allowance that has never synced
     When the seat true-up runs
@@ -285,19 +285,19 @@ Feature: Billing a connected self-hosted customer
   # Monthly statement
   # ============================================================================
 
-  @unit @unimplemented
+  @unit
   Scenario: The billing contact receives a monthly usage statement
     Given "ACME" used hosted services during the month
     When the monthly statement runs
     Then the billing contact of "ACME" receives the spend for the month by service, the commit drawn down so far, the credit remaining and the seats licensed and reported
 
-  @unit @unimplemented
+  @unit
   Scenario: A month with no usage sends no statement
     Given "ACME" used no hosted services during the month
     When the monthly statement runs
     Then no statement is sent to "ACME"
 
-  @unit @unimplemented
+  @unit
   Scenario: The statement is sent once per month
     Given the statement for the month was already sent to "ACME"
     When the monthly statement runs again
@@ -307,13 +307,13 @@ Feature: Billing a connected self-hosted customer
   # Backoffice
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: The backoffice shows the commercial state of each connected customer
     Given "ACME" was onboarded, has used hosted services and has synced
     When an operator opens the customer in the backoffice
     Then they see the commit, the amount drawn down, the overage, the seats licensed and the seats reported, the time of the last sync and the open invoices
 
-  @unit @unimplemented
+  @unit
   Scenario: The backoffice says so when live spend cannot be read
     Given the spend ledger cannot be read
     When an operator opens the customer in the backoffice

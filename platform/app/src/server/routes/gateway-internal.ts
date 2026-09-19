@@ -453,7 +453,15 @@ async function resolveLicenseToken(
       refusal.status,
     );
   }
-  return keyResolutionResponse(c, { service, vk, notAfter: license.expiresAt });
+  // The license's services travel on the signed token, so the gateway can
+  // refuse a hosted service outside the contract before it resolves anything
+  // else about the request (ADR-139 section 8).
+  return keyResolutionResponse(c, {
+    service,
+    vk,
+    notAfter: license.expiresAt,
+    connectServices: license.services,
+  });
 }
 
 /** Sign for a key that may serve, and answer the gateway. */
@@ -463,10 +471,17 @@ async function keyResolutionResponse(
     service,
     vk,
     notAfter,
+    connectServices,
   }: {
     service: VirtualKeyService;
     vk: VirtualKeyWithScopes;
     notAfter: Date | null;
+    /**
+     * The hosted services of the license this key runs under. Undefined for a
+     * presented virtual key, which is what keeps the claim off tokens that
+     * have no license behind them.
+     */
+    connectServices?: string[];
   },
 ) {
   // Where this key's traces land, read off the key. Null for a key written
@@ -487,6 +502,7 @@ async function keyResolutionResponse(
     principal_id: vk.principalUserId,
     revision: vk.revision.toString(),
     notAfter,
+    ...(connectServices ? { connect_services: connectServices } : {}),
   });
 
   // Fire-and-forget last-used bump. Failures here must not deny the request.
