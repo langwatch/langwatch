@@ -117,6 +117,17 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       And the billable events identifier is unchanged from before the second meter existed
 
     @unit
+    Scenario: The Instant Eval meter is reported only once Stripe holds it
+      Given a Stripe mode whose catalog maps no Instant Evals meter yet
+      And an organization with Instant Eval spend this month
+      When the month is reported
+      Then the events meter is reported as usual
+      And no Instant Eval meter event is sent and its checkpoint is not advanced
+      # Stripe accepts an event for a meter that does not exist and drops it
+      # later, so reporting early would skip the usage for good. The first
+      # report after the meter is mapped carries the month from zero.
+
+    @unit
     Scenario: A month with no Instant Eval spend reports nothing on that meter
       Given an organization whose Instant Eval spend this month is zero
       When the month is reported
