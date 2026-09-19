@@ -1,0 +1,125 @@
+---
+title: Reading Instant Eval results
+sidebarTitle: Results
+keywords: langwatch, instant evals, results, verdicts, judgments dataset, sample, langwatchql join, matched conversations
+description: Page through a run's verdicts, read the text the judge saw beside each one, and query the judgments dataset with LangWatchQL to join verdicts to your traces.
+---
+
+## The headline and the first rows
+
+When a run finishes, the CLI prints one line with the totals and then the first twenty matched rows:
+
+```
+Found 3,351 matches in 10,000 conversations · 2m 26s · 11.4M tokens · $0.62
+```
+
+Each row shows the conversation or trace, the answer with its probability, such as `yes (0.94)`, and the start of the judged text. Copy the command on the last line to read the rest, and pass `--show 25` to print up to twenty five rows instead of twenty.
+
+## Every verdict
+
+```bash
+langwatch instant-eval results <run-id> --matched
+langwatch instant-eval results <run-id> --question annoyed --unmatched --limit 500
+langwatch instant-eval results <run-id> --status skipped
+langwatch instant-eval results <run-id> --matched -o json
+```
+
+Use `results` to page through the run's verdicts, one per row and question. Narrow it with:
+
+- `--question annoyed`: one question only
+- `--matched` or `--unmatched`: the yes or no verdicts that matched, or the ones that did not
+- `--status skipped`: only `judged`, `skipped` or `failed` rows
+
+You get up to 1,000 verdicts per page, and the last line prints the `--cursor` value to pass for the next page.
+
+The cursor is the only safe way to page while a run is still writing: a page read by cursor neither repeats a verdict nor skips one. In `-o json` a verdict looks like this:
+
+```json
+{
+  "traceId": "trace_01J8...",
+  "questionId": "annoyed",
+  "threadId": "thread_seed_1380",
+  "spanId": "",
+  "kind": "boolean",
+  "status": "judged",
+  "passed": true,
+  "probability": 0.78,
+  "score": null,
+  "label": null,
+  "probabilities": null,
+  "error": null,
+  "occurredAt": "2026-09-17T14:02:11.000Z"
+}
+```
+
+| Field | Set for |
+|---|---|
+| `passed`, `probability` | A yes or no question |
+| `score` | A score question |
+| `label`, `probability`, `probabilities` | A category question: the most likely option, its probability, and every option's probability |
+| `status`, `error` | Every verdict: `judged`, `skipped` (the judge declined the row) or `failed` (the judge could not be reached), with the reason in `error` | For example, a row is skipped when its text is too large even after cutting.
+
+## What did the judge read
+
+`sample` prints the text the judge read for a few rows, beside the verdict each one got:
+
+```bash
+langwatch instant-eval sample <run-id> -n 5
+```
+
+The rows are re-read through the run's own statement, so no row is judged again and you are not charged. A run with a yes or no question shows matched rows first, and the rows differ between calls, so run it a few times to read both sides of the line.
+
+The judged text is not stored with the verdict, so `sample` is how you read it.
+
+## The judgments dataset
+
+Every verdict is a row in the `judgments` view of [LangWatchQL](/api-reference/query/overview), kept until you delete the project. Join it to `traces` on `TraceId` to read verdicts beside anything else you know about the trace:
+
+```sql
+SELECT
+  t.Attributes['user.id'] AS user,
+  sum(j.Passed) AS annoyed,
+  count() AS conversations
+FROM analytics.judgments AS j
+JOIN analytics.traces AS t ON t.TraceId = j.TraceId
+WHERE j.RunId = {run:String}
+  AND j.QuestionId = 'annoyed'
+  AND j.CreatedAt >= subtractDays(now(), 7)
+  AND t.OccurredAt >= subtractDays(now(), 37)
+GROUP BY user
+ORDER BY annoyed DESC
+LIMIT 20
+```
+
+```bash
+langwatch query "$(cat by-user.sql)" --param run=<run-id>
+```
+
+| Column | What it holds |
+|---|---|
+| `RunId` | The run the verdict belongs to |
+| `TraceId`, `ThreadId`, `SpanId` | The trace whose text was judged, its conversation, and the span when the statement judged one span. `ThreadId` and `SpanId` are empty otherwise |
+| `QuestionId` | The question, named by its column in the run's statement |
+| `Kind` | `boolean`, `score` or `category` |
+| `Status` | `judged`, `skipped` or `failed` |
+| `Passed` | 1 or 0 for a yes or no question, null for the other kinds |
+| `Probability` | The probability of yes, or of the chosen label for a category question |
+| `Score` | The probability-weighted mean inside the declared range, for a score question |
+| `Label` | The most likely option, for a category question |
+| `Probabilities` | Every option's probability for a category question, as a JSON object |
+| `OccurredAt` | When the judged row happened, so a verdict can be joined to a trace inside a bounded period |
+| `CreatedAt` | When the verdict was written. Filter on it to keep the query fast |
+
+`langwatch query reference` lists the columns with their types, and `GET /api/v1/query/schema` returns the same over REST.
+
+## Rows the judge did not answer
+
+Run `status <run-id>` and look at the `Unjudged` line:
+
+```
+Unjudged: 12 failed, 3 skipped
+```
+
+When more than half of a page fails, LangWatch retries the page instead of writing it, so you get an answer for well over half the rows of any finished run.
+
+To read the rows it missed, pass `--status skipped` or `--status failed` to `results`. To get them judged, run a statement of your own over those trace ids.

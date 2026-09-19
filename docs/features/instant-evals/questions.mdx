@@ -1,0 +1,116 @@
+---
+title: Instant Evals questions
+sidebarTitle: Questions
+keywords: langwatch, instant evals, eval question, criteria, threshold, score, category, llm judge, questions file
+description: The three kinds of question a run can ask, how to sharpen a yes or no with criteria and a threshold, and how to ask up to ten questions of the same text in one run.
+---
+
+A question is what the judge is asked about each row. There are three kinds:
+
+1. Yes or no: a statement to confirm.
+2. Score: a rating on a scale you name.
+3. Category: one option out of a list you give.
+
+Each question becomes one column in the run's statement and one verdict per row.
+
+## A yes or no question
+
+```bash
+langwatch instant-eval run "the agent apologised" --target threads --last 7d
+```
+
+A yes or no question is a statement about the text, and the answer is the probability, between 0 and 1, that the statement is true. It counts as yes at 0.5 or above, and the probability is calibrated: of the rows that score 0.9, the statement holds for nine in ten.
+
+Write the question as a statement about the text, the way you would write a checklist item for a person: "the agent apologised", "the customer was told something wrong", "the tests the agent ran failed".
+
+## Say what counts with criteria
+
+```bash
+langwatch instant-eval run \
+  --ask "the customer sounds annoyed" \
+    --criteria "sarcasm, repetition or a raised voice count" \
+    --criteria "a calm complaint does not count" \
+  --target threads --last 7d
+```
+
+Write `--criteria` twice after the question it belongs to: first what counts as yes, then what does not. Use it when the sample shows the judge drawing the line somewhere other than where you would.
+
+For example, with only "the agent contacted the colleague", a ticket that mentions the colleague passes. With "a message sent to the colleague directly counts, a ticket that names them does not", it fails.
+
+## Move the threshold
+
+```bash
+langwatch instant-eval run "the agent apologised" --threshold 0.8 --target threads --last 7d
+```
+
+With a threshold, a row counts as yes at or above the number you give instead of 0.5. Raise it when you want only the rows the judge is sure about, and lower it when missing a row costs more than reading a false one. A question takes criteria or a threshold, not both.
+
+## A score
+
+```bash
+langwatch instant-eval run "How satisfied is the customer, from 1 for angry to 5 for delighted" \
+  --score 1..5 --target threads --last 7d
+```
+
+You get a score such as 2.26 for a conversation between 2 and 3, the probability-weighted mean over the levels, rather than a snap to one of them. A scale holds at most ten whole-numbered levels. Write both ends of the scale into the question, as the example does, so that 1 and 5 have a meaning.
+
+## A category
+
+```bash
+langwatch instant-eval run "what is the customer asking for" \
+  --category refund="wants money back" \
+  --category bug="reports something broken" \
+  --category other="anything else" \
+  --target threads --last 7d
+```
+
+Write each option as `name=what it means`, between 2 and 255 of them. You get the most likely option and its probability, plus every option's probability, so you can read the runner-up.
+
+A score or a category question counts its rows as judged rather than matched, so `--matched` on `results` and the matched count in the headline cover the yes or no questions only.
+
+## Several questions of one text
+
+```bash
+langwatch instant-eval run \
+  --ask "the customer sounds annoyed" --threshold 0.8 \
+  --ask "the agent apologised" \
+  --ask "what is the customer asking for" \
+    --category refund="wants money back" --category bug="reports something broken" \
+  --target threads --last 7d
+```
+
+You can ask up to ten questions per run, all of the same text. Put each `--criteria`, `--threshold`, `--score`, `--category` and `--id` after the `--ask` it belongs to. You pay for the text plus the questions, in one judge request per row, so ten questions cost about the same as one.
+
+## Questions from a file
+
+```json
+[
+  { "id": "annoyed", "kind": "boolean", "instructions": "the customer sounds annoyed",
+    "criteria": ["sarcasm, repetition or a raised voice count", "a calm complaint does not count"] },
+  { "id": "apologised", "kind": "boolean", "instructions": "the agent apologised", "threshold": 0.8 },
+  { "id": "satisfaction", "kind": "score",
+    "instructions": "How satisfied is the customer, from 1 for angry to 5 for delighted",
+    "range": { "min": 1, "max": 5 } },
+  { "id": "intent", "kind": "category", "instructions": "what is the customer asking for",
+    "options": [
+      { "name": "refund", "description": "wants money back" },
+      { "name": "bug", "description": "reports something broken" }
+    ] }
+]
+```
+
+```bash
+langwatch instant-eval run --questions-file questions.json --target threads --last 7d
+```
+
+The file is JSON or YAML with the same fields as the flags: `kind` is `boolean`, `score` or `category`; `criteria` is a list of two strings; `range` has `min` and `max`; `options` is a list of `name` and `description`. The REST API takes the same list as `questions`.
+
+## Naming a question
+
+Without a name, questions are called `q1`, `q2` and so on. Give one with `--id annoyed` after the `--ask`, or `id` in the file. The name shows up in three places:
+
+- as the column in the statement
+- as `questionId` on every verdict
+- as the value you pass to `results --question`
+
+A name is a plain column name: letters, digits and underscores. `TraceId`, `ThreadId`, `SpanId` and `OccurredAt` are taken by the row itself, and two questions cannot share a name.
