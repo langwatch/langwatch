@@ -12,6 +12,8 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { FormErrorDisplay } from "@langwatch/design-system/form-error-display";
+import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -19,8 +21,6 @@ import { z } from "zod";
 import { authClient } from "../../behavior/auth-client.tsx";
 import { useSearchParams } from "../../behavior/use-route.ts";
 import { AuthCard } from "../../ui/elements/auth-card.tsx";
-import { FormErrorDisplay } from "../../ui/elements/form-error-display.tsx";
-import { HorizontalFormControl } from "../../ui/elements/horizontal-form-control.tsx";
 import { LogoIcon } from "../../ui/elements/logo-icon.tsx";
 import Link from "../../ui/elements/router-link.tsx";
 

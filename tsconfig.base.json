@@ -31,6 +31,8 @@
     // the file on disk. `rewriteRelativeImportExtensions` is what keeps the
     // emitting packages honest: their declarations still say `.js`.
     "allowImportingTsExtensions": true,
-    "rewriteRelativeImportExtensions": true
+    // false here because these configs emit nothing; tsconfig.emit.json turns it
+    // on for the projects that do, which is who the rule is for.
+    "rewriteRelativeImportExtensions": false
   }
 }

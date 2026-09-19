@@ -20,7 +20,7 @@ function isRestOrTransportSource(file) {
 
   const path = file.sourcePath ?? "";
 
-  return /\.rest\.ts$/.test(path) || /(?:^|\/)transport\/.*\.api\.ts$/.test(path);
+  return path.endsWith('.rest.ts') || /(?:^|\/)transport\/.*\.api\.ts$/.test(path);
 }
 
 function isContextJsonCall(node) {

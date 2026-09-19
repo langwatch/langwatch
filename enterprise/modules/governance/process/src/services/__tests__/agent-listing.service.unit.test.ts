@@ -26,11 +26,11 @@ import {
   MAX_BOT_PAGES,
   readBotRows,
   readCopilotBots,
-} from "../copilot-bots.service";
+} from "../copilot-bots.service.ts";
 import {
   genieSpacesAsAgents,
   listGenieAgents as listGenieAgentsWithHttp,
-} from "../genie-spaces.service";
+} from "../genie-spaces.service.ts";
 
 vi.mock("../ssrf-safe-fetch.ts", () => ({
   ssrfSafeFetch: vi.fn(),

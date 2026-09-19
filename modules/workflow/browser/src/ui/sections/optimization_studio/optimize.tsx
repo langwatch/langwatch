@@ -13,8 +13,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { toaster } from "@langwatch/browser-host/toaster";
-import { api } from "@langwatch/browser-trpc/workflow-api";
-import { api as workflowApi } from "@langwatch/browser-trpc/workflow-api";
+import { api,api as workflowApi } from "@langwatch/browser-trpc/workflow-api";
 import { Select } from "@langwatch/design-system/select";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Dialog } from "@langwatch/design-system/studio-dialog";

@@ -2,7 +2,6 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "rootDir": "src",
-    "noEmit": true,
     "lib": ["es2023"],
     "noUncheckedIndexedAccess": true,
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
@@ -11,7 +10,6 @@
     "outDir": "./dist",
     "verbatimModuleSyntax": true,
 
-    "rewriteRelativeImportExtensions": false
   },
   "include": ["src/**/*.ts"],
   "exclude": ["src/**/__tests__/**", "src/**/*.test.ts"],

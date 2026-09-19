@@ -39,6 +39,7 @@ function withDeployment(isDevelopment: boolean) {
       appBaseUrl: "https://app.langwatch.test",
       hasNlpService: true,
       hasLangevals: true,
+      hasEmailProvider: false,
     },
   };
   return ({ children }: { children: ReactNode }) =>

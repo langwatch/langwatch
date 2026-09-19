@@ -1,7 +1,6 @@
 {
   "extends": "../../../../tsconfig.base.json",
   "compilerOptions": {
-    "noEmit": true,
     "rootDir": "src",
     "outDir": "dist",
 
@@ -10,7 +9,6 @@
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
 
-    "rewriteRelativeImportExtensions": false
   },
   "include": ["src/**/*.ts"],
   "references": [

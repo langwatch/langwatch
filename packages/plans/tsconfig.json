@@ -3,15 +3,12 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "noEmit": true,
     "lib": ["es2023"],
     "types": [],
     "noUncheckedIndexedAccess": true,
-    "incremental": true,
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "verbatimModuleSyntax": true,
 
-    "rewriteRelativeImportExtensions": false
   },
   "include": ["src/**/*.ts"],
   "exclude": ["src/**/__tests__/**"],

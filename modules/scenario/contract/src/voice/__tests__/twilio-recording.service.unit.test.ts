@@ -4,8 +4,8 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { resolveTwilioRecordingWavUrl, type TwilioCredential } from "../twilio-recording.service";
-import { VOICE_HTTP_TIMEOUT_MS } from "../voice-limits";
+import { resolveTwilioRecordingWavUrl, type TwilioCredential } from "../twilio-recording.service.ts";
+import { VOICE_HTTP_TIMEOUT_MS } from "../voice-limits.ts";
 
 const CREDENTIAL: TwilioCredential = {
   accountSid: "AC123",

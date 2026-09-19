@@ -2,7 +2,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { generateModuleLists } from "../../../dev/scripts/generate-modules.mjs";
+import { generateModuleLists } from "@langwatch/dev-scripts/generate-modules";
 
 const REPOSITORY_ROOT = resolve(import.meta.dirname, "../../..");
 const scratch: string[] = [];

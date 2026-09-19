@@ -1,5 +1,4 @@
-import type { LlmConfigInputType } from "@langwatch/prompt-contract";
-import { exampleParameterValue } from "@langwatch/workflow-browser/evaluate-api-snippet";
+import { exampleParameterValue } from "@langwatch/workflow-browser-kit";
 
 import type { Snippet } from "./openapi-snippet.types.ts";
 
@@ -10,7 +9,7 @@ import type { Snippet } from "./openapi-snippet.types.ts";
  */
 export interface PromptSnippetVariable {
   identifier: string;
-  type?: LlmConfigInputType | string;
+  type?: string;
 }
 
 interface ExampleObject {

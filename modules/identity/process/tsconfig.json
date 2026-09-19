@@ -10,10 +10,8 @@
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     // Consumers import the TypeScript sources directly (see the package's
     // `exports`), so this project only ever type-checks - nothing is built.
-    "noEmit": true,
     "verbatimModuleSyntax": true,
 
-    "rewriteRelativeImportExtensions": false
   },
   "include": ["src/**/*.ts"],
   // Tests are checked by tsconfig.test.json, which adds the vitest globals

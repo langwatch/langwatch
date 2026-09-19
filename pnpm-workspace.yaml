@@ -1,57 +1,20 @@
-# The single pnpm workspace for every JavaScript project in the repo.
-# See dev/docs/adr/076-single-pnpm-workspace.md.
-#
-# This used to be six independent install roots with six lockfiles: the repo
-# root, platform/app/, sdks/typescript/, mcp/typescript/, skills/ and
-# dev/tests/agentic-e2e/. mcp/typescript was BOTH its own root and a member of
-# platform/app/'s workspace, so CI installed it twice on every app build; skills/
-# and dev/tests/agentic-e2e/ needed `--ignore-workspace` to escape a workspace they
-# were never members of; and each root carried its own `overrides` block, so a
-# security pin applied in one could be silently absent from another.
-#
-# One install from the repo root now covers all of it.
 packages:
-  - "apps/*"
-  - "packages/*"
-  - "modules/*/*"
-  # The generated statement of what this build installs: the server and web
-  # module lists and the members each module declared. It is a package rather
-  # than three loose files so the lists resolve the module packages they name
-  # and a renamed export fails to compile.
-  - "modules"
-  - "enterprise/packages/composition/*"
-  - "enterprise/modules/*/*"
-  - "mcp/typescript"
-  - "plugins/*"
-  - "sdks/typescript"
-  - "services/langyworker"
-  # The capture half of visualdiff (tools/visualdiff): Playwright is Node, so
-  # the Go CLI orchestrates and this package drives the browsers.
-  - "tools/*/runner"
-  # The contributor-only backend launcher: the API and worker applications in
-  # one local process (ADR-004, amendment 2026-09-07). Private, never shipped,
-  # and the one package architecture-enforcer lets combine both runtimes.
-  - "tools/dev-runtime"
-  - "skills"
-  - "dev/tests/agentic-e2e"
-  - "dev/tests/e2e-stack"
+  - apps/*
+  - packages/*
+  - modules/*/*
+  - enterprise/packages/composition/*
+  - enterprise/modules/*/*
+  - mcp/typescript
+  - plugins/*
+  - sdks/typescript
+  - services/langyworker
+  - tools/*/runner
+  - tools/dev-runtime
+  - skills
+  - dev/tests/agentic-e2e
+  - dev/tests/e2e-stack
+  - dev/scripts
 
-# pnpm 10 already defaults this to false. It is stated explicitly because the
-# six-root merge is what made it load-bearing: sdks/typescript/ is the package
-# `langwatch`, and a member depending on `langwatch@<range>` means the PUBLISHED
-# SDK. With both in one workspace, flipping this to true would silently switch
-# every such member — and everything built from them, including the production
-# image — onto the SDK working copy. Linking the working copy is a deliberate
-# change (`"langwatch": "workspace:*"`, which is what the packages that need the
-# working copy declare today), not something to acquire by accident.
-linkWorkspacePackages: false
-
-# The one place each shared dependency's version lives. `catalog:` (default)
-# covers every dependency whose declared range agrees everywhere it is used,
-# or whose differing spellings already resolved to one version before this
-# existed (dev/docs/best_practices/typescript.md, "pnpm catalogs"). A manifest
-# opts in with `"dep": "catalog:"`; `pnpm sync:references` is the sibling for
-# tsconfig project references, not dependency versions.
 catalog:
   '@ai-sdk/anthropic': ^3.0.44
   '@ai-sdk/openai': ^3.0.79
@@ -68,24 +31,16 @@ catalog:
   '@dnd-kit/sortable': ^10.0.0
   '@dnd-kit/utilities': 3.2.2
   '@elevenlabs/client': 1.23.0
-  # The scenario SDK's ElevenLabs voice adapter, which it import()s lazily and
-  # declares an optional peer. Kept out of the child bundle (build-server.mjs)
-  # so a simulation with no voice does not parse it on every spawn.
   '@elevenlabs/elevenlabs-js': 2.58.0
   '@emotion/react': ^11.14.0
   '@hono/node-server': ^2.0.6
   '@hookform/resolvers': ^5.4.0
-  # The vendored voice build. A catalog entry may NOT use the `file:` protocol
-  # (ERR_PNPM_CATALOG_ENTRY_INVALID_SPEC), so the version the tarball declares
-  # is named here and the override below is what actually resolves it.
   '@langwatch/scenario': 1.7.0-dev.voice6
   '@modelcontextprotocol/sdk': ^1.29.0
   '@monaco-editor/react': ^4.7.0
+  '@nx/oxlint': 23.2.1
   '@opentelemetry/api': ^1.9.1
   '@opentelemetry/api-logs': 0.221.0
-  # Pinned to the exact version @opentelemetry/sdk-trace-node depends on: two
-  # copies of the context manager would each own their own async storage, and
-  # context would stop crossing await boundaries with nothing reporting it.
   '@opentelemetry/context-async-hooks': 2.10.0
   '@opentelemetry/core': 2.10.0
   '@opentelemetry/exporter-logs-otlp-http': 0.221.0
@@ -153,6 +108,7 @@ catalog:
   jsdom: ^30.0.1
   jsonpath-plus: ^10.4.0
   jsonwebtoken: ^9.0.2
+  knip: ^6.35.1
   libphonenumber-js: ^1.13.7
   liqe: ^3.8.7
   liquidjs: ^10.27.1
@@ -169,9 +125,6 @@ catalog:
   openapi-types: ^12.1.3
   ora: ^9.3.0
   oxlint: ^1.78.0
-  # The type-aware companion binary. oxlint declares it as an OPTIONAL peer,
-  # so `--type-aware` silently does nothing until it is installed; it is what
-  # lights up no-floating-promises, unbound-method and twelve more.
   oxlint-tsgolint: 7.0.2001
   papaparse: ^5.5.4
   pino: ^10.3.1
@@ -219,385 +172,51 @@ catalog:
   zundo: ^2.3.0
   zustand: ^4.5.7
 
-# Named catalogs, for a dependency with a second, deliberate resolution:
-# `"dep": "catalog:<name>"`.
-#
-# sdk-toolchain: the published SDK (sdks/typescript), the MCP server
-# (mcp/typescript) and architecture-enforcer all pin TypeScript ^6.0.3 rather than
-# the app's ^7.0.2. The SDK and the MCP server are published packages and must
-# not force TS7 on their consumers; architecture-enforcer imports the classic
-# `typescript` compiler API directly (`import ts from "typescript"` across its
-# policies and tools), which TS7 no longer exposes from its root export (see
-# CLAUDE.md's TypeScript table and ADR-099 — static scans elsewhere go through
-# `src/test-utils/tsAst.ts`, which owns the one TS7 API session; architecture-enforcer
-# predates that seam and still needs the real compiler).
+catalogMode: strict
+
 catalogs:
   sdk-toolchain:
     typescript: ^6.0.3
 
-# strict: `pnpm add` may only add a dependency at a version the catalog already
-# carries; added in pnpm v10.12.1 (docs/settings/catalogMode), honoured by 10.24.
-catalogMode: strict
+linkWorkspacePackages: false
 
-# Supply-chain age gate. Previously set only on platform/app/'s root, so five of
-# the six projects had no gate at all. Repo-wide now.
 minimumReleaseAge: 10080
-# Adding workspace packages forces a re-resolve; these shipped fresh releases
-# inside the age gate with no older version satisfying the requested ranges.
-# Version-pinned so only the pinned release bypasses the gate; drop each entry
-# once that version ages past it.
+
 minimumReleaseAgeExclude:
-  # First-party: the scenario SDK is LangWatch's own. skills/.npmrc carried a
-  # standing (unversioned) exemption for it that silently died with the merge —
-  # a member .npmrc is never read once the install root is the repo root.
-  - "@langwatch/scenario"
+  - '@langwatch/scenario'
   - langwatch@1.0.0
   - ws@8.21.1
-  - "@browserbasehq/sdk@2.16.0"
+  - '@browserbasehq/sdk@2.16.0'
   - postcss@8.5.19
-  # vitest 5.0.0 shipped 2026-09-03; Alex approved the early pull on 2026-09-06.
-  # Drop these once 5.0.0 ages past the gate on 2026-09-10. @vitest/mocker is
-  # not a direct declaration anywhere in the workspace — it is vitest's own
-  # dependency, installed transitively, and pnpm's install still gates it the
-  # same as a direct one, so it needs the same exclusion as the four we chose.
   - vitest@5.0.0
-  - "@vitest/browser@5.0.0"
-  - "@vitest/browser-playwright@5.0.0"
-  - "@vitest/coverage-v8@5.0.0"
-  - "@vitest/mocker@5.0.0"
-  - "@vitest/spy@5.0.0"
-  - "@vitest/ui@5.0.0"
-  - "@vitest/utils@5.0.0"
-  - "@vitest/pretty-format@5.0.0"
-  # deepmerge-ts prototype pollution: the patched 8.0.0 (and 8.0.1) both
-  # published 2026-08-16, inside the age gate. Drop this once they age out.
+  - '@vitest/browser@5.0.0'
+  - '@vitest/browser-playwright@5.0.0'
+  - '@vitest/coverage-v8@5.0.0'
+  - '@vitest/mocker@5.0.0'
+  - '@vitest/spy@5.0.0'
+  - '@vitest/ui@5.0.0'
+  - '@vitest/utils@5.0.0'
+  - '@vitest/pretty-format@5.0.0'
   - deepmerge-ts@8.0.0
-  # better-auth 1.7.x, taken deliberately inside the gate. The passkey plugin
-  # gains `createSession` on `/passkey/verify-registration`, which mints the
-  # session inside the SAME transaction as the credential row — that is what
-  # lets passkey sign-up create an account, its passkey and its session
-  # atomically instead of as three unguarded writes. The core schema is
-  # byte-identical to 1.6.23 (`dist/db/schema.mjs` diffs empty), so this is a
-  # behavior upgrade with no migration. 1.7.0 and 1.7.1 ship an identical
-  # passkey plugin; 1.7.1 is named because it is the release the app is
-  # actually tested against. Drop both once they age past 2026-08-25.
-  # better-auth pins its whole family to its own version, so exempting the
-  # entry point alone fails on the first transitive one. All of them, pinned.
   - better-auth@1.7.1
-  - "@better-auth/passkey@1.7.1"
-  - "@better-auth/core@1.7.1"
-  - "@better-auth/drizzle-adapter@1.7.1"
-  - "@better-auth/kysely-adapter@1.7.1"
-  - "@better-auth/memory-adapter@1.7.1"
-  - "@better-auth/mongo-adapter@1.7.1"
-  - "@better-auth/prisma-adapter@1.7.1"
-  - "@better-auth/telemetry@1.7.1"
+  - '@better-auth/passkey@1.7.1'
+  - '@better-auth/core@1.7.1'
+  - '@better-auth/drizzle-adapter@1.7.1'
+  - '@better-auth/kysely-adapter@1.7.1'
+  - '@better-auth/memory-adapter@1.7.1'
+  - '@better-auth/mongo-adapter@1.7.1'
+  - '@better-auth/prisma-adapter@1.7.1'
+  - '@better-auth/telemetry@1.7.1'
   - better-call@1.4.0
-  # Collateral of the security re-resolve below, NOT a new dependency: 1.11.23
-  # is already the version this lockfile carries for mermaid's dayjs, but it
-  # published 2026-08-17 and re-resolving re-tests it against the gate, which
-  # fails the whole install. Drop this once it ages out (2026-08-24).
   - dayjs@1.11.23
   - es-toolkit@1.51.0
-  # The Langy pi harness pins the pi SDK exactly (services/langyworker); the
-  # release sits right at the age-gate boundary, so name it explicitly rather
-  # than letting the install flap around the 7-day mark. pi-ai is the SDK's
-  # model layer, a direct dependency too (the wrapper reads its model catalog),
-  # pinned to the same release. Drop both once they age out (2026-08-28).
-  - "@earendil-works/pi-coding-agent@0.84.2"
-  - "@earendil-works/pi-ai@0.84.2"
+  - '@earendil-works/pi-coding-agent@0.84.2'
+  - '@earendil-works/pi-ai@0.84.2'
 
-# The union of what the six roots each pinned separately. Overrides are
-# workspace-root-only in pnpm, which is precisely why the old split let these
-# lists drift: `langsmith` was pinned in platform/app/ and skills/ but not at the
-# root, `esbuild` at the root and in skills/ but not in platform/app/, and hono /
-# uuid / ip-address / qs / form-data / js-yaml only in skills/.
-# NOTE ON UNCONDITIONAL PINS. Three of these lists lived in a member's
-# `pnpm.overrides` (platform/app/, sdks/typescript/, skills/) where they applied to
-# that project ALONE. Merged here they apply to everything, so an unconditional
-# `pkg: version` that was fine for one project can break another. Three were
-# deliberately NOT carried up, because each is a DIRECT dependency of the
-# project that pinned it and its own declaration governs it just as well:
-#
-#   zod: ^4.0.14                   (sdks/typescript) — every first-party package
-#                                  now declares Zod 4 directly. A global pin is
-#                                  still unnecessary and would also rewrite
-#                                  private third-party dependency graphs.
-#
-#   ...and sdks/typescript's whole OpenTelemetry pin set, eleven entries in
-#   all: api, api-logs 0.205.0, sdk-logs 0.205.0, core, resources,
-#   sdk-trace-base, sdk-node 0.219.0, instrumentation 0.219.0,
-#   context-async-hooks, exporter-logs-otlp-http 0.219.0 and
-#   exporter-trace-otlp-http 0.219.0. All are the SDK's own direct
-#   (peer)dependency declarations, several older than the app's stack — made
-#   global they would downgrade the app's telemetry pipeline. None sits below
-#   a known advisory floor: the security-relevant OTel floors (>=0.217.0 for
-#   CVE-2026-44902) are carried as ranges below and apply to the SDK too.
-#
-# Anything expressed as a RANGE (`pkg@<x`) is safe to share and all of them are
-# merged below: a range pin only bites the versions it names.
-overrides:
-  # --- Version alignment (not security) ---
-  pino: ^10.3.1
-  pino-pretty: ^13.1.3
-  thread-stream: ^4.0.0
-  ai: ^6.0.161
-  react: ^19.2.7
-  react-dom: ^19.2.7
-  react-is: ^19.2.7
-  kysely: 0.28.17
-  # One copy, or better-auth's types stop being its own. better-auth 1.7.1 and
-  # @better-auth/passkey peer `@better-auth/utils` at exactly 0.4.2, while
-  # better-call 1.4.0 — which better-auth itself depends on — requires 0.5.0.
-  # Left alone, pnpm satisfies the peer from each side and builds TWO
-  # `@better-auth/core@1.7.1` instances; `GenericEndpointContext` from one is
-  # then not assignable to the same type from the other, and every plugin
-  # callback we hand better-auth fails to typecheck against the plugin that
-  # receives it. 0.5.0 is the version that must exist regardless, so it is the
-  # one everything gets.
-  "@better-auth/utils": 0.5.0
-  # One copy of the Node typings, for the same reason as the line above: a
-  # second copy is a second set of GLOBAL module declarations, so `stream/web`
-  # from one is not the `stream/web` from the other and every type crossing
-  # them stops being itself. The tree carried five majors — 10.17.60, 18.19.130,
-  # 22.20.1, 24.13.3 and 26.2.0 — because @types packages depend on @types/node
-  # themselves and pnpm gives each its own. The 18.x copy is the one that bit:
-  # @types/ssh2@1.15.5 depends on `@types/node: ^18.11.18` and opens with
-  # `/// <reference types="node" />`, which resolves to ITS OWN copy, so any
-  # program reaching @types/ssh2 (via @langwatch/test-harness ->
-  # @testcontainers/clickhouse -> testcontainers -> @types/dockerode) loaded
-  # BOTH 18 and 26. That is what made `ReadableStream<any>` unassignable to
-  # `ReadableStream<Uint8Array>` in apps/api/src/rest/body-limit.ts — the
-  # detail named `import("stream/web")` and `import("node:stream/web")` as
-  # different types — and what made every ioredis `.on(...)` / `.once(...)`
-  # a union of two incompatible EventEmitter bases ("this expression is not
-  # callable"). The shared source was correct throughout; only the programs
-  # that pulled a second copy were red. ^26.0.1 is what the workspace already
-  # declares almost everywhere; the stragglers on ^22/^24 were drift, not a
-  # requirement. Do NOT narrow this to a path-scoped pin: six different
-  # packages request the 18.x line, so pinning one edge just moves the bug.
-  "@types/node": ^26.0.1
-  # Raised from ^8.5.13 to clear a postcss parsing DoS: the caret already
-  # permitted 8.5.23, but resolution was sitting on a vulnerable 8.5.x.
-  postcss: ^8.5.23
-  lodash: ^4.18.1
-  glob: ^11.1.0
-  picomatch: ">=4.0.4"
-  # Intersection of platform/app/'s `>=10.6 <11` and skills//mcp/typescript's `>=10.26.0`.
-  liquidjs: ">=10.26.0 <11"
-  # `-` removes the dependency outright: the app talks to neither engine and
-  # both arrive only as unused transitive baggage.
-  "@elastic/elasticsearch": "-"
-  "@opensearch-project/opensearch": "-"
-  # Path-scoped, so they touch only these two dependents.
-  "@aws-sdk/xml-builder>fast-xml-parser": ^5.7.0
-  "@langchain/community>fast-xml-parser": ^5.7.0
-  # The scenario child bundle inlines @langwatch/scenario and its whole graph
-  # (build-server.mjs, `inlineAll`) but keeps @opentelemetry/* external, so the
-  # SDK bundled in there binds `NoopLoggerProvider` against the app's own
-  # api-logs. 0.221 dropped that export, which killed every scenario run at
-  # module init. The published SDK still calls it; the workspace one already
-  # moved to `createNoopLogger`, so scenario reads from the same copy the app
-  # does instead of a second, older one resolved from npm.
-  # The version in this key MUST be bumped together with the vendored tarball
-  # version below, in the same change, or the crash returns. It was previously
-  # pinned to @langwatch/scenario@1.3.0, and when scenario was bumped 1.3.0 ->
-  # 1.6.0 the pinned key silently stopped matching, so the override no longer
-  # applied and the child bundle fell back to the published npm langwatch (whose
-  # NoopLoggerProvider crashed the run at module init).
-  # The version pin is deliberate, not a convenience. An unversioned selector
-  # ("@langwatch/scenario>langwatch") also matches the OLDER scenario versions
-  # that mcp/typescript (0.4.x) and skills (1.6.x) depend on, and forces THEM
-  # onto the workspace SDK too. Those two are built against npm langwatch 0.16.1,
-  # not through the inlining bundle that breaks, and the workspace SDK is a newer
-  # major with a different zod peer, so pointing them at it introduces peer
-  # mismatches for no benefit. Pinning to the exact vendored version keeps the
-  # override scoped to the one package that needs it, the child-bundle tarball.
-  # Keyed on the version the vendored tarball DECLARES, which is
-  # `1.7.0-dev.voice6` - not `voice7`, the name of the file that carries it.
-  # The two disagree; see vendor/README.md. Keying on the filename would leave
-  # this override silently unmatched, which is the exact failure described above.
-  # Resolves every `catalog:` reference to the vendored tarball. It lives here
-  # rather than in the catalog because catalogs reject `file:`; the path is
-  # relative to the workspace root, which is what makes one entry serve all
-  # five consumers.
-  "@langwatch/scenario": "file:./vendor/langwatch-scenario-1.7.0-dev.voice9.tgz"
-  "@langwatch/scenario@1.7.0-dev.voice9>langwatch": "workspace:*"
-
-  # --- Security ---
-  # shell-quote quote() newline escaping (CRITICAL), then a further escaping
-  # bypass fixed in 1.9.0 — 1.8.4 itself is vulnerable to the follow-up.
-  "shell-quote@<1.9.0": ">=1.9.0"
-  # esbuild Deno binary integrity RCE + dev-server file read
-  # (GHSA-gv7w-rqvm-qjhr / GHSA-g7r4-m6w7-qqqr)
-  "esbuild@<0.28.1": ">=0.28.1"
-  # minimatch ReDoS (CVE #464/#476/#477/#478/#479)
-  "minimatch@<3.1.4": ">=3.1.4 <4"
-  "minimatch@>=5.0.0 <5.1.8": ">=5.1.8 <6"
-  "minimatch@>=9.0.0 <9.0.7": ">=9.0.7 <10"
-  # fast-xml-parser DoS (CVE #494/#495/#402)
-  "fast-xml-parser@>=4.1.3 <4.5.4": ">=4.5.4 <5"
-  "fast-xml-parser@>=5.0.0 <5.3.6": ">=5.3.6 <6"
-  # @modelcontextprotocol/sdk cross-client data leak (#246)
-  "@modelcontextprotocol/sdk@>=1.10.0 <=1.25.3": ">=1.26.0"
-  # langchain serialization injection (#223)
-  "langchain@<0.3.37": ">=0.3.37"
-  "@langchain/core@<0.3.80": ">=0.3.80"
-  # langsmith SDK floor (from mcp/typescript and skills)
-  "langsmith@<0.6.0": ">=0.6.0"
-  # merge prototype pollution (#194) via exec-sh
-  "merge@<2.1.1": ">=2.1.1"
-  braces: ^3.0.3
-  cross-spawn: ^7.0.6
-  "exec-sh": ^0.4.0
-  tmp: ">=0.2.6"
-  # @hono/node-server request smuggling. Per-major: the 2.x line is a separate
-  # advisory and an unconditional floor would force 1.x dependents onto 2.
-  "@hono/node-server@<1.19.13": ">=1.19.13"
-  "@hono/node-server@>=2.0.0 <2.0.10": ">=2.0.10"
-  # ...and path-scoped for the MCP SDK specifically. With two range selectors
-  # already present for this name, pnpm matched only the first and left the
-  # SDK's own `@hono/node-server: 2.0.6` (inside the advisory range) in place.
-  # Verified: without this line the lockfile still resolves a vulnerable 2.0.6.
-  "@modelcontextprotocol/sdk>@hono/node-server": ">=2.0.10"
-  # undici DoS / request smuggling. The 8.x line carries its own advisory and
-  # was previously unpinned entirely.
-  "undici@>=6.0.0 <6.27.0": ">=6.27.0 <7"
-  "undici@>=7.0.0 <7.28.0": ">=7.28.0 <8"
-  "undici@>=8.0.0 <8.9.0": ">=8.9.0 <9"
-  # vitest advisory floor. @vitest/browser is a separate package with its own
-  # CRITICAL advisory (Browser Mode provider commands bypass the file-access
-  # permission gate) and is NOT covered by the vitest pin.
-  "vitest@<4.1.0": ">=4.1.0"
-  "@vitest/browser@>=4.0.0 <4.1.10": ">=4.1.10"
-  # brace-expansion ReDoS. Five major lines are published and the tree carries
-  # 1.x, 2.x and 5.x, so each needs its own floor; an unconditional pin would
-  # force every dependent onto 5.x. The 4.x line is stagnant at 4.0.1 and its
-  # advisory range resolves up into 5.x, which is why 4 and 5 share a selector.
-  "brace-expansion@<1.1.18": ">=1.1.18 <2"
-  "brace-expansion@>=2.0.0 <2.1.4": ">=2.1.4 <3"
-  "brace-expansion@>=4.0.0 <5.0.9": ">=5.0.9"
-  "file-type@>=13.0.0 <21.3.1": ">=21.3.1 <22"
-  "prismjs@<1.30.0": ">=1.30.0"
-  "@grpc/grpc-js@<1.14.4": ">=1.14.4"
-  "js-yaml@>=3.0.0 <3.15.0": ">=3.15.0 <4"
-  "dompurify@<3.4.13": ">=3.4.13 <4"
-  # validator incomplete filtering (#216) via class-validator
-  "validator@<13.15.22": ">=13.15.22"
-  # express-rate-limit DoS (from mcp/typescript)
-  "express-rate-limit@>=8.2.0 <8.2.2": ">=8.2.2"
-  # glob ReDoS (from mcp/typescript) is covered by the unconditional `glob: ^11.1.0`
-  # above, which platform/app/ carried and is the stricter of the two.
-  # Next.js DoS with Server Components (#872). next is an unused optional peer
-  # dep of better-auth (the app is a Vite app).
-  "next@>=13.0.0 <15.5.15": ">=15.5.15"
-  # axios prototype pollution gadgets, header injection, loopback bypass
-  # (#982/#984/#987/#988)
-  "axios@>=1.0.0 <1.16.0": ">=1.16.0"
-  # fast-xml-builder attribute value quote bypass (#1028)
-  "fast-xml-builder@<1.1.7": ">=1.1.7"
-  # URI authority confusion and path normalization bypasses.
-  "fast-uri@<4.1.3": ">=4.1.3 <5"
-  # MySQL authentication downgrade and compressed-packet resource exhaustion.
-  "mysql2@<3.23.1": ">=3.23.1 <4"
-  # systeminformation command injection / privilege issues across five
-  # advisories; 5.31.7 is the first release above all of them.
-  "systeminformation@<5.31.7": ">=5.31.7"
-  # deepmerge-ts prototype pollution. Pinned to the exact patched release
-  # rather than a range: 8.0.0 and 8.0.1 both published 2026-08-16 and are
-  # inside the minimumReleaseAge window, so only the exact version named in
-  # minimumReleaseAgeExclude below can resolve. Widen to a range and drop the
-  # exclude once 8.0.x ages past the gate.
-  "deepmerge-ts@<8.0.0": "8.0.0"
-  # body-parser DoS on malformed urlencoded input.
-  "body-parser@<1.20.6": ">=1.20.6"
-  # @langchain/community SSRF / path traversal in loaders is deliberately NOT
-  # pinned. The advisory range is `<=1.1.17`, which covers the 0.3.59 this tree
-  # actually resolves, and the first patched release is 1.1.18 — i.e. the only
-  # fix is a 0.x -> 1.x major. 1.x pruned its exports map and dropped the
-  # `./llms/ollama` subpath, which @copilotkit/runtime@1.8.14 requires
-  # internally, so forcing the floor crashes the server at boot with
-  # ERR_PACKAGE_PATH_NOT_EXPORTED and takes two unit shards with it (verified:
-  # the pin resolved 1.1.29 and CI went red on exactly that).
-  # Clearing these two medium alerts means moving @copilotkit/runtime to a
-  # release built against @langchain/community 1.x, which is its own change.
-  # OpenTelemetry core + Jaeger propagator parsing advisories.
-  "@opentelemetry/core@<2.8.0": ">=2.8.0"
-  "@opentelemetry/propagator-jaeger@<2.9.0": ">=2.9.0"
-  # protobufjs code execution, prototype pollution, DoS, Any-expansion DoS and
-  # property shadowing (GHSA-xq3m-2v4x-88gg, GHSA-66ff-xgx4-vchm,
-  # GHSA-75px-5xx7-5xc7, GHSA-jvwf-75h9-cwgg, GHSA-685m-2w69-288q,
-  # GHSA-wcpc-wj8m-hjx6, GHSA-f38q-mgvj-vph7 / CVE-2026-44289/44290/44291/44293).
-  #
-  # The three roots disagreed on the 8.x floor: platform/app/ required >=8.0.2,
-  # skills/ >=8.0.2, mcp/typescript/ >=8.6.0. Taking the strictest — a package
-  # patched in one project was, until now, left vulnerable in the others, which
-  # is the whole reason these lists are merged.
-  # Per-major floors, NOT the single unconditional union three old roots
-  # carried. The union rewrites every request — including ^7.x ones — to
-  # "highest matching", which hoists @opentelemetry/otlp-transformer 0.55.0
-  # (declares protobufjs ^7.3.0) onto the 8.x runtime, and its pbjs-GENERATED
-  # static code fails there (`Cannot read properties of undefined (reading
-  # 'v1')` in ExportTraceServiceRequest.encode; reproduced locally on 8.6.5,
-  # 8.6.6 and 8.7.1 — the OTLP decode suite is green only with the
-  # transformer on the 7.x line, the state every green CI run actually had).
-  # Both floors sit at their majors' advisory-patched releases
-  # (CVE-2026-44289..44293), so nothing is left below a fixed version; the
-  # majors just stop being force-merged.
-  #
-  # The 0.55.0 transformer pin itself is DELIBERATE and stays: the app
-  # consumes a deprecated type that later transformer releases removed (the
-  # `@opentelemetry/otlp-transformer-next` alias exists for the new line).
-  # So do not "simplify" these two selectors back into one union — the 7.x
-  # branch is load-bearing for as long as that pin lives.
-  "protobufjs@<7.5.6": ">=7.5.6 <8.0.0"
-  "protobufjs@>=8.0.0 <8.6.0": ">=8.6.0"
-  # OpenTelemetry Prometheus exporter crash via malformed HTTP (CVE-2026-44902)
-  "@opentelemetry/exporter-prometheus@<0.217.0": ">=0.217.0"
-  "@opentelemetry/sdk-node@<0.217.0": ">=0.217.0"
-  # From skills/ (liquidjs is in the alignment block above, intersected with
-  # platform/app/'s narrower `>=10.6 <11`)
-  "hono@<4.12.34": ">=4.12.34"
-  "uuid@<11.1.1": ">=11.1.1 <12"
-  "ip-address@<10.3.1": ">=10.3.1"
-  "qs@<6.16.0": ">=6.16.0 <7"
-  "form-data@<4.0.6": ">=4.0.6"
-  "js-yaml@>=4.0.0 <4.3.1": ">=4.3.1 <5"
-
-  # --- vite ---
-  # platform/app/pnpm-workspace.yaml carried an unconditional `vite: 8.0.10`, but
-  # platform/app/package.json's `pnpm.overrides` carried these two ranges as well
-  # and they are what the old lockfile actually resolved to (8.0.16, never
-  # 8.0.10). Keeping the ranges preserves the resolution the app already
-  # shipped; skills/'s 7.x line is left alone by both.
-  # The three selectors partition the range rather than overlapping it. An
-  # earlier form paired `vite@<7.3.2` with `vite@>=7.0.0 <7.3.5`, which both
-  # match 7.0.0–7.3.1: whichever pnpm resolved first won, and the first bumped
-  # to 8.0.16 — a major jump for exactly the 7.x line skills/ needs, despite
-  # the comment claiming 7.x was left alone.
-  "vite@<7.0.0": "8.0.16"
-  "vite@>=7.0.0 <7.3.5": ">=7.3.5 <8"
-  "vite@>=8.0.0 <8.0.16": ">=8.0.16"
-
-packageExtensions:
-  "@google-cloud/dlp":
-    dependencies:
-      protobufjs: "^7.5.4"
-
-# Union of the three roots' allowlists. node-pty is skills/ and mcp/typescript's;
-# the rest came from platform/app/.
-#
-# cloudflared's postinstall downloads the actual `cloudflared` binary into its
-# own bin/ (`node lib/cloudflared.js bin install latest`). pnpm 10 runs a
-# dependency's build/postinstall ONLY when it is allowlisted here, so without
-# this entry the binary is never fetched, the voice worker's quick-tunnel mint
-# spawns a non-existent path (ENOENT), no VOICE_PUBLIC_BASE_URL is set, and
-# phone calls dial a URL nothing answers (Twilio error 31920). See
-# specs/features/agents/voice-phone.feature.
 onlyBuiltDependencies:
-  - "@prisma/client"
-  - "@prisma/engines"
-  - "@scarf/scarf"
+  - '@prisma/client'
+  - '@prisma/engines'
+  - '@scarf/scarf'
   - bcrypt
   - bufferutil
   - cloudflared
@@ -610,3 +229,88 @@ onlyBuiltDependencies:
   - protobufjs
   - sharp
   - ssh2
+
+overrides:
+  '@aws-sdk/xml-builder>fast-xml-parser': ^5.7.0
+  '@better-auth/utils': 0.5.0
+  '@elastic/elasticsearch': '-'
+  '@grpc/grpc-js@<1.14.4': '>=1.14.4'
+  '@hono/node-server@<1.19.13': '>=1.19.13'
+  '@hono/node-server@>=2.0.0 <2.0.10': '>=2.0.10'
+  '@langchain/community>fast-xml-parser': ^5.7.0
+  '@langchain/core@<0.3.80': '>=0.3.80'
+  '@langwatch/scenario': file:./vendor/langwatch-scenario-1.7.0-dev.voice9.tgz
+  '@langwatch/scenario@1.7.0-dev.voice9>langwatch': workspace:*
+  '@modelcontextprotocol/sdk>@hono/node-server': '>=2.0.10'
+  '@modelcontextprotocol/sdk@>=1.10.0 <=1.25.3': '>=1.26.0'
+  '@opensearch-project/opensearch': '-'
+  '@opentelemetry/core@<2.8.0': '>=2.8.0'
+  '@opentelemetry/exporter-prometheus@<0.217.0': '>=0.217.0'
+  '@opentelemetry/propagator-jaeger@<2.9.0': '>=2.9.0'
+  '@opentelemetry/sdk-node@<0.217.0': '>=0.217.0'
+  '@types/node': ^26.0.1
+  '@vitest/browser@>=4.0.0 <4.1.10': '>=4.1.10'
+  ai: ^6.0.161
+  axios@>=1.0.0 <1.16.0: '>=1.16.0'
+  body-parser@<1.20.6: '>=1.20.6'
+  brace-expansion@<1.1.18: '>=1.1.18 <2'
+  brace-expansion@>=2.0.0 <2.1.4: '>=2.1.4 <3'
+  brace-expansion@>=4.0.0 <5.0.9: '>=5.0.9'
+  braces: ^3.0.3
+  cross-spawn: ^7.0.6
+  deepmerge-ts@<8.0.0: 8.0.0
+  dompurify@<3.4.13: '>=3.4.13 <4'
+  esbuild@<0.28.1: '>=0.28.1'
+  exec-sh: ^0.4.0
+  express-rate-limit@>=8.2.0 <8.2.2: '>=8.2.2'
+  fast-uri@<4.1.3: '>=4.1.3 <5'
+  fast-xml-builder@<1.1.7: '>=1.1.7'
+  fast-xml-parser@>=4.1.3 <4.5.4: '>=4.5.4 <5'
+  fast-xml-parser@>=5.0.0 <5.3.6: '>=5.3.6 <6'
+  file-type@>=13.0.0 <21.3.1: '>=21.3.1 <22'
+  form-data@<4.0.6: '>=4.0.6'
+  glob: ^11.1.0
+  hono@<4.12.34: '>=4.12.34'
+  ip-address@<10.3.1: '>=10.3.1'
+  js-yaml@>=3.0.0 <3.15.0: '>=3.15.0 <4'
+  js-yaml@>=4.0.0 <4.3.1: '>=4.3.1 <5'
+  kysely: 0.28.17
+  langchain@<0.3.37: '>=0.3.37'
+  langsmith@<0.6.0: '>=0.6.0'
+  liquidjs: '>=10.26.0 <11'
+  lodash: ^4.18.1
+  merge@<2.1.1: '>=2.1.1'
+  minimatch@<3.1.4: '>=3.1.4 <4'
+  minimatch@>=5.0.0 <5.1.8: '>=5.1.8 <6'
+  minimatch@>=9.0.0 <9.0.7: '>=9.0.7 <10'
+  mysql2@<3.23.1: '>=3.23.1 <4'
+  next@>=13.0.0 <15.5.15: '>=15.5.15'
+  picomatch: '>=4.0.4'
+  pino: ^10.3.1
+  pino-pretty: ^13.1.3
+  postcss: ^8.5.23
+  prismjs@<1.30.0: '>=1.30.0'
+  protobufjs@<7.5.6: '>=7.5.6 <8.0.0'
+  protobufjs@>=8.0.0 <8.6.0: '>=8.6.0'
+  qs@<6.16.0: '>=6.16.0 <7'
+  react: ^19.2.7
+  react-dom: ^19.2.7
+  react-is: ^19.2.7
+  shell-quote@<1.9.0: '>=1.9.0'
+  systeminformation@<5.31.7: '>=5.31.7'
+  thread-stream: ^4.0.0
+  tmp: '>=0.2.6'
+  undici@>=6.0.0 <6.27.0: '>=6.27.0 <7'
+  undici@>=7.0.0 <7.28.0: '>=7.28.0 <8'
+  undici@>=8.0.0 <8.9.0: '>=8.9.0 <9'
+  uuid@<11.1.1: '>=11.1.1 <12'
+  validator@<13.15.22: '>=13.15.22'
+  vite@<7.0.0: 8.0.16
+  vite@>=7.0.0 <7.3.5: '>=7.3.5 <8'
+  vite@>=8.0.0 <8.0.16: '>=8.0.16'
+  vitest@<4.1.0: '>=4.1.0'
+
+packageExtensions:
+  '@google-cloud/dlp':
+    dependencies:
+      protobufjs: ^7.5.4

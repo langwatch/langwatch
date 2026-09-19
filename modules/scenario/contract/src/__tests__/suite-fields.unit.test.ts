@@ -14,7 +14,7 @@ import {
   parseScenarioFieldValues,
   parseSuiteFieldDefinitions,
   suiteFieldDefinitionsSchema,
-} from "../suite-fields";
+} from "../suite-fields.ts";
 
 describe("suite fields", () => {
   describe("given a suite declaring fields", () => {

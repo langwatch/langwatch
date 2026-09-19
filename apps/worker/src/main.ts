@@ -1,7 +1,7 @@
 import "@langwatch/time/polyfill";
 import { auditLogNullServer } from "@langwatch/audit-log-null";
 import { createDataPrivacyDirectoryReader } from "@langwatch/data-privacy-process";
-import { serverModules as processModules } from "@langwatch/installed-modules/server";
+import { serverModules as processModules } from "@langwatch/installed-server-modules";
 import { processMetrics, processTelemetry } from "@langwatch/observability/node";
 import { processConfig, Server, type ProcessServer } from "@langwatch/process-server";
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { evaluationFailsRun, gatedStatus, gatedVerdict } from "../scenario-evaluation-gate";
-import type { ScenarioEvaluationResult } from "../schemas/event-schemas";
+import { evaluationFailsRun, gatedStatus, gatedVerdict } from "../scenario-evaluation-gate.ts";
+import type { ScenarioEvaluationResult } from "../schemas/event-schemas.ts";
 
 function evaluation(overrides: Partial<ScenarioEvaluationResult> = {}): ScenarioEvaluationResult {
   return {

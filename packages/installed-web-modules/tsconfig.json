@@ -1,0 +1,108 @@
+{
+  // The generated list, and nothing else.
+  //
+  // It needed a home that type-checks: nothing imported it, so a renamed export
+  // in any module package would have gone unnoticed until a process failed to
+  // boot. A tsconfig alone could not be that home, because every project this
+  // repository checks is reached through a package's own `typecheck` script,
+  // and because resolving a module package needs the dependency edges pnpm
+  // links from a package.json. So this directory is the package.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["es2023"],
+    "types": [],
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "verbatimModuleSyntax": true,
+    "rootDir": "src"
+  },
+  "include": ["src/*.generated.ts"],
+  "references": [
+    {
+      "path": "../../modules/agent/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../dev/tsconfig.web-declarations.json"
+    },
+    {
+      "path": "../../modules/annotation/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/api-key/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/auth/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/authz/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/automation/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/coding-agent/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/data-privacy/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/data-retention/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/billing/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/governance/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/licensing/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/scim/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/feature-flag/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/gateway/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/github/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/monitor/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/navigation/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/notification/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/onboarding/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/ops/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/organization/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/presence/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/secret/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/share/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/suite/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/topic/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/user/browser/tsconfig.build.json"
+    }
+  ]
+}

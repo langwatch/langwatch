@@ -6,7 +6,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { webModules } from "@langwatch/installed-modules/web";
+import { webModules } from "@langwatch/installed-web-modules";
 import { installedModuleScreens } from "@langwatch/ui-kernel/module-screens";
 import { matchRoutes } from "react-router";
 import { describe, expect, it } from "vitest";

@@ -1,11 +1,10 @@
 import "../../model/ambient.d.ts";
 import { Box, Heading, Text, VStack } from "@chakra-ui/react";
+import { FullLogo } from "@langwatch/design-system/full-logo";
 import type { ReactNode } from "react";
 
-import { FRONT_DOOR_GRADIENT, HEADING_FONT } from "../../model/front-door-theme.ts";
-
 import "./auth-front-door.css";
-import { FullLogo } from "./full-logo.tsx";
+import { FRONT_DOOR_GRADIENT, HEADING_FONT } from "../../model/front-door-theme.ts";
 
 /** Value proposition panel; slots for headline, tagline, trust strip; hides on mobile. */
 export function FrontDoorValuePanel({

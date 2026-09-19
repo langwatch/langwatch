@@ -14,7 +14,7 @@ import {
   isVoiceMediaSocketMessage,
   VOICE_MEDIA_SOCKET_MESSAGE,
   type VoiceMediaSocketMessage,
-} from "../voice-socket-handoff";
+} from "../voice-socket-handoff.ts";
 
 function message(): VoiceMediaSocketMessage {
   return {

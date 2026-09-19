@@ -41,12 +41,14 @@ export class MemoryAnnotationQueueRepository implements AnnotationQueueRepositor
   }
   async createQueue(input: QueueCreateInput): Promise<AnnotationQueueRecord> {
     const now = toDate(nowInstant());
+
     const queue = {
       id: generate("annotationqueue").toString(),
       ...input,
       createdAt: now,
       updatedAt: now,
     };
+
     this.#database.replaceQueues([...this.#database.queues(), queue]);
 
     return structuredClone(queue);

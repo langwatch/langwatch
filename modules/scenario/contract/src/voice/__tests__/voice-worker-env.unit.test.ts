@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { readVoiceWorkerEnv, VOICE_WS_PORT_DEFAULT } from "../voice-worker-env";
+import { readVoiceWorkerEnv, VOICE_WS_PORT_DEFAULT } from "../voice-worker-env.ts";
 
 describe("readVoiceWorkerEnv", () => {
   describe("given no variables set", () => {

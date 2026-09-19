@@ -7,10 +7,8 @@
     ],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
-    "noEmit": true,
     "rootDir": "src",
     "outDir": "dist",
-    "rewriteRelativeImportExtensions": false
   },
   "include": [
     "src/**/*.ts"

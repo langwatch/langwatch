@@ -10,6 +10,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -23,7 +24,6 @@ import { useSearchParams } from "../../behavior/use-route.ts";
 import { authFailureMessage, isCredentialRejection } from "../../model/auth-failure-message.ts";
 import { readHandledError } from "../../model/read-handled-error.ts";
 import { HandledErrorAlert } from "../../ui/elements/handled-error-alert.tsx";
-import { HorizontalFormControl } from "../../ui/elements/horizontal-form-control.tsx";
 import { Link } from "../../ui/elements/link.tsx";
 import { LogoIcon } from "../../ui/elements/logo-icon.tsx";
 import { FrontDoorShell } from "../../ui/sections/front-door-shell.tsx";

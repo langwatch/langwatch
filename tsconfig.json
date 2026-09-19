@@ -351,7 +351,10 @@
       "path": "modules/identity/process/tsconfig.test.json"
     },
     {
-      "path": "modules/tsconfig.json"
+      "path": "packages/installed-server-modules/tsconfig.json"
+    },
+    {
+      "path": "packages/installed-web-modules/tsconfig.json"
     },
     {
       "path": "packages/kernel/tsconfig.test.json"

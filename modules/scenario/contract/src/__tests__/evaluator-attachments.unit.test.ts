@@ -16,8 +16,8 @@ import {
   isExpectedLikeInput,
   scenarioMappingPathIssue,
   scenarioMappingSources,
-} from "../evaluator-attachments";
-import type { SuiteFieldDefinition } from "../suite-fields";
+} from "../evaluator-attachments.ts";
+import type { SuiteFieldDefinition } from "../suite-fields.ts";
 
 const text = (identifier: string): SuiteFieldDefinition => ({
   identifier,

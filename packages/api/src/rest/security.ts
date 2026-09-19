@@ -458,6 +458,7 @@ export class BrowserOriginGuard {
     if (!origin) return false;
 
     const host = request.req.header("x-forwarded-host") ?? request.req.header("host") ?? "";
+
     try {
       return new URL(origin).host === host;
     } catch {

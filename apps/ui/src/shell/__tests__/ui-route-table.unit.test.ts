@@ -1,4 +1,4 @@
-import { webModules } from "@langwatch/installed-modules/web";
+import { webModules } from "@langwatch/installed-web-modules";
 import { uiRoutePageKeys } from "@langwatch/ui-kernel/feature-install";
 import { installedModuleScreens } from "@langwatch/ui-kernel/module-screens";
 import { matchRoutes } from "react-router";

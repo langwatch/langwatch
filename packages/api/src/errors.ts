@@ -386,6 +386,7 @@ export class ProjectMissingCredentialsError extends HandledError {
       httpStatus: 401,
       fault: "customer",
     });
+
     this.name = "ProjectMissingCredentialsError";
   }
 }
@@ -399,6 +400,7 @@ export class ProjectInvalidCredentialsError extends HandledError {
       httpStatus: 401,
       fault: "customer",
     });
+
     this.name = "ProjectInvalidCredentialsError";
   }
 }
@@ -412,6 +414,7 @@ export class OrganizationMissingCredentialsError extends HandledError {
       httpStatus: 401,
       fault: "customer",
     });
+
     this.name = "OrganizationMissingCredentialsError";
   }
 }
@@ -426,6 +429,7 @@ export class OrganizationCredentialClassMismatchError extends HandledError {
       "This endpoint requires an organization API key, and a project key was presented.",
       { httpStatus: 401, fault: "customer" },
     );
+
     this.name = "OrganizationCredentialClassMismatchError";
   }
 }
@@ -453,6 +457,7 @@ export class OrganizationNotFoundForCredentialError extends HandledError {
       httpStatus: 401,
       fault: "customer",
     });
+
     this.name = "OrganizationNotFoundForCredentialError";
   }
 }
@@ -466,6 +471,7 @@ export class OrganizationAuthenticationUnavailableError extends HandledError {
       httpStatus: 500,
       fault: "platform",
     });
+
     this.name = "OrganizationAuthenticationUnavailableError";
   }
 }
@@ -477,6 +483,7 @@ export class OrganizationPermissionError extends HandledError {
       httpStatus: 403,
       fault: "customer",
     });
+
     this.name = "OrganizationPermissionError";
   }
 }
@@ -493,6 +500,7 @@ export class SurfaceUnverifiedError extends HandledError {
       fault: "customer",
       meta: { surface },
     });
+
     this.name = "SurfaceUnverifiedError";
   }
 }
@@ -506,6 +514,7 @@ export class SurfaceCapabilityUnavailableError extends HandledError {
       httpStatus: 503,
       fault: "platform",
     });
+
     this.name = "SurfaceCapabilityUnavailableError";
   }
 }
@@ -535,6 +544,7 @@ export class SurfaceBlankSecretError extends HandledError {
       fault: "platform",
       meta: { surface },
     });
+
     this.name = "SurfaceBlankSecretError";
   }
 }
@@ -554,6 +564,7 @@ export class LiveStreamNotFoundError extends HandledError {
       httpStatus: 404,
       fault: "customer",
     });
+
     this.name = "LiveStreamNotFoundError";
   }
 }
@@ -570,6 +581,7 @@ export class LiveStreamUnsupportedProcedureError extends HandledError {
       "Only subscriptions are served on the live update channel; call this procedure over the tRPC endpoint instead.",
       { httpStatus: 405, fault: "customer" },
     );
+
     this.name = "LiveStreamUnsupportedProcedureError";
   }
 }
@@ -584,6 +596,7 @@ export class LiveStreamCrossSiteBlockedError extends HandledError {
       "A live update channel can only be opened from this application's own pages.",
       { httpStatus: 403, fault: "customer" },
     );
+
     this.name = "LiveStreamCrossSiteBlockedError";
   }
 }

@@ -14,14 +14,14 @@ import {
   SuiteFieldIdentifierDuplicateError,
   SuiteFieldIdentifierInvalidError,
   SuiteFieldInUseError,
-} from "../errors";
+} from "../errors.ts";
 import {
   assertFieldsNotInUse,
   findMissingMappings,
   mergeRunAttachments,
   readEvaluatorAttachments,
   readSuiteFieldDefinitions,
-} from "../suite-evaluators";
+} from "../suite-evaluators.ts";
 
 const attachment = (overrides: Partial<EvaluatorAttachment> = {}): EvaluatorAttachment => ({
   id: "att_1",

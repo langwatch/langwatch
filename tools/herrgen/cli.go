@@ -12,7 +12,7 @@ import (
 )
 
 // defaultOut is where the control plane reads the codes from.
-const defaultOut = "packages/handled-error/src/codes.generated.ts"
+const defaultOut = "packages/error-presentation/src/codes.generated.ts"
 
 // Run is the herrgen CLI: it parses the Go tree's herr codes and writes the
 // TypeScript the control plane type-checks against. It returns the process exit

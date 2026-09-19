@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { VoiceConcurrencyGate } from "../voice-concurrency-gate";
+import { VoiceConcurrencyGate } from "../voice-concurrency-gate.ts";
 
 describe("VoiceConcurrencyGate", () => {
   describe("given a per-project concurrency gate", () => {

@@ -1,4 +1,5 @@
 import { Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { LoadingScreen } from "@langwatch/design-system/loading-screen";
 
 import { signOut } from "../../behavior/auth-client.tsx";
 import { hardRedirect } from "../../behavior/hard-redirect.ts";
@@ -8,7 +9,6 @@ import { useRequiredSession } from "../../behavior/use-required-session.ts";
 import { useRouter } from "../../behavior/use-route.ts";
 import { HandledErrorAlert } from "../../ui/elements/handled-error-alert.tsx";
 import { InviteLanding } from "../../ui/sections/invite-landing.tsx";
-import { LoadingScreen } from "../../ui/sections/loading-screen.tsx";
 import { SetupLayout } from "../../ui/sections/setup-layout.tsx";
 
 /** Invitation link landing; shows inviter, guides sign-in/up or confirms sign-in. */

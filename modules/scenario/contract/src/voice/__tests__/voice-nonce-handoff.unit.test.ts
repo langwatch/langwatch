@@ -23,8 +23,8 @@ import {
   VoiceNonceRegistrationFailedError,
   VoiceNonceRegistrationNoChannelError,
   VoiceNonceRegistrationTimeoutError,
-} from "../voice-nonce-handoff";
-import { VoiceNonceRegistry } from "../voice-nonce-registry";
+} from "../voice-nonce-handoff.ts";
+import { VoiceNonceRegistry } from "../voice-nonce-registry.ts";
 
 describe("isVoiceNonceRegisterMessage", () => {
   it("matches only the registration request", () => {

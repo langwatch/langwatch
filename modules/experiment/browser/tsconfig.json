@@ -8,13 +8,11 @@
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
 
-    "noEmit": true,
 
     "rootDir": ".",
 
     "outDir": "dist",
 
-    "rewriteRelativeImportExtensions": false
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "types/**/*.d.ts"],
 

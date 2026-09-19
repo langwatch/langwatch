@@ -19,11 +19,11 @@ vi.mock("../ssrf-safe-fetch.ts", () => ({
   ssrfSafeFetch: (...args: unknown[]) => fetchMock(...args),
 }));
 
-const { listAnthropicPeople, listOpenAiPeople } = await import("../admin-api-users.service");
+const { listAnthropicPeople, listOpenAiPeople } = await import("../admin-api-users.service.ts");
 const { listDatabricksPeople: listDatabricksPeopleWithHttp, scimUsersAsPeople } =
-  await import("../databricks-scim-users.service");
+  await import("../databricks-scim-users.service.ts");
 const { directoryUsersAsPeople, listMicrosoftPeople } =
-  await import("../microsoft-directory-read.service");
+  await import("../microsoft-directory-read.service.ts");
 const { listingDay, peopleListed, peopleRefused, personListingEvents } =
   await import("../../rules/people-listing.rules.ts");
 const { DIRECTORY_REPORT_ACTION } = await import("../../rules/microsoft-graph-directory.rules.ts");

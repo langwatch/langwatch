@@ -22,6 +22,7 @@ export type StorageEndpoints = Readonly<{
  */
 function originOf(url: string | undefined): string | null {
   if (!url) return null;
+
   try {
     const { origin } = new URL(url);
 
@@ -47,15 +48,18 @@ export function storageConnectSources(endpoints: StorageEndpoints): readonly str
   const origins = new Set<string>();
 
   const endpoint = originOf(endpoints.s3Endpoint);
+
   const looksLikeAws = Boolean(
     endpoints.s3Endpoint ?? endpoints.s3Region ?? endpoints.s3Bucket ?? endpoints.awsRegion,
   );
+
   if (endpoint) {
     origins.add(endpoint);
   } else if (looksLikeAws) {
     // Some AWS or S3 setting is present but no usable explicit endpoint, so the
     // AWS origins for the configured region are the closest true answer.
     const region = (endpoints.s3Region ?? endpoints.awsRegion)?.trim();
+
     if (region && AWS_REGION.test(region)) {
       origins.add(`https://s3.${region}.amazonaws.com`);
       origins.add(`https://*.s3.${region}.amazonaws.com`);
@@ -210,6 +214,7 @@ export class ContentSecurityPolicy {
   /** Sources appended to one directive, as a new policy. */
   withSources(directive: string, ...sources: readonly string[]): ContentSecurityPolicy {
     if (sources.length === 0) return this;
+
     const existing = this.#directives.get(directive) ?? [];
 
     return new ContentSecurityPolicy(
@@ -274,6 +279,7 @@ export class ContentSecurityPolicy {
     const directives = [...this.#directives].map(
       ([directive, sources]) => `${directive} ${sources.join(" ")}`,
     );
+
     const upgrade = this.#upgradeInsecureRequests ? ["upgrade-insecure-requests"] : [];
 
     return [...directives, ...upgrade].join("; ");

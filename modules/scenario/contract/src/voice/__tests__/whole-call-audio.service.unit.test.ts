@@ -9,7 +9,7 @@ import {
   resolveWholeCallAudio,
   TWILIO_CALL_SID_ATTR,
   type WholeCallAudioInfrastructure,
-} from "../whole-call-audio.service";
+} from "../whole-call-audio.service.ts";
 
 /** A fake span reader: the run's trace ids, and the span attribute maps of
  *  each, keyed by trace id. Nothing touches ClickHouse. */

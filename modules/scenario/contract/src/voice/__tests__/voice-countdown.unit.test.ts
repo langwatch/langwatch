@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { isRedCountdown, remainingSeconds } from "../voice-countdown";
+import { isRedCountdown, remainingSeconds } from "../voice-countdown.ts";
 
 describe("voice countdown", () => {
   describe("given a call duration limit", () => {

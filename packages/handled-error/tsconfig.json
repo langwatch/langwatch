@@ -3,7 +3,6 @@
   "compilerOptions": {
     "types": ["node"],
     "rootDir": "src",
-    "noEmit": true,
     // `dom` for the `URL` parser the docs-origin allowlist in
     // `read-handled-error` is built on, and `es2022` for `Object.hasOwn`, which
     // is how the presentation registry looks a code up without inheriting from
@@ -17,7 +16,6 @@
     "outDir": "./dist",
     "verbatimModuleSyntax": true,
 
-    "rewriteRelativeImportExtensions": false
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   // Tests run via vitest (`pnpm test`), which provides the `vitest` module and

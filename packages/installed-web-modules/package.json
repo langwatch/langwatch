@@ -1,0 +1,62 @@
+{
+  "name": "@langwatch/installed-web-modules",
+  "version": "0.1.0",
+  "private": true,
+  "description": "What the browser application installs: the generated web module list. Its own package, so the UI carries the browser half alone and a process change cannot mark it affected.",
+  "license": "MIT",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/web-modules.generated.ts",
+  "exports": {
+    ".": "./src/web-modules.generated.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@langwatch/agent-browser": "workspace:*",
+    "@langwatch/analytics-browser": "workspace:*",
+    "@langwatch/annotation-browser": "workspace:*",
+    "@langwatch/api-key-browser": "workspace:*",
+    "@langwatch/auth-browser": "workspace:*",
+    "@langwatch/authz-browser": "workspace:*",
+    "@langwatch/automation-browser": "workspace:*",
+    "@langwatch/coding-agent-browser": "workspace:*",
+    "@langwatch/data-privacy-browser": "workspace:*",
+    "@langwatch/data-retention-browser": "workspace:*",
+    "@langwatch/dataset-browser": "workspace:*",
+    "@langwatch/enterprise-billing-browser": "workspace:*",
+    "@langwatch/enterprise-governance-browser": "workspace:*",
+    "@langwatch/enterprise-licensing-browser": "workspace:*",
+    "@langwatch/enterprise-scim-browser": "workspace:*",
+    "@langwatch/evaluator-browser": "workspace:*",
+    "@langwatch/experiment-browser": "workspace:*",
+    "@langwatch/feature-flag-browser": "workspace:*",
+    "@langwatch/gateway-browser": "workspace:*",
+    "@langwatch/github-browser": "workspace:*",
+    "@langwatch/langy-browser": "workspace:*",
+    "@langwatch/model-provider-browser": "workspace:*",
+    "@langwatch/monitor-browser": "workspace:*",
+    "@langwatch/navigation-browser": "workspace:*",
+    "@langwatch/notification-browser": "workspace:*",
+    "@langwatch/onboarding-browser": "workspace:*",
+    "@langwatch/ops-browser": "workspace:*",
+    "@langwatch/organization-browser": "workspace:*",
+    "@langwatch/presence-browser": "workspace:*",
+    "@langwatch/project-browser": "workspace:*",
+    "@langwatch/prompt-browser": "workspace:*",
+    "@langwatch/scenario-browser": "workspace:*",
+    "@langwatch/secret-browser": "workspace:*",
+    "@langwatch/share-browser": "workspace:*",
+    "@langwatch/suite-browser": "workspace:*",
+    "@langwatch/topic-browser": "workspace:*",
+    "@langwatch/trace-browser": "workspace:*",
+    "@langwatch/user-browser": "workspace:*",
+    "@langwatch/workflow-browser": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

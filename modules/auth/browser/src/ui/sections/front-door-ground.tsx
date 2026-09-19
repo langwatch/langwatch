@@ -1,9 +1,8 @@
 import "../../model/ambient.d.ts";
 import { useColorMode } from "@langwatch/design-system/color-mode";
+import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import { MeshGradient, Warp } from "@paper-design/shaders-react";
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
-
-import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
 
 import "../elements/auth-front-door.css";
 import { useTweenedGround } from "../../behavior/use-tweened-ground.ts";

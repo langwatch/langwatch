@@ -9,13 +9,11 @@
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "verbatimModuleSyntax": true,
 
-    "noEmit": true,
 
     "rootDir": ".",
 
     "outDir": "dist",
 
-    "rewriteRelativeImportExtensions": false
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["tests/**/*.ts", "**/__tests__/**"],

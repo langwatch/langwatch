@@ -218,3 +218,9 @@ dev/docs/plans/handover-*.md
 # workspace-data directory is a derived index; neither is source (ADR-150).
 .nx/cache
 .nx/workspace-data
+
+.nx/polygraph
+.claude/worktrees
+
+
+.nx/migrate-runs

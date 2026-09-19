@@ -1,0 +1,171 @@
+{
+  // The generated list, and nothing else.
+  //
+  // It needed a home that type-checks: nothing imported it, so a renamed export
+  // in any module package would have gone unnoticed until a process failed to
+  // boot. A tsconfig alone could not be that home, because every project this
+  // repository checks is reached through a package's own `typecheck` script,
+  // and because resolving a module package needs the dependency edges pnpm
+  // links from a package.json. So this directory is the package.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["es2023"],
+    "types": [],
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "verbatimModuleSyntax": true,
+    "rootDir": "src"
+  },
+  "include": ["src/*.generated.ts"],
+  "references": [
+    {
+      "path": "../../modules/agent/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/analytics/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/annotation/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/api-key/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/auth/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/authz/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/automation/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/coding-agent/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/dashboard/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/data-privacy/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/data-retention/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/dataset/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/governance/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/licensing/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/managed-provider/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/scim/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/sso/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/entitlement/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/evaluation/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/evaluator/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/experiment/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/feature-flag/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/gateway/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/github/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/hosted-mcp/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/identity/process/tsconfig.build.json"
+    },
+    {
+      "path": "../kernel/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/langy/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/log/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/metric/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/model-provider/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/monitor/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/notification/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/ops/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/organization/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/platform-health/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/presence/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/project/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/prompt/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/role/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/scenario/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/secret/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/share/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/stored-object/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/suite/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/topic/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/trace/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/user/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/webhook/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/workflow/process/tsconfig.build.json"
+    }
+  ]
+}

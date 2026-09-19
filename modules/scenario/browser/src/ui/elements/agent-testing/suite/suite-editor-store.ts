@@ -10,8 +10,7 @@
  * @see dev/docs/best_practices/drawers.md
  */
 
-import type { EvaluatorAttachment } from "@langwatch/scenario-contract";
-import type { SuiteFieldType } from "@langwatch/scenario-contract";
+import type { EvaluatorAttachment,SuiteFieldType } from "@langwatch/scenario-contract";
 import { create } from "zustand";
 
 /** One row of the fields section. */

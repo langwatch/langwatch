@@ -1,16 +1,13 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "noEmit": true,
     "rootDir": "src",
     "outDir": "dist",
-    "incremental": true,
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "lib": ["es2023"],
     "types": ["node"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
-    "rewriteRelativeImportExtensions": false
   },
   "include": ["src/**/*.ts"],
   "references": [

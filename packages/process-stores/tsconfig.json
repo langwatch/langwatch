@@ -5,13 +5,10 @@
     "types": ["node"],
     "noUncheckedIndexedAccess": true,
     "noImplicitReturns": true,
-    "incremental": true,
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "verbatimModuleSyntax": true,
-    "noEmit": true,
     "rootDir": ".",
     "outDir": "dist",
-    "rewriteRelativeImportExtensions": false
   },
   "include": ["src/**/*.ts"],
   "exclude": ["tests/**/*.ts"],

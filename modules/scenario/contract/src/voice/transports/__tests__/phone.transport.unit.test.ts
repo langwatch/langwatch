@@ -5,8 +5,8 @@
 import { AgentRole } from "@langwatch/scenario";
 import { describe, expect, it, vi } from "vitest";
 
-import { VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV } from "../../voice-public-url-env";
-import type { VoiceTransportCredential } from "../../voice-transport.registry";
+import { VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV } from "../../voice-public-url-env.ts";
+import type { VoiceTransportCredential } from "../../voice-transport.registry.ts";
 import {
   createPhoneTransport,
   PHONE_CONNECT_REJECTED_PREFIX,
@@ -19,7 +19,7 @@ import {
   type TwilioAgentFactory,
   VoicePhoneTransportUnavailableError,
   VoicePublicBaseUrlMissingError,
-} from "../phone.transport";
+} from "../phone.transport.ts";
 
 const twilioAgentMock = vi.hoisted(() => vi.fn());
 

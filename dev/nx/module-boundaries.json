@@ -1,0 +1,242 @@
+{
+  "$comment": "The one boundary constraint set, consumed by @nx/enforce-module-boundaries (oxlint) and by dev/nx/check-boundaries.mjs. Tags are derived from the layout in dev/nx/tags-plugin.mjs, never hand-listed. packages/ is a ladder: a rung depends only on its own and lower ones. Test and tooling packages are build-time dependencies of every layer, so they are allowed targets everywhere; file-level test discipline stays with the architecture-enforcer.",
+  "allow": [],
+  "depConstraints": [
+    {
+      "$why": "rung 0. A primitive is a leaf: it is what everything else is built from.",
+      "sourceTag": "layer:primitive",
+      "onlyDependOnLibsWithTags": [
+        "layer:primitive",
+        "layer:test",
+        "layer:tooling"
+      ]
+    },
+    {
+      "$why": "rung 1. A client wraps one conduit and knows nothing above it.",
+      "sourceTag": "layer:client",
+      "onlyDependOnLibsWithTags": [
+        "layer:client",
+        "layer:primitive",
+        "layer:test",
+        "layer:tooling"
+      ]
+    },
+    {
+      "$why": "rung 2. Owned state: the only layer permitted to name a raw client.",
+      "sourceTag": "layer:repository",
+      "onlyDependOnLibsWithTags": [
+        "layer:repository",
+        "layer:client",
+        "layer:primitive",
+        "layer:contract",
+        "layer:test",
+        "layer:tooling"
+      ]
+    },
+    {
+      "$why": "rung 2. Schema movement also reaches a client directly.",
+      "sourceTag": "layer:migration",
+      "onlyDependOnLibsWithTags": [
+        "layer:migration",
+        "layer:client",
+        "layer:primitive",
+        "layer:contract",
+        "layer:test",
+        "layer:tooling"
+      ]
+    },
+    {
+      "$why": "rung 2. Telemetry observes; it never owns state.",
+      "sourceTag": "layer:observability",
+      "onlyDependOnLibsWithTags": [
+        "layer:observability",
+        "layer:primitive",
+        "layer:test",
+        "layer:tooling"
+      ]
+    },
+    {
+      "$why": "rung 3. Messages to anything we do not own.",
+      "sourceTag": "layer:eventing",
+      "onlyDependOnLibsWithTags": [
+        "layer:eventing",
+        "layer:repository",
+        "layer:client",
+        "layer:observability",
+        "layer:primitive",
+        "layer:contract",
+        "layer:test",
+        "layer:tooling"
+      ]
+    },
+    {
+      "$why": "rung 3. Transport machinery serialises; it holds no state.",
+      "sourceTag": "layer:transport",
+      "onlyDependOnLibsWithTags": [
+        "layer:transport",
+        "layer:observability",
+        "layer:primitive",
+        "layer:contract",
+        "layer:test",
+        "layer:tooling"
+      ]
+    },
+    {
+      "$why": "rung 3. The browser's own framework. Never a module half.",
+      "sourceTag": "layer:design",
+      "onlyDependOnLibsWithTags": [
+        "layer:design",
+        "layer:transport",
+        "layer:observability",
+        "layer:primitive",
+        "layer:contract",
+        "layer:test",
+        "layer:tooling"
+      ]
+    },
+    {
+      "$why": "rung 4. The process runtime composes every lower rung.",
+      "sourceTag": "layer:runtime",
+      "onlyDependOnLibsWithTags": [
+        "layer:runtime",
+        "layer:eventing",
+        "layer:transport",
+        "layer:repository",
+        "layer:migration",
+        "layer:observability",
+        "layer:client",
+        "layer:primitive",
+        "layer:contract",
+        "layer:framework",
+        "layer:test",
+        "layer:tooling"
+      ]
+    },
+    {
+      "$why": "A contract is portable: primitives and the transport declarations only. Contract-to-contract is permitted here and tracked separately.",
+      "sourceTag": "layer:contract",
+      "onlyDependOnLibsWithTags": [
+        "layer:contract",
+        "layer:primitive",
+        "layer:transport",
+        "layer:test",
+        "layer:tooling"
+      ]
+    },
+    {
+      "$why": "The process half never imports a browser package. It may name a client package because repositories/prisma/** legitimately does; which FILES may name one is a file-level rule the architecture-enforcer owns, not something tags can express.",
+      "sourceTag": "layer:process",
+      "onlyDependOnLibsWithTags": [
+        "layer:process",
+        "layer:contract",
+        "layer:runtime",
+        "layer:eventing",
+        "layer:transport",
+        "layer:repository",
+        "layer:migration",
+        "layer:observability",
+        "layer:primitive",
+        "layer:framework",
+        "layer:sdk",
+        "layer:test",
+        "layer:tooling",
+        "layer:client"
+      ]
+    },
+    {
+      "$why": "The browser half never imports the process half, nor a datastore client.",
+      "sourceTag": "layer:browser",
+      "onlyDependOnLibsWithTags": [
+        "layer:browser",
+        "layer:browser-kit",
+        "layer:contract",
+        "layer:design",
+        "layer:transport",
+        "layer:observability",
+        "layer:primitive",
+        "layer:framework",
+        "layer:sdk",
+        "layer:test",
+        "layer:tooling"
+      ]
+    },
+    {
+      "$why": "A kit is a leaf. Reaching a module browser package is the violation that merges packages into one declaration program.",
+      "sourceTag": "layer:browser-kit",
+      "onlyDependOnLibsWithTags": [
+        "layer:browser-kit",
+        "layer:contract",
+        "layer:design",
+        "layer:transport",
+        "layer:observability",
+        "layer:primitive",
+        "layer:framework",
+        "layer:test",
+        "layer:tooling"
+      ]
+    },
+    {
+      "$why": "Core must not depend on enterprise. Enterprise may depend on core. Applications and the generated install lists carry no tier, so they are exempt by construction.",
+      "sourceTag": "tier:core",
+      "onlyDependOnLibsWithTags": [
+        "tier:core",
+        "layer:test",
+        "layer:tooling"
+      ]
+    },
+    {
+      "$why": "Composition names every half.",
+      "sourceTag": "layer:composition",
+      "onlyDependOnLibsWithTags": [
+        "*"
+      ]
+    },
+    {
+      "$why": "Applications compose.",
+      "sourceTag": "layer:app",
+      "onlyDependOnLibsWithTags": [
+        "*"
+      ]
+    },
+    {
+      "sourceTag": "layer:test",
+      "onlyDependOnLibsWithTags": [
+        "*"
+      ]
+    },
+    {
+      "sourceTag": "layer:tooling",
+      "onlyDependOnLibsWithTags": [
+        "*"
+      ]
+    },
+    {
+      "sourceTag": "layer:sdk",
+      "onlyDependOnLibsWithTags": [
+        "*"
+      ]
+    },
+    {
+      "sourceTag": "layer:service",
+      "onlyDependOnLibsWithTags": [
+        "*"
+      ]
+    },
+    {
+      "sourceTag": "layer:mcp",
+      "onlyDependOnLibsWithTags": [
+        "*"
+      ]
+    },
+    {
+      "sourceTag": "layer:framework",
+      "onlyDependOnLibsWithTags": [
+        "layer:framework",
+        "layer:primitive",
+        "layer:contract",
+        "layer:test",
+        "layer:tooling"
+      ]
+    }
+  ]
+}

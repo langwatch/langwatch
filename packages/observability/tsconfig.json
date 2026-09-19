@@ -2,7 +2,6 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "dist",
-    "noEmit": true,
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "module": "ESNext",
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
@@ -11,7 +10,6 @@
     "rootDir": "src",
     "types": ["node"],
 
-    "rewriteRelativeImportExtensions": false
   },
   "include": ["src/**/*"],
 

@@ -1,7 +1,6 @@
 {
   "extends": "../../../../tsconfig.base.json",
   "compilerOptions": {
-    "noEmit": true,
     "rootDir": "src",
     "outDir": "dist",
 
@@ -13,7 +12,6 @@
       "@langwatch/enterprise-governance-contract": ["../contract/src/index.ts"]
     },
 
-    "rewriteRelativeImportExtensions": false
   },
   "include": ["src/**/*.ts"],
   "references": [

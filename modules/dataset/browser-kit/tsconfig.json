@@ -1,7 +1,6 @@
 {
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
-    "noEmit": true,
     "rootDir": ".",
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
@@ -10,7 +9,6 @@
     "types": ["vitest/globals", "@testing-library/jest-dom/vitest"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
-    "rewriteRelativeImportExtensions": false
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.setup.ts"],
   "references": [

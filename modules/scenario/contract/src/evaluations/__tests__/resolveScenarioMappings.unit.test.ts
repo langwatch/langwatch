@@ -1,8 +1,8 @@
 import type { Span } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import type { EvaluatorAttachment } from "../../evaluator-attachments";
-import { MAX_STORED_INPUT_LENGTH } from "../constants";
+import type { EvaluatorAttachment } from "../../evaluator-attachments.ts";
+import { MAX_STORED_INPUT_LENGTH } from "../constants.ts";
 import {
   attachmentsReadTrace,
   type ConversationMessage,
@@ -13,7 +13,7 @@ import {
   type ScenarioInputs,
   storedInputsOf,
   toolNameOf,
-} from "../resolveScenarioMappings";
+} from "../resolveScenarioMappings.ts";
 
 const messages: ConversationMessage[] = [
   { role: "user", content: "How many refunds last quarter?" },

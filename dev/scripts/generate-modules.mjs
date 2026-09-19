@@ -7,10 +7,16 @@ import { createRequire } from "node:module";
 import { resolve, dirname, relative } from "node:path";
 
 const REPOSITORY_ROOT = resolve(import.meta.dirname, "../..");
-const SERVER_LIST = "modules/server-modules.generated.ts";
-const WEB_LIST = "modules/web-modules.generated.ts";
-const SERVER_MEMBERS = "modules/server-module-members.generated.ts";
-const MODULES_PACKAGE = "modules/package.json";
+// One package per half, because a process installs one half and the package it
+// depends on is what its graph carries. A single package owning both lists made
+// every browser change mark the api and the worker as affected.
+const SERVER_ROOT = "packages/installed-server-modules";
+const WEB_ROOT = "packages/installed-web-modules";
+const SERVER_LIST = `${SERVER_ROOT}/src/server-modules.generated.ts`;
+const WEB_LIST = `${WEB_ROOT}/src/web-modules.generated.ts`;
+const SERVER_MEMBERS = `${SERVER_ROOT}/src/server-module-members.generated.ts`;
+const SERVER_PACKAGE = `${SERVER_ROOT}/package.json`;
+const WEB_PACKAGE = `${WEB_ROOT}/package.json`;
 
 /** `api-key` reads as `apiKey`, which is how a module names its declaration. */
 function camelCase(id) {
@@ -165,22 +171,11 @@ function sourceFor({ declarations, constant, half }) {
   ].join("\n");
 }
 
-function packageSourceFor({ root, catalogue, configs }) {
-  const manifest = JSON.parse(readFileSync(resolve(root, MODULES_PACKAGE), "utf8"));
-  const installed = [
-    ...declarationsFor({ root, catalogue, half: "server", suffix: "Server" }),
-    ...declarationsFor({ root, catalogue, half: "web", suffix: "Web" }),
-    ...configs.map((config) => ({ package: config.specifier })),
-  ];
+function packageSourceFor({ root, manifestPath, packages }) {
+  const manifest = JSON.parse(readFileSync(resolve(root, manifestPath), "utf8"));
 
-  // No generated file imports the kernel since `createServerApp` was removed,
-  // but `modules/tsconfig.json` still references its build project and
-  // `createProcessApp` (ARCHITECTURE.md §16) will import it again. Dropping it
-  // means regenerating references, so it stays declared.
   manifest.dependencies = Object.fromEntries(
-    [...new Set(["@langwatch/kernel", ...installed.map((declaration) => declaration.package)])]
-      .toSorted()
-      .map((name) => [name, "workspace:*"]),
+    [...new Set(packages)].toSorted().map((name) => [name, "workspace:*"]),
   );
 
   return `${JSON.stringify(manifest, undefined, 2)}\n`;
@@ -293,25 +288,26 @@ export function generateBrowserRenderers({ root = REPOSITORY_ROOT } = {}) {
   };
 }
 
-function pairingSource({ root, catalogue }) {
-  const web = catalogue.features.filter((entry) =>
-    existsSync(resolve(root, entry.root, "web/package.json")),
-  );
-  const paired = web.filter((entry) =>
-    existsSync(resolve(root, entry.root, "server/package.json")),
-  );
-  const packages = Object.fromEntries(
-    web.map((entry) => [
-      entry.id,
-      JSON.parse(readFileSync(resolve(root, entry.root, "web/package.json"), "utf8")).name,
-    ]),
-  );
+// The two halves are separate packages, so the server half's names are written
+// in as a union rather than imported: the check stays a compile error without
+// putting a process package in the browser list's graph. It probed web/ and
+// server/ until the process/browser rename, which left PairedOnDisk `never` and
+// the whole assertion vacuous.
+function pairingSource({ root, catalogue, serverNames }) {
+  // A half counts when it declares a module, not when its directory exists: a
+  // browser package holding only `ui/` is a server-only module, not a missing
+  // half. What this catches is a declaration written and never exported, which
+  // drops the module out of its list with nothing said.
+  const declares = (entry, dir, half) =>
+    existsSync(resolve(root, entry.root, dir, "src", `${entry.id}.${half}.ts`));
+  const browser = catalogue.features.filter((entry) => declares(entry, "browser", "web"));
+  const paired = browser.filter((entry) => declares(entry, "process", "server"));
+  const union = (names) => names.map((name) => JSON.stringify(name)).join(" | ") || "never";
   return [
-    'import type { serverModules } from "./server-modules.generated";',
-    `export const webModulePackages = ${JSON.stringify(packages, null, 2)} as const;`,
-    `type PairedOnDisk = ${paired.map((entry) => JSON.stringify(entry.id)).join(" | ") || "never"};`,
+    `type PairedOnDisk = ${union(paired.map((entry) => entry.id))};`,
+    `type ServerHalfOnDisk = ${union(serverNames)};`,
     'type MissingWeb = Exclude<PairedOnDisk, (typeof webModules)[number]["name"]>;',
-    'type MissingServer = Exclude<PairedOnDisk, (typeof serverModules)[number]["name"]>;',
+    "type MissingServer = Exclude<PairedOnDisk, ServerHalfOnDisk>;",
     "export const webModulePairing = {} satisfies {",
     '  [Id in `missing web half "${MissingWeb}"` | `missing server half "${MissingServer}"`]: never;',
     "};",
@@ -323,21 +319,36 @@ function pairingSource({ root, catalogue }) {
 export function generateModuleLists({ root = REPOSITORY_ROOT } = {}) {
   const catalogue = JSON.parse(readFileSync(resolve(root, "modules/catalogue.json"), "utf8"));
   const configs = moduleConfigsFor({ root, catalogue });
+  const serverDeclarations = declarationsFor({ root, catalogue, half: "server", suffix: "Server" });
+  const webDeclarations = declarationsFor({ root, catalogue, half: "web", suffix: "Web" });
 
   return {
     [SERVER_LIST]: sourceFor({
-      declarations: declarationsFor({ root, catalogue, half: "server", suffix: "Server" }),
+      declarations: serverDeclarations,
       constant: "serverModules",
       half: "server",
     }),
     [WEB_LIST]:
-      sourceFor({
-        declarations: declarationsFor({ root, catalogue, half: "web", suffix: "Web" }),
-        constant: "webModules",
-        half: "web",
-      }) + pairingSource({ root, catalogue }),
+      sourceFor({ declarations: webDeclarations, constant: "webModules", half: "web" }) +
+      pairingSource({ root, catalogue, serverNames: serverDeclarations.map((one) => one.id) }),
     [SERVER_MEMBERS]: memberSourceFor({ root, catalogue }),
-    [MODULES_PACKAGE]: packageSourceFor({ root, catalogue, configs }),
+    // The kernel stays declared on the server half: no generated file imports it
+    // since `createServerApp` was removed, but the build project is referenced
+    // and `createProcessApp` (ARCHITECTURE.md §16) will import it again.
+    [SERVER_PACKAGE]: packageSourceFor({
+      root,
+      manifestPath: SERVER_PACKAGE,
+      packages: [
+        "@langwatch/kernel",
+        ...serverDeclarations.map((one) => one.package),
+        ...configs.map((config) => config.specifier),
+      ],
+    }),
+    [WEB_PACKAGE]: packageSourceFor({
+      root,
+      manifestPath: WEB_PACKAGE,
+      packages: webDeclarations.map((one) => one.package),
+    }),
     ...generateBrowserRenderers({ root }),
   };
 }

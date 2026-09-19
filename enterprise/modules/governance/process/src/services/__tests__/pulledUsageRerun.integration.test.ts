@@ -38,7 +38,7 @@ import {
 } from "../../../projections/governanceCostRollup.foldProjection";
 import { GovernanceCostRollupStore } from "../../../projections/governanceCostRollup.store";
 import { GovernanceCostRollupClickHouseRepository } from "../../governanceCostRollup.clickhouse.repository";
-import { type AzureDailyCost, azureCostEvents } from "../azure-cost-management.service";
+import { type AzureDailyCost, azureCostEvents } from "../azure-cost-management.service.ts";
 import { buildPulledUsageRecord } from "../pulledUsageRecord";
 
 /** Well inside the table's retention horizon, so nothing is swept mid-test. */

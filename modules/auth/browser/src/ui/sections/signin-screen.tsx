@@ -11,6 +11,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -22,7 +23,6 @@ import { useIdentityFrontDoor } from "../../behavior/use-identity-front-door.ts"
 import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { useSearchParams } from "../../behavior/use-route.ts";
 import { authFailureMessage } from "../../model/auth-failure-message.ts";
-import { HorizontalFormControl } from "../../ui/elements/horizontal-form-control.tsx";
 import { LogoIcon } from "../../ui/elements/logo-icon.tsx";
 import Link from "../../ui/elements/router-link.tsx";
 import { FrontDoorShell } from "../../ui/sections/front-door-shell.tsx";

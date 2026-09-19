@@ -2,7 +2,6 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "rootDir": "src",
-    "noEmit": true,
     "lib": [
       "es2023",
       "dom",
@@ -17,7 +16,6 @@
     "emitDeclarationOnly": true,
     "outDir": "./dist",
     "verbatimModuleSyntax": true,
-    "rewriteRelativeImportExtensions": false
   },
   "include": [
     "src/**/*.ts"

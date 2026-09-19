@@ -5,11 +5,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ScenarioRunStatus } from "../../scenario-run.ts";
-import type { CallRecord } from "../call-record";
+import type { CallRecord } from "../call-record.ts";
 import {
   createPhoneTransport,
   VoicePhoneTransportUnavailableError,
-} from "../transports/phone.transport";
+} from "../transports/phone.transport.ts";
 import type { VoiceSessionTokenPayload } from "../voice-session-token.payload.ts";
 import {
   authorizeRecordingPlayback,
@@ -22,8 +22,8 @@ import {
   VoiceRecordingUnavailableError,
   VoiceScenarioNotFoundError,
   type VoiceSessionInfrastructure,
-} from "../voice-session.service";
-import type { VoiceTransportCredential, VoiceTransportRunner } from "../voice-transport.registry";
+} from "../voice-session.service.ts";
+import type { VoiceTransportCredential, VoiceTransportRunner } from "../voice-transport.registry.ts";
 
 const CREDENTIAL: VoiceTransportCredential = {
   kind: "elevenlabs",

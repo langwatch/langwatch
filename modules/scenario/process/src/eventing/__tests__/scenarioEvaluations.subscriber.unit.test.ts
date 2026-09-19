@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createScenarioEvaluationsSubscriber,
   type ScenarioEvaluationsSubscriberDeps,
-} from "../scenarioEvaluations.subscriber";
+} from "../scenarioEvaluations.subscriber.ts";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({

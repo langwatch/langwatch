@@ -1,9 +1,9 @@
 import "../../model/ambient.d.ts";
 import { Box, Card, Container, Heading, Text, VStack } from "@chakra-ui/react";
-import type { ReactNode } from "react";
+import { FullLogo } from "@langwatch/design-system/full-logo";
 
 import "./auth-front-door.css";
-import { FullLogo } from "./full-logo.tsx";
+import type { ReactNode } from "react";
 
 /** Glass card container for all auth screens; centered on desktop, full-bleed on mobile. */
 export function AuthCard({

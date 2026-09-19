@@ -81,6 +81,7 @@ describe("AnnotationService review workflow", () => {
     harnessed.writeSuggestion.mockRejectedValue(new Error("overlay unavailable"));
 
     await expect(harnessed.app.createReview(createInput)).rejects.toThrow("overlay unavailable");
+
     expect(await harnessed.repository.findAll({ projectId: "project-1", anchor: "all" })).toEqual(
       [],
     );
@@ -156,6 +157,7 @@ describe("AnnotationService review workflow", () => {
     });
 
     expect(deleted.id).toBe(created.id);
+
     expect(await harnessed.repository.findAll({ projectId: "project-1", anchor: "all" })).toEqual(
       [],
     );

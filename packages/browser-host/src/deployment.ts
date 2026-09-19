@@ -16,5 +16,6 @@ export function deriveUiDeployment(config: PublicAppConfig): UiDeployment {
     ...(config.licensePaymentUrl ? { licensePaymentUrl: config.licensePaymentUrl } : {}),
     hasNlpService: config.capabilities.nlp,
     hasLangevals: config.capabilities.langevals,
+    hasEmailProvider: config.capabilities.email,
   };
 }

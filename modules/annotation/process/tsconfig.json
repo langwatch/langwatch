@@ -1,7 +1,6 @@
 {
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
-    "noEmit": true,
     "rootDir": "src",
     "outDir": "dist",
 
@@ -11,7 +10,6 @@
     "verbatimModuleSyntax": true,
     "types": ["vitest/globals"],
 
-    "rewriteRelativeImportExtensions": false
   },
   "include": ["src/**/*.ts"],
   "references": [

@@ -8,12 +8,11 @@
   // this config emits the JavaScript used by the server processes.
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
     "paths": {
       "@langwatch/mail": ["./src/index.ts"]
     },
-    "noEmit": false,
-    "outDir": "dist",
-    "rootDir": "src",
     "declaration": false,
     "sourceMap": true,
     "types": ["node"],

@@ -141,6 +141,10 @@ export const boundaryRule = defineRule({
       what: "`{{specifier}}` resolves outside `{{packageRoot}}`, so this package depends on a file it does not own.",
       fix: "Replace `{{specifier}}` with the target's package name — `@langwatch/<feature>-<contract|process|browser|browser-kit>` for a module package, `@langwatch/<name>` for any other workspace package. Move the file into `{{packageRoot}}` instead only when nothing outside `{{packageRoot}}` imports it.",
     },
+    unownedEscape: {
+      what: "`{{specifier}}` resolves outside `{{packageRoot}}` into a directory no package owns, so nothing records that this package depends on it.",
+      fix: "Give the target directory a `package.json` and add it to `pnpm-workspace.yaml`, then import it by that name — the way `dev/scripts` became `@langwatch/dev-scripts`. Move the file into `{{packageRoot}}` instead when only this package reads it.",
+    },
     contractRuntime: {
       what: "A contract package is transport-neutral: `{{specifier}}` is a node, browser or server runtime.",
       fix: "Keep only types and schemas here, and move the code that calls `{{specifier}}` to the feature's server package when it is a `node:` or server import, or to its web package when it is a browser import.",
@@ -208,17 +212,17 @@ export const boundaryRule = defineRule({
         if (packageRoot) {
           const targetPath = resolve(dirname(filename), specifier);
           const escaped = relative(packageRoot, targetPath).startsWith("..");
-          // Only when the target belongs to another workspace member: that is
-          // the case the fix can name. A path into a directory no package owns
-          // (dev/scripts, services/langevals) has no package name to replace it
-          // with, and a rule whose fix cannot be followed reads as debt.
+          // Two escapes, because they have two different fixes: into another
+          // member, replace the path with that member's name; into a directory
+          // no package owns, there is no name to replace it with and the
+          // directory has to become one first.
           const targetRoot = packageRootForFile(targetPath, context.cwd);
           const crossesIntoAMember =
             targetRoot !== undefined && targetRoot !== packageRoot && targetRoot !== context.cwd;
-          if (escaped && crossesIntoAMember) {
+          if (escaped) {
             context.report({
               node,
-              messageId: "packageEscape",
+              messageId: crossesIntoAMember ? "packageEscape" : "unownedEscape",
               data: {
                 specifier,
                 packageRoot: relative(context.cwd, packageRoot).split(sep).join("/"),

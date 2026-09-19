@@ -1,0 +1,14 @@
+{
+  "name": "@langwatch/dev-scripts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The repository's own scripts. A package so the few entries other packages import — the module-list generator that `pnpm generate:modules` runs — are named rather than reached for by relative path; the rest stay plain files their shell callers run by path.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    "./generate-modules": "./generate-modules.mjs"
+  },
+  "devDependencies": {
+    "@langwatch/scenario-child": "workspace:*"
+  }
+}

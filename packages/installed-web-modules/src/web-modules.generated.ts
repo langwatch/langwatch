@@ -83,11 +83,10 @@ export const webModules = [
   userWeb satisfies { readonly name: "user" },
   workflowWeb satisfies { readonly name: "workflow" },
 ] as const;
-import type { serverModules } from "./server-modules.generated";
-export const webModulePackages = {} as const;
-type PairedOnDisk = never;
+type PairedOnDisk = "agent" | "analytics" | "annotation" | "api-key" | "auth" | "authz" | "automation" | "coding-agent" | "data-privacy" | "data-retention" | "dataset" | "evaluator" | "experiment" | "feature-flag" | "gateway" | "github" | "langy" | "model-provider" | "monitor" | "notification" | "ops" | "organization" | "presence" | "project" | "prompt" | "scenario" | "secret" | "share" | "suite" | "topic" | "trace" | "user" | "workflow" | "billing" | "governance" | "licensing" | "scim";
+type ServerHalfOnDisk = "agent" | "analytics" | "annotation" | "api-key" | "auth" | "authz" | "automation" | "coding-agent" | "dashboard" | "data-privacy" | "data-retention" | "dataset" | "entitlement" | "evaluation" | "evaluator" | "experiment" | "feature-flag" | "gateway" | "github" | "governance" | "hosted-mcp" | "identity" | "langy" | "licensing" | "log" | "managed-provider" | "metric" | "model-provider" | "monitor" | "notification" | "ops" | "organization" | "platform-health" | "presence" | "project" | "prompt" | "role" | "scenario" | "scim" | "secret" | "share" | "sso" | "stored-object" | "suite" | "topic" | "trace" | "user" | "webhook" | "workflow";
 type MissingWeb = Exclude<PairedOnDisk, (typeof webModules)[number]["name"]>;
-type MissingServer = Exclude<PairedOnDisk, (typeof serverModules)[number]["name"]>;
+type MissingServer = Exclude<PairedOnDisk, ServerHalfOnDisk>;
 export const webModulePairing = {} satisfies {
   [Id in `missing web half "${MissingWeb}"` | `missing server half "${MissingServer}"`]: never;
 };

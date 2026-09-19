@@ -11,7 +11,8 @@
       "types": "./dist/bundle-path.d.ts",
       "default": "./src/bundle-path.ts"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./bundle-optional-externals": "./scripts/bundle-optional-externals.mjs"
   },
   "scripts": {
     "build": "node scripts/build-child.mjs",
@@ -44,5 +45,8 @@
     "esbuild": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
-  }
+  },
+  "files": [
+    "scripts"
+  ]
 }

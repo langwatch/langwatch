@@ -11,7 +11,7 @@ import {
   ensureCloudflaredOnPath,
   resolveCloudflaredFromScopes,
   VoiceTunnelBinaryError,
-} from "../voice-cloudflared-binary";
+} from "../voice-cloudflared-binary.ts";
 
 const BIN = "/pkg/cloudflared/bin/cloudflared";
 const BIN_DIR = "/pkg/cloudflared/bin";

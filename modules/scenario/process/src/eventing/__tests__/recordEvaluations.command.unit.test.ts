@@ -9,8 +9,8 @@ import {
 } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { RecordEvaluationsDeps } from "../recordEvaluations.command";
-import { evaluationsFingerprint, RecordEvaluationsCommand } from "../recordEvaluations.command";
+import type { RecordEvaluationsDeps } from "../recordEvaluations.command.ts";
+import { evaluationsFingerprint, RecordEvaluationsCommand } from "../recordEvaluations.command.ts";
 
 const FAILED_REQUIRED: ScenarioEvaluationResult = {
   evaluatorId: "ragas/sql_query_equivalence",

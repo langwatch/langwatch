@@ -2,7 +2,6 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "dist",
-    "noEmit": true,
     "module": "ESNext",
     "lib": ["ES2023", "DOM"],
     "esModuleInterop": true,
@@ -11,7 +10,6 @@
     "types": ["node"],
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
 
-    "rewriteRelativeImportExtensions": false
   },
   "include": ["src/**/*"],
   "references": [

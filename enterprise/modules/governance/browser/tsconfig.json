@@ -1,7 +1,6 @@
 {
   "extends": "../../../../tsconfig.base.json",
   "compilerOptions": {
-    "noEmit": true,
     "rootDir": "src",
     "outDir": "dist",
 
@@ -19,7 +18,6 @@
       "@langwatch/coding-agent-browser": ["../../../../modules/coding-agent/browser/src/index.ts"]
     },
 
-    "rewriteRelativeImportExtensions": false
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "references": [

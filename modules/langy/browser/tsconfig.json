@@ -1,7 +1,6 @@
 {
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
-    "target": "es2023",
     "lib": ["es2023", "dom"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
@@ -13,13 +12,11 @@
     "types": ["node", "vitest/globals", "@testing-library/jest-dom"],
     "resolveJsonModule": true,
 
-    "noEmit": true,
 
     "rootDir": ".",
 
     "outDir": "dist",
 
-    "rewriteRelativeImportExtensions": false
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts", "scripts/**/*.ts"],
 

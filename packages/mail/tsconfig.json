@@ -8,13 +8,11 @@
     "verbatimModuleSyntax": true,
     "types": ["node", "vitest/globals"],
 
-    "noEmit": true,
 
     "rootDir": ".",
 
     "outDir": "dist/typecheck",
 
-    "rewriteRelativeImportExtensions": false
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
 

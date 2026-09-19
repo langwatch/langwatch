@@ -20,7 +20,7 @@ import { nanoid } from "nanoid";
 import type { ConnectedWorkspace } from "../repositories/langy-local-presence.repository.ts";
 import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
 import { workspaceChannel } from "./langy-local-control-keys.rules.ts";
-import {} from "./langy-local-session-text.rules.ts";
+
 /** The credential behind one socket, once it resolved to a conversation. */
 export interface ControlCredential {
   apiKeyId: string;

@@ -22,7 +22,7 @@ import {
 } from "@langwatch/browser-host/transport";
 import type { PublicAppConfig } from "@langwatch/config/public-app-config";
 import { configureDocsRuntime } from "@langwatch/error-presentation/docs-url";
-import { webModules } from "@langwatch/installed-modules/web";
+import { webModules } from "@langwatch/installed-web-modules";
 import {
   createBrowserUiScope,
   isUiPublicRoute,

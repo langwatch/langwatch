@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createCallLimitTimer } from "../call-limit-timer";
+import { createCallLimitTimer } from "../call-limit-timer.ts";
 
 describe("createCallLimitTimer", () => {
   describe("given a running call limit timer", () => {

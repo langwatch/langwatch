@@ -268,6 +268,165 @@ jobs:
               - '.github/scripts/**'
               - '.github/workflows/langwatch-app-ci.yml'
 
+  # Which applications a change actually reaches, from the Nx project graph
+  # (ADR-150) rather than from path globs.
+  #
+  # `changes` answers "did a relevant path move". It cannot answer "does this
+  # reach @langwatch/ui", because a path glob has no view of a dependency edge:
+  # a package changes, and a dependent that should be tested is not, because no
+  # pattern matched its directory. This job answers the second question.
+  #
+  # Measured over the eighteen commits before 317d961fa5: eleven reached `ui`
+  # alone and only four reached all three applications, while every one of them
+  # ran all three `test-unit` legs. That is the waste this recovers -- whole
+  # legs skipped, with no change to sharding, services or file splits.
+  #
+  # It costs one install (~2 min) ahead of a lane whose legs run up to 25 min
+  # each, so it pays the moment a single leg is skipped.
+  #
+  # NARROWING IS GUARDED. This is the one job here that can cause something NOT
+  # to run, so every uncertain answer is the full set:
+  #   - main and merge_group never narrow. The merge path always runs all three.
+  #   - a global input (lockfile, base tsconfig, nx.json, prisma schema) means
+  #     all three, because those are inputs to everything and the graph models
+  #     them as a shared hash rather than an edge.
+  #   - any failure -- bad base sha, nx error, unparseable output -- means all
+  #     three. `continue-on-error` plus the `|| echo` fallbacks below exist so
+  #     that a broken graph degrades to today's behaviour instead of to a
+  #     green job that tested nothing.
+  #
+  # To run this in shadow (compute, log, change nothing), set APPLY to 'false'.
+  affected:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      # Flip to 'false' to observe the selection for a few weeks without
+      # letting it skip anything. The step summary records what it WOULD have
+      # skipped either way.
+      APPLY: "true"
+    outputs:
+      # From `guard`, never from `pick`: `pick` is continue-on-error, so on a
+      # failure its outputs are empty and only `guard` is guaranteed to name a
+      # non-empty set.
+      apps: ${{ steps.guard.outputs.apps }}
+      narrowed: ${{ steps.pick.outputs.narrowed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          # nx affected diffs against a base commit, so the shallow default
+          # checkout is not enough -- without history the base sha is absent
+          # and every run falls back to the full set.
+          fetch-depth: 0
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+          sparse-checkout-cone-mode: false
+
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: all
+
+      # The graph is derived, not source: it is rebuilt whenever the workspace
+      # shape changes and is cheap to recompute, so a miss costs seconds.
+      - name: Cache the Nx project graph
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .nx/workspace-data
+          key: ${{ runner.os }}-nx-graph-${{ hashFiles('pnpm-lock.yaml', 'nx.json') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-nx-graph-${{ hashFiles('pnpm-lock.yaml', 'nx.json') }}-
+            ${{ runner.os }}-nx-graph-
+
+      - name: Decide which applications this change reaches
+        id: pick
+        continue-on-error: true
+        env:
+          ALL: '["platform-api","worker","ui"]'
+        run: |
+          set -uo pipefail
+          # The merge path is never narrowed.
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "apps=$ALL" >> "$GITHUB_OUTPUT"
+            echo "narrowed=false" >> "$GITHUB_OUTPUT"
+            echo "Not a pull request — running all three applications." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          BASE="${{ github.event.pull_request.base.sha }}"
+          if [ -z "$BASE" ] || ! git cat-file -e "$BASE" 2>/dev/null; then
+            echo "apps=$ALL" >> "$GITHUB_OUTPUT"
+            echo "narrowed=false" >> "$GITHUB_OUTPUT"
+            echo "Base commit unavailable — running all three applications." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # Inputs that belong to everything. The graph hashes these globally
+          # rather than as edges, so a change here is not "affected" in the
+          # per-project sense and must be handled by name.
+          if git diff --name-only "$BASE" HEAD | grep -qE \
+            '^(pnpm-lock\.yaml|pnpm-workspace\.yaml|nx\.json|tsconfig\.base\.json|packages/prisma-client/prisma/|\.github/)'; then
+            echo "apps=$ALL" >> "$GITHUB_OUTPUT"
+            echo "narrowed=false" >> "$GITHUB_OUTPUT"
+            echo "A global input changed — running all three applications." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          RAW=$(pnpm exec nx show projects --affected --base="$BASE" --head=HEAD --json 2>/dev/null | tail -1)
+          PICKED=$(printf '%s' "$RAW" | node -e '
+            let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
+              let a;try{a=new Set(JSON.parse(s))}catch{process.stdout.write("");return}
+              const m={"platform-api":"@langwatch/platform-api","worker":"@langwatch/worker","ui":"@langwatch/ui"};
+              const hit=Object.keys(m).filter(k=>a.has(m[k]));
+              process.stdout.write(JSON.stringify(hit));
+            });' 2>/dev/null)
+
+          # An empty string means nx or the parse failed. An empty ARRAY is a
+          # real answer -- nothing reached an application -- but this lane is
+          # not the only thing gating a merge, so it still runs one leg rather
+          # than reporting a green lane that executed nothing.
+          if [ -z "$PICKED" ]; then
+            echo "apps=$ALL" >> "$GITHUB_OUTPUT"
+            echo "narrowed=false" >> "$GITHUB_OUTPUT"
+            echo "Could not compute affected projects — running all three applications." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [ "$PICKED" = "[]" ]; then PICKED='["platform-api"]'; fi
+
+          {
+            echo "### Applications this change reaches"
+            echo ""
+            echo "Graph says: \`$PICKED\`  (of \`$ALL\`)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "${APPLY}" != "true" ]; then
+            echo "apps=$ALL" >> "$GITHUB_OUTPUT"
+            echo "narrowed=false" >> "$GITHUB_OUTPUT"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Shadow mode (\`APPLY\` is not \`true\`) — all three ran anyway." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "apps=$PICKED" >> "$GITHUB_OUTPUT"
+          echo "narrowed=true" >> "$GITHUB_OUTPUT"
+
+      # continue-on-error above means a failed step still arrives here with
+      # empty outputs. Nothing downstream may read an empty matrix, so the
+      # full set is restored by name.
+      - name: Fall back to every application if the decision did not produce one
+        id: guard
+        run: |
+          APPS='${{ steps.pick.outputs.apps }}'
+          if [ -z "$APPS" ]; then
+            echo "The affected step did not complete — running all three applications." >> "$GITHUB_STEP_SUMMARY"
+            echo 'apps=["platform-api","worker","ui"]' >> "$GITHUB_OUTPUT"
+          else
+            echo "apps=$APPS" >> "$GITHUB_OUTPUT"
+          fi
+
   # Every workspace package's own typecheck, as one recursive run through the
   # root `typecheck` script (`pnpm --workspace-concurrency=1 -r --no-bail
   # --filter "!@langwatch/server" typecheck`).
@@ -351,7 +510,7 @@ jobs:
         run: bash .github/scripts/notify-slack-job-failure.sh typecheck
 
   test-unit:
-    needs: changes
+    needs: [changes, affected]
     if: needs.changes.outputs.relevant == 'true'
     strategy:
       fail-fast: false
@@ -361,7 +520,16 @@ jobs:
         # about two thousand tests between them and each is its own vitest
         # root, so the parallelism that pays is per application rather than per
         # slice of one corpus.
-        app: [platform-api, worker, ui]
+        #
+        # The list is now the applications the change actually reaches, from
+        # the Nx graph -- see the `affected` job, which falls back to all three
+        # on main, on merge_group, on a global-input change, and on any
+        # failure. A leg absent here was not skipped by a path glob guessing;
+        # it was skipped because nothing in the graph connects it to the diff.
+        # The `||` is load-bearing, not defensive habit: a matrix expression is
+        # evaluated even when the job is skipped, so a skipped or output-less
+        # `affected` would make fromJSON('') a hard error rather than a skip.
+        app: ${{ fromJSON(needs.affected.outputs.apps || '["platform-api","worker","ui"]') }}
     env:
       VITEST_MAX_WORKERS: "4" # physical core count on GitHub-hosted ubuntu runners
       DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
@@ -1356,6 +1524,13 @@ jobs:
     needs:
       [
         changes,
+        # `affected` decides test-unit's matrix, and test-unit is an allowed
+        # skip. So if this job failed and were not named here, test-unit would
+        # skip, the skip would be allowed, and the lane would report green
+        # having run no unit tests at all. It is deliberately NOT in
+        # allowed-skips below: a graph that cannot answer must stop the merge,
+        # not quietly excuse the tests it was meant to select.
+        affected,
         typecheck,
         test-unit,
         package-suites,

@@ -7,9 +7,8 @@ import {
   renderScenarioContent,
   type RunParameterValues,
   withoutParameterNames,
-  type ScenarioConfig,
+  type ScenarioConfig,parseCallerVoiceConfig,type CallerVoiceConfig
 } from "@langwatch/scenario-contract";
-import { parseCallerVoiceConfig, type CallerVoiceConfig } from "@langwatch/scenario-contract";
 import { extractSuiteId, type Suite, type SuiteApi } from "@langwatch/suite-contract";
 
 import type { ScenarioService } from "./scenario.service.ts";

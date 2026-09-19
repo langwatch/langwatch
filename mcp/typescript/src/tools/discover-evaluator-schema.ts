@@ -1,8 +1,8 @@
-import { AVAILABLE_EVALUATORS } from "../../../../services/langevals/ts-integration/evaluators.generated.js";
-import type {
-  EvaluatorDefinition,
-  EvaluatorTypes,
-} from "../../../../services/langevals/ts-integration/evaluators.generated.js";
+import {
+  AVAILABLE_EVALUATORS,
+  type EvaluatorDefinition,
+  type EvaluatorTypes,
+} from "@langwatch/evaluator-contract";
 
 /**
  * Formats evaluator schema for discover_schema: an overview (all types,

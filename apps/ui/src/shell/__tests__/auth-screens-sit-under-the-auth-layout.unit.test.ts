@@ -3,7 +3,7 @@
  * mounts as a layout is only mounted above the routes under that layout, and
  * nothing checked that. Spec: specs/ui/module-host-mounting.feature
  */
-import { webModules } from "@langwatch/installed-modules/web";
+import { webModules } from "@langwatch/installed-web-modules";
 import { describe, expect, it } from "vitest";
 
 import { uiRouteTable } from "../ui-route-table";

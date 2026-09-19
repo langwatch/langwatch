@@ -734,6 +734,7 @@ function handledErrorEnvelope(
   traceIds: { traceId?: string; spanId?: string },
 ): { status: ContentfulStatusCode; body: ApiErrorBody } {
   const isValidation = error.code === VALIDATION_ERROR_CODE;
+
   const status = (
     isValidation ? VALIDATION_ERROR_STATUS : (error.httpStatus ?? 500)
   ) as ContentfulStatusCode;
@@ -773,6 +774,7 @@ function handledErrorEnvelope(
  */
 export function canonicalErrorAnswer(failure: unknown): Response {
   const span = trace.getActiveSpan()?.spanContext();
+
   const { status, body } = canonicalErrorFor(failure, {
     ...(span && span.traceId !== INVALID_TRACE_ID ? { traceId: span.traceId } : {}),
     ...(span && span.spanId !== INVALID_SPAN_ID ? { spanId: span.spanId } : {}),
@@ -808,6 +810,7 @@ export function createCanonicalFamilyErrorHandler(options: {
   ) => { status: ContentfulStatusCode; body: ApiErrorBody };
 }): ErrorHandler {
   const logger = createLogger(options.loggerName);
+
   const mapError =
     options.mapError ?? ((error: unknown, c: Context<any>) => canonicalErrorFor(error, requestTraceIds(c)));
 

@@ -6,7 +6,7 @@ import {
   VOICE_RUNS_MAX_CONCURRENT_DEFAULT,
   voiceCallMaxSeconds,
   voiceRunsMaxConcurrent,
-} from "../voice-limits";
+} from "../voice-limits.ts";
 
 describe("voiceCallMaxSeconds", () => {
   describe("given the call time limit env vars", () => {

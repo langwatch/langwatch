@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { backoffDelayMs, SCENARIO_EVALUATIONS_JOB } from "../constants";
-import { TraceDataPendingError } from "../runScenarioEvaluations";
+import { backoffDelayMs, SCENARIO_EVALUATIONS_JOB } from "../constants.ts";
+import { TraceDataPendingError } from "../runScenarioEvaluations.ts";
 import {
   createScenarioEvaluationsJobHandler,
   isFinalAttempt,
   type ScenarioEvaluationsJobDeps,
   scenarioEvaluationsJobId,
-} from "../scenarioEvaluations.job";
-import type { ScenarioEvaluationsJobPayload } from "../types";
+} from "../scenarioEvaluations.job.ts";
+import type { ScenarioEvaluationsJobPayload } from "../types.ts";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({

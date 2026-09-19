@@ -4,8 +4,8 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { proxyAudioStream } from "../audio-proxy-stream";
-import { VoiceRecordingUnavailableError } from "../voice-session.service";
+import { proxyAudioStream } from "../audio-proxy-stream.ts";
+import { VoiceRecordingUnavailableError } from "../voice-session.service.ts";
 
 /** A minimal upstream stand-in with the three fields the proxy reads. */
 const okUpstream = (contentType: string | null) => ({

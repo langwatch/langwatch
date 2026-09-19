@@ -29,7 +29,7 @@ type LiveSpanTreeNodeShape = {
 };
 
 // `".."`, not `"../src"`: from `src/__tests__/` that resolved to `src/src`.
-type ContractNode = import("..").SpanTreeNode;
+type ContractNode = import("../index.ts").SpanTreeNode;
 type NodeParity = [ContractNode] extends [LiveSpanTreeNodeShape]
   ? [LiveSpanTreeNodeShape] extends [ContractNode]
     ? true

@@ -96,7 +96,7 @@ generated output is not required to run this check.
 
 Nobody types a project reference. `pnpm sync:references` derives every
 `references` array from the workspace manifests and rewrites it in place;
-`node dev/scripts/sync-tsconfig-references.mjs --check` prints the files that
+`node packages/architecture-enforcer/src/tools/sync-tsconfig-references.mjs --check` prints the files that
 would change and exits non-zero, and the same rule reports drift as a lint
 violation naming the missing or extra entry. The rules: a package's producer is
 its own `tsconfig.build.json`, or the group solution when it belongs to the

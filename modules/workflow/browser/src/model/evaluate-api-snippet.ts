@@ -1,33 +1,7 @@
+import { IMAGE_EXAMPLE, exampleParameterValue } from "@langwatch/workflow-browser-kit";
 import type { WorkflowField } from "@langwatch/workflow-contract";
 
-/**
- * A base64 data-URL example for image inputs. Truncated for readability: it
- * shows the "data:<mime>;base64,<payload>" structure the endpoint expects,
- * not a usable image. Callers replace it with their own encoded image.
- */
-export const IMAGE_EXAMPLE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...";
-
-/**
- * Example scalar value for an entry field type, or undefined when not a
- * scalar. The evaluate endpoint only accepts string/number/boolean params,
- * so structured inputs (lists, dicts, chat messages) come from the dataset.
- */
-export function exampleParameterValue(type: string): string | number | boolean | undefined {
-  switch (type) {
-    case "str":
-      return "example";
-    case "image":
-      return IMAGE_EXAMPLE;
-    case "float":
-      return 0.5;
-    case "int":
-      return 42;
-    case "bool":
-      return true;
-    default:
-      return undefined;
-  }
-}
+export { IMAGE_EXAMPLE, exampleParameterValue };
 
 /**
  * Build the example "parameters" object: entry fields the dataset doesn't

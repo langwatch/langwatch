@@ -6,7 +6,7 @@ import type {
 } from "@langwatch/scenario-contract/voice-runtime";
 import { describe, expect, it, vi } from "vitest";
 
-import { createSerializedVoiceAgentAdapter, NO_OPENAI_KEY_MESSAGE } from "../voice-agent.adapter";
+import { createSerializedVoiceAgentAdapter, NO_OPENAI_KEY_MESSAGE } from "../voice-agent.adapter.ts";
 
 const fakeAdapter = { call: async () => "" } as unknown as AgentAdapter;
 

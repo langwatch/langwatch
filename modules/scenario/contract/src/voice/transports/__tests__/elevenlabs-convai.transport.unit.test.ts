@@ -5,7 +5,7 @@ import {
   elevenLabsConvaiTransport,
   readElevenLabsErrorReason,
   wrapConnectRejection,
-} from "../elevenlabs-convai.transport";
+} from "../elevenlabs-convai.transport.ts";
 
 const CREDENTIAL = {
   kind: "elevenlabs",

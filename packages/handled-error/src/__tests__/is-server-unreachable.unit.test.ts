@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isServerUnreachable } from "../is-server-unreachable";
+import { isServerUnreachable } from "../is-server-unreachable.ts";
 
 /**
  * The one distinction the error surface makes before the registry: did

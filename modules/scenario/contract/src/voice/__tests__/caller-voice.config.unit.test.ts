@@ -4,7 +4,7 @@ import {
   callerVoiceConfigSchema,
   DEFAULT_CALLER_VOICE,
   parseCallerVoiceConfig,
-} from "../caller-voice.config";
+} from "../caller-voice.config.ts";
 
 describe("parseCallerVoiceConfig", () => {
   describe("when the stored value is null or undefined", () => {

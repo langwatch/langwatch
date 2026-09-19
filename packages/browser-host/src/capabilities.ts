@@ -281,6 +281,12 @@ export type UiDeployment = {
   licensePaymentUrl?: string;
   hasNlpService: boolean;
   hasLangevals: boolean;
+  /**
+   * Whether this deployment can actually send mail. Required, not optional: a
+   * host answering `false` where mail works tells an administrator their invite
+   * was not sent when it was.
+   */
+  hasEmailProvider: boolean;
 };
 
 /** What a composition that declared no deployment is read as. */
@@ -292,6 +298,7 @@ const PRODUCTION_UI_DEPLOYMENT: UiDeployment = {
   appBaseUrl: typeof window === "undefined" ? "" : window.location.origin,
   hasNlpService: true,
   hasLangevals: true,
+  hasEmailProvider: false,
 };
 
 /** Every capability a screen can ask for, all of them answered. */

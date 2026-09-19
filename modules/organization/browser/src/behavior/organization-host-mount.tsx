@@ -4,7 +4,11 @@
  * family's own borrowed `organization.getAll` query. ARCHITECTURE.md §10.1.
  */
 
-import { useUiCapabilities, useUiScope } from "@langwatch/browser-host/capabilities";
+import {
+  useUiCapabilities,
+  useUiDeployment,
+  useUiScope,
+} from "@langwatch/browser-host/capabilities";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useMemo, type ReactNode } from "react";
 
@@ -35,6 +39,8 @@ class CapabilityOrganizationHost extends OrganizationHostApi {
       activeProject: OrganizationProjectReading | undefined;
       isEnterprise: boolean;
       isPlanLoading: boolean;
+      /** Whether this deployment can send the invitation rather than only mint a link. */
+      hasEmailProvider: boolean;
       isFeatureEnabled: (flag: string) => boolean;
       openOverlay: (name: string, props?: Record<string, unknown>) => void;
       closeOverlay: () => void;
@@ -83,13 +89,8 @@ class CapabilityOrganizationHost extends OrganizationHostApi {
     return this.deps.isPlanLoading;
   }
 
-  /**
-   * No capability carries this deployment's mail configuration —
-   * `UiDeployment` has no such field. Fail-safe FALSE: the members page
-   * offers a copyable link, never claiming a message went out that did not.
-   */
   hasEmailProvider(): boolean {
-    return false;
+    return this.deps.hasEmailProvider;
   }
 
   isFeatureEnabled(flag: string): boolean {
@@ -139,6 +140,7 @@ class CapabilityOrganizationHost extends OrganizationHostApi {
 
 export default function OrganizationHostMount({ children }: { children?: ReactNode }) {
   const { session, route, feedback, navigation } = useUiCapabilities();
+  const deployment = useUiDeployment();
   const uiScope = useUiScope();
   const activeScope = uiScope.activeScope();
   const scopeHost = uiScope.scopeHost();
@@ -169,6 +171,7 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
         activeProject: graph.activeProject?.project,
         isEnterprise: facts.isEnterprise,
         isPlanLoading: facts.isPlanLoading,
+        hasEmailProvider: deployment.hasEmailProvider,
         isFeatureEnabled: (flag) => session.isFeatureEnabled(flag),
         openOverlay: (name, props) => openDrawer(name, props),
         closeOverlay: () => closeDrawer(),
@@ -187,6 +190,7 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
       sessionActor,
       facts.isEnterprise,
       facts.isPlanLoading,
+      deployment.hasEmailProvider,
       openDrawer,
       closeDrawer,
       feedback,

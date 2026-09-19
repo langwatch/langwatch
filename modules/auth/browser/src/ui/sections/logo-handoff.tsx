@@ -1,7 +1,6 @@
 import "../../model/ambient.d.ts";
+import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import { useEffect } from "react";
-
-import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
 
 import "../elements/auth-front-door.css";
 import { beginEntrance, endEntrance } from "../../model/entrance.ts";

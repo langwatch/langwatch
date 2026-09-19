@@ -17,9 +17,8 @@ import {
   type EvaluatorAttachment,
   type EvaluatorInputSpec,
   parseEvaluatorAttachments,
-  type ScenarioMappingContext,
+  type ScenarioMappingContext,parseSuiteFieldDefinitions
 } from "@langwatch/scenario-contract";
-import { parseSuiteFieldDefinitions } from "@langwatch/scenario-contract";
 import { useProjectSpanNames } from "@langwatch/trace-browser/surfaces/project-span-names";
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useMemo } from "react";

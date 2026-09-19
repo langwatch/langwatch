@@ -2,10 +2,10 @@ import type { EvaluatorWithFields, SingleEvaluationResult } from "@langwatch/eva
 import type { Span } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { EvaluatorAttachment } from "../../evaluator-attachments";
-import { runEvaluatorDefinitionOf } from "../../scenario-run-evaluators";
+import type { EvaluatorAttachment } from "../../evaluator-attachments.ts";
+import { runEvaluatorDefinitionOf } from "../../scenario-run-evaluators.ts";
 import type { JsonValue } from "../../scenario.ts";
-import { MAX_STORED_INPUT_LENGTH } from "../constants";
+import { MAX_STORED_INPUT_LENGTH } from "../constants.ts";
 import {
   checkTypeOf,
   loadRunAttachments,
@@ -13,8 +13,8 @@ import {
   runScenarioEvaluations,
   TraceDataPendingError,
   toScenarioEvaluationResult,
-} from "../runScenarioEvaluations";
-import type { ScenarioEvaluationsJobPayload } from "../types";
+} from "../runScenarioEvaluations.ts";
+import type { ScenarioEvaluationsJobPayload } from "../types.ts";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({

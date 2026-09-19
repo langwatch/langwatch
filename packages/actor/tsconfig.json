@@ -3,8 +3,6 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "noEmit": true,
-    "target": "es2023",
     "lib": ["es2023"],
     // Deliberately NO "types": ["node"]. This package is isomorphic: the
     // frontend and the backend both import it, so a `node:*` import or a
@@ -16,7 +14,6 @@
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "verbatimModuleSyntax": true,
 
-    "rewriteRelativeImportExtensions": false
   },
   "include": ["src/**/*.ts"],
   // The package ships its TypeScript sources (exports point at src/*.ts), so

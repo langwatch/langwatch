@@ -43,6 +43,22 @@ describe("deriveUiDeployment", () => {
     });
   });
 
+  describe("given a deployment with mail configured", () => {
+    it("says so, so the invite flow can claim the message went out", () => {
+      expect(deriveUiDeployment(configWith({})).hasEmailProvider).toBe(true);
+    });
+  });
+
+  describe("given a deployment with no mail provider", () => {
+    it("says so, so the invite flow offers a link instead of claiming a send", () => {
+      const deployment = deriveUiDeployment(
+        configWith({ capabilities: { email: false, nlp: true, langevals: true } }),
+      );
+
+      expect(deployment.hasEmailProvider).toBe(false);
+    });
+  });
+
   describe("given no demo project", () => {
     it("omits the slug", () => {
       expect("demoProjectSlug" in deriveUiDeployment(configWith({}))).toBe(false);

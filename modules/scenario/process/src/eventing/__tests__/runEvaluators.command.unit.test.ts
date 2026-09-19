@@ -15,8 +15,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { FinishRunDeps } from "../finish-run.commands.ts";
 import { FinishRunCommand } from "../finish-run.commands.ts";
-import type { QueueRunCommandData } from "../queueRun.command";
-import { QueueRunCommand } from "../queueRun.command";
+import type { QueueRunCommandData } from "../queueRun.command.ts";
+import { QueueRunCommand } from "../queueRun.command.ts";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({

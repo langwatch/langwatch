@@ -33,7 +33,7 @@ import {
   azureCostRequestBody,
   nextAzureCostCursor,
   readAzureCostRows,
-} from "../azure-cost-management.service";
+} from "../azure-cost-management.service.ts";
 import capturedReply from "./fixtures/azureCostManagementDailyResponse.json";
 
 /** A reply built from named columns, so a test can vary one thing at a time. */

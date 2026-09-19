@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { builtinModules, createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { OPTIONAL_EXTERNALS } from "../../../apps/worker/scripts/bundle-optional-externals.mjs";
+import { OPTIONAL_EXTERNALS } from "@langwatch/scenario-child/bundle-optional-externals";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 

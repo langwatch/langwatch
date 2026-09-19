@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { webModules } from "@langwatch/installed-modules/web";
+import { webModules } from "@langwatch/installed-web-modules";
 import { createUi } from "@langwatch/ui-kernel";
 import { installedModuleScreens } from "@langwatch/ui-kernel/module-screens";
 import { createUiRouteObjects, UiRouteOutlet } from "@langwatch/ui-kernel/route-objects";

@@ -61,6 +61,7 @@ function harness(scope: UiActiveScope) {
       appBaseUrl: "https://app.langwatch.test",
       hasNlpService: true,
       hasLangevals: true,
+      hasEmailProvider: false,
     },
   };
 

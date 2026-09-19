@@ -90,6 +90,7 @@ export class ClientAddress {
       header: (name) => exchange.request.headers.get(name) ?? void 0,
       ...(exchange.socketAddress ? { socketAddress: exchange.socketAddress } : {}),
     });
+
     if (address === void 0) return;
 
     Object.defineProperty(exchange.request, RESOLVED, { value: address, configurable: true });
@@ -103,6 +104,7 @@ export class ClientAddress {
   of(request: AddressedRequest, reporter?: ClientAddressReporter): string | undefined {
     const socket = request.socketAddress ? (parseAddress(request.socketAddress) ?? void 0) : void 0;
     if (reporter) this.announceUndeclaredPublicProxyOnce(request, socket, reporter);
+
     if (socket === void 0 || !this.isInfrastructureHop(socket)) return socket;
 
     return this.forwardedAddress(request) ?? socket;
@@ -126,10 +128,13 @@ export class ClientAddress {
     for (const name of ADDRESS_HEADERS) {
       const value = request.header(name);
       if (!value) continue;
+
       const hops = value.split(",");
+
       for (let index = hops.length - 1; index >= 0; index--) {
         const address = parseAddress(hops[index] ?? "");
         if (address === null) continue;
+
         if (!this.isInfrastructureHop(address)) return address;
       }
     }
@@ -148,11 +153,15 @@ export class ClientAddress {
     reporter: ClientAddressReporter,
   ): void {
     if (this.#announced) return;
+
     if (this.trusted !== void 0 && this.trusted.length > 0) return;
+
     if (!request.header("x-forwarded-for")) return;
+
     if (socket === void 0 || isPrivateAddress(socket)) return;
 
     this.#announced = true;
+
     reporter.warn(
       { setting: "TRUSTED_PROXY_ADDRESSES" },
       "Ignored a forwarded-for header from a public peer, so signed-out authentication limits are counting that peer rather than the caller behind it. If it is this deployment's proxy, name it in TRUSTED_PROXY_ADDRESSES.",
@@ -212,6 +221,7 @@ function withinIpv4Range(address: string, range: string): boolean {
 
 function ipv4AsNumber(address: string): number | null {
   if (isIP(address) !== 4) return null;
+
   const octets = address.split(".").map(Number);
   if (octets.some((octet) => octet > 255)) return null;
 

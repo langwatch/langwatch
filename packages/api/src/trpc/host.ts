@@ -110,6 +110,7 @@ export class MembershipDisabledError extends HandledError {
       httpStatus: 403,
       fault: "customer",
     });
+
     this.name = "MembershipDisabledError";
   }
 }
@@ -160,22 +161,26 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
   private constructor(options: Parameters<typeof TrpcHost.create>[0]) {
     this.#options = options;
     this.#logger = options.logger ?? createLogger("langwatch:api:trpc");
+
     this.#root = TrpcRootDefinition.forContext<TrpcRequestContext>().create({
       errorFormatter: createTrpcErrorFormatter({
         causePayload: options.errorCausePayload ?? { payloadFor: () => null },
         traceIds: trpcFailureTraceIds,
       }),
     });
+
     const policy = createTrpcRuntimePolicy<TrpcRequestContext, TrpcRequestContext>(this.#root, {
       identity: {
         authenticate: (ctx) => {
           (ctx as TrpcRequestContext).actor();
+
           return ctx as TrpcRequestContext;
         },
         actor: (ctx) => {
           const context = ctx as TrpcRequestContext;
           const actor = context.tryActor?.();
           if (!actor) return void 0;
+
           const impersonatorId = context.session?.user.impersonator?.id;
 
           return impersonatorId ? { id: actor.id, impersonatorId } : actor;
@@ -190,6 +195,7 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
       // This surface re-raises no cause with a code of its own.
       causes: { translate: () => void 0 },
     });
+
     this.#runtime = createTrpcRuntime<TrpcRequestContext>({
       root: this.#root as Parameters<typeof createTrpcRuntime<TrpcRequestContext>>[0]["root"],
       procedure: policy.authProtectedProcedure,
@@ -207,18 +213,22 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
     if (this.#composed) {
       throw new Error("The tRPC root was composed; a namespace can no longer be mounted on it.");
     }
+
     const mount = this.#runtime.mount as unknown as (
       declaration: MountableTransport,
       app: (ctx: TrpcRequestContext) => unknown,
       options?: TrpcMountOptions<TrpcRequestContext>,
     ) => TrpcNamespace;
+
     const namespace = namespaceOf(declaration);
+
     const mounted = mount(declaration, () => app(), {
       facts: [
         ...this.#processFacts(),
         ...((options?.facts ?? []) as readonly TrpcFactBinding<TrpcRequestContext>[]),
       ],
     });
+
     this.#namespaces[namespace] = mounted;
 
     return mounted;
@@ -243,6 +253,7 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
   procedureTypeAt(path: string): "query" | "mutation" | "subscription" | undefined {
     const procedures: Record<string, { _def?: { type?: unknown } } | undefined> =
       this.router._def.procedures;
+
     const type = procedures[path]?._def?.type;
 
     return type === "query" || type === "mutation" || type === "subscription" ? type : void 0;
@@ -259,6 +270,7 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
     const caller = await this.#options.sessions.read(request);
     const session = sessionOf(caller);
     const authenticated = session ? { id: session.user.id } : null;
+
     const req: TrpcRequestLike = {
       headers: Object.fromEntries(request.headers),
       ...(address ? { socket: { remoteAddress: address } } : {}),
@@ -339,17 +351,20 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
     error?: Error;
   }): Promise<void> {
     const audit = this.#options.audit;
+
     if (!audit) {
       this.#logger.warn(
         { trail: "audit-log", action: entry.action },
         "A mutation went unrecorded: this process installed no audit-log module",
       );
+
       return;
     }
 
     const scopes = auditScopeIds(entry.args);
     const organizationId = entry.organizationId ?? scopes.organizationId;
     const projectId = entry.projectId ?? scopes.projectId;
+
     await audit.record({
       userId: entry.userId,
       action: entry.action,
