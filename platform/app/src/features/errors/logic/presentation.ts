@@ -472,6 +472,11 @@ const presentations = {
     describe: () =>
       "Ask for fewer rows, or extract less text from each one. To judge the whole selection, run it as a job instead.",
   },
+  instant_eval_questions_too_long: {
+    title: "Those questions leave no room for the text",
+    describe: () =>
+      "The questions alone fill what the judge can read at once. Shorten them, or ask fewer of them in one query.",
+  },
   instant_eval_classifier_unavailable: {
     title: "The judgements couldn't be made right now",
     describe: () =>

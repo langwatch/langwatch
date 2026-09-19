@@ -209,6 +209,7 @@ export const APP_ERROR_CODES = [
   "instant_eval_query_budget_exceeded",
   "instant_eval_query_invalid",
   "instant_eval_query_missing_columns",
+  "instant_eval_questions_too_long",
   "instant_eval_row_cap_exceeded",
   "instant_eval_stalled",
   "insufficient_permissions",

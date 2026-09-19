@@ -265,6 +265,19 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
     Then the rendered conversation holds the text from those messages
 
   @unit
+  Scenario: Questions that leave no room for text are refused before anything is judged
+    Given eval questions that alone fill the judge's state
+    When the statement is hydrated
+    Then it fails with instant_eval_questions_too_long and nothing is sent to the judge
+
+  @unit
+  Scenario: A conversation over the judge's budget is measured with the judge's own ratio
+    Given a conversation that fits four bytes a token but not the judge's denser ratio
+    When the statement is hydrated
+    Then it is re-rendered under the judge's budget before it is sent
+    And the row is reported truncated
+
+  @unit
   Scenario: A bounded conversation keeps both ends and names what it dropped
     Given a thread whose turns do not fit the requested token budget
     When conversation_bounded hydrates

@@ -217,6 +217,12 @@ const registry = {
       "Contact support to have it enabled for this workspace",
     ],
   },
+  instant_eval_questions_too_long: {
+    tips: [
+      "Read `meta.questionTokens` against `meta.stateTokens`; the questions alone fill the judge's state, so no text could be sent beside them",
+      "Shorten the question texts, or split them across several eval calls run as separate queries",
+    ],
+  },
   instant_eval_query_budget_exceeded: {
     tips: [
       "Read `meta.estimatedTokens` against `meta.budget`; that is the text the whole query would send to be judged, summed across its rows",
