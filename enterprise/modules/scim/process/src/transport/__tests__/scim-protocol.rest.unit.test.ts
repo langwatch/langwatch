@@ -7,12 +7,16 @@
  * The /Schemas discovery copy is what an identity-provider administrator reads
  * when wiring provisioning, so it must name the right resource.
  */
-import { createRestRuntime } from "@langwatch/api/rest";
+import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
 import type { ScimListResponse, ScimUser } from "@langwatch/enterprise-scim-contract";
 import { ENTERPRISE_FEATURE_ERRORS } from "@langwatch/entitlement-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { scimProtocolErrorHandler, scimProtocolRest } from "../scim-protocol.rest.ts";
+import {
+  scimProtocolErrorHandler,
+  scimProtocolRest,
+  scimRestCredential,
+} from "../scim-protocol.rest.ts";
 import { ScimServiceFake, scimTestApp } from "./support/scim-app.fixture.ts";
 
 const ORGANIZATION_ID = "org_acme";
@@ -22,7 +26,12 @@ const BEARER = "Bearer scim_token_acme";
 class DirectoryFake extends ScimServiceFake {
   override readonly verifyToken = vi.fn(async ({ token }: { token: string }) =>
     token === "scim_token_acme"
-      ? ({ status: "ok", organizationId: ORGANIZATION_ID, connectionId: null } as const)
+      ? ({
+          status: "ok",
+          id: "scim_token_1",
+          organizationId: ORGANIZATION_ID,
+          connectionId: null,
+        } as const)
       : ({ status: "invalid_token" } as const),
   );
   override readonly listUsers = vi.fn(async (): Promise<ScimListResponse<ScimUser>> => ({
@@ -37,6 +46,7 @@ class DirectoryFake extends ScimServiceFake {
 function mount() {
   const scim = new DirectoryFake();
   const { app } = scimTestApp({ scim });
+  const directories = new WeakMap<Request, { connectionId: string | null }>();
 
   const runtime = createRestRuntime({
     identity: {
@@ -46,16 +56,28 @@ function mount() {
       identify: ({ request }) =>
         app
           .authenticateDirectory({ authorization: request.headers.get("authorization") })
-          .then((scope) => ({
-            actor: { type: "api_key" as const, id: "scim-directory-token" },
-            scope: { tier: "organization" as const, id: scope.organizationId },
-          })),
+          .then((directory) => {
+            directories.set(request, { connectionId: directory.connectionId });
+
+            return {
+              actor: { type: "api_key" as const, id: directory.id },
+              scope: { tier: "organization" as const, id: directory.organizationId },
+            };
+          }),
     },
   });
 
   const hono = runtime.mount(scimProtocolRest.router(), {
     app: () => app,
     onError: scimProtocolErrorHandler,
+    facts: [
+      bindRestMiddleware(scimRestCredential, (c) => {
+        const directory = directories.get(c.req.raw);
+        if (!directory) throw new Error("The directory door resolved no credential");
+
+        return directory;
+      }),
+    ],
   });
 
   return {
@@ -160,6 +182,11 @@ describe("given a directory holding this organization's SCIM bearer token", () =
       const hono = runtime.mount(scimProtocolRest.router(), {
         app: () => app,
         onError: scimProtocolErrorHandler,
+        facts: [
+          bindRestMiddleware(scimRestCredential, () => {
+            throw new Error("The plan gate refuses before a handler ever reads this fact");
+          }),
+        ],
       });
 
       const response = await hono.fetch(

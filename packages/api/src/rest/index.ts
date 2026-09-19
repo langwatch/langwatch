@@ -147,6 +147,8 @@ export {
   recordBrowserCaller,
   recordOrganizationCredential,
   recordProjectCredential,
+  recordScimCredential,
+  scimCredentialOfRequest,
   SessionReader,
   type SessionCaller,
   type SessionVerification,
@@ -168,6 +170,7 @@ export {
   type RestResolvedInternalCredential,
   type RestResolvedOrganizationCredential,
   type RestResolvedProjectCredential,
+  type RestResolvedScimCredential,
 } from "./credential.ts";
 
 // The response half: the context keys, the handler context, the status-carrying

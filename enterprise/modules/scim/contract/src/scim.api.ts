@@ -23,7 +23,11 @@ import type {
 } from "./scim.contract.ts";
 
 /** The organization a directory credential resolved to. */
-export type ScimDirectoryScope = Readonly<{ organizationId: string }>;
+export type ScimDirectoryScope = Readonly<{
+  id: string;
+  organizationId: string;
+  connectionId: string | null;
+}>;
 
 /** What one directory delivery is answered with, before anything is provisioned. */
 export type ScimDeliveryAdmission =

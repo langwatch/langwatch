@@ -23,6 +23,7 @@ import {
   projectRestFacts,
   recordOrganizationCredential,
   recordProjectCredential,
+  recordScimCredential,
   RestHost,
   SessionReader,
   type RestCaller,
@@ -279,8 +280,10 @@ class ApiSurface {
         authorization: request.headers.get("authorization"),
       });
 
+      recordScimCredential(request, directory);
+
       return {
-        actor: { type: "api_key", id: directory.organizationId },
+        actor: { type: "api_key", id: directory.id },
         scope: { tier: "organization", id: directory.organizationId },
       };
     };

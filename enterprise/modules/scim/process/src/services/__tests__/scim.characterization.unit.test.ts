@@ -141,6 +141,7 @@ describe("SCIM characterization: token lifecycle", () => {
     ]);
     expect(await scim.verifyToken({ token: minted.token })).toEqual({
       status: "ok",
+      id: "token_1",
       organizationId: "org_1",
       connectionId: "connection_1",
     });

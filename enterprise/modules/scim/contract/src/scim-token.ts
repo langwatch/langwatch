@@ -3,7 +3,7 @@ import { z } from "zod";
 export type ScimTokenEntitlement =
   | { status: "invalid_token" }
   | { status: "plan_not_entitled"; organizationId: string }
-  | { status: "ok"; organizationId: string; connectionId: string | null };
+  | { status: "ok"; id: string; organizationId: string; connectionId: string | null };
 
 /** One token as the settings page lists it. Never the token value itself. */
 export const scimTokenSummarySchema = z

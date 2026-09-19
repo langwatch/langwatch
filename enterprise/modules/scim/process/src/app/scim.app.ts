@@ -220,7 +220,11 @@ export class ScimApp implements ScimApiContract {
       throw scimRefusal(403, ENTERPRISE_FEATURE_ERRORS.SCIM);
     }
 
-    return { organizationId: entitlement.organizationId };
+    return {
+      id: entitlement.id,
+      organizationId: entitlement.organizationId,
+      connectionId: entitlement.connectionId,
+    };
   }
 
   verifyToken(input: { token: string }): Promise<ScimTokenEntitlement> {

@@ -218,8 +218,20 @@ export function organizationCredentialPrincipalOf(c: Context): RestOrganizationC
 /** Who a browser cookie was verified as, for a family that binds it as a fact. */
 export type RestBrowserCaller = Readonly<{ userId: string | null }>;
 
+/**
+ * What the SCIM door resolved: the token's own id (the actor), the
+ * organization it was minted for (the scope), and the directory connection
+ * it belongs to, when it belongs to one.
+ */
+export type RestResolvedScimCredential = Readonly<{
+  id: string;
+  organizationId: string;
+  connectionId: string | null;
+}>;
+
 const projectCredentials = new WeakMap<Request, RestResolvedProjectCredential>();
 const organizationCredentials = new WeakMap<Request, RestResolvedOrganizationCredential>();
+const scimCredentials = new WeakMap<Request, RestResolvedScimCredential>();
 const browserCallers = new WeakMap<Request, RestBrowserCaller>();
 
 /** The project door states what it resolved, once per request. */
@@ -236,6 +248,14 @@ export function recordOrganizationCredential(
   credential: RestResolvedOrganizationCredential,
 ): void {
   organizationCredentials.set(request, credential);
+}
+
+/** The SCIM door states what it resolved, once per request. */
+export function recordScimCredential(
+  request: Request,
+  credential: RestResolvedScimCredential,
+): void {
+  scimCredentials.set(request, credential);
 }
 
 /** The byte door states who it verified, once per request. */
@@ -268,6 +288,19 @@ export function organizationCredentialOfRequest(
   if (!credential) {
     throw new Error(
       "A module bound a fact from the organization credential, and this request's door resolved none",
+    );
+  }
+
+  return credential;
+}
+
+/** The same, for the SCIM door. */
+export function scimCredentialOfRequest(request: Request): RestResolvedScimCredential {
+  const credential = scimCredentials.get(request);
+
+  if (!credential) {
+    throw new Error(
+      "A module bound a fact from the SCIM credential, and this request's door resolved none",
     );
   }
 

@@ -32,7 +32,7 @@ class DirectoryFake extends ScimServiceFake {
     const organizationId = DIRECTORY_TOKENS[token];
 
     return organizationId
-      ? ({ status: "ok", organizationId, connectionId: null } as const)
+      ? ({ status: "ok", id: "scim_token_1", organizationId, connectionId: null } as const)
       : ({ status: "invalid_token" } as const);
   });
   override readonly createUser = vi.fn(async () => ({}) as never);

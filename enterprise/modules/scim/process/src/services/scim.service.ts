@@ -198,6 +198,7 @@ export class ScimService extends ScimServiceContract {
 
     return {
       status: "ok",
+      id: stored.id,
       organizationId: stored.organizationId,
       connectionId: stored.connectionId,
     };

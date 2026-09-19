@@ -18,6 +18,7 @@
  */
 import { anyAuthenticated, publicRoute } from "@langwatch/api/access";
 import {
+  defineRestMiddleware,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   type RestErrorHandler,
@@ -64,6 +65,16 @@ const DISCOVERY_IS_PRE_CREDENTIAL =
 
 const BEARER_IS_THE_WHOLE_GATE =
   "a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides";
+
+/**
+ * The directory connection the presented token belongs to, when it belongs
+ * to one — bound from the SCIM door's own resolution (§8: a module fact
+ * reads the door's credential back, it never re-verifies the bearer itself).
+ */
+export const scimRestCredential = defineRestMiddleware(
+  "scimRestCredential",
+  z.object({ connectionId: z.string().nullable() }),
+);
 
 const idParams = z.object({ id: z.string().min(1) });
 
@@ -372,6 +383,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .get("/Users", "scimListUsers")
   .withQuery(listQuery)
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
+  .withMiddleware(scimRestCredential)
   .withRawResponse({ produces: SCIM_ANSWER })
   .withDocs(LIST_USERS)
   .handle(async ({ app, input, scope }) =>
@@ -387,6 +399,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
 
   .post("/Users", "scimCreateUser")
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
+  .withMiddleware(scimRestCredential)
   .withRawResponse({ produces: SCIM_ANSWER })
   .withDocs(CREATE_USER)
   .handle(async ({ app, scope, request }) => {
@@ -404,6 +417,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .get("/Users/:id", "scimGetUser")
   .withParams(idParams)
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
+  .withMiddleware(scimRestCredential)
   .withRawResponse({ produces: SCIM_ANSWER })
   .withDocs(GET_USER)
   .handle(async ({ app, input, scope }) =>
@@ -413,6 +427,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .put("/Users/:id", "scimReplaceUser")
   .withParams(idParams)
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
+  .withMiddleware(scimRestCredential)
   .withRawResponse({ produces: SCIM_ANSWER })
   .withDocs(REPLACE_USER)
   .handle(async ({ app, input, scope, request }) => {
@@ -432,6 +447,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .patch("/Users/:id", "scimPatchUser")
   .withParams(idParams)
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
+  .withMiddleware(scimRestCredential)
   .withRawResponse({ produces: SCIM_ANSWER })
   .withDocs(PATCH_USER)
   .handle(async ({ app, input, scope, request }) => {
@@ -455,6 +471,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .delete("/Users/:id", "scimDeleteUser")
   .withParams(idParams)
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
+  .withMiddleware(scimRestCredential)
   .withRawResponse({ produces: SCIM_ANSWER })
   .withDocs(DELETE_USER)
   .handle(async ({ app, input, scope }) => {
@@ -468,6 +485,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .get("/Groups", "scimListGroups")
   .withQuery(groupListQuery)
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
+  .withMiddleware(scimRestCredential)
   .withRawResponse({ produces: SCIM_ANSWER })
   .withDocs(LIST_GROUPS)
   .handle(async ({ app, input, scope }) =>
@@ -484,6 +502,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
 
   .post("/Groups", "scimCreateGroup")
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
+  .withMiddleware(scimRestCredential)
   .withRawResponse({ produces: SCIM_ANSWER })
   .withDocs(CREATE_GROUP)
   .handle(async ({ app, scope, request }) => {
@@ -502,6 +521,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .withParams(idParams)
   .withQuery(excludedAttributesQuery)
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
+  .withMiddleware(scimRestCredential)
   .withRawResponse({ produces: SCIM_ANSWER })
   .withDocs(GET_GROUP)
   .handle(async ({ app, input, scope }) =>
@@ -517,6 +537,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .put("/Groups/:id", "scimReplaceGroup")
   .withParams(idParams)
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
+  .withMiddleware(scimRestCredential)
   .withRawResponse({ produces: SCIM_ANSWER })
   .withDocs(REPLACE_GROUP)
   .handle(async ({ app, input, scope, request }) => {
@@ -540,6 +561,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .patch("/Groups/:id", "scimPatchGroup")
   .withParams(idParams)
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
+  .withMiddleware(scimRestCredential)
   .withRawResponse({ produces: SCIM_ANSWER })
   .withDocs(PATCH_GROUP)
   .handle(async ({ app, input, scope, request }) => {
@@ -563,6 +585,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .delete("/Groups/:id", "scimDeleteGroup")
   .withParams(idParams)
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
+  .withMiddleware(scimRestCredential)
   .withRawResponse({ produces: SCIM_ANSWER })
   .withDocs(DELETE_GROUP)
   .handle(async ({ app, input, scope }) => {

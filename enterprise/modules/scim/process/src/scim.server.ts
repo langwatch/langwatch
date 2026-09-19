@@ -5,7 +5,11 @@
  * depends on; a process that supplies both, plus the directory-sync history
  * `createScimSyncLifecycle` builds, installs this and mounts what it wants.
  */
-import { bindRestMiddleware, organizationCredentialOfRequest } from "@langwatch/api/rest";
+import {
+  bindRestMiddleware,
+  organizationCredentialOfRequest,
+  scimCredentialOfRequest,
+} from "@langwatch/api/rest";
 import { defineServerModule } from "@langwatch/kernel";
 
 import { ScimApp } from "./app/scim.app.ts";
@@ -14,7 +18,7 @@ import {
   ScimSyncLifecycleService,
   type ScimSyncLifecycleAdapterDeps,
 } from "./services/scim-sync-lifecycle.service.ts";
-import { scimProtocolRest } from "./transport/scim-protocol.rest.ts";
+import { scimProtocolRest, scimRestCredential } from "./transport/scim-protocol.rest.ts";
 import { scimTokenRest, scimTokenRestActor } from "./transport/scim-token.rest.ts";
 import { scimTokenTrpcTransport } from "./transport/scim-token.trpc.ts";
 import { scimWebhookRest } from "./transport/scim-webhook.rest.ts";
@@ -31,6 +35,11 @@ export const scimServer = defineServerModule("scim")
       const credential = organizationCredentialOfRequest(context.req.raw);
 
       return { actorId: credential.userId ?? `apikey:${credential.apiKeyId}` };
+    }),
+    bindRestMiddleware(scimRestCredential, (context) => {
+      const credential = scimCredentialOfRequest(context.req.raw);
+
+      return { connectionId: credential.connectionId };
     }),
   ]);
 
