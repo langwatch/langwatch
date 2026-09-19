@@ -29553,6 +29553,8 @@ export interface operations {
                         costUsd: number;
                         /** @description What the run would cost you, in United States dollars. */
                         priceUsd: number;
+                        /** @description What is left of the free Instant Evals budget, in United States dollars. Only present for an organization without a paid plan. */
+                        freeBudgetRemainingUsd?: number;
                     };
                 };
             };

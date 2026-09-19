@@ -146,4 +146,5 @@ export const KSUID_RESOURCES = {
   EXPORT: "export",
   TRACE_EDIT_OVERLAY: "traceedit",
   INSTANT_EVAL_RUN: "instanteval",
+  INSTANT_EVAL_QUERY: "instantevalquery",
 } as const;

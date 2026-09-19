@@ -45,6 +45,11 @@ export interface InstantEvalEstimate {
   readonly requests: number;
   readonly costUsd: number;
   readonly priceUsd: number;
+  /**
+   * What is left of the free budget, for an organization without a paid plan.
+   * Absent for a paid organization, which has no such budget.
+   */
+  readonly freeBudgetRemainingUsd?: number;
 }
 
 export async function estimateInstantEvalRun({

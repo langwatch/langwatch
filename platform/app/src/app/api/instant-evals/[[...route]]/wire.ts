@@ -138,6 +138,12 @@ export const instantEvalEstimateSchema = z.object({
   priceUsd: z
     .number()
     .describe("What the run would cost you, in United States dollars."),
+  freeBudgetRemainingUsd: z
+    .number()
+    .optional()
+    .describe(
+      "What is left of the free Instant Evals budget, in United States dollars. Only present for an organization without a paid plan.",
+    ),
 });
 
 export const instantEvalJudgmentSchema = z.object({

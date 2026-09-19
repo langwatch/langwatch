@@ -68,6 +68,7 @@ import {
 } from "~/server/onboarding/project-active-day";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
+import { queryInstantEvalSpendTotal } from "../../../ee/billing/services/instantEvalSpendQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
 import type { TriggerService } from "../app-layer/automations/trigger.service";
 import type { BillingCheckpointService } from "../app-layer/billing/billingCheckpoint.service";
@@ -2022,6 +2023,7 @@ export class PipelineRegistry {
       billingCheckpoints: this.deps.billingCheckpoints,
       getUsageReportingService: () => this.deps.usageReportingService,
       queryBillableEventsTotal,
+      queryInstantEvalSpendTotal,
       selfDispatch: (data) => {
         const pipeline = this.deps.eventSourcing.getPipeline(
           BILLING_REPORTING_PIPELINE_NAME,

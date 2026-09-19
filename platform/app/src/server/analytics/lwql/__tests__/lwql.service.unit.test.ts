@@ -95,6 +95,7 @@ const NO_INSTANT_EVALS: LangWatchQLServiceDependencies["instantEvals"] = {
   },
   maxConcurrency: 1,
   queryTokenBudget: 0,
+  assertFreeBudget: async () => {},
   recordSpend: async () => {},
 };
 

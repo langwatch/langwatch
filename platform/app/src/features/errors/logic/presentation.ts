@@ -520,6 +520,18 @@ const presentations = {
         : `A run judges up to ${cap.toLocaleString()} rows. Split the selection across more than one run.`;
     },
   },
+  instant_eval_free_budget_exhausted: {
+    title: "Your free Instant Evals budget is used up",
+    // Both numbers are on the error, and the reader is deciding whether to
+    // upgrade, so the sentence says what the free allowance was and where
+    // upgrading is done rather than leaving them to find the plan page.
+    describe: (error) => {
+      const budget = error.meta.budgetUsd;
+      const allowance =
+        typeof budget === "number" ? `$${budget.toFixed(2)}` : "the free";
+      return `Organizations without a paid plan can judge up to ${allowance} of text in total. Upgrade your plan under Settings, Subscription to keep running Instant Evals.`;
+    },
+  },
   instant_eval_already_finished: {
     title: "That run is already over",
     describe: () => "There is nothing left to cancel.",

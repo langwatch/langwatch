@@ -64943,6 +64943,10 @@
                     "priceUsd": {
                       "type": "number",
                       "description": "What the run would cost you, in United States dollars."
+                    },
+                    "freeBudgetRemainingUsd": {
+                      "type": "number",
+                      "description": "What is left of the free Instant Evals budget, in United States dollars. Only present for an organization without a paid plan."
                     }
                   },
                   "required": [

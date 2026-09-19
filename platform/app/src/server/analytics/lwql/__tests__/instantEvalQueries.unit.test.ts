@@ -57,11 +57,13 @@ function serviceJudgingWith({
   queryTokenBudget = 4_000_000,
   spends = [],
   rows = [{ annoyed: "the agent said sorry" }],
+  assertFreeBudget = async () => {},
 }: {
   classifier: InstantEvalClassifier;
   queryTokenBudget?: number;
   spends?: InstantEvalSpendRecord[];
   rows?: Record<string, unknown>[];
+  assertFreeBudget?: () => Promise<void>;
 }): LangWatchQLService {
   return new LangWatchQLService({
     executor: recordingExecutor({
@@ -74,6 +76,7 @@ function serviceJudgingWith({
       classifier: () => classifier,
       maxConcurrency: 4,
       queryTokenBudget,
+      assertFreeBudget,
       recordSpend: async (record) => {
         spends.push(record);
       },
@@ -120,6 +123,35 @@ describe("given a statement that would judge more text than one query may", () =
         (error as { meta?: { estimatedTokens?: number } }).meta
           ?.estimatedTokens,
       ).toBeGreaterThan(1);
+    });
+  });
+});
+
+describe("given an organization that has spent its free Instant Evals budget", () => {
+  describe("when a judged statement is executed", () => {
+    /** @scenario "At the budget a synchronous judged query is refused" */
+    it("refuses it before anything is sent to the classifier", async () => {
+      const { InstantEvalFreeBudgetExhaustedError } = await import(
+        "~/server/app-layer/instant-evals/errors"
+      );
+      let classified = 0;
+      const service = serviceJudgingWith({
+        classifier: classifierAnswering(async () => {
+          classified += 1;
+          throw new Error("nothing should have been sent");
+        }),
+        assertFreeBudget: async () => {
+          throw new InstantEvalFreeBudgetExhaustedError({
+            spentUsd: 1,
+            budgetUsd: 1,
+          });
+        },
+      });
+
+      expect(await codeOf(() => run(service))).toBe(
+        "instant_eval_free_budget_exhausted",
+      );
+      expect(classified).toBe(0);
     });
   });
 });
@@ -272,6 +304,7 @@ describe("given a statement that calls no eval function", () => {
             gateReads += 1;
             return true;
           },
+          assertFreeBudget: async () => {},
           classifier: () => {
             throw new Error("a statement that judges nothing needs no judge");
           },

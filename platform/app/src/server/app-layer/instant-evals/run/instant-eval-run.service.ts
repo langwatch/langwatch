@@ -26,6 +26,7 @@
 import { createLogger } from "@langwatch/observability";
 
 import type { LangWatchQLService } from "~/server/analytics/lwql";
+import type { InstantEvalFreeBudget } from "~/server/app-layer/usage/instant-eval-free-budget.service";
 import type { Protections } from "~/server/traces/protections";
 import type { InstantEvalClassifier } from "../classifier/classifier";
 import type { InstantEvalShorthandInput } from "../shorthand";
@@ -121,6 +122,8 @@ export interface InstantEvalRunServiceDependencies {
     name: string;
     isFree: boolean;
   }>;
+  /** The free budget an organization without a paid plan is bounded by. */
+  readonly budget: InstantEvalFreeBudget;
   readonly now?: () => number;
   /** The seed a sample's pseudo-random order uses. Injected so a test can pin it. */
   readonly sampleSeed?: () => number;
@@ -199,6 +202,9 @@ export class InstantEvalRunService {
       projectId,
       ...(input.limit === undefined ? {} : { requested: input.limit }),
     });
+    // Before the statement is accepted, so a free organization past its
+    // budget is told so without the probe reading anything on its behalf.
+    await this.deps.budget.assertWithinBudget({ projectId });
     return await createInstantEvalRun({
       runs: this.deps.runs,
       commands: this.deps.commands(),
@@ -225,7 +231,7 @@ export class InstantEvalRunService {
       projectId,
       ...(input.limit === undefined ? {} : { requested: input.limit }),
     });
-    return await estimateInstantEvalRun({
+    const estimate = await estimateInstantEvalRun({
       projectId,
       protections,
       caller,
@@ -234,6 +240,12 @@ export class InstantEvalRunService {
       rowSource: this.deps.rowSource,
       classifier: this.deps.classifier(),
     });
+    // An estimate is not refused by the budget: it judges nothing, and a caller
+    // deciding whether to upgrade wants the price beside what is left.
+    const standing = await this.deps.budget.standing({ projectId });
+    return standing.remainingUsd === null
+      ? estimate
+      : { ...estimate, freeBudgetRemainingUsd: standing.remainingUsd };
   }
 
   async list({

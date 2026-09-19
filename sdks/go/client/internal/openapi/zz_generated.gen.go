@@ -107699,6 +107699,9 @@ type EstimateInstantEvalRunResponse struct {
 		// CostUsd What the run would cost us, in United States dollars.
 		CostUsd float32 `json:"costUsd"`
 
+		// FreeBudgetRemainingUsd What is left of the free Instant Evals budget, in United States dollars. Only present for an organization without a paid plan.
+		FreeBudgetRemainingUsd *float32 `json:"freeBudgetRemainingUsd,omitempty"`
+
 		// IsRowsCapped Whether the statement matches more rows than the run may judge.
 		IsRowsCapped bool `json:"isRowsCapped"`
 
@@ -134388,6 +134391,9 @@ func ParseEstimateInstantEvalRunResponse(rsp *http.Response) (*EstimateInstantEv
 
 			// CostUsd What the run would cost us, in United States dollars.
 			CostUsd float32 `json:"costUsd"`
+
+			// FreeBudgetRemainingUsd What is left of the free Instant Evals budget, in United States dollars. Only present for an organization without a paid plan.
+			FreeBudgetRemainingUsd *float32 `json:"freeBudgetRemainingUsd,omitempty"`
 
 			// IsRowsCapped Whether the statement matches more rows than the run may judge.
 			IsRowsCapped bool `json:"isRowsCapped"`

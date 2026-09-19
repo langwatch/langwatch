@@ -3426,12 +3426,16 @@ model BillingMeterCheckpoint {
   id                   String   @id @default(cuid())
   organizationId       String
   billingMonth         String // "2026-02"
+  // The Stripe meter event name this checkpoint tracks. Each meter reports
+  // its own running total, in its own unit: a count for billable events,
+  // ten-thousandths of a dollar for Instant Evals.
+  meter                String   @default("langwatch_billable_events")
   lastReportedTotal    Int      @default(0)
   pendingReportedTotal Int? // non-null = in-flight Stripe call
   consecutiveFailures  Int      @default(0)
   updatedAt            DateTime @updatedAt
 
-  @@unique([organizationId, billingMonth])
+  @@unique([organizationId, billingMonth, meter])
 }
 
 // ============================================================================
