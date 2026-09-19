@@ -62,9 +62,15 @@ export async function hostedServiceRoute(c: Context) {
   );
   if (!call || !envelope.success) {
     // The gateway's own generic refusal, not one of this app's codes.
-    const code = "bad_request";
+    const refusal = "bad_request";
     return c.json(
-      { error: { type: code, code, message: "unknown hosted service call" } },
+      {
+        error: {
+          type: refusal,
+          code: refusal,
+          message: "unknown hosted service call",
+        },
+      },
       400,
     );
   }
