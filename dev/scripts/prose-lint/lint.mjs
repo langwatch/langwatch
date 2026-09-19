@@ -146,16 +146,23 @@ const isFounder = (sentence) => typeof sentence === "string" && FOUNDER_MARK.tes
 // same block (the earlier items of a list, the line above in a paragraph) are
 // not covered by it.
 function founderUnitsIn(paragraphs) {
-  const units = new Set();
+  const marked = new Set();
+  const plain = new Set();
   for (const p of paragraphs) {
-    const marked = p.text
+    const founderLines = p.text
       .split("\n")
-      .filter(isFounder)
-      .map((l) => l.replace(/\s+/g, " ").trim());
-    if (marked.length === 0) continue;
-    for (const u of p.units) if (isFounder(u) || marked.some((l) => l.includes(u))) units.add(u);
+      .map((l) => l.replace(/\s+/g, " ").trim())
+      .filter(isFounder);
+    for (const u of p.units) {
+      if (isFounder(u) || founderLines.some((l) => l.includes(u))) marked.add(u);
+      else plain.add(u);
+    }
   }
-  return units;
+  // The judge answers with sentence text, so the same sentence on a marked and
+  // an unmarked line is one choice. It keeps failing: the exemption is the
+  // claim that needs proof.
+  for (const u of plain) marked.delete(u);
+  return marked;
 }
 
 // ---------- document parsing ----------
@@ -481,7 +488,10 @@ async function judgeSection(key, rules, section, doc, opts, usage) {
 }
 
 async function locateSentences(key, findings, section, doc, opts, usage) {
-  const fired = findings.filter((f) => f.rule.kind === "judge" && f.probability >= opts.locate);
+  // A finding that can fail the run is located even below --locate: without a
+  // sentence there is no way to tell whether it sits on a founder line.
+  const cutoff = Math.min(opts.locate, opts.threshold);
+  const fired = findings.filter((f) => f.rule.kind === "judge" && f.probability >= cutoff);
   const prose = section.paragraphs.filter((p) => p.kind !== "code" && p.kind !== "tag");
   const sentences = prose.flatMap((p) => p.units);
   const founderUnits = founderUnitsIn(prose);
@@ -542,6 +552,8 @@ async function lintFile(file, rules, opts, key) {
   const doc = { file, frontmatter, firstHeading, firstContentIndex, context: opts.context, sections };
   const skipped = rules.filter((r) => r.context && !opts.context);
   if (skipped.length) console.error(`note: ${skipped.map((r) => r.key).join(", ")} need --context and were skipped`);
+  if (opts.noLocate && /\[founder\]/.test(src))
+    console.error("note: --no-locate skips the sentence-locating request, so [founder] lines are not recognised and can fail the run");
   const usage = { requests: 0, inputTokens: 0 };
   const docCounts = {};
   const results = new Array(sections.length);
