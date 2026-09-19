@@ -36,6 +36,13 @@ export interface LangWatchQLHydrationLimits {
    * page of a hundred should cost that one cell, not the ninety-nine others.
    */
   readonly maxHydratedValueBytes: number;
+  /**
+   * Byte budget for what the trace reads may fetch before the result is
+   * assembled. Past it the read stops and the query is refused, because a
+   * result cut down to the hydrated ceiling afterwards would already have held
+   * every trace in memory. Defaults to the shipped budget when absent.
+   */
+  readonly maxReadBytes?: number;
 }
 
 /** One call's values that were cut at the per-value ceiling. */

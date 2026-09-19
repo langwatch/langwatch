@@ -167,7 +167,7 @@ describe("given a finished LangWatchQL result", () => {
 
       expect(result.rows.map((row) => row.j)).toEqual([null, null]);
       expect(result.unresolvedKeys).toEqual([]);
-      expect(source.askedTraceIds).toEqual([[]]);
+      expect(source.askedTraceIds).toEqual([]);
     });
   });
 

@@ -161,7 +161,7 @@ describe("given an eval over a plain column", () => {
       });
 
       expect(classifier.requests[0]?.text).toBe("we are sorry for the delay");
-      expect(traceSource.askedTraceIds).toEqual([[]]);
+      expect(traceSource.askedTraceIds).toEqual([]);
       expect(result.rows).toEqual([{ apology: 0.2 }]);
     });
   });

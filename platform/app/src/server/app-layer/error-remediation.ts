@@ -291,6 +291,13 @@ const registry = {
       "`meta.keyKind` says which cap it was, and `meta.functions` which calls count against it; the schema endpoint publishes every cap",
     ],
   },
+  lwql_app_function_read_budget: {
+    tips: [
+      "Read `meta.budgetBytes` and `meta.readBytes`; the traces the query names weigh more than one run may read",
+      "Lower the query's LIMIT so each run names fewer traces, and page with a keyset predicate on the dataset's time column and trace id",
+      "The budget counts the traces' stored content, so a query over long conversations needs smaller pages than one over short ones",
+    ],
+  },
   lwql_app_function_hydration_failed: {
     tips: [
       "The query itself was accepted and ran; loading the conversation or trace content it projected is what failed",

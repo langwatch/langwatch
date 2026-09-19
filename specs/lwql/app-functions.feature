@@ -276,6 +276,26 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
   # ---------------------------------------------------------------------------
 
   @unit
+  Scenario: A cancelled query keeps the judgements it made
+    Given a judged query whose caller cancels after one row was answered
+    When hydration returns
+    Then the answered verdict and its usage are kept
+    And the result names the rows that were never judged
+
+  @unit
+  Scenario: A read past the byte budget is refused, not completed
+    Given a page whose traces together hold more bytes than one read may fetch
+    When their traces are read for hydration
+    Then the read stops at the budget and fails with lwql_app_function_read_budget
+    And the error names the budget and how much had been read
+
+  @unit
+  Scenario: A cancelled read stops between chunks
+    Given a page of traces read in chunks
+    When the caller cancels after the first chunk
+    Then no further chunk is read
+
+  @unit
   Scenario: A failed fetch is a platform failure, not a wrong answer
     Given the trace service throws while hydrating
     When the query runs

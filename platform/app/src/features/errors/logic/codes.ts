@@ -291,6 +291,7 @@ export const APP_ERROR_CODES = [
   "lite_member_viewer_only",
   "lwql_app_function_hydration_failed",
   "lwql_app_function_key_cap",
+  "lwql_app_function_read_budget",
   "lwql_app_function_unavailable",
   "lwql_granularity_parameter_type",
   "lwql_granularity_requires_window",
