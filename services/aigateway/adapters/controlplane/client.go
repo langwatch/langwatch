@@ -99,6 +99,34 @@ func NewClient(opts ClientOptions) *Client {
 	}
 }
 
+// forbiddenKeyRefusal reads a 403 from resolve-key. The control plane
+// distinguishes the reversible disable and the self-serve expiry from the
+// one-way revoke in its error code; forward the distinction so neither tenant
+// is told its credential is gone for good. The decoded code decides it, never
+// a substring of the body: the human-readable message travels in the same
+// payload and may name a code this is not. An unrecognized or undecodable 403
+// still reads as revoked, which is the safe answer for a gateway older than the
+// code.
+func forbiddenKeyRefusal(ctx context.Context, respBody []byte) error {
+	var rejection struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	_ = json.Unmarshal(respBody, &rejection)
+	switch rejection.Error.Code {
+	case "virtual_key_disabled":
+		return herr.New(ctx, domain.ErrKeyDisabled, herr.M{
+			"message": "This key is disabled. An administrator can re-enable it; the key material is unchanged.",
+		})
+	case "virtual_key_expired":
+		return herr.New(ctx, domain.ErrKeyExpired, herr.M{
+			"message": domain.KeyExpiredMessage,
+		})
+	}
+	return herr.New(ctx, domain.ErrKeyRevoked, nil)
+}
+
 // ResolveKey exchanges a presented credential for a domain.Bundle: a raw
 // virtual key, or a license token with the id of the install presenting it.
 func (c *Client) ResolveKey(ctx context.Context, key domain.PresentedKey) (*domain.Bundle, error) {
@@ -131,31 +159,7 @@ func (c *Client) ResolveKey(ctx context.Context, key domain.PresentedKey) (*doma
 	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusUnauthorized:
 		return nil, herr.New(ctx, domain.ErrInvalidAPIKey, nil)
 	case resp.StatusCode == http.StatusForbidden:
-		// The control plane distinguishes the reversible disable and the
-		// self-serve expiry from the one-way revoke in its error code;
-		// forward the distinction so neither tenant is told its credential
-		// is gone for good. The decoded code decides it, never a substring
-		// of the body: the human-readable message travels in the same
-		// payload and may name a code this is not. An unrecognized or
-		// undecodable 403 still reads as revoked, which is the safe answer
-		// for a gateway older than the code.
-		var rejection struct {
-			Error struct {
-				Code string `json:"code"`
-			} `json:"error"`
-		}
-		_ = json.Unmarshal(respBody, &rejection)
-		switch rejection.Error.Code {
-		case "virtual_key_disabled":
-			return nil, herr.New(ctx, domain.ErrKeyDisabled, herr.M{
-				"message": "This key is disabled. An administrator can re-enable it; the key material is unchanged.",
-			})
-		case "virtual_key_expired":
-			return nil, herr.New(ctx, domain.ErrKeyExpired, herr.M{
-				"message": domain.KeyExpiredMessage,
-			})
-		}
-		return nil, herr.New(ctx, domain.ErrKeyRevoked, nil)
+		return nil, forbiddenKeyRefusal(ctx, respBody)
 	case resp.StatusCode != http.StatusOK:
 		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, fmt.Errorf("control plane returned %d", resp.StatusCode))
 	}

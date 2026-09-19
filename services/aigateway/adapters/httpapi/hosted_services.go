@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/langwatch/langwatch/pkg/herr"
+	"github.com/langwatch/langwatch/services/aigateway/app"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -30,28 +31,38 @@ func hostedServiceHandler(deps RouterDeps, op domain.HostedServiceOperation) htt
 		if !ok {
 			return
 		}
-		var body []byte
-		if r.Method != http.MethodGet {
-			body, ok = readFullBody(deps.Logger, w, r, maxHostedServiceBodyBytes)
-			if !ok {
-				return
-			}
+		body, ok := hostedServiceBody(deps, w, r)
+		if !ok {
+			return
 		}
-		answer, err := deps.App.CallHostedService(r.Context(), bundle, op, body)
+		answer, err := deps.App.CallHostedService(r.Context(), bundle, app.HostedCall{Operation: op, Body: body})
 		if err != nil {
 			writeError(deps.Logger, w, r.Context(), err)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		if code := relayedErrorCode(answer); code != "" {
-			// The same marker a refusal authored here carries, so a client
-			// tells a named refusal from a proxy's error page the same way
-			// for both.
-			w.Header().Set(herr.HandledErrorHeader, code)
-		}
-		w.WriteHeader(answer.StatusCode)
-		_, _ = w.Write(answer.Body)
+		writeHostedAnswer(w, answer)
 	}
+}
+
+// hostedServiceBody reads the request body of a call that carries one. A GET
+// carries none, and reading it would only wait on a client that sends nothing.
+func hostedServiceBody(deps RouterDeps, w http.ResponseWriter, r *http.Request) ([]byte, bool) {
+	if r.Method == http.MethodGet {
+		return nil, true
+	}
+	return readFullBody(deps.Logger, w, r, maxHostedServiceBodyBytes)
+}
+
+// writeHostedAnswer relays the control plane's answer as it is. A refusal gets
+// the same marker a refusal authored here carries, so a client tells a named
+// refusal from a proxy's error page the same way for both.
+func writeHostedAnswer(w http.ResponseWriter, answer domain.HostedServiceResponse) {
+	w.Header().Set("Content-Type", "application/json")
+	if code := relayedErrorCode(answer); code != "" {
+		w.Header().Set(herr.HandledErrorHeader, code)
+	}
+	w.WriteHeader(answer.StatusCode)
+	_, _ = w.Write(answer.Body)
 }
 
 // relayedErrorCode reads the code of a refusal the control plane answered

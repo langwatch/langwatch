@@ -551,55 +551,67 @@ func (s *Service) Resolve(ctx context.Context, key domain.PresentedKey) (*domain
 	}
 	s.recordLookup()
 
-	// L1: in-memory
+	lk := lookup{key: key, hash: h}
 	if e, ok := s.l1.Get(h); ok {
-		switch classifyEntry(e) {
-		case entryFresh:
-			// Serve, maybe trigger background refresh on near-expiry.
-			s.recordHit()
-			if e.nearSoftExpiry(s.refreshThreshold) {
-				go s.refreshBackground(key, h) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
-			} else if e.configStale(s.configTTL) && e.tryBeginConfigRefresh() {
-				go s.refreshConfigBackground(h, e) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
-			}
-			return e.bundle, nil
-
-		case entryStale:
-			// Soft-expired but within hard grace. A foreground refresh is
-			// needed before the entry can serve, so it counts as a miss
-			// even when stale-while-error ends up serving the old bundle.
-			s.recordMiss()
-			return s.refreshOrServeStale(ctx, key, h, e)
-
-		case entryKeyExpired:
-			// The key ran out. Fail closed with the key's own error and skip
-			// the control plane: a reachable control plane answers exactly
-			// this, and an unreachable one must not turn a finished key into
-			// a retryable upstream failure that grace keeps serving through.
-			s.recordMiss()
-			s.l1.Remove(h)
-			s.logger.Error("auth_cache_hard_evict",
-				zap.String("vk_id", e.bundle.VirtualKeyID),
-				zap.String("reason", "virtual_key_expired"),
-			)
-			return nil, herr.New(ctx, domain.ErrKeyExpired, herr.M{
-				"message": domain.KeyExpiredMessage,
-			})
-
-		default:
-			// Past hard cap: evict, fall through to fresh resolve.
-			s.recordMiss()
-			s.l1.Remove(h)
-			s.logger.Error("auth_cache_hard_evict",
-				zap.String("vk_id", e.bundle.VirtualKeyID),
-				zap.String("reason", "hard_cap_exceeded_on_lookup"),
-			)
-		}
-	} else {
-		s.recordMiss()
+		return s.resolveCached(ctx, lk, e)
 	}
-
+	s.recordMiss()
 	return s.resolveFresh(ctx, key, h)
+}
+
+// lookup is one presented credential with its cache hash, computed once per
+// resolve and handed down the paths that need both.
+type lookup struct {
+	key  domain.PresentedKey
+	hash [64]byte
+}
+
+// resolveCached serves an L1 entry according to its age: fresh entries serve
+// at once, stale ones after a foreground refresh, and the rest are evicted.
+func (s *Service) resolveCached(ctx context.Context, lk lookup, e *entry) (*domain.Bundle, error) {
+	switch classifyEntry(e) {
+	case entryFresh:
+		// Serve, maybe trigger background refresh on near-expiry.
+		s.recordHit()
+		if e.nearSoftExpiry(s.refreshThreshold) {
+			go s.refreshBackground(lk.key, lk.hash) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
+		} else if e.configStale(s.configTTL) && e.tryBeginConfigRefresh() {
+			go s.refreshConfigBackground(lk.hash, e) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
+		}
+		return e.bundle, nil
+
+	case entryStale:
+		// Soft-expired but within hard grace. A foreground refresh is
+		// needed before the entry can serve, so it counts as a miss
+		// even when stale-while-error ends up serving the old bundle.
+		s.recordMiss()
+		return s.refreshOrServeStale(ctx, lk, e)
+
+	case entryKeyExpired:
+		// The key ran out. Fail closed with the key's own error and skip
+		// the control plane: a reachable control plane answers exactly
+		// this, and an unreachable one must not turn a finished key into
+		// a retryable upstream failure that grace keeps serving through.
+		s.recordMiss()
+		s.evictOnLookup(lk.hash, e, "virtual_key_expired")
+		return nil, herr.New(ctx, domain.ErrKeyExpired, herr.M{
+			"message": domain.KeyExpiredMessage,
+		})
+
+	default:
+		// Past hard cap: evict, then resolve fresh.
+		s.recordMiss()
+		s.evictOnLookup(lk.hash, e, "hard_cap_exceeded_on_lookup")
+		return s.resolveFresh(ctx, lk.key, lk.hash)
+	}
+}
+
+func (s *Service) evictOnLookup(h [64]byte, e *entry, reason string) {
+	s.l1.Remove(h)
+	s.logger.Error("auth_cache_hard_evict",
+		zap.String("vk_id", e.bundle.VirtualKeyID),
+		zap.String("reason", reason),
+	)
 }
 
 // CacheLen reports how many virtual keys L1 is currently holding, so the
@@ -650,8 +662,9 @@ func (s *Service) resolveFresh(ctx context.Context, key domain.PresentedKey, h [
 // On success replaces the L1 entry. On transport-class failure bumps the
 // stale entry's soft expiry by SoftBump and serves the stale bundle. On
 // auth-class failure evicts the entry and returns the rejection.
-func (s *Service) refreshOrServeStale(ctx context.Context, key domain.PresentedKey, h [64]byte, stale *entry) (*domain.Bundle, error) {
-	bundle, err := s.resolver.ResolveKey(ctx, key)
+func (s *Service) refreshOrServeStale(ctx context.Context, lk lookup, stale *entry) (*domain.Bundle, error) {
+	h := lk.hash
+	bundle, err := s.resolver.ResolveKey(ctx, lk.key)
 	cls := classifyRefreshError(err)
 
 	staleBundle, _, hardExpiresAt := stale.snapshot()

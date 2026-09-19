@@ -46,8 +46,10 @@ func TestCallHostedService_WithinBudget_CarriesTheResolvedIdentity(t *testing.T)
 	hosted := &recordingHostedServices{}
 	a := appWithHostedServices(hosted)
 
-	answer, err := a.CallHostedService(context.Background(), connectBundle(120, 1000),
-		domain.HostedInstantEvalsClassify, []byte(`{"text":"hello","virtual_key_id":"vk_someone_else"}`))
+	answer, err := a.CallHostedService(context.Background(), connectBundle(120, 1000), HostedCall{
+		Operation: domain.HostedInstantEvalsClassify,
+		Body:      []byte(`{"text":"hello","virtual_key_id":"vk_someone_else"}`),
+	})
 
 	require.NoError(t, err)
 	assert.Equal(t, 200, answer.StatusCode)
@@ -66,8 +68,10 @@ func TestCallHostedService_Classify_BudgetUsedUp_RefusedBeforeAnythingIsJudged(t
 	hosted := &recordingHostedServices{}
 	a := appWithHostedServices(hosted)
 
-	_, err := a.CallHostedService(context.Background(), connectBundle(1000, 1000),
-		domain.HostedInstantEvalsClassify, []byte(`{"text":"hello"}`))
+	_, err := a.CallHostedService(context.Background(), connectBundle(1000, 1000), HostedCall{
+		Operation: domain.HostedInstantEvalsClassify,
+		Body:      []byte(`{"text":"hello"}`),
+	})
 
 	require.ErrorIs(t, err, domain.ErrBudgetExceeded)
 	assert.Empty(t, hosted.calls, "nothing reaches the classifier, so nothing is judged or recorded")
@@ -79,7 +83,7 @@ func TestCallHostedService_UsageAndBudget_AreServedAtTheCap(t *testing.T) {
 		hosted := &recordingHostedServices{}
 		a := appWithHostedServices(hosted)
 
-		_, err := a.CallHostedService(context.Background(), connectBundle(1000, 1000), op, nil)
+		_, err := a.CallHostedService(context.Background(), connectBundle(1000, 1000), HostedCall{Operation: op})
 
 		require.NoError(t, err, string(op))
 		assert.Len(t, hosted.calls, 1, string(op))
@@ -89,7 +93,7 @@ func TestCallHostedService_UsageAndBudget_AreServedAtTheCap(t *testing.T) {
 func TestCallHostedService_NotWired_IsNotFound(t *testing.T) {
 	a := New(WithLogger(zap.NewNop()))
 
-	_, err := a.CallHostedService(context.Background(), connectBundle(0, 1000), domain.HostedUsage, nil)
+	_, err := a.CallHostedService(context.Background(), connectBundle(0, 1000), HostedCall{Operation: domain.HostedUsage})
 
 	require.ErrorIs(t, err, domain.ErrNotFound)
 }
