@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { type MutableRefObject, useCallback, useRef, useState } from "react";
 import { toaster } from "~/components/ui/toaster";
 import { explainAnyError, readHandledError } from "~/features/errors";
 import type { InstantEvalSearchTarget } from "~/server/app-layer/traces/ai-query";
@@ -87,35 +87,65 @@ export interface InstantEvalRouteState {
   isStarting: boolean;
 }
 
+/** The payload the open dialog or popover is about. */
+interface PendingRoute {
+  payload: InstantEvalRoutePayload;
+  key: string;
+}
+
+/** The run request the estimate and the start both send. */
+function runInput(payload: InstantEvalRoutePayload) {
+  return {
+    projectId: payload.projectId,
+    target: payload.target,
+    filter: payload.otherQuery,
+    window: { from: payload.timeRange.from, to: payload.timeRange.to },
+    question: {
+      instructions: payload.question.instructions,
+      criteria: payload.question.criteria,
+    },
+  };
+}
+
+/** The key a route's run is registered under, with the window's preset. */
+function routeRunKey({
+  payload,
+  presetId,
+}: {
+  payload: InstantEvalRoutePayload;
+  presetId: string | undefined;
+}): string {
+  return instantEvalRunKey({
+    question: payload.question.instructions,
+    target: payload.target,
+    otherQuery: queryWithoutInstantEvalChips(payload.otherQuery),
+    window: {
+      from: payload.timeRange.from,
+      to: payload.timeRange.to,
+      ...(presetId ? { presetId } : {}),
+    },
+  });
+}
+
 /**
- * The Explorer's handler for the `instant_eval` route: the cost rule, the
- * chip and the refusals.
- *
- * A run already registered for the scope is reused with no request. Else an
- * estimate is made; under {@link INSTANT_EVAL_AUTO_RUN_USD} the run starts,
- * otherwise the dialog asks. A started run becomes an `eval` chip beside the
- * other terms and is registered under its key, so the reads send it. A spent
- * budget or a missing judge is a popover, and every refusal ends in the
- * phrase search the router built.
- *
- * Spec: specs/traces-v2/instant-eval-search.feature ("A run starts under
- * the cost rule", "A refusal is a popover, never an error state").
+ * The dialog and the popover: what is shown, and the two ways out of it (the
+ * phrase search, or a refusal that ends in the phrase search).
  */
-export function useInstantEvalRoute(): InstantEvalRouteState {
+function useInstantEvalOutcome(): {
+  confirmation: InstantEvalConfirmation | null;
+  setConfirmation: (value: InstantEvalConfirmation | null) => void;
+  refusal: InstantEvalRefusal | null;
+  setRefusal: (value: InstantEvalRefusal | null) => void;
+  pendingRef: MutableRefObject<PendingRoute | null>;
+  searchWordsInstead: () => void;
+  refuse: (args: { error: unknown; payload: InstantEvalRoutePayload }) => void;
+} {
   const applyQueryText = useFilterStore((s) => s.applyQueryText);
-  const registerEvalRun = useFilterStore((s) => s.registerEvalRun);
-  const estimate = api.tracesV2.instantEval.estimate.useMutation();
-  const start = api.tracesV2.instantEval.start.useMutation();
   const [confirmation, setConfirmation] =
     useState<InstantEvalConfirmation | null>(null);
   const [refusal, setRefusal] = useState<InstantEvalRefusal | null>(null);
-  // The payload the open dialog or popover is about, so a later Enter
-  // supersedes it rather than racing it.
-  const pendingRef = useRef<{
-    payload: InstantEvalRoutePayload;
-    key: string;
-  } | null>(null);
-  const seqRef = useRef(0);
+  // A later Enter supersedes the open dialog or popover rather than racing it.
+  const pendingRef = useRef<PendingRoute | null>(null);
 
   const searchWordsInstead = useCallback(() => {
     const pending = pendingRef.current;
@@ -154,29 +184,61 @@ export function useInstantEvalRoute(): InstantEvalRouteState {
     [searchWordsInstead],
   );
 
-  const runInput = useCallback((payload: InstantEvalRoutePayload) => {
-    return {
-      projectId: payload.projectId,
-      target: payload.target,
-      filter: payload.otherQuery,
-      window: { from: payload.timeRange.from, to: payload.timeRange.to },
-      question: {
-        instructions: payload.question.instructions,
-        criteria: payload.question.criteria,
-      },
-    };
-  }, []);
+  return {
+    confirmation,
+    setConfirmation,
+    refusal,
+    setRefusal,
+    pendingRef,
+    searchWordsInstead,
+    refuse,
+  };
+}
+
+/** What the dialog shows when the estimate is at or over the auto-run line. */
+function confirmationOf({
+  payload,
+  estimate,
+}: {
+  payload: InstantEvalRoutePayload;
+  estimate: {
+    rows: number;
+    isRowsCapped: boolean;
+    priceUsd: number;
+    freeBudgetRemainingUsd?: number;
+  };
+}): InstantEvalConfirmation {
+  return {
+    question: payload.question.instructions,
+    criteria: payload.question.criteria,
+    rows: estimate.rows,
+    isRowsCapped: estimate.isRowsCapped,
+    priceUsd: estimate.priceUsd,
+    ...(estimate.freeBudgetRemainingUsd === undefined
+      ? {}
+      : { freeBudgetRemainingUsd: estimate.freeBudgetRemainingUsd }),
+  };
+}
+
+/** Starts a run and, when it is accepted, puts its chip in the bar. */
+function useInstantEvalStarter({
+  outcome,
+  seqRef,
+}: {
+  outcome: ReturnType<typeof useInstantEvalOutcome>;
+  seqRef: MutableRefObject<number>;
+}): {
+  start: ReturnType<typeof api.tracesV2.instantEval.start.useMutation>;
+  applyChip: (args: PendingRoute & { runId: string }) => void;
+  startRun: (args: PendingRoute & { seq: number }) => void;
+} {
+  const applyQueryText = useFilterStore((s) => s.applyQueryText);
+  const registerEvalRun = useFilterStore((s) => s.registerEvalRun);
+  const start = api.tracesV2.instantEval.start.useMutation();
+  const { pendingRef, setConfirmation, refuse } = outcome;
 
   const applyChip = useCallback(
-    ({
-      payload,
-      key,
-      runId,
-    }: {
-      payload: InstantEvalRoutePayload;
-      key: string;
-      runId: string;
-    }) => {
+    ({ payload, key, runId }: PendingRoute & { runId: string }) => {
       const lensId = useViewStore.getState().activeLensId;
       registerEvalRun({ key, runId });
       applyQueryText(
@@ -194,15 +256,7 @@ export function useInstantEvalRoute(): InstantEvalRouteState {
   );
 
   const startRun = useCallback(
-    ({
-      payload,
-      key,
-      seq,
-    }: {
-      payload: InstantEvalRoutePayload;
-      key: string;
-      seq: number;
-    }) => {
+    ({ payload, key, seq }: PendingRoute & { seq: number }) => {
       start.mutate(runInput(payload), {
         onSuccess: (run) => {
           if (seq !== seqRef.current) return;
@@ -216,39 +270,53 @@ export function useInstantEvalRoute(): InstantEvalRouteState {
         },
       });
     },
-    [applyChip, refuse, runInput, start],
+    [applyChip, pendingRef, refuse, seqRef, setConfirmation, start],
   );
+
+  return { start, applyChip, startRun };
+}
+
+/**
+ * The Explorer's handler for the `instant_eval` route: the cost rule, the
+ * chip and the refusals.
+ *
+ * A run already registered for the scope is reused with no request. Else an
+ * estimate is made; under {@link INSTANT_EVAL_AUTO_RUN_USD} the run starts,
+ * otherwise the dialog asks. A started run becomes an `eval` chip beside the
+ * other terms and is registered under its key, so the reads send it. A spent
+ * budget or a missing judge is a popover, and every refusal ends in the
+ * phrase search the router built.
+ *
+ * Spec: specs/traces-v2/instant-eval-search.feature ("A run starts under
+ * the cost rule", "A refusal is a popover, never an error state").
+ */
+export function useInstantEvalRoute(): InstantEvalRouteState {
+  const estimate = api.tracesV2.instantEval.estimate.useMutation();
+  const outcome = useInstantEvalOutcome();
+  const { pendingRef, setConfirmation, setRefusal, refuse } = outcome;
+  const seqRef = useRef(0);
+  const { start, applyChip, startRun } = useInstantEvalStarter({
+    outcome,
+    seqRef,
+  });
 
   const confirmRun = useCallback(() => {
     const pending = pendingRef.current;
     if (!pending) return;
-    startRun({
-      payload: pending.payload,
-      key: pending.key,
-      seq: seqRef.current,
-    });
-  }, [startRun]);
+    startRun({ ...pending, seq: seqRef.current });
+  }, [pendingRef, startRun]);
 
   const onInstantEvalRoute = useCallback(
     (payload: InstantEvalRoutePayload) => {
       const seq = ++seqRef.current;
-      const { timeRange } = useFilterStore.getState();
-      const key = instantEvalRunKey({
-        question: payload.question.instructions,
-        target: payload.target,
-        otherQuery: queryWithoutInstantEvalChips(payload.otherQuery),
-        window: {
-          from: payload.timeRange.from,
-          to: payload.timeRange.to,
-          ...(timeRange.presetId ? { presetId: timeRange.presetId } : {}),
-        },
-      });
+      const { timeRange, evalRuns } = useFilterStore.getState();
+      const key = routeRunKey({ payload, presetId: timeRange.presetId });
       pendingRef.current = { payload, key };
       setRefusal(null);
       setConfirmation(null);
 
       // A run already judged this scope: the chip is enough.
-      const known = useFilterStore.getState().evalRuns[key];
+      const known = evalRuns[key];
       if (known) {
         pendingRef.current = null;
         applyChip({ payload, key, runId: known });
@@ -262,16 +330,7 @@ export function useInstantEvalRoute(): InstantEvalRouteState {
             startRun({ payload, key, seq });
             return;
           }
-          setConfirmation({
-            question: payload.question.instructions,
-            criteria: payload.question.criteria,
-            rows: result.rows,
-            isRowsCapped: result.isRowsCapped,
-            priceUsd: result.priceUsd,
-            ...(result.freeBudgetRemainingUsd === undefined
-              ? {}
-              : { freeBudgetRemainingUsd: result.freeBudgetRemainingUsd }),
-          });
+          setConfirmation(confirmationOf({ payload, estimate: result }));
         },
         onError: (error) => {
           if (seq !== seqRef.current) return;
@@ -279,16 +338,24 @@ export function useInstantEvalRoute(): InstantEvalRouteState {
         },
       });
     },
-    [applyChip, estimate, refuse, runInput, startRun],
+    [
+      applyChip,
+      estimate,
+      pendingRef,
+      refuse,
+      setConfirmation,
+      setRefusal,
+      startRun,
+    ],
   );
 
   return {
     onInstantEvalRoute,
-    confirmation,
+    confirmation: outcome.confirmation,
     confirmRun,
-    searchWordsInstead,
-    refusal,
-    dismissRefusal: searchWordsInstead,
+    searchWordsInstead: outcome.searchWordsInstead,
+    refusal: outcome.refusal,
+    dismissRefusal: outcome.searchWordsInstead,
     isEstimating: estimate.isPending,
     isStarting: start.isPending,
   };

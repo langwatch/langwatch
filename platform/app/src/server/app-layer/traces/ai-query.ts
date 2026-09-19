@@ -644,6 +644,89 @@ const searchRouteSchema = z.discriminatedUnion("route", [
   z.object({ route: z.literal("langy") }),
 ]);
 
+type SearchRouteObject = z.infer<typeof searchRouteSchema>;
+
+/** A model answer that closes the loop, or the reason to ask again. */
+type SearchRouteAttempt =
+  | { done: SearchRouteDecision }
+  | { retry: { lastQuery: string; lastError: string } };
+
+function interpretSearchRouteObject({
+  decision,
+  langyAvailable,
+}: {
+  decision: SearchRouteObject;
+  langyAvailable: boolean;
+}): SearchRouteAttempt {
+  switch (decision.route) {
+    case "filter": {
+      const validation = validateQuery(decision.query);
+      if (validation.ok) {
+        return { done: { route: "filter", query: decision.query } };
+      }
+      return {
+        retry: { lastQuery: decision.query, lastError: validation.error },
+      };
+    }
+    case "instant_eval":
+      return {
+        done: {
+          route: "instant_eval",
+          instructions: decision.instructions,
+          criteria: [decision.yes, decision.no],
+        },
+      };
+    case "langy":
+      return { done: { route: langyAvailable ? "langy" : "free_text" } };
+    case "free_text":
+      return { done: { route: "free_text" } };
+  }
+}
+
+/** The system prompt, with the previous parse failure appended on a retry. */
+function searchRouteSystemPrompt({
+  systemPrompt,
+  retry,
+}: {
+  systemPrompt: string;
+  retry: { lastQuery: string; lastError: string } | null;
+}): string {
+  if (!retry) return systemPrompt;
+  return `${systemPrompt}\n\nThe previous attempt produced query "${retry.lastQuery}" which failed to parse: ${retry.lastError}\nReturn a valid query this time.`;
+}
+
+/** One structured call to the model, or the provider failure it raised. */
+async function askSearchRoute({
+  model,
+  system,
+  text,
+}: {
+  model: Awaited<ReturnType<typeof getVercelAIModel>>;
+  system: string;
+  text: string;
+}): Promise<
+  | { decision: SearchRouteObject }
+  | { providerError: { error: unknown; message: string } }
+> {
+  try {
+    const { object } = await generateObject({
+      model,
+      schemaName: "SearchRoute",
+      schemaDescription:
+        "Where a typed search sentence goes: a trace filter, a judge question, a literal phrase, or the assistant.",
+      schema: searchRouteSchema,
+      system,
+      prompt: text,
+      maxRetries: 1,
+    });
+    return { decision: object };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown generation error.";
+    return { providerError: { error, message } };
+  }
+}
+
 /**
  * One model call that both decides the route and builds what the route
  * needs, for deployments without the classifier. Same field catalogue and
@@ -661,67 +744,43 @@ export async function generateSearchRoute(
     featureKey: "traces.ai_search",
   });
 
-  let lastError = "Unknown error";
-  let lastQuery = "";
-  let lastFailure: "provider" | "validation" | null = null;
-  let lastProviderError: unknown = null;
+  let retry: { lastQuery: string; lastError: string } | null = null;
+  let providerError: { error: unknown; message: string } | null = null;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    let decision: z.infer<typeof searchRouteSchema>;
-    try {
-      const { object } = await generateObject({
-        model,
-        schemaName: "SearchRoute",
-        schemaDescription:
-          "Where a typed search sentence goes: a trace filter, a judge question, a literal phrase, or the assistant.",
-        schema: searchRouteSchema,
-        system:
-          attempt === 1 || lastFailure !== "validation"
-            ? systemPrompt
-            : `${systemPrompt}\n\nThe previous attempt produced query "${lastQuery}" which failed to parse: ${lastError}\nReturn a valid query this time.`,
-        prompt: input.text,
-        maxRetries: 1,
-      });
-      decision = object;
-    } catch (e) {
-      lastFailure = "provider";
-      lastProviderError = e;
-      lastError = e instanceof Error ? e.message : "Unknown generation error.";
+    const asked = await askSearchRoute({
+      model,
+      system: searchRouteSystemPrompt({ systemPrompt, retry }),
+      text: input.text,
+    });
+    if ("providerError" in asked) {
+      providerError = asked.providerError;
+      retry = null;
       logger.error(
-        { projectId: input.projectId, attempt, lastError, err: e },
+        { projectId: input.projectId, attempt, err: asked.providerError.error },
         "Search route generation failed",
       );
       continue;
     }
-
-    if (decision.route === "filter") {
-      lastQuery = decision.query;
-      const validation = validateQuery(decision.query);
-      if (validation.ok) return { route: "filter", query: decision.query };
-      lastFailure = "validation";
-      lastError = validation.error;
-      logger.info(
-        { projectId: input.projectId, attempt, lastError, lastQuery },
-        "Search route query failed validation, retrying",
-      );
-      continue;
-    }
-    if (decision.route === "instant_eval") {
-      return {
-        route: "instant_eval",
-        instructions: decision.instructions,
-        criteria: [decision.yes, decision.no],
-      };
-    }
-    if (decision.route === "langy" && !input.langyAvailable) {
-      return { route: "free_text" };
-    }
-    return { route: decision.route };
+    const outcome = interpretSearchRouteObject({
+      decision: asked.decision,
+      langyAvailable: input.langyAvailable,
+    });
+    if ("done" in outcome) return outcome.done;
+    providerError = null;
+    retry = outcome.retry;
+    logger.info(
+      { projectId: input.projectId, attempt, ...retry },
+      "Search route query failed validation, retrying",
+    );
   }
 
   throw new AiQueryProviderError(
-    lastFailure === "provider"
-      ? summarizeProviderError(lastProviderError, { model: model.modelId })
-      : { reason: lastError, lastQuery },
+    providerError
+      ? summarizeProviderError(providerError.error, { model: model.modelId })
+      : {
+          reason: retry?.lastError ?? "Unknown error",
+          lastQuery: retry?.lastQuery ?? "",
+        },
   );
 }
 

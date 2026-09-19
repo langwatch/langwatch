@@ -6,7 +6,7 @@
  * Spec: specs/traces-v2/search.feature ("Enter routes a sentence").
  */
 import { HandledError } from "@langwatch/handled-error";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, type Mock, vi } from "vitest";
 import type {
   InstantEvalClassifyRequest,
   InstantEvalJudgement,
@@ -61,7 +61,7 @@ class NoModel extends HandledError {
 }
 
 function deps(overrides: Partial<SearchRouterDeps> = {}): SearchRouterDeps & {
-  recordDecision: ReturnType<typeof vi.fn>;
+  recordDecision: Mock<SearchRouterDeps["recordDecision"]>;
 } {
   return {
     classifier: null,
@@ -80,7 +80,7 @@ function deps(overrides: Partial<SearchRouterDeps> = {}): SearchRouterDeps & {
       evaluators: ["ragas/faithfulness"],
       events: ["thumbs_up_down"],
     })),
-    recordDecision: vi.fn(),
+    recordDecision: vi.fn<SearchRouterDeps["recordDecision"]>(),
     ...overrides,
   };
 }

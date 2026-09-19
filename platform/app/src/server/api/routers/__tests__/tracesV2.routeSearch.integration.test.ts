@@ -150,7 +150,7 @@ describe("tracesV2.routeSearch", () => {
       mockGetVercelAIModel.mockRejectedValue(
         new ModelNotConfiguredError(
           "traces.ai_search",
-          "fast",
+          "FAST",
           "Trace search",
           PROJECT_ID,
         ),
