@@ -13,6 +13,7 @@ import { canonicalErrorAnswer } from "../rest/response.ts";
 import { TrpcHost } from "../trpc/host.ts";
 import { SseLane } from "../trpc/sse.ts";
 import type { HttpFailureAnswer } from "./http-mux.ts";
+import { openapiDocumentRoute } from "./openapi-document.ts";
 
 /** The tRPC lanes, then every REST family, then the 404 — mount order is match order. */
 export function composeApiApplication(
@@ -37,7 +38,10 @@ export function composeApiApplication(
 
   if (hosts.trpc) root.route("/", trpcLanes(hosts.trpc));
 
-  if (hosts.rest) root.route("/", hosts.rest.app);
+  if (hosts.rest) {
+    root.get("/api/openapi.json", openapiDocumentRoute(hosts.rest.app));
+    root.route("/", hosts.rest.app);
+  }
 
   // An address under this prefix that nothing serves is the API's own 404,
   // never a page the browser application would try to route.
