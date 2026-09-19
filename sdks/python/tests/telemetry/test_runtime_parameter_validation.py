@@ -59,6 +59,42 @@ def test_non_string_label_warns_and_skips_export() -> None:
     assert exporter.spans == []
 
 
+def test_non_dictionary_metadata_with_trace_id_warns_and_skips_export() -> None:
+    exporter = RecordingExporter()
+
+    with pytest.warns(RuntimeWarning, match="metadata must be a dictionary"):
+        trace = LangWatchTrace(
+            trace_id="legacy-trace-id",
+            metadata="bad",  # type: ignore[arg-type]
+            tracer_provider=provider_with(exporter),
+            name="invalid-metadata",
+        )
+
+    with trace:
+        pass
+
+    assert trace.metadata == {"deprecated.trace_id": "legacy-trace-id"}
+    assert exporter.spans == []
+
+
+def test_non_dictionary_metadata_decorator_warns_and_skips_export() -> None:
+    exporter = RecordingExporter()
+
+    with pytest.warns(RuntimeWarning, match="metadata must be a dictionary"):
+        trace = LangWatchTrace(
+            metadata="bad",  # type: ignore[arg-type]
+            tracer_provider=provider_with(exporter),
+            name="invalid-metadata-decorator",
+        )
+
+    @trace
+    def decorated() -> str:
+        return "ok"
+
+    assert decorated() == "ok"
+    assert exporter.spans == []
+
+
 # @scenario "A trace with a list of string labels is exported normally"
 def test_string_list_labels_export_without_warning() -> None:
     exporter = RecordingExporter()

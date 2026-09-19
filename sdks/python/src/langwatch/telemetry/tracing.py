@@ -159,6 +159,8 @@ class LangWatchTrace:
                 stacklevel=2,
             )
             tracer_provider = _get_non_recording_provider()
+            if not isinstance(metadata, dict):
+                metadata = {}
         if api_key is not None:
             warn(
                 "Setting API key on trace is deprecated. Please set it on the LangWatch client instance instead using `langwatch.setup(api_key=<api_key>)`"
