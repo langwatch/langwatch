@@ -365,6 +365,11 @@ export async function textPass(
     parameters: { ...parameters, [INSTANT_EVAL_PAGE_PARAMETER]: traceIds },
     maxRows: INSTANT_EVAL_PAGE_ROW_CEILING,
   });
+  // Refused for the same reason every other length-sensitive pass refuses: a
+  // high fan-out trace can return far more rows than the traces asked for, and
+  // extracting all of them is work nobody asked for over an answer that was
+  // already cut.
+  if (execution.truncated) throw new InstantEvalResultTruncatedError("text");
   const hydration = await passes.judge({
     prepared: await passes.prepare({
       caller,

@@ -183,7 +183,7 @@ map projection is one record per event by contract. The page's own intent writes
 them, before it records the page as judged.
 
 What replaces the projection's guarantee is the key. A judgement is keyed
-`(TenantId, RunId, TraceId, QuestionId)` in a `ReplacingMergeTree`, so the same
+`(TenantId, RunId, TraceId, SpanId, QuestionId)` in a `ReplacingMergeTree`, so the same
 page judged twice re-inserts the same rows rather than doubling them, and a
 crash between the write and the record costs a redelivery. A page that lost more
 than half of its judgements to a judge that was reachable and did not answer is

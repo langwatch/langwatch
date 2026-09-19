@@ -29293,8 +29293,6 @@ export interface operations {
                             skipped: number;
                             /** @description Input tokens the judge billed for. */
                             tokens: number;
-                            /** @description What the judging cost us, in United States dollars. */
-                            costUsd: number;
                             /** @description What the judging costs you, in United States dollars. */
                             priceUsd: number;
                             /** @description The code of the failure that ended the run, when one did. */
@@ -29441,8 +29439,6 @@ export interface operations {
                         skipped: number;
                         /** @description Input tokens the judge billed for. */
                         tokens: number;
-                        /** @description What the judging cost us, in United States dollars. */
-                        costUsd: number;
                         /** @description What the judging costs you, in United States dollars. */
                         priceUsd: number;
                         /** @description The code of the failure that ended the run, when one did. */
@@ -29549,10 +29545,10 @@ export interface operations {
                         totalTokens: number;
                         /** @description Classifications the run would make, one per judged row. */
                         requests: number;
-                        /** @description What the run would cost us, in United States dollars. */
-                        costUsd: number;
                         /** @description What the run would cost you, in United States dollars. */
                         priceUsd: number;
+                        /** @description What is left of the free Instant Evals budget, in United States dollars. Only present for an organization without a paid plan. */
+                        freeBudgetRemainingUsd?: number;
                     };
                 };
             };
@@ -29626,8 +29622,6 @@ export interface operations {
                         skipped: number;
                         /** @description Input tokens the judge billed for. */
                         tokens: number;
-                        /** @description What the judging cost us, in United States dollars. */
-                        costUsd: number;
                         /** @description What the judging costs you, in United States dollars. */
                         priceUsd: number;
                         /** @description The code of the failure that ended the run, when one did. */
@@ -29713,8 +29707,6 @@ export interface operations {
                         skipped: number;
                         /** @description Input tokens the judge billed for. */
                         tokens: number;
-                        /** @description What the judging cost us, in United States dollars. */
-                        costUsd: number;
                         /** @description What the judging costs you, in United States dollars. */
                         priceUsd: number;
                         /** @description The code of the failure that ended the run, when one did. */

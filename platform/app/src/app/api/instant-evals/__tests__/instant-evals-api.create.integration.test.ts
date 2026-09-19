@@ -11,6 +11,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { InstantEvalFreeBudgetExhaustedError } from "~/server/app-layer/instant-evals/errors";
 import {
   InstantEvalQueryInvalidError,
   InstantEvalQueryMissingColumnsError,
@@ -49,6 +50,27 @@ beforeEach(() => {
 const { api, runRow } = harness;
 
 describe("Feature: The Instant Eval run over REST", () => {
+  describe("given a free organization past its Instant Evals budget", () => {
+    describe("when a run is requested", () => {
+      /** @scenario "The refusal reaches a REST caller as a 402 with its meta" */
+      it("answers 402 with the code and what was spent against the budget", async () => {
+        runs.create.mockRejectedValue(
+          new InstantEvalFreeBudgetExhaustedError({
+            spentUsd: 1.02,
+            budgetUsd: 1,
+          }),
+        );
+
+        const res = await api.post(BASE, { sql: SQL });
+        const body = await res.json();
+
+        expect(res.status).toBe(402);
+        expect(body.code).toBe("instant_eval_free_budget_exhausted");
+        expect(body.meta).toEqual({ spentUsd: 1.02, budgetUsd: 1 });
+      });
+    });
+  });
+
   describe("given a statement that projects a trace id and a judged column", () => {
     describe("when it is submitted to the run endpoint", () => {
       /** @scenario "A statement that projects a trace id and a judged column is accepted" */

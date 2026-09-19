@@ -22,6 +22,8 @@ import {
   type InstantEvalSpendRecorder,
   LoggingInstantEvalSpendRecorder,
 } from "~/server/app-layer/instant-evals/instant-eval-spend.recorder";
+import { createInstantEvalFreeBudgetFromEnv } from "~/server/app-layer/instant-evals/spend";
+import type { InstantEvalFreeBudget } from "~/server/app-layer/usage/instant-eval-free-budget.service";
 import { prisma } from "~/server/db";
 
 /**
@@ -59,6 +61,12 @@ export interface LangWatchQLInstantEvalSupport {
   classifier(): InstantEvalClassifier;
   readonly maxConcurrency: number;
   readonly queryTokenBudget: number;
+  /**
+   * Refuses a statement that judges when the organization has spent its free
+   * allowance. Called before anything is sent, so the budget bounds what was
+   * spent rather than what will be billed.
+   */
+  assertFreeBudget(args: { projectId: string }): Promise<void>;
   recordSpend(record: InstantEvalSpendRecord): Promise<void>;
 }
 
@@ -73,13 +81,15 @@ export interface LangWatchQLInstantEvalSupport {
  */
 export function createLangWatchQLInstantEvalSupport({
   recorder,
+  budget = createInstantEvalFreeBudgetFromEnv(),
   isProjectEnabled = (projectId: string) =>
     instantEvalsEnabled({ prisma, projectId }),
 }: {
   recorder?: InstantEvalSpendRecorder;
+  budget?: InstantEvalFreeBudget;
   /**
    * Whether one project may judge, injectable so the scope rule below can be
-   * stated in a test without a datastore behind it — the same reason
+   * stated in a test without a datastore behind it, the same reason
    * `instantEvalsEnabled` takes `isClassifierConfigured`.
    */
   isProjectEnabled?: (projectId: string) => Promise<boolean>;
@@ -98,6 +108,8 @@ export function createLangWatchQLInstantEvalSupport({
     maxConcurrency: DEFAULT_MAX_CONCURRENCY,
     queryTokenBudget:
       env.INSTANT_EVAL_QUERY_TOKEN_BUDGET ?? DEFAULT_QUERY_TOKEN_BUDGET,
+    assertFreeBudget: ({ projectId }) =>
+      budget.assertWithinBudget({ projectId }),
     recordSpend: async (record) => {
       const bound = recorder ?? tryGetApp()?.instantEvals.spend ?? fallback;
       await bound.recordSpend(record);

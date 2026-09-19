@@ -6,6 +6,8 @@ from typing import Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..types import UNSET, Unset
+
 T = TypeVar("T", bound="EstimateInstantEvalRunResponse200")
 
 
@@ -20,6 +22,8 @@ class EstimateInstantEvalRunResponse200:
         requests (int): Classifications the run would make, one per judged row.
         cost_usd (float): What the run would cost us, in United States dollars.
         price_usd (float): What the run would cost you, in United States dollars.
+        free_budget_remaining_usd (float | Unset): What is left of the free Instant Evals budget, in United States
+            dollars. Only present for an organization without a paid plan.
     """
 
     rows: int
@@ -29,6 +33,7 @@ class EstimateInstantEvalRunResponse200:
     requests: int
     cost_usd: float
     price_usd: float
+    free_budget_remaining_usd: float | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -46,6 +51,8 @@ class EstimateInstantEvalRunResponse200:
 
         price_usd = self.price_usd
 
+        free_budget_remaining_usd = self.free_budget_remaining_usd
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -59,6 +66,8 @@ class EstimateInstantEvalRunResponse200:
                 "priceUsd": price_usd,
             }
         )
+        if free_budget_remaining_usd is not UNSET:
+            field_dict["freeBudgetRemainingUsd"] = free_budget_remaining_usd
 
         return field_dict
 
@@ -79,6 +88,8 @@ class EstimateInstantEvalRunResponse200:
 
         price_usd = d.pop("priceUsd")
 
+        free_budget_remaining_usd = d.pop("freeBudgetRemainingUsd", UNSET)
+
         estimate_instant_eval_run_response_200 = cls(
             rows=rows,
             is_rows_capped=is_rows_capped,
@@ -87,6 +98,7 @@ class EstimateInstantEvalRunResponse200:
             requests=requests,
             cost_usd=cost_usd,
             price_usd=price_usd,
+            free_budget_remaining_usd=free_budget_remaining_usd,
         )
 
         estimate_instant_eval_run_response_200.additional_properties = d

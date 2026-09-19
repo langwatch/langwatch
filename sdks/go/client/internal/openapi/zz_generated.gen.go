@@ -107476,9 +107476,6 @@ type ListInstantEvalRunsResponse struct {
 	JSON200      *struct {
 		// Runs The project's runs, newest first.
 		Runs []struct {
-			// CostUsd What the judging cost us, in United States dollars.
-			CostUsd float32 `json:"costUsd"`
-
 			// CreatedAt When the run was accepted.
 			CreatedAt string `json:"createdAt"`
 
@@ -107585,9 +107582,6 @@ type CreateInstantEvalRunResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON202      *struct {
-		// CostUsd What the judging cost us, in United States dollars.
-		CostUsd float32 `json:"costUsd"`
-
 		// CreatedAt When the run was accepted.
 		CreatedAt string `json:"createdAt"`
 
@@ -107696,8 +107690,8 @@ type EstimateInstantEvalRunResponse struct {
 		// AvgTokens Input tokens one judged row sends, measured from a sample.
 		AvgTokens int `json:"avgTokens"`
 
-		// CostUsd What the run would cost us, in United States dollars.
-		CostUsd float32 `json:"costUsd"`
+		// FreeBudgetRemainingUsd What is left of the free Instant Evals budget, in United States dollars. Only present for an organization without a paid plan.
+		FreeBudgetRemainingUsd *float32 `json:"freeBudgetRemainingUsd,omitempty"`
 
 		// IsRowsCapped Whether the statement matches more rows than the run may judge.
 		IsRowsCapped bool `json:"isRowsCapped"`
@@ -107744,9 +107738,6 @@ type GetInstantEvalRunResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
-		// CostUsd What the judging cost us, in United States dollars.
-		CostUsd float32 `json:"costUsd"`
-
 		// CreatedAt When the run was accepted.
 		CreatedAt string `json:"createdAt"`
 
@@ -107852,9 +107843,6 @@ type CancelInstantEvalRunResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
-		// CostUsd What the judging cost us, in United States dollars.
-		CostUsd float32 `json:"costUsd"`
-
 		// CreatedAt When the run was accepted.
 		CreatedAt string `json:"createdAt"`
 
@@ -134174,9 +134162,6 @@ func ParseListInstantEvalRunsResponse(rsp *http.Response) (*ListInstantEvalRunsR
 		var dest struct {
 			// Runs The project's runs, newest first.
 			Runs []struct {
-				// CostUsd What the judging cost us, in United States dollars.
-				CostUsd float32 `json:"costUsd"`
-
 				// CreatedAt When the run was accepted.
 				CreatedAt string `json:"createdAt"`
 
@@ -134279,9 +134264,6 @@ func ParseCreateInstantEvalRunResponse(rsp *http.Response) (*CreateInstantEvalRu
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
 		var dest struct {
-			// CostUsd What the judging cost us, in United States dollars.
-			CostUsd float32 `json:"costUsd"`
-
 			// CreatedAt When the run was accepted.
 			CreatedAt string `json:"createdAt"`
 
@@ -134386,8 +134368,8 @@ func ParseEstimateInstantEvalRunResponse(rsp *http.Response) (*EstimateInstantEv
 			// AvgTokens Input tokens one judged row sends, measured from a sample.
 			AvgTokens int `json:"avgTokens"`
 
-			// CostUsd What the run would cost us, in United States dollars.
-			CostUsd float32 `json:"costUsd"`
+			// FreeBudgetRemainingUsd What is left of the free Instant Evals budget, in United States dollars. Only present for an organization without a paid plan.
+			FreeBudgetRemainingUsd *float32 `json:"freeBudgetRemainingUsd,omitempty"`
 
 			// IsRowsCapped Whether the statement matches more rows than the run may judge.
 			IsRowsCapped bool `json:"isRowsCapped"`
@@ -134430,9 +134412,6 @@ func ParseGetInstantEvalRunResponse(rsp *http.Response) (*GetInstantEvalRunRespo
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			// CostUsd What the judging cost us, in United States dollars.
-			CostUsd float32 `json:"costUsd"`
-
 			// CreatedAt When the run was accepted.
 			CreatedAt string `json:"createdAt"`
 
@@ -134534,9 +134513,6 @@ func ParseCancelInstantEvalRunResponse(rsp *http.Response) (*CancelInstantEvalRu
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			// CostUsd What the judging cost us, in United States dollars.
-			CostUsd float32 `json:"costUsd"`
-
 			// CreatedAt When the run was accepted.
 			CreatedAt string `json:"createdAt"`
 

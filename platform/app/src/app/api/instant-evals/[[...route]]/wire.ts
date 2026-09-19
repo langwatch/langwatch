@@ -94,9 +94,6 @@ export const instantEvalRunSchema = z.object({
   failed: z.number().int().describe("Rows the judge could not answer."),
   skipped: z.number().int().describe("Rows the judge declined to answer."),
   tokens: z.number().int().describe("Input tokens the judge billed for."),
-  costUsd: z
-    .number()
-    .describe("What the judging cost us, in United States dollars."),
   priceUsd: z
     .number()
     .describe("What the judging costs you, in United States dollars."),
@@ -132,12 +129,15 @@ export const instantEvalEstimateSchema = z.object({
     .number()
     .int()
     .describe("Classifications the run would make, one per judged row."),
-  costUsd: z
-    .number()
-    .describe("What the run would cost us, in United States dollars."),
   priceUsd: z
     .number()
     .describe("What the run would cost you, in United States dollars."),
+  freeBudgetRemainingUsd: z
+    .number()
+    .optional()
+    .describe(
+      "What is left of the free Instant Evals budget, in United States dollars. Only present for an organization without a paid plan.",
+    ),
 });
 
 export const instantEvalJudgmentSchema = z.object({
@@ -266,7 +266,6 @@ export function toInstantEvalRunWire(
     failed: row.failed,
     skipped: row.skipped,
     tokens: row.tokens,
-    costUsd: row.costUsd,
     priceUsd: row.priceUsd,
     error: row.error,
     createdAt: row.createdAt.toISOString(),

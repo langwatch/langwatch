@@ -86,3 +86,40 @@ export class InstantEvalClassifierUnavailableError extends HandledError {
     this.name = "InstantEvalClassifierUnavailableError";
   }
 }
+
+/**
+ * The organization has spent its free Instant Evals allowance.
+ *
+ * `customer` fault and a 402: the organization has no paid plan, the
+ * allowance is spent across every project it owns, and upgrading is the one
+ * thing that lifts it. Refused before anything is judged, for both a run and
+ * a synchronous query, so the budget is a ceiling on what was spent rather
+ * than a bill that arrives after.
+ */
+export class InstantEvalFreeBudgetExhaustedError extends HandledError {
+  declare readonly code: "instant_eval_free_budget_exhausted";
+
+  constructor({
+    spentUsd,
+    budgetUsd,
+  }: {
+    /** What the organization has spent on Instant Evals, in USD. */
+    readonly spentUsd: number;
+    /** The allowance an organization without a paid plan has, in USD. */
+    readonly budgetUsd: number;
+  }) {
+    super(
+      "instant_eval_free_budget_exhausted",
+      "This organization has used its free Instant Evals allowance. Upgrade to a paid plan to keep judging.",
+      {
+        httpStatus: 402,
+        fault: "customer",
+        // Named consumer: the upgrade dialog and the CLI, which say what was
+        // spent against what the free plan allows.
+        meta: { spentUsd, budgetUsd },
+        ...remediation("instant_eval_free_budget_exhausted"),
+      },
+    );
+    this.name = "InstantEvalFreeBudgetExhaustedError";
+  }
+}

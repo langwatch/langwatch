@@ -734,6 +734,7 @@ export class LangWatchQLService {
       ...(parameters ? { parameters } : {}),
       ...(timeWindow ? { timeWindow } : {}),
     });
+    await this.assertJudgingWithinFreeBudget({ projects, validation });
     const granularity = resolveRunGranularityOrRefuseUnfilled({
       declared: validation.parameters,
       ...(parameters ? { parameters } : {}),
@@ -767,14 +768,6 @@ export class LangWatchQLService {
     });
   }
 
-  /**
-   * Runs a statement that passed every gate as the restricted identity, and
-   * shapes what came back with the facts those gates recorded.
-   *
-   * Split from {@link execute} because it is the half of the order that has no
-   * more decisions to make — only the database call, the advisory diagnostics
-   * over its answer, and the result both of them describe.
-   */
   /**
    * The trace source the hydration stage reads through, built on first use.
    *
@@ -922,6 +915,36 @@ export class LangWatchQLService {
     return hydration;
   }
 
+  /**
+   * Refuses a statement that judges once the organization has spent its free
+   * allowance.
+   *
+   * Before the database runs, so the budget bounds what was spent rather than
+   * what will be billed: nothing reaches the classifier past it. The scope is
+   * one project wherever an eval call was admitted, which is what the
+   * validator enforces and what gives the spend an owner.
+   */
+  private async assertJudgingWithinFreeBudget({
+    projects,
+    validation,
+  }: {
+    readonly projects: readonly LangWatchQLCaller[];
+    readonly validation: ReturnType<LangWatchQLService["validate"]>;
+  }): Promise<void> {
+    if (!callsEvalFunction(validation.appFunctions)) return;
+    const judging = projects.length === 1 ? projects[0] : undefined;
+    if (!judging) return;
+    await this.instantEvals().assertFreeBudget({ projectId: judging.id });
+  }
+
+  /**
+   * Runs a statement that passed every gate as the restricted identity, and
+   * shapes what came back with the facts those gates recorded.
+   *
+   * Split from {@link execute} because it is the half of the order that has no
+   * more decisions to make: the database call, the advisory diagnostics over
+   * its answer, and the result both of them describe.
+   */
   private async executeValidated({
     executor,
     projects,

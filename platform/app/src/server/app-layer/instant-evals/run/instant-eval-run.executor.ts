@@ -126,6 +126,19 @@ export interface InstantEvalRunExecutorDependencies {
     projectId: string;
     runId: string;
   }) => Promise<boolean>;
+  /**
+   * Refuses the next page once the organization's free allowance is gone.
+   *
+   * Checked per page rather than at admission alone: a run records its spend
+   * once, when it finishes, so an admission check reads a ledger that knows
+   * nothing about the run already under way. Passing what this run has judged
+   * so far as `inFlightUsd` is what bounds it to one page past the budget.
+   * Unset on a deployment with no free budget to enforce.
+   */
+  readonly assertWithinBudget?: (input: {
+    projectId: string;
+    inFlightUsd: number;
+  }) => Promise<void>;
   readonly now?: () => number;
 }
 
@@ -545,6 +558,14 @@ async function judgeRunPageOrThrow(
     return emptyPage();
   }
 
+  // Thrown rather than returning an empty page: a run stopped by the budget
+  // did not finish its selection, and recording it as complete would report a
+  // partial answer as the whole one.
+  await deps.assertWithinBudget?.({
+    projectId,
+    inFlightUsd: runSpendSoFarUsd(deps, row.tokens),
+  });
+
   const startedPage = Date.now();
   const { keyPage, prepared, keyMs, prefetched } = await takePageAndReadAhead({
     deps,
@@ -687,6 +708,25 @@ async function judgeUnderCancellation({
   } finally {
     cancelWatch?.stop();
   }
+}
+
+/**
+ * What this run has already spent, priced the way its finish will price it.
+ *
+ * Read off the run row's running token total rather than tracked here, because
+ * a page is its own intent: the process that judges page six need not be the
+ * one that judged page five, and the row is what both of them share.
+ */
+function runSpendSoFarUsd(
+  deps: InstantEvalRunExecutorDependencies,
+  inputTokens: number,
+): number {
+  if (inputTokens <= 0) return 0;
+  const pricing = deps.classifier().pricing;
+  return instantEvalPriceUsd({
+    costUsd: instantEvalCostUsd({ inputTokens, pricing }),
+    pricing,
+  });
 }
 
 /** What the run cost, recorded once. */

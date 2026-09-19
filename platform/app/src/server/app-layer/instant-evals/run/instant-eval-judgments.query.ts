@@ -59,8 +59,17 @@ export function parseProbabilities(
   if (typeof value !== "string" || value === "") return null;
   try {
     const parsed: unknown = JSON.parse(value);
-    return parsed && typeof parsed === "object"
-      ? (parsed as Record<string, number>)
+    // Shape-checked rather than cast: the column holds whatever the classifier
+    // wrote, and an array or a string-valued map would otherwise reach the API
+    // typed as a distribution it is not.
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed))
+      return null;
+    const entries = Object.entries(parsed);
+    return entries.every(
+      ([, probability]) =>
+        typeof probability === "number" && Number.isFinite(probability),
+    )
+      ? Object.fromEntries(entries)
       : null;
   } catch {
     return null;

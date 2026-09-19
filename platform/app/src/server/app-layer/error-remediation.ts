@@ -257,7 +257,13 @@ const registry = {
   instant_eval_row_cap_exceeded: {
     tips: [
       "Read `meta.cap` against `meta.maxCap`; the first is what this plan judges in one run and the second is the ceiling any plan offers",
-      "Lower the requested limit, or split the selection across more than one run with a keyset predicate on TraceId",
+      "Lower the requested limit, or split the selection across more than one run with a keyset predicate on (TraceId, SpanId) where the statement projects SpanId, and on TraceId alone where it does not",
+    ],
+  },
+  instant_eval_free_budget_exhausted: {
+    tips: [
+      "Read `meta.spentUsd` against `meta.budgetUsd`; the organization has spent its free Instant Evals allowance across every project",
+      "Upgrade the organization to a paid plan under Settings, Subscription; judged queries and runs are then billed per input token",
     ],
   },
   instant_eval_already_finished: {

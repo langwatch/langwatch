@@ -3623,6 +3623,8 @@ Spend events, spend summaries and the webhook endpoints are an Enterprise capabi
 
 An outcome that arrives after settlement is recorded as `success` or `error`. A `success` event is never downgraded.
 
+An [Instant Eval](/api-reference/instant-evals/running-an-instant-eval) query or run is also one spend event, recorded as `success` with no `admitted` step before it. It carries `request_type: "instant_eval"`, model `jev`, an empty virtual key and no provider; `usage.input_tokens` is what the judge read, `cost` is the customer price, and `metadata` holds the request count. A run's event id starts with `instanteval_` followed by the run id, so a run finished twice is one event. Budgets debit it like any other spend.
+
 Event ids are stable: `<gateway_request_id>:<completed|settled|admitted>`. A retried or replayed delivery carries the same id, so you can dedupe on it. Recorded spend never changes: a budget reset moves a period boundary and leaves every event as it was.
 
 ## The event payload
@@ -67313,6 +67315,8 @@ GROUP BY TraceId, ConversationId
 
 `priceUsd` is what the run costs you and `costUsd` is what it costs us. One classification is made per row, carrying every question the statement asks, so a statement with four eval columns still sends one request per row.
 
+An organization without a paid plan also gets `freeBudgetRemainingUsd`, what is left of its $1 free budget. Once that is spent, a new run and a judged query answer `402` with `instant_eval_free_budget_exhausted`, carrying `spentUsd` and `budgetUsd` in `meta`, until the organization upgrades. The rate is on [Pricing](/pricing#instant-evals).
+
 ## Row Limits
 
 A run judges at most 10,000 rows by default. Pass `limit` to ask for fewer, or for up to 100,000 on a plan that lifts the cap. A `limit` above what your plan allows answers `instant_eval_row_cap_exceeded` with the cap and the plan in `meta`.
@@ -70485,6 +70489,18 @@ For the exact arithmetic per family, what is never billed, and how retries are d
 ### What's included
 
 Each plan includes a base volume of events stored for a default window. For example, the **Growth** plan includes **200,000 events stored for 49 days.** If you need a longer retention window or a higher volume, you can [extend retention](#extending-retention) with an Enterprise plan.
+
+## Instant Evals
+
+Instant Evals are priced separately from events. A judged query or run is charged per input token sent to the judge, at **$0.0546 per million input tokens**. Output is free. Judging ten thousand conversations of average size costs about a quarter of a dollar.
+
+Input tokens are the text the judge reads plus the questions asked about it. One request carries every question about one text, so a statement with three eval columns costs about the same as one with a single column.
+
+`POST /api/v1/instant-evals/estimate` returns the price of a run before it starts, from the rows the statement matches and a sample of their size. See [Running an Instant Eval](/api-reference/instant-evals/running-an-instant-eval).
+
+Organizations without a paid plan have a **$1 free budget** for Instant Evals in total, across all their projects. Past it, a new run or a judged query is refused until the organization upgrades. Paid plans have no such limit and are billed monthly for what was judged.
+
+Every judged query and run is one spend event on the [billing events](/ai-gateway/billing-events) ledger, so a [gateway budget](/ai-gateway/budgets) set on a project or an organization caps Instant Evals the same way it caps gateway traffic.
 
 ## Custom data retention
 

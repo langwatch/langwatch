@@ -25,6 +25,7 @@ import { prisma } from "~/server/db";
 import { instantEvalsEnabled } from "../access";
 import { getInstantEvalClassifier } from "../classifier";
 import type { InstantEvalSpendRecorder } from "../instant-eval-spend.recorder";
+import { createInstantEvalFreeBudgetFromEnv } from "../spend";
 import {
   createInstantEvalCancellations,
   type InstantEvalCancellationRedis,
@@ -107,6 +108,11 @@ export function createInstantEvalRunPortFromEnv({
     maxConcurrency: INSTANT_EVAL_PAGE_CONCURRENCY,
     protections: (projectId) => getProtectionsForProject(prisma, { projectId }),
     isCancelled: ({ runId }) => cancellations().isRequested({ runId }),
+    assertWithinBudget: ({ projectId, inFlightUsd }) =>
+      createInstantEvalFreeBudgetFromEnv().assertWithinBudget({
+        projectId,
+        inFlightUsd,
+      }),
   });
 }
 
@@ -126,6 +132,7 @@ export function getInstantEvalRunService(): InstantEvalRunService {
     isEnabled: ({ projectId }) => instantEvalsEnabled({ prisma, projectId }),
     caller: callerFor,
     plan: planFor,
+    budget: createInstantEvalFreeBudgetFromEnv(),
   });
   return cached;
 }

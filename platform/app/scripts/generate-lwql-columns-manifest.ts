@@ -76,7 +76,10 @@ async function clickHouseForDump(): Promise<{
     const password = decodeURIComponent(url.password);
     return {
       httpUrl: `${url.protocol}//${url.host}`,
-      connectionUrl: `${url.protocol}//${username}:${password}@${url.host}/${MANIFEST_DATABASE}`,
+      // Re-encoded on the way back into a URL: the decoded pair is what the
+      // client wants, but a password holding @ : / or # would split this
+      // string at the wrong place and point goose at another host.
+      connectionUrl: `${url.protocol}//${encodeURIComponent(username)}:${encodeURIComponent(password)}@${url.host}/${MANIFEST_DATABASE}`,
       username,
       password,
       stop: async () => {

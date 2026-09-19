@@ -64396,10 +64396,6 @@
                       "type": "integer",
                       "description": "Input tokens the judge billed for."
                     },
-                    "costUsd": {
-                      "type": "number",
-                      "description": "What the judging cost us, in United States dollars."
-                    },
                     "priceUsd": {
                       "type": "number",
                       "description": "What the judging costs you, in United States dollars."
@@ -64449,7 +64445,6 @@
                     "failed",
                     "skipped",
                     "tokens",
-                    "costUsd",
                     "priceUsd",
                     "error",
                     "createdAt",
@@ -64789,10 +64784,6 @@
                             "type": "integer",
                             "description": "Input tokens the judge billed for."
                           },
-                          "costUsd": {
-                            "type": "number",
-                            "description": "What the judging cost us, in United States dollars."
-                          },
                           "priceUsd": {
                             "type": "number",
                             "description": "What the judging costs you, in United States dollars."
@@ -64842,7 +64833,6 @@
                           "failed",
                           "skipped",
                           "tokens",
-                          "costUsd",
                           "priceUsd",
                           "error",
                           "createdAt",
@@ -64936,13 +64926,13 @@
                       "type": "integer",
                       "description": "Classifications the run would make, one per judged row."
                     },
-                    "costUsd": {
-                      "type": "number",
-                      "description": "What the run would cost us, in United States dollars."
-                    },
                     "priceUsd": {
                       "type": "number",
                       "description": "What the run would cost you, in United States dollars."
+                    },
+                    "freeBudgetRemainingUsd": {
+                      "type": "number",
+                      "description": "What is left of the free Instant Evals budget, in United States dollars. Only present for an organization without a paid plan."
                     }
                   },
                   "required": [
@@ -64951,7 +64941,6 @@
                     "avgTokens",
                     "totalTokens",
                     "requests",
-                    "costUsd",
                     "priceUsd"
                   ]
                 }
@@ -65284,10 +65273,6 @@
                       "type": "integer",
                       "description": "Input tokens the judge billed for."
                     },
-                    "costUsd": {
-                      "type": "number",
-                      "description": "What the judging cost us, in United States dollars."
-                    },
                     "priceUsd": {
                       "type": "number",
                       "description": "What the judging costs you, in United States dollars."
@@ -65337,7 +65322,6 @@
                     "failed",
                     "skipped",
                     "tokens",
-                    "costUsd",
                     "priceUsd",
                     "error",
                     "createdAt",
@@ -65516,10 +65500,6 @@
                       "type": "integer",
                       "description": "Input tokens the judge billed for."
                     },
-                    "costUsd": {
-                      "type": "number",
-                      "description": "What the judging cost us, in United States dollars."
-                    },
                     "priceUsd": {
                       "type": "number",
                       "description": "What the judging costs you, in United States dollars."
@@ -65569,7 +65549,6 @@
                     "failed",
                     "skipped",
                     "tokens",
-                    "costUsd",
                     "priceUsd",
                     "error",
                     "createdAt",

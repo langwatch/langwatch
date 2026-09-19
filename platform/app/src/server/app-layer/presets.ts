@@ -275,6 +275,7 @@ import {
   ClickHouseInstantEvalRunProjectionStore,
   ClickHouseInstantEvalRunRepository,
 } from "./instant-evals/run/instant-eval-run.repository";
+import { createInstantEvalSpendRecorderFromEnv } from "./instant-evals/spend";
 import { LangyConversationService } from "./langy/langy-conversation.service";
 import {
   createLangyTrustedMessageReader,
@@ -477,7 +478,10 @@ export function initializeDefaultApp(options?: {
   const instantEvalJudgments = new ClickHouseInstantEvalJudgmentsRepository(
     resolveClickHouseClient,
   );
-  const instantEvalSpend = new LoggingInstantEvalSpendRecorder();
+  // The spend spine when it is registered, a log line when it is not: the
+  // pipelines register after this container is built, so the choice is made
+  // per record rather than here.
+  const instantEvalSpend = createInstantEvalSpendRecorderFromEnv();
 
   // Clustering reads ClickHouse directly (its query has no repository yet), so
   // it takes the resolver as a parameter. Bound once here, then handed to both
