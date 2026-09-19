@@ -232,6 +232,7 @@ Feature: Langy is tested with LangWatch's own scenario and evaluation tooling
     Given a scenario that needs a person of their own
     When the harness seeds the account
     Then it writes a verified user and a password account the sign-in accepts
+    And the two are written together, so a failure leaves neither behind
     And it reads the database address from the environment, or from the app's own .env
 
   @unit

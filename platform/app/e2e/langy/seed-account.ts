@@ -80,11 +80,16 @@ export function resolveSeedDatabaseUrl({
 /** The two rows an email sign-in needs, behind a port so a test can stand in. */
 export interface AccountStore {
   findUserIdByEmail(email: string): Promise<string | null>;
-  createVerifiedUser(user: { name: string; email: string }): Promise<string>;
-  createPasswordAccount(account: {
-    userId: string;
+  /**
+   * Writes the verified user and its password account together: both rows or
+   * neither. A user left without its account cannot sign in, and the next run
+   * would refuse its address as taken.
+   */
+  createVerifiedUserWithPassword(account: {
+    name: string;
+    email: string;
     passwordHash: string;
-  }): Promise<void>;
+  }): Promise<string>;
   close(): Promise<void>;
 }
 
@@ -105,9 +110,9 @@ export async function seedCredentialAccount({
     if (existing) {
       throw new Error(`An account for ${email} already exists.`);
     }
-    const userId = await store.createVerifiedUser({ name, email });
-    await store.createPasswordAccount({
-      userId,
+    const userId = await store.createVerifiedUserWithPassword({
+      name,
+      email,
       passwordHash: await hash(password, 10),
     });
     return { userId };
@@ -144,27 +149,28 @@ export async function openLocalAccountStore({
     findUserIdByEmail: async (email) =>
       (await prisma.user.findUnique({ where: { email }, select: { id: true } }))
         ?.id ?? null,
-    createVerifiedUser: async ({ name, email }) =>
-      (
-        await prisma.user.create({
+    createVerifiedUserWithPassword: ({ name, email, passwordHash }) =>
+      // One transaction, since the account's id is the user's id and so the
+      // user has to exist before the account can be written.
+      prisma.$transaction(async (tx) => {
+        const { id: userId } = await tx.user.create({
           data: { name, email, emailVerified: true },
           select: { id: true },
-        })
-      ).id,
-    createPasswordAccount: async ({ userId, passwordHash }) => {
-      await prisma.account.create({
-        data: {
-          userId,
-          type: "credentials",
-          provider: "credential",
-          // better-auth keys an account by `(issuer, accountId)`, and the
-          // local credential provider's issuer is `local:credential`.
-          issuer: "local:credential",
-          providerAccountId: userId,
-          password: passwordHash,
-        },
-      });
-    },
+        });
+        await tx.account.create({
+          data: {
+            userId,
+            type: "credentials",
+            provider: "credential",
+            // better-auth keys an account by `(issuer, accountId)`, and the
+            // local credential provider's issuer is `local:credential`.
+            issuer: "local:credential",
+            providerAccountId: userId,
+            password: passwordHash,
+          },
+        });
+        return userId;
+      }),
     close: () => prisma.$disconnect(),
   };
 }

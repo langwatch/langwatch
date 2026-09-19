@@ -17,17 +17,13 @@ const LOCAL_DB =
 
 function fakeStore(existingUserId: string | null = null) {
   const rows: {
-    user?: { name: string; email: string };
-    account?: { userId: string; passwordHash: string };
+    account?: { name: string; email: string; passwordHash: string };
   } = {};
   const store: AccountStore = {
     findUserIdByEmail: vi.fn(async () => existingUserId),
-    createVerifiedUser: vi.fn(async (user) => {
-      rows.user = user;
-      return "user_1";
-    }),
-    createPasswordAccount: vi.fn(async (account) => {
+    createVerifiedUserWithPassword: vi.fn(async (account) => {
       rows.account = account;
+      return "user_1";
     }),
     close: vi.fn(async () => undefined),
   };
@@ -48,8 +44,13 @@ describe("seeding a scenario's own account", () => {
       });
 
       expect(userId).toBe("user_1");
-      expect(rows.user).toEqual({ name: "Riley", email: "riley@acme.test" });
-      expect(rows.account?.userId).toBe("user_1");
+      expect(rows.account).toMatchObject({
+        name: "Riley",
+        email: "riley@acme.test",
+      });
+      // One write for both rows, so a failure never leaves a user with no
+      // account behind.
+      expect(store.createVerifiedUserWithPassword).toHaveBeenCalledOnce();
       expect(
         await compare("GuidedRun!2026", rows.account?.passwordHash ?? ""),
       ).toBe(true);
@@ -100,7 +101,7 @@ describe("seeding a scenario's own account", () => {
           store,
         }),
       ).rejects.toThrow(/already exists/);
-      expect(store.createVerifiedUser).not.toHaveBeenCalled();
+      expect(store.createVerifiedUserWithPassword).not.toHaveBeenCalled();
       expect(store.close).toHaveBeenCalledOnce();
     });
   });
