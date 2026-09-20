@@ -145,6 +145,34 @@ describe("searchTracesCommand()", () => {
 		});
 	});
 
+	describe("when the window is given", () => {
+		it("reads epoch milliseconds as the instant they are", async () => {
+			mockSearch.mockResolvedValue({
+				traces: [],
+				pagination: { totalHits: 0 },
+			});
+
+			await searchTracesCommand({
+				startDate: "1789000000000",
+				endDate: "2026-09-20T06:00:00.000Z",
+			});
+
+			const body = mockSearch.mock.calls[0]?.[0] as {
+				startDate?: number;
+				endDate?: number;
+			};
+			expect(body.startDate).toBe(1789000000000);
+			expect(body.endDate).toBe(Date.parse("2026-09-20T06:00:00.000Z"));
+		});
+
+		it("refuses a value that is neither an instant nor epoch milliseconds", async () => {
+			await expect(
+				searchTracesCommand({ startDate: "last tuesday" }),
+			).rejects.toThrow(ProcessExitError);
+			expect(mockSearch).not.toHaveBeenCalled();
+		});
+	});
+
 	describe("when traces are found", () => {
 		it("calls search and prints results", async () => {
 			mockSearch.mockResolvedValue({
