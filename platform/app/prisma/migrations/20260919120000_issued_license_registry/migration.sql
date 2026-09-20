@@ -1,3 +1,11 @@
+-- IRREVERSIBLE: no down step. Reversing it would drop IssuedLicense with every
+-- license LangWatch has recorded, and drop Organization.selfHostedCustomer.
+-- The registry table is the only copy of that record: a reissued license
+-- waiting for its install, a revocation and its reason, and the commercial
+-- terms a customer's invoices are computed from all live here and nowhere
+-- else. Rolling the code back is safe and leaves the table unread. Rolling the
+-- data back is a restore from backup, not a reverse migration.
+--
 -- The license registry (ADR-139).
 --
 -- IssuedLicense records every license LangWatch issues. A license linked to a

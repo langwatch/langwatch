@@ -136,7 +136,7 @@ Feature: The license is the credential for hosted services
     And the key that was created for it is ended
 
   @integration
-  Scenario: Refusals do not reveal whether a license exists
+  Scenario: Refusals do not reveal license metadata
     When calls present an unregistered token, a revoked token and a token bound to another instance
     Then none of the responses includes the customer name, the seats or the term
 

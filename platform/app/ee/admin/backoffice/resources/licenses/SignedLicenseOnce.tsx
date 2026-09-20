@@ -1,6 +1,5 @@
 import { Text, Textarea, VStack } from "@chakra-ui/react";
 
-/** One issued or reissued license, shown once. */
 export function SignedLicenseOnce({ licenseKey }: { licenseKey: string }) {
   return (
     <VStack align="start" gap={2} width="full">

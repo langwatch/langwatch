@@ -1,3 +1,8 @@
+-- IRREVERSIBLE: no down step. Dropping LicenseSeatReport would lose the seat
+-- peak of every term quarter, which the quarterly true-up invoices from and
+-- which an install only reports once a day: it cannot be recomputed after the
+-- fact. Rolling the code back is safe, the tables stay unread.
+--
 -- License sync (ADR-139, section 6).
 --
 -- A connected install posts its seat counts once a day and gets a signed lease

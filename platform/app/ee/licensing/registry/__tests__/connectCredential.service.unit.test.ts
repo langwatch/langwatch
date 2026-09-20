@@ -260,37 +260,34 @@ describe("ConnectCredentialService", () => {
             context.travelTo(new Date(NEXT_YEAR.getTime() + 1));
           },
         ],
-      ] as const)(
-        "refuses with %s's code and leaves no active key when it is %s mid-call",
-        async (_label, code, interleave) => {
-          const { id, token } = await issue();
-          await context.repository.update(id, { instanceId: "instance-a" });
-          // The interleaving lands between the status check and the attach:
-          // the key exists, the license no longer admits it.
-          const provision = context.managedKeys.provision.bind(
-            context.managedKeys,
-          );
-          vi.spyOn(context.managedKeys, "provision").mockImplementation(
-            async (params) => {
-              const created = await provision(params);
-              await interleave(id);
-              return created;
-            },
-          );
+      ] as const)("refuses with %s's code and leaves no active key when it is %s mid-call", async (_label, code, interleave) => {
+        const { id, token } = await issue();
+        await context.repository.update(id, { instanceId: "instance-a" });
+        // The interleaving lands between the status check and the attach:
+        // the key exists, the license no longer admits it.
+        const provision = context.managedKeys.provision.bind(
+          context.managedKeys,
+        );
+        vi.spyOn(context.managedKeys, "provision").mockImplementation(
+          async (params) => {
+            const created = await provision(params);
+            await interleave(id);
+            return created;
+          },
+        );
 
-          const result = await context.credentials.resolve({
-            token,
-            instanceId: "instance-a",
-          });
+        const result = await context.credentials.resolve({
+          token,
+          instanceId: "instance-a",
+        });
 
-          expect(result).toEqual({ ok: false, code });
-          expect(context.managedKeys.keys.size).toBe(1);
-          expect(context.managedKeys.active()).toEqual([]);
-          expect((await context.repository.findById(id))?.virtualKeyId).toBe(
-            null,
-          );
-        },
-      );
+        expect(result).toEqual({ ok: false, code });
+        expect(context.managedKeys.keys.size).toBe(1);
+        expect(context.managedKeys.active()).toEqual([]);
+        expect((await context.repository.findById(id))?.virtualKeyId).toBe(
+          null,
+        );
+      });
     });
 
     describe("when recording the managed key on the license fails", () => {

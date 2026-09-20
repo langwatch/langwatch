@@ -29,7 +29,13 @@ export function IssueModeField({ form, set }: FieldsProps) {
       <NativeSelect.Root>
         <NativeSelect.Field
           value={form.mode}
-          onChange={(event) => set("mode", event.target.value as IssueMode)}
+          onChange={(event) => {
+            const mode = event.target.value as IssueMode;
+            set("mode", mode);
+            // Registering names an existing customer, and the register button
+            // submits organizationId whatever the customer field is showing.
+            if (mode === "register") set("customerMode", "existing");
+          }}
         >
           <option value="issue">
             Issue a new license, signed with the server key

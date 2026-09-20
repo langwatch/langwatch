@@ -8,7 +8,6 @@ import { generateLicenseKey } from "../../licenseGenerationService";
 import {
   buildService,
   langwatchKeys,
-  NEXT_YEAR,
   NOW,
   OPERATOR,
 } from "./support/registryHarness";

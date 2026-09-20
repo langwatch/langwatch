@@ -14,7 +14,8 @@ export function Detail({
       <Text fontSize="xs" color="fg.muted">
         {label}
       </Text>
-      <Text>{children}</Text>
+      {/* A value can be a Text of its own, and a p may not hold a p. */}
+      <Text as="div">{children}</Text>
     </VStack>
   );
 }

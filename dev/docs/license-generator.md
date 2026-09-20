@@ -72,9 +72,11 @@ org's plan resolution returns the new plan on the next `getActivePlan()`
 call.
 
 If `LANGWATCH_LICENSE_PRIVATE_KEY` is not set in env, the script emits a
-warning, skips the license mint, and the org falls through to the FREE
-plan. **That is the no-bypass intent** — operators who don't set the
-env var get the gated behavior, not a silent Enterprise unlock.
+warning, skips the license mint, and the org keeps the unlicensed
+baseline `getActivePlan()` returns when `Organization.license` is empty.
+**That is the no-bypass intent:** operators who don't set the env var get
+whatever their deployment already gave them, not a silent Enterprise
+unlock.
 
 ## Programmatic API
 
@@ -113,10 +115,10 @@ unset, and is safe to call on every seed run.
   requires their plan tier, generate a matching license against a local
   org instead of toggling a bypass.
 
-## What about FREE-plan reproduction?
+## What about reproducing the unlicensed baseline?
 
-The FREE plan is the default — you don't need to generate a license. Just
-*don't* call the generator. `getActivePlan()` returns the unlicensed baseline when
+It is the default, so there is nothing to generate. Just *don't* call the
+generator. `getActivePlan()` returns the unlicensed baseline when
 `Organization.license` is empty or the license has expired.
 
 ## Security notes

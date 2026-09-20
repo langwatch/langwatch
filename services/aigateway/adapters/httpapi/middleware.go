@@ -189,7 +189,6 @@ func extractToken(r *http.Request) string {
 }
 
 const (
-	// headerInstanceID names the install presenting a license token.
 	headerInstanceID       = "X-LangWatch-Instance"
 	headerEndUserID        = "X-LangWatch-End-User-Id"
 	headerEndUserIDLiteLLM = "X-Litellm-End-User-Id"

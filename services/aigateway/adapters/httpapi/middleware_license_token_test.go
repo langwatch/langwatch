@@ -13,7 +13,6 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
-// keyRecorder is an auth resolver that records the credential it was handed.
 type keyRecorder struct{ seen []domain.PresentedKey }
 
 func (k *keyRecorder) Resolve(_ context.Context, key domain.PresentedKey) (*domain.Bundle, error) {

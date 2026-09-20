@@ -6,7 +6,7 @@
 
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { env } from "~/env.mjs";
-import type { PrismaClient } from "~/generated/prisma/client";
+import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import { rateLimit } from "~/server/rateLimit";
 import { decrypt, encrypt } from "~/utils/encryption";
 import { createContractBudgetService } from "../connect/connect.prisma";
@@ -46,6 +46,35 @@ export function createLicenseRegistryService(
     organizations: new PrismaCustomerOrganizations(prisma),
     managedKeys: new PrismaConnectManagedKeys(prisma),
     contractBudgets: createContractBudgetService(prisma),
+    signingKey: licenseSigningKey,
+    publicKey: PUBLIC_KEY,
+    encrypt,
+  });
+}
+
+/**
+ * The registry restricted to recording a license, inside the caller's
+ * transaction, so the row and whatever the caller writes beside it land
+ * together. `record` reaches only the repository; the managed key and the
+ * contract budget need a full client, and calling them here is a mistake the
+ * stubs name rather than a silent no-op.
+ */
+export function createLicenseRecorderService(
+  tx: Prisma.TransactionClient,
+): LicenseRegistryService {
+  const outOfScope = () => {
+    throw new Error("recording a license reaches no managed key or budget");
+  };
+  return new LicenseRegistryService({
+    repository: new PrismaIssuedLicenseRepository(tx),
+    seatReports: new PrismaLicenseSeatReports(tx),
+    organizations: new PrismaCustomerOrganizations(tx),
+    managedKeys: {
+      provision: outOfScope,
+      retire: outOfScope,
+      invalidate: outOfScope,
+    },
+    contractBudgets: { sync: outOfScope },
     signingKey: licenseSigningKey,
     publicKey: PUBLIC_KEY,
     encrypt,

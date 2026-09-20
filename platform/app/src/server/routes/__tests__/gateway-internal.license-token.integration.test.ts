@@ -301,7 +301,7 @@ describe("a license token on resolve-key (real PG + internal route)", () => {
     });
 
     describe("when calls present an unregistered token, a revoked one and one bound elsewhere", () => {
-      /** @scenario Refusals do not reveal whether a license exists */
+      /** @scenario Refusals do not reveal license metadata */
       it("answers with a code and nothing about the customer, the seats or the term", async () => {
         const revoked = await issue(73);
         await registry.revoke({

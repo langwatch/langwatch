@@ -1,3 +1,7 @@
+-- IRREVERSIBLE: no down step. Dropping connectLease discards the signed lease
+-- an install is running on, so its seat allowance stops until the next sync
+-- mints another. Rolling the code back is safe: the column stays unread.
+--
 -- Connected self-hosted (ADR-139, section 6): what a license sync leaves on the
 -- install.
 --

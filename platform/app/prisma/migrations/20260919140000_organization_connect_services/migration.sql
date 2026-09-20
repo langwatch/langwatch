@@ -1,3 +1,7 @@
+-- IRREVERSIBLE: no down step. Dropping connectServices would lose which hosted
+-- services each customer switched on, which nothing else records. Rolling the
+-- code back is safe: the column stays unread and the install sends nothing.
+--
 -- Connected self-hosted (ADR-139): which hosted services an organization has
 -- switched on.
 --

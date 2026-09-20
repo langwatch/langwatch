@@ -244,12 +244,9 @@ describe("a license minted by main before this change", () => {
     });
 
     it("keeps the registry out of every module that validates or enforces a license", () => {
-      const modules = OFFLINE_LICENSE_DIRECTORIES.flatMap((directory) => {
-        const url = new URL(directory, import.meta.url);
-        return readdirSync(url)
-          .filter((name) => name.endsWith(".ts"))
-          .map((name) => new URL(name, url));
-      });
+      const modules = OFFLINE_LICENSE_DIRECTORIES.flatMap((directory) =>
+        modulesUnder(new URL(directory, import.meta.url)),
+      );
       const offenders = modules
         .filter((module) =>
           /from\s+"[^"]*\/registry(\/|")/.test(readFileSync(module, "utf8")),
@@ -371,7 +368,35 @@ describe("an install upgraded with no Connect configuration", () => {
  * the license registry, which lives in its own folder and exists only for
  * LangWatch Cloud.
  */
+/**
+ * Everything that runs inside an install: reading and verifying its license,
+ * and enforcing the numbers that license sold. `connect/install` is on this
+ * list because it too runs inside the install, on the lease a sync left there.
+ */
 const OFFLINE_LICENSE_DIRECTORIES = [
   "../",
+  "../connect/install/",
   "../../../src/server/license-enforcement/",
 ];
+
+/**
+ * The two subtrees that do not run inside an install and are therefore the
+ * only ones allowed to read the registry: the registry itself, and the
+ * LangWatch Cloud side of Connect.
+ */
+const CLOUD_ONLY_DIRECTORIES = new Set(["registry", "connect"]);
+
+/**
+ * Every `.ts` under a directory, nested ones included. A direct listing would
+ * miss a validating or enforcing module one level down, and that module could
+ * reach the registry with this contract still reading green.
+ */
+function modulesUnder(directory: URL): URL[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    if (entry.isDirectory()) {
+      if (CLOUD_ONLY_DIRECTORIES.has(entry.name)) return [];
+      return modulesUnder(new URL(`${entry.name}/`, directory));
+    }
+    return entry.name.endsWith(".ts") ? [new URL(entry.name, directory)] : [];
+  });
+}

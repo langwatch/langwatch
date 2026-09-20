@@ -409,5 +409,4 @@ describe("LicenseRegistryService", () => {
       });
     });
   });
-
 });

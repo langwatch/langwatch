@@ -17,8 +17,14 @@ import type {
   LicenseSeatReportRepository,
 } from "./seatReports";
 
+/**
+ * A transaction client carries the same model methods, so a caller that needs
+ * the row and its own writes to land together passes one in.
+ */
+type RegistryClient = PrismaClient | Prisma.TransactionClient;
+
 export class PrismaIssuedLicenseRepository implements IssuedLicenseRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: RegistryClient) {}
 
   async create(
     data: Omit<IssuedLicenseRecord, "id" | "createdAt" | "updatedAt">,
@@ -138,7 +144,7 @@ export class PrismaIssuedLicenseRepository implements IssuedLicenseRepository {
 }
 
 export class PrismaLicenseSeatReports implements LicenseSeatReportRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: RegistryClient) {}
 
   /**
    * One statement, so two syncs arriving together cannot each read the old
@@ -203,7 +209,7 @@ export class PrismaLicenseSeatReports implements LicenseSeatReportRepository {
 }
 
 export class PrismaCustomerOrganizations implements CustomerOrganizationPort {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly prisma: RegistryClient) {}
 
   async findById(id: string): Promise<{ id: string; name: string } | null> {
     return this.prisma.organization.findUnique({

@@ -1,3 +1,9 @@
+-- IRREVERSIBLE: no down step. Reversing it would drop the connected billing
+-- tables with every true-up intent, statement and invoice reference in them,
+-- which is what says a customer was already invoiced for a quarter. Replaying
+-- against Stripe after such a rollback would invoice twice. Rolling the code
+-- back is safe, the tables stay unread.
+--
 -- Invoice billing for a connected self-hosted customer (ADR-139, section 7).
 --
 -- Additive only: new tables and enums. A self-hosted install gets them and

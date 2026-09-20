@@ -18,7 +18,7 @@ export function IssueDrawer({
   open: boolean;
   onClose: () => void;
 }) {
-  const { form, set } = useIssueForm();
+  const { form, set, reset } = useIssueForm();
   const [issuedKey, setIssuedKey] = useState<string | null>(null);
   const commands = useIssueCommands({
     onIssued: setIssuedKey,
@@ -26,8 +26,10 @@ export function IssueDrawer({
   });
 
   useEffect(() => {
-    if (open) setIssuedKey(null);
-  }, [open]);
+    if (!open) return;
+    reset();
+    setIssuedKey(null);
+  }, [open, reset]);
 
   return (
     <Drawer.Root

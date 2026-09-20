@@ -747,7 +747,6 @@ function redactHeaderValues(headers: readonly unknown[]): unknown[] {
   });
 }
 
-/** The credential string fields this input carries a value for. */
 function credentialStringFieldsIn(record: Record<string, unknown>): string[] {
   return CREDENTIAL_STRING_FIELDS.filter((field) => {
     const value = record[field];
