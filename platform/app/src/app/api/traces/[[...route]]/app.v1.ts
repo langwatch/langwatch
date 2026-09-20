@@ -363,8 +363,12 @@ export function registerTracesRoutes(
       // origin leaves them out and its count is the count the Explorer shows.
       // Naming an origin, in the filter string or the legacy filter map, is
       // the caller choosing origins, and the default steps aside.
+      const originFilter = searchFields.filters?.["traces.origin"];
       const namesOriginFilter =
-        (searchFields.filters?.["traces.origin"]?.length ?? 0) > 0;
+        originFilter !== undefined &&
+        (Array.isArray(originFilter)
+          ? originFilter.length > 0
+          : Object.keys(originFilter).length > 0);
       const filterWhere = withHiddenOrigins(
         compileTraceFilter({
           filter,

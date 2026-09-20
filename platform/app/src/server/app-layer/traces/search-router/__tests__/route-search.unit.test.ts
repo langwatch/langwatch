@@ -60,7 +60,9 @@ class NoModel extends HandledError {
   }
 }
 
-function deps(overrides: Partial<SearchRouterDeps> = {}): SearchRouterDeps & {
+function deps(
+  overrides: Partial<Omit<SearchRouterDeps, "recordDecision">> = {},
+): SearchRouterDeps & {
   recordDecision: Mock<SearchRouterDeps["recordDecision"]>;
 } {
   return {
