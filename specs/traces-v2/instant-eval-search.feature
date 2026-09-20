@@ -226,6 +226,9 @@ Feature: Instant Evals inside the Trace Explorer
       Given a run whose progress moves from 1,000 to 2,000
       When the poll reports the new progress
       Then the list and the facets are refetched
+      And while the run judges the list is read again at most every 2 seconds and the facets at most every 8
+      And a read still in flight is left to finish instead of being started again
+      And when the run ends both are read once more, so the settled numbers are final
 
     @integration
     Scenario: The header count reads the run's counters during a run

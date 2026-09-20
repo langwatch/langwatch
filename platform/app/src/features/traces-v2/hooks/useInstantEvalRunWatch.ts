@@ -3,6 +3,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { isInstantEvalRunActive } from "~/server/app-layer/instant-evals/run/instant-eval-explorer";
 import { api } from "~/utils/api";
 import { useInstantEvalRunStore } from "../stores/instantEvalRunStore";
+import { dueInstantEvalRefetches } from "./instantEvalRefetchPacing";
 import { useInstantEvalRuns } from "./useInstantEvalRuns";
 
 /** How often a judging run is read while it judges, the CLI's own cadence. */
@@ -61,18 +62,44 @@ export function useInstantEvalRunWatch(): void {
   });
 
   // A change of progress means a page of verdicts landed: the table and the
-  // sidebar read the judgements table through the chip, so both refetch.
+  // sidebar read the judgements table through the chip, so both read again,
+  // paced while the run judges (see `instantEvalRefetchPacing`).
   const progressSignature = Object.values(runs)
     .map(
       (run) => `${run.id}:${run.status}:${run.progress}:${run.matched ?? ""}`,
     )
     .join("|");
+  const isAnyRunActive = Object.values(runs).some((run) =>
+    isInstantEvalRunActive(run.status),
+  );
   const previousSignature = useRef(progressSignature);
+  const lastListAt = useRef(Number.NEGATIVE_INFINITY);
+  const lastFacetsAt = useRef(Number.NEGATIVE_INFINITY);
   useEffect(() => {
     if (previousSignature.current === progressSignature) return;
     previousSignature.current = progressSignature;
-    void trpcUtils.tracesV2.list.invalidate();
-    void trpcUtils.tracesV2.sessions.invalidate();
-    void trpcUtils.tracesV2.facets.invalidate();
-  }, [progressSignature, trpcUtils]);
+    const now = Date.now();
+    const due = dueInstantEvalRefetches({
+      now,
+      lastListAt: lastListAt.current,
+      lastFacetsAt: lastFacetsAt.current,
+      isAnyRunActive,
+    });
+    // While a run judges, a read still in flight is left to finish: replacing
+    // it only cancels the request, the server keeps running the query.
+    const options = isAnyRunActive ? { cancelRefetch: false } : undefined;
+    if (due.list) {
+      lastListAt.current = now;
+      void trpcUtils.tracesV2.list.invalidate(undefined, undefined, options);
+      void trpcUtils.tracesV2.sessions.invalidate(
+        undefined,
+        undefined,
+        options,
+      );
+    }
+    if (due.facets) {
+      lastFacetsAt.current = now;
+      void trpcUtils.tracesV2.facets.invalidate(undefined, undefined, options);
+    }
+  }, [progressSignature, isAnyRunActive, trpcUtils]);
 }

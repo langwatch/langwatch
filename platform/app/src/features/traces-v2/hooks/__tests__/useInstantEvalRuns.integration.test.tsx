@@ -11,7 +11,7 @@
  */
 import { renderHook } from "@testing-library/react";
 import { act } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => ({
   list: vi.fn(),
@@ -187,30 +187,90 @@ describe("given a run with total 10,000, progress 3,200 and 412 matched", () => 
 });
 
 describe("given a run whose progress moves", () => {
+  const run = ({
+    progress,
+    status = "running",
+  }: {
+    progress: number;
+    status?: string;
+  }) => ({
+    data: {
+      id: "run-1",
+      status,
+      total: 10_000,
+      progress,
+      matched: 12,
+      failed: 0,
+      skipped: 0,
+      error: null,
+      priceUsd: 0.1,
+    },
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   describe("when the poll reports the new progress", () => {
     /** @scenario "Matches appear as pages finish" */
     it("refetches the list and the facets", () => {
-      const run = (progress: number) => ({
-        data: {
-          id: "run-1",
-          status: "running",
-          total: 10_000,
-          progress,
-          matched: 12,
-          failed: 0,
-          skipped: 0,
-          error: null,
-          priceUsd: 0.1,
-        },
-      });
-      harness.getResults = [run(1_000)];
+      harness.getResults = [run({ progress: 1_000 })];
+      renderHook(() => useInstantEvalRunWatch());
+      expect(harness.invalidate.list).toHaveBeenCalledTimes(1);
+      expect(harness.invalidate.facets).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "Matches appear as pages finish" */
+    it("spaces the reads while the run judges, and leaves a read in flight alone", () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(100_000);
+      harness.getResults = [run({ progress: 1_000 })];
       const { rerender } = renderHook(() => useInstantEvalRunWatch());
       expect(harness.invalidate.list).toHaveBeenCalledTimes(1);
-      harness.getResults = [run(2_000)];
+
+      vi.setSystemTime(101_000);
+      harness.getResults = [run({ progress: 2_000 })];
+      rerender();
+      rerender();
+      expect(harness.invalidate.list).toHaveBeenCalledTimes(1);
+      expect(harness.invalidate.facets).toHaveBeenCalledTimes(1);
+
+      vi.setSystemTime(102_500);
+      harness.getResults = [run({ progress: 3_000 })];
+      rerender();
+      rerender();
+      expect(harness.invalidate.list).toHaveBeenCalledTimes(2);
+      expect(harness.invalidate.list).toHaveBeenLastCalledWith(
+        undefined,
+        undefined,
+        { cancelRefetch: false },
+      );
+      expect(harness.invalidate.facets).toHaveBeenCalledTimes(1);
+
+      vi.setSystemTime(109_000);
+      harness.getResults = [run({ progress: 4_000 })];
+      rerender();
+      rerender();
+      expect(harness.invalidate.facets).toHaveBeenCalledTimes(2);
+    });
+
+    /** @scenario "Matches appear as pages finish" */
+    it("always reads both once more when the run ends", () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(100_000);
+      harness.getResults = [run({ progress: 9_000 })];
+      const { rerender } = renderHook(() => useInstantEvalRunWatch());
+      vi.setSystemTime(100_300);
+      harness.getResults = [run({ progress: 10_000, status: "finished" })];
       rerender();
       rerender();
       expect(harness.invalidate.list).toHaveBeenCalledTimes(2);
       expect(harness.invalidate.facets).toHaveBeenCalledTimes(2);
+      expect(harness.invalidate.facets).toHaveBeenLastCalledWith(
+        undefined,
+        undefined,
+        undefined,
+      );
     });
   });
 });
