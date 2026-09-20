@@ -120,7 +120,13 @@ describe("the back-office license registry surface", () => {
   });
 
   afterEach(() => {
-    process.env.ADMIN_EMAILS = originalAdminEmails;
+    // Assigning an undefined stores the string "undefined", which is a
+    // configured staff list as far as the next test is concerned.
+    if (originalAdminEmails === undefined) {
+      delete process.env.ADMIN_EMAILS;
+    } else {
+      process.env.ADMIN_EMAILS = originalAdminEmails;
+    }
   });
 
   describe("given an organization admin who is not a LangWatch operator", () => {
@@ -199,6 +205,48 @@ describe("the back-office license registry surface", () => {
       expect(JSON.stringify(mockService.issue.mock.calls[0]?.[0])).not.toMatch(
         /BEGIN PRIVATE KEY/,
       );
+    });
+
+    describe("when the registry refuses a command", () => {
+      /** @scenario A refused license command is still recorded */
+      it("records the attempt with the refusal and lets it reach the operator", async () => {
+        mockService.revoke.mockRejectedValueOnce(
+          Object.assign(new Error("already revoked"), {
+            code: "issued_license_not_active",
+          }),
+        );
+        const caller = buildCaller("olive@langwatch.ai");
+
+        await expect(
+          caller.revoke({ id: "il_1", reason: "leaked" }),
+        ).rejects.toThrow();
+
+        expect(mockAuditLog).toHaveBeenCalledWith(
+          expect.objectContaining({
+            action: "licenseRegistry.revoke",
+            targetId: "il_1",
+            error: expect.objectContaining({ message: "already revoked" }),
+          }),
+        );
+      });
+
+      it("keeps a pasted license out of the failure entry too", async () => {
+        mockService.registerLegacy.mockRejectedValueOnce(
+          new Error("license_already_registered"),
+        );
+        const caller = buildCaller("olive@langwatch.ai");
+
+        await expect(
+          caller.registerLegacy({
+            licenseKey: "pasted-license-text",
+            organizationId: "org_acme",
+          }),
+        ).rejects.toThrow();
+
+        expect(JSON.stringify(mockAuditLog.mock.calls)).not.toContain(
+          "pasted-license-text",
+        );
+      });
     });
 
     it("never writes a license key to the audit log", async () => {

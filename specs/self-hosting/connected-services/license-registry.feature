@@ -92,6 +92,12 @@ Feature: License registry
     And it does not hold the key
 
   @unit
+  Scenario: A refused license command is still recorded
+    When the registry refuses a command an operator sent
+    Then the audit trail holds the attempt together with the refusal
+    And the refusal still reaches the operator
+
+  @unit
   Scenario: The same license always maps to the same registry row
     Given a license that was recorded when it was issued
     When the same license is presented with different line wrapping and trailing whitespace

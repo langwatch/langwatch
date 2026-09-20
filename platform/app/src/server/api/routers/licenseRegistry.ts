@@ -44,6 +44,40 @@ function requireOperator(user: { id: string; email?: string | null }): {
   return { userId: user.id };
 }
 
+/**
+ * Runs a license-registry command and, when the service refuses it, records the
+ * attempt before the refusal travels on. A refusal is the half of the trail an
+ * operator most often needs back: the successful audit entry below can name
+ * what the command produced, this one can only name what was asked for.
+ */
+async function audited<T>({
+  operatorId,
+  action,
+  args,
+  targetId,
+  run,
+}: {
+  operatorId: string;
+  action: string;
+  args: Record<string, unknown>;
+  targetId?: string;
+  run: () => Promise<T>;
+}): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    await auditLog({
+      userId: operatorId,
+      action,
+      args,
+      error: error instanceof Error ? error : new Error(String(error)),
+      targetKind: "issuedLicense",
+      ...(targetId === undefined ? {} : { targetId }),
+    });
+    throw error;
+  }
+}
+
 const service = () => createLicenseRegistryService(prisma);
 
 const licenseTarget = z.object({ id: z.string().min(1) });
@@ -131,9 +165,15 @@ export const licenseRegistryRouter = createTRPCRouter({
       const operator = requireOperator(
         ctx.session.user.impersonator ?? ctx.session.user,
       );
-      const result = await service().issue({
-        ...input,
+      const result = await audited({
         operatorId: operator.userId,
+        action: "licenseRegistry.issue",
+        args: {
+          planType: input.planType,
+          maxMembers: input.maxMembers,
+          expiresAt: input.expiresAt.toISOString(),
+        },
+        run: () => service().issue({ ...input, operatorId: operator.userId }),
       });
       await auditLog({
         userId: operator.userId,
@@ -162,9 +202,12 @@ export const licenseRegistryRouter = createTRPCRouter({
       const operator = requireOperator(
         ctx.session.user.impersonator ?? ctx.session.user,
       );
-      const license = await service().registerLegacy({
-        ...input,
+      const license = await audited({
         operatorId: operator.userId,
+        action: "licenseRegistry.registerLegacy",
+        args: { organizationId: input.organizationId },
+        run: () =>
+          service().registerLegacy({ ...input, operatorId: operator.userId }),
       });
       await auditLog({
         userId: operator.userId,
@@ -183,9 +226,12 @@ export const licenseRegistryRouter = createTRPCRouter({
       const operator = requireOperator(
         ctx.session.user.impersonator ?? ctx.session.user,
       );
-      const license = await service().revoke({
-        ...input,
+      const license = await audited({
         operatorId: operator.userId,
+        action: "licenseRegistry.revoke",
+        args: { id: input.id, reason: input.reason },
+        targetId: input.id,
+        run: () => service().revoke({ ...input, operatorId: operator.userId }),
       });
       await auditLog({
         userId: operator.userId,
@@ -212,9 +258,12 @@ export const licenseRegistryRouter = createTRPCRouter({
       const operator = requireOperator(
         ctx.session.user.impersonator ?? ctx.session.user,
       );
-      const result = await service().reissue({
-        ...input,
+      const result = await audited({
         operatorId: operator.userId,
+        action: "licenseRegistry.reissue",
+        args: { replaces: input.id, expiresAt: input.expiresAt.toISOString() },
+        targetId: input.id,
+        run: () => service().reissue({ ...input, operatorId: operator.userId }),
       });
       await auditLog({
         userId: operator.userId,
@@ -237,7 +286,13 @@ export const licenseRegistryRouter = createTRPCRouter({
       const operator = requireOperator(
         ctx.session.user.impersonator ?? ctx.session.user,
       );
-      const license = await service().resetInstanceBinding(input);
+      const license = await audited({
+        operatorId: operator.userId,
+        action: "licenseRegistry.resetInstanceBinding",
+        args: { id: input.id },
+        targetId: input.id,
+        run: () => service().resetInstanceBinding(input),
+      });
       await auditLog({
         userId: operator.userId,
         action: "licenseRegistry.resetInstanceBinding",
@@ -255,9 +310,13 @@ export const licenseRegistryRouter = createTRPCRouter({
       const operator = requireOperator(
         ctx.session.user.impersonator ?? ctx.session.user,
       );
-      const license = await service().updateTerms({
-        ...input,
+      const license = await audited({
         operatorId: operator.userId,
+        action: "licenseRegistry.updateTerms",
+        args: { id: input.id },
+        targetId: input.id,
+        run: () =>
+          service().updateTerms({ ...input, operatorId: operator.userId }),
       });
       const { id, ...terms } = input;
       await auditLog({
@@ -277,9 +336,16 @@ export const licenseRegistryRouter = createTRPCRouter({
       const operator = requireOperator(
         ctx.session.user.impersonator ?? ctx.session.user,
       );
-      const license = await service().linkToOrganization({
-        ...input,
+      const license = await audited({
         operatorId: operator.userId,
+        action: "licenseRegistry.linkToOrganization",
+        args: { id: input.id, organizationId: input.organizationId },
+        targetId: input.id,
+        run: () =>
+          service().linkToOrganization({
+            ...input,
+            operatorId: operator.userId,
+          }),
       });
       await auditLog({
         userId: operator.userId,

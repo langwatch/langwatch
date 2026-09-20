@@ -202,6 +202,128 @@ function nullIfEmpty(raw: string): string | null {
   return raw.trim() === "" ? null : raw;
 }
 
+type SetOrganizationField = <K extends keyof FormState>(
+  key: K,
+  value: FormState[K],
+) => void;
+
+/**
+ * What the operator actually changed. Credentials and the license key are
+ * write-only: the form starts them empty because the server never echoes the
+ * stored value, so an empty input means leave it alone rather than clear it.
+ */
+interface FormDiff {
+  form: FormState;
+  organization: AdminOrganization;
+}
+
+/**
+ * What the operator actually changed, one section at a time. Credentials and
+ * the license key are write-only: the form starts them empty because the server
+ * never echoes the stored value, so an empty input means leave it alone rather
+ * than clear it.
+ */
+function changedOrganizationFields(diff: FormDiff): Record<string, unknown> {
+  return {
+    ...changedIdentityFields(diff),
+    ...changedBillingFields(diff),
+    ...changedLicenseFields(diff),
+    ...changedStorageFields(diff),
+  };
+}
+
+function changedIdentityFields({
+  form,
+  organization,
+}: FormDiff): Record<string, unknown> {
+  const data: Record<string, unknown> = {};
+  if (form.name !== organization.name) data.name = form.name;
+  if (form.slug !== organization.slug) data.slug = form.slug;
+  if (form.phoneNumber !== (organization.phoneNumber ?? ""))
+    data.phoneNumber = nullIfEmpty(form.phoneNumber);
+  // No `ssoDomain` / `ssoProvider` diff: this drawer no longer edits them,
+  // so it can no longer send them. The server refuses such a write once
+  // connection routing is enforced; not sending one is how this surface
+  // stops asking for a refusal.
+  return data;
+}
+
+function changedBillingFields({
+  form,
+  organization,
+}: FormDiff): Record<string, unknown> {
+  const data: Record<string, unknown> = {};
+  const nextLimit = numOrNull(form.usageSpendingMaxLimit);
+  if (nextLimit !== organization.usageSpendingMaxLimit) {
+    data.usageSpendingMaxLimit = nextLimit;
+  }
+  if (form.signedDPA !== !!organization.signedDPA)
+    data.signedDPA = form.signedDPA;
+  if (form.promoCode !== (organization.promoCode ?? ""))
+    data.promoCode = nullIfEmpty(form.promoCode);
+  if (form.stripeCustomerId !== (organization.stripeCustomerId ?? ""))
+    data.stripeCustomerId = nullIfEmpty(form.stripeCustomerId);
+  if (form.currency !== organization.currency) data.currency = form.currency;
+  if (form.pricingModel !== organization.pricingModel)
+    data.pricingModel = form.pricingModel;
+  return data;
+}
+
+function changedLicenseFields({
+  form,
+  organization,
+}: FormDiff): Record<string, unknown> {
+  const data: Record<string, unknown> = {};
+  if (form.license.trim() !== "") data.license = form.license.trim();
+  const nextExpires = dateInputToISO(form.licenseExpiresAt);
+  if (nextExpires !== organization.licenseExpiresAt) {
+    data.licenseExpiresAt = nextExpires;
+  }
+  return data;
+}
+
+function changedStorageFields({
+  form,
+  organization,
+}: FormDiff): Record<string, unknown> {
+  const data: Record<string, unknown> = {};
+  if (form.useCustomS3 !== !!organization.useCustomS3)
+    data.useCustomS3 = form.useCustomS3;
+  if (form.s3Endpoint.trim() !== "") data.s3Endpoint = form.s3Endpoint;
+  if (form.s3AccessKeyId.trim() !== "") data.s3AccessKeyId = form.s3AccessKeyId;
+  if (form.s3SecretAccessKey.trim() !== "")
+    data.s3SecretAccessKey = form.s3SecretAccessKey;
+  if (form.s3Bucket.trim() !== "") data.s3Bucket = form.s3Bucket;
+  return data;
+}
+
+function emptyOrganizationForm(organization: AdminOrganization): FormState {
+  return {
+    name: organization.name ?? "",
+    slug: organization.slug ?? "",
+    phoneNumber: organization.phoneNumber ?? "",
+    usageSpendingMaxLimit: organization.usageSpendingMaxLimit?.toString() ?? "",
+    signedDPA: !!organization.signedDPA,
+    promoCode: organization.promoCode ?? "",
+    stripeCustomerId: organization.stripeCustomerId ?? "",
+    currency: organization.currency,
+    pricingModel: organization.pricingModel,
+    // A license key is credential material (a connected install derives its
+    // token from it), so like the S3 fields below it is write-only.
+    license: "",
+    licenseExpiresAt: toDateInputValue(organization.licenseExpiresAt),
+    useCustomS3: !!organization.useCustomS3,
+    // Credentials are write-only: the server doesn't echo them back in
+    // list/getOne responses (see ee/admin/safeSelects.ts), so the form
+    // always starts empty. A non-empty value on save is the user typing
+    // a *new* secret; an empty value is left unchanged.
+    s3Endpoint: "",
+    s3AccessKeyId: "",
+    s3SecretAccessKey: "",
+    s3Bucket: "",
+  };
+}
+
 function OrganizationEditDrawer({
   organization,
   onClose,
@@ -214,77 +336,15 @@ function OrganizationEditDrawer({
 
   useEffect(() => {
     if (!organization) return;
-    setForm({
-      name: organization.name ?? "",
-      slug: organization.slug ?? "",
-      phoneNumber: organization.phoneNumber ?? "",
-      usageSpendingMaxLimit:
-        organization.usageSpendingMaxLimit?.toString() ?? "",
-      signedDPA: !!organization.signedDPA,
-      promoCode: organization.promoCode ?? "",
-      stripeCustomerId: organization.stripeCustomerId ?? "",
-      currency: organization.currency,
-      pricingModel: organization.pricingModel,
-      // A license key is credential material (a connected install derives its
-      // token from it), so like the S3 fields below it is write-only.
-      license: "",
-      licenseExpiresAt: toDateInputValue(organization.licenseExpiresAt),
-      useCustomS3: !!organization.useCustomS3,
-      // Credentials are write-only: the server doesn't echo them back in
-      // list/getOne responses (see ee/admin/safeSelects.ts), so the form
-      // always starts empty. A non-empty value on save is the user typing
-      // a *new* secret; an empty value is left unchanged.
-      s3Endpoint: "",
-      s3AccessKeyId: "",
-      s3SecretAccessKey: "",
-      s3Bucket: "",
-    });
+    setForm(emptyOrganizationForm(organization));
   }, [organization]);
 
-  const setField = <K extends keyof FormState>(key: K, value: FormState[K]) =>
+  const setField: SetOrganizationField = (key, value) =>
     setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
 
   const handleSave = () => {
     if (!organization || !form) return;
-    const data: Record<string, unknown> = {};
-    if (form.name !== organization.name) data.name = form.name;
-    if (form.slug !== organization.slug) data.slug = form.slug;
-    if (form.phoneNumber !== (organization.phoneNumber ?? ""))
-      data.phoneNumber = nullIfEmpty(form.phoneNumber);
-    // No `ssoDomain` / `ssoProvider` diff: this drawer no longer edits them,
-    // so it can no longer send them. The server refuses such a write once
-    // connection routing is enforced; not sending one is how this surface
-    // stops asking for a refusal.
-    const nextLimit = numOrNull(form.usageSpendingMaxLimit);
-    if (nextLimit !== organization.usageSpendingMaxLimit) {
-      data.usageSpendingMaxLimit = nextLimit;
-    }
-    if (form.signedDPA !== !!organization.signedDPA)
-      data.signedDPA = form.signedDPA;
-    if (form.promoCode !== (organization.promoCode ?? ""))
-      data.promoCode = nullIfEmpty(form.promoCode);
-    if (form.stripeCustomerId !== (organization.stripeCustomerId ?? ""))
-      data.stripeCustomerId = nullIfEmpty(form.stripeCustomerId);
-    if (form.currency !== organization.currency) data.currency = form.currency;
-    if (form.pricingModel !== organization.pricingModel)
-      data.pricingModel = form.pricingModel;
-    if (form.license.trim() !== "") data.license = form.license.trim();
-    const nextExpires = dateInputToISO(form.licenseExpiresAt);
-    if (nextExpires !== organization.licenseExpiresAt) {
-      data.licenseExpiresAt = nextExpires;
-    }
-    if (form.useCustomS3 !== !!organization.useCustomS3)
-      data.useCustomS3 = form.useCustomS3;
-    // Credentials are write-only — the form starts empty and the server
-    // never echoes the stored value. Only forward fields the user typed
-    // into; an empty input is treated as "leave the stored secret alone".
-    if (form.s3Endpoint.trim() !== "") data.s3Endpoint = form.s3Endpoint;
-    if (form.s3AccessKeyId.trim() !== "")
-      data.s3AccessKeyId = form.s3AccessKeyId;
-    if (form.s3SecretAccessKey.trim() !== "")
-      data.s3SecretAccessKey = form.s3SecretAccessKey;
-    if (form.s3Bucket.trim() !== "") data.s3Bucket = form.s3Bucket;
-
+    const data = changedOrganizationFields({ form, organization });
     if (Object.keys(data).length === 0) {
       onClose();
       return;
@@ -325,181 +385,11 @@ function OrganizationEditDrawer({
         <Drawer.Body>
           {organization && form && (
             <VStack gap={4} align="stretch">
-              <SectionHeading>Identity</SectionHeading>
-              <Field.Root>
-                <Field.Label>Name</Field.Label>
-                <Input
-                  value={form.name}
-                  onChange={(e) => setField("name", e.target.value)}
-                />
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>Slug</Field.Label>
-                <Input
-                  value={form.slug}
-                  onChange={(e) => setField("slug", e.target.value)}
-                />
-                <Field.HelperText>
-                  URL-safe identifier. Changing this can break existing links.
-                </Field.HelperText>
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>Phone number</Field.Label>
-                <Input
-                  type="tel"
-                  value={form.phoneNumber}
-                  onChange={(e) => setField("phoneNumber", e.target.value)}
-                />
-              </Field.Root>
-
-              <SectionHeading>Billing</SectionHeading>
-              <HStack gap={3} align="start">
-                <Field.Root>
-                  <Field.Label>Currency</Field.Label>
-                  <EnumSelect
-                    value={form.currency}
-                    options={Object.values(Currency)}
-                    onChange={(v) => setField("currency", v as Currency)}
-                  />
-                </Field.Root>
-                <Field.Root>
-                  <Field.Label>Pricing model</Field.Label>
-                  <EnumSelect
-                    value={form.pricingModel}
-                    options={Object.values(PricingModel)}
-                    onChange={(v) =>
-                      setField("pricingModel", v as PricingModel)
-                    }
-                  />
-                </Field.Root>
-              </HStack>
-              <Field.Root>
-                <Field.Label>Stripe customer ID</Field.Label>
-                <Input
-                  value={form.stripeCustomerId}
-                  onChange={(e) => setField("stripeCustomerId", e.target.value)}
-                />
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>Promo code</Field.Label>
-                <Input
-                  value={form.promoCode}
-                  onChange={(e) => setField("promoCode", e.target.value)}
-                />
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>Usage spending max limit</Field.Label>
-                <Input
-                  type="number"
-                  value={form.usageSpendingMaxLimit}
-                  onChange={(e) =>
-                    setField("usageSpendingMaxLimit", e.target.value)
-                  }
-                  placeholder="Leave empty for no cap"
-                />
-              </Field.Root>
-              <ToggleRow
-                label="Signed DPA"
-                hint="Enterprise data processing agreement on file."
-                checked={form.signedDPA}
-                onChange={(v) => setField("signedDPA", v)}
-              />
-
-              <SectionHeading>Authentication</SectionHeading>
-              {/*
-                The two free-text single sign-on fields used to live here.
-                They are gone rather than disabled: a connection is a guarded
-                lifecycle with history, and an input that writes a string
-                cannot express claiming a domain, approving that claim, or
-                vouching for it. Editing them is refused once connection
-                routing is enforced, so leaving them here would have offered a
-                control whose only answer is a refusal.
-              */}
-              <Text fontSize="sm" color="fg.muted">
-                Single sign-on for this organization is set up on its
-                connection, under Backoffice &rarr; Single Sign-On.
-              </Text>
-
-              <SectionHeading>License</SectionHeading>
-              <Field.Root>
-                <Field.Label>License key</Field.Label>
-                <Textarea
-                  rows={4}
-                  value={form.license}
-                  onChange={(e) => setField("license", e.target.value)}
-                  placeholder="Paste a license to replace the current one. The stored key is never shown here."
-                  fontFamily="mono"
-                  fontSize="xs"
-                />
-                <Field.HelperText>
-                  Leave empty to keep the current license. Issue and manage
-                  licenses under Backoffice, Licenses.
-                </Field.HelperText>
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>License expires at</Field.Label>
-                <Input
-                  type="date"
-                  value={form.licenseExpiresAt}
-                  onChange={(e) => setField("licenseExpiresAt", e.target.value)}
-                />
-              </Field.Root>
-
-              <SectionHeading>Custom S3</SectionHeading>
-              <Text fontSize="xs" color="fg.muted">
-                Credentials below are write-only — the server never reads them
-                back. Leave blank to keep the stored value; type to replace.
-              </Text>
-              <ToggleRow
-                label="Use custom S3"
-                hint="Store large blobs (datasets, uploads) in the tenant's own bucket."
-                checked={form.useCustomS3}
-                onChange={(v) => setField("useCustomS3", v)}
-              />
-              <Field.Root>
-                <Field.Label>Endpoint</Field.Label>
-                <Input
-                  type="url"
-                  value={form.s3Endpoint}
-                  onChange={(e) => setField("s3Endpoint", e.target.value)}
-                  placeholder="Leave blank to keep current"
-                  disabled={!form.useCustomS3}
-                />
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>Bucket</Field.Label>
-                <Input
-                  value={form.s3Bucket}
-                  onChange={(e) => setField("s3Bucket", e.target.value)}
-                  placeholder="Leave blank to keep current"
-                  disabled={!form.useCustomS3}
-                />
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>Access key ID</Field.Label>
-                <Input
-                  type="password"
-                  value={form.s3AccessKeyId}
-                  onChange={(e) => setField("s3AccessKeyId", e.target.value)}
-                  placeholder="Leave blank to keep current"
-                  disabled={!form.useCustomS3}
-                  autoComplete="new-password"
-                />
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>Secret access key</Field.Label>
-                <Input
-                  type="password"
-                  value={form.s3SecretAccessKey}
-                  onChange={(e) =>
-                    setField("s3SecretAccessKey", e.target.value)
-                  }
-                  placeholder="Leave blank to keep current"
-                  autoComplete="new-password"
-                  disabled={!form.useCustomS3}
-                />
-              </Field.Root>
-
+              <IdentityFields form={form} setField={setField} />
+              <BillingFields form={form} setField={setField} />
+              <AuthenticationSection />
+              <LicenseFields form={form} setField={setField} />
+              <CustomS3Fields form={form} setField={setField} />
               <Separator my={2} />
               <VStack align="start" gap={0}>
                 <Text fontSize="xs" color="fg.muted">
@@ -525,6 +415,210 @@ function OrganizationEditDrawer({
         </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+interface SectionProps {
+  form: FormState;
+  setField: SetOrganizationField;
+}
+
+function IdentityFields({ form, setField }: SectionProps) {
+  return (
+    <>
+      <SectionHeading>Identity</SectionHeading>
+      <Field.Root>
+        <Field.Label>Name</Field.Label>
+        <Input
+          value={form.name}
+          onChange={(e) => setField("name", e.target.value)}
+        />
+      </Field.Root>
+      <Field.Root>
+        <Field.Label>Slug</Field.Label>
+        <Input
+          value={form.slug}
+          onChange={(e) => setField("slug", e.target.value)}
+        />
+        <Field.HelperText>
+          URL-safe identifier. Changing this can break existing links.
+        </Field.HelperText>
+      </Field.Root>
+      <Field.Root>
+        <Field.Label>Phone number</Field.Label>
+        <Input
+          type="tel"
+          value={form.phoneNumber}
+          onChange={(e) => setField("phoneNumber", e.target.value)}
+        />
+      </Field.Root>
+    </>
+  );
+}
+
+function BillingFields({ form, setField }: SectionProps) {
+  return (
+    <>
+      <SectionHeading>Billing</SectionHeading>
+      <HStack gap={3} align="start">
+        <Field.Root>
+          <Field.Label>Currency</Field.Label>
+          <EnumSelect
+            value={form.currency}
+            options={Object.values(Currency)}
+            onChange={(v) => setField("currency", v as Currency)}
+          />
+        </Field.Root>
+        <Field.Root>
+          <Field.Label>Pricing model</Field.Label>
+          <EnumSelect
+            value={form.pricingModel}
+            options={Object.values(PricingModel)}
+            onChange={(v) => setField("pricingModel", v as PricingModel)}
+          />
+        </Field.Root>
+      </HStack>
+      <Field.Root>
+        <Field.Label>Stripe customer ID</Field.Label>
+        <Input
+          value={form.stripeCustomerId}
+          onChange={(e) => setField("stripeCustomerId", e.target.value)}
+        />
+      </Field.Root>
+      <Field.Root>
+        <Field.Label>Promo code</Field.Label>
+        <Input
+          value={form.promoCode}
+          onChange={(e) => setField("promoCode", e.target.value)}
+        />
+      </Field.Root>
+      <Field.Root>
+        <Field.Label>Usage spending max limit</Field.Label>
+        <Input
+          type="number"
+          value={form.usageSpendingMaxLimit}
+          onChange={(e) => setField("usageSpendingMaxLimit", e.target.value)}
+          placeholder="Leave empty for no cap"
+        />
+      </Field.Root>
+      <ToggleRow
+        label="Signed DPA"
+        hint="Enterprise data processing agreement on file."
+        checked={form.signedDPA}
+        onChange={(v) => setField("signedDPA", v)}
+      />
+    </>
+  );
+}
+
+function AuthenticationSection() {
+  return (
+    <>
+      <SectionHeading>Authentication</SectionHeading>
+      {/*
+        The two free-text single sign-on fields used to live here.
+        They are gone rather than disabled: a connection is a guarded
+        lifecycle with history, and an input that writes a string
+        cannot express claiming a domain, approving that claim, or
+        vouching for it. Editing them is refused once connection
+        routing is enforced, so leaving them here would have offered a
+        control whose only answer is a refusal.
+      */}
+      <Text fontSize="sm" color="fg.muted">
+        Single sign-on for this organization is set up on its connection, under
+        Backoffice &rarr; Single Sign-On.
+      </Text>
+    </>
+  );
+}
+
+function LicenseFields({ form, setField }: SectionProps) {
+  return (
+    <>
+      <SectionHeading>License</SectionHeading>
+      <Field.Root>
+        <Field.Label>License key</Field.Label>
+        <Textarea
+          rows={4}
+          value={form.license}
+          onChange={(e) => setField("license", e.target.value)}
+          placeholder="Paste a license to replace the current one. The stored key is never shown here."
+          fontFamily="mono"
+          fontSize="xs"
+        />
+        <Field.HelperText>
+          Leave empty to keep the current license. Issue and manage licenses
+          under Backoffice, Licenses.
+        </Field.HelperText>
+      </Field.Root>
+      <Field.Root>
+        <Field.Label>License expires at</Field.Label>
+        <Input
+          type="date"
+          value={form.licenseExpiresAt}
+          onChange={(e) => setField("licenseExpiresAt", e.target.value)}
+        />
+      </Field.Root>
+    </>
+  );
+}
+
+function CustomS3Fields({ form, setField }: SectionProps) {
+  return (
+    <>
+      <SectionHeading>Custom S3</SectionHeading>
+      <Text fontSize="xs" color="fg.muted">
+        Credentials below are write-only: the server never reads them back.
+        Leave blank to keep the stored value; type to replace.
+      </Text>
+      <ToggleRow
+        label="Use custom S3"
+        hint="Store large blobs (datasets, uploads) in the tenant's own bucket."
+        checked={form.useCustomS3}
+        onChange={(v) => setField("useCustomS3", v)}
+      />
+      <Field.Root>
+        <Field.Label>Endpoint</Field.Label>
+        <Input
+          type="url"
+          value={form.s3Endpoint}
+          onChange={(e) => setField("s3Endpoint", e.target.value)}
+          placeholder="Leave blank to keep current"
+          disabled={!form.useCustomS3}
+        />
+      </Field.Root>
+      <Field.Root>
+        <Field.Label>Bucket</Field.Label>
+        <Input
+          value={form.s3Bucket}
+          onChange={(e) => setField("s3Bucket", e.target.value)}
+          placeholder="Leave blank to keep current"
+          disabled={!form.useCustomS3}
+        />
+      </Field.Root>
+      <Field.Root>
+        <Field.Label>Access key ID</Field.Label>
+        <Input
+          type="password"
+          value={form.s3AccessKeyId}
+          onChange={(e) => setField("s3AccessKeyId", e.target.value)}
+          placeholder="Leave blank to keep current"
+          disabled={!form.useCustomS3}
+          autoComplete="new-password"
+        />
+      </Field.Root>
+      <Field.Root>
+        <Field.Label>Secret access key</Field.Label>
+        <Input
+          type="password"
+          value={form.s3SecretAccessKey}
+          onChange={(e) => setField("s3SecretAccessKey", e.target.value)}
+          placeholder="Leave blank to keep current"
+          autoComplete="new-password"
+          disabled={!form.useCustomS3}
+        />
+      </Field.Root>
+    </>
   );
 }
 
