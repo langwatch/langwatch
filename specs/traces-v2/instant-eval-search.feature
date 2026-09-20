@@ -164,6 +164,7 @@ Feature: Instant Evals inside the Trace Explorer
       Then a dialog shows the question as understood, the rows and the estimated cost
       And "Run" starts the run
       And "Search the words instead" applies the phrase search
+      And the criteria are shown as the classifier wrote them, one under Yes and one under No
 
     @integration
     Scenario: A target that differs from the lens default is written on the chip

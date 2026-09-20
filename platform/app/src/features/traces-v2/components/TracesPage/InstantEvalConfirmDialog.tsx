@@ -64,10 +64,23 @@ export const InstantEvalConfirmDialog: React.FC<
                   {confirmation.question}
                 </Text>
                 {confirmation.criteria && (
-                  <Text textStyle="xs" color="fg.muted">
-                    Yes when {confirmation.criteria[0]}. No when{" "}
-                    {confirmation.criteria[1]}.
-                  </Text>
+                  // The criteria are shown as the classifier wrote them. They
+                  // arrive as whole sentences as often as fragments, so they
+                  // are not folded into a sentence of the dialog's own.
+                  <VStack align="stretch" gap={0.5}>
+                    <Text textStyle="xs" color="fg.muted">
+                      <Text as="span" fontWeight="medium">
+                        Yes:
+                      </Text>{" "}
+                      {confirmation.criteria[0]}
+                    </Text>
+                    <Text textStyle="xs" color="fg.muted">
+                      <Text as="span" fontWeight="medium">
+                        No:
+                      </Text>{" "}
+                      {confirmation.criteria[1]}
+                    </Text>
+                  </VStack>
                 )}
               </VStack>
               <HStack gap={6}>

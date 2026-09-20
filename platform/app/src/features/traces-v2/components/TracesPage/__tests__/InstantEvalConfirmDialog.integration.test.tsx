@@ -60,3 +60,38 @@ describe("given an estimate of 2.40 USD over 12,000 rows", () => {
     });
   });
 });
+
+describe("given criteria the classifier wrote as whole sentences", () => {
+  describe("when the dialog opens", () => {
+    /** @scenario "An estimate of half a dollar or more asks first" */
+    it("shows each criterion as written, under its answer", () => {
+      render(
+        <InstantEvalConfirmDialog
+          confirmation={{
+            question: "Does the user express frustration?",
+            criteria: [
+              "The user complains or repeats a request with emphasis.",
+              "The user stays neutral or satisfied throughout.",
+            ],
+            rows: 5_678,
+            isRowsCapped: false,
+            priceUsd: 0.53,
+          }}
+          isStarting={false}
+          onRun={vi.fn()}
+          onSearchWords={vi.fn()}
+          onClose={vi.fn()}
+        />,
+        { wrapper },
+      );
+      const dialog = screen.getByRole("dialog");
+      expect(dialog).toHaveTextContent(
+        "Yes: The user complains or repeats a request with emphasis.",
+      );
+      expect(dialog).toHaveTextContent(
+        "No: The user stays neutral or satisfied throughout.",
+      );
+      expect(dialog.textContent).not.toContain("..");
+    });
+  });
+});
