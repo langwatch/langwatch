@@ -107,11 +107,16 @@ function rowFromSignedLicense(
 }
 
 /**
- * Whether a unique violation is the one on this column. Prisma reports it in
- * `meta.target`, sometimes as the column and sometimes as the index built over
- * it, so the column name is looked for inside each entry rather than compared.
- * A client that names nothing answers false, which leaves the caller with the
- * refusal that fits every constraint on this table but one.
+ * Whether a unique violation is the one on this column.
+ *
+ * Where the constraint is reported moves with the client: Prisma 7 on a driver
+ * adapter puts it under `meta.driverAdapterError.cause.constraint.fields` and
+ * in the message of that cause, older clients put it in `meta.target`, and the
+ * name is sometimes the column and sometimes the index built over it. All of
+ * them spell the column, so the column is looked for in the whole report rather
+ * than at a path that changes. A client that reports nothing answers false,
+ * which leaves the caller with the refusal that fits every constraint on this
+ * table but one.
  */
 export function violationNames({
   error,
@@ -121,15 +126,13 @@ export function violationNames({
   column: string;
 }): boolean {
   if (!isUniqueViolation(error)) return false;
-  const target = (error as { meta?: { target?: unknown } }).meta?.target;
-  const names = Array.isArray(target)
-    ? target
-    : typeof target === "string"
-      ? [target]
-      : [];
-  return names.some(
-    (name) => typeof name === "string" && name.includes(column),
-  );
+  const { meta } = error as { meta?: unknown };
+  if (meta === undefined) return false;
+  try {
+    return JSON.stringify(meta)?.includes(column) ?? false;
+  } catch {
+    return false;
+  }
 }
 
 /** Prisma's unique constraint violation, without importing Prisma here. */

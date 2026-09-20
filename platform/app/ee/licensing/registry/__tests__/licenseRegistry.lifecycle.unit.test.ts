@@ -192,17 +192,36 @@ describe("LicenseRegistryService", () => {
 
     describe("when a reissue loses to a unique constraint", () => {
       /** @scenario A reissue names the constraint the table refused it on */
+      // Where a client reports the constraint: `meta.target` as the column or
+      // as the index over it, and Prisma 7 on a driver adapter.
+      const reports = {
+        column: (name: string) => ({ target: [name] }),
+        index: (name: string) => ({ target: [`IssuedLicense_${name}_key`] }),
+        driverAdapter: (name: string) => ({
+          modelName: "IssuedLicense",
+          driverAdapterError: {
+            name: "DriverAdapterError",
+            cause: {
+              originalCode: "23505",
+              kind: "UniqueConstraintViolation",
+              constraint: { fields: [`"${name}"`] },
+            },
+          },
+        }),
+      };
+
       it.each([
-        ["replacesId", "license_already_reissued"],
-        ["IssuedLicense_replacesId_key", "license_already_reissued"],
-        ["tokenHash", "license_already_registered"],
-        ["licenseId", "license_already_registered"],
-      ] as const)("refuses a %s clash as %s", async (column, code) => {
+        ["replacesId", "column", "license_already_reissued"],
+        ["replacesId", "index", "license_already_reissued"],
+        ["replacesId", "driverAdapter", "license_already_reissued"],
+        ["tokenHash", "column", "license_already_registered"],
+        ["licenseId", "driverAdapter", "license_already_registered"],
+      ] as const)("refuses a %s clash reported as %s with %s", async (column, shape, code) => {
         const { license } = await context.service.issue(issueInput(acme));
         vi.spyOn(context.repository, "create").mockRejectedValueOnce(
           Object.assign(new Error("unique violation"), {
             code: "P2002",
-            meta: { target: [column] },
+            meta: reports[shape](column),
           }),
         );
 
