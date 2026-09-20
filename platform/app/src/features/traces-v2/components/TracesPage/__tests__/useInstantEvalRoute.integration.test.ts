@@ -161,6 +161,53 @@ describe("given the router handed over a question", () => {
     });
   });
 
+  describe("when the bar already carries an eval chip", () => {
+    /** @scenario "A second question judges the same rows as the first" */
+    it("judges the scope without the first chip and keeps both chips in the bar", () => {
+      const { result } = renderHook(() => useInstantEvalRoute());
+      act(() =>
+        result.current.onInstantEvalRoute({
+          ...payload,
+          question: {
+            instructions: "the user asked twice",
+            criteria: ["the user repeats", "the user asks once"],
+          },
+          otherQuery: 'service:api AND eval:"the user is annoyed"',
+        }),
+      );
+
+      // The scope is the rows the first run judged, not its verdicts: the
+      // server holds no run for a chip it is being asked to compile.
+      expect(lastCall(mutations.estimate).input).toMatchObject({
+        filter: "service:api",
+      });
+      act(() =>
+        lastCall(mutations.estimate).options.onSuccess?.(estimateOf(0.1)),
+      );
+      expect(lastCall(mutations.start).input).toMatchObject({
+        filter: "service:api",
+      });
+      act(() =>
+        lastCall(mutations.start).options.onSuccess?.({
+          id: "run-3",
+          status: "queued",
+        }),
+      );
+
+      expect(useExplorerStore.getState().queryText).toBe(
+        'service:api AND eval:"the user is annoyed" AND eval:"the user asked twice"',
+      );
+      expect(useExplorerStore.getState().evalRuns).toEqual({
+        [instantEvalRunKey({
+          question: "the user asked twice",
+          target: "traces",
+          otherQuery: "service:api",
+          window: { from: 1_000, to: 2_000, presetId: "7d" },
+        })]: "run-3",
+      });
+    });
+  });
+
   describe("when the estimate is half a dollar or more", () => {
     /** @scenario "An estimate of half a dollar or more asks first" */
     it("opens the dialog, and Run starts while the other button searches the words", () => {

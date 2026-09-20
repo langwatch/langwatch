@@ -187,6 +187,13 @@ Feature: Instant Evals inside the Trace Explorer
       Then the chip is `eval.trace:"<question>"`
 
     @integration
+    Scenario: A second question judges the same rows as the first
+      Given the bar already carries an eval chip
+      When a second question starts a run
+      Then the run judges the query without either eval chip
+      And both chips stay in the bar, so a row must pass both
+
+    @integration
     Scenario: A run already registered for the scope is reused
       Given a run registered under the key the payload would compute
       When the Explorer receives the payload

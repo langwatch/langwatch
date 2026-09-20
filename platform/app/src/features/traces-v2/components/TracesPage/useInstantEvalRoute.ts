@@ -92,12 +92,21 @@ interface PendingRoute {
   key: string;
 }
 
-/** The run request the estimate and the start both send. */
+/**
+ * The run request the estimate and the start both send.
+ *
+ * The eval chips already in the bar are left out of the scope. A second
+ * question judges the same rows the first one did, and the two chips
+ * intersect when the list is read; sending the first chip as part of the
+ * filter would ask the server to compile a judgement it has no run for. The
+ * run key is computed over the same stripped filter, so a run found again is
+ * the run this input would have started.
+ */
 function runInput(payload: InstantEvalRoutePayload) {
   return {
     projectId: payload.projectId,
     target: payload.target,
-    filter: payload.otherQuery,
+    filter: queryWithoutInstantEvalChips(payload.otherQuery),
     window: { from: payload.timeRange.from, to: payload.timeRange.to },
     question: {
       instructions: payload.question.instructions,
