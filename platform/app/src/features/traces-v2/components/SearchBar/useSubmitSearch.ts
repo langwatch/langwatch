@@ -14,7 +14,7 @@ import type { InstantEvalRoutePayload } from "../TracesPage/useInstantEvalRoute"
 
 interface UseSubmitSearchOptions {
   /** Whether the Langy route is open to this user. */
-  langyAvailable: boolean;
+  isLangyAvailable: boolean;
   /** Sample data is client fixtures; a routed search has nothing to run on. */
   isSamplePreview: boolean;
   /** Hands the sentence to Langy as a question. */
@@ -63,7 +63,7 @@ function useApplyRoute({
           return;
         case "free_text":
           applyQueryText(result.query);
-          if (result.modelUnavailable) onModelUnavailable();
+          if (result.isModelUnavailable) onModelUnavailable();
           return;
         case "langy":
           onLangy(result.question);
@@ -103,7 +103,7 @@ function useApplyRoute({
  * Spec: specs/traces-v2/search.feature ("Enter routes a sentence").
  */
 export function useSubmitSearch({
-  langyAvailable,
+  isLangyAvailable,
   isSamplePreview,
   onLangy,
   onInstantEval,
@@ -153,7 +153,7 @@ export function useSubmitSearch({
           timeRange: range,
           activeQuery: queryText,
           lensId: useExplorerStore.getState().activeLensId,
-          langyAvailable,
+          isLangyAvailable,
           ...(options?.forceKind ? { forceKind: options.forceKind } : {}),
         },
         {
@@ -172,7 +172,7 @@ export function useSubmitSearch({
       applyQueryText,
       applyRoute,
       isSamplePreview,
-      langyAvailable,
+      isLangyAvailable,
       project?.id,
       routeSearch,
     ],

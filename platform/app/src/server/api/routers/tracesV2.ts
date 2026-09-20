@@ -1556,7 +1556,7 @@ export const tracesV2Router = createTRPCRouter({
         timeRange: timeRangeSchema,
         activeQuery: z.string().max(2000).default(""),
         lensId: z.string().max(200).optional(),
-        langyAvailable: z.boolean().optional(),
+        isLangyAvailable: z.boolean().optional(),
         // The page re-running a search it already routed once names the
         // route, so the answer cannot land somewhere else this time.
         forceKind: z.enum(SEARCH_ROUTE_KINDS).optional(),
@@ -1570,7 +1570,7 @@ export const tracesV2Router = createTRPCRouter({
         timeRange: { from: input.timeRange.from, to: input.timeRange.to },
         activeQuery: input.activeQuery,
         lensId: input.lensId,
-        langyAvailable: input.langyAvailable,
+        isLangyAvailable: input.isLangyAvailable,
         forceKind: input.forceKind,
       });
     }),

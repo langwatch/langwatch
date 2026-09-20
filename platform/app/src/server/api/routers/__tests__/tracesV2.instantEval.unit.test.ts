@@ -11,7 +11,10 @@ import {
   toInstantEvalExplorerRun,
 } from "~/server/app-layer/instant-evals/run/instant-eval-explorer";
 import type { InstantEvalRunRow } from "~/server/app-layer/instant-evals/run/instant-eval-run.repository";
-import { toExplorerRunInput } from "../tracesV2.instantEval";
+import {
+  explorerInstantEvalRunSchema,
+  toExplorerRunInput,
+} from "../tracesV2.instantEval";
 
 describe("given the Explorer's request", () => {
   describe("when it is turned into the run service's input", () => {
@@ -71,6 +74,23 @@ describe("given the Explorer's request", () => {
       expect(input.shorthand?.filter).toBe(
         "origin:langy OR origin:application",
       );
+    });
+  });
+
+  describe("when a window bound is past what a date can represent", () => {
+    /** @scenario "A window outside the calendar range is refused as a validation error" */
+    it("is refused by the schema rather than raising while the instants are written", () => {
+      const request = {
+        projectId: "project-1",
+        target: "traces" as const,
+        filter: "",
+        window: { from: 0, to: 9_000_000_000_000_000 },
+        question: { instructions: "the user is annoyed" },
+      };
+      expect(explorerInstantEvalRunSchema.safeParse(request).success).toBe(
+        false,
+      );
+      expect(() => toExplorerRunInput(request)).toThrow(RangeError);
     });
   });
 });

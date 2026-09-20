@@ -312,7 +312,7 @@ export const SearchBar: React.FC = () => {
     setSmarterSearchPrimerOpen(true);
   }, []);
   const { submitSearch, isRouting } = useSubmitSearch({
-    langyAvailable: langyRoutesAsk,
+    isLangyAvailable: langyRoutesAsk,
     isSamplePreview,
     onLangy: askLangyFromSearch,
     onInstantEval: onInstantEvalRoute,

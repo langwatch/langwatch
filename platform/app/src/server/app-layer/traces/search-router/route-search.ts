@@ -78,7 +78,7 @@ export interface RouteSearchInput {
   /** The lens the search ran in; the Conversations lens judges threads. */
   lensId?: string;
   /** Whether the Langy route is open to this user. Defaults to true. */
-  langyAvailable?: boolean;
+  isLangyAvailable?: boolean;
   /**
    * The route the caller already knows, which skips the classifier. Set when
    * the text comes from a search that was routed once already, so re-running
@@ -90,9 +90,9 @@ export interface RouteSearchInput {
 
 /** Which of the optional routes this submit may be given. */
 interface RouteAvailability {
-  langyAvailable: boolean;
+  isLangyAvailable: boolean;
   /** False while Instant Evals are not released for the project. */
-  instantEvalAvailable: boolean;
+  isInstantEvalAvailable: boolean;
 }
 
 export type RouteSearchResult =
@@ -124,7 +124,7 @@ export type RouteSearchResult =
       query: string;
       decidedBy: SearchRouteDecidedBy;
       /** No classifier and no model: the client offers to configure one. */
-      modelUnavailable: boolean;
+      isModelUnavailable: boolean;
       /** Set when another route was chosen first and could not be built. */
       fellBackFrom?: SearchRouteKind | "routing";
     }
@@ -166,11 +166,11 @@ const ROUTE_QUESTION_ID = "route";
 
 /** How the classifier is asked. Exported so the prompt is pinned by a test. */
 export function buildRouteQuestion({
-  langyAvailable,
-  instantEvalAvailable = true,
-}: Pick<RouteAvailability, "langyAvailable"> &
+  isLangyAvailable,
+  isInstantEvalAvailable = true,
+}: Pick<RouteAvailability, "isLangyAvailable"> &
   Partial<
-    Pick<RouteAvailability, "instantEvalAvailable">
+    Pick<RouteAvailability, "isInstantEvalAvailable">
   >): InstantEvalCategoryQuestion {
   const options = [
     {
@@ -178,7 +178,7 @@ export function buildRouteQuestion({
       description:
         "The sentence can be written with the trace filter fields listed: a status, a model, a service, a duration, a cost, an evaluator result, an event name, a user or conversation id.",
     },
-    ...(instantEvalAvailable
+    ...(isInstantEvalAvailable
       ? [
           {
             name: "instant_eval",
@@ -192,7 +192,7 @@ export function buildRouteQuestion({
       description:
         "The sentence is a literal string to look for in the traces: an id, an error message, a product name, a quoted phrase.",
     },
-    ...(langyAvailable
+    ...(isLangyAvailable
       ? [
           {
             name: "langy",
@@ -266,7 +266,7 @@ const MODEL_UNAVAILABLE_CODES: readonly string[] = [
   "model_provider_disabled",
 ];
 
-function isModelUnavailable(error: unknown): boolean {
+function isModelUnavailableError(error: unknown): boolean {
   return (
     error instanceof HandledError &&
     MODEL_UNAVAILABLE_CODES.includes(error.code)
@@ -310,12 +310,12 @@ function phraseSearch({
 function freeText({
   context,
   decidedBy,
-  modelUnavailable = false,
+  isModelUnavailable = false,
   fellBackFrom,
 }: {
   context: RouteContext;
   decidedBy: SearchRouteDecidedBy;
-  modelUnavailable?: boolean;
+  isModelUnavailable?: boolean;
   fellBackFrom?: SearchRouteKind | "routing";
 }): RouteSearchResult {
   context.deps.recordDecision({ route: "free_text", decidedBy });
@@ -323,7 +323,7 @@ function freeText({
     kind: "free_text",
     query: phraseSearch(context),
     decidedBy,
-    modelUnavailable,
+    isModelUnavailable,
     ...(fellBackFrom ? { fellBackFrom } : {}),
   };
 }
@@ -410,7 +410,7 @@ async function buildFilterRoute({
     return freeText({
       context,
       decidedBy: "fallback",
-      modelUnavailable: isModelUnavailable(error),
+      isModelUnavailable: isModelUnavailableError(error),
       fellBackFrom: "filter",
     });
   }
@@ -440,7 +440,7 @@ async function buildInstantEvalRoute({
     return freeText({
       context,
       decidedBy: "fallback",
-      modelUnavailable: isModelUnavailable(error),
+      isModelUnavailable: isModelUnavailableError(error),
       fellBackFrom: "instant_eval",
     });
   }
@@ -514,7 +514,7 @@ async function applyClassified({
       // The option is not offered while Instant Evals are unreleased; an
       // answer naming it anyway is searched as a filter, which falls to the
       // phrase on its own when the model cannot write one.
-      return context.available.instantEvalAvailable
+      return context.available.isInstantEvalAvailable
         ? buildInstantEvalRoute({ context, decidedBy })
         : buildFilterRoute({ context, decidedBy });
     case "free_text":
@@ -540,8 +540,8 @@ async function routeWithModel(
       ...context.available,
     });
   } catch (error) {
-    const modelUnavailable = isModelUnavailable(error);
-    if (!modelUnavailable) {
+    const isModelUnavailable = isModelUnavailableError(error);
+    if (!isModelUnavailable) {
       logger.warn(
         { projectId: input.projectId, err: error },
         "Model could not route the search; searching the phrase instead",
@@ -550,7 +550,7 @@ async function routeWithModel(
     return freeText({
       context,
       decidedBy: "fallback",
-      modelUnavailable,
+      isModelUnavailable,
       fellBackFrom: "routing",
     });
   }
@@ -559,7 +559,7 @@ async function routeWithModel(
     case "filter":
       return finishFilter({ context, generated: decision.query, decidedBy });
     case "instant_eval":
-      if (!context.available.instantEvalAvailable) {
+      if (!context.available.isInstantEvalAvailable) {
         return freeText({ context, decidedBy });
       }
       return instantEval({
@@ -629,7 +629,7 @@ async function routeSearch({
     deps.recordDecision({ route: "filter", decidedBy: "fallback" });
     return { kind: "filter", query: explicitQuery, decidedBy: "fallback" };
   }
-  const [known, instantEvalAvailable] = await Promise.all([
+  const [known, isInstantEvalAvailable] = await Promise.all([
     listKnownSignals({ deps, input }),
     isInstantEvalReleased({ deps, input }),
   ]);
@@ -641,8 +641,8 @@ async function routeSearch({
     target: input.lensId === CONVERSATIONS_LENS_ID ? "threads" : "traces",
     known,
     available: {
-      langyAvailable: input.langyAvailable ?? true,
-      instantEvalAvailable,
+      isLangyAvailable: input.isLangyAvailable ?? true,
+      isInstantEvalAvailable,
     },
   };
   if (input.forceKind) {

@@ -196,7 +196,7 @@ describe("tracesV2.routeSearch", () => {
         kind: "free_text",
         query: '"annoyed users"',
         decidedBy: "model",
-        modelUnavailable: false,
+        isModelUnavailable: false,
       });
       expect(JSON.stringify(model.doGenerateCalls[0]?.prompt)).toContain(
         "`instant_eval` is not available on this project",
@@ -224,7 +224,7 @@ describe("tracesV2.routeSearch", () => {
         kind: "free_text",
         query: 'status:error AND "annoyed users"',
         decidedBy: "fallback",
-        modelUnavailable: true,
+        isModelUnavailable: true,
         fellBackFrom: "routing",
       });
     });
@@ -288,7 +288,7 @@ describe("tracesV2.routeSearch", () => {
         kind: "free_text",
         query: '"annoyed users"',
         decidedBy: "fallback",
-        modelUnavailable: true,
+        isModelUnavailable: true,
         fellBackFrom: "routing",
       });
     });
@@ -312,7 +312,7 @@ describe("tracesV2.routeSearch", () => {
       expect(result).toMatchObject({
         kind: "free_text",
         query: '"annoyed users"',
-        modelUnavailable: false,
+        isModelUnavailable: false,
         fellBackFrom: "routing",
       });
     });

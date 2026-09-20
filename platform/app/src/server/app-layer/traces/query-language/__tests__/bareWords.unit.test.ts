@@ -84,12 +84,12 @@ describe("splitBareWords", () => {
     });
 
     it("still lifts the words that sit in conjunction-only positions", () => {
-      expect(
-        splitBareWords("annoyed AND (status:error OR status:ok)"),
-      ).toEqual({
-        sentence: "annoyed",
-        explicitQuery: "(status:error OR status:ok)",
-      });
+      expect(splitBareWords("annoyed AND (status:error OR status:ok)")).toEqual(
+        {
+          sentence: "annoyed",
+          explicitQuery: "(status:error OR status:ok)",
+        },
+      );
     });
   });
 
@@ -134,7 +134,10 @@ describe("combineQueries", () => {
     /** @scenario "Joining a query that holds a top-level OR groups it first" */
     it("groups it, so the OR keeps both of its own operands", () => {
       expect(
-        combineQueries({ base: "(status:error) OR (status:ok)", addition: "c" }),
+        combineQueries({
+          base: "(status:error) OR (status:ok)",
+          addition: "c",
+        }),
       ).toBe("((status:error) OR (status:ok)) AND c");
     });
 

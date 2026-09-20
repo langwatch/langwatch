@@ -85,7 +85,7 @@ const registry = {
   filter_too_complex: {
     tips: [
       "Wrap a sentence in double quotes so it counts as one phrase instead of one term per word",
-      "Keep the filter under meta.maxNodes terms and operators in total",
+      "Keep the filter under meta.maxNodes nodes in total; every term, operator, negation and pair of parentheses counts as one",
     ],
   },
   filter_field_unknown: {

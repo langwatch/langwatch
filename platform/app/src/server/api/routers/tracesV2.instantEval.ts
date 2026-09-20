@@ -27,6 +27,18 @@ import { INSTANT_EVAL_TARGETS } from "~/server/app-layer/instant-evals/shorthand
 import { explorerHiddenOrigins } from "~/server/app-layer/traces/hidden-origins";
 import { combineQueries } from "~/server/app-layer/traces/query-language/mutations";
 
+/**
+ * Epoch milliseconds a JavaScript `Date` can represent. The run input is
+ * turned into ISO instants below, and `toISOString()` raises a `RangeError`
+ * past this, which would reach the caller as an internal error rather than as
+ * the validation failure it is.
+ */
+const EPOCH_MS = z
+  .number()
+  .int()
+  .min(-8_640_000_000_000_000)
+  .max(8_640_000_000_000_000);
+
 /** What the Explorer asks to judge: the shorthand, in the search bar's words. */
 export const explorerInstantEvalRunSchema = z.object({
   projectId: z.string(),
@@ -34,7 +46,7 @@ export const explorerInstantEvalRunSchema = z.object({
   /** The other chips of the query, as the filter narrowing what is judged. */
   filter: z.string().max(4_000).default(""),
   /** The exact bounds the search ran in, frozen for the run's life. */
-  window: z.object({ from: z.number().int(), to: z.number().int() }),
+  window: z.object({ from: EPOCH_MS, to: EPOCH_MS }),
   question: z.object({
     instructions: z.string().min(1).max(2_000),
     /** What counts as yes, then what counts as no. */

@@ -1412,6 +1412,15 @@ Rule: Enter routes a sentence
     Then the joined query reads "((a) OR (b)) AND c"
     And a query already wrapped in one pair of parentheses is not wrapped again
 
+  # A rejected key makes the provider's own response body the credential, so
+  # the log line gets the same curation the customer-facing disclosure gets.
+  @unit
+  Scenario: A provider failure is logged curated, never raw
+    Given a provider call fails with its own message
+    When the failure is logged
+    Then the line carries the provider, the model and the status code
+    And none of the provider's own text is in it
+
   @unit
   Scenario: A filter the model could not write becomes a phrase search
     Given the classifier answers "filter"

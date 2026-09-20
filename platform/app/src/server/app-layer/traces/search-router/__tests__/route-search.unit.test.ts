@@ -154,7 +154,7 @@ describe("given the classifier is configured", () => {
         kind: "free_text",
         query: '"annoyed users"',
         decidedBy: "fallback",
-        modelUnavailable: false,
+        isModelUnavailable: false,
         fellBackFrom: "filter",
       });
     });
@@ -169,7 +169,7 @@ describe("given the classifier is configured", () => {
       const result = await createSearchRouter(d).route(input());
       expect(result).toMatchObject({
         kind: "free_text",
-        modelUnavailable: true,
+        isModelUnavailable: true,
         fellBackFrom: "filter",
       });
     });
@@ -191,7 +191,7 @@ describe("given the classifier is configured", () => {
         kind: "free_text",
         query: '"failing calls"',
         decidedBy: "fallback",
-        modelUnavailable: true,
+        isModelUnavailable: true,
         fellBackFrom: "filter",
       });
     });
@@ -267,7 +267,7 @@ describe("given the classifier is configured", () => {
         kind: "free_text",
         query: 'service:api AND "cannot connect to database"',
         decidedBy: "classifier",
-        modelUnavailable: false,
+        isModelUnavailable: false,
       });
       expect(d.buildFilter).not.toHaveBeenCalled();
       expect(d.routeWithModel).not.toHaveBeenCalled();
@@ -291,7 +291,7 @@ describe("given the classifier is configured", () => {
     it("never offers the Langy option when Langy is not available", async () => {
       const classifier = answering("free_text");
       await createSearchRouter(deps({ classifier })).route(
-        input({ langyAvailable: false }),
+        input({ isLangyAvailable: false }),
       );
       const request = classifier.classify.mock.calls[0]?.[0];
       const question = request?.questions[0];
@@ -346,13 +346,13 @@ describe("given the classifier is configured", () => {
       });
       const result = await createSearchRouter(d).route(input());
       expect(d.routeWithModel).toHaveBeenCalledWith(
-        expect.objectContaining({ instantEvalAvailable: false }),
+        expect.objectContaining({ isInstantEvalAvailable: false }),
       );
       expect(result).toEqual({
         kind: "free_text",
         query: '"annoyed users"',
         decidedBy: "model",
-        modelUnavailable: false,
+        isModelUnavailable: false,
       });
     });
 
@@ -428,7 +428,7 @@ describe("given the classifier is configured", () => {
     });
 
     it("asks one category question with the four routes", () => {
-      const question = buildRouteQuestion({ langyAvailable: true });
+      const question = buildRouteQuestion({ isLangyAvailable: true });
       expect(question.options.map((option) => option.name)).toEqual([
         "filter",
         "instant_eval",
@@ -466,8 +466,8 @@ describe("given no classifier", () => {
           evaluators: ["ragas/faithfulness"],
           events: ["thumbs_up_down"],
         },
-        langyAvailable: true,
-        instantEvalAvailable: true,
+        isLangyAvailable: true,
+        isInstantEvalAvailable: true,
       });
     });
 
@@ -517,7 +517,7 @@ describe("given no classifier", () => {
         kind: "free_text",
         query: '"annoyed users"',
         decidedBy: "fallback",
-        modelUnavailable: true,
+        isModelUnavailable: true,
         fellBackFrom: "routing",
       });
     });
@@ -536,7 +536,7 @@ describe("given no classifier", () => {
         kind: "free_text",
         query: '"annoyed users"',
         decidedBy: "fallback",
-        modelUnavailable: false,
+        isModelUnavailable: false,
         fellBackFrom: "routing",
       });
     });

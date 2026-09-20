@@ -52,6 +52,55 @@ type ProviderPrimerPopoverProps = {
     }
 );
 
+/** The words, the icon and the one-click way out of needing them. */
+const ProviderPrimerBody: React.FC<{ copy: ProviderPrimerCopy }> = ({
+  copy,
+}) => (
+  <PopoverContent maxWidth="320px">
+    <PopoverArrow />
+    <PopoverBody>
+      <VStack align="stretch" gap={3}>
+        <HStack gap={2}>
+          <Box
+            width="28px"
+            height="28px"
+            borderRadius="full"
+            bg="orange.subtle"
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+            color="orange.fg"
+          >
+            <Zap size={14} />
+          </Box>
+          <Text textStyle="sm" fontWeight="semibold">
+            {copy.title}
+          </Text>
+        </HStack>
+        <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
+          {copy.body}
+        </Text>
+        <NextLink
+          href="/settings/model-providers"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ display: "block" }}
+        >
+          <Button
+            size="xs"
+            width="full"
+            bg="orange.solid"
+            color="white"
+            _hover={{ bg: "orange.fg" }}
+          >
+            Add a provider
+          </Button>
+        </NextLink>
+      </VStack>
+    </PopoverBody>
+  </PopoverContent>
+);
+
 /**
  * Shown where a feature needs a model provider and none is enabled. The point
  * is not to disable the affordance but to say why a provider is needed and
@@ -87,49 +136,7 @@ export const ProviderPrimerPopover: React.FC<ProviderPrimerPopoverProps> = (
       ) : (
         <PopoverTrigger asChild>{children}</PopoverTrigger>
       )}
-      <PopoverContent maxWidth="320px">
-        <PopoverArrow />
-        <PopoverBody>
-          <VStack align="stretch" gap={3}>
-            <HStack gap={2}>
-              <Box
-                width="28px"
-                height="28px"
-                borderRadius="full"
-                bg="orange.subtle"
-                display="flex"
-                alignItems="center"
-                justifyContent="center"
-                color="orange.fg"
-              >
-                <Zap size={14} />
-              </Box>
-              <Text textStyle="sm" fontWeight="semibold">
-                {copy.title}
-              </Text>
-            </HStack>
-            <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
-              {copy.body}
-            </Text>
-            <NextLink
-              href="/settings/model-providers"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ display: "block" }}
-            >
-              <Button
-                size="xs"
-                width="full"
-                bg="orange.solid"
-                color="white"
-                _hover={{ bg: "orange.fg" }}
-              >
-                Add a provider
-              </Button>
-            </NextLink>
-          </VStack>
-        </PopoverBody>
-      </PopoverContent>
+      <ProviderPrimerBody copy={copy} />
     </PopoverRoot>
   );
 };

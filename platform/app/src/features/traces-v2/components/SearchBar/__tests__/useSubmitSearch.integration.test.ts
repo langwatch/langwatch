@@ -44,7 +44,7 @@ function renderSubmit(
 ) {
   return renderHook(() =>
     useSubmitSearch({
-      langyAvailable: true,
+      isLangyAvailable: true,
       isSamplePreview: false,
       ...handlers,
       ...overrides,
@@ -119,7 +119,7 @@ describe("given the text has bare words", () => {
         timeRange: { from: 1000, to: 2000 },
         activeQuery: "model:gpt-4o",
         lensId: "conversations",
-        langyAvailable: true,
+        isLangyAvailable: true,
       });
       // Nothing lands on the store until the router answers.
       expect(useExplorerStore.getState().queryText).toBe("model:gpt-4o");
@@ -159,7 +159,7 @@ describe("given the text has bare words", () => {
           kind: "free_text",
           query: '"cannot connect to database"',
           decidedBy: "classifier",
-          modelUnavailable: false,
+          isModelUnavailable: false,
         }),
       );
       expect(useExplorerStore.getState().queryText).toBe(
@@ -177,7 +177,7 @@ describe("given the text has bare words", () => {
           kind: "free_text",
           query: '"annoyed users"',
           decidedBy: "fallback",
-          modelUnavailable: true,
+          isModelUnavailable: true,
           fellBackFrom: "routing",
         }),
       );

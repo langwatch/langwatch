@@ -296,7 +296,11 @@ export async function generateTraceAction(
       lastProviderError = e;
       lastError = e instanceof Error ? e.message : "Unknown generation error.";
       logger.error(
-        { projectId: input.projectId, attempt, lastError, err: e },
+        {
+          projectId: input.projectId,
+          attempt,
+          providerError: summarizeProviderError(e, { model: model.modelId }),
+        },
         "AI action generation failed",
       );
       continue;
@@ -524,7 +528,10 @@ export async function generateInstantEvalQuestion(
     object = generated.object;
   } catch (e) {
     logger.error(
-      { projectId: input.projectId, err: e },
+      {
+        projectId: input.projectId,
+        providerError: summarizeProviderError(e, { model: model.modelId }),
+      },
       "Instant Eval question generation failed",
     );
     throw new AiQueryProviderError(
@@ -624,9 +631,9 @@ export interface SearchRouteInput {
   target: InstantEvalSearchTarget;
   known: KnownProjectSignals;
   /** Whether the Langy route is open to this user at all. */
-  langyAvailable: boolean;
+  isLangyAvailable: boolean;
   /** Whether Instant Evals are released for the project. */
-  instantEvalAvailable: boolean;
+  isInstantEvalAvailable: boolean;
 }
 
 const searchRouteSchema = z.discriminatedUnion("route", [
@@ -655,12 +662,12 @@ type SearchRouteAttempt =
 
 function interpretSearchRouteObject({
   decision,
-  langyAvailable,
-  instantEvalAvailable,
+  isLangyAvailable,
+  isInstantEvalAvailable,
 }: {
   decision: SearchRouteObject;
-  langyAvailable: boolean;
-  instantEvalAvailable: boolean;
+  isLangyAvailable: boolean;
+  isInstantEvalAvailable: boolean;
 }): SearchRouteAttempt {
   switch (decision.route) {
     case "filter": {
@@ -673,7 +680,7 @@ function interpretSearchRouteObject({
       };
     }
     case "instant_eval":
-      if (!instantEvalAvailable) return { done: { route: "free_text" } };
+      if (!isInstantEvalAvailable) return { done: { route: "free_text" } };
       return {
         done: {
           route: "instant_eval",
@@ -682,7 +689,7 @@ function interpretSearchRouteObject({
         },
       };
     case "langy":
-      return { done: { route: langyAvailable ? "langy" : "free_text" } };
+      return { done: { route: isLangyAvailable ? "langy" : "free_text" } };
     case "free_text":
       return { done: { route: "free_text" } };
   }
@@ -761,15 +768,21 @@ export async function generateSearchRoute(
       providerError = asked.providerError;
       retry = null;
       logger.error(
-        { projectId: input.projectId, attempt, err: asked.providerError.error },
+        {
+          projectId: input.projectId,
+          attempt,
+          providerError: summarizeProviderError(asked.providerError.error, {
+            model: model.modelId,
+          }),
+        },
         "Search route generation failed",
       );
       continue;
     }
     const outcome = interpretSearchRouteObject({
       decision: asked.decision,
-      langyAvailable: input.langyAvailable,
-      instantEvalAvailable: input.instantEvalAvailable,
+      isLangyAvailable: input.isLangyAvailable,
+      isInstantEvalAvailable: input.isInstantEvalAvailable,
     });
     if ("done" in outcome) return outcome.done;
     providerError = null;
@@ -803,13 +816,13 @@ function buildSearchRoutePrompt({
       : "(none)";
   const events =
     input.known.events.length > 0 ? input.known.events.join(", ") : "(none)";
-  const langyRoute = input.langyAvailable
+  const langyRoute = input.isLangyAvailable
     ? `4. **\`langy\`**: the sentence needs several steps, reasoning over
    many traces, or data the filters cannot reach ("why did errors spike
    this morning", "compare this week with last week", "summarise what
    changed"). The assistant takes it as a question.`
     : `4. \`langy\` is not available to this operator; never pick it.`;
-  const instantEvalRoute = input.instantEvalAvailable
+  const instantEvalRoute = input.isInstantEvalAvailable
     ? `2. **\`instant_eval\`**: finding the traces needs reading each one and
    judging it ("annoyed users", "answers that promise a refund",
    "conversations in German"), and no evaluator or event below already
@@ -820,7 +833,7 @@ function buildSearchRoutePrompt({
     : `2. \`instant_eval\` is not available on this project; never pick it. A
    sentence that needs a judgement is a \`filter\` when an evaluator or
    event below answers it, and \`free_text\` otherwise.`;
-  const judgementExample = input.instantEvalAvailable
+  const judgementExample = input.isInstantEvalAvailable
     ? `{"route":"instant_eval","instructions":"Does the user express frustration or annoyance at any point?","yes":"The user complains, repeats a request with emphasis, or uses words like frustrated or useless.","no":"The user stays neutral or satisfied throughout."}`
     : `{"route":"free_text"}`;
   return `You decide what an operator's search-bar sentence is, and build what it
@@ -876,7 +889,7 @@ ${judgementExample}
 {"route":"free_text"}
 
 "why did errors spike this morning" →
-{"route":"${input.langyAvailable ? "langy" : "free_text"}"}`;
+{"route":"${input.isLangyAvailable ? "langy" : "free_text"}"}`;
 }
 
 function buildActionSystemPrompt(fieldsBlock: string): string {

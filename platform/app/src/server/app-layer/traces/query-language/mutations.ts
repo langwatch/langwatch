@@ -548,9 +548,7 @@ function tagsUnderOr(
 function bindsAsOr(query: string): boolean {
   try {
     const ast = parse(query);
-    return (
-      ast.type === "LogicalExpression" && ast.operator.operator === "OR"
-    );
+    return ast.type === "LogicalExpression" && ast.operator.operator === "OR";
   } catch {
     return /\bOR\b/.test(query);
   }

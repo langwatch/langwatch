@@ -222,6 +222,12 @@ Feature: Instant Evals inside the Trace Explorer
       And the run's counters are answered in the Explorer's own shape
 
     @unit
+    Scenario: A window outside the calendar range is refused as a validation error
+      Given a request whose window bound is past what a date can represent
+      When the request is validated
+      Then it is refused as invalid input rather than raising while the instants are written
+
+    @unit
     Scenario: A run judges the rows the Explorer shows
       Given the other chips name no origin
       When the request is turned into the run service's input
