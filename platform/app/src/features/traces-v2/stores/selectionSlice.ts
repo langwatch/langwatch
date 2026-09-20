@@ -50,6 +50,30 @@ export interface SelectionSlice {
  */
 const addressesATrace = (traceId: string): boolean => traceId.trim().length > 0;
 
+/**
+ * The selection with `traceIds` added or removed. Leaving all-matching mode
+ * starts from an empty set, because that mode names no ids of its own. Only an
+ * id that addresses a trace may enter; anything at all may leave, so a
+ * selection can always be emptied.
+ */
+function withMembers({
+  selection,
+  traceIds,
+  checked,
+}: {
+  selection: Selection;
+  traceIds: string[];
+  checked: boolean;
+}): Selection {
+  const next =
+    selection.mode === "all-matching"
+      ? new Set<string>()
+      : new Set(selection.traceIds);
+  if (checked) for (const id of traceIds.filter(addressesATrace)) next.add(id);
+  else for (const id of traceIds) next.delete(id);
+  return { mode: "explicit", traceIds: next };
+}
+
 export const createSelectionSlice: StateCreator<
   ExplorerStore,
   [],
@@ -76,20 +100,9 @@ export const createSelectionSlice: StateCreator<
     }),
 
   setSelectedMany: (traceIds, checked) =>
-    set((state) => {
-      const { selection } = state;
-      const next =
-        selection.mode === "all-matching"
-          ? new Set<string>()
-          : new Set(selection.traceIds);
-      // Only an id that addresses a trace may enter; anything at all may leave,
-      // so a selection can always be emptied.
-      for (const id of checked ? traceIds.filter(addressesATrace) : traceIds) {
-        if (checked) next.add(id);
-        else next.delete(id);
-      }
-      return { selection: { mode: "explicit", traceIds: next } };
-    }),
+    set((state) => ({
+      selection: withMembers({ selection: state.selection, traceIds, checked }),
+    })),
 
   selectAllMatching: () =>
     set({ selection: { mode: "all-matching", traceIds: new Set<string>() } }),

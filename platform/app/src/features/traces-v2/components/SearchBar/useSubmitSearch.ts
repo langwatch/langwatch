@@ -109,7 +109,7 @@ export function useSubmitSearch({
   onInstantEval,
   onModelUnavailable,
 }: UseSubmitSearchOptions): {
-  submitSearch: (text: string) => void;
+  submitSearch: (text: string, options?: SubmitSearchOptions) => void;
   isRouting: boolean;
 } {
   const { project } = useOrganizationTeamProject();
