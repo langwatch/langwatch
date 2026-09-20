@@ -17,6 +17,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -160,14 +161,15 @@ describe("<ConnectSettings />", () => {
     it("states what is sent, that it is not stored, and what is never sent", () => {
       renderSettings(connectedStatus());
 
+      const entry = within(screen.getByTestId("connect-service-instant_evals"));
       expect(
-        screen.getByText(
+        entry.getByText(
           "The judged text and the questions asked about it are sent to LangWatch.",
         ),
       ).toBeDefined();
-      expect(screen.getByText("They are not stored.")).toBeDefined();
+      expect(entry.getByText("They are not stored.")).toBeDefined();
       expect(
-        screen.getByText("Traces, prompts and datasets are never sent."),
+        entry.getByText("Traces, prompts and datasets are never sent."),
       ).toBeDefined();
     });
 
@@ -211,7 +213,8 @@ describe("<ConnectSettings />", () => {
     it("says it is not included and leaves the switch dead", () => {
       renderSettings(connectedStatus({ entitledServices: [] }));
 
-      expect(screen.getByText("Not included in your license")).toBeDefined();
+      const entry = within(screen.getByTestId("connect-service-instant_evals"));
+      expect(entry.getByText("Not included in your license")).toBeDefined();
       expect(switchInput().disabled).toBe(true);
     });
   });
