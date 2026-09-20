@@ -55,7 +55,9 @@ const {
   // callbacks survive. One given to `useMutation` runs whatever happened to
   // the component; one given to `mutate` is dropped when the observer is
   // gone by the time the server answers.
-  type Callbacks = { onSettled?: () => void } | undefined;
+  type Callbacks =
+    | { onSettled?: () => void; trpc?: { context?: Record<string, unknown> } }
+    | undefined;
   const dismissal = {
     onMutation: undefined as Callbacks,
     onCall: undefined as Callbacks,
@@ -116,7 +118,10 @@ vi.mock("~/utils/api", () => ({
     user: {
       secureAccountNudge: { useQuery: () => ({ data: nudgeRef.current }) },
       dismissSecureAccountNudge: {
-        useMutation: (options?: { onSettled?: () => void }) => {
+        useMutation: (options?: {
+          onSettled?: () => void;
+          trpc?: { context?: Record<string, unknown> };
+        }) => {
           dismissal.onMutation = options;
           return {
             mutate: (input: unknown, perCall?: { onSettled?: () => void }) => {
@@ -236,6 +241,11 @@ describe("the secure-account offer", () => {
         });
         // Still parked inside the cancel: the write went out ahead of it.
         expect(cacheCalls).toEqual(["cancel"]);
+        // Sent so it outlives the document as well. Being sent first is not
+        // enough on its own: the browser cancels everything still in flight
+        // when a page goes away, and an end-to-end run showed the answer lost
+        // in exactly that window, a few milliseconds wide.
+        expect(dismissal.onMutation?.trpc?.context?.keepalive).toBe(true);
       });
     });
 

@@ -219,6 +219,13 @@ function useNudgeAnswer() {
   // the mutation survives, which is what makes the refresh below happen at
   // all.
   const dismiss = api.user.dismissSecureAccountNudge.useMutation({
+    // Sent so it outlives the document. Answering this dialog is very often
+    // the last thing somebody does on the page: "Set up two-step
+    // verification" navigates itself, and "Not now" is what people press
+    // before carrying on with whatever they came for. A request cancelled by
+    // that navigation never reaches the server, and the offer then returns
+    // over the next page.
+    trpc: { context: { keepalive: true } },
     onSettled: () => {
       void apiContext.user.secureAccountNudge.invalidate();
     },
