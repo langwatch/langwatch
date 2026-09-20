@@ -45,6 +45,7 @@ import { TraceV2DrawerShell } from "../TraceDrawer";
 import { TraceTable } from "../TraceTable/TraceTable";
 import { AuroraSvg } from "./AuroraSvg";
 import { EmptyResultsPane } from "./EmptyResultsPane";
+import { ExplorerLangyActionsMount } from "./ExplorerLangyActionsMount";
 import { InstantEvalProgressMount } from "./InstantEvalProgressMount";
 import { IntegratePane } from "./IntegratePane";
 import { PageKeyboardShortcuts } from "./PageKeyboardShortcuts";
@@ -270,6 +271,7 @@ export const TracesPage: React.FC = () => {
             </AnimatePresence>
           </HStack>
           <PageKeyboardShortcuts />
+          <ExplorerLangyActionsMount />
           <TraceDrawerMount />
         </VStack>
         {/* Phase 2 spotlight tour overlay — floats above the page,

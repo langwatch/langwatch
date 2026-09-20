@@ -13,12 +13,19 @@ export interface ExplorerResults {
   itemNoun: string;
   /** The ids on the current page, in table order. */
   pageTraceIds: string[];
+  /**
+   * Whether the list has answered: false while a read is in flight or the
+   * rows shown are still the previous search's, when the count is not yet
+   * the count of what the page state asks for.
+   */
+  isSettled: boolean;
 }
 
 export const EMPTY_RESULTS: ExplorerResults = {
   totalHits: null,
   itemNoun: "traces",
   pageTraceIds: [],
+  isSettled: false,
 };
 
 /**
@@ -88,6 +95,7 @@ export const createRowsSlice: StateCreator<ExplorerStore, [], [], RowsSlice> = (
       if (
         previous.totalHits === results.totalHits &&
         previous.itemNoun === results.itemNoun &&
+        previous.isSettled === results.isSettled &&
         sameIds(previous.pageTraceIds, results.pageTraceIds)
       ) {
         return state;

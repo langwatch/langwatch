@@ -18,6 +18,7 @@ describe("readLiveExplorer", () => {
           totalHits: 412,
           itemNoun: "traces",
           pageTraceIds: ["trace-a", "trace-b"],
+          isSettled: true,
         },
         lensName: "All",
       });
@@ -54,7 +55,12 @@ describe("readLiveExplorer", () => {
     it("carries the run's judged, total and matched counts", () => {
       const read = readLiveExplorer({
         state: explorerState(),
-        results: { totalHits: 412, itemNoun: "traces", pageTraceIds: [] },
+        results: {
+          totalHits: 412,
+          itemNoun: "traces",
+          pageTraceIds: [],
+          isSettled: true,
+        },
         instantEvalProgress: {
           runId: "run-1",
           judged: 3200,
@@ -73,7 +79,12 @@ describe("readLiveExplorer", () => {
     it("leaves the field out when no run is judging", () => {
       const read = readLiveExplorer({
         state: explorerState(),
-        results: { totalHits: 0, itemNoun: "traces", pageTraceIds: [] },
+        results: {
+          totalHits: 0,
+          itemNoun: "traces",
+          pageTraceIds: [],
+          isSettled: true,
+        },
         instantEvalProgress: null,
       });
       expect("instantEvalProgress" in read).toBe(false);
@@ -87,7 +98,12 @@ describe("readLiveExplorer", () => {
           selection: { mode: "explicit", traceIds: new Set(["trace-a"]) },
           expandedRows: new Set(["conversation-a"]),
         }),
-        results: { totalHits: 1, itemNoun: "traces", pageTraceIds: [] },
+        results: {
+          totalHits: 1,
+          itemNoun: "traces",
+          pageTraceIds: [],
+          isSettled: true,
+        },
       });
       expect(JSON.parse(JSON.stringify(read))).toMatchObject({
         selection: { mode: "explicit", traceIds: ["trace-a"] },

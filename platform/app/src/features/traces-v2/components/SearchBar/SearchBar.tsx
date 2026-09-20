@@ -38,6 +38,7 @@ import {
 } from "../ai/ProviderPrimerPopover";
 import { InstantEvalConfirmDialog } from "../TracesPage/InstantEvalConfirmDialog";
 import { InstantEvalRefusalPopover } from "../TracesPage/InstantEvalRefusalPopover";
+import { registerInstantEvalRoute } from "../TracesPage/instantEvalRouteBridge";
 import { useInstantEvalRoute } from "../TracesPage/useInstantEvalRoute";
 import { ActiveSearchEditor } from "./ActiveSearchEditor";
 import { AiErrorDetails, hasAiErrorDetails } from "./ErrorBannerDetail";
@@ -297,6 +298,12 @@ export const SearchBar: React.FC = () => {
   const [smarterSearchPrimerOpen, setSmarterSearchPrimerOpen] = useState(false);
   const instantEval = useInstantEvalRoute();
   const { onInstantEvalRoute } = instantEval;
+  // The route's dialog and popover are anchored here, so a caller outside the
+  // bar (a Langy action) reaches this same route rather than one of its own.
+  useEffect(
+    () => registerInstantEvalRoute(onInstantEvalRoute),
+    [onInstantEvalRoute],
+  );
   const handleModelUnavailable = useCallback(() => {
     if (smarterSearchPrimerShown) return;
     smarterSearchPrimerShown = true;

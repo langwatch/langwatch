@@ -107,14 +107,17 @@ export function useExplorerCounts(): ExplorerCounts {
   // The store keeps the last answer so a reader of the page state (the
   // Langy `explorer.getState` action) sees the count the header shows.
   const setResults = useExplorerStore((s) => s.setResults);
-  const { totalHits, itemNoun, isLoading } = counts;
+  const { totalHits, itemNoun, isLoading, isFetching, isPlaceholderData } =
+    counts;
+  const isSettled = !isLoading && !isFetching && !isPlaceholderData;
   useEffect(() => {
     setResults({
       totalHits: isLoading ? null : totalHits,
       itemNoun,
       pageTraceIds,
+      isSettled,
     });
-  }, [setResults, totalHits, itemNoun, isLoading, pageTraceIds]);
+  }, [setResults, totalHits, itemNoun, isLoading, isSettled, pageTraceIds]);
 
   return {
     ...counts,

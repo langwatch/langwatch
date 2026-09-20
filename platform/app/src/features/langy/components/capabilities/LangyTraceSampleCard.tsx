@@ -35,6 +35,7 @@ import { Button, Text } from "@chakra-ui/react";
 import { asJsonDocument, type CliResultDigest } from "@langwatch/langy";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
+import { useExplorerLinkLensId } from "~/features/traces-v2/hooks/useExplorerLinkLensId";
 import {
   type CapabilityData,
   useCapabilityData,
@@ -83,12 +84,14 @@ export function LangyTraceSampleCard({
 }: CapabilityCardInput) {
   const parsed = parseTraceSearch(output);
   const search = readTraceSearchQuery(input);
+  const lensId = useExplorerLinkLensId();
   const explorerHref = buildTraceExplorerHref({
     projectSlug,
     search,
     // This card renders a `langwatch trace search` result, so a search that
     // named no window really did cover the CLI's last-24h default.
     unstatedWindow: "cli-last-24h",
+    lensId,
   });
 
   // Hydrate the result's REFERENCES through the product's own API with the

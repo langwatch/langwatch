@@ -12,6 +12,10 @@ import {
 } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
 import {
+  explorerHiddenOrigins,
+  withHiddenOrigins,
+} from "~/server/app-layer/traces/hidden-origins";
+import {
   traceMetadataUpdateSchema,
   updateTraceMetadata,
 } from "~/server/app-layer/traces/trace-metadata.service";
@@ -354,12 +358,22 @@ export function registerTracesRoutes(
 
       const startDate = coerceToEpoch(params.startDate);
       const endDate = coerceToEpoch(params.endDate);
-      const filterWhere = compileTraceFilter({
-        filter,
-        tenantId: project.id,
-        timeRange: { from: startDate, to: endDate },
-        dateField,
-      });
+      // The same default the Trace Explorer applies: Langy's own turns trace
+      // into the project but are not its traffic, so a search that names no
+      // origin leaves them out and its count is the count the Explorer shows.
+      // Naming an origin, in the filter string or the legacy filter map, is
+      // the caller choosing origins, and the default steps aside.
+      const namesOriginFilter =
+        (searchFields.filters?.["traces.origin"]?.length ?? 0) > 0;
+      const filterWhere = withHiddenOrigins(
+        compileTraceFilter({
+          filter,
+          tenantId: project.id,
+          timeRange: { from: startDate, to: endDate },
+          dateField,
+        }),
+        namesOriginFilter ? [] : explorerHiddenOrigins(filter),
+      );
 
       const traceService = TraceService.create(prisma);
       const results = await traceService.getAllTracesForProject(

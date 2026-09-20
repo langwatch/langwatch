@@ -16,6 +16,7 @@ import { Button, Text, VStack } from "@chakra-ui/react";
 // panel agree on what a result document IS in exactly one place.
 import { asJsonDocument } from "@langwatch/langy";
 import { Search } from "lucide-react";
+import { useExplorerLinkLensId } from "~/features/traces-v2/hooks/useExplorerLinkLensId";
 import { useRouter } from "~/utils/compat/next-router";
 import {
   buildTraceExplorerHref,
@@ -157,13 +158,20 @@ export function LangyTracesCard({
   // window; a local copy of it did neither.
   const router = useRouter();
   const search = readTraceSearchQuery(input);
-  const queryHref = search.query
+  const lensId = useExplorerLinkLensId();
+  const narrowsTheSearch =
+    !!search.query ||
+    !!search.filter ||
+    !!search.errorsOnly ||
+    (search.origins?.length ?? 0) > 0;
+  const queryHref = narrowsTheSearch
     ? buildTraceExplorerHref({
         projectSlug,
         search,
         // A `langwatch trace search` result — an absent window here is the
         // CLI's own last-24h default, not an unknown one.
         unstatedWindow: "cli-last-24h",
+        lensId,
       })
     : null;
 
