@@ -73,6 +73,13 @@ Feature: Connect on a self-hosted install
     Then the settings say that Connect is off for this deployment
     And no request is sent to either LangWatch host
 
+  @unit
+  Scenario: A Connect endpoint must be https unless it is a loopback host
+    Given a deployment configuration that names a Connect endpoint over plain http
+    When the app reads its configuration at boot
+    Then the endpoint is refused and the boot fails naming the variable
+    But an http endpoint on localhost is accepted, for a developer running both sides on one machine
+
   # ============================================================================
   # The classifier
   # ============================================================================

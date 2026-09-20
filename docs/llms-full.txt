@@ -60650,7 +60650,7 @@ The chart writes these as environment variables on the app and the workers. Set 
 | `LANGWATCH_CONNECT_LICENSE_ENDPOINT` | `https://connect.langwatch.ai` | Where the daily license sync goes. |
 | `LANGWATCH_CONNECT_INSTANCE_ID` | the id of the organization whose license is used | The identity this install presents on both hosts. |
 
-Both endpoints must be `https`. Restart the app and the workers after changing any of them.
+Both endpoints must be `https`; plain `http` is accepted for a loopback host only, for a developer running both sides on one machine. Restart the app and the workers after changing any of them.
 
 ### Outbound rules
 

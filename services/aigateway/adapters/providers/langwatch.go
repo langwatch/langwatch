@@ -277,7 +277,7 @@ func langWatchBaseURL(ctx context.Context, cred domain.Credential) (string, erro
 	if err != nil || parsed.Host == "" {
 		return "", langWatchCredentialRefusal(ctx, "the langwatch provider's endpoint is not a valid URL")
 	}
-	if strings.ToLower(parsed.Scheme) == "https" {
+	if strings.EqualFold(parsed.Scheme, "https") {
 		return raw, nil
 	}
 	if _, loopback := langWatchLoopbackHosts[strings.ToLower(parsed.Hostname())]; loopback {

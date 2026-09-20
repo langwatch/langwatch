@@ -172,6 +172,37 @@ export function alignDevAuthUrlsToPort(processEnv = process.env) {
 /** @type {any} */
 let _env = null;
 
+/**
+ * ADR-139: a Connect endpoint carries the license token in an Authorization
+ * header, so it must be https. The one exception is a loopback host, where a
+ * developer runs both sides on one machine; the gateway's langwatch provider
+ * lane applies the same rule.
+ */
+const CONNECT_LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+export const isAcceptableConnectEndpoint = (value) => {
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol === "https:") return true;
+  return (
+    parsed.protocol === "http:" &&
+    CONNECT_LOOPBACK_HOSTS.has(parsed.hostname.toLowerCase())
+  );
+};
+
+export const connectEndpointSchema = (name) =>
+  z
+    .string()
+    .url()
+    .refine(isAcceptableConnectEndpoint, {
+      message: `${name} must use https (http is accepted for a loopback host only)`,
+    })
+    .optional();
+
 export function createEnvConfig() {
   if (_env) return _env;
 
@@ -364,22 +395,13 @@ export function createEnvConfig() {
       // and with it off nothing below is read and no outbound call is made.
       LANGWATCH_CONNECT_ENABLED: z.boolean().optional(),
       // Both endpoints are origins, and both have a default in
-      // `ee/licensing/connect/install/connectConfig.ts`. HTTPS only: the
-      // license token travels in an Authorization header.
-      LANGWATCH_CONNECT_GATEWAY_ENDPOINT: z
-        .string()
-        .url()
-        .refine((value) => value.startsWith("https://"), {
-          message: "LANGWATCH_CONNECT_GATEWAY_ENDPOINT must use https",
-        })
-        .optional(),
-      LANGWATCH_CONNECT_LICENSE_ENDPOINT: z
-        .string()
-        .url()
-        .refine((value) => value.startsWith("https://"), {
-          message: "LANGWATCH_CONNECT_LICENSE_ENDPOINT must use https",
-        })
-        .optional(),
+      // `ee/licensing/connect/install/connectConfig.ts`.
+      LANGWATCH_CONNECT_GATEWAY_ENDPOINT: connectEndpointSchema(
+        "LANGWATCH_CONNECT_GATEWAY_ENDPOINT",
+      ),
+      LANGWATCH_CONNECT_LICENSE_ENDPOINT: connectEndpointSchema(
+        "LANGWATCH_CONNECT_LICENSE_ENDPOINT",
+      ),
       // Overrides the identity this install presents. The default is the
       // organization id whose license is used, which survives restarts,
       // backups and hostname changes.
