@@ -191,7 +191,6 @@ describe("LicenseRegistryService", () => {
     });
 
     describe("when a reissue loses to a unique constraint", () => {
-      /** @scenario A reissue names the constraint the table refused it on */
       // Where a client reports the constraint: `meta.target` as the column or
       // as the index over it, and Prisma 7 on a driver adapter.
       const reports = {
@@ -210,6 +209,7 @@ describe("LicenseRegistryService", () => {
         }),
       };
 
+      /** @scenario A reissue names the constraint the table refused it on */
       it.each([
         ["replacesId", "column", "license_already_reissued"],
         ["replacesId", "index", "license_already_reissued"],
