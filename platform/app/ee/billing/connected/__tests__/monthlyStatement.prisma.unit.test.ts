@@ -24,7 +24,9 @@ const { mockSumCostNanoUsdByRequestType, mockListWithHealth, mockSpendEvents } =
         value: {
           sumCostNanoUsdByRequestType: mockSumCostNanoUsdByRequestType,
         } as
-          | { sumCostNanoUsdByRequestType: typeof mockSumCostNanoUsdByRequestType }
+          | {
+              sumCostNanoUsdByRequestType: typeof mockSumCostNanoUsdByRequestType;
+            }
           | undefined,
       },
     };

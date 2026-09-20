@@ -180,6 +180,7 @@ let _env = null;
  */
 const CONNECT_LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
+/** @param {string} value */
 export const isAcceptableConnectEndpoint = (value) => {
   let parsed;
   try {
@@ -194,6 +195,7 @@ export const isAcceptableConnectEndpoint = (value) => {
   );
 };
 
+/** @param {string} name the variable, named in the refusal */
 export const connectEndpointSchema = (name) =>
   z
     .string()
