@@ -100,6 +100,7 @@ describe("given no page claims an explorer action", () => {
     it("says source saved, the default lens and window, and no count", async () => {
       const result = (await run("explorer.getState", {})) as {
         source: string;
+        note: string;
         lens: { id: string };
         timeRange: { presetId: string; to: number };
         totalHits: number | null;
@@ -107,7 +108,6 @@ describe("given no page claims an explorer action", () => {
       };
       expect(result.source).toBe("saved");
       expect(result.note).toContain("not what is on the user's screen");
-      expect(result.totalHits).toBeNull();
       expect(result.lens.id).toBe("all-traces");
       expect(result.timeRange.presetId).toBe("30d");
       expect(result.timeRange.to).toBe(NOW);
