@@ -96,6 +96,13 @@ Feature: Langy drives and reads the Trace Explorer
       And a note saying these are not what is on the user's screen
 
     @unit
+    Scenario: A CLI older than the skill is named, not worked around
+      Given the find-traces skill
+      When a trace subcommand it needs is refused as unknown
+      Then it says the worker's CLI is older than the skill and names the command
+      And it does not report that nothing was found
+
+    @unit
     Scenario: The skill answers a saved read with the link, not a count
       Given the find-traces skill
       When it reads a state whose source is saved

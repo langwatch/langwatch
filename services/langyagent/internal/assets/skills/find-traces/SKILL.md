@@ -42,6 +42,8 @@ langwatch trace facets <field> --start-date <from> --end-date <to> --format json
 
 Read the reference once per session. Use `trace facets` every time the concept maps to a field whose values you have not seen, because values differ per project: an event named `thumbs_up_down` in one project is `feedback` in another.
 
+If any of these three is refused as an unknown command or an unknown option, the CLI on this worker is older than this skill. Say that, name the command that was refused and the version `langwatch --version` reports, and stop: an older CLI cannot list the fields or filter the search, so a search that runs without them would answer "none found" for a project that has results.
+
 ## Step 3: Search every form the concept can take
 
 A concept can be recorded in several places. One empty search says one form is empty, not that the traces do not exist. Before reporting that nothing was found, try each form that applies:

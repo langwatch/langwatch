@@ -76,6 +76,20 @@ describe("the find-traces skill", () => {
     });
   });
 
+  describe("given its section on learning the fields", () => {
+    /** @scenario "A CLI older than the skill is named, not worked around" */
+    it("names a CLI too old for the commands it needs instead of answering none", () => {
+      const section = sectionOf(
+        renderedSkill(),
+        "Step 2: Learn the fields before writing a filter",
+      );
+      expect(section).toContain("refused as an unknown command");
+      expect(section).toContain("older than this skill");
+      expect(section).toContain("langwatch --version");
+      expect(section).toContain('"none found"');
+    });
+  });
+
   describe("given its section on driving the Explorer", () => {
     /** @scenario "The skill answers a saved read with the link, not a count" */
     it("answers a saved read with the link rather than a number it did not read", () => {
