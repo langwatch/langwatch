@@ -8,10 +8,10 @@ import {
 } from "@chakra-ui/react";
 import type { BankTransferChoice, BillingForm } from "./billingForm";
 
-type SetField = <K extends keyof BillingForm>(
-  key: K,
-  value: BillingForm[K],
-) => void;
+type SetField = <K extends keyof BillingForm>(change: {
+  key: K;
+  value: BillingForm[K];
+}) => void;
 
 /** The contract an operator onboards or renews on. */
 export function BillingFields({
@@ -23,7 +23,7 @@ export function BillingFields({
   onChange: (form: BillingForm) => void;
   showPaymentFields: boolean;
 }) {
-  const set: SetField = (key, value) => onChange({ ...form, [key]: value });
+  const set: SetField = ({ key, value }) => onChange({ ...form, [key]: value });
   return (
     <VStack align="start" gap={3} width="full">
       <SimpleGrid columns={2} gap={3} width="full">
@@ -32,7 +32,9 @@ export function BillingFields({
           <Input
             type="date"
             value={form.termStartsAt}
-            onChange={(event) => set("termStartsAt", event.target.value)}
+            onChange={(event) =>
+              set({ key: "termStartsAt", value: event.target.value })
+            }
           />
         </Field.Root>
         <Field.Root>
@@ -40,7 +42,9 @@ export function BillingFields({
           <Input
             type="date"
             value={form.termEndsAt}
-            onChange={(event) => set("termEndsAt", event.target.value)}
+            onChange={(event) =>
+              set({ key: "termEndsAt", value: event.target.value })
+            }
           />
         </Field.Root>
         <Field.Root>
@@ -49,7 +53,9 @@ export function BillingFields({
             type="number"
             min={1}
             value={form.seats}
-            onChange={(event) => set("seats", event.target.value)}
+            onChange={(event) =>
+              set({ key: "seats", value: event.target.value })
+            }
           />
         </Field.Root>
         <Field.Root>
@@ -60,13 +66,18 @@ export function BillingFields({
               min={0}
               step="0.01"
               value={form.seatRate}
-              onChange={(event) => set("seatRate", event.target.value)}
+              onChange={(event) =>
+                set({ key: "seatRate", value: event.target.value })
+              }
             />
             <NativeSelect.Root width="28">
               <NativeSelect.Field
                 value={form.seatCurrency}
                 onChange={(event) =>
-                  set("seatCurrency", event.target.value as "USD" | "EUR")
+                  set({
+                    key: "seatCurrency",
+                    value: event.target.value as "USD" | "EUR",
+                  })
                 }
               >
                 <option value="USD">USD</option>
@@ -83,7 +94,9 @@ export function BillingFields({
             min={0}
             step="0.01"
             value={form.commit}
-            onChange={(event) => set("commit", event.target.value)}
+            onChange={(event) =>
+              set({ key: "commit", value: event.target.value })
+            }
           />
           <Field.HelperText>
             Must match the commit agreed on the license.
@@ -103,7 +116,9 @@ function PaymentFields({ form, set }: { form: BillingForm; set: SetField }) {
         <Input
           type="email"
           value={form.billingEmail}
-          onChange={(event) => set("billingEmail", event.target.value)}
+          onChange={(event) =>
+            set({ key: "billingEmail", value: event.target.value })
+          }
         />
       </Field.Root>
       <Field.Root>
@@ -113,10 +128,10 @@ function PaymentFields({ form, set }: { form: BillingForm; set: SetField }) {
             <NativeSelect.Field
               value={form.bankTransferType}
               onChange={(event) =>
-                set(
-                  "bankTransferType",
-                  event.target.value as BankTransferChoice,
-                )
+                set({
+                  key: "bankTransferType",
+                  value: event.target.value as BankTransferChoice,
+                })
               }
             >
               <option value="">
@@ -135,7 +150,9 @@ function PaymentFields({ form, set }: { form: BillingForm; set: SetField }) {
             placeholder="NL"
             disabled={form.bankTransferType !== "eu_bank_transfer"}
             value={form.bankTransferCountry}
-            onChange={(event) => set("bankTransferCountry", event.target.value)}
+            onChange={(event) =>
+              set({ key: "bankTransferCountry", value: event.target.value })
+            }
           />
         </HStack>
       </Field.Root>

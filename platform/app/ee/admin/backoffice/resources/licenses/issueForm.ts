@@ -22,10 +22,10 @@ export interface IssueForm {
   licenseKey: string;
 }
 
-export type SetIssueField = <K extends keyof IssueForm>(
-  key: K,
-  value: IssueForm[K],
-) => void;
+export type SetIssueField = <K extends keyof IssueForm>(change: {
+  key: K;
+  value: IssueForm[K];
+}) => void;
 
 function emptyIssueForm(): IssueForm {
   return {
@@ -45,8 +45,13 @@ function emptyIssueForm(): IssueForm {
 
 export function useIssueForm() {
   const [form, setForm] = useState<IssueForm>(emptyIssueForm);
-  const set = <K extends keyof IssueForm>(key: K, value: IssueForm[K]) =>
-    setForm((current) => ({ ...current, [key]: value }));
+  const set = <K extends keyof IssueForm>({
+    key,
+    value,
+  }: {
+    key: K;
+    value: IssueForm[K];
+  }) => setForm((current) => ({ ...current, [key]: value }));
   // The drawer stays mounted between openings, so it is this that decides
   // what the operator sees on the next one rather than the unmount.
   const reset = useCallback(() => setForm(emptyIssueForm()), []);

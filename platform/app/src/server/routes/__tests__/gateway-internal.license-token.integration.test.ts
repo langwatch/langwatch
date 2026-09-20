@@ -9,20 +9,6 @@
  * Spec: specs/self-hosting/connected-services/license-credential.feature
  */
 
-import {
-  createHash,
-  createHmac,
-  generateKeyPairSync,
-  randomBytes,
-} from "node:crypto";
-import { licenseTokenFromKey } from "@ee/licensing/licenseToken";
-import { PrismaConnectManagedKeys } from "@ee/licensing/registry/connectManagedKey.prisma";
-import {
-  PrismaCustomerOrganizations,
-  PrismaIssuedLicenseRepository,
-  PrismaLicenseSeatReports,
-} from "@ee/licensing/registry/issuedLicense.prisma";
-import { LicenseRegistryService } from "@ee/licensing/registry/licenseRegistry.service";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
@@ -32,126 +18,24 @@ import {
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { eligibleModelProvidersForVk } from "~/server/gateway/scopeResolver";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
-import { app } from "../gateway-internal";
-
-const suffix = nanoid(8);
-const USER_ID = `usr-lwl-${suffix}`;
-const CUSTOMER_NAME = `ACME Rockets ${suffix}`;
-const SIGNING_SECRET = randomBytes(16).toString("hex");
-const NEXT_YEAR = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
-
-const { privateKey, publicKey } = generateKeyPairSync("rsa", {
-  modulusLength: 2048,
-  privateKeyEncoding: { type: "pkcs8", format: "pem" },
-  publicKeyEncoding: { type: "spki", format: "pem" },
-});
-
-function signedResolveKey(body: Record<string, string>) {
-  const path = "/api/internal/gateway/resolve-key";
-  const payload = JSON.stringify(body);
-  const timestamp = Math.floor(Date.now() / 1000).toString();
-  const bodyHash = createHash("sha256").update(payload).digest("hex");
-  const signature = createHmac("sha256", SIGNING_SECRET)
-    .update(`POST\n${path}\n${timestamp}\n${bodyHash}`)
-    .digest("hex");
-  return new Request(`http://localhost${path}`, {
-    method: "POST",
-    body: payload,
-    headers: {
-      "Content-Type": "application/json",
-      "X-LangWatch-Gateway-Signature": signature,
-      "X-LangWatch-Gateway-Timestamp": timestamp,
-    },
-  });
-}
-
-async function resolve(body: Record<string, string>) {
-  const res = await app.request(signedResolveKey(body));
-  const text = await res.text();
-  const json = JSON.parse(text) as {
-    jwt?: string;
-    key_id?: string;
-    error?: { code?: string };
-  };
-  return { status: res.status, text, json };
-}
-
-function claimsOf(jwt: string): Record<string, unknown> {
-  const payload = jwt.split(".")[1] ?? "";
-  return JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
-}
+import { licenseTokenHarness } from "./support/licenseTokenHarness";
 
 describe("a license token on resolve-key (real PG + internal route)", () => {
-  const previous: Record<string, string | undefined> = {};
-  const organizationIds: string[] = [];
-  const registry = new LicenseRegistryService({
-    repository: new PrismaIssuedLicenseRepository(prisma),
-    seatReports: new PrismaLicenseSeatReports(prisma),
-    organizations: new PrismaCustomerOrganizations(prisma),
-    managedKeys: new PrismaConnectManagedKeys(prisma),
-    contractBudgets: { sync: async () => undefined },
-    signingKey: () => privateKey,
-    publicKey,
-    encrypt: (plain) => `enc:${plain.length}`,
-  });
-
-  const issue = async (seats = 50) => {
-    const { licenseKey, license } = await registry.issue({
-      customer: { newOrganizationName: CUSTOMER_NAME },
-      email: "ops@acme.test",
-      planType: "ENTERPRISE",
-      maxMembers: seats,
-      expiresAt: NEXT_YEAR,
-      operatorId: USER_ID,
-    });
-    organizationIds.push(license.organizationId as string);
-    return {
-      id: license.id,
-      organizationId: license.organizationId as string,
-      token: licenseTokenFromKey(licenseKey) as string,
-    };
-  };
+  const harness = licenseTokenHarness();
+  const { claimsOf, issue, resolve } = harness;
+  const USER_ID = harness.userId;
+  const suffix = harness.suffix;
+  const NEXT_YEAR = harness.nextYear;
+  const organizationIds = harness.organizationIds;
+  const registry = harness.registry;
 
   beforeAll(async () => {
     await startTestContainers();
-    for (const name of [
-      "LW_GATEWAY_INTERNAL_SECRET",
-      "LW_GATEWAY_JWT_SECRET",
-    ]) {
-      previous[name] = process.env[name];
-      process.env[name] = SIGNING_SECRET;
-    }
-    await prisma.user.create({
-      data: { id: USER_ID, email: `${suffix}@lwl.local`, name: "Operator" },
-    });
+    await harness.start();
   }, 120_000);
 
   afterAll(async () => {
-    for (const [name, value] of Object.entries(previous)) {
-      if (value === undefined) delete process.env[name];
-      else process.env[name] = value;
-    }
-    const inOrganizations = { organizationId: { in: organizationIds } };
-    await prisma.issuedLicense.deleteMany({ where: inOrganizations });
-    await prisma.gatewayChangeEvent.deleteMany({ where: inOrganizations });
-    const keys = await prisma.virtualKey.findMany({
-      where: inOrganizations,
-      select: { id: true },
-    });
-    await prisma.virtualKeyScope.deleteMany({
-      where: { virtualKeyId: { in: keys.map((key) => key.id) } },
-    });
-    await prisma.virtualKey.deleteMany({ where: inOrganizations });
-    for (const organizationId of organizationIds) {
-      await prisma.modelProvider.deleteMany({ where: { organizationId } });
-    }
-    await prisma.auditLog.deleteMany({ where: inOrganizations });
-    await prisma.project.deleteMany({ where: { team: inOrganizations } });
-    await prisma.team.deleteMany({ where: inOrganizations });
-    await prisma.organization.deleteMany({
-      where: { id: { in: organizationIds } },
-    });
-    await prisma.user.deleteMany({ where: { id: USER_ID } });
+    await harness.stop();
     await stopTestContainers();
   });
 

@@ -9,7 +9,10 @@ import {
 import type { TermsForm } from "./terms";
 import { SERVICE_LABELS, SERVICES } from "./types";
 
-type SetTerm = <K extends keyof TermsForm>(key: K, value: TermsForm[K]) => void;
+type SetTerm = <K extends keyof TermsForm>(change: {
+  key: K;
+  value: TermsForm[K];
+}) => void;
 
 export function TermsFields({
   form,
@@ -18,8 +21,13 @@ export function TermsFields({
   form: TermsForm;
   onChange: (form: TermsForm) => void;
 }) {
-  const set = <K extends keyof TermsForm>(key: K, value: TermsForm[K]) =>
-    onChange({ ...form, [key]: value });
+  const set = <K extends keyof TermsForm>({
+    key,
+    value,
+  }: {
+    key: K;
+    value: TermsForm[K];
+  }) => onChange({ ...form, [key]: value });
   return (
     <VStack align="start" gap={3} width="full">
       <ServicesField form={form} set={set} />
@@ -42,12 +50,12 @@ function ServicesField({ form, set }: { form: TermsForm; set: SetTerm }) {
               type="checkbox"
               checked={form.services.includes(service)}
               onChange={(event) =>
-                set(
-                  "services",
-                  event.target.checked
+                set({
+                  key: "services",
+                  value: event.target.checked
                     ? [...form.services, service]
                     : form.services.filter((s) => s !== service),
-                )
+                })
               }
             />{" "}
             {SERVICE_LABELS[service]}
@@ -70,7 +78,9 @@ function SeatFields({ form, set }: { form: TermsForm; set: SetTerm }) {
           type="number"
           min={0}
           value={form.seatOverageAllowance}
-          onChange={(event) => set("seatOverageAllowance", event.target.value)}
+          onChange={(event) =>
+            set({ key: "seatOverageAllowance", value: event.target.value })
+          }
           placeholder="Default: a fifth of the seats, rounded up"
         />
       </Field.Root>
@@ -82,13 +92,18 @@ function SeatFields({ form, set }: { form: TermsForm; set: SetTerm }) {
             min={0}
             step="0.01"
             value={form.seatRate}
-            onChange={(event) => set("seatRate", event.target.value)}
+            onChange={(event) =>
+              set({ key: "seatRate", value: event.target.value })
+            }
           />
           <NativeSelect.Root width="28">
             <NativeSelect.Field
               value={form.seatCurrency}
               onChange={(event) =>
-                set("seatCurrency", event.target.value as "USD" | "EUR")
+                set({
+                  key: "seatCurrency",
+                  value: event.target.value as "USD" | "EUR",
+                })
               }
             >
               <option value="USD">USD</option>
@@ -112,7 +127,9 @@ function UsageFields({ form, set }: { form: TermsForm; set: SetTerm }) {
           min={0}
           step="0.01"
           value={form.commit}
-          onChange={(event) => set("commit", event.target.value)}
+          onChange={(event) =>
+            set({ key: "commit", value: event.target.value })
+          }
         />
       </Field.Root>
       <Field.Root>
@@ -122,7 +139,10 @@ function UsageFields({ form, set }: { form: TermsForm; set: SetTerm }) {
             <NativeSelect.Field
               value={form.overageEnabled ? "on" : "off"}
               onChange={(event) =>
-                set("overageEnabled", event.target.value === "on")
+                set({
+                  key: "overageEnabled",
+                  value: event.target.value === "on",
+                })
               }
             >
               <option value="off">Off</option>
@@ -136,7 +156,9 @@ function UsageFields({ form, set }: { form: TermsForm; set: SetTerm }) {
             step="0.01"
             disabled={!form.overageEnabled}
             value={form.overageMax}
-            onChange={(event) => set("overageMax", event.target.value)}
+            onChange={(event) =>
+              set({ key: "overageMax", value: event.target.value })
+            }
             placeholder="Maximum (USD)"
           />
         </HStack>
