@@ -74,6 +74,13 @@ export interface RouteSearchInput {
   langyAvailable?: boolean;
 }
 
+/** Which of the optional routes this submit may be given. */
+interface RouteAvailability {
+  langyAvailable: boolean;
+  /** False while Instant Evals are not released for the project. */
+  instantEvalAvailable: boolean;
+}
+
 export type RouteSearchResult =
   | {
       kind: "filter";
@@ -129,6 +136,8 @@ export interface SearchRouterDeps {
     projectId: string;
     timeRange: { from: number; to: number };
   }) => Promise<KnownProjectSignals>;
+  /** Whether Instant Evals are released for the project (the flag alone). */
+  isInstantEvalReleased: (input: { projectId: string }) => Promise<boolean>;
   /** Counts a decision. Never metered. */
   recordDecision: (decision: {
     route: SearchRouteKind;
@@ -144,20 +153,26 @@ const ROUTE_QUESTION_ID = "route";
 /** How the classifier is asked. Exported so the prompt is pinned by a test. */
 export function buildRouteQuestion({
   langyAvailable,
-}: {
-  langyAvailable: boolean;
-}): InstantEvalCategoryQuestion {
+  instantEvalAvailable = true,
+}: Pick<RouteAvailability, "langyAvailable"> &
+  Partial<
+    Pick<RouteAvailability, "instantEvalAvailable">
+  >): InstantEvalCategoryQuestion {
   const options = [
     {
       name: "filter",
       description:
         "The sentence can be written with the trace filter fields listed: a status, a model, a service, a duration, a cost, an evaluator result, an event name, a user or conversation id.",
     },
-    {
-      name: "instant_eval",
-      description:
-        "Finding the traces needs reading each one and judging its content (a tone, a language, a promise made, a topic discussed), and no listed evaluator or event already records it.",
-    },
+    ...(instantEvalAvailable
+      ? [
+          {
+            name: "instant_eval",
+            description:
+              "Finding the traces needs reading each one and judging its content (a tone, a language, a promise made, a topic discussed), and no listed evaluator or event already records it.",
+          },
+        ]
+      : []),
     {
       name: "free_text",
       description:
@@ -227,8 +242,21 @@ function isRouteKind(value: unknown): value is SearchRouteKind {
   );
 }
 
+/**
+ * The codes model resolution fails with when the project has no model to
+ * call: none set at any scope, or one set whose provider is switched off.
+ * Both are fixed from the model provider settings, so both get the primer.
+ */
+const MODEL_UNAVAILABLE_CODES: readonly string[] = [
+  "model_not_configured",
+  "model_provider_disabled",
+];
+
 function isModelUnavailable(error: unknown): boolean {
-  return error instanceof HandledError && error.code === "model_not_configured";
+  return (
+    error instanceof HandledError &&
+    MODEL_UNAVAILABLE_CODES.includes(error.code)
+  );
 }
 
 /** A query the language parses, or null when it does not. */
@@ -249,7 +277,7 @@ interface RouteContext {
   explicitQuery: string;
   target: InstantEvalSearchTarget;
   known: KnownProjectSignals;
-  langyAvailable: boolean;
+  available: RouteAvailability;
 }
 
 function phraseSearch({
@@ -434,9 +462,7 @@ async function classify(
         timeRange: input.timeRange,
         known: context.known,
       }),
-      questions: [
-        buildRouteQuestion({ langyAvailable: context.langyAvailable }),
-      ],
+      questions: [buildRouteQuestion(context.available)],
     });
     const label = judgement.verdicts.find(
       (candidate) => candidate.questionId === ROUTE_QUESTION_ID,
@@ -470,7 +496,12 @@ async function applyClassified({
     case "filter":
       return buildFilterRoute({ context, decidedBy });
     case "instant_eval":
-      return buildInstantEvalRoute({ context, decidedBy });
+      // The option is not offered while Instant Evals are unreleased; an
+      // answer naming it anyway is searched as a filter, which falls to the
+      // phrase on its own when the model cannot write one.
+      return context.available.instantEvalAvailable
+        ? buildInstantEvalRoute({ context, decidedBy })
+        : buildFilterRoute({ context, decidedBy });
     case "free_text":
       return freeText({ context, decidedBy });
     case "langy":
@@ -491,7 +522,7 @@ async function routeWithModel(
       timeRange: input.timeRange,
       target: context.target,
       known: context.known,
-      langyAvailable: context.langyAvailable,
+      ...context.available,
     });
   } catch (error) {
     const modelUnavailable = isModelUnavailable(error);
@@ -513,6 +544,9 @@ async function routeWithModel(
     case "filter":
       return finishFilter({ context, generated: decision.query, decidedBy });
     case "instant_eval":
+      if (!context.available.instantEvalAvailable) {
+        return freeText({ context, decidedBy });
+      }
       return instantEval({
         context,
         question: {
@@ -525,6 +559,25 @@ async function routeWithModel(
       return langy({ context, decidedBy });
     case "free_text":
       return freeText({ context, decidedBy });
+  }
+}
+
+/** The flag read, failing closed: an unreadable flag offers no judgement. */
+async function isInstantEvalReleased({
+  deps,
+  input,
+}: {
+  deps: SearchRouterDeps;
+  input: RouteSearchInput;
+}): Promise<boolean> {
+  try {
+    return await deps.isInstantEvalReleased({ projectId: input.projectId });
+  } catch (error) {
+    logger.warn(
+      { projectId: input.projectId, err: error },
+      "Instant Evals release could not be read; routing without the judgement route",
+    );
+    return false;
   }
 }
 
@@ -561,14 +614,21 @@ async function routeSearch({
     deps.recordDecision({ route: "filter", decidedBy: "fallback" });
     return { kind: "filter", query: explicitQuery, decidedBy: "fallback" };
   }
+  const [known, instantEvalAvailable] = await Promise.all([
+    listKnownSignals({ deps, input }),
+    isInstantEvalReleased({ deps, input }),
+  ]);
   const context: RouteContext = {
     deps,
     input,
     sentence,
     explicitQuery,
     target: input.lensId === CONVERSATIONS_LENS_ID ? "threads" : "traces",
-    known: await listKnownSignals({ deps, input }),
-    langyAvailable: input.langyAvailable ?? true,
+    known,
+    available: {
+      langyAvailable: input.langyAvailable ?? true,
+      instantEvalAvailable,
+    },
   };
   const classified = await classify(context);
   if (classified) return applyClassified({ context, classified });

@@ -8,10 +8,12 @@
 import { type Counter, metrics } from "@opentelemetry/api";
 
 import { getApp } from "~/server/app-layer/app";
+import { instantEvalsReleased } from "~/server/app-layer/instant-evals/access";
 import {
   getInstantEvalClassifier,
   isInstantEvalClassifierConfigured,
 } from "~/server/app-layer/instant-evals/classifier";
+import { prisma } from "~/server/db";
 import {
   generateInstantEvalQuestion,
   generateSearchRoute,
@@ -91,6 +93,8 @@ export function routeSearch(
     buildQuestion: generateInstantEvalQuestion,
     routeWithModel: generateSearchRoute,
     listKnownSignals,
+    isInstantEvalReleased: ({ projectId }) =>
+      instantEvalsReleased({ prisma, projectId }),
     recordDecision,
   }).route(input);
 }

@@ -10,7 +10,17 @@
  * Spec: specs/traces-v2/search.feature ("Enter routes a sentence").
  */
 import { MockLanguageModelV3 } from "ai/test";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { nanoid } from "nanoid";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
+import { prisma } from "~/server/db";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { getTestUser } from "../../../../utils/testUtils";
 import { ModelNotConfiguredError } from "../../../modelProviders/modelNotConfiguredError";
@@ -26,11 +36,31 @@ vi.mock("~/server/app-layer/instant-evals/classifier", () => ({
   },
 }));
 
-const mockGetVercelAIModel = vi.fn();
-vi.mock("~/server/modelProviders/utils", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("~/server/modelProviders/utils")>()),
-  getVercelAIModel: (...args: unknown[]) => mockGetVercelAIModel(...args),
+// The release flag is off by default; these cases state it instead.
+const mockInstantEvalsReleased = vi.fn(async () => true);
+vi.mock("~/server/app-layer/instant-evals/access", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("~/server/app-layer/instant-evals/access")
+  >()),
+  instantEvalsReleased: () => mockInstantEvalsReleased(),
 }));
+
+const mockGetVercelAIModel = vi.fn();
+/** The unmocked resolver, for the case that runs the real model resolution. */
+const real = vi.hoisted(() => ({
+  getVercelAIModel: null as ((...args: unknown[]) => unknown) | null,
+}));
+vi.mock("~/server/modelProviders/utils", async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import("~/server/modelProviders/utils")>();
+  real.getVercelAIModel = original.getVercelAIModel as (
+    ...args: unknown[]
+  ) => unknown;
+  return {
+    ...original,
+    getVercelAIModel: (...args: unknown[]) => mockGetVercelAIModel(...args),
+  };
+});
 
 const PROJECT_ID = "test-project-id";
 const RANGE = { from: Date.now() - 3_600_000, to: Date.now() };
@@ -69,6 +99,8 @@ describe("tracesV2.routeSearch", () => {
 
   beforeEach(() => {
     mockGetVercelAIModel.mockReset();
+    mockInstantEvalsReleased.mockReset();
+    mockInstantEvalsReleased.mockResolvedValue(true);
   });
 
   describe("given only field:value terms", () => {
@@ -144,6 +176,34 @@ describe("tracesV2.routeSearch", () => {
     });
   });
 
+  describe("given Instant Evals are not released and a model that answers a judgement", () => {
+    /** @scenario "With Instant Evals not released for the project the router does not offer the judgement route" */
+    it("searches the phrase and tells the model the route is closed", async () => {
+      mockInstantEvalsReleased.mockResolvedValue(false);
+      const model = modelAnswering({
+        route: "instant_eval",
+        instructions: "Does the user sound annoyed?",
+        yes: "Complains or repeats a request",
+        no: "Stays neutral",
+      });
+      mockGetVercelAIModel.mockResolvedValue(model);
+      const result = await caller.tracesV2.routeSearch({
+        projectId: PROJECT_ID,
+        text: "annoyed users",
+        timeRange: RANGE,
+      });
+      expect(result).toEqual({
+        kind: "free_text",
+        query: '"annoyed users"',
+        decidedBy: "model",
+        modelUnavailable: false,
+      });
+      expect(JSON.stringify(model.doGenerateCalls[0]?.prompt)).toContain(
+        "`instant_eval` is not available on this project",
+      );
+    });
+  });
+
   describe("given no classifier and no model configured", () => {
     /** @scenario "Without a classifier or a model the words are searched as a phrase" */
     it("searches the phrase and flags the missing model, without an error", async () => {
@@ -163,6 +223,70 @@ describe("tracesV2.routeSearch", () => {
       expect(result).toEqual({
         kind: "free_text",
         query: 'status:error AND "annoyed users"',
+        decidedBy: "fallback",
+        modelUnavailable: true,
+        fellBackFrom: "routing",
+      });
+    });
+  });
+
+  describe("given no classifier and a FAST model whose provider is disabled", () => {
+    let configId: string | undefined;
+    let providerId: string | undefined;
+
+    beforeAll(async () => {
+      const project = await prisma.project.findUniqueOrThrow({
+        where: { id: PROJECT_ID },
+        include: { team: true },
+      });
+      const organizationId = project.team.organizationId;
+      const provider = await prisma.modelProvider.create({
+        data: {
+          name: `DeepSeek ${nanoid(6)}`,
+          provider: "deepseek",
+          enabled: false,
+          organizationId,
+          scopes: { create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }] },
+        },
+        select: { id: true },
+      });
+      providerId = provider.id;
+      const config = await prisma.modelDefaultConfig.create({
+        data: {
+          config: {
+            DEFAULT: "deepseek/deepseek-chat",
+            FAST: "deepseek/deepseek-chat",
+          },
+          organizationId,
+          scopes: { create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }] },
+        },
+        select: { id: true },
+      });
+      configId = config.id;
+    });
+
+    afterAll(async () => {
+      if (configId) {
+        await prisma.modelDefaultConfig.delete({ where: { id: configId } });
+      }
+      if (providerId) {
+        await prisma.modelProvider.delete({ where: { id: providerId } });
+      }
+    });
+
+    /** @scenario "A model whose provider is disabled counts as no model" */
+    it("searches the phrase and flags the missing model, through the real model resolution", async () => {
+      mockGetVercelAIModel.mockImplementation((...args: unknown[]) =>
+        real.getVercelAIModel?.(...args),
+      );
+      const result = await caller.tracesV2.routeSearch({
+        projectId: PROJECT_ID,
+        text: "annoyed users",
+        timeRange: RANGE,
+      });
+      expect(result).toEqual({
+        kind: "free_text",
+        query: '"annoyed users"',
         decidedBy: "fallback",
         modelUnavailable: true,
         fellBackFrom: "routing",

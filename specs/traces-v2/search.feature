@@ -1436,6 +1436,46 @@ Rule: Enter routes a sentence
     And the bar shows the "Connect a model for smarter search" popover once per session, closable
     And the popover links to the model provider settings in a new tab
 
+  @integration
+  Scenario: Back returns to the search before
+    Given the user submitted "status:error" and then "model:gpt-5-mini"
+    When the user presses the browser's Back button
+    Then the Explorer stays open on "status:error", with its window, lens and run keys
+    And Forward returns to "model:gpt-5-mini"
+    # A submitted search (Enter, a facet click, a range or lens pick, a Langy
+    # action) is a history entry. Restoring one is not a new search.
+
+  @integration
+  Scenario: Run progress and run keys never add history entries
+    Given a search whose Instant Eval run is registered a moment after the submit
+    When the run key reaches the URL
+    Then it is written into the entry the submit made
+
+  @unit
+  Scenario: With Instant Evals not released for the project the router does not offer the judgement route
+    Given Instant Evals are not released for the project
+    When the user submits "annoyed users"
+    Then the classifier is asked without the instant_eval option
+    And the model is told the instant_eval route is not available
+    And a judgement answer from either is searched as a filter or as the phrase
+    And no Instant Eval popover or dialog is shown
+
+  @integration
+  Scenario: A model whose provider is disabled counts as no model
+    Given the deployment has no classifier configured
+    And the project's FAST model belongs to a provider that is disabled
+    When the user submits "annoyed users"
+    Then the query `"annoyed users"` is applied
+    And the result says a model is unavailable
+
+  @unit
+  Scenario: A classified route that finds the provider disabled says a model is unavailable
+    Given the classifier answers "filter"
+    And the project's FAST model belongs to a provider that is disabled
+    When the user submits "failing calls"
+    Then the query `"failing calls"` is applied
+    And the result says a model is unavailable
+
   @unit
   Scenario: A model failure is a phrase search, not an error
     Given the FAST model fails on every attempt
@@ -1502,10 +1542,26 @@ Rule: The search bar's ask affordance belongs to Langy when Langy is available
 
   Scenario: Clicking Ask Langy floats the ask surface over the search bar
     Given the Langy panel is closed
-    When the user clicks "Ask Langy" (or presses ⌘I / Ctrl+I)
+    When the user clicks "Ask Langy"
     Then a Langy-styled ask surface floats where the search bar was
     And the user can type their question there, next to their traces
     And the inline AI composer does not open
+
+  @integration
+  Scenario: With Langy available the ⌘I shortcut belongs to the Langy panel
+    Given the Langy panel is closed
+    When the user presses ⌘I / Ctrl+I on the Observe page
+    Then the search bar does not answer the shortcut, and no floating surface opens
+    # ⌘I toggles the Langy panel on every page of the product. Two listeners
+    # on one key opened the surface and the panel together, and the panel
+    # opening retired the surface, so the key keeps its one product-wide
+    # meaning. The panel reads the view and the search as page context.
+
+  @integration
+  Scenario: Without Langy the ⌘I shortcut opens the Ask AI bar
+    Given Langy is not available to the user
+    When the user presses ⌘I / Ctrl+I on the Observe page
+    Then the structured bar is replaced by the floating Ask AI bar
 
   Scenario: The floating surface shows what will go with the question
     Given the search bar contains the applied query "status:error"

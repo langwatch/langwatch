@@ -625,6 +625,8 @@ export interface SearchRouteInput {
   known: KnownProjectSignals;
   /** Whether the Langy route is open to this user at all. */
   langyAvailable: boolean;
+  /** Whether Instant Evals are released for the project. */
+  instantEvalAvailable: boolean;
 }
 
 const searchRouteSchema = z.discriminatedUnion("route", [
@@ -654,9 +656,11 @@ type SearchRouteAttempt =
 function interpretSearchRouteObject({
   decision,
   langyAvailable,
+  instantEvalAvailable,
 }: {
   decision: SearchRouteObject;
   langyAvailable: boolean;
+  instantEvalAvailable: boolean;
 }): SearchRouteAttempt {
   switch (decision.route) {
     case "filter": {
@@ -669,6 +673,7 @@ function interpretSearchRouteObject({
       };
     }
     case "instant_eval":
+      if (!instantEvalAvailable) return { done: { route: "free_text" } };
       return {
         done: {
           route: "instant_eval",
@@ -764,6 +769,7 @@ export async function generateSearchRoute(
     const outcome = interpretSearchRouteObject({
       decision: asked.decision,
       langyAvailable: input.langyAvailable,
+      instantEvalAvailable: input.instantEvalAvailable,
     });
     if ("done" in outcome) return outcome.done;
     providerError = null;
@@ -803,6 +809,20 @@ function buildSearchRoutePrompt({
    this morning", "compare this week with last week", "summarise what
    changed"). The assistant takes it as a question.`
     : `4. \`langy\` is not available to this operator; never pick it.`;
+  const instantEvalRoute = input.instantEvalAvailable
+    ? `2. **\`instant_eval\`**: finding the traces needs reading each one and
+   judging it ("annoyed users", "answers that promise a refund",
+   "conversations in German"), and no evaluator or event below already
+   captures it. Write the judge question: \`instructions\` (one or two
+   sentences, second person, about one ${
+     input.target === "threads" ? "conversation" : "trace"
+}), \`yes\` and \`no\` (what each looks like in the text).`
+    : `2. \`instant_eval\` is not available on this project; never pick it. A
+   sentence that needs a judgement is a \`filter\` when an evaluator or
+   event below answers it, and \`free_text\` otherwise.`;
+  const judgementExample = input.instantEvalAvailable
+    ? `{"route":"instant_eval","instructions":"Does the user express frustration or annoyance at any point?","yes":"The user complains, repeats a request with emphasis, or uses words like frustrated or useless.","no":"The user stays neutral or satisfied throughout."}`
+    : `{"route":"free_text"}`;
   return `You decide what an operator's search-bar sentence is, and build what it
 needs. The operator is looking at a list of LLM traces and typed words
 without \`field:value\` syntax. Reply with a JSON object matching the
@@ -813,13 +833,7 @@ without \`field:value\` syntax. Reply with a JSON object matching the
 1. **\`filter\`**: the sentence can be written in the trace query language
    with the fields below ("errors from gpt-4 over five seconds",
    "traces with negative feedback"). Build the \`query\`.
-2. **\`instant_eval\`**: finding the traces needs reading each one and
-   judging it ("annoyed users", "answers that promise a refund",
-   "conversations in German"), and no evaluator or event below already
-   captures it. Write the judge question: \`instructions\` (one or two
-   sentences, second person, about one ${
-     input.target === "threads" ? "conversation" : "trace"
-}), \`yes\` and \`no\` (what each looks like in the text).
+${instantEvalRoute}
 3. **\`free_text\`**: the sentence is a literal string to find in the
    traces ("order 4521", "cannot connect to database", a quoted error).
 ${langyRoute}
@@ -856,7 +870,7 @@ ${fieldsBlock}
 {"route":"filter","query":"status:error AND model:gpt-4* AND duration:>5000"}
 
 "annoyed users" →
-{"route":"instant_eval","instructions":"Does the user express frustration or annoyance at any point?","yes":"The user complains, repeats a request with emphasis, or uses words like frustrated or useless.","no":"The user stays neutral or satisfied throughout."}
+${judgementExample}
 
 "cannot connect to database" →
 {"route":"free_text"}

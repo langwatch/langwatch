@@ -53,6 +53,15 @@ function answering(label: SearchRouteKind | null) {
   return { classify };
 }
 
+class ProviderDisabled extends HandledError {
+  declare readonly code: "model_provider_disabled";
+  constructor() {
+    super("model_provider_disabled", "The model's provider is disabled.", {
+      httpStatus: 400,
+    });
+  }
+}
+
 class NoModel extends HandledError {
   declare readonly code: "model_not_configured";
   constructor() {
@@ -82,6 +91,7 @@ function deps(
       evaluators: ["ragas/faithfulness"],
       events: ["thumbs_up_down"],
     })),
+    isInstantEvalReleased: vi.fn(async () => true),
     recordDecision: vi.fn<SearchRouterDeps["recordDecision"]>(),
     ...overrides,
   };
@@ -159,6 +169,28 @@ describe("given the classifier is configured", () => {
       const result = await createSearchRouter(d).route(input());
       expect(result).toMatchObject({
         kind: "free_text",
+        modelUnavailable: true,
+        fellBackFrom: "filter",
+      });
+    });
+  });
+
+  describe("when it answers filter and the model's provider is disabled", () => {
+    /** @scenario "A classified route that finds the provider disabled says a model is unavailable" */
+    it("searches the phrase and says a model is unavailable", async () => {
+      const d = deps({
+        classifier: answering("filter"),
+        buildFilter: vi.fn(async () => {
+          throw new ProviderDisabled();
+        }),
+      });
+      const result = await createSearchRouter(d).route(
+        input({ text: "failing calls" }),
+      );
+      expect(result).toEqual({
+        kind: "free_text",
+        query: '"failing calls"',
+        decidedBy: "fallback",
         modelUnavailable: true,
         fellBackFrom: "filter",
       });
@@ -272,6 +304,77 @@ describe("given the classifier is configured", () => {
     });
   });
 
+  describe("when Instant Evals are not released for the project", () => {
+    /** @scenario "With Instant Evals not released for the project the router does not offer the judgement route" */
+    it("asks the classifier without the instant_eval option", async () => {
+      const classifier = answering("free_text");
+      await createSearchRouter(
+        deps({ classifier, isInstantEvalReleased: vi.fn(async () => false) }),
+      ).route(input());
+      const question = classifier.classify.mock.calls[0]?.[0]?.questions[0];
+      expect(
+        question?.kind === "category"
+          ? question.options.map((option) => option.name)
+          : [],
+      ).toEqual(["filter", "free_text", "langy"]);
+    });
+
+    /** @scenario "With Instant Evals not released for the project the router does not offer the judgement route" */
+    it("searches a judgement answer from the classifier as a filter, never as an Instant Eval", async () => {
+      const d = deps({
+        classifier: answering("instant_eval"),
+        isInstantEvalReleased: vi.fn(async () => false),
+      });
+      const result = await createSearchRouter(d).route(input());
+      expect(result).toEqual({
+        kind: "filter",
+        query: "status:error",
+        decidedBy: "classifier",
+      });
+      expect(d.buildQuestion).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "With Instant Evals not released for the project the router does not offer the judgement route" */
+    it("tells the model the route is closed and searches a judgement answer as the phrase", async () => {
+      const d = deps({
+        isInstantEvalReleased: vi.fn(async () => false),
+        routeWithModel: vi.fn(async () => ({
+          route: "instant_eval" as const,
+          instructions: "Is the user annoyed?",
+          criteria: ["yes", "no"] as [string, string],
+        })),
+      });
+      const result = await createSearchRouter(d).route(input());
+      expect(d.routeWithModel).toHaveBeenCalledWith(
+        expect.objectContaining({ instantEvalAvailable: false }),
+      );
+      expect(result).toEqual({
+        kind: "free_text",
+        query: '"annoyed users"',
+        decidedBy: "model",
+        modelUnavailable: false,
+      });
+    });
+
+    it("routes without the judgement route when the release cannot be read", async () => {
+      const classifier = answering("free_text");
+      await createSearchRouter(
+        deps({
+          classifier,
+          isInstantEvalReleased: vi.fn(async () => {
+            throw new Error("flags down");
+          }),
+        }),
+      ).route(input());
+      const question = classifier.classify.mock.calls[0]?.[0]?.questions[0];
+      expect(
+        question?.kind === "category"
+          ? question.options.map((option) => option.name)
+          : [],
+      ).not.toContain("instant_eval");
+    });
+  });
+
   describe("when it skips or fails", () => {
     it("lets the model decide instead", async () => {
       const d = deps({
@@ -364,6 +467,7 @@ describe("given no classifier", () => {
           events: ["thumbs_up_down"],
         },
         langyAvailable: true,
+        instantEvalAvailable: true,
       });
     });
 
