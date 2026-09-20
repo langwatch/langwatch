@@ -18,7 +18,7 @@
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import { ActiveSearchEditor } from "../ActiveSearchEditor";
@@ -93,6 +93,82 @@ describe("ActiveSearchEditor keys", () => {
       expect(submitQueryText).not.toHaveBeenCalled();
       expect(applyQueryText).not.toHaveBeenCalled();
       expect(editor.textContent).toContain("annoyed users");
+    });
+  });
+});
+
+describe("ActiveSearchEditor applied query", () => {
+  // jsdom has no layout, and no `Range` geometry at all. A focused editor
+  // scrolls its selection into view, which reads both.
+  beforeAll(() => {
+    const emptyRect = {
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      width: 0,
+      height: 0,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect;
+    Range.prototype.getClientRects = () => [] as unknown as DOMRectList;
+    Range.prototype.getBoundingClientRect = () => emptyRect;
+  });
+
+  function editorWith(queryText: string) {
+    const submitQueryText = vi.fn();
+    const ui = (text: string) => (
+      <ChakraProvider value={defaultSystem}>
+        <ActiveSearchEditor
+          queryText={text}
+          applyQueryText={vi.fn()}
+          submitQueryText={submitQueryText}
+          autoFocus={false}
+          onHasContentChange={() => {
+            /* no-op */
+          }}
+        />
+      </ChakraProvider>
+    );
+    const utils = render(ui(queryText));
+    return { ...utils, ui, submitQueryText };
+  }
+
+  describe("given a focused bar whose sentence was submitted with Enter", () => {
+    describe("when the query the router produced is applied", () => {
+      /** @scenario "The routed query replaces the sentence in the bar while the bar keeps focus" */
+      it("shows the applied query as chips", async () => {
+        const { rerender, ui } = editorWith("annoyed users");
+        const editor = await waitForEditor();
+        editor.focus();
+        fireEvent.focus(editor);
+        fireEvent.keyDown(editor, { key: "Enter" });
+
+        rerender(ui("status:error AND service:checkout"));
+
+        await waitFor(() => {
+          expect(editor.textContent).toContain("status:error");
+        });
+        expect(editor.querySelectorAll(".filter-token").length).toBe(2);
+      });
+    });
+  });
+
+  describe("given a focused bar the user has not submitted", () => {
+    describe("when the applied query changes", () => {
+      it("keeps what the user is typing", async () => {
+        const { rerender, ui } = editorWith("annoyed users");
+        const editor = await waitForEditor();
+        editor.focus();
+        fireEvent.focus(editor);
+
+        rerender(ui("status:error"));
+
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        expect(editor.textContent).toContain("annoyed users");
+        expect(editor.textContent).not.toContain("status:error");
+      });
     });
   });
 });

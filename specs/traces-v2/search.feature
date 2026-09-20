@@ -1356,6 +1356,14 @@ Rule: Enter routes a sentence
     And a strip under the bar reads "Searched as: <query>" with "Search the words instead"
     And "Search the words instead" applies the sentence as one quoted phrase
 
+  @integration
+  Scenario: The routed query replaces the sentence in the bar while the bar keeps focus
+    Given the user typed "annoyed users" and pressed Enter
+    And the bar still has focus
+    When the query the router produced is applied
+    Then the bar shows the applied query as chips, with the caret at its end
+    And a bar the user kept typing in after Enter keeps what they typed
+
   @unit
   Scenario: Explicit terms typed next to a sentence are kept
     When the user types "annoyed users status:error asking refunds"
@@ -1960,8 +1968,9 @@ Rule: Leaving the search bar is not a search
   Blur, whatever caused it (clicking out, tabbing out, a programmatic focus
   change), keeps the typed text where it is and searches nothing. Enter is
   the one way out. A store change from outside while the bar is unfocused
-  (a facet click, Clear, the router applying what Enter produced) replaces
-  the unsent text with the applied query.
+  (a facet click, Clear) replaces the unsent text with the applied query.
+  The answer to the user's own Enter is applied to the bar even while it
+  keeps focus, as long as the text is still what was submitted.
 
   Background:
     Given the user is authenticated with "traces:view" permission

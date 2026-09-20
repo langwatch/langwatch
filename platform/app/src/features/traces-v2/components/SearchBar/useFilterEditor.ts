@@ -243,6 +243,10 @@ export function useFilterEditor({
   // Tracks last reported hasContent so we only fire onHasContentChange when
   // it actually flips (not on every keystroke that keeps the state).
   const lastHasContentRef = useRef<boolean>(queryText.length > 0);
+  // The text Enter last submitted. While the editor still holds exactly this,
+  // the applied query that answers the submit may replace it even though the
+  // editor has focus: nothing was typed since, so there is nothing to clobber.
+  const submittedTextRef = useRef<string | null>(null);
   // The ProseMirror editor is the source of truth while the user types. The
   // global filter store (the sidebar, the chips, the URL, the network) only
   // hears about the text on Enter, through `submitQueryText`. Nothing here
@@ -526,6 +530,7 @@ export function useFilterEditor({
           case "submit": {
             event.preventDefault();
             triggerPosRef.current = null;
+            submittedTextRef.current = action.text.trim();
             submitQueryTextRef.current(action.text.trim());
             // Open a fresh clause so the next keystroke starts a NEW token
             // instead of gluing onto the just-completed one (`status:ok` + `x`
@@ -681,20 +686,29 @@ export function useFilterEditor({
     return () => dom.removeEventListener("mousedown", handler);
   }, [editor, applyQueryTextRef, onTokenClick]);
 
-  // Sync external query changes back into the editor. Only runs while the
-  // editor is NOT focused — while focused, the editor is the source of
-  // truth and clobbering its content (via setContent) would race with
-  // in-flight typing and drop characters. When the store changes from
-  // outside (URL load, clear button, X-widget delete, a facet click, the
-  // router applying what Enter produced), the applied query wins over any
-  // text left unsent in the editor.
+  // Sync external query changes back into the editor. While the editor is
+  // focused it is the source of truth, and clobbering its content (via
+  // setContent) would race with in-flight typing and drop characters, so a
+  // focused editor is left alone, with one exception: the answer to the
+  // user's own Enter. The router turns a submitted sentence into a query a
+  // moment later, the editor still has focus, and the bar must show what was
+  // searched. That is safe while the editor holds exactly the submitted text.
+  // When the store changes from outside an unfocused editor (URL load, clear
+  // button, a facet click), the applied query wins over any unsent text.
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
-    if (editor.isFocused) return;
     const normalize = (s: string): string => s.replace(/\u00A0/g, " ").trim();
-    if (normalize(editor.getText()) === normalize(queryText)) return;
+    const current = normalize(editor.getText());
+    const submitted = submittedTextRef.current;
+    const answersSubmit =
+      submitted !== null && current === normalize(submitted);
+    if (editor.isFocused && !answersSubmit) return;
+    if (current === normalize(queryText)) return;
+    submittedTextRef.current = null;
+    const keepFocus = editor.isFocused;
     isProgrammaticRef.current = true;
     editor.commands.setContent(buildDocument(queryText));
+    if (keepFocus) editor.commands.focus("end");
     const next = queryText.length > 0;
     if (lastHasContentRef.current !== next) {
       lastHasContentRef.current = next;
