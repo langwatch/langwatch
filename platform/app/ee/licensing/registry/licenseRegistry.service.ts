@@ -12,11 +12,13 @@
  * Dependencies are injected so the rules are testable without a database. The
  * row, the ports and the derived rules are in `./issuedLicense.ts`, writing a
  * row in `./issuedLicenseRows.ts`, reading one back in
- * `./issuedLicenseViews.ts`, and the Prisma bindings in
+ * `./issuedLicenseViews.ts`, the commercial terms in `./licenseTerms.ts`, the
+ * customer in `./licenseCustomers.ts`, what follows a change in
+ * `./licenseSideEffects.ts`, and the Prisma bindings in
  * `./issuedLicense.prisma.ts`.
  */
 
-import { LicenseKeyInvalidError, OrganizationNotFoundError } from "../errors";
+import { LicenseKeyInvalidError } from "../errors";
 import { generateLicenseKey } from "../licenseGenerationService";
 import { parseLicenseKey, verifySignature } from "../validation";
 import {
@@ -24,7 +26,6 @@ import {
   IssuedLicenseNotFoundError,
   LicenseAlreadyRegisteredError,
   LicenseAlreadyReissuedError,
-  LicenseOverageMaxRequiresOverageError,
   LicenseSigningNotConfiguredError,
 } from "./errors";
 import {
@@ -39,6 +40,9 @@ import {
 } from "./issuedLicense";
 import { createIssuedLicenseRow, isUniqueViolation } from "./issuedLicenseRows";
 import { browseIssuedLicenses, issuedLicenseView } from "./issuedLicenseViews";
+import { resolveLicenseCustomer } from "./licenseCustomers";
+import { retireManagedKeyOf, syncContractBudgetOf } from "./licenseSideEffects";
+import { resolveLicenseTerms } from "./licenseTerms";
 
 export class LicenseRegistryService {
   private readonly now: () => Date;
@@ -60,8 +64,11 @@ export class LicenseRegistryService {
     operatorId: string;
   }): Promise<{ licenseKey: string; license: IssuedLicenseView }> {
     const privateKey = this.requireSigningKey();
-    const terms = this.resolveTerms({ current: null, input: input.terms });
-    const organization = await this.resolveCustomer(input.customer);
+    const terms = resolveLicenseTerms({ current: null, input: input.terms });
+    const organization = await resolveLicenseCustomer({
+      organizations: this.deps.organizations,
+      customer: input.customer,
+    });
 
     const { licenseKey } = generateLicenseKey({
       organizationName: organization.name,
@@ -88,7 +95,7 @@ export class LicenseRegistryService {
       issuedById: input.operatorId,
       overrides: terms,
     });
-    await this.syncContractBudget(row, input.operatorId);
+    await this.syncBudget(row, input.operatorId);
     return { licenseKey, license: this.toView(row) };
   }
 
@@ -129,10 +136,10 @@ export class LicenseRegistryService {
     if (!signed || !verifySignature(signed, this.deps.publicKey)) {
       throw new LicenseKeyInvalidError();
     }
-    const organization = await this.deps.organizations.findById(
-      input.organizationId,
-    );
-    if (!organization) throw new OrganizationNotFoundError();
+    const organization = await resolveLicenseCustomer({
+      organizations: this.deps.organizations,
+      customer: { organizationId: input.organizationId },
+    });
 
     // Same order as `issue`: the row is the last write. A retry after a failure
     // here would otherwise find its own tokenHash already taken and be refused
@@ -170,7 +177,7 @@ export class LicenseRegistryService {
       revokedReason: input.reason,
       pendingDeliveryLicense: null,
     });
-    await this.syncContractBudget(updated, input.operatorId);
+    await this.syncBudget(updated, input.operatorId);
     return this.toView(updated);
   }
 
@@ -264,9 +271,9 @@ export class LicenseRegistryService {
   ): Promise<IssuedLicenseView> {
     const { id, operatorId, ...terms } = input;
     const row = await this.requireRow(id);
-    const resolved = this.resolveTerms({ current: row, input: terms });
+    const resolved = resolveLicenseTerms({ current: row, input: terms });
     const updated = await this.deps.repository.update(row.id, resolved);
-    await this.syncContractBudget(updated, operatorId);
+    await this.syncBudget(updated, operatorId);
     return this.toView(updated);
   }
 
@@ -276,10 +283,10 @@ export class LicenseRegistryService {
     operatorId: string;
   }): Promise<IssuedLicenseView> {
     const row = await this.requireRow(input.id);
-    const organization = await this.deps.organizations.findById(
-      input.organizationId,
-    );
-    if (!organization) throw new OrganizationNotFoundError();
+    const organization = await resolveLicenseCustomer({
+      organizations: this.deps.organizations,
+      customer: { organizationId: input.organizationId },
+    });
 
     // A managed key belongs to the organization it was created on. Moving the
     // license ends it, and the next call creates one on the new organization.
@@ -300,7 +307,7 @@ export class LicenseRegistryService {
         operatorId: input.operatorId,
       });
     }
-    await this.syncContractBudget(updated, input.operatorId);
+    await this.syncBudget(updated, input.operatorId);
     return this.toView(updated);
   }
 
@@ -333,29 +340,21 @@ export class LicenseRegistryService {
     return issuedLicenseView({ row, now: this.now() });
   }
 
-  private async syncContractBudget(
-    row: IssuedLicenseRecord,
-    operatorId: string,
-  ): Promise<void> {
-    if (!row.organizationId) return;
-    await this.deps.contractBudgets.sync({
-      organizationId: row.organizationId,
+  private syncBudget(row: IssuedLicenseRecord, operatorId: string) {
+    return syncContractBudgetOf({
+      contractBudgets: this.deps.contractBudgets,
+      row,
       operatorId,
     });
   }
 
-  private async retireManagedKey({
-    row,
-    actorId,
-  }: {
+  private retireManagedKey(params: {
     row: IssuedLicenseRecord;
     actorId: string;
-  }): Promise<void> {
-    if (!row.virtualKeyId || !row.organizationId) return;
-    await this.deps.managedKeys.retire({
-      virtualKeyId: row.virtualKeyId,
-      organizationId: row.organizationId,
-      actorId,
+  }) {
+    return retireManagedKeyOf({
+      managedKeys: this.deps.managedKeys,
+      ...params,
     });
   }
 
@@ -371,46 +370,6 @@ export class LicenseRegistryService {
     const row = await this.deps.repository.findById(id);
     if (!row) throw new IssuedLicenseNotFoundError();
     return row;
-  }
-
-  private async resolveCustomer(
-    customer: LicenseCustomer,
-  ): Promise<{ id: string; name: string }> {
-    if ("newOrganizationName" in customer) {
-      return this.deps.organizations.createSelfHostedCustomer({
-        name: customer.newOrganizationName,
-      });
-    }
-    const organization = await this.deps.organizations.findById(
-      customer.organizationId,
-    );
-    if (!organization) throw new OrganizationNotFoundError();
-    return organization;
-  }
-
-  /**
-   * The terms to store, checked as they will stand after the change: an
-   * overage maximum is only valid while overage is enabled, and switching
-   * overage off clears it.
-   */
-  private resolveTerms({
-    current,
-    input,
-  }: {
-    current: IssuedLicenseRecord | null;
-    input: LicenseTermsInput | undefined;
-  }): LicenseTermsInput {
-    if (!input) return {};
-    const overageEnabled =
-      input.overageEnabled ?? current?.overageEnabled ?? false;
-
-    if (!overageEnabled && input.overageMaxUsdCents != null) {
-      throw new LicenseOverageMaxRequiresOverageError();
-    }
-    if (!overageEnabled && input.overageEnabled === false) {
-      return { ...input, overageMaxUsdCents: null };
-    }
-    return input;
   }
 
   private createRow(params: {
