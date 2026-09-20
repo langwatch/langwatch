@@ -83,8 +83,29 @@ describe("useFilteredTraceFacets", () => {
     });
 
     /** @scenario "Facet counts are cached only per query and window" */
-    it("keeps the counts only as long as the list keeps its page", () => {
-      renderHook(() => useFilteredTraceFacets());
+    it("asks under a different input when the query or the window changes, so no cached count can answer for it", () => {
+      const { rerender } = renderHook(() => useFilteredTraceFacets());
+      const first = lastInput();
+
+      harness.filter.debouncedQueryText = "status:ok";
+      rerender();
+      const afterQuery = lastInput();
+      expect(afterQuery).not.toEqual(first);
+      expect(afterQuery).toMatchObject({ query: "status:ok" });
+
+      harness.filter.debouncedTimeRange = {
+        from: 30,
+        to: 40,
+        label: "Last 24h",
+      };
+      rerender();
+      const afterWindow = lastInput();
+      expect(afterWindow).not.toEqual(afterQuery);
+      expect(afterWindow).toMatchObject({ timeRange: { from: 30, to: 40 } });
+
+      // The input is the whole cache key, so a count for one input is never
+      // read for another; the freshness window only says how long the count
+      // for THIS input stands without a refetch.
       expect(lastOpts()?.staleTime).toBe(60_000);
     });
   });

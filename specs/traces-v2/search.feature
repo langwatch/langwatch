@@ -1100,10 +1100,19 @@ Rule: Numbers that agree
     Given the user is authenticated with "traces:view" permission
     And the project has traces
 
+  # The selection header, the pagination line and the sidebar total all render
+  # from one selector, so the two scenarios below are the whole rule: the
+  # selector answers one total, and the surfaces print what it answers.
   @integration
-  Scenario: The header, the pagination line and the sidebar total show one number
+  Scenario: One selector answers the total, the noun and the page ids
     Given the list read answered a total for the active filter
-    Then the selection header, the pagination line and the sidebar total all show that number
+    Then the selector answers that total, the noun for the lens and the ids on the page
+    And on the Conversations lens it answers the sessions read's total, named in conversations
+
+  @integration
+  Scenario: The pagination line and the sidebar total show one number
+    Given the list read answered a total for the active filter
+    Then the pagination line and the sidebar total both show that number
     And on the Conversations lens the number is the sessions read's total, named in conversations
 
   @integration

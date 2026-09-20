@@ -25,6 +25,7 @@ import {
 } from "~/server/app-layer/instant-evals/run";
 import { INSTANT_EVAL_TARGETS } from "~/server/app-layer/instant-evals/shorthand";
 import { explorerHiddenOrigins } from "~/server/app-layer/traces/hidden-origins";
+import { queryWithoutInstantEvalChips } from "~/server/app-layer/traces/query-language/instantEvalChips";
 import { combineQueries } from "~/server/app-layer/traces/query-language/mutations";
 
 /**
@@ -64,15 +65,26 @@ export type ExplorerInstantEvalRunInput = z.infer<
 
 /** The run service's input for what the Explorer asked. */
 /**
- * The filter a run judges: the other chips, minus the origins the Explorer
- * hides. The table leaves Langy's own traces out unless the query names an
- * origin, so a run over the bare chips would judge rows the table cannot
- * show, and its total would disagree with the count beside it.
+ * The filter a run judges: the other chips, minus any eval chip and minus the
+ * origins the Explorer hides.
+ *
+ * An eval chip is dropped here as well as on the client. A run has no run
+ * reference for another chip's question, so the selection compiler would fall
+ * back to the legacy evaluator-name meaning of a bare `eval:` and judge a
+ * different set than the Explorer shows. A second question judges the query
+ * without either chip, and both chips then intersect when the list is read
+ * (specs/traces-v2/instant-eval-search.feature, "A second question judges the
+ * same rows as the first").
+ *
+ * The table leaves Langy's own traces out unless the query names an origin,
+ * so a run over the bare chips would judge rows the table cannot show, and
+ * its total would disagree with the count beside it.
  */
 export function explorerJudgedFilter(filter: string): string {
+  const scope = queryWithoutInstantEvalChips(filter);
   return combineQueries({
-    base: filter,
-    addition: explorerHiddenOrigins(filter)
+    base: scope,
+    addition: explorerHiddenOrigins(scope)
       .map((origin) => `NOT origin:${origin}`)
       .join(" AND "),
   });

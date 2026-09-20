@@ -77,6 +77,20 @@ describe("given the Explorer's request", () => {
     });
   });
 
+  /** @scenario "A second question judges the same rows as the first" */
+  describe("when the filter still carries an eval chip", () => {
+    it("drops it, so no run compiles a judgement it has no run reference for", () => {
+      const input = toExplorerRunInput({
+        projectId: "project-1",
+        target: "traces",
+        filter: 'eval:"the user is annoyed" AND service:api',
+        window: { from: 1, to: 2 },
+        question: { instructions: "the user asked twice" },
+      });
+      expect(input.shorthand?.filter).toBe("service:api AND NOT origin:langy");
+    });
+  });
+
   describe("when a window bound is past what a date can represent", () => {
     /** @scenario "A window outside the calendar range is refused as a validation error" */
     it("is refused by the schema rather than raising while the instants are written", () => {

@@ -199,6 +199,7 @@ Feature: Instant Evals inside the Trace Explorer
       When a second question starts a run
       Then the run judges the query without either eval chip
       And both chips stay in the bar, so a row must pass both
+      And a request that still carries one has it dropped before the run is written, because no run reference comes with it
 
     @integration
     Scenario: A run already registered for the scope is reused

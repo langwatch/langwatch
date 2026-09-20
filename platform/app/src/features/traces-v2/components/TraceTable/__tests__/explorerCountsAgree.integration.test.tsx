@@ -69,7 +69,7 @@ afterEach(() => cleanup());
 
 describe("the Explorer's counts", () => {
   describe("given the list read answered a total", () => {
-    /** @scenario "The header, the pagination line and the sidebar total show one number" */
+    /** @scenario "The pagination line and the sidebar total show one number" */
     it("prints that number on the sidebar total and the pagination line", () => {
       renderBoth();
       expect(screen.getByTestId("explorer-total")).toHaveTextContent(

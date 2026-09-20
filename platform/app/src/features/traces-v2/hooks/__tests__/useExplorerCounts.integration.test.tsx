@@ -48,7 +48,7 @@ beforeEach(() => {
 
 describe("useExplorerCounts", () => {
   describe("given a lens that walks the traces", () => {
-    /** @scenario "The header, the pagination line and the sidebar total show one number" */
+    /** @scenario "One selector answers the total, the noun and the page ids" */
     it("answers the list read's total, noun and page ids", () => {
       const { result } = renderHook(() => useExplorerCounts());
       expect(result.current).toEqual({
