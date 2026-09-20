@@ -17,7 +17,6 @@ export const ExplorerTotal: React.FC = () => {
       fontVariantNumeric="tabular-nums"
       opacity={isPlaceholderData ? 0.5 : 1}
       transition="opacity 120ms ease"
-      whiteSpace="nowrap"
     >
       {summary}
     </Text>

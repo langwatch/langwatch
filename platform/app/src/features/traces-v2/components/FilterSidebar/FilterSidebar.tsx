@@ -410,10 +410,6 @@ export const FilterSidebar: React.FC = () => {
               <PanelLeftClose size={14} />
             </IconButton>
           </Tooltip>
-          {/* The same number the pagination line and the selection header
-              show, from the same read (`useExplorerCounts`), so the sidebar
-              can never claim more or fewer rows than the table. */}
-          <ExplorerTotal />
         </HStack>
         <HStack gap={1} align="center">
           {/* Clear-all and Reset-to-lens only mount while there's something
@@ -496,6 +492,21 @@ export const FilterSidebar: React.FC = () => {
           </Tooltip>
         </HStack>
       </HStack>
+      {/* The same number the pagination line and the selection header show,
+          from the same read (`useExplorerCounts`), so the sidebar can never
+          claim more or fewer rows than the table. It has a row of its own:
+          the header's buttons leave no room for it at the default width, and
+          while an Instant Eval judges the summary is a sentence. */}
+      <Box
+        flexShrink={0}
+        paddingX={3}
+        paddingY={1}
+        borderBottomWidth="1px"
+        borderColor="border"
+        _empty={{ display: "none" }}
+      >
+        <ExplorerTotal />
+      </Box>
       <Box
         flex="1"
         display="flex"
