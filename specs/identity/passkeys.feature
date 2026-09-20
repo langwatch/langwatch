@@ -144,6 +144,7 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
     Given "sam" is shown the offer and answers it with "Not now"
     When the next page mounts the offer again
     Then it stays closed
+    And the account was told first, so a full page load cannot lose the answer
 
   @unit @unimplemented
   Scenario: A registered passkey becomes an identifier like every other method
