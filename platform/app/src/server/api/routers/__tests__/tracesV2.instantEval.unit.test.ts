@@ -77,8 +77,8 @@ describe("given the Explorer's request", () => {
     });
   });
 
-  /** @scenario "A second question judges the same rows as the first" */
   describe("when the filter still carries an eval chip", () => {
+    /** @scenario "A second question judges the same rows as the first" */
     it("drops it, so no run compiles a judgement it has no run reference for", () => {
       const input = toExplorerRunInput({
         projectId: "project-1",

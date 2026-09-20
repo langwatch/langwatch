@@ -296,11 +296,12 @@ export async function generateTraceAction(
       lastProviderError = e;
       lastError = e instanceof Error ? e.message : "Unknown generation error.";
       logger.error(
-        {
+        providerErrorLogPayload({
           projectId: input.projectId,
           attempt,
-          providerError: summarizeProviderError(e, { model: model.modelId }),
-        },
+          error: e,
+          model: model.modelId,
+        }),
         "AI action generation failed",
       );
       continue;
@@ -347,6 +348,37 @@ export async function generateTraceAction(
       ? summarizeProviderError(lastProviderError, { model: model.modelId })
       : { reason: lastError, lastQuery },
   );
+}
+
+/**
+ * What a provider failure is allowed to put in the log.
+ *
+ * A rejected key makes the provider's own response body the credential (see
+ * `ai-query.summarize-provider-error.unit.test.ts`), so the log line carries
+ * the same curated fields the customer-facing disclosure carries and none of
+ * the provider's text. Every `logger.error` on a provider path builds its
+ * payload here, so there is one place to read and one place to change.
+ */
+export function providerErrorLogPayload({
+  projectId,
+  attempt,
+  error,
+  model,
+}: {
+  projectId: string;
+  attempt?: number;
+  error: unknown;
+  model?: string;
+}): {
+  projectId: string;
+  attempt?: number;
+  providerError: AiActionErrorDetails;
+} {
+  return {
+    projectId,
+    ...(attempt === undefined ? {} : { attempt }),
+    providerError: summarizeProviderError(error, model ? { model } : undefined),
+  };
 }
 
 /**
@@ -528,10 +560,11 @@ export async function generateInstantEvalQuestion(
     object = generated.object;
   } catch (e) {
     logger.error(
-      {
+      providerErrorLogPayload({
         projectId: input.projectId,
-        providerError: summarizeProviderError(e, { model: model.modelId }),
-      },
+        error: e,
+        model: model.modelId,
+      }),
       "Instant Eval question generation failed",
     );
     throw new AiQueryProviderError(
@@ -768,13 +801,12 @@ export async function generateSearchRoute(
       providerError = asked.providerError;
       retry = null;
       logger.error(
-        {
+        providerErrorLogPayload({
           projectId: input.projectId,
           attempt,
-          providerError: summarizeProviderError(asked.providerError.error, {
-            model: model.modelId,
-          }),
-        },
+          error: asked.providerError.error,
+          model: model.modelId,
+        }),
         "Search route generation failed",
       );
       continue;
