@@ -354,6 +354,12 @@ func reduceJSONValue(v any, maxString, maxItems int) any {
 		dropped := 0
 		if len(keys) > maxItems {
 			dropped = len(keys) - maxItems
+			// Identity first, then alphabetical. A row that loses its id is a
+			// row no card can link or name, so "trace_id" must not lose its
+			// place to "error" and "evaluations" for sorting after them.
+			sort.SliceStable(keys, func(i, j int) bool {
+				return isIdentityKey(keys[i]) && !isIdentityKey(keys[j])
+			})
 			keys = keys[:maxItems]
 		}
 		out := make(map[string]any, len(keys)+1)
@@ -367,6 +373,12 @@ func reduceJSONValue(v any, maxString, maxItems int) any {
 	default:
 		return v
 	}
+}
+
+// isIdentityKey reports whether a field names the record it sits on: "id", or a
+// name ending in "_id" or "Id" ("trace_id", "traceId", "scenarioRunId").
+func isIdentityKey(key string) bool {
+	return key == "id" || strings.HasSuffix(key, "_id") || strings.HasSuffix(key, "Id")
 }
 
 // ToolCallTracker de-dupes the tool lifecycle across re-delivered call updates:
