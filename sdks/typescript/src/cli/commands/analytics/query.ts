@@ -27,8 +27,50 @@ const METRIC_ALIASES: Record<string, keyof typeof METRIC_PRESETS> = {
   cost: "total-cost",
   traces: "trace-count",
   "trace-counts": "trace-count",
+  "trace_count": "trace-count",
+  "traces.count": "trace-count",
+  "trace.count": "trace-count",
   "pass-rate": "eval-pass-rate",
 };
+
+// The metric paths the platform accepts, mirrored from the analytics
+// registry (platform/app/src/server/analytics/registry.ts,
+// `flattenAnalyticsMetricsEnum`). Checked here so a mistyped path is refused
+// with the list in hand, before a request is made.
+const KNOWN_METRICS = [
+  "metadata.trace_id",
+  "metadata.user_id",
+  "metadata.thread_id",
+  "metadata.span_type",
+  "sentiment.thumbs_up_down",
+  "performance.completion_time",
+  "performance.first_token",
+  "performance.total_cost",
+  "performance.cost_billed",
+  "performance.cost_non_billed",
+  "performance.prompt_tokens",
+  "performance.completion_tokens",
+  "performance.cache_read_tokens",
+  "performance.cache_write_tokens",
+  "performance.reasoning_tokens",
+  "performance.total_processed_tokens",
+  "performance.total_tokens",
+  "performance.tokens_per_second",
+  "events.event_type",
+  "events.event_score",
+  "events.event_details",
+  "evaluations.evaluation_score",
+  "evaluations.evaluation_pass_rate",
+  "evaluations.evaluation_runs",
+  "threads.average_duration_per_thread",
+];
+
+/** The presets and metric paths a `--metric` value can name, for an error. */
+const metricChoices = (): string =>
+  [
+    `Presets: ${Object.keys(METRIC_PRESETS).join(", ")}`,
+    `Metrics: ${KNOWN_METRICS.join(", ")}`,
+  ].join("\n");
 
 /**
  * Returns the timeseries rather than printing it: the output port renders it
@@ -65,6 +107,16 @@ export const queryAnalyticsCommand = async (options: {
   } else {
     metric = options.metric ?? "metadata.trace_id";
     aggregation = options.aggregation ?? "cardinality";
+  }
+
+  if (!KNOWN_METRICS.includes(metric)) {
+    console.error(
+      chalk.red(
+        `Error: "${options.metric}" is not a metric preset or a metric path.`,
+      ),
+    );
+    console.error(chalk.gray(metricChoices()));
+    process.exit(1);
   }
 
   const now = Date.now();
