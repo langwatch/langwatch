@@ -33,10 +33,13 @@ import { createInnerTRPCContext } from "../../trpc";
 const PROJECT_ID = "test-project-id";
 // A window of its own, far from every other suite seeding this tenant.
 const DAY_MS = 24 * 60 * 60 * 1000;
+// Inside the table's retention window: a row older than its retention is
+// deleted by the TTL, on insert or on the next merge, and the suite reads
+// nothing back. Minute-aligned so two suites rarely share a window.
 const base =
-  Date.UTC(2021, 0, 1) +
-  Math.floor(Math.random() * 3_000) * DAY_MS +
-  Math.floor(Math.random() * 20) * 60 * 60 * 1000;
+  Math.floor(Date.now() / 60_000) * 60_000 -
+  (20 + Math.floor(Math.random() * 250)) * DAY_MS -
+  Math.floor(Math.random() * 24 * 60) * 60_000;
 const WINDOW = { from: base - 60_000, to: base + 60_000 };
 
 const run = nanoid();
