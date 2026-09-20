@@ -459,13 +459,17 @@ describe("resolveConnectedReferences", () => {
       } as unknown as ConnectedTargetReads;
 
       const [withoutActor] = await resolveConnectedReferences({
-        targets: [{ type: "connected", referenceId: "support-agent@development" }],
+        targets: [
+          { type: "connected", referenceId: "support-agent@development" },
+        ],
         projectId,
         actor: undefined,
         agents: foreign,
       });
       const [asTeammate] = await resolveConnectedReferences({
-        targets: [{ type: "connected", referenceId: "support-agent@development" }],
+        targets: [
+          { type: "connected", referenceId: "support-agent@development" },
+        ],
         projectId,
         actor: { id: "u_2", label: "user" },
         agents: foreign,
@@ -633,13 +637,21 @@ describe("resolveConnectedReferences", () => {
     it("picks another person's online personal agent when the caller may run nothing else", async () => {
       const [withoutActor] = await resolve({
         rows: [
-          row({ id: "agent_theirs", environment: "development", ownerUserId: "u_1" }),
+          row({
+            id: "agent_theirs",
+            environment: "development",
+            ownerUserId: "u_1",
+          }),
         ],
         online: ["agent_theirs"],
       });
       const [asTeammate] = await resolve({
         rows: [
-          row({ id: "agent_theirs", environment: "development", ownerUserId: "u_1" }),
+          row({
+            id: "agent_theirs",
+            environment: "development",
+            ownerUserId: "u_1",
+          }),
         ],
         online: ["agent_theirs"],
         actor: { id: "u_2", label: "user" },
@@ -653,7 +665,11 @@ describe("resolveConnectedReferences", () => {
     it("prefers a shared online agent over another person's personal one", async () => {
       const [target] = await resolve({
         rows: [
-          row({ id: "agent_theirs", environment: "development", ownerUserId: "u_1" }),
+          row({
+            id: "agent_theirs",
+            environment: "development",
+            ownerUserId: "u_1",
+          }),
           row({ id: "agent_staging", environment: "staging" }),
         ],
         online: ["agent_theirs", "agent_staging"],
@@ -666,7 +682,11 @@ describe("resolveConnectedReferences", () => {
     it("still refuses as unresolved when the only personal agent is offline", async () => {
       const failure = await resolve({
         rows: [
-          row({ id: "agent_theirs", environment: "development", ownerUserId: "u_1" }),
+          row({
+            id: "agent_theirs",
+            environment: "development",
+            ownerUserId: "u_1",
+          }),
         ],
         online: [],
       }).catch((error: unknown) => error);

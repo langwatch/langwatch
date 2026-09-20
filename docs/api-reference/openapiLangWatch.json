@@ -2409,6 +2409,50 @@
                                     "items": {
                                       "type": "string"
                                     }
+                                  },
+                                  "scope": {
+                                    "oneOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "const": "shared"
+                                          }
+                                        },
+                                        "required": [
+                                          "kind"
+                                        ]
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "const": "owner"
+                                          }
+                                        },
+                                        "required": [
+                                          "kind"
+                                        ]
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "const": "host"
+                                          },
+                                          "hostLabel": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "kind",
+                                          "hostLabel"
+                                        ]
+                                      }
+                                    ]
                                   }
                                 },
                                 "required": [
@@ -2416,7 +2460,8 @@
                                   "environment",
                                   "id",
                                   "url",
-                                  "parameterNotes"
+                                  "parameterNotes",
+                                  "scope"
                                 ]
                               }
                             },

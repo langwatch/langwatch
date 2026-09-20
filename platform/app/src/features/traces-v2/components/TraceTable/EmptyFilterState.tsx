@@ -129,9 +129,9 @@ const EmailRedactionNotice: React.FC = () => {
   return (
     <Box width="full" textAlign="left">
       <PIIRedactionAlert>
-        Email addresses are redacted before a trace is stored by this
-        project's privacy settings, so a search for one finds nothing. Search
-        by a thread id, a trace id or a name instead.
+        Email addresses are redacted before a trace is stored by this project's
+        privacy settings, so a search for one finds nothing. Search by a thread
+        id, a trace id or a name instead.
       </PIIRedactionAlert>
     </Box>
   );

@@ -1025,6 +1025,14 @@
               "available": true
             },
             {
+              "name": "InconclusiveCriteria",
+              "type": "Array(String)",
+              "description": "Criteria the judge could not decide; each is also in UnmetCriteria.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
               "name": "TraceIds",
               "type": "Array(String)",
               "description": "Traces recorded while the run executed.",

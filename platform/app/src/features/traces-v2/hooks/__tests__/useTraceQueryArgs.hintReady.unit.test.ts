@@ -18,7 +18,8 @@ vi.mock("../../context/TraceViewerContext", () => ({
   useTraceViewer: () => ({ traceId: null }),
 }));
 vi.mock("../../stores/drawerStore", () => ({
-  useDrawerStore: (selector: (state: typeof storeState) => unknown) => selector(storeState),
+  useDrawerStore: (selector: (state: typeof storeState) => unknown) =>
+    selector(storeState),
 }));
 vi.mock("../useDrawerProjectId", () => ({
   useDrawerProjectId: () => "p1",
@@ -38,7 +39,10 @@ describe("useTraceQueryArgs", () => {
 
       expect(result.current.isReady).toBe(true);
       expect(result.current.hintReady).toBe(false);
-      expect(result.current.queryArgs).toEqual({ projectId: "p1", traceId: "t1" });
+      expect(result.current.queryArgs).toEqual({
+        projectId: "p1",
+        traceId: "t1",
+      });
     });
   });
 

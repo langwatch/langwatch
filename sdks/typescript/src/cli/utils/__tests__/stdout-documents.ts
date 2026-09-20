@@ -26,10 +26,11 @@ export const stdoutLines = (): string[] => {
   const logged = isMocked(console.log)
     ? vi.mocked(console.log).mock.calls.map((call) => call.map(String).join(" "))
     : [];
-  const written = isMocked(process.stdout.write)
-    ? vi
-        .mocked(process.stdout.write)
-        .mock.calls.map((call) => String(call[0]).replace(/\n$/, ""))
+  // Read as a property rather than a method reference: the suites replace it
+  // with a spy, and there is no `this` to lose.
+  const write = (process.stdout as unknown as { write: unknown }).write;
+  const written = isMocked(write)
+    ? write.mock.calls.map((call) => String(call[0]).replace(/\n$/, ""))
     : [];
   return [...logged, ...written];
 };

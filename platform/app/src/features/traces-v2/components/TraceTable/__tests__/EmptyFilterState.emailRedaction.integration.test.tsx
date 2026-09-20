@@ -38,10 +38,11 @@ import { useFilterStore } from "../../../stores/filterStore";
 import { EmptyFilterState } from "../EmptyFilterState";
 
 function piiLevel(level: string) {
-  snapshotQuery.mockImplementation((_input: unknown, options?: { enabled?: boolean }) =>
-    options?.enabled === false
-      ? { data: undefined, isLoading: false }
-      : { data: { effective: { pii: { level } } }, isLoading: false },
+  snapshotQuery.mockImplementation(
+    (_input: unknown, options?: { enabled?: boolean }) =>
+      options?.enabled === false
+        ? { data: undefined, isLoading: false }
+        : { data: { effective: { pii: { level } } }, isLoading: false },
   );
 }
 
@@ -75,7 +76,9 @@ describe("EmptyFilterState after a search for an email address", () => {
         renderEmptyState({ query: "priya.raman@northwind.example" });
 
         expect(screen.getByText(NOTICE)).toBeInTheDocument();
-        expect(screen.getByText(/thread id, a trace id or a name/i)).toBeInTheDocument();
+        expect(
+          screen.getByText(/thread id, a trace id or a name/i),
+        ).toBeInTheDocument();
         expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute(
           "href",
           "/settings/data-privacy",

@@ -46,7 +46,9 @@ describe("error remediation registry", () => {
       const { remediation } = await import("../error-remediation");
       const tips = remediation("agent_environment_unresolved").tips ?? [];
 
-      expect(tips.some((tip) => tip.includes("visible only to its owner"))).toBe(true);
+      expect(
+        tips.some((tip) => tip.includes("visible only to its owner")),
+      ).toBe(true);
       expect(
         tips.some((tip) => tip.includes("LANGWATCH_AGENT_ENVIRONMENT")),
       ).toBe(true);
