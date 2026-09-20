@@ -593,11 +593,6 @@ export const SearchBar: React.FC = () => {
   );
 };
 
-/**
- * What an `eval` chip wears beside its question: "(pending)" until a run is
- * registered for it, "(partial)" once the run ended short of its total, and
- * nothing while it judges or after it finished whole.
- */
 /** The overlay labels of the marked `eval` chips: field, then question. */
 export function instantEvalChipMarks({
   chips,
@@ -642,6 +637,11 @@ export function instantEvalChipLabel({
   return `"${question}" ${mark}`;
 }
 
+/**
+ * What an `eval` chip wears beside its question: "(pending)" until a run is
+ * registered for it, "(partial)" once the run ended short of its total, and
+ * nothing while it judges or after it finished whole.
+ */
 export function instantEvalChipMark({
   run,
   hasRun,

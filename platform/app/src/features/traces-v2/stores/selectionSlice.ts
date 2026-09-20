@@ -24,6 +24,12 @@ export const EMPTY_SELECTION: Selection = {
 
 export interface SelectionSlice {
   selection: Selection;
+  /**
+   * The lens, query and window the current selection was made under, or null
+   * before a page has said. The store outlives the page, so this is what
+   * tells a remount whether the checked rows are still the rows listed.
+   */
+  selectionViewKey: string | null;
 
   toggleSelected: (traceId: string) => void;
   setSelectedMany: (traceIds: string[], checked: boolean) => void;
@@ -31,6 +37,8 @@ export interface SelectionSlice {
   clearSelection: () => void;
   /** Replace the selection whole, which is what a transform does. */
   setSelection: (selection: Selection) => void;
+  /** Record the view the selection now belongs to. */
+  setSelectionViewKey: (key: string) => void;
 }
 
 /**
@@ -49,6 +57,7 @@ export const createSelectionSlice: StateCreator<
   SelectionSlice
 > = (set) => ({
   selection: EMPTY_SELECTION,
+  selectionViewKey: null,
 
   toggleSelected: (traceId) =>
     set((state) => {
@@ -89,6 +98,8 @@ export const createSelectionSlice: StateCreator<
     set({ selection: { mode: "explicit", traceIds: new Set<string>() } }),
 
   setSelection: (selection) => set({ selection }),
+
+  setSelectionViewKey: (key) => set({ selectionViewKey: key }),
 });
 
 /**
