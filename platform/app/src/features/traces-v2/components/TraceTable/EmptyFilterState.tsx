@@ -49,9 +49,16 @@ interface EmptyContent {
 
 /**
  * What an empty table says about the eval chip in the query, or null when no
- * chip explains it. A chip whose run covered another window, lens or filter
- * matches no rows here, and a run still judging has not reached them yet;
- * neither of those is "nothing matches these filters".
+ * chip explains it. A chip with no run for this scope matches no rows here,
+ * and a run still judging has not reached them yet; neither of those is
+ * "nothing matches these filters".
+ *
+ * The unjudged sentence says the scope has not been judged rather than naming
+ * what changed. A chip arrives unjudged for several reasons that look alike
+ * from here: the reader edited the window, the lens or another filter, or the
+ * chip came in from a shared link or a saved lens with no run behind it at
+ * all. Naming one of them would be right in some of those cases and wrong in
+ * the rest.
  */
 function instantEvalEmptyContent({
   isJudging,
@@ -64,7 +71,7 @@ function instantEvalEmptyContent({
     return {
       title: "These results are not judged yet",
       description:
-        "The Instant Eval in this search covered a different window, lens or filter. Judge these results to see which ones match.",
+        "No Instant Eval has judged this question over this window, lens and filter. Judge these results to see which ones match.",
     };
   }
   if (isJudging) {

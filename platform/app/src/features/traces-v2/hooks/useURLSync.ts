@@ -12,6 +12,11 @@
  */
 import { useCallback, useEffect, useRef } from "react";
 import { useLocation } from "react-router";
+import {
+  instantEvalChipsOf,
+  instantEvalRunKey,
+  queryWithoutInstantEvalChips,
+} from "~/server/app-layer/traces/query-language/instantEvalChips";
 import { useExplorerStore } from "../stores/explorerStore";
 import type { TimeRange } from "../stores/querySlice";
 import { getPersistedActiveLensId, type LensConfig } from "../stores/viewSlice";
@@ -37,6 +42,63 @@ interface BarState {
 }
 
 const NO_RUNS: Record<string, string> = {};
+
+/**
+ * The runs the applied state keeps: the ones the fragment named, plus any the
+ * page already holds whose key an eval chip of the restored query computes to.
+ *
+ * A lens carries its draft filter, and a fragment that names only a lens
+ * (`#my-lens`) carries no `q` and therefore no runs. Dropping to none there
+ * restored the chip without its run: the table then had an unjudged chip, the
+ * empty state offered "Judge these results", and taking it would have started
+ * a second run over rows the first one had already judged, and charged for it.
+ *
+ * Carrying a held run over is safe because the key IS the scope. It is the
+ * hash of the question, the unit judged, the other chips of the query and the
+ * window, so a key that matches names a run whose judgements cover exactly the
+ * rows this query asks for. Change any of them and the chip computes a
+ * different key, nothing matches, and the chip is pending as it should be.
+ *
+ * @see ~/server/app-layer/traces/query-language/instantEvalChips.ts
+ */
+function runsForRestoredQuery({
+  named,
+  held,
+  query,
+  lensId,
+  timeRange,
+}: {
+  named: Record<string, string>;
+  held: Record<string, string>;
+  query: string;
+  lensId: string;
+  timeRange: TimeRange;
+}): Record<string, string> {
+  if (!query.trim()) return named;
+  const chips = instantEvalChipsOf({ queryText: query, lensId });
+  if (chips.length === 0) return named;
+  const otherQuery = queryWithoutInstantEvalChips(query);
+  const window = {
+    from: timeRange.from,
+    to: timeRange.to,
+    ...(timeRange.presetId ? { presetId: timeRange.presetId } : {}),
+  };
+  let restored: Record<string, string> | null = null;
+  for (const chip of chips) {
+    const key = instantEvalRunKey({
+      question: chip.question,
+      target: chip.target,
+      otherQuery,
+      window,
+    });
+    if (named[key] !== undefined) continue;
+    const run = held[key];
+    if (run === undefined) continue;
+    restored ??= { ...named };
+    restored[key] = run;
+  }
+  return restored ?? named;
+}
 
 function readFragment(): string {
   if (typeof window === "undefined") return "";
@@ -368,11 +430,19 @@ export function useURLSync(): void {
       // statement at all and the window the store holds is the answer.
       timeRange: targetTimeRange ?? live.timeRange,
       // A run rides with the query it was written for: a fragment naming a
-      // query names its runs too, and one naming none has none.
-      evalRuns:
-        target.overrides.query !== undefined
-          ? (target.overrides.runs ?? NO_RUNS)
-          : NO_RUNS,
+      // query names its runs too. What the fragment does not name is still
+      // recovered from the runs the page already holds, by key — see
+      // `runsForRestoredQuery`.
+      evalRuns: runsForRestoredQuery({
+        named:
+          target.overrides.query !== undefined
+            ? (target.overrides.runs ?? NO_RUNS)
+            : NO_RUNS,
+        held: live.evalRuns ?? NO_RUNS,
+        query: target.overrides.query ?? lensQuery,
+        lensId: target.lensId,
+        timeRange: targetTimeRange ?? live.timeRange,
+      }),
     };
 
     // `popstate` fires for every history entry this page owns, and the trace

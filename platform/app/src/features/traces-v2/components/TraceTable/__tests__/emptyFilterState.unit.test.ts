@@ -46,6 +46,9 @@ describe("emptyContent", () => {
         });
         expect(content.title).toBe("These results are not judged yet");
         expect(content.description).toContain("Judge these results");
+        // A chip can arrive with no run at all, from a shared link or a saved
+        // lens, so the sentence must not assert that one ran over another scope.
+        expect(content.description).not.toContain("covered a different");
       });
     });
   });

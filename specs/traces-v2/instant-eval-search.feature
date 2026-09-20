@@ -135,6 +135,17 @@ Feature: Instant Evals inside the Trace Explorer
       When the list, the facets and the new count are read
       Then each read carries evalRuns with the question, the target and the run id
 
+    # A lens brings its own filter back, and a fragment naming only a lens
+    # carries no query and therefore no run keys. Dropping the runs there left
+    # an identical query offering "Judge these results", and taking it would
+    # have started a second run over rows the first one had already judged.
+    @integration
+    Scenario: A lens round trip keeps the run behind a restored chip
+      Given a lens whose filter carries an eval chip and a run held for its key
+      When the fragment names only that lens
+      Then the restored chip keeps its run, because the question, the target, the other chips and the window all still match its key
+      And a run held under any other key is not carried, so a changed scope is judged again
+
     @unit
     Scenario: A registered run resets the new-count baseline
       Given the new count has settled for a query whose chip had no run
@@ -144,9 +155,10 @@ Feature: Instant Evals inside the Trace Explorer
 
     @unit
     Scenario: An empty table under an unjudged chip says these results are not judged
-      Given a chip whose run covered another window, lens or filter
+      Given a chip with no run for this window, lens and filter
       When the table has no rows
-      Then the empty state says these results are not judged yet
+      Then the empty state says no Instant Eval has judged this question over this window, lens and filter
+      And it does not claim a previous run covered something else, because a chip can arrive with no run at all
       And "Judge these results" submits the question through the search bar, with the other chips kept
 
     @unit
