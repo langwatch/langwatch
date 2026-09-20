@@ -84,6 +84,13 @@ Feature: Connected agents
     Then the identity key is "support-agent@production"
     And the row records no owner and no host label
 
+  @integration
+  Scenario: The registered frame reports the scope
+    Given a personal API key of user "u_1"
+    When a process registers an agent in "development"
+    Then the registered frame says the agent has scope "owner", with no user id on the wire
+    And an agent registered in "production" is reported with scope "shared"
+
   # ---------------------------------------------------------------------------
   # Owner-only refusal at scheduling
   # ---------------------------------------------------------------------------
