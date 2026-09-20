@@ -106,7 +106,7 @@ export class InstantEvalsApiService {
   }): T {
     const failed = response !== undefined && !response.ok;
     if (error || failed || data === undefined) {
-      this.handleApiError(operation, error || undefined, response);
+      this.handleApiError(operation, error ?? undefined, response);
     }
     return data as T;
   }
