@@ -1269,7 +1269,11 @@ export class TraceListService {
         limit,
         offset: 0,
         traceScope: filterWhere
-          ? scopeTraceFilterToTable({ table: def.table, filterWhere })
+          ? scopeTraceFilterToTable({
+              table: def.table,
+              filterWhere,
+              isLiveWindow: params.timeRange.live === true,
+            })
           : undefined,
       });
       result = await this.repository.findCategoricalFacetRaw({

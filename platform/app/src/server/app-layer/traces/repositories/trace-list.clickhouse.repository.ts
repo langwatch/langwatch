@@ -135,9 +135,14 @@ function buildWhereClauseForTable(
 function facetFilterFragment(
   table: FacetTableName,
   filterWhere: { sql: string; params: Record<string, unknown> } | undefined,
+  timeRange: { to: number; live?: boolean },
 ): { sql: string; params: Record<string, unknown> } {
   if (!filterWhere) return { sql: "", params: {} };
-  const scoped = scopeTraceFilterToTable({ table, filterWhere });
+  const scoped = scopeTraceFilterToTable({
+    table,
+    filterWhere,
+    isLiveWindow: isLiveUpperBound(timeRange),
+  });
   return { sql: `AND ${scoped.sql}`, params: scoped.params };
 }
 
@@ -564,7 +569,11 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       params.timeRange,
       params.timeColumn,
     );
-    const filter = facetFilterFragment(params.table, params.filterWhere);
+    const filter = facetFilterFragment(
+      params.table,
+      params.filterWhere,
+      params.timeRange,
+    );
 
     const prefixFilter = params.prefix
       ? `AND ${params.facetExpression} ILIKE concat({prefix:String}, '%')`
@@ -635,7 +644,11 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       params.timeRange,
       params.timeColumn,
     );
-    const filter = facetFilterFragment(params.table, params.filterWhere);
+    const filter = facetFilterFragment(
+      params.table,
+      params.filterWhere,
+      params.timeRange,
+    );
 
     // Same ReplacingMergeTree dedup as findCategoricalFacet — only
     // trace_summaries re-projects a logical trace across versions.
@@ -728,7 +741,11 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       params.timeRange,
       params.timeColumn,
     );
-    const filter = facetFilterFragment(params.table, params.filterWhere);
+    const filter = facetFilterFragment(
+      params.table,
+      params.filterWhere,
+      params.timeRange,
+    );
 
     // Match the dedup behaviour of findCategoricalFacet/findBatchedFacets:
     // trace_summaries is a ReplacingMergeTree projection, so without the
@@ -785,7 +802,11 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       params.timeRange,
       params.timeColumn,
     );
-    const filter = facetFilterFragment(params.table, params.filterWhere);
+    const filter = facetFilterFragment(
+      params.table,
+      params.filterWhere,
+      params.timeRange,
+    );
     const queryParams = { ...filter.params, ...baseParams };
 
     // `trace_summaries` is a ReplacingMergeTree-style projection — same trace

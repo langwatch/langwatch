@@ -5,8 +5,23 @@ import type { FilterWhere } from "./hidden-origins";
  * The tenant and window predicate of `trace_summaries`, bound to the same
  * parameter names the filter compiler seeds (`tenantId`, `timeFrom`, `timeTo`).
  */
-const TRACE_WINDOW_WHERE =
-  "TenantId = {tenantId:String} AND OccurredAt >= fromUnixTimestamp64Milli({timeFrom:Int64}) AND OccurredAt <= fromUnixTimestamp64Milli({timeTo:Int64})";
+const TRACE_WINDOW_FROM =
+  "TenantId = {tenantId:String} AND OccurredAt >= fromUnixTimestamp64Milli({timeFrom:Int64})";
+
+const TRACE_WINDOW_TO =
+  " AND OccurredAt <= fromUnixTimestamp64Milli({timeTo:Int64})";
+
+/**
+ * A live window's `to` is rolling, so the reads that bound it leave the upper
+ * predicate off and new traces keep arriving (`isLiveUpperBound` in the
+ * ClickHouse repository). The membership subquery has to leave it off for the
+ * same reason: kept, it caps a filtered `stored_spans` or `evaluation_runs`
+ * facet at the instant the request was built, and that facet then counts
+ * fewer traces than the table beside it shows.
+ */
+function traceWindowWhere(isLiveWindow: boolean): string {
+  return isLiveWindow ? TRACE_WINDOW_FROM : TRACE_WINDOW_FROM + TRACE_WINDOW_TO;
+}
 
 /**
  * A trace filter as a predicate on a facet table.
@@ -24,22 +39,26 @@ const TRACE_WINDOW_WHERE =
 export function scopeTraceFilterToTable({
   table,
   filterWhere,
+  isLiveWindow = false,
 }: {
   table: FacetTable;
   filterWhere: FilterWhere;
+  /** The window's `to` is rolling, so the reads around this one do not cap it. */
+  isLiveWindow?: boolean;
 }): FilterWhere {
   if (table === "trace_summaries") {
     return { sql: `(${filterWhere.sql})`, params: filterWhere.params };
   }
+  const window = traceWindowWhere(isLiveWindow);
   return {
     sql: `TraceId IN (
       SELECT TraceId
       FROM trace_summaries
-      WHERE ${TRACE_WINDOW_WHERE}
+      WHERE ${window}
         AND (TenantId, TraceId, UpdatedAt) IN (
           SELECT TenantId, TraceId, max(UpdatedAt)
           FROM trace_summaries
-          WHERE ${TRACE_WINDOW_WHERE}
+          WHERE ${window}
           GROUP BY TenantId, TraceId
         )
         AND (${filterWhere.sql})

@@ -1027,6 +1027,15 @@ Rule: Facet count updates
     Then the Model facet counts show how many error traces each model has
     And the Status facet still lists "Ok" with its own count, because the facet's own field is left out
 
+  # A rolling "to" is the instant the request was built, and the table read
+  # drops it for that reason. A facet read on another table has to agree.
+  @unit
+  Scenario: A live window leaves the facet membership uncapped
+    Given the window is a rolling preset
+    When a facet on another table is counted under the active filter
+    Then the membership test carries no upper bound on the window
+    And an absolute window still carries both bounds
+
   @unit
   Scenario: A facet term under a NOT is removed with the rest
     Given the query reads "NOT (status:error OR service:api)"
