@@ -215,21 +215,27 @@ describe("native skill generation", () => {
   // a skill that isn't in the shipped image teaches the model to hallucinate.
   // The image's skill set is the root-compiled native set Docker overlays into
   // the Go embed directory.
-  // A reproduced failure is only a reproduction when the simulated user says
-  // what the customer said: the identifiers the agent looks up (an email, an
-  // order id) travel verbatim, and a redacted value is asked for, never
-  // invented. Both skills that write scenarios from traces carry the rule.
+  // A scenario is a simulation, so the identifiers it needs are invented
+  // rather than copied out of the trace, named in the situation so the
+  // simulated user cannot improvise a different value on every run, and
+  // backed by a record the agent's lookup can find. Both skills that write
+  // scenarios from traces carry the rule.
   // Backs specs/langy/langy-scenario-grounding.feature.
   describe("given the skills that reproduce a failing trace as a scenario", () => {
-    /** @scenario "A reproduced scenario carries the trace's identifiers verbatim" */
-    it("tell the agent to copy looked-up identifiers verbatim and to ask for a redacted one", () => {
+    /** @scenario "A reproduced scenario invents its identifiers and seeds the lookup" */
+    it("tell the agent to invent the identifiers, name them in the situation and seed the lookup", () => {
       for (const slug of ["agent-improve", "scenarios"]) {
         const body = renderSkill(skills.find((s) => s.slug === slug)!);
-        expect(body, `${slug}: identifiers rule`).toContain(
-          "verbatim into the situation",
-        );
         expect(body, `${slug}: redaction rule`).toContain("[REDACTED]");
-        expect(body, `${slug}: redaction rule`).toContain("never invent one");
+        expect(body, `${slug}: redaction rule`).toContain("invent a stand-in");
+        expect(body, `${slug}: naming rule`).toContain(
+          "stops being reproducible",
+        );
+        expect(body, `${slug}: lookup rule`).toContain("fixtures or test data");
+        expect(
+          body,
+          `${slug}: the trace's own identifiers are not copied`,
+        ).not.toContain("verbatim into the situation");
       }
     });
   });

@@ -1,30 +1,32 @@
-Feature: A scenario reproduced from a trace keeps the identifiers the agent looks up
+Feature: A scenario reproduced from a trace invents its identifiers and seeds the lookup
   As a person turning a failing production conversation into a scenario
-  I want the scenario to carry the names, emails and ids the agent looked up
-  So that the simulated user reproduces the failure instead of a lookup miss
+  I want the scenario to run on test data of its own
+  So that it reproduces the failure without carrying the customer's details
 
-  Background: stand-ins reproduce the wrong failure.
-    A situation written with a stand-in ("colleague Zoe") makes the simulated
-    user invent an email, the agent's lookup misses, and the run fails for a
-    reason the original conversation never had. The identifiers the agent
-    looks up (the tool-call inputs of the trace) travel verbatim into the
-    situation; everything else sensitive keeps its structure with stand-ins.
-    A `[REDACTED]` value means the project redacts PII at ingestion: the
-    assistant asks the user for the value and never invents one. The rule
-    lives in the agent-improve and scenarios skills, which Langy reads from
-    the compiled native set.
+  Background: a simulation runs on invented data, named and seeded.
+    A scenario is a simulation, so the names, emails and ids it needs are
+    invented rather than copied out of the trace, and a `[REDACTED]` value is
+    invented too rather than asked for. The invented value is named in the
+    situation, because a situation that leaves a role unnamed lets the
+    simulated user make a different address up on every run. An identifier the
+    agent looks up needs a record in the agent's fixtures or test data, added
+    in the same change when it is missing: a lookup that always misses proves
+    the miss rather than the behaviour under test. The rule lives in the
+    agent-improve and scenarios skills, which Langy reads from the compiled
+    native set.
 
   @unit
-  Scenario: A reproduced scenario carries the trace's identifiers verbatim
+  Scenario: A reproduced scenario invents its identifiers and seeds the lookup
     Given the compiled agent-improve and scenarios skills Langy reads
     When their bodies are inspected
-    Then both tell the agent to copy the identifiers it looks up verbatim into the situation
-    And both tell it that a redacted value is asked for, never invented
+    Then both tell the agent to invent a stand-in rather than ask for a redacted value
+    And both tell it that an unnamed role costs the run its reproducibility
+    And both tell it to seed the looked-up record in the agent's fixtures or test data
 
   @integration
-  Scenario: Langy copies the identifier the agent looks up into the situation it reproduces
+  Scenario: Langy names the looked-up identifier in the situation it writes
     Given a connected support agent that looks a colleague up by email
-    And a failing conversation in which the customer names the colleague's email
+    And a failing conversation in which the customer asks for a colleague to be looped in
     When the assistant is asked to reproduce the failure as a platform scenario
-    Then the scenario it creates carries that email verbatim in its situation
+    Then the situation it writes names one concrete colleague email the agent can look up
     And the reply that reports the scenario proposes the connected agent as the target and asks whether to run it

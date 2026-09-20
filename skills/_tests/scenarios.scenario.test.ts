@@ -986,9 +986,9 @@ describe("Scenarios Skill", () => {
       3_600_000
     );
 
-    /** @scenario "Langy copies the identifier the agent looks up into the situation it reproduces" */
+    /** @scenario "Langy names the looked-up identifier in the situation it writes" */
     it.skipIf(isCI || !process.env.LANGWATCH_API_KEY || !process.env.OPENAI_API_KEY)(
-      "carries the colleague's email verbatim into the scenario it reproduces",
+      "names one colleague email the connected agent can look up in the situation it writes",
       async () => {
         const tempFolder = createSkillTestWorkDir("langwatch-skill-scenarios-grounding-");
         console.log(`[scenarios grounding dogfood] working dir: ${tempFolder}`);
@@ -1006,8 +1006,9 @@ describe("Scenarios Skill", () => {
           `LANGWATCH_API_KEY=${apiKey}\n` + (endpoint ? `LANGWATCH_ENDPOINT=${endpoint}\n` : ""),
         );
 
-        // The one email the fixture agent can look up. The scenario has to
-        // carry it exactly: a stand-in makes the lookup miss.
+        // The one email the fixture agent can look up. The situation has to
+        // name it: an unnamed colleague leaves the simulated user to invent an
+        // address on every run, and the lookup then misses.
         const colleagueEmail = "priya.raman@northwind.example";
         const stamp = Date.now().toString(36);
         const agentName = `skill-test-handoff-${stamp}`;
@@ -1025,14 +1026,14 @@ describe("Scenarios Skill", () => {
 
           const result = await scenario.run({
             setId: SKILL_TESTS_SET_ID,
-            name: "A reproduced failure keeps the identifiers the agent looks up",
+            name: "A reproduced failure names an identifier the agent can look up",
             description:
               "The user's support agent is connected to LangWatch and can look a colleague up by " +
-              "email. A production conversation failed: the customer named a colleague by email and " +
-              "the agent claimed to have forwarded the request without looking anyone up. The scenarios " +
-              "skill must reproduce that failure as a platform scenario whose situation carries the " +
-              "colleague's exact email, and report the created scenario together with the proposed " +
-              "target and the question whether to run it.",
+              "email. A production conversation failed: the customer asked for a colleague to be looped " +
+              "in and the agent claimed to have forwarded the request without looking anyone up. The " +
+              "scenarios skill must reproduce that failure as a platform scenario whose situation names " +
+              "one concrete colleague email the agent can look up, and report the created scenario " +
+              "together with the proposed target and the question whether to run it.",
             agents: [
               createClaudeCodeAgent({ workingDirectory: tempFolder }),
               scenario.userSimulatorAgent({ model: judgeModel }),
@@ -1040,7 +1041,7 @@ describe("Scenarios Skill", () => {
                 model: judgeModel,
                 criteria: [
                   "Agent read the scenarios skill instructions before acting",
-                  "Agent created the scenario on the platform with the langwatch CLI, with the colleague's exact email in the situation text rather than a stand-in or a made-up address",
+                  "Agent created the scenario on the platform with the langwatch CLI, and the situation text names one concrete colleague email the agent can look up rather than leaving the colleague unnamed",
                   "Agent reported the created scenario and, in the same reply, named the connected agent as the proposed target and asked whether to run it, instead of running unasked or asking without naming a target",
                   "If creating the scenario on the platform failed, the agent reported that failure instead of claiming the scenario was created; a command it retried with different flags while exploring does not count",
                 ],
@@ -1068,7 +1069,7 @@ describe("Scenarios Skill", () => {
                 ).toBeGreaterThan(0);
                 expect(
                   creates.some((command) => command.includes(colleagueEmail)),
-                  "Expected the colleague's email verbatim in the scenario's situation",
+                  "Expected the situation to name the colleague email the fixture can look up",
                 ).toBe(true);
                 expect(
                   findTestFiles(tempFolder, /^test_.*\.py$|\.test\.ts$/).length,
