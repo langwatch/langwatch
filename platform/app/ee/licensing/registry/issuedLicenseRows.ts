@@ -70,13 +70,12 @@ export async function createIssuedLicenseRow({
     });
   } catch (error) {
     // Two writes of the same license key both pass the read above, and the
-    // unique index refuses the second. A replacement row can also collide on
-    // `replacesId`, which means the license was already reissued: that one
-    // belongs to `reissue` and keeps its own refusal.
-    const isReplacement = overrides.replacesId != null;
-    if (isUniqueViolation(error) && !isReplacement) {
-      throw new LicenseAlreadyRegisteredError();
-    }
+    // unique index refuses the second. The constraint the table names is what
+    // tells the two apart: a `replacesId` clash means this license was already
+    // reissued, which is `reissue`'s own refusal, and every other clash means
+    // the license itself is already registered.
+    if (violationNames({ error, column: "replacesId" })) throw error;
+    if (isUniqueViolation(error)) throw new LicenseAlreadyRegisteredError();
     throw error;
   }
 }
@@ -105,6 +104,32 @@ function rowFromSignedLicense(
     issuedAt: new Date(signed.data.issuedAt),
     expiresAt: new Date(signed.data.expiresAt),
   };
+}
+
+/**
+ * Whether a unique violation is the one on this column. Prisma reports it in
+ * `meta.target`, sometimes as the column and sometimes as the index built over
+ * it, so the column name is looked for inside each entry rather than compared.
+ * A client that names nothing answers false, which leaves the caller with the
+ * refusal that fits every constraint on this table but one.
+ */
+export function violationNames({
+  error,
+  column,
+}: {
+  error: unknown;
+  column: string;
+}): boolean {
+  if (!isUniqueViolation(error)) return false;
+  const target = (error as { meta?: { target?: unknown } }).meta?.target;
+  const names = Array.isArray(target)
+    ? target
+    : typeof target === "string"
+      ? [target]
+      : [];
+  return names.some(
+    (name) => typeof name === "string" && name.includes(column),
+  );
 }
 
 /** Prisma's unique constraint violation, without importing Prisma here. */

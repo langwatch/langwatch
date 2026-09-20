@@ -3,7 +3,7 @@
  *
  * Spec: specs/self-hosting/connected-services/license-registry.feature
  */
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { validateLicense } from "../../validation";
 import { LicenseRegistryService } from "../licenseRegistry.service";
 import {
@@ -187,6 +187,32 @@ describe("LicenseRegistryService", () => {
             operatorId: OPERATOR,
           }),
         ).rejects.toMatchObject({ code: "license_already_reissued" });
+      });
+    });
+
+    describe("when a reissue loses to a unique constraint", () => {
+      /** @scenario A reissue names the constraint the table refused it on */
+      it.each([
+        ["replacesId", "license_already_reissued"],
+        ["IssuedLicense_replacesId_key", "license_already_reissued"],
+        ["tokenHash", "license_already_registered"],
+        ["licenseId", "license_already_registered"],
+      ] as const)("refuses a %s clash as %s", async (column, code) => {
+        const { license } = await context.service.issue(issueInput(acme));
+        vi.spyOn(context.repository, "create").mockRejectedValueOnce(
+          Object.assign(new Error("unique violation"), {
+            code: "P2002",
+            meta: { target: [column] },
+          }),
+        );
+
+        await expect(
+          context.service.reissue({
+            id: license.id,
+            expiresAt: NEXT_YEAR,
+            operatorId: OPERATOR,
+          }),
+        ).rejects.toMatchObject({ code });
       });
     });
 

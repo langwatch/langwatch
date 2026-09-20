@@ -25,15 +25,14 @@ export class InMemoryIssuedLicenseRepository
   async create(
     data: Omit<IssuedLicenseRecord, "id" | "createdAt" | "updatedAt">,
   ): Promise<IssuedLicenseRecord> {
-    // The same unique columns the table has.
-    const clashes = this.rows.some(
-      (row) =>
-        row.tokenHash === data.tokenHash ||
-        row.licenseId === data.licenseId ||
-        (data.replacesId !== null && row.replacesId === data.replacesId),
-    );
-    if (clashes) {
-      throw Object.assign(new Error("unique violation"), { code: "P2002" });
+    // The same unique columns the table has, and it names the one that
+    // clashed the way Prisma does: the caller decides by that name.
+    const clashed = this.clashingColumn(data);
+    if (clashed) {
+      throw Object.assign(new Error("unique violation"), {
+        code: "P2002",
+        meta: { target: [clashed] },
+      });
     }
     const row: IssuedLicenseRecord = {
       ...data,
@@ -43,6 +42,24 @@ export class InMemoryIssuedLicenseRepository
     };
     this.rows.push(row);
     return { ...row };
+  }
+
+  private clashingColumn(
+    data: Omit<IssuedLicenseRecord, "id" | "createdAt" | "updatedAt">,
+  ): string | null {
+    if (this.rows.some((row) => row.tokenHash === data.tokenHash)) {
+      return "tokenHash";
+    }
+    if (this.rows.some((row) => row.licenseId === data.licenseId)) {
+      return "licenseId";
+    }
+    if (
+      data.replacesId !== null &&
+      this.rows.some((row) => row.replacesId === data.replacesId)
+    ) {
+      return "replacesId";
+    }
+    return null;
   }
 
   // Reads hand out copies, as a database does: a caller holding a row does

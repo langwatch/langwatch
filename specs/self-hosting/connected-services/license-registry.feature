@@ -188,6 +188,13 @@ Feature: License registry
     Then the signed license is still shown
 
   @unit
+  Scenario: A reissue names the constraint the table refused it on
+    Given an active license in the registry
+    When a reissue of it loses to a unique constraint
+    Then a clash on the license it replaces is refused as already reissued
+    And a clash on the license itself is refused as already registered
+
+  @unit
   Scenario: A license past its term reads as expired
     Given a license in the registry whose term has ended
     When its status is read
