@@ -104,6 +104,13 @@ Feature: Hosted services on the gateway host
     And it sees "instant_evals" among its entitled services
 
   @unit
+  Scenario: The install parses the usage answer it is given
+    Given a connected install with a contract budget
+    When the install reads the usage route
+    Then every field the install requires is present in the answer
+    And a field the host stops sending fails the host's own suite
+
+  @unit
   Scenario: A virtual key reads its usage too
     Given a Cloud project with a virtual key and a budget
     When a call with that virtual key reads the usage route

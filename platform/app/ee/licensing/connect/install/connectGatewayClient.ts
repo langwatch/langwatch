@@ -54,7 +54,12 @@ const contractSchema = budgetSchema.extend({
   term_ends_at: z.string().nullable(),
 });
 
-const usageAnswerSchema = z.object({
+/**
+ * The published shape of the usage answer. Exported so the host's own suite can
+ * parse what it returns against the schema the install applies to it, which is
+ * what keeps the two halves of this route from drifting apart.
+ */
+export const usageAnswerSchema = z.object({
   services: z.array(z.string()),
   spend_available: z.boolean(),
   read_at: z.string(),

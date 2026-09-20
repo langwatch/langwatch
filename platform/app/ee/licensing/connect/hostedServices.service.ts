@@ -231,5 +231,6 @@ function budgetWire(budget: HostedBudgetUsage) {
         ? null
         : Math.max(0, budget.limitUsd - budget.spentUsd),
     period_started_at: budget.periodStartedAt.toISOString(),
+    is_contract: budget.isContract,
   };
 }

@@ -7,6 +7,7 @@ import { INSTANT_EVAL_PRICING } from "~/server/app-layer/instant-evals/classifie
 import type { IssuedLicenseRecord } from "../../registry/licenseRegistry.service";
 import type { ConnectSpendEntry } from "../connectSpendBuffer";
 import { ContractBudgetService } from "../contractBudget.service";
+import { usageAnswerSchema } from "../install/connectGatewayClient";
 import {
   type HostedBudgetUsage,
   type HostedCaller,
@@ -279,6 +280,25 @@ describe("HostedServicesService", () => {
           term_ends_at: row.expiresAt.toISOString(),
         },
       });
+    });
+
+    /** @scenario The install parses the usage answer it is given */
+    it("answers within the shape the install applies to it", async () => {
+      const row = license();
+      const { service, contractBudgets } = build({
+        licenses: [row],
+        budgets: [contractBudget(120)],
+      });
+      await contractBudgets.sync({
+        organizationId: ACME,
+        operatorId: "user_operator",
+      });
+
+      const usage = await service.usage({ caller: callerOf(row) });
+
+      const parsed = usageAnswerSchema.safeParse(usage);
+      expect(parsed.error?.issues ?? []).toEqual([]);
+      expect(parsed.success).toBe(true);
     });
 
     /** @scenario A virtual key reads its usage too */
