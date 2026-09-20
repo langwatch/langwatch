@@ -1053,6 +1053,18 @@ Rule: Facet count updates
     And the Origin facet still offers Langy with its count
     And the counts read the window the table reads, never a rounded one
 
+  @unit
+  Scenario: A facet on spans or evaluations reads the listed traces once any filter is active
+    Given the query names only an evaluator facet
+    Then that facet counts the evaluations of the traces in the window, its own field left out
+    And Langy's own traces and traces outside the window are not counted
+
+  @unit
+  Scenario: Span and evaluation facets count the whole window while no filter is active
+    Given no query is active
+    Then the span and evaluation facets count every row in the window
+    And they are counted again through the listed traces as soon as a filter is applied
+
   @integration
   Scenario: Facet counts are cached only per query and window
     When the user changes the query or the time window

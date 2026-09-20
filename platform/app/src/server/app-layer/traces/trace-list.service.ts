@@ -613,9 +613,13 @@ export class TraceListService {
    * Facets on `stored_spans` and `evaluation_runs` count their own rows
    * (spans, evaluation runs), so their counts are per row, not per trace,
    * and the query reaches them through a membership test on the filtered
-   * traces. With no query, only the hidden origins would apply, and a
-   * membership test over the whole window buys nothing a user reads; those
-   * facets then count as discover does.
+   * traces. With no query they count as discover does: the membership test
+   * reads every trace in the window once per table (about 2 KB of attributes
+   * per trace, measured), which the page would pay on every unfiltered load to
+   * leave out Langy's rows and rows whose trace sits outside the window. Under
+   * any query the test is already paid for, so it then applies to every facet,
+   * the one the query names included, and the counts next to a filtered list
+   * come from the traces that list reads. See ADR-139.
    */
   async getFacets(params: FacetParams): Promise<FacetsResult> {
     const compiler = createFacetFilterCompiler({
@@ -630,10 +634,13 @@ export class TraceListService {
       FilterWhere | undefined,
       FilterWhere | undefined
     >();
+    const hasQuery = (params.query ?? "").trim() !== "";
     const filterFor = (def: FacetDefinition): FilterWhere | undefined => {
       const own = compiler.forFacet(def.key);
       if (def.key === "origin") return own;
-      if (def.table !== "trace_summaries" && !own) return undefined;
+      if (def.table !== "trace_summaries" && !own && !hasQuery) {
+        return undefined;
+      }
       if (!withHidden.has(own)) {
         withHidden.set(own, withHiddenOrigins(own, params.hiddenOrigins));
       }

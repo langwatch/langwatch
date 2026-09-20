@@ -206,6 +206,7 @@ describe("TraceListService.getFacets", () => {
       expect(model?.filterWhere?.params).toHaveProperty(HIDDEN_ORIGINS_PARAM);
     });
 
+    /** @scenario "Span and evaluation facets count the whole window while no filter is active" */
     it("counts facets on other tables as discover does when only the origin rule applies", async () => {
       const repository = fakeRepository();
       await serviceWith(repository).getFacets({
@@ -223,6 +224,24 @@ describe("TraceListService.getFacets", () => {
         .map(([params]) => params.query as { sql: string })
         .find((q) => q.sql.includes("FROM evaluation_runs"));
       expect(evaluator?.sql).not.toContain("TraceId IN (");
+    });
+  });
+
+  describe("given a query naming only a facet on another table", () => {
+    /** @scenario "A facet on spans or evaluations reads the listed traces once any filter is active" */
+    it("scopes that facet to the window's visible traces, its own field left out", async () => {
+      const repository = fakeRepository();
+      await serviceWith(repository).getFacets({
+        tenantId: TENANT,
+        timeRange,
+        query: "evaluatorStatus:error",
+        hiddenOrigins: [LANGY_TRACE_ORIGIN],
+      });
+
+      const own = batchCarrying(repository, "evaluatorStatus");
+      expect(own.table).toBe("evaluation_runs");
+      expect(own.filterWhere?.sql).toContain(HIDDEN_ORIGINS_PARAM);
+      expect(own.filterWhere?.sql).not.toContain("evaluation_runs");
     });
   });
 

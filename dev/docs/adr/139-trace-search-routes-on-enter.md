@@ -53,6 +53,8 @@ What is compromised: a single bare word ("timeout") also goes through the router
 
 `tracesV2.routeSearch` is a new procedure with no migration. It reads facet values for the context line and calls the classifier and the FAST model; the FAST model uses the project's own keys under the `traces.ai_search` feature. The `instant_eval` kind has a typed payload the Explorer turns into a run through `tracesV2.instantEval`, a nested family with no migration of its own: it reads and writes the Instant Eval tables the REST family already uses, and the `eval` chip reads `instant_eval_judgments` through the filter compiler. The route metric is the only trace routing leaves.
 
+Facets on `stored_spans` and `evaluation_runs` count spans and evaluation runs, and reach a filter through a membership test on the traces the list reads. With no query the test is skipped. Measured on a seeded project with 5,924 traces over 30 days, it adds 100 to 400 ms to each of those reads and reads 12 MB of trace attributes, about 2 KB per trace in the window, because the origin lives in the attributes map. A window of one million traces would read about 2 GB and hold a set of one million trace ids per table on every unfiltered page load. So with no query these facets include the rows of Langy's own traces and rows whose trace starts outside the window (139 of 1,796 evaluation runs on the seeded project). Under any query the test applies to every facet, the one the query names included, so the counts are read again through the listed traces right after a facet click.
+
 ## References
 
 - Related ADRs: ADR-045 (handled errors), ADR-137 (Instant Eval runs), ADR-138 (the query reference)
