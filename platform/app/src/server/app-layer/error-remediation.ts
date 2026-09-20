@@ -809,6 +809,11 @@ const registry = {
       "The page applied the change but could not write it to the server, so the saved evaluation does not have it. Do not build the next step on it: pass --experiment <slug> to apply the change to the saved evaluation instead",
     ],
   },
+  langy_ui_page_not_ready: {
+    tips: [
+      "The page was open but still loading and never became ready; run the same action once more, and if it fails again tell the user the page did not load",
+    ],
+  },
   langy_ui_timeout: {
     tips: [
       "The page may have applied part of the action; read the current state (for example `langwatch workbench get-state`) before retrying",

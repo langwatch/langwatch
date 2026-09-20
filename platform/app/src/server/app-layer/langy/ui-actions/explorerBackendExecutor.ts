@@ -29,6 +29,10 @@ import { LangyUiHandlerFailedError, LangyUiNoBrowserError } from "./errors";
 const DEFAULT_LENS_ID = "all-traces";
 const DEFAULT_PRESET_ID = "30d";
 
+/** What a read answered from defaults says about itself. */
+export const SAVED_READ_NOTE =
+  "No open Trace Explorer page answered. These are the Explorer's defaults, not what is on the user's screen: do not report them as the user's filter, window or count. Open the Explorer with `langwatch navigate open traces` and read the state again.";
+
 /** The label the card puts on the link an away action answers. */
 export const EXPLORER_LINK_LABEL = "View in Trace Explorer";
 
@@ -81,6 +85,9 @@ function savedRead({ projectSlug }: { projectSlug: string }) {
   const state = defaultExplorerState();
   return {
     source: "saved" as const,
+    // Read by the agent: without it a saved read looks like a page that shows
+    // no filter and 30 days, and the agent reports that as the user's screen.
+    note: SAVED_READ_NOTE,
     query: state.queryText,
     timeRange: {
       from: state.timeRange.from,

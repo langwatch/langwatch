@@ -106,6 +106,8 @@ describe("given no page claims an explorer action", () => {
         href: string;
       };
       expect(result.source).toBe("saved");
+      expect(result.note).toContain("not what is on the user's screen");
+      expect(result.totalHits).toBeNull();
       expect(result.lens.id).toBe("all-traces");
       expect(result.timeRange.presetId).toBe("30d");
       expect(result.timeRange.to).toBe(NOW);

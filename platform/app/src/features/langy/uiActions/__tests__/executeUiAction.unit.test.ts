@@ -43,7 +43,7 @@ describe("executeUiAction", () => {
         entry: ENTRY,
         turnId: "turn-1",
         seen,
-        handlers: makeHandlers(),
+        getHandlers: () => makeHandlers(),
         ...legs,
       };
 
@@ -63,12 +63,67 @@ describe("executeUiAction", () => {
         entry: ENTRY,
         turnId: "turn-1",
         seen: new Set(),
-        handlers: {},
+        getHandlers: () => ({}),
         ...legs,
       });
 
       expect(outcome).toBe("no-handler");
       expect(legs.claim).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the browser is on the owning page and its handlers have not registered yet", () => {
+    /** @scenario An action that arrives while its page is still mounting is held for that page */
+    it("claims at once and runs the handler as soon as the page registers it", async () => {
+      const legs = makeLegs();
+      const run = vi.fn(() => ({ targetId: "t2" }));
+      let registered: LangyUiActionHandlers = {};
+      let polls = 0;
+
+      const outcome = await executeUiAction({
+        entry: ENTRY,
+        turnId: "turn-1",
+        seen: new Set(),
+        getHandlers: () => registered,
+        isPageArriving: () => true,
+        sleep: async () => {
+          polls += 1;
+          if (polls === 3) registered = makeHandlers(run as never);
+        },
+        ...legs,
+      });
+
+      expect(outcome).toBe("executed");
+      expect(legs.claim).toHaveBeenCalledTimes(1);
+      expect(run).toHaveBeenCalledTimes(1);
+      expect(legs.complete).toHaveBeenCalledWith({
+        actionId: "a1",
+        ok: true,
+        result: { targetId: "t2" },
+      });
+    });
+
+    /** @scenario A page that never finishes mounting reports it instead of leaving the agent waiting */
+    it("completes as failed with the page-not-ready code when the hold runs out", async () => {
+      const legs = makeLegs();
+
+      const outcome = await executeUiAction({
+        entry: ENTRY,
+        turnId: "turn-1",
+        seen: new Set(),
+        getHandlers: () => ({}),
+        isPageArriving: () => true,
+        holdMs: 200,
+        sleep: async () => undefined,
+        ...legs,
+      });
+
+      expect(outcome).toBe("handler-failed");
+      expect(legs.complete).toHaveBeenCalledWith({
+        actionId: "a1",
+        ok: false,
+        errorCode: "langy_ui_page_not_ready",
+      });
     });
   });
 
@@ -82,7 +137,7 @@ describe("executeUiAction", () => {
         entry: ENTRY,
         turnId: "turn-1",
         seen: new Set(),
-        handlers: makeHandlers(run as never),
+        getHandlers: () => makeHandlers(run as never),
         ...legs,
       });
 
@@ -101,7 +156,7 @@ describe("executeUiAction", () => {
         entry: { ...ENTRY, payload: { targetId: 7 } },
         turnId: "turn-1",
         seen: new Set(),
-        handlers: makeHandlers(run as never),
+        getHandlers: () => makeHandlers(run as never),
         ...legs,
       });
 
@@ -124,7 +179,7 @@ describe("executeUiAction", () => {
         entry: ENTRY,
         turnId: "turn-1",
         seen: new Set(),
-        handlers: makeHandlers(),
+        getHandlers: () => makeHandlers(),
         ...legs,
       });
 
@@ -145,9 +200,10 @@ describe("executeUiAction", () => {
         entry: ENTRY,
         turnId: "turn-1",
         seen: new Set(),
-        handlers: makeHandlers(() => {
-          throw failure;
-        }),
+        getHandlers: () =>
+          makeHandlers(() => {
+            throw failure;
+          }),
         ...legs,
         onHandlerError,
       });
@@ -173,7 +229,7 @@ describe("executeUiAction", () => {
         entry: ENTRY,
         turnId: "turn-1",
         seen: new Set(),
-        handlers: makeHandlers(),
+        getHandlers: () => makeHandlers(),
         ...legs,
         onHandlerError,
       });
@@ -199,7 +255,7 @@ describe("executeUiAction", () => {
         entry: ENTRY,
         turnId: "turn-1",
         seen: new Set(),
-        handlers: makeHandlers(),
+        getHandlers: () => makeHandlers(),
         ...legs,
         onHandlerError,
       });
@@ -219,9 +275,10 @@ describe("executeUiAction", () => {
         entry: ENTRY,
         turnId: "turn-1",
         seen: new Set(),
-        handlers: makeHandlers(() => {
-          throw new Error("no such target");
-        }),
+        getHandlers: () =>
+          makeHandlers(() => {
+            throw new Error("no such target");
+          }),
         ...legs,
         onHandlerError,
       });

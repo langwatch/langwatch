@@ -7564,6 +7564,8 @@ langwatch ui call explorer.getState --payload '{}'
 
 Read `executedVia` on every call. `"browser"` means the Explorer on screen changed. `"backend"` means no Explorer was open: the answer carries `href` and the card shows "View in Trace Explorer" on that filter, and the page did not change. In that case take the count from `langwatch trace search` with the same filter and window, and tell the user the link opens the Explorer on it.
 
+A state with `source: "saved"` carries a `note` and the Explorer's defaults, not the user's screen: do not quote its query, window or count as theirs. A call that fails with `langy_ui_page_not_ready` reached a page that was still loading. In both cases run the same call once more before you answer.
+
 `explorer.setFilter` refuses a filter the language does not parse with `filter_invalid` and a position. Fix the filter and call once more.
 
 Other kinds, for follow-up asks: `explorer.setLens`, `explorer.setSort`, `explorer.setPage`, `explorer.select`, and `explorer.runInstantEval` for a judgement no field holds ("which of these sound annoyed"). `explorer.runInstantEval` spends the user's budget and needs an open Explorer, so use it when the fields and events above cannot express the concept.
