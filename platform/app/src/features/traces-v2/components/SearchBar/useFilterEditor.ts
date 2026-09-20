@@ -252,6 +252,22 @@ export function useFilterEditor({
   // hears about the text on Enter, through `submitQueryText`. Nothing here
   // commits on a timer or on blur, so typing and pausing never search.
 
+  // End-of-content anchor for the inline submit hint. Independent of the
+  // cursor: a ⌘+A or a click back into the middle puts the caret anywhere, but
+  // the hint stays pinned right after the text. Measured by asking PM for the
+  // coords at the document's end position (PARAGRAPH_OFFSET + text length).
+  const measureEndAnchor = useCallback((editor: Editor, text: string) => {
+    try {
+      const view = editor.view;
+      const editorRect = view.dom.getBoundingClientRect();
+      const coords = view.coordsAtPos(PARAGRAPH_OFFSET + text.length);
+      const next = Math.round(coords.left - editorRect.left);
+      setEndAnchorX((prev) => (prev === next ? prev : next));
+    } catch {
+      // coordsAtPos throws on cold mount; the next refresh will recover.
+    }
+  }, []);
+
   const refreshSuggestion = useCallback(
     (editor: Editor, prereadText?: string) => {
       const text = prereadText ?? editor.getText();
@@ -287,22 +303,7 @@ export function useFilterEditor({
         }
       }
 
-      // End-of-content anchor for the inline submit hint. Independent
-      // of the cursor — a ⌘+A or click-back-to-middle puts the caret
-      // anywhere, but the hint should stay pinned right after whatever
-      // the user has typed. Measure the rightmost edge of the document
-      // by asking PM for coords at the document's *end* position
-      // (PARAGRAPH_OFFSET + text length).
-      try {
-        const view = editor.view;
-        const editorRect = view.dom.getBoundingClientRect();
-        const endPos = PARAGRAPH_OFFSET + text.length;
-        const coords = view.coordsAtPos(endPos);
-        const next = Math.round(coords.left - editorRect.left);
-        setEndAnchorX((prev) => (prev === next ? prev : next));
-      } catch {
-        // coordsAtPos throws on cold mount; the next refresh will recover.
-      }
+      measureEndAnchor(editor, text);
 
       // Escape is sticky for the session — `dismissedRef` only clears on
       // blur, reset, or a fresh `@` trigger.
@@ -364,7 +365,7 @@ export function useFilterEditor({
         return suggestionUIEqual(prev, next) ? prev : next;
       });
     },
-    [dismissedRef, valueResolverRef],
+    [dismissedRef, valueResolverRef, measureEndAnchor],
   );
 
   const editor = useEditor({
@@ -709,6 +710,10 @@ export function useFilterEditor({
     isProgrammaticRef.current = true;
     editor.commands.setContent(buildDocument(queryText));
     if (keepFocus) editor.commands.focus("end");
+    // Programmatic changes skip the refresh that measures the hint's anchor,
+    // and a bar that keeps focus keeps showing the hint: measure it here, or
+    // the hint stays where the replaced sentence ended, on top of the chips.
+    measureEndAnchor(editor, editor.getText());
     const next = queryText.length > 0;
     if (lastHasContentRef.current !== next) {
       lastHasContentRef.current = next;
@@ -716,7 +721,7 @@ export function useFilterEditor({
     }
     triggerPosRef.current = null;
     isProgrammaticRef.current = false;
-  }, [editor, queryText, onHasContentChangeRef]);
+  }, [editor, queryText, onHasContentChangeRef, measureEndAnchor]);
 
   const acceptSuggestion = useCallback(
     (label: string) => {

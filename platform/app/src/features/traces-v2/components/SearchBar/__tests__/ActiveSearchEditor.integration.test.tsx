@@ -118,6 +118,7 @@ describe("ActiveSearchEditor applied query", () => {
 
   function editorWith(queryText: string) {
     const submitQueryText = vi.fn();
+    const onCursorAnchorChange = vi.fn();
     const ui = (text: string) => (
       <ChakraProvider value={defaultSystem}>
         <ActiveSearchEditor
@@ -128,11 +129,12 @@ describe("ActiveSearchEditor applied query", () => {
           onHasContentChange={() => {
             /* no-op */
           }}
+          onCursorAnchorChange={onCursorAnchorChange}
         />
       </ChakraProvider>
     );
     const utils = render(ui(queryText));
-    return { ...utils, ui, submitQueryText };
+    return { ...utils, ui, submitQueryText, onCursorAnchorChange };
   }
 
   describe("given a focused bar whose sentence was submitted with Enter", () => {
@@ -151,6 +153,72 @@ describe("ActiveSearchEditor applied query", () => {
           expect(editor.textContent).toContain("status:error");
         });
         expect(editor.querySelectorAll(".filter-token").length).toBe(2);
+      });
+
+      /** @scenario "The routed query replaces the sentence in the bar while the bar keeps focus" */
+      it("moves the Enter hint to the end of the applied query", async () => {
+        // Eight pixels a character, measured over whatever the bar holds at
+        // the moment of the measurement.
+        const CHARACTER_PX = 8;
+        const widthOfBar = () =>
+          (document
+            .querySelector(".ProseMirror")
+            ?.textContent?.replace(/\u00A0/g, " ")
+            .trimEnd().length ?? 0) * CHARACTER_PX;
+        const rectAt = (left: number) =>
+          ({
+            top: 0,
+            bottom: 16,
+            left,
+            right: left,
+            width: 0,
+            height: 16,
+            x: left,
+            y: 0,
+            toJSON: () => ({}),
+          }) as DOMRect;
+        const originalRects = Range.prototype.getClientRects;
+        const originalBox = Range.prototype.getBoundingClientRect;
+        const originalElementBox = Element.prototype.getBoundingClientRect;
+        const originalElementRects = Element.prototype.getClientRects;
+        Range.prototype.getClientRects = () =>
+          [rectAt(widthOfBar())] as unknown as DOMRectList;
+        Range.prototype.getBoundingClientRect = () => rectAt(widthOfBar());
+        // The editor root is the origin; everything inside it ends where the
+        // text ends.
+        const insideEditor = (element: Element) =>
+          !element.classList.contains("ProseMirror") &&
+          element.closest(".ProseMirror") !== null;
+        Element.prototype.getBoundingClientRect = function (this: Element) {
+          return rectAt(insideEditor(this) ? widthOfBar() : 0);
+        };
+        Element.prototype.getClientRects = function (this: Element) {
+          return [
+            rectAt(insideEditor(this) ? widthOfBar() : 0),
+          ] as unknown as DOMRectList;
+        };
+        try {
+          const applied = "status:error AND service:checkout";
+          const { rerender, ui, onCursorAnchorChange } =
+            editorWith("annoyed users");
+          const editor = await waitForEditor();
+          editor.focus();
+          fireEvent.focus(editor);
+          fireEvent.keyDown(editor, { key: "Enter" });
+
+          rerender(ui(applied));
+
+          await waitFor(() => {
+            expect(onCursorAnchorChange).toHaveBeenLastCalledWith(
+              applied.length * CHARACTER_PX,
+            );
+          });
+        } finally {
+          Range.prototype.getClientRects = originalRects;
+          Range.prototype.getBoundingClientRect = originalBox;
+          Element.prototype.getBoundingClientRect = originalElementBox;
+          Element.prototype.getClientRects = originalElementRects;
+        }
       });
     });
   });

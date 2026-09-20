@@ -1363,6 +1363,7 @@ Rule: Enter routes a sentence
     When the query the router produced is applied
     Then the bar shows the applied query as chips, with the caret at its end
     And a bar the user kept typing in after Enter keeps what they typed
+    And the Enter hint sits after the applied query, not where the sentence ended
 
   @unit
   Scenario: Explicit terms typed next to a sentence are kept
