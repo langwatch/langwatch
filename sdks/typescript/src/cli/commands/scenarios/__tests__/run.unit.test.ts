@@ -17,6 +17,16 @@ vi.mock("../../run-plans/cli-run-plans-service", () => ({
   createCliRunPlansService: vi.fn(() => ({ run: runSpy })),
 }));
 
+const getAllSpy = vi.hoisted(() =>
+  vi.fn(async () => [
+    { id: "scenario_1", name: "Login Flow" },
+    { id: "scenario_2", name: "Refund a paid order" },
+  ]),
+);
+vi.mock("../cli-scenarios-service", () => ({
+  createCliScenariosService: vi.fn(() => ({ getAll: getAllSpy })),
+}));
+
 vi.mock("../../../utils/apiKey", () => ({
   resolveCredentials: vi.fn(async () => ({
     apiKey: "test-key",
@@ -117,6 +127,19 @@ describe("runScenarioCommand()", () => {
       const printed = vi.mocked(console.log).mock.calls.flat().join("\n");
       expect(printed).toContain("Login Flow against Support Agent");
       expect(printed).toContain("batch_1");
+    });
+  });
+
+  describe("when the scenario is named by its name", () => {
+    /** @scenario "Run a scenario by its name" */
+    it("posts the run scoped to the scenario that name names", async () => {
+      await runScenarioCommand("Refund a paid order", { target: ["http:agent_abc123"] });
+
+      expect(runSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({ scenarioIds: ["scenario_2"] }),
+        }),
+      );
     });
   });
 

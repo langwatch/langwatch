@@ -12,9 +12,18 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const useSpy = vi.hoisted(() => vi.fn());
 const putSpy = vi.hoisted(() => vi.fn());
+const getSpy = vi.hoisted(() =>
+  vi.fn(async () => ({
+    data: [{ id: "scenario_abc123", name: "Login Flow", testSuiteId: null }],
+  })),
+);
 
 vi.mock("@/internal/api/client", () => ({
-  createLangWatchApiClient: vi.fn(() => ({ use: useSpy, PUT: putSpy })),
+  createLangWatchApiClient: vi.fn(() => ({
+    use: useSpy,
+    PUT: putSpy,
+    GET: getSpy,
+  })),
 }));
 
 vi.mock("../../../utils/apiKey", () => ({
