@@ -69,7 +69,11 @@ function documentation() {
  */
 export function openapiDocumentRoute(restApp: Hono): MiddlewareHandler {
   return async (context) => {
-    const document = await generateSpecs(restApp, { documentation: documentation() });
+    const generated = await generateSpecs(restApp, { documentation: documentation() });
+    // Both corrections rewrite in place, and hono-openapi hands every request the
+    // SAME resolved schema objects: correcting those would leave the second request
+    // a `$defs` block already hoisted away and a ref pointing at nothing.
+    const document: unknown = JSON.parse(JSON.stringify(generated));
 
     hoistStraySchemaDefs(document);
 
