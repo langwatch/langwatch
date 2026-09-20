@@ -9,6 +9,7 @@
  * Spec: specs/features/run-plan-cli.feature
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { stdoutDocuments, stdoutLines } from "../../../utils/__tests__/stdout-documents";
 import { RunPlansApiError } from "@/client-sdk/services/run-plans";
 import { AGENT_MODE_ENV_VARS } from "../../../utils/output";
 
@@ -103,16 +104,6 @@ const makePlan = (overrides: Record<string, unknown> = {}) => ({
  * flip the human-path tests into a machine format.
  */
 let savedAgentEnv: Record<string, string | undefined> = {};
-
-/** Every JSON document the command printed on stdout. */
-const printedDocuments = (): string[] =>
-  vi
-    .mocked(console.log)
-    .mock.calls.map((call) => call[0] as unknown)
-    .filter(
-      (line): line is string =>
-        typeof line === "string" && line.trimStart().startsWith("{"),
-    );
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -620,7 +611,7 @@ describe("runRunPlanCommand()", () => {
         format: "json",
       });
 
-      expect(printedDocuments()).toEqual([
+      expect(stdoutDocuments()).toEqual([
         JSON.stringify({ ...result, outcome: "scheduled" }, null, 2),
       ]);
     });
@@ -649,7 +640,7 @@ describe("runRunPlanCommand()", () => {
 
       await runWithFakeTimers({ advanceMs: 3000 });
 
-      const documents = printedDocuments();
+      const documents = stdoutDocuments();
       expect(documents).toHaveLength(1);
       const document = JSON.parse(documents[0]!) as Record<string, unknown>;
       expect(document.batchRunId).toBe("batch_123");
@@ -686,7 +677,7 @@ describe("runRunPlanCommand()", () => {
 
       await runWithFakeTimers({ advanceMs: 45 * 60 * 1000 + 3000 });
 
-      const documents = printedDocuments();
+      const documents = stdoutDocuments();
       expect(documents).toHaveLength(1);
       const document = JSON.parse(documents[0]!) as Record<string, unknown>;
       expect(document.outcome).toBe("timeout");
@@ -702,7 +693,7 @@ describe("runRunPlanCommand()", () => {
 
       await runWithFakeTimers({ wait: "1", advanceMs: 60 * 1000 + 3000 });
 
-      const documents = printedDocuments();
+      const documents = stdoutDocuments();
       expect(documents).toHaveLength(1);
       const document = JSON.parse(documents[0]!) as Record<string, unknown>;
       expect(document.outcome).toBe("timeout");
@@ -737,7 +728,7 @@ describe("runRunPlanCommand()", () => {
 
       await runWithFakeTimers({ advanceMs: 5 * 3000 });
 
-      const documents = printedDocuments();
+      const documents = stdoutDocuments();
       expect(documents).toHaveLength(1);
       const document = JSON.parse(documents[0]!) as Record<string, unknown>;
       expect(document.outcome).toBe("poll_failure");
@@ -761,7 +752,15 @@ describe("runRunPlanCommand()", () => {
 
       await runWithFakeTimers({ advanceMs: 3000, format: "table" });
 
-      expect(printedDocuments()).toHaveLength(0);
+      const machineDocuments = stdoutLines().filter((line) => {
+        try {
+          JSON.parse(line);
+          return true;
+        } catch {
+          return false;
+        }
+      });
+      expect(machineDocuments).toHaveLength(0);
       expect(console.log).toHaveBeenCalledWith(
         expect.stringContaining("batch_123"),
       );

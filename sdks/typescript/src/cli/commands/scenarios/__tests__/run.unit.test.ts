@@ -9,6 +9,7 @@
  * Spec: specs/features/scenario-cli.feature
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { stdoutDocuments } from "../../../utils/__tests__/stdout-documents";
 import { AGENT_MODE_ENV_VARS } from "../../../utils/output";
 
 const runSpy = vi.hoisted(() => vi.fn());
@@ -67,16 +68,6 @@ const makeRunResult = (overrides: Record<string, unknown> = {}) => ({
  * flip the human-path tests into a machine format.
  */
 let savedAgentEnv: Record<string, string | undefined> = {};
-
-/** Every JSON document the command printed on stdout. */
-const printedDocuments = (): string[] =>
-  vi
-    .mocked(console.log)
-    .mock.calls.map((call) => call[0] as unknown)
-    .filter(
-      (line): line is string =>
-        typeof line === "string" && line.trimStart().startsWith("{"),
-    );
 
 describe("runScenarioCommand()", () => {
   beforeEach(() => {
@@ -350,7 +341,7 @@ describe("runScenarioCommand()", () => {
         vi.useRealTimers();
       }
 
-      const documents = printedDocuments();
+      const documents = stdoutDocuments();
       expect(documents).toHaveLength(1);
       const document = JSON.parse(documents[0]!) as Record<string, unknown>;
       expect(document.outcome).toBe("failed");
