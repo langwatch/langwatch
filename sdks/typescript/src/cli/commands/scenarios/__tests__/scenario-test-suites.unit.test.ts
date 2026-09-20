@@ -104,7 +104,7 @@ describe("filing a scenario into a test suite from the command line", () => {
     vi.mocked(ScenariosApiService).mockImplementation(function () {
       return {
         getAll: mockScenarioGetAll,
-        get: vi.fn(),
+        get: vi.fn(async (id: string) => makeScenario({ id })),
         create: mockScenarioCreate,
         update: mockScenarioUpdate,
         delete: vi.fn(),

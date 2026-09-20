@@ -2796,7 +2796,10 @@ function LangyPanel({
     () =>
       timeTravel
         ? null
-        : { send: (text: string) => void send(text), turnInFlight },
+        : {
+            send: (text: string) => void send(text),
+            isTurnInFlight: turnInFlight,
+          },
     [timeTravel, send, turnInFlight],
   );
   const displayBusy = timeTravel ? timeTravel.isTurnInFlight : isBusy;

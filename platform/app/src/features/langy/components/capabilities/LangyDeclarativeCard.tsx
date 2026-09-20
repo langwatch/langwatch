@@ -534,7 +534,7 @@ function createdScenarioRunOffer({
     <LangyCardActionChip
       label="Run against my agent"
       icon={<Play size={12} />}
-      disabled={send.turnInFlight}
+      disabled={send.isTurnInFlight}
       onClick={() =>
         send.send(`Run scenario "${name}" against my connected agent`)
       }

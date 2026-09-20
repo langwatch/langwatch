@@ -21,10 +21,13 @@ export class ScenarioReferenceError extends Error {
 /**
  * Finds the scenario a reference names.
  *
- * An id is tried first, then an exact name, then a name compared without
- * case. A name two scenarios share is refused with both ids, because picking
- * one for the caller would act on a scenario they did not ask for. The same
- * reading `test-suite` commands give a suite reference.
+ * The reference is read as an id first, with one fetch, so `scenario get
+ * <id>` does not download every scenario in the project with its situation,
+ * criteria, labels and parameters. Only a reference the platform does not
+ * hold as an id reaches the listing, where an exact name is tried and then a
+ * name compared without case. A name two scenarios share is refused with both
+ * ids, because picking one for the caller would act on a scenario they did
+ * not ask for. The same reading `test-suite` commands give a suite reference.
  *
  * @see specs/features/scenario-cli.feature
  */
@@ -36,7 +39,21 @@ export async function resolveScenarioReference({
   service?: ScenariosApiService;
 }): Promise<ScenarioResponse> {
   const scenariosService = service ?? createCliScenariosService();
-  const scenarios = await scenariosService.getAll();
+
+  const direct = await scenariosService
+    .get(reference)
+    .then((found) => ({ found, error: undefined }))
+    .catch((error: unknown) => ({ found: undefined, error }));
+  if (direct.found) return direct.found;
+
+  let scenarios: ScenarioResponse[];
+  try {
+    scenarios = await scenariosService.getAll();
+  } catch (listingError) {
+    // Neither read answered. The caller asked about one reference, so the
+    // failure that names it is the one worth showing.
+    throw direct.error ?? listingError;
+  }
 
   const byId = scenarios.find((scenario) => scenario.id === reference);
   if (byId) return byId;

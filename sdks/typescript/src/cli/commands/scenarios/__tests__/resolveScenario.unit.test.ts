@@ -32,7 +32,14 @@ const scenario = (
   }) as ScenarioResponse;
 
 const serviceListing = (scenarios: ScenarioResponse[]): ScenariosApiService =>
-  ({ getAll: vi.fn(async () => scenarios) }) as unknown as ScenariosApiService;
+  ({
+    getAll: vi.fn(async () => scenarios),
+    get: vi.fn(async (id: string) => {
+      const found = scenarios.find((candidate) => candidate.id === id);
+      if (!found) throw new Error(`no scenario ${id}`);
+      return found;
+    }),
+  }) as unknown as ScenariosApiService;
 
 describe("resolveScenarioReference()", () => {
   describe("given scenarios with distinct names", () => {
@@ -71,6 +78,29 @@ describe("resolveScenarioReference()", () => {
           service,
         });
         expect(found.id).toBe("scenario_2");
+      });
+    });
+
+    describe("when the reference is an id the project holds", () => {
+      it("fetches that scenario without listing the project", async () => {
+        const one = serviceListing([
+          scenario({ id: "scenario_1", name: "Login Flow" }),
+        ]);
+        await resolveScenarioReference({ reference: "scenario_1", service: one });
+        expect(one.get).toHaveBeenCalledWith("scenario_1");
+        expect(one.getAll).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the reference is shaped like an id but names nothing", () => {
+      it("falls back to the listing and refuses with the list command", async () => {
+        const one = serviceListing([
+          scenario({ id: "scenario_1", name: "Login Flow" }),
+        ]);
+        await expect(
+          resolveScenarioReference({ reference: "scenario_9", service: one }),
+        ).rejects.toThrow("langwatch scenario list");
+        expect(one.getAll).toHaveBeenCalled();
       });
     });
 

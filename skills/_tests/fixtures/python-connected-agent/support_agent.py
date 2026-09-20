@@ -120,6 +120,17 @@ def support_agent(
                     "content": lookup_colleague(arguments.get("email", "")),
                 }
             )
+    else:
+        # Every round asked for another tool call. One more completion with the
+        # tools withheld is what turns that into an answer instead of a blank
+        # reply.
+        completion = client.chat.completions.create(
+            model=model,
+            messages=history,
+            tools=TOOLS,
+            tool_choice="none",
+        )
+        output = completion.choices[0].message.content or ""
     return langwatch.AgentReply(
         output=output,
         session={"thread_id": thread_id, "turn": turn},

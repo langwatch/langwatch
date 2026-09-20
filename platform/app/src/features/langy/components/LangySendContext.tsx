@@ -11,7 +11,7 @@ export interface LangySend {
   /** Sends a message through the composer, as if the reader had typed it. */
   send: (text: string) => void;
   /** True while Langy is answering; an offer that sends waits it out. */
-  turnInFlight: boolean;
+  isTurnInFlight: boolean;
 }
 
 const LangySendContext = createContext<LangySend | null>(null);

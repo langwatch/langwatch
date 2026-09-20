@@ -17,14 +17,20 @@ vi.mock("../../run-plans/cli-run-plans-service", () => ({
   createCliRunPlansService: vi.fn(() => ({ run: runSpy })),
 }));
 
-const getAllSpy = vi.hoisted(() =>
-  vi.fn(async () => [
-    { id: "scenario_1", name: "Login Flow" },
-    { id: "scenario_2", name: "Refund a paid order" },
-  ]),
+const scenarios = vi.hoisted(() => [
+  { id: "scenario_1", name: "Login Flow" },
+  { id: "scenario_2", name: "Refund a paid order" },
+]);
+const getAllSpy = vi.hoisted(() => vi.fn(async () => scenarios));
+const getSpy = vi.hoisted(() =>
+  vi.fn(async (id: string) => {
+    const found = scenarios.find((scenario) => scenario.id === id);
+    if (!found) throw new Error(`no scenario ${id}`);
+    return found;
+  }),
 );
 vi.mock("../cli-scenarios-service", () => ({
-  createCliScenariosService: vi.fn(() => ({ getAll: getAllSpy })),
+  createCliScenariosService: vi.fn(() => ({ getAll: getAllSpy, get: getSpy })),
 }));
 
 vi.mock("../../../utils/apiKey", () => ({

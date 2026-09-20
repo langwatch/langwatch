@@ -48,7 +48,7 @@ export function PIIRedactionAlert({
         <Alert.Description fontSize="sm">
           {children ??
             "Some content was redacted by this project's privacy settings (PII or secrets redaction)."}{" "}
-          Review them under{" "}
+          Review your privacy settings under{" "}
           <Link asChild color="blue.600" textDecoration="underline">
             <NextLink href={settingsHref}>Settings</NextLink>
           </Link>

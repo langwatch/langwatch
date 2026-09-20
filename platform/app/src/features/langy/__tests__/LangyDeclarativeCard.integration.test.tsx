@@ -310,7 +310,7 @@ describe("LangyDeclarativeCard", () => {
       it("offers to run it against the agent, and waits while Langy answers", () => {
         const { unmount } = renderCard({
           ...createdScenario,
-          send: { send: vi.fn(), turnInFlight: false },
+          send: { send: vi.fn(), isTurnInFlight: false },
         });
         const offer = screen.getByTestId("langy-card-run-scenario");
         expect(offer).toHaveTextContent("Run against my agent");
@@ -319,7 +319,7 @@ describe("LangyDeclarativeCard", () => {
 
         renderCard({
           ...createdScenario,
-          send: { send: vi.fn(), turnInFlight: true },
+          send: { send: vi.fn(), isTurnInFlight: true },
         });
         expect(screen.getByTestId("langy-card-run-scenario")).toBeDisabled();
       });
@@ -327,7 +327,10 @@ describe("LangyDeclarativeCard", () => {
       /** @scenario "Choosing the run offer asks Langy in words, through the composer" */
       it("sends the run as a message when the offer is chosen", () => {
         const send = vi.fn();
-        renderCard({ ...createdScenario, send: { send, turnInFlight: false } });
+        renderCard({
+          ...createdScenario,
+          send: { send, isTurnInFlight: false },
+        });
 
         fireEvent.click(screen.getByTestId("langy-card-run-scenario"));
 
@@ -349,7 +352,7 @@ describe("LangyDeclarativeCard", () => {
           name: "langwatch.trigger.create",
           input: { name: "Alert on errors" },
           output: "Created trigger Alert on errors",
-          send: { send: vi.fn(), turnInFlight: false },
+          send: { send: vi.fn(), isTurnInFlight: false },
         });
 
         expect(screen.queryByTestId("langy-card-run-scenario")).toBeNull();

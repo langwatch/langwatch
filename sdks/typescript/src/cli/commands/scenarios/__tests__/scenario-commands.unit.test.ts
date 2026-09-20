@@ -62,6 +62,17 @@ const makeScenario = (overrides: Partial<ScenarioResponse> = {}): ScenarioRespon
   ...overrides,
 });
 
+/** The platform's read by id: it answers for the fixture's id and nothing else. */
+const getById = () =>
+  vi.fn(async (id: string) => {
+    const found = makeScenario();
+    if (id !== found.id) throw new ScenariosApiError(
+      `Scenario "${id}" not found`,
+      `fetch scenario with ID "${id}"`,
+    );
+    return found;
+  });
+
 describe("listScenariosCommand()", () => {
   let mockGetAll: ReturnType<typeof vi.fn>;
 
@@ -70,7 +81,7 @@ describe("listScenariosCommand()", () => {
     mockGetAll = vi.fn();
     vi.mocked(ScenariosApiService).mockImplementation(function () { return ({
       getAll: mockGetAll,
-      get: vi.fn(),
+      get: getById(),
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
@@ -114,13 +125,15 @@ describe("listScenariosCommand()", () => {
 
 describe("getScenarioCommand()", () => {
   let mockGetAll: ReturnType<typeof vi.fn>;
+  let mockGet: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAll = vi.fn();
+    mockGet = getById();
     vi.mocked(ScenariosApiService).mockImplementation(function () { return ({
       getAll: mockGetAll,
-      get: vi.fn(),
+      get: mockGet,
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
@@ -187,6 +200,9 @@ describe("getScenarioCommand()", () => {
 
   describe("when the API call fails", () => {
     it("exits with code 1", async () => {
+      mockGet.mockRejectedValue(
+        new ScenariosApiError("Network error", "fetch scenario"),
+      );
       mockGetAll.mockRejectedValue(
         new ScenariosApiError("Network error", "fetch all scenarios"),
       );
@@ -204,7 +220,7 @@ describe("createScenarioCommand()", () => {
     mockCreate = vi.fn();
     vi.mocked(ScenariosApiService).mockImplementation(function () { return ({
       getAll: vi.fn(),
-      get: vi.fn(),
+      get: getById(),
       create: mockCreate,
       update: vi.fn(),
       delete: vi.fn(),
@@ -271,7 +287,7 @@ describe("updateScenarioCommand()", () => {
     mockUpdate = vi.fn();
     vi.mocked(ScenariosApiService).mockImplementation(function () { return ({
       getAll: vi.fn(async () => [makeScenario()]),
-      get: vi.fn(),
+      get: getById(),
       create: vi.fn(),
       update: mockUpdate,
       delete: vi.fn(),
@@ -347,7 +363,7 @@ describe("deleteScenarioCommand()", () => {
     mockDelete = vi.fn();
     vi.mocked(ScenariosApiService).mockImplementation(function () { return ({
       getAll: mockGetAll,
-      get: vi.fn(),
+      get: getById(),
       create: vi.fn(),
       update: vi.fn(),
       delete: mockDelete,
