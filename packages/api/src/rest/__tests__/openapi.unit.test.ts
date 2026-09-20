@@ -10,7 +10,11 @@ import { z } from "zod";
 
 import type { RestTransportRoute } from "../declaration.ts";
 import type { RestTransportDocs } from "../openapi.ts";
-import { hoistStraySchemaDefs, normalizeExclusiveBounds, restRouteDocumentation } from "../openapi.ts";
+import {
+  hoistStraySchemaDefs,
+  normalizeExclusiveBounds,
+  restRouteDocumentation,
+} from "../openapi.ts";
 
 /** A webhook intake: the signature is over the exact characters, so nothing parses them. */
 function rawBodyRoute(docs?: RestTransportDocs): RestTransportRoute<unknown> {
@@ -222,7 +226,9 @@ describe("hoistStraySchemaDefs", () => {
   function documentWith(schema: unknown) {
     return {
       components: { schemas: {} as Record<string, unknown> },
-      paths: { "/a": { get: { responses: { 200: { content: { "application/json": { schema } } } } } } },
+      paths: {
+        "/a": { get: { responses: { 200: { content: { "application/json": { schema } } } } } },
+      },
     };
   }
 
@@ -250,8 +256,22 @@ describe("hoistStraySchemaDefs", () => {
       const document = {
         components: { schemas: {} as Record<string, unknown> },
         paths: {
-          "/a": { get: { schema: { $ref: "#/components/schemas/__schema0", $defs: { __schema0: { type: "string" } } } } },
-          "/b": { get: { schema: { $ref: "#/components/schemas/__schema0", $defs: { __schema0: { type: "number" } } } } },
+          "/a": {
+            get: {
+              schema: {
+                $ref: "#/components/schemas/__schema0",
+                $defs: { __schema0: { type: "string" } },
+              },
+            },
+          },
+          "/b": {
+            get: {
+              schema: {
+                $ref: "#/components/schemas/__schema0",
+                $defs: { __schema0: { type: "number" } },
+              },
+            },
+          },
         },
       };
 
