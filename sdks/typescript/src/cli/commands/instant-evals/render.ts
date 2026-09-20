@@ -131,6 +131,11 @@ export function printEstimate(estimate: InstantEvalEstimate): void {
     `    ${chalk.gray("Requests:")} ${grouped(estimate.requests)}  ${chalk.gray("Tokens:")} ${grouped(estimate.totalTokens)} (${grouped(estimate.avgTokens)} per row)`,
   );
   console.log(`    ${chalk.gray("Price:")}    ${chalk.cyan(money(estimate.priceUsd))}`);
+  if (estimate.freeBudgetRemainingUsd !== undefined) {
+    console.log(
+      `    ${chalk.gray("Free budget:")} ${money(estimate.freeBudgetRemainingUsd)} left`,
+    );
+  }
   console.log();
   console.log(chalk.gray("  Nothing was judged and nothing was charged."));
 }

@@ -369,3 +369,25 @@ describe("given a free organization under its budget", () => {
     });
   });
 });
+
+describe("given a statement whose eval calls take longer than the database read", () => {
+  describe("when the query answers", () => {
+    /** @scenario "A judged query reports the time its judging took" */
+    it("reports an elapsed time that covers the judging", async () => {
+      const service = serviceJudgingWith({
+        classifier: classifierAnswering(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 60));
+          return {
+            verdicts: [{ questionId: "annoyed", probability: 0.5 }],
+            inputTokens: 500,
+            isTextTruncated: false,
+          };
+        }),
+      });
+
+      const result = await run(service);
+
+      expect(result.statistics.elapsedMs).toBeGreaterThanOrEqual(60);
+    });
+  });
+});

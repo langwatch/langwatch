@@ -48,3 +48,17 @@ describe("given a response from the classifier", () => {
     });
   });
 });
+
+describe("given a judgement whose raw product carries float noise", () => {
+  describe("when its cost and price are computed", () => {
+    /** @scenario "A priced amount is rounded to nano-USD precision" */
+    it("rounds both to the ledger's nano-USD unit", () => {
+      const costUsd = instantEvalCostUsd({ inputTokens: 211_727 });
+      const priceUsd = instantEvalPriceUsd({ costUsd });
+
+      expect(costUsd).toBe(0.008892534);
+      expect(priceUsd).toBe(0.011560294);
+      expect(String(priceUsd)).not.toMatch(/0000000\d$/);
+    });
+  });
+});

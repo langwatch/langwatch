@@ -75,6 +75,41 @@ describe("instant-eval estimate, given the same inputs a run takes", () => {
       expect(result?.data).toEqual(ESTIMATE);
     });
   });
+
+  describe("when the organization has a free budget", () => {
+    /** @scenario "estimate prints what is left of the free budget" */
+    it("prints what is left of it", async () => {
+      estimateSpy.mockResolvedValue({
+        ...ESTIMATE,
+        freeBudgetRemainingUsd: 0.6,
+      });
+
+      const result = await estimateInstantEvalCommand(
+        "annoyed",
+        { target: "threads", last: "30d" },
+        [],
+      );
+      result?.table?.();
+
+      expect(printed()).toContain("Free budget: $0.60 left");
+    });
+  });
+
+  describe("when the organization is on a paid plan", () => {
+    /** @scenario "estimate prints no free budget line for a paid organization" */
+    it("prints no free budget line", async () => {
+      estimateSpy.mockResolvedValue(ESTIMATE);
+
+      const result = await estimateInstantEvalCommand(
+        "annoyed",
+        { target: "threads", last: "30d" },
+        [],
+      );
+      result?.table?.();
+
+      expect(printed()).not.toContain("Free budget");
+    });
+  });
 });
 
 describe("instant-eval status, given a run id", () => {

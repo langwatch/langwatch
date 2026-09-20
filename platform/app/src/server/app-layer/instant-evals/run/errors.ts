@@ -186,8 +186,10 @@ export class InstantEvalAlreadyFinishedError extends HandledError {
         httpStatus: 409,
         fault: "customer",
         // Named consumer: a CLI that raced its own cancel against the run
-        // finishing, and reports the state it actually ended in.
-        meta: { runId, status },
+        // finishing, and reports the state it actually ended in. Spelled the
+        // way the run's own wire status is, so a reader compares like with
+        // like rather than "FINISHED" against "finished".
+        meta: { runId, status: status.toLowerCase() },
         ...remediation("instant_eval_already_finished"),
       },
     );

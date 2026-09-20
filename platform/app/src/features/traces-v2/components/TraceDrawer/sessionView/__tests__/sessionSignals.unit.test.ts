@@ -56,6 +56,7 @@ function session(
     cacheCreationTokens: 0,
     costUsd: 1.5,
     agentReportedCostUsd: 0,
+    usageByContext: [],
     modelCallMs: 30_000,
     toolMs: 10_000,
     ttftMsTotal: 2_000,
