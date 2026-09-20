@@ -29344,7 +29344,7 @@ export interface operations {
                      * @description With target: the newest instant to judge. Defaults to now.
                      */
                     end?: string;
-                    /** @description With target: what to ask of each row. One classification asks them all, which is why a three-question run costs about what a one-question run does. */
+                    /** @description With target: what to ask of each row. One classification asks them all per row, and the question text is part of what that classification is priced on; the estimate endpoint prices the exact set. */
                     questions?: {
                         /** @description What to call this question. It becomes the statement's output column and the name every judgement is filed under. Defaults to q1, q2 and so on. */
                         id?: string;
@@ -29489,7 +29489,7 @@ export interface operations {
                      * @description With target: the newest instant to judge. Defaults to now.
                      */
                     end?: string;
-                    /** @description With target: what to ask of each row. One classification asks them all, which is why a three-question run costs about what a one-question run does. */
+                    /** @description With target: what to ask of each row. One classification asks them all per row, and the question text is part of what that classification is priced on; the estimate endpoint prices the exact set. */
                     questions?: {
                         /** @description What to call this question. It becomes the statement's output column and the name every judgement is filed under. Defaults to q1, q2 and so on. */
                         id?: string;

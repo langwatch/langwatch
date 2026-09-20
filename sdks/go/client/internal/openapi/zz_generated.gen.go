@@ -26292,7 +26292,7 @@ type CreateInstantEvalRunJSONBody struct {
 	// Parameters Values for the parameters the statement declares.
 	Parameters *map[string]*CreateInstantEvalRunJSONBody_Parameters_AdditionalProperties `json:"parameters,omitempty"`
 
-	// Questions With target: what to ask of each row. One classification asks them all, which is why a three-question run costs about what a one-question run does.
+	// Questions With target: what to ask of each row. One classification asks them all per row, and the question text is part of what that classification is priced on; the estimate endpoint prices the exact set.
 	Questions *[]struct {
 		// Criteria For a yes or no question: what counts as yes, then what counts as no. Cannot be combined with a threshold.
 		Criteria *[]string `json:"criteria,omitempty"`
@@ -26395,7 +26395,7 @@ type EstimateInstantEvalRunJSONBody struct {
 	// Parameters Values for the parameters the statement declares.
 	Parameters *map[string]*EstimateInstantEvalRunJSONBody_Parameters_AdditionalProperties `json:"parameters,omitempty"`
 
-	// Questions With target: what to ask of each row. One classification asks them all, which is why a three-question run costs about what a one-question run does.
+	// Questions With target: what to ask of each row. One classification asks them all per row, and the question text is part of what that classification is priced on; the estimate endpoint prices the exact set.
 	Questions *[]struct {
 		// Criteria For a yes or no question: what counts as yes, then what counts as no. Cannot be combined with a threshold.
 		Criteria *[]string `json:"criteria,omitempty"`

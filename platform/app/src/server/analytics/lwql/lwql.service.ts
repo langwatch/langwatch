@@ -1085,6 +1085,11 @@ export class LangWatchQLService {
       rows: hydration.rows,
       statistics: {
         ...execution.statistics,
+        // The database's own elapsed time plus what hydration spent reading
+        // and judging: a judged query that took three seconds must not report
+        // the sixty milliseconds ClickHouse saw of it.
+        elapsedMs:
+          execution.statistics.elapsedMs + hydrationMs(hydration.timings),
         // Hydration can drop trailing rows at its own ceiling, so the count the
         // caller is told has to be the count they received.
         rowsReturned: hydration.rows.length,
@@ -1154,6 +1159,12 @@ function appFunctionDiagnosticsInput({
         : {}),
     },
   };
+}
+
+/** What the hydration stage spent, in wall-clock milliseconds, or nothing. */
+function hydrationMs(timings: LangWatchQLHydrationResult["timings"]): number {
+  if (!timings) return 0;
+  return timings.readMs + timings.computeMs + timings.judgeMs;
 }
 
 /** One line per executed statement, with what the caller actually received. */

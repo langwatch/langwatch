@@ -83,6 +83,7 @@ const REAL_SESSION: CodingAgentSessionRow = {
   cacheCreationTokens: 284_220,
   costUsd: 10.6188605,
   agentReportedCostUsd: 10.9,
+  usageByContext: [],
   modelCallMs: 713_056,
   toolMs: 687_202,
   ttftMsTotal: 0,

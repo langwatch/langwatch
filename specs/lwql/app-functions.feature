@@ -309,6 +309,12 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
     Then no further chunk is read
 
   @unit
+  Scenario: A judged query reports the time its judging took
+    Given a statement whose eval calls take longer than the database read
+    When the query answers
+    Then its elapsed time covers the read and the judging, not the database alone
+
+  @unit
   Scenario: A failed fetch is a platform failure, not a wrong answer
     Given the trace service throws while hydrating
     When the query runs
