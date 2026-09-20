@@ -1998,12 +1998,16 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         "How long --wait-online waits before failing",
         "120",
       )
+      .option(
+        "--all",
+        "List every row, including offline rows of a name and environment that a newer row replaced",
+      )
       // No positional argument here, so a stray word is a name with a space
       // passed bare after --wait-online: the refusal says to quote it.
       .configureOutput({
         outputError: (message, write) => write(withQuotedNameHint(message)),
       }),
-    async (options: { waitOnline?: string; timeout?: string }) => {
+    async (options: { waitOnline?: string; timeout?: string; all?: boolean }) => {
       const { listAgentsCommand: impl } = await import("./commands/agents/list.js");
       return impl(options);
     },

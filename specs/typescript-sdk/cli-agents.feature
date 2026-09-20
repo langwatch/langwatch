@@ -12,12 +12,39 @@ Feature: The agent commands show connected agents and run them through the relay
 
   Rule: The list shows where each agent runs and whether it is online
 
-    Scenario: The list prints Name, Environment, Status, Type, ID, Owner and Updated
+    Scenario: The list prints Name, Environment, Status, Last seen, Type, ID, Owner and Updated
       Given the project has a connected agent online in production and an HTTP agent
       When I run "langwatch agent list"
-      Then the table has the columns Name, Environment, Status, Type, ID, Owner and Updated
+      Then the table has the columns Name, Environment, Status, Last seen, Type, ID, Owner and Updated
       And the connected agent reads online
       And the HTTP agent has an empty environment and status
+
+    Scenario: The list prints when a connected agent was last seen
+      Given a connected agent online, one offline last seen two days ago, and an HTTP agent
+      When I run "langwatch agent list"
+      Then the online agent's last seen reads "now"
+      And the offline agent's last seen reads how long ago it was seen
+      And the HTTP agent's last seen is empty
+
+    # A connected agent gets a new row whenever its scope changes: a personal
+    # key instead of a project key, another machine, another environment. The
+    # old rows stay for thirty days and are never coming back.
+    Scenario: Stale sibling rows of one name and environment are collapsed
+      Given "support-agent" in development has an online row, an offline row last seen three days ago and an offline row last seen an hour ago
+      When I run "langwatch agent list"
+      Then the online row and the row seen an hour ago are listed
+      And the row seen three days ago is not
+      And the summary says one stale row is hidden and names --all
+
+    Scenario: A lone offline row is never collapsed
+      Given "support-agent" in staging has one offline row last seen a month ago
+      When I run "langwatch agent list"
+      Then that row is listed
+
+    Scenario: The --all flag lists every row
+      Given "support-agent" in development has an online row and an offline row last seen three days ago
+      When I run "langwatch agent list --all"
+      Then both rows are listed
 
     Scenario: The status colour follows the status, not the column width
       Given a list with both an online and an offline agent
