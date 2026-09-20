@@ -2092,9 +2092,11 @@ Rule: Leaving the search bar is not a search
   Blur, whatever caused it (clicking out, tabbing out, a programmatic focus
   change), keeps the typed text where it is and searches nothing. Enter is
   the one way out. A store change from outside while the bar is unfocused
-  (a facet click, Clear) replaces the unsent text with the applied query.
+  (a facet click) replaces the unsent text with the applied query.
   The answer to the user's own Enter is applied to the bar even while it
-  keeps focus, as long as the text is still what was submitted.
+  keeps focus, as long as the text is still what was submitted. Clear is the
+  user's own instruction rather than a store change, so it empties the bar
+  whether or not it has focus, and whether or not the text was submitted.
 
   Background:
     Given the user is authenticated with "traces:view" permission
@@ -2129,6 +2131,13 @@ Rule: Leaving the search bar is not a search
     Given the search bar contains "@status:error" and is focused
     When the user presses Enter twice
     Then the applied query is "@status:error" and the AST identity does not churn
+
+  @integration
+  Scenario: Clear empties the bar even while the bar has focus
+    Given the search bar contains "annoyed users" and is focused
+    When the user clicks Clear
+    Then the bar is empty
+    And text the user never submitted is emptied the same way, though the applied query was already empty
 
 
 Rule: Suggestion accept replaces only the active token

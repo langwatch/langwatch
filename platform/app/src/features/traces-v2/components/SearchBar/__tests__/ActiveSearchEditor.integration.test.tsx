@@ -119,7 +119,7 @@ describe("ActiveSearchEditor applied query", () => {
   function editorWith(queryText: string) {
     const submitQueryText = vi.fn();
     const onCursorAnchorChange = vi.fn();
-    const ui = (text: string) => (
+    const ui = (text: string, clearNonce = 0) => (
       <ChakraProvider value={defaultSystem}>
         <ActiveSearchEditor
           queryText={text}
@@ -130,6 +130,7 @@ describe("ActiveSearchEditor applied query", () => {
             /* no-op */
           }}
           onCursorAnchorChange={onCursorAnchorChange}
+          clearNonce={clearNonce}
         />
       </ChakraProvider>
     );
@@ -236,6 +237,28 @@ describe("ActiveSearchEditor applied query", () => {
         await new Promise((resolve) => setTimeout(resolve, 50));
         expect(editor.textContent).toContain("annoyed users");
         expect(editor.textContent).not.toContain("status:error");
+      });
+    });
+
+    // Clear runs on mousedown and preventDefaults it, so the caret stays in
+    // the bar. The sync effect leaves a focused editor alone, so emptying the
+    // store alone left the words on screen until the next blur, and text that
+    // was never submitted is not in the store to empty at all. Clear reaches
+    // the document itself.
+    describe("when the user clicks Clear", () => {
+      /** @scenario "Clear empties the bar even while the bar has focus" */
+      it("empties the bar", async () => {
+        const { rerender, ui } = editorWith("annoyed users");
+        const editor = await waitForEditor();
+        await waitFor(() =>
+          expect(editor.textContent).toContain("annoyed users"),
+        );
+        editor.focus();
+        fireEvent.focus(editor);
+
+        rerender(ui("", 1));
+
+        await waitFor(() => expect(editor.textContent).toBe(""));
       });
     });
   });

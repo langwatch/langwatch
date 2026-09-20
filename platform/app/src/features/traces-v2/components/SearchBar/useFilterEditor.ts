@@ -775,8 +775,21 @@ export function useFilterEditor({
     [editor, suggestionRef],
   );
 
+  /**
+   * Empties the editor on the user's own instruction, whatever the store
+   * holds. Clear keeps the caret in the bar, so the sync effect below never
+   * sees it: the effect leaves a focused editor alone, and a bar holding text
+   * that was never submitted has nothing in the store to change anyway. The
+   * clear is applied here for the same reason the X widget applies its own
+   * delete here.
+   */
   const reset = useCallback(() => {
-    editor?.commands.clearContent();
+    if (editor && !editor.isDestroyed) {
+      isProgrammaticRef.current = true;
+      editor.commands.clearContent();
+      isProgrammaticRef.current = false;
+    }
+    submittedTextRef.current = null;
     if (lastHasContentRef.current) {
       lastHasContentRef.current = false;
       onHasContentChangeRef.current?.(false);

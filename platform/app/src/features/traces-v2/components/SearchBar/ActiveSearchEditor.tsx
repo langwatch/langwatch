@@ -40,6 +40,13 @@ interface ActiveSearchEditorProps {
   onCursorAnchorChange?: (anchorX: number) => void;
   /** Mirrors the editor's focus state so the parent can gate chrome. */
   onFocusChange?: (focused: boolean) => void;
+  /**
+   * Bumped by the parent's Clear button. Clear keeps the caret in the bar,
+   * and text that was never submitted is not in the store, so neither focus
+   * nor the applied query can carry the instruction down here. A rising
+   * value empties the editor.
+   */
+  clearNonce?: number;
 }
 
 /**
@@ -58,11 +65,13 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
   onSuggestionOpenChange,
   onCursorAnchorChange,
   onFocusChange,
+  clearNonce = 0,
 }) => {
   const {
     editor,
     suggestion,
     acceptSuggestion,
+    reset,
     cursorAnchorX,
     endAnchorX,
     isFocused,
@@ -105,6 +114,14 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
   useEffect(() => {
     onFocusChange?.(isFocused);
   }, [isFocused, onFocusChange]);
+
+  // The mount value is the parent's starting count, not a clear.
+  const lastClearNonceRef = useRef(clearNonce);
+  useEffect(() => {
+    if (clearNonce === lastClearNonceRef.current) return;
+    lastClearNonceRef.current = clearNonce;
+    reset();
+  }, [clearNonce, reset]);
 
   return (
     <>

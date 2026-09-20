@@ -215,12 +215,16 @@ export const SearchBar: React.FC = () => {
 
   const hasContent = editorMounted ? editorHasContent : queryText.length > 0;
 
+  // Clear runs on mousedown and preventDefaults it, so the caret stays in the
+  // bar. That keeps the editor the source of truth for its own document, and
+  // text the user never submitted is not in the store, so emptying the store
+  // alone would leave the words on screen. The bump is the instruction.
+  const [clearNonce, setClearNonce] = useState(0);
   const handleClear = useCallback(
     (event: React.MouseEvent) => {
       event.preventDefault();
       clearAll();
-      // The active editor's queryText effect will sync the empty state back
-      // into the ProseMirror document on next render.
+      setClearNonce((n) => n + 1);
     },
     [clearAll],
   );
@@ -511,6 +515,7 @@ export const SearchBar: React.FC = () => {
                     onSuggestionOpenChange={setSuggestionOpen}
                     onCursorAnchorChange={setCursorAnchorX}
                     onFocusChange={setEditorFocused}
+                    clearNonce={clearNonce}
                   />
                 ) : (
                   <PlaceholderEditor
