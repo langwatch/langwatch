@@ -35,7 +35,7 @@ import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
 import {
   extractFreeTextTerms,
   type ResolvedInstantEvalRun,
-  translateFilterToClickHouse,
+  translateFilterWithEvalRuns,
 } from "~/server/app-layer/traces/filter-to-clickhouse";
 import { explorerHiddenOrigins } from "~/server/app-layer/traces/hidden-origins";
 import {
@@ -199,12 +199,12 @@ async function buildFilterWhere(input: {
 }) {
   const evalRuns = await resolveEvalRuns(input);
   return (
-    translateFilterToClickHouse(
-      input.query ?? "",
-      input.projectId,
-      input.timeRange,
-      { ...(evalRuns ? { evalRuns } : {}) },
-    ) ?? undefined
+    translateFilterWithEvalRuns({
+      queryText: input.query ?? "",
+      tenantId: input.projectId,
+      timeRange: input.timeRange,
+      ...(evalRuns ? { evalRuns } : {}),
+    }) ?? undefined
   );
 }
 

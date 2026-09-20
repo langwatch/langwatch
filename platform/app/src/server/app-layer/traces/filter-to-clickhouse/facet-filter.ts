@@ -1,7 +1,7 @@
 import type { LiqeQuery } from "liqe";
 import { isEmptyAST, parse, serialize } from "../query-language/parse";
 import { filterAST } from "../query-language/walk";
-import { translateFilterToClickHouse } from "./ast";
+import { translateFilterWithEvalRuns } from "./ast";
 import type { ResolvedInstantEvalRun } from "./instant-eval-field";
 
 export interface FacetFilterWhere {
@@ -86,7 +86,10 @@ export function createFacetFilterCompiler({
   evalRuns?: readonly ResolvedInstantEvalRun[];
 }): { forFacet: (facetKey: string) => FacetFilterWhere | undefined } {
   const compile = (text: string) =>
-    translateFilterToClickHouse(text, tenantId, timeRange, {
+    translateFilterWithEvalRuns({
+      queryText: text,
+      tenantId,
+      timeRange,
       ...(evalRuns ? { evalRuns } : {}),
     }) ?? undefined;
   const whole = compile(queryText);

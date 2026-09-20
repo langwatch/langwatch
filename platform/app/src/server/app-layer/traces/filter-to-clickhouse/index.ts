@@ -4,6 +4,7 @@ export {
   queryNamesField,
   translateFilterAst,
   translateFilterToClickHouse,
+  translateFilterWithEvalRuns,
 } from "./ast";
 export {
   FIELD_DEFS,

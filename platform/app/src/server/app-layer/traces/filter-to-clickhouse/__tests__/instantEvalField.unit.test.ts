@@ -7,7 +7,7 @@
 import { parse, type TagToken } from "liqe";
 import { describe, expect, it } from "vitest";
 import { SEARCH_FIELDS } from "../../query-language/metadata";
-import { translateFilterToClickHouse } from "../ast";
+import { translateFilterWithEvalRuns } from "../ast";
 import { FIELD_DEFS } from "../build-handlers";
 import { UNSUPPORTED } from "../field-def";
 import type { ResolvedInstantEvalRun } from "../instant-eval-field";
@@ -27,7 +27,10 @@ const run = (
 });
 
 const compile = (query: string, evalRuns?: ResolvedInstantEvalRun[]) =>
-  translateFilterToClickHouse(query, TENANT, WINDOW, {
+  translateFilterWithEvalRuns({
+    queryText: query,
+    tenantId: TENANT,
+    timeRange: WINDOW,
     ...(evalRuns ? { evalRuns } : {}),
   });
 

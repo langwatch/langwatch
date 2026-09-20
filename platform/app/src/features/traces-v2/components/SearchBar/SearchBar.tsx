@@ -56,6 +56,7 @@ import {
 } from "./SearchBarIndicators";
 import { SearchedAsNotice } from "./SearchedAsNotice";
 import { SyntaxHelpDrawerHost } from "./SyntaxHelpDrawer";
+import { searchSubmitProgress } from "./searchSubmitProgress";
 import {
   TokenValuePicker,
   type TokenValuePickerAnchor,
@@ -64,7 +65,6 @@ import { useAskLangyFromSearch } from "./useAskLangyFromSearch";
 import type { ValueResolver } from "./useFilterEditor";
 import { useFloatRect } from "./useFloatRect";
 import { useGlobalAiShortcut } from "./useGlobalAiShortcut";
-import { searchSubmitProgress } from "./searchSubmitProgress";
 import { useSubmitSearch } from "./useSubmitSearch";
 
 /**

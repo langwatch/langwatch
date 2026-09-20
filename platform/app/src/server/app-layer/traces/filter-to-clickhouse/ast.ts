@@ -71,11 +71,26 @@ export function translateFilterToClickHouse(
   queryText: string,
   tenantId: string,
   timeRange: { from: number; to: number },
-  options: {
-    /** The Instant Eval runs registered for the query's `eval` chips. */
-    evalRuns?: readonly ResolvedInstantEvalRun[];
-  } = {},
 ): { sql: string; params: Record<string, unknown> } | null {
+  return translateFilterWithEvalRuns({ queryText, tenantId, timeRange });
+}
+
+/**
+ * {@link translateFilterToClickHouse} for a query that may carry `eval` chips:
+ * each chip compiles against the Instant Eval run registered for it.
+ */
+export function translateFilterWithEvalRuns({
+  queryText,
+  tenantId,
+  timeRange,
+  evalRuns,
+}: {
+  queryText: string;
+  tenantId: string;
+  timeRange: { from: number; to: number };
+  /** The Instant Eval runs registered for the query's `eval` chips. */
+  evalRuns?: readonly ResolvedInstantEvalRun[];
+}): { sql: string; params: Record<string, unknown> } | null {
   const ctx: TranslationContext = {
     paramCounter: 0,
     nodeCount: 0,
@@ -86,7 +101,7 @@ export function translateFilterToClickHouse(
     },
     tenantId,
     timeRange,
-    ...(options.evalRuns ? { evalRuns: options.evalRuns } : {}),
+    ...(evalRuns ? { evalRuns } : {}),
   };
 
   const sql = translateFilterAst({ queryText, ctx, translateTag });

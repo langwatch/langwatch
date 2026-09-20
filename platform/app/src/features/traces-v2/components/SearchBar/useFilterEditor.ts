@@ -209,6 +209,32 @@ interface FilterEditorApi {
   isFocused: boolean;
 }
 
+const normalizeEditorText = (text: string): string =>
+  text.replace(/\u00A0/g, " ").trim();
+
+/**
+ * Whether a query applied from outside replaces what the editor holds. A
+ * focused editor keeps its text unless it still holds exactly what the user
+ * submitted, which is the router answering their own Enter.
+ */
+function externalQueryReplacesEditor({
+  editorText,
+  submittedText,
+  queryText,
+  isFocused,
+}: {
+  editorText: string;
+  submittedText: string | null;
+  queryText: string;
+  isFocused: boolean;
+}): boolean {
+  const current = normalizeEditorText(editorText);
+  const answersSubmit =
+    submittedText !== null && current === normalizeEditorText(submittedText);
+  if (isFocused && !answersSubmit) return false;
+  return current !== normalizeEditorText(queryText);
+}
+
 export function useFilterEditor({
   queryText,
   applyQueryText,
@@ -698,13 +724,13 @@ export function useFilterEditor({
   // button, a facet click), the applied query wins over any unsent text.
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
-    const normalize = (s: string): string => s.replace(/\u00A0/g, " ").trim();
-    const current = normalize(editor.getText());
-    const submitted = submittedTextRef.current;
-    const answersSubmit =
-      submitted !== null && current === normalize(submitted);
-    if (editor.isFocused && !answersSubmit) return;
-    if (current === normalize(queryText)) return;
+    const replaces = externalQueryReplacesEditor({
+      editorText: editor.getText(),
+      submittedText: submittedTextRef.current,
+      queryText,
+      isFocused: editor.isFocused,
+    });
+    if (!replaces) return;
     submittedTextRef.current = null;
     const keepFocus = editor.isFocused;
     isProgrammaticRef.current = true;

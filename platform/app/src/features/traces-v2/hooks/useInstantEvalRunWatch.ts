@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { isInstantEvalRunActive } from "~/server/app-layer/instant-evals/run/instant-eval-explorer";
+import {
+  type InstantEvalExplorerRun,
+  isInstantEvalRunActive,
+} from "~/server/app-layer/instant-evals/run/instant-eval-explorer";
 import { api } from "~/utils/api";
 import { useInstantEvalRunStore } from "../stores/instantEvalRunStore";
 import { dueInstantEvalRefetches } from "./instantEvalRefetchPacing";
@@ -31,8 +34,6 @@ export function useInstantEvalRunWatch(): void {
   const runs = useInstantEvalRunStore((s) => s.runs);
   const setRun = useInstantEvalRunStore((s) => s.setRun);
   const keepOnly = useInstantEvalRunStore((s) => s.keepOnly);
-  const trpcUtils = api.useUtils();
-
   useEffect(() => {
     keepOnly(runIds);
   }, [runIds, keepOnly]);
@@ -61,9 +62,18 @@ export function useInstantEvalRunWatch(): void {
     }
   });
 
-  // A change of progress means a page of verdicts landed: the table and the
-  // sidebar read the judgements table through the chip, so both read again,
-  // paced while the run judges (see `instantEvalRefetchPacing`).
+  useRefetchOnRunProgress(runs);
+}
+
+/**
+ * A change of progress means a page of verdicts landed: the table and the
+ * sidebar read the judgements table through the chip, so both read again,
+ * paced while the run judges (see `instantEvalRefetchPacing`).
+ */
+function useRefetchOnRunProgress(
+  runs: Record<string, InstantEvalExplorerRun>,
+): void {
+  const trpcUtils = api.useUtils();
   const progressSignature = Object.values(runs)
     .map(
       (run) => `${run.id}:${run.status}:${run.progress}:${run.matched ?? ""}`,

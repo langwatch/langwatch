@@ -74,7 +74,11 @@ describe("LangyTracesCard", () => {
       it("says it could not read the result instead of claiming nothing matched", () => {
         renderCard({
           traces: [
-            { "…": "5 more keys truncated", error: null, input: { value: "refund?" } },
+            {
+              "…": "5 more keys truncated",
+              error: null,
+              input: { value: "refund?" },
+            },
             "… 12 more items truncated, 13 total",
           ],
           pagination: { totalHits: 13 },
