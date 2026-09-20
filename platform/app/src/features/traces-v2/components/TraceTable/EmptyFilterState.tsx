@@ -8,7 +8,9 @@ import {
   Text,
 } from "@chakra-ui/react";
 import type React from "react";
+import { isInstantEvalRunActive } from "~/server/app-layer/instant-evals/run/instant-eval-explorer";
 import { useExplorerStore } from "../../stores/explorerStore";
+import { useInstantEvalRunStore } from "../../stores/instantEvalRunStore";
 import type { TimeRange } from "../../stores/querySlice";
 import { QueryBreakdownChips } from "./QueryBreakdownChips";
 
@@ -43,15 +45,28 @@ interface EmptyContent {
   description: string;
 }
 
-function emptyContent({
+export function emptyContent({
   activeLensId,
   hasFilters,
   rangeHours,
+  isJudging,
 }: {
   activeLensId: string;
   hasFilters: boolean;
   rangeHours: number;
+  /** An Instant Eval behind one of the query's chips is still running. */
+  isJudging: boolean;
 }): EmptyContent {
+  // An empty table during a run is rows not judged yet, not a query that
+  // matched nothing. Saying "nothing matches" here is a wrong answer for the
+  // first seconds of every run.
+  if (isJudging) {
+    return {
+      title: "No matches yet",
+      description:
+        "The Instant Eval is still judging. Matches appear here as each page of results finishes.",
+    };
+  }
   if (activeLensId === "errors") {
     return {
       title: "No errors here — lucky you",
@@ -124,12 +139,23 @@ export const EmptyFilterState: React.FC = () => {
   const activeLensId = useExplorerStore((s) => s.activeLensId);
   const selectLens = useExplorerStore((s) => s.selectLens);
 
+  const isJudging = useInstantEvalRunStore((s) =>
+    Object.values(s.runs).some((run) => isInstantEvalRunActive(run.status)),
+  );
+
   const hasFilters = queryText.trim().length > 0;
   const rangeHours = (timeRange.to - timeRange.from) / MS_PER_HOUR;
-  const content = emptyContent({ activeLensId, hasFilters, rangeHours });
+  const content = emptyContent({
+    activeLensId,
+    hasFilters,
+    rangeHours,
+    isJudging,
+  });
 
   const actions: ActionButton[] = [];
-  if (hasFilters) {
+  // While a run judges, the way out is Stop on the progress bar. Offering
+  // "Clear filters" as the main action would throw the run's chip away.
+  if (hasFilters && !isJudging) {
     actions.push({ label: "Clear filters", onClick: clearAll, primary: true });
   }
   if (activeLensId !== "all-traces") {

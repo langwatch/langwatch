@@ -222,6 +222,14 @@ Feature: Instant Evals inside the Trace Explorer
       Then it reads "Judging 3,200 / 10,000 · 412 matched" with a Stop button
       And the bar is at 32 percent
 
+    @unit
+    Scenario: An empty table during a run says matches are still coming
+      Given a run is judging and no row has matched yet
+      When the table has no rows to show
+      Then it says there are no matches yet and that the run is still judging
+      And it does not say that nothing matches the filters
+      And it does not offer "Clear filters" as the way out
+
     @integration
     Scenario: Matches appear as pages finish
       Given a run whose progress moves from 1,000 to 2,000
