@@ -184,6 +184,13 @@ Feature: Instant Evals inside the Trace Explorer
       When the run starts
       Then the start request carries the window's exact bounds, the other chips as the filter and one boolean question
 
+    @unit
+    Scenario: The bar names the step between Enter and the progress bar
+      Given a sentence the router answered as an Instant Eval
+      When the estimate is being made, and then the run is being started
+      Then the search bar reads "Estimating the Instant Eval" and then "Starting the Instant Eval"
+      And while the router decides it reads "Searching"
+
   Rule: tRPC wraps the run service for the Explorer
 
     @unit

@@ -64,6 +64,7 @@ import { useAskLangyFromSearch } from "./useAskLangyFromSearch";
 import type { ValueResolver } from "./useFilterEditor";
 import { useFloatRect } from "./useFloatRect";
 import { useGlobalAiShortcut } from "./useGlobalAiShortcut";
+import { searchSubmitProgress } from "./searchSubmitProgress";
 import { useSubmitSearch } from "./useSubmitSearch";
 
 /**
@@ -316,6 +317,11 @@ export const SearchBar: React.FC = () => {
     onInstantEval: onInstantEvalRoute,
     onModelUnavailable: handleModelUnavailable,
   });
+  const submitProgress = searchSubmitProgress({
+    isRouting,
+    isEstimating: instantEval.isEstimating,
+    isStarting: instantEval.isStarting,
+  });
 
   // Reuse the discover payload that already powers the facets sidebar — its
   // `topValues` is exactly the autocomplete pool for `model:`, `service:`,
@@ -515,10 +521,16 @@ export const SearchBar: React.FC = () => {
                 looking. Showing the badge *and* the banner would be
                 redundant and noisy. */}
               {status.kind !== "error" && <StatusBadge status={status} />}
-              {isRouting && (
-                <HStack gap={1.5} flexShrink={0} color="fg.subtle">
+              {submitProgress && (
+                <HStack
+                  gap={1.5}
+                  flexShrink={0}
+                  color="fg.subtle"
+                  role="status"
+                  data-testid="search-submit-progress"
+                >
                   <Spinner size="xs" />
-                  <Text textStyle="xs">Searching</Text>
+                  <Text textStyle="xs">{submitProgress}</Text>
                 </HStack>
               )}
               {hasContent ? (
