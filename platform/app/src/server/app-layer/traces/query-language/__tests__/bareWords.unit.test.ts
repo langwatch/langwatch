@@ -65,6 +65,34 @@ describe("splitBareWords", () => {
     });
   });
 
+  describe("given a bare word under an OR", () => {
+    /** @scenario "A word under an OR stays in the explicit query" */
+    it("keeps it explicit, because the two halves are rejoined with AND", () => {
+      expect(splitBareWords("status:error OR refund")).toEqual({
+        sentence: "",
+        explicitQuery: "status:error OR refund",
+      });
+    });
+
+    it("keeps a word under an OR nested inside a group explicit too", () => {
+      expect(
+        splitBareWords("model:gpt-4o AND (status:error OR refund)"),
+      ).toEqual({
+        sentence: "",
+        explicitQuery: "model:gpt-4o AND (status:error OR refund)",
+      });
+    });
+
+    it("still lifts the words that sit in conjunction-only positions", () => {
+      expect(
+        splitBareWords("annoyed AND (status:error OR status:ok)"),
+      ).toEqual({
+        sentence: "annoyed",
+        explicitQuery: "(status:error OR status:ok)",
+      });
+    });
+  });
+
   describe("given text that does not parse", () => {
     it("has no sentence, so the parse error surfaces where it always did", () => {
       expect(splitBareWords('status:"unclosed')).toEqual({
@@ -100,6 +128,24 @@ describe("combineQueries", () => {
         addition: "model:gpt-4o OR model:claude",
       }),
     ).toBe("status:error AND (model:gpt-4o OR model:claude)");
+  });
+
+  describe("when a side starts and ends with a parenthesis without being one group", () => {
+    /** @scenario "Joining a query that holds a top-level OR groups it first" */
+    it("groups it, so the OR keeps both of its own operands", () => {
+      expect(
+        combineQueries({ base: "(status:error) OR (status:ok)", addition: "c" }),
+      ).toBe("((status:error) OR (status:ok)) AND c");
+    });
+
+    it("leaves a query that really is one group alone", () => {
+      expect(
+        combineQueries({
+          base: "(status:error OR status:ok)",
+          addition: "c",
+        }),
+      ).toBe("(status:error OR status:ok) AND c");
+    });
   });
 });
 

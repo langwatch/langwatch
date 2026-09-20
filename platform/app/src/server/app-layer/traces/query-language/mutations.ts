@@ -503,8 +503,57 @@ export function combineQueries({
   if (!left) return right;
   if (!right) return left;
   const guard = (query: string): string =>
-    /\bOR\b/.test(query) && !/^\(.*\)$/.test(query) ? `(${query})` : query;
+    bindsAsOr(query) ? `(${query})` : query;
   return `${guard(left)} AND ${guard(right)}`;
+}
+
+/**
+ * Whether joining this query with AND would rebind an OR it already holds.
+ *
+ * Read from the parsed top level rather than from the text: a query can both
+ * start with `(` and end with `)` without being one group — `(a) OR (b)` does
+ * — and treating that as already grouped produced `(a) OR (b) AND c`, which
+ * is a different result set than the caller asked for. Text that does not
+ * parse is grouped whenever it spells an `OR` at all, since the join must not
+ * be the thing that decides how it binds.
+ */
+/**
+ * Every tag with an `OR` above it, at any depth. Such a tag cannot be taken
+ * out of the query on its own: what is left behind rebinds, and the caller
+ * rejoins the two halves with AND.
+ */
+function tagsUnderOr(
+  ast: LiqeQuery,
+  inOr = false,
+  found: Set<LiqeQuery> = new Set(),
+): Set<LiqeQuery> {
+  if (ast.type === "Tag") {
+    if (inOr) found.add(ast);
+    return found;
+  }
+  if (ast.type === "UnaryOperator") {
+    return tagsUnderOr(ast.operand, inOr, found);
+  }
+  if (ast.type === "ParenthesizedExpression") {
+    return tagsUnderOr(ast.expression, inOr, found);
+  }
+  if (ast.type === "LogicalExpression") {
+    const underOr = inOr || ast.operator.operator === "OR";
+    tagsUnderOr(ast.left, underOr, found);
+    tagsUnderOr(ast.right, underOr, found);
+  }
+  return found;
+}
+
+function bindsAsOr(query: string): boolean {
+  try {
+    const ast = parse(query);
+    return (
+      ast.type === "LogicalExpression" && ast.operator.operator === "OR"
+    );
+  } catch {
+    return /\bOR\b/.test(query);
+  }
 }
 
 /**
@@ -515,9 +564,12 @@ export function combineQueries({
  *
  * A quoted phrase (`"refund policy"`) and a negated word (`-refund`) both stay
  * explicit: the writer already said how to search them, and a router turning
- * either into a question would lose the quotes or the negation. Text that
- * does not parse has no halves: the sentence is empty and the query is
- * returned as it came, so the parse error surfaces where it always did.
+ * either into a question would lose the quotes or the negation. A word under
+ * an `OR` stays explicit for the same reason: the caller joins the two halves
+ * with AND, so lifting `refund` out of `status:error OR refund` would return
+ * it as `status:error AND refund`. Text that does not parse has no halves:
+ * the sentence is empty and the query is returned as it came, so the parse
+ * error surfaces where it always did.
  */
 export function splitBareWords(currentQuery: string): {
   sentence: string;
@@ -533,10 +585,12 @@ export function splitBareWords(currentQuery: string): {
     walkAST(ast, (node, negated) => {
       if (negated) negatedTags.add(node);
     });
+    const disjunctTags = tagsUnderOr(ast);
     const bare: string[] = [];
     const explicit = filterAST(ast, (node) => {
       if (node.type !== "Tag") return true;
       if (negatedTags.has(node)) return true;
+      if (disjunctTags.has(node)) return true;
       if (node.field.type !== "ImplicitField") return true;
       if (node.expression.type !== "LiteralExpression") return true;
       if (node.expression.quoted) return true;

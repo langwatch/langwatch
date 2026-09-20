@@ -104,7 +104,7 @@ Rule: Search bar layout and behavior
   Scenario: The inline hint names Enter
     Given the search bar is focused with text in it
     Then the hint after the text reads "⏎ Enter to search"
-    And there is no other key that leaves the bar
+    And no other key submits the search
 
   # Pasting a multi-line error message used to create one Paragraph node
   # per line, growing the editor vertically until it pushed the rest of
@@ -1028,6 +1028,13 @@ Rule: Facet count updates
     And the Status facet still lists "Ok" with its own count, because the facet's own field is left out
 
   @unit
+  Scenario: A facet term under a NOT is removed with the rest
+    Given the query reads "NOT (status:error OR service:api)"
+    When the Status facet is counted
+    Then the term it is counted under no longer names status
+    And the rest of the negated group still applies
+
+  @unit
   Scenario: Facet counts are fetched in a single batched query
     When the user applies a filter
     Then all facet counts are fetched in one query, not one per facet
@@ -1389,6 +1396,21 @@ Rule: Enter routes a sentence
     Then the sentence is "annoyed users asking refunds"
     And the explicit query is "status:error"
     And a quoted phrase or a negated word counts as explicit, not as part of the sentence
+
+  # The two halves are rejoined with AND, so a word the writer put under an OR
+  # would come back meaning something else than they typed.
+  @unit
+  Scenario: A word under an OR stays in the explicit query
+    When the user types "status:error OR refund"
+    Then the sentence is empty
+    And the explicit query is "status:error OR refund"
+    And the query is applied as typed rather than routed
+
+  @unit
+  Scenario: Joining a query that holds a top-level OR groups it first
+    Given a query "(a) OR (b)" and an addition "c"
+    Then the joined query reads "((a) OR (b)) AND c"
+    And a query already wrapped in one pair of parentheses is not wrapped again
 
   @unit
   Scenario: A filter the model could not write becomes a phrase search

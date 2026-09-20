@@ -46,6 +46,16 @@ describe("queryWithoutFacet", () => {
       ).toBe("spanName:llm");
     });
 
+    /** @scenario "A facet term under a NOT is removed with the rest" */
+    it("removes the term from under a NOT instead of keeping the group whole", () => {
+      const without = queryWithoutFacet({
+        queryText: "NOT (status:error OR service:api)",
+        facetKey: "status",
+      });
+      expect(without).not.toContain("status:error");
+      expect(without).toContain("service:api");
+    });
+
     it("becomes empty when the query only named this facet", () => {
       expect(
         queryWithoutFacet({
