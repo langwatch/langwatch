@@ -10,7 +10,6 @@
 import { securityRequirement } from "@langwatch/api/access";
 import { describe, expect, it } from "vitest";
 
-import { LIST_GROUPS, LIST_USERS } from "../../rules/scim-openapi.rules.ts";
 import { scimProtocolRest } from "../scim-protocol.rest.ts";
 import { scimTokenRest } from "../scim-token.rest.ts";
 
@@ -18,14 +17,17 @@ const protocol = scimProtocolRest.router();
 const tokens = scimTokenRest.router();
 
 describe("SCIM transport characterization", () => {
-  it("keeps discovery public and carries the documented page-size cap", () => {
+  it("keeps discovery public and documents its answer from a real schema, not hand-written JSON", () => {
     const discovery = protocol.routes.find(
       (route) => route.operation === "scimGetServiceProviderConfig",
     );
 
     expect(discovery?.access?.kind).toBe("public");
     expect(securityRequirement("public")).toEqual([]);
-    expect(JSON.stringify(discovery?.docs)).toContain("maxResults");
+    const published = discovery?.docs?.responses?.[200]?.content?.["application/json"]?.schema as
+      | { vendor?: string }
+      | undefined;
+    expect(published?.vendor).toBe("zod");
   });
 
   it("keeps Users and Groups list operations bearer-protected", () => {
@@ -37,8 +39,8 @@ describe("SCIM transport characterization", () => {
 
     expect(listUsers?.access?.kind).toBe("authenticated");
     expect(listGroups?.access?.kind).toBe("authenticated");
-    expect(listUsers?.docs).toBe(LIST_USERS);
-    expect(listGroups?.docs).toBe(LIST_GROUPS);
+    expect(listUsers?.docs?.summary).toBe("List provisioned users");
+    expect(listGroups?.docs?.summary).toBe("List provisioned groups");
   });
 
   it("keeps the management family behind an organization credential and organization:manage", () => {

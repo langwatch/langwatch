@@ -10,7 +10,7 @@ import { z } from "zod";
 
 import type { RestTransportRoute } from "../declaration.ts";
 import type { RestTransportDocs } from "../openapi.ts";
-import { normalizeExclusiveBounds, restRouteDocumentation } from "../openapi.ts";
+import { hoistStraySchemaDefs, normalizeExclusiveBounds, restRouteDocumentation } from "../openapi.ts";
 
 /** A webhook intake: the signature is over the exact characters, so nothing parses them. */
 function rawBodyRoute(docs?: RestTransportDocs): RestTransportRoute<unknown> {
@@ -213,6 +213,91 @@ describe("normalizeExclusiveBounds", () => {
       expect(document.components.schemas.page.anyOf[0]).toEqual({
         type: "integer",
         exclusiveMinimum: 0,
+      });
+    });
+  });
+});
+
+describe("hoistStraySchemaDefs", () => {
+  function documentWith(schema: unknown) {
+    return {
+      components: { schemas: {} as Record<string, unknown> },
+      paths: { "/a": { get: { responses: { 200: { content: { "application/json": { schema } } } } } } },
+    };
+  }
+
+  describe("given a response schema carrying a local $defs entry", () => {
+    /** @scenario "A schema with a local $defs block is hoisted into components" */
+    it("moves the entry into components and repoints the ref at its new place", () => {
+      const document = documentWith({
+        $ref: "#/components/schemas/__schema0",
+        $defs: { __schema0: { type: "string" } },
+      });
+
+      hoistStraySchemaDefs(document);
+
+      expect(document.components.schemas).toEqual({ __hoisted0: { type: "string" } });
+
+      const schema = document.paths["/a"].get.responses[200].content["application/json"].schema;
+
+      expect(schema).toEqual({ $ref: "#/components/schemas/__hoisted0" });
+    });
+  });
+
+  describe("given two schemas that each name a $defs entry the same generic name", () => {
+    /** @scenario "Two unrelated schemas each name a $defs entry the same generic name" */
+    it("hoists each under its own name, neither overwriting the other", () => {
+      const document = {
+        components: { schemas: {} as Record<string, unknown> },
+        paths: {
+          "/a": { get: { schema: { $ref: "#/components/schemas/__schema0", $defs: { __schema0: { type: "string" } } } } },
+          "/b": { get: { schema: { $ref: "#/components/schemas/__schema0", $defs: { __schema0: { type: "number" } } } } },
+        },
+      };
+
+      hoistStraySchemaDefs(document);
+
+      expect(Object.values(document.components.schemas)).toEqual(
+        expect.arrayContaining([{ type: "string" }, { type: "number" }]),
+      );
+      expect(Object.keys(document.components.schemas)).toHaveLength(2);
+      expect(document.paths["/a"].get.schema.$ref).not.toBe(document.paths["/b"].get.schema.$ref);
+    });
+  });
+
+  describe("given a $defs entry that references itself", () => {
+    /** @scenario "A $defs entry that references itself keeps resolving after the move" */
+    it("repoints the definition's own self-reference at its new name", () => {
+      const document = documentWith({
+        $ref: "#/components/schemas/__schema0",
+        $defs: {
+          __schema0: {
+            type: "object",
+            additionalProperties: { $ref: "#/components/schemas/__schema0" },
+          },
+        },
+      });
+
+      hoistStraySchemaDefs(document);
+
+      expect(document.components.schemas.__hoisted0).toEqual({
+        type: "object",
+        additionalProperties: { $ref: "#/components/schemas/__hoisted0" },
+      });
+    });
+  });
+
+  describe("given a response schema with no $defs entry", () => {
+    /** @scenario "A schema with no $defs is left exactly as it was" */
+    it("leaves the schema exactly as it was", () => {
+      const document = documentWith({ type: "object", properties: { id: { type: "string" } } });
+
+      hoistStraySchemaDefs(document);
+
+      expect(document.components.schemas).toEqual({});
+      expect(document.paths["/a"].get.responses[200].content["application/json"].schema).toEqual({
+        type: "object",
+        properties: { id: { type: "string" } },
       });
     });
   });

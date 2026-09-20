@@ -1,4 +1,4 @@
-import type { Hono } from "hono";
+import type { Hono, MiddlewareHandler } from "hono";
 /**
  * The live twin of the document apps/api/src/features/discovery used to
  * freeze: instead of a byte buffer checked in once, this walks whatever
@@ -8,7 +8,9 @@ import type { Hono } from "hono";
  * changes this document the moment the process restarts — nothing to keep
  * in sync by hand, nothing that can go stale the way the frozen file did.
  */
-import { openAPIRouteHandler } from "hono-openapi";
+import { generateSpecs } from "hono-openapi";
+
+import { hoistStraySchemaDefs, normalizeExclusiveBounds } from "../rest/openapi.ts";
 
 const SECURITY_SCHEMES = {
   project_api_key: {
@@ -44,19 +46,33 @@ const SECURITY_SCHEMES = {
   },
 } as const;
 
-/** Mounted at GET /api/openapi.json — restApp is RestHost.app, every family's own router. */
-export function openapiDocumentRoute(restApp: Hono) {
-  return openAPIRouteHandler(restApp, {
-    documentation: {
-      openapi: "3.1.0",
-      info: {
-        title: "LangWatch API",
-        description: "LangWatch openapi spec",
-        version: "1.0.0",
-      },
-      servers: [{ url: "https://app.langwatch.ai" }],
-      security: [{ project_api_key: [] }],
-      components: { securitySchemes: SECURITY_SCHEMES },
+/** The document's own preamble, merged over whatever the mounted routes describe. */
+function documentation() {
+  return {
+    openapi: "3.1.0",
+    info: {
+      title: "LangWatch API",
+      description: "LangWatch openapi spec",
+      version: "1.0.0",
     },
-  });
+    servers: [{ url: "https://app.langwatch.ai" }],
+    security: [{ project_api_key: [] }],
+    components: { securitySchemes: SECURITY_SCHEMES, schemas: {} },
+  };
+}
+
+/**
+ * Mounted at GET /api/openapi.json — restApp is RestHost.app, every family's own router.
+ * The generated document is published through the two corrections the schema builders
+ * cannot make for themselves: 3.1's numeric exclusive bounds, and the recursive `$defs`
+ * blocks whose refs dangle until they are hoisted (specs/api-reference).
+ */
+export function openapiDocumentRoute(restApp: Hono): MiddlewareHandler {
+  return async (context) => {
+    const document = await generateSpecs(restApp, { documentation: documentation() });
+
+    hoistStraySchemaDefs(document);
+
+    return context.json(normalizeExclusiveBounds(document));
+  };
 }

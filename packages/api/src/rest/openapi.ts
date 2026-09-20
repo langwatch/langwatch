@@ -453,6 +453,94 @@ function normalizeBound({
   delete node[flag];
 }
 
+// zod's OpenAPI adapter rewrites a recursive schema's self-reference to
+// `#/components/schemas/<name>` but leaves the definition itself sitting in
+// that response's own local `$defs`, never hoisted — so the ref dangles the
+// moment two routes' schemas share one document. `__schema0`-style anonymous
+// names are not unique across routes, so hoisting renames per occurrence.
+
+/**
+ * Moves every schema's local `$defs` block into the document's
+ * `components.schemas`, in place, renaming each entry to stay unique across
+ * the whole document and rewriting every `$ref` (including a definition's
+ * own self-reference) to match. The components section is created when the
+ * generated document carries none. A schema with no `$defs` is untouched.
+ */
+export function hoistStraySchemaDefs(document: unknown): void {
+  const schemas = componentSchemasOf(document);
+
+  if (!schemas) return;
+
+  let nextId = 0;
+  walkForDefs(document, schemas, () => `__hoisted${nextId++}`);
+}
+
+/** The document's own `components.schemas`, created when the generator wrote none. */
+function componentSchemasOf(document: unknown): Record<string, unknown> | undefined {
+  if (!isRecord(document)) return void 0;
+
+  const components = (document.components ??= {});
+
+  if (!isRecord(components)) return void 0;
+
+  const schemas = (components.schemas ??= {});
+
+  return isRecord(schemas) ? schemas : void 0;
+}
+
+function walkForDefs(
+  node: unknown,
+  schemas: Record<string, unknown>,
+  nameGenerator: () => string,
+): void {
+  if (Array.isArray(node)) {
+    for (const child of node) walkForDefs(child, schemas, nameGenerator);
+
+    return;
+  }
+
+  if (!isRecord(node)) return;
+
+  const defs = node.$defs;
+
+  if (isRecord(defs)) {
+    delete node.$defs;
+
+    const renamed = new Map(Object.keys(defs).map((name) => [name, nameGenerator()]));
+
+    rewriteRefs(node, renamed);
+
+    for (const [name, definition] of Object.entries(defs)) {
+      rewriteRefs(definition, renamed);
+      schemas[renamed.get(name) ?? name] = definition;
+    }
+  }
+
+  for (const child of Object.values(node)) walkForDefs(child, schemas, nameGenerator);
+}
+
+/** Rewrites every `$ref` naming an entry in `renamed` to its new component path. */
+function rewriteRefs(node: unknown, renamed: ReadonlyMap<string, string>): void {
+  if (Array.isArray(node)) {
+    for (const child of node) rewriteRefs(child, renamed);
+
+    return;
+  }
+
+  if (!isRecord(node)) return;
+
+  const ref = node.$ref;
+
+  if (typeof ref === "string") {
+    const name = ref.split("/").pop();
+    const newName = name === undefined ? undefined : renamed.get(name);
+
+    if (newName !== undefined) node.$ref = `#/components/schemas/${newName}`;
+  }
+
+  for (const child of Object.values(node)) rewriteRefs(child, renamed);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // A hand-written operation, for a family that documents what it parses itself.
 // ─────────────────────────────────────────────────────────────────────────────
