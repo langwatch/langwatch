@@ -518,6 +518,24 @@ export function combineQueries({
  * be the thing that decides how it binds.
  */
 /**
+ * The word a node contributes to the sentence, or `null` when it stays in the
+ * explicit query. A bare, unquoted, un-negated word outside any `OR` is the
+ * only thing the router may be handed; everything else was written the way
+ * the writer meant it.
+ */
+function liftableWord(
+  node: LiqeQuery,
+  keepExplicit: ReadonlySet<LiqeQuery>,
+): string | null {
+  if (node.type !== "Tag") return null;
+  if (keepExplicit.has(node)) return null;
+  if (node.field.type !== "ImplicitField") return null;
+  if (node.expression.type !== "LiteralExpression") return null;
+  if (node.expression.quoted) return null;
+  return String(node.expression.value);
+}
+
+/**
  * Every tag with an `OR` above it, at any depth. Such a tag cannot be taken
  * out of the query on its own: what is left behind rebinds, and the caller
  * rejoins the two halves with AND.
@@ -583,16 +601,15 @@ export function splitBareWords(currentQuery: string): {
     walkAST(ast, (node, negated) => {
       if (negated) negatedTags.add(node);
     });
-    const disjunctTags = tagsUnderOr(ast);
+    const keepExplicit = new Set<LiqeQuery>([
+      ...negatedTags,
+      ...tagsUnderOr(ast),
+    ]);
     const bare: string[] = [];
     const explicit = filterAST(ast, (node) => {
-      if (node.type !== "Tag") return true;
-      if (negatedTags.has(node)) return true;
-      if (disjunctTags.has(node)) return true;
-      if (node.field.type !== "ImplicitField") return true;
-      if (node.expression.type !== "LiteralExpression") return true;
-      if (node.expression.quoted) return true;
-      bare.push(String(node.expression.value));
+      const word = liftableWord(node, keepExplicit);
+      if (word === null) return true;
+      bare.push(word);
       return false;
     });
     if (bare.length === 0) return { sentence: "", explicitQuery: trimmed };
