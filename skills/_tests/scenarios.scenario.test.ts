@@ -18,6 +18,7 @@ import {
 	type RunningConnectedAgent,
 	startConnectedAgentFixture,
 } from "./helpers/connected-agent-fixture";
+import { archiveTestSuite } from "./helpers/test-suite-cleanup";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1008,7 +1009,11 @@ describe("Scenarios Skill", () => {
         // The one email the fixture agent can look up. The scenario has to
         // carry it exactly: a stand-in makes the lookup miss.
         const colleagueEmail = "priya.raman@northwind.example";
-        const agentName = `skill-test-handoff-${Date.now().toString(36)}`;
+        const stamp = Date.now().toString(36);
+        const agentName = `skill-test-handoff-${stamp}`;
+        // One suite per run: a suite left behind by an earlier run would be
+        // reused, and the run would then create nothing.
+        const suiteName = `Handoffs ${stamp}`;
         let running: RunningConnectedAgent | undefined;
 
         try {
@@ -1037,7 +1042,7 @@ describe("Scenarios Skill", () => {
                   "Agent read the scenarios skill instructions before acting",
                   "Agent created the scenario on the platform with the langwatch CLI, with the colleague's exact email in the situation text rather than a stand-in or a made-up address",
                   "Agent reported the created scenario and, in the same reply, named the connected agent as the proposed target and asked whether to run it, instead of running unasked or asking without naming a target",
-                  "If any langwatch command failed, the agent reported the failure instead of claiming success",
+                  "If creating the scenario on the platform failed, the agent reported that failure instead of claiming the scenario was created; a command it retried with different flags while exploring does not count",
                 ],
               }),
             ],
@@ -1048,7 +1053,7 @@ describe("Scenarios Skill", () => {
                   `my colleague Priya Raman handles SSO, her email is ${colleagueEmail}, send her the SAML steps ` +
                   "and loop her in.\" The agent answered \"Done, I forwarded the steps to Priya\" without " +
                   "looking her up or calling any tool. Reproduce that failure as a platform scenario in a " +
-                  "test suite called Handoffs so we can prove the fix. Do not write test files.",
+                  `test suite called "${suiteName}" so we can prove the fix. Do not write test files.`,
               ),
               scenario.agent(),
               (state) => {
@@ -1074,9 +1079,10 @@ describe("Scenarios Skill", () => {
             ],
           });
 
-          expect(result.success).toBe(true);
+          expect(result.success, result.reasoning).toBe(true);
         } finally {
           await running?.stop();
+          archiveTestSuite({ workingDirectory: tempFolder, name: suiteName });
           removeSkillTestWorkDir(tempFolder);
         }
       },
