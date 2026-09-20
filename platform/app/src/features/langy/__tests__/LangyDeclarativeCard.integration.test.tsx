@@ -13,11 +13,15 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { CliResultDigest } from "@langwatch/langy";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { cloneElement, type ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveCapability } from "../components/capabilities/capabilityRegistry";
 import { LangyDeclarativeCard } from "../components/capabilities/LangyDeclarativeCard";
+import {
+  type LangySend,
+  LangySendProvider,
+} from "../components/LangySendContext";
 import type { CapabilityData } from "../hooks/useCapabilityData";
 
 // The hydration seam is mocked: these tests pin RENDERING per hydration state;
@@ -59,21 +63,26 @@ function renderCard({
   name,
   input = {},
   output,
+  send = null,
 }: {
   name: string;
   input?: unknown;
   output: unknown;
+  /** The panel's send; null renders the card the way a replayed turn does. */
+  send?: LangySend | null;
 }) {
   const descriptor = resolveCapability(name);
   if (!descriptor) throw new Error(`no descriptor for ${name}`);
   return render(
     <ChakraProvider value={defaultSystem}>
-      <LangyDeclarativeCard
-        descriptor={descriptor}
-        input={input}
-        output={output}
-        projectSlug="acme"
-      />
+      <LangySendProvider value={send}>
+        <LangyDeclarativeCard
+          descriptor={descriptor}
+          input={input}
+          output={output}
+          projectSlug="acme"
+        />
+      </LangySendProvider>
     </ChakraProvider>,
   );
 }
@@ -287,6 +296,63 @@ describe("LangyDeclarativeCard", () => {
         });
 
         expect(screen.getByText("Created and ready to use.")).toBeTruthy();
+      });
+    });
+
+    describe("when a scenario was created in a live conversation", () => {
+      const createdScenario = {
+        name: "langwatch.scenario.create",
+        input: { name: "Customer support agent" },
+        output: { id: "scenario_1", name: "Customer support agent" },
+      };
+
+      /** @scenario "A created scenario offers to run against the connected agent" */
+      it("offers to run it against the agent, and waits while Langy answers", () => {
+        const { unmount } = renderCard({
+          ...createdScenario,
+          send: { send: vi.fn(), turnInFlight: false },
+        });
+        const offer = screen.getByTestId("langy-card-run-scenario");
+        expect(offer).toHaveTextContent("Run against my agent");
+        expect(offer).not.toBeDisabled();
+        unmount();
+
+        renderCard({
+          ...createdScenario,
+          send: { send: vi.fn(), turnInFlight: true },
+        });
+        expect(screen.getByTestId("langy-card-run-scenario")).toBeDisabled();
+      });
+
+      /** @scenario "Choosing the run offer asks Langy in words, through the composer" */
+      it("sends the run as a message when the offer is chosen", () => {
+        const send = vi.fn();
+        renderCard({ ...createdScenario, send: { send, turnInFlight: false } });
+
+        fireEvent.click(screen.getByTestId("langy-card-run-scenario"));
+
+        expect(send).toHaveBeenCalledWith(
+          'Run scenario "Customer support agent" against my connected agent',
+        );
+      });
+
+      /** @scenario "A created scenario in a replayed conversation offers no run" */
+      it("offers no run when the card can route no request", () => {
+        renderCard({ ...createdScenario, send: null });
+
+        expect(screen.getByText("Created and ready to use.")).toBeTruthy();
+        expect(screen.queryByTestId("langy-card-run-scenario")).toBeNull();
+      });
+
+      it("offers no run on another created resource", () => {
+        renderCard({
+          name: "langwatch.trigger.create",
+          input: { name: "Alert on errors" },
+          output: "Created trigger Alert on errors",
+          send: { send: vi.fn(), turnInFlight: false },
+        });
+
+        expect(screen.queryByTestId("langy-card-run-scenario")).toBeNull();
       });
     });
 
