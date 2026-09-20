@@ -54156,7 +54156,9 @@ langwatch trace export --format jsonl --limit 1000 --origin application -o trace
 langwatch trace export --format jsonl --limit 1000 --origin application --start-date <30d-ago> --end-date <14d-ago> -o traces-before.jsonl
 ```
 
-`--origin application` scopes the sample to real production traffic (it includes traces with no recorded origin). Evaluation, simulation, playground, gateway, and langy traces would pollute the picture of what the agent does for users; include those origins (comma-separated) only when they are the subject of the question.
+`--origin application` scopes the export to real production traffic (it includes traces with no recorded origin). Evaluation, simulation, playground, gateway, and langy traces would pollute the picture of what the agent does for users; include those origins (comma-separated) only when they are the subject of the question.
+
+That narrowing belongs to the export and to nothing else. An export is a local sample you analyse offline, so choosing its origins is part of the analysis, and a count taken from it is a count of production traffic rather than of what the Trace Explorer shows. `trace search` is the other case: it answers with cards and a "View in Trace Explorer" link, and the link carries whatever the search named. Name an origin there and the Explorer opens narrower than the page the user was on, with a smaller number than the one beside it. So on `trace search`, name no origin unless the user does.
 
 Write small local scripts (python3 or jq) over the JSONL to compute, at minimum:
 
@@ -54203,7 +54205,8 @@ If the `agent-improve` skill is installed, offer it as the next step: it turns e
 - Do NOT analyze only the happy window; without a before/after comparison you cannot see behavior change
 - Do NOT dump raw JSON at the user; the deliverable is the diagnosis and the report, written in plain language with numbers
 - Do NOT stop at an empty evaluation metric; when evaluations have no data, the answer comes from the traces (and simulation runs), with a closing invitation to dig deeper
-- Do NOT mix origins blindly; questions about production behavior are answered from `--origin application` traffic
+- Do NOT mix origins blindly in an export; a question about production behavior is analysed from `--origin application` traffic
+- Do NOT pass `--origin` to `trace search` unless the user named an origin; the card's link carries it and opens the Explorer on a narrower set than the count beside it
 - If the CLI returns an error, report the user-facing consequence (what couldn't be determined and why in plain terms), not the raw error text. An activity card already shows the underlying failure
 ````
 
@@ -56358,7 +56361,9 @@ langwatch trace export --format jsonl --limit 1000 --origin application -o trace
 langwatch trace export --format jsonl --limit 1000 --origin application --start-date <30d-ago> --end-date <14d-ago> -o traces-before.jsonl
 ```
 
-`--origin application` scopes the sample to real production traffic (it includes traces with no recorded origin). Evaluation, simulation, playground, gateway, and langy traces would pollute the picture of what the agent does for users; include those origins (comma-separated) only when they are the subject of the question.
+`--origin application` scopes the export to real production traffic (it includes traces with no recorded origin). Evaluation, simulation, playground, gateway, and langy traces would pollute the picture of what the agent does for users; include those origins (comma-separated) only when they are the subject of the question.
+
+That narrowing belongs to the export and to nothing else. An export is a local sample you analyse offline, so choosing its origins is part of the analysis, and a count taken from it is a count of production traffic rather than of what the Trace Explorer shows. `trace search` is the other case: it answers with cards and a "View in Trace Explorer" link, and the link carries whatever the search named. Name an origin there and the Explorer opens narrower than the page the user was on, with a smaller number than the one beside it. So on `trace search`, name no origin unless the user does.
 
 Write small local scripts (python3 or jq) over the JSONL to compute, at minimum:
 
@@ -56405,7 +56410,8 @@ If the `agent-improve` skill is installed, offer it as the next step: it turns e
 - Do NOT analyze only the happy window; without a before/after comparison you cannot see behavior change
 - Do NOT dump raw JSON at the user; the deliverable is the diagnosis and the report, written in plain language with numbers
 - Do NOT stop at an empty evaluation metric; when evaluations have no data, the answer comes from the traces (and simulation runs), with a closing invitation to dig deeper
-- Do NOT mix origins blindly; questions about production behavior are answered from `--origin application` traffic
+- Do NOT mix origins blindly in an export; a question about production behavior is analysed from `--origin application` traffic
+- Do NOT pass `--origin` to `trace search` unless the user named an origin; the card's link carries it and opens the Explorer on a narrower set than the count beside it
 - If the CLI returns an error, report the user-facing consequence (what couldn't be determined and why in plain terms), not the raw error text. An activity card already shows the underlying failure
 ````
 

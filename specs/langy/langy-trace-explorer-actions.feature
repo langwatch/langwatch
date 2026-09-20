@@ -191,6 +191,17 @@ Feature: Langy drives and reads the Trace Explorer
       Then it says to search with the page's from, to and filter
       And it does not tell Langy to add an application origin
 
+    # The Explorer leaves Langy's own traces out server side, so a search that
+    # names no origin counts what the Explorer counts. Naming `application`
+    # also drops evaluation, simulation, sample and gateway traces, and the
+    # card's "View in Trace Explorer" link carries whatever the search named,
+    # so the Explorer opens narrower than the count beside it.
+    @unit
+    Scenario: A trace search names no origin
+      Given every skill Langy can load
+      Then none of the `trace search` commands they print names an origin
+      And the one skill that narrows an export to production traffic says that narrowing belongs to the export, because no card or link carries it
+
     @unit
     Scenario: The skill searches every form a concept can take before saying nothing was found
       Given the find-traces skill

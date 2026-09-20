@@ -187,3 +187,41 @@ describe("Langy's routing table", () => {
     expect(mirrored).toBe(committed);
   });
 });
+
+// Backs specs/langy/langy-trace-explorer-actions.feature ("A trace search
+// names no origin"). The Explorer already leaves Langy's own traces out
+// server side, so a search that names no origin counts what the Explorer
+// counts; naming `application` also drops evaluation, simulation, sample and
+// gateway traces, and the card's link then opens narrower than the count
+// beside it.
+describe("every skill that tells Langy to run a trace search", () => {
+  describe("given the commands they print", () => {
+    /** @scenario "A trace search names no origin" */
+    it("names no origin on `trace search`", () => {
+      const offenders: string[] = [];
+      for (const skill of listNativeSkills(skillsRoot)) {
+        for (const line of renderSkill(skill).split("\n")) {
+          const command = line.trim();
+          if (!command.startsWith("langwatch trace search")) continue;
+          if (command.includes("--origin")) {
+            offenders.push(`${skill.slug}: ${command}`);
+          }
+        }
+      }
+      expect(offenders).toEqual([]);
+    });
+
+    /** @scenario "A trace search names no origin" */
+    it("keeps the production-traffic narrowing on the export, where no link carries it", () => {
+      const performance = listNativeSkills(skillsRoot).find(
+        (s) => s.slug === "agent-performance",
+      );
+      if (!performance) throw new Error("agent-performance is not shipped");
+      const rendered = renderSkill(performance);
+      expect(rendered).toContain(
+        "langwatch trace export --format jsonl --limit 1000 --origin application",
+      );
+      expect(rendered).toContain("name no origin unless the user does");
+    });
+  });
+});
