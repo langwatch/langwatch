@@ -99,6 +99,8 @@ export interface InstantEvalExplorerRun {
   /** The code of the failure that ended the run, when one did. */
   error: string | null;
   priceUsd: number;
+  /** When the run ended, or null while it has not. */
+  finishedAtMs: number | null;
 }
 
 export function toInstantEvalExplorerRun(
@@ -114,6 +116,7 @@ export function toInstantEvalExplorerRun(
     skipped: row.skipped,
     error: row.error,
     priceUsd: row.priceUsd,
+    finishedAtMs: row.finishedAt?.getTime() ?? null,
   };
 }
 

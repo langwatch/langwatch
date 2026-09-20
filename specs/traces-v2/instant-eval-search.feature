@@ -252,6 +252,24 @@ Feature: Instant Evals inside the Trace Explorer
       When Stop is pressed
       Then cancel is called with the run id
       And the chip stays, marked partial, with a tooltip naming judged versus total
+      And the partial chip shows the question in quotes, as the running chip does
+
+    @integration
+    Scenario: A stopped run is read until its numbers hold still
+      Given a running run that was asked to stop
+      Then the bar stays and says it is stopping, with Stop disabled
+      When the run's status turns cancelled
+      Then the run is still polled, because the page it held lands its verdicts last
+      And the header, the pagination and the sidebar keep reading the run's counters
+      When a second read answers the same counters
+      Then the list and the facets are read one last time
+      And only after they answer do the bar leave, the chip read partial and the counts read the list's total
+
+    @unit
+    Scenario: A run that ended long before the page opened is settled at once
+      Given a run that finished more than fifteen seconds ago
+      When the page reads it for the first time
+      Then it is settled without a second read, and no bar is shown
 
   # ---------------------------------------------------------------------------
   # Refusals

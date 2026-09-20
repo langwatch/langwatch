@@ -8,7 +8,6 @@ import {
   Text,
 } from "@chakra-ui/react";
 import type React from "react";
-import { isInstantEvalRunActive } from "~/server/app-layer/instant-evals/run/instant-eval-explorer";
 import { useExplorerStore } from "../../stores/explorerStore";
 import { useInstantEvalRunStore } from "../../stores/instantEvalRunStore";
 import type { TimeRange } from "../../stores/querySlice";
@@ -140,7 +139,7 @@ export const EmptyFilterState: React.FC = () => {
   const selectLens = useExplorerStore((s) => s.selectLens);
 
   const isJudging = useInstantEvalRunStore((s) =>
-    Object.values(s.runs).some((run) => isInstantEvalRunActive(run.status)),
+    Object.keys(s.runs).some((runId) => !s.settled[runId]),
   );
 
   const hasFilters = queryText.trim().length > 0;

@@ -288,7 +288,7 @@ export const SearchBar: React.FC = () => {
     if (askAiNeedsProviderPrimer) return;
     setAiMode(true);
   }, [askAiNeedsProviderPrimer, isSamplePreview, langyRoutesAsk, openLangyAsk]);
-  useGlobalAiShortcut(handleAiShortcut);
+  useGlobalAiShortcut(handleAiShortcut, { enabled: !langyRoutesAsk });
 
   const handleAiBarClose = useCallback(() => setAiMode(false), []);
 
@@ -348,21 +348,16 @@ export const SearchBar: React.FC = () => {
   // and keeps the chip as partial", "A chip with no registered run is pending").
   const { chips: evalChips } = useInstantEvalRuns();
   const evalRuns = useInstantEvalRunStore((s) => s.runs);
-  const evalChipMarks = useMemo(() => {
-    const marks: Record<string, Record<string, string>> = {};
-    for (const chip of evalChips) {
-      const mark = instantEvalChipMark({
-        run: chip.runId ? evalRuns[chip.runId] : undefined,
-        hasRun: chip.runId !== null,
-      });
-      if (!mark) continue;
-      marks[chip.field] = {
-        ...(marks[chip.field] ?? {}),
-        [chip.question]: `${chip.question} ${mark}`,
-      };
-    }
-    return marks;
-  }, [evalChips, evalRuns]);
+  const settledEvalRuns = useInstantEvalRunStore((s) => s.settled);
+  const evalChipMarks = useMemo(
+    () =>
+      instantEvalChipMarks({
+        chips: evalChips,
+        runs: evalRuns,
+        settled: settledEvalRuns,
+      }),
+    [evalChips, evalRuns, settledEvalRuns],
+  );
 
   // Publish the (field → value → label) lookup the chip overlay reads
   // from. The editor's FilterHighlight plugin watches this via a
@@ -589,9 +584,54 @@ export const SearchBar: React.FC = () => {
  * registered for it, "(partial)" once the run ended short of its total, and
  * nothing while it judges or after it finished whole.
  */
+/** The overlay labels of the marked `eval` chips: field, then question. */
+export function instantEvalChipMarks({
+  chips,
+  runs,
+  settled,
+}: {
+  chips: readonly { field: string; question: string; runId: string | null }[];
+  runs: Readonly<
+    Record<
+      string,
+      {
+        status: InstantEvalExplorerStatus;
+        progress: number;
+        total: number | null;
+      }
+    >
+  >;
+  settled: Readonly<Record<string, true>>;
+}): Record<string, Record<string, string>> {
+  const marks: Record<string, Record<string, string>> = {};
+  for (const chip of chips) {
+    const mark = instantEvalChipMark({
+      run: chip.runId === null ? undefined : runs[chip.runId],
+      hasRun: chip.runId !== null,
+      isSettled: chip.runId !== null && settled[chip.runId] === true,
+    });
+    if (!mark) continue;
+    const label = instantEvalChipLabel({ question: chip.question, mark });
+    marks[chip.field] = { ...marks[chip.field], [chip.question]: label };
+  }
+  return marks;
+}
+
+/** A marked chip reads like an unmarked one: the question in its quotes. */
+export function instantEvalChipLabel({
+  question,
+  mark,
+}: {
+  question: string;
+  mark: string;
+}): string {
+  return `"${question}" ${mark}`;
+}
+
 export function instantEvalChipMark({
   run,
   hasRun,
+  isSettled = true,
 }: {
   run:
     | {
@@ -601,10 +641,12 @@ export function instantEvalChipMark({
       }
     | undefined;
   hasRun: boolean;
+  /** False while an ended run's counters may still move. */
+  isSettled?: boolean;
 }): string | null {
   if (!hasRun) return "(pending)";
   if (!run) return null;
-  if (isInstantEvalRunActive(run.status)) return null;
+  if (isInstantEvalRunActive(run.status) || !isSettled) return null;
   const ended = run.status === "cancelled" || run.status === "failed";
   if (ended && (run.total === null || run.progress < run.total)) {
     const judged = run.progress.toLocaleString();

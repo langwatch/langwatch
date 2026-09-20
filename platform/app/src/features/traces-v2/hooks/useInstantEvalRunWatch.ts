@@ -13,13 +13,13 @@ import { useInstantEvalRuns } from "./useInstantEvalRuns";
 export const INSTANT_EVAL_POLL_MS = 1_000;
 
 /**
- * Polls every run behind the query's `eval` chips while it judges, keeps
+ * Polls every run behind the query's `eval` chips until it has settled, keeps
  * the run store current, and refetches the list and the facets on every
  * change of progress so matches appear as pages finish. Mounted once, on the
  * Explorer page.
  *
  * Spec: specs/traces-v2/instant-eval-search.feature ("Matches appear as
- * pages finish").
+ * pages finish", "A stopped run is read until its numbers hold still").
  */
 export function useInstantEvalRunWatch(): void {
   const { project } = useOrganizationTeamProject();
@@ -32,37 +32,51 @@ export function useInstantEvalRunWatch(): void {
     [chips],
   );
   const runs = useInstantEvalRunStore((s) => s.runs);
+  const settled = useInstantEvalRunStore((s) => s.settled);
   const setRun = useInstantEvalRunStore((s) => s.setRun);
   const keepOnly = useInstantEvalRunStore((s) => s.keepOnly);
   useEffect(() => {
     keepOnly(runIds);
   }, [runIds, keepOnly]);
 
+  // A run is read until it has settled, not until its status turns terminal:
+  // the page it held when it stopped lands its verdicts after that.
   const results = api.useQueries((t) =>
     runIds.map((runId) => {
-      const known = runs[runId];
-      const active = !known || isInstantEvalRunActive(known.status);
+      const isWatched = !settled[runId];
       return t.tracesV2.instantEval.get(
         { projectId, runId },
         {
           enabled: !!projectId,
-          refetchInterval: active ? INSTANT_EVAL_POLL_MS : false,
-          staleTime: active ? 0 : 60_000,
+          refetchInterval: isWatched ? INSTANT_EVAL_POLL_MS : false,
+          staleTime: isWatched ? 0 : 60_000,
         },
       );
     }),
   );
 
-  // Every poll answer lands in the store; the store ignores answers that
-  // move nothing, so a stable run does not re-render its readers.
-  const latest = results.map((result) => result.data);
+  // Every poll answer lands in the store, which also notes an ended run whose
+  // counters came back unchanged. `dataUpdatedAt` is what tells two equal
+  // answers apart, so the second one is counted once and not on every render.
+  const answers = results.map((result) => ({
+    run: result.data,
+    at: result.dataUpdatedAt ?? 0,
+  }));
+  const lastAnswer = useRef<
+    Record<string, { run: InstantEvalExplorerRun; at: number }>
+  >({});
   useEffect(() => {
-    for (const run of latest) {
-      if (run) setRun(run);
+    for (const { run, at } of answers) {
+      if (!run) continue;
+      const last = lastAnswer.current[run.id];
+      if (last && last.at === at && last.run === run) continue;
+      lastAnswer.current[run.id] = { run, at };
+      setRun(run);
     }
   });
 
   useRefetchOnRunProgress(runs);
+  useSettleQuietRuns();
 }
 
 /**
@@ -112,4 +126,32 @@ function useRefetchOnRunProgress(
       void trpcUtils.tracesV2.facets.invalidate(undefined, undefined, options);
     }
   }, [progressSignature, isAnyRunActive, trpcUtils]);
+}
+
+/**
+ * An ended run whose counters held still gets its final read: the table and
+ * the sidebar read once more, and only when both have answered is the run
+ * settled. Until then every count on the page keeps reading the run's
+ * counters, so no surface shows a total the next read replaces.
+ */
+function useSettleQuietRuns(): void {
+  const trpcUtils = api.useUtils();
+  const quiet = useInstantEvalRunStore((s) => s.quiet);
+  const settled = useInstantEvalRunStore((s) => s.settled);
+  const markSettled = useInstantEvalRunStore((s) => s.markSettled);
+  const settling = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    for (const runId of Object.keys(quiet)) {
+      if (settled[runId] || settling.current.has(runId)) continue;
+      settling.current.add(runId);
+      void Promise.allSettled([
+        trpcUtils.tracesV2.list.invalidate(),
+        trpcUtils.tracesV2.sessions.invalidate(),
+        trpcUtils.tracesV2.facets.invalidate(),
+      ]).then(() => {
+        settling.current.delete(runId);
+        markSettled(runId);
+      });
+    }
+  }, [quiet, settled, markSettled, trpcUtils]);
 }

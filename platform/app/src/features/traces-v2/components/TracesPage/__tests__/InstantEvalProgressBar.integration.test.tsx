@@ -31,7 +31,7 @@ describe("given a run with total 10,000, progress 3,200 and 412 matched", () => 
           total={10_000}
           matched={412}
           question="the user is annoyed"
-          isStopping={false}
+          phase="judging"
           onStop={onStop}
         />,
         { wrapper },
@@ -44,6 +44,36 @@ describe("given a run with total 10,000, progress 3,200 and 412 matched", () => 
       );
       fireEvent.click(screen.getByRole("button", { name: "Stop judging" }));
       expect(onStop).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "A stopped run is read until its numbers hold still" */
+    it("says it is stopping, with Stop disabled, once the run was asked to stop", () => {
+      const onStop = vi.fn();
+      render(
+        <InstantEvalProgressBar
+          judged={500}
+          total={1_354}
+          matched={72}
+          question="the user is annoyed"
+          phase="stopping"
+          onStop={onStop}
+        />,
+        { wrapper },
+      );
+      expect(
+        screen.getByText("Stopping 500 / 1,354 · 72 matched"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Stop judging" }),
+      ).toBeDisabled();
+      expect(
+        instantEvalProgressCopy({
+          judged: 920,
+          total: 1_354,
+          matched: 127,
+          phase: "settling",
+        }),
+      ).toBe("Reading the last verdicts 920 / 1,354 · 127 matched");
     });
 
     it("says the total is still being counted before the run has one", () => {

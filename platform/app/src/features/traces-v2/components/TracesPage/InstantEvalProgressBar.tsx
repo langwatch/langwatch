@@ -1,6 +1,10 @@
 import { Box, Button, HStack, Progress, Text } from "@chakra-ui/react";
 import { Square } from "lucide-react";
 import type React from "react";
+import type { InstantEvalRunPhase } from "../../stores/instantEvalRunStore";
+
+/** The phases the bar is shown in: every one before the run has settled. */
+export type InstantEvalBarPhase = Exclude<InstantEvalRunPhase, "settled">;
 
 interface InstantEvalProgressBarProps {
   /** Rows judged so far. */
@@ -10,7 +14,7 @@ interface InstantEvalProgressBarProps {
   matched: number;
   /** The question, so the bar says what is being judged. */
   question: string;
-  isStopping: boolean;
+  phase: InstantEvalBarPhase;
   onStop: () => void;
 }
 
@@ -19,13 +23,21 @@ export function instantEvalProgressCopy({
   judged,
   total,
   matched,
+  phase = "judging",
 }: {
   judged: number;
   total: number | null;
   matched: number;
+  phase?: InstantEvalBarPhase;
 }): string {
   const totalText = total === null ? "…" : total.toLocaleString();
-  return `Judging ${judged.toLocaleString()} / ${totalText} · ${matched.toLocaleString()} matched`;
+  const counters = `${judged.toLocaleString()} / ${totalText} · ${matched.toLocaleString()} matched`;
+  if (phase === "judging") return `Judging ${counters}`;
+  // A stop waits for the classifications already in flight, and an ended run
+  // for its last verdicts: both say so, with counters that still move.
+  return phase === "stopping"
+    ? `Stopping ${counters}`
+    : `Reading the last verdicts ${counters}`;
 }
 
 /** Where the bar sits, 0 to 100. Null while the run is still counting. */
@@ -54,7 +66,7 @@ export const InstantEvalProgressBar: React.FC<InstantEvalProgressBarProps> = ({
   total,
   matched,
   question,
-  isStopping,
+  phase,
   onStop,
 }) => {
   const percent = instantEvalProgressPercent({ judged, total });
@@ -78,7 +90,7 @@ export const InstantEvalProgressBar: React.FC<InstantEvalProgressBarProps> = ({
       <HStack justify="space-between" gap={3} marginBottom={1.5}>
         <HStack gap={2} minWidth={0}>
           <Text textStyle="sm" color="fg" fontVariantNumeric="tabular-nums">
-            {instantEvalProgressCopy({ judged, total, matched })}
+            {instantEvalProgressCopy({ judged, total, matched, phase })}
           </Text>
           <Text textStyle="xs" color="fg.muted" truncate title={question}>
             {question}
@@ -88,7 +100,7 @@ export const InstantEvalProgressBar: React.FC<InstantEvalProgressBarProps> = ({
           variant="ghost"
           size="xs"
           onClick={onStop}
-          loading={isStopping}
+          disabled={phase !== "judging"}
           aria-label="Stop judging"
         >
           <Square size={12} />

@@ -4,7 +4,6 @@ import type {
   LangyUiActionHandlers,
 } from "~/features/langy/uiActions/types";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { isInstantEvalRunActive } from "~/server/app-layer/instant-evals/run/instant-eval-explorer";
 import { queryWithoutInstantEvalChips } from "~/server/app-layer/traces/query-language/instantEvalChips";
 import {
   commitExplorerState,
@@ -73,10 +72,11 @@ async function waitForSettledCount(): Promise<boolean> {
 
 function runningInstantEval(): InstantEvalProgress | null {
   const { evalRuns } = useExplorerStore.getState();
-  const { runs } = useInstantEvalRunStore.getState();
+  const { runs, settled } = useInstantEvalRunStore.getState();
   for (const runId of Object.values(evalRuns)) {
     const run = runs[runId];
-    if (run && isInstantEvalRunActive(run.status)) {
+    // A run that ended but has not settled still moves the count.
+    if (run && !settled[runId]) {
       return {
         runId: run.id,
         judged: run.progress,

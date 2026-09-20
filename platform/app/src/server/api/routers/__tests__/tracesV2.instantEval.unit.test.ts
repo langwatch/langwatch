@@ -89,6 +89,7 @@ describe("given a run's row", () => {
         skipped: 2,
         error: null,
         priceUsd: 0.31,
+        finishedAt: null,
       } as unknown as InstantEvalRunRow;
       expect(toInstantEvalExplorerRun(row)).toEqual({
         id: "run-1",
@@ -100,6 +101,7 @@ describe("given a run's row", () => {
         skipped: 2,
         error: null,
         priceUsd: 0.31,
+        finishedAtMs: null,
       });
       expect(isInstantEvalRunActive("running")).toBe(true);
       expect(isInstantEvalRunActive("cancelled")).toBe(false);

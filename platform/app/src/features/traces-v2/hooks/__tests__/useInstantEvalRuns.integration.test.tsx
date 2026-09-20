@@ -58,7 +58,11 @@ vi.mock("../../onboarding/hooks/usePreviewTracesActive", () => ({
 }));
 
 import { instantEvalRunKey } from "~/server/app-layer/traces/query-language/instantEvalChips";
-import { instantEvalChipMark } from "../../components/SearchBar/SearchBar";
+import {
+  instantEvalChipLabel,
+  instantEvalChipMark,
+} from "../../components/SearchBar/SearchBar";
+import { instantEvalProgressCopy } from "../../components/TracesPage/InstantEvalProgressBar";
 import { useExplorerStore } from "../../stores/explorerStore";
 import { useInstantEvalRunStore } from "../../stores/instantEvalRunStore";
 import { useExplorerCounts } from "../useExplorerCounts";
@@ -100,7 +104,12 @@ beforeEach(() => {
     evalRuns: { [key]: "run-1" },
   });
   useExplorerStore.setState({ activeLensId: "all-traces", grouping: "flat" });
-  useInstantEvalRunStore.setState({ runs: {}, stoppedByUser: {} });
+  useInstantEvalRunStore.setState({
+    runs: {},
+    stoppedByUser: {},
+    quiet: {},
+    settled: {},
+  });
 });
 
 const expectedEvalRuns = {
@@ -155,6 +164,7 @@ describe("given a run with total 10,000, progress 3,200 and 412 matched", () => 
         skipped: 0,
         error: null,
         priceUsd: 0.3,
+        finishedAtMs: null,
       });
       const { result, rerender } = renderHook(() => useExplorerCounts());
       expect(result.current.summary).toBe(
@@ -165,20 +175,26 @@ describe("given a run with total 10,000, progress 3,200 and 412 matched", () => 
         judged: 3_200,
         total: 10_000,
         matched: 412,
+        phase: "judging",
       });
-      act(() =>
-        useInstantEvalRunStore.getState().setRun({
-          id: "run-1",
-          status: "finished",
-          total: 10_000,
-          progress: 10_000,
-          matched: 900,
-          failed: 0,
-          skipped: 0,
-          error: null,
-          priceUsd: 0.9,
-        }),
+      const finished = {
+        id: "run-1",
+        status: "finished" as const,
+        total: 10_000,
+        progress: 10_000,
+        matched: 900,
+        failed: 0,
+        skipped: 0,
+        error: null,
+        priceUsd: 0.9,
+        finishedAtMs: Date.now(),
+      };
+      act(() => useInstantEvalRunStore.getState().setRun(finished));
+      rerender();
+      expect(result.current.summary).toBe(
+        "900 matched so far · 10,000 of 10,000 judged",
       );
+      act(() => useInstantEvalRunStore.getState().markSettled("run-1"));
       rerender();
       expect(result.current.instantEval).toBeNull();
       expect(result.current.summary).toBe("3 traces");
@@ -204,6 +220,7 @@ describe("given a run whose progress moves", () => {
       skipped: 0,
       error: null,
       priceUsd: 0.1,
+      finishedAtMs: status === "running" ? null : Date.now(),
     },
   });
 
@@ -275,6 +292,114 @@ describe("given a run whose progress moves", () => {
   });
 });
 
+describe("given a running run that was asked to stop", () => {
+  const stopped = ({
+    status,
+    progress,
+    matched,
+  }: {
+    status: "running" | "cancelled";
+    progress: number;
+    matched: number;
+  }) => ({
+    data: {
+      id: "run-1",
+      status,
+      total: 1_354,
+      progress,
+      matched,
+      failed: 0,
+      skipped: 0,
+      error: null,
+      priceUsd: 0.1,
+      finishedAtMs: status === "running" ? null : Date.now(),
+    },
+  });
+
+  describe("when the run turns cancelled and its counters keep moving", () => {
+    /** @scenario "A stopped run is read until its numbers hold still" */
+    it("keeps the counts on the run's counters until a repeated read and the final list read", async () => {
+      useInstantEvalRunStore.getState().markStopped("run-1");
+      harness.getResults = [
+        stopped({ status: "running", progress: 500, matched: 72 }),
+      ];
+      const watch = renderHook(() => useInstantEvalRunWatch());
+      const counts = renderHook(() => useExplorerCounts());
+      expect(counts.result.current.instantEval?.phase).toBe("stopping");
+      expect(
+        instantEvalProgressCopy({
+          judged: 500,
+          total: 1_354,
+          matched: 72,
+          phase: "stopping",
+        }),
+      ).toBe("Stopping 500 / 1,354 · 72 matched");
+
+      // Terminal, but the page it held is still landing verdicts.
+      harness.getResults = [
+        stopped({ status: "cancelled", progress: 540, matched: 80 }),
+      ];
+      watch.rerender();
+      counts.rerender();
+      expect(counts.result.current.instantEval?.phase).toBe("settling");
+      expect(counts.result.current.summary).toBe(
+        "80 matched so far · 540 of 1,354 judged",
+      );
+
+      harness.getResults = [
+        stopped({ status: "cancelled", progress: 920, matched: 127 }),
+      ];
+      watch.rerender();
+      counts.rerender();
+      expect(counts.result.current.summary).toBe(
+        "127 matched so far · 920 of 1,354 judged",
+      );
+      expect(
+        useInstantEvalRunStore.getState().settled["run-1"],
+      ).toBeUndefined();
+
+      // The same counters again: quiet, so the final read goes out.
+      const listReadsBefore = harness.invalidate.list.mock.calls.length;
+      harness.getResults = [
+        stopped({ status: "cancelled", progress: 920, matched: 127 }),
+      ];
+      watch.rerender();
+      expect(useInstantEvalRunStore.getState().quiet["run-1"]).toBe(true);
+      expect(harness.invalidate.list.mock.calls.length).toBe(
+        listReadsBefore + 1,
+      );
+      await act(async () => {
+        await Promise.resolve();
+      });
+      counts.rerender();
+      expect(useInstantEvalRunStore.getState().settled["run-1"]).toBe(true);
+      expect(counts.result.current.instantEval).toBeNull();
+      expect(counts.result.current.summary).toBe("3 traces");
+    });
+  });
+
+  describe("when a run that ended long ago is read for the first time", () => {
+    /** @scenario "A run that ended long before the page opened is settled at once" */
+    it("is settled without a second read", () => {
+      useInstantEvalRunStore.getState().setRun({
+        id: "run-1",
+        status: "cancelled",
+        total: 1_354,
+        progress: 920,
+        matched: 127,
+        failed: 0,
+        skipped: 0,
+        error: null,
+        priceUsd: 0.1,
+        finishedAtMs: Date.now() - 60_000,
+      });
+      expect(useInstantEvalRunStore.getState().settled["run-1"]).toBe(true);
+      const { result } = renderHook(() => useExplorerCounts());
+      expect(result.current.instantEval).toBeNull();
+    });
+  });
+});
+
 describe("given a run stopped short of its total", () => {
   describe("when the chip is marked", () => {
     /** @scenario "Stop cancels the run and keeps the chip as partial" */
@@ -285,6 +410,19 @@ describe("given a run stopped short of its total", () => {
           hasRun: true,
         }),
       ).toBe("(partial: 3,200 of 10,000 judged)");
+      expect(
+        instantEvalChipMark({
+          run: { status: "cancelled", progress: 3_200, total: 10_000 },
+          hasRun: true,
+          isSettled: false,
+        }),
+      ).toBeNull();
+      expect(
+        instantEvalChipLabel({
+          question: "the user is annoyed",
+          mark: "(partial: 3,200 of 10,000 judged)",
+        }),
+      ).toBe('"the user is annoyed" (partial: 3,200 of 10,000 judged)');
       expect(
         instantEvalChipMark({
           run: { status: "finished", progress: 10_000, total: 10_000 },
