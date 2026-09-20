@@ -98,14 +98,19 @@ function fakeProvider({
       itemId: `si_${sequence}`,
     })),
     createCreditGrant: vi.fn(async () => ({ id: `credgr_${++sequence}` })),
-    createOneOffInvoice: vi.fn(async ({ currency, lines }) => ({
-      id: `in_${++sequence}`,
-      status: "open",
-      currency,
-      amountDueCents: lines.reduce((sum, line) => sum + line.amountCents, 0),
-      subscriptionId: null,
-      periodEnd: null,
-    })),
+    createOneOffInvoice: vi.fn(
+      async ({
+        currency,
+        lines,
+      }: Parameters<ConnectedBillingProvider["createOneOffInvoice"]>[0]) => ({
+        id: `in_${++sequence}`,
+        status: "open",
+        currency,
+        amountDueCents: lines.reduce((sum, line) => sum + line.amountCents, 0),
+        subscriptionId: null,
+        periodEnd: null,
+      }),
+    ),
     retrieveInvoice: vi.fn(async (id: string) => {
       const invoice = invoices[id];
       if (!invoice) throw new Error(`no invoice ${id}`);

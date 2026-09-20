@@ -37,10 +37,15 @@ function makeStore(overrides: Record<string, unknown> = {}) {
 
 function makeInvoicer() {
   const stripe = {
-    invoiceItems: { create: vi.fn(async () => ({ id: "ii_1" })) },
+    invoiceItems: {
+      create: vi.fn(async (..._args: unknown[]) => ({ id: "ii_1" })),
+    },
     invoices: {
-      create: vi.fn(async () => ({ id: "in_draft" })),
-      finalizeInvoice: vi.fn(async () => ({ id: "in_1", status: "open" })),
+      create: vi.fn(async (..._args: unknown[]) => ({ id: "in_draft" })),
+      finalizeInvoice: vi.fn(async (..._args: unknown[]) => ({
+        id: "in_1",
+        status: "open",
+      })),
     },
   };
   const prisma = { connectedInvoice: { upsert: vi.fn(async () => undefined) } };

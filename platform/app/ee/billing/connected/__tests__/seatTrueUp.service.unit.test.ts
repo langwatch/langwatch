@@ -58,6 +58,7 @@ function makeAccount(
     seats: 50,
     termStartsAt: TERM_STARTS_AT,
     termEndsAt: TERM_ENDS_AT,
+    bankTransfer: null,
     ...overrides,
   };
 }
@@ -112,7 +113,9 @@ function makeHarness({
       recorded.push(record);
     }),
   };
-  const invoiceAddedSeats = vi.fn(async () => ({ invoiceId: "in_seat_1" }));
+  const invoiceAddedSeats = vi.fn(async (..._args: unknown[]) => ({
+    invoiceId: "in_seat_1",
+  }));
 
   return {
     service: new ConnectedSeatTrueUpService({
