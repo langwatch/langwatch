@@ -19,6 +19,7 @@
  */
 
 import { getLangWatchQLService } from "~/server/analytics/lwql";
+import { lwqlConnectionFromEnv } from "~/server/analytics/lwql/executor";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { getApp, tryGetApp } from "~/server/app-layer/app";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
@@ -39,6 +40,7 @@ import {
   type InstantEvalRunCommands,
   InstantEvalRunService,
 } from "./instant-eval-run.service";
+import { queryCapabilityOf } from "./query-capability";
 import { createInstantEvalRowSource } from "./row-source";
 
 /**
@@ -52,13 +54,15 @@ import { createInstantEvalRowSource } from "./row-source";
  */
 const INSTANT_EVAL_PAGE_CONCURRENCY = 128;
 
-/** The project's own query capability, or null when it has none. */
 async function callerFor(projectId: string) {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     select: { id: true, lwqlKey: true },
   });
-  return project?.lwqlKey ? { id: project.id, lwqlKey: project.lwqlKey } : null;
+  return queryCapabilityOf({
+    project,
+    hasDeploymentIdentity: lwqlConnectionFromEnv() !== null,
+  });
 }
 
 /** The plan that caps this project's runs. */
