@@ -66,11 +66,13 @@ Write small local scripts (python3 or jq) over the JSONL to compute, at minimum:
 6. **Outliers**: the single weirdest traces by duration, cost, span count, and output size. Read them individually.
 
 ```bash
-langwatch trace search --errors-only --origin application --limit 25 --format json  # Every failure, without guessing at text
-langwatch trace search -q "<one phrase from a pattern>" --origin application --limit 10 --format json   # Chase a specific pattern
+langwatch trace search --errors-only --limit 25 --format json  # Every failure, without guessing at text
+langwatch trace search -q "<one phrase from a pattern>" --limit 10 --format json   # Chase a specific pattern
 langwatch trace get <traceId>                                                   # Read a representative trace in full
 langwatch trace get <traceId> -f json                                           # Every span, token count, and timing
 ```
+
+A search that names no origin counts what the Trace Explorer counts (every trace except Langy's own), so the numbers you report match the link on the card. When the ask is to find specific traces rather than to diagnose the agent ("show me the thumbs down ones", "filter to alice"), use the `find-traces` skill: it drives the Explorer and searches every form a concept can take.
 
 For every pattern you claim, keep 2-3 example trace IDs as evidence. Never report a pattern without example traces behind it.
 

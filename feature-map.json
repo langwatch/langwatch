@@ -1920,7 +1920,8 @@
       "agent-best-practices": "Expert AI engineering consultant for your LangWatch setup",
       "evaluate-multimodal": "Evaluate multimodal agents (images, audio, PDFs)",
       "generate-rag-dataset": "Generate synthetic evaluation dataset from your RAG knowledge base",
-      "test-compliance": "Test that your agent stays observational in regulated domains"
+      "test-compliance": "Test that your agent stays observational in regulated domains",
+      "find-traces": "Find the traces a description names: drive the Trace Explorer or answer with cards, trying every form a concept can take"
     }
   }
 }
