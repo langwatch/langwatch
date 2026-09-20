@@ -35,8 +35,9 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
-vi.mock("../../stores/viewStore", () => ({
-  useViewStore: (selector: (s: unknown) => unknown) => selector(harness.view),
+vi.mock("../../stores/explorerStore", () => ({
+  useExplorerStore: (selector: (s: unknown) => unknown) =>
+    selector(harness.view),
 }));
 
 import type { AnnotationByTrace } from "~/hooks/useAnnotationsByTraceIds";

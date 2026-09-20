@@ -3,7 +3,7 @@ import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
 import { useLangyTraceViewContext } from "~/features/langy/hooks/useLangyTraceViewContext";
 import { useShowLangy } from "~/features/langy/hooks/useShowLangy";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
-import { useFilterStore } from "../../stores/filterStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 import { handOffSearchToLangy } from "./searchLangyHandoff";
 
 /**
@@ -37,7 +37,7 @@ export function useAskLangyFromSearch(): {
         typedText,
         // Read at call time rather than subscribing — the handoff needs the
         // query once per click, not a re-render per keystroke.
-        appliedQueryText: useFilterStore.getState().queryText,
+        appliedQueryText: useExplorerStore.getState().queryText,
         viewContext,
         askLangy,
         openPanel,

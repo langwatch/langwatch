@@ -2,7 +2,7 @@ import { keepPreviousData } from "@tanstack/react-query";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { usePreviewTracesActive } from "../onboarding/hooks/usePreviewTracesActive";
-import { useFilterStore } from "../stores/filterStore";
+import { useExplorerStore } from "../stores/explorerStore";
 import type { DiscoverDescriptors } from "./discoverCache";
 import { useInstantEvalRuns } from "./useInstantEvalRuns";
 
@@ -28,8 +28,8 @@ export interface FilteredTraceFacetsResult {
 export function useFilteredTraceFacets(): FilteredTraceFacetsResult {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
-  const timeRange = useFilterStore((s) => s.debouncedTimeRange);
-  const queryText = useFilterStore((s) => s.debouncedQueryText);
+  const timeRange = useExplorerStore((s) => s.debouncedTimeRange);
+  const queryText = useExplorerStore((s) => s.debouncedQueryText);
   const isSamplePreview = usePreviewTracesActive();
   const { evalRuns } = useInstantEvalRuns();
 

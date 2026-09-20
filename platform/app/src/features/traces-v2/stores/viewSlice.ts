@@ -1,4 +1,4 @@
-import { create } from "zustand";
+import type { StateCreator } from "zustand";
 import type { RowKind } from "../components/TraceTable/registry";
 import {
   LENS_CAPABILITIES,
@@ -6,7 +6,7 @@ import {
   reconcileColumns,
   reconcileSort,
 } from "../lens/capabilities";
-import { getCurrentFilterText, useFilterStore } from "./filterStore";
+import type { ExplorerStore } from "./explorerStore";
 
 export type GroupingMode =
   | "flat"
@@ -100,7 +100,7 @@ export interface LensDraftInput {
   filterText: string;
 }
 
-interface ViewState {
+export interface ViewSlice {
   activeLensId: string;
   allLenses: LensConfig[];
   sort: SortConfig;
@@ -586,21 +586,6 @@ function clearDraftFor(
 }
 
 /**
- * Push a lens's saved filter into the filter store. Imperative one-way write —
- * viewStore never subscribes to filterStore.
- *
- * Corrupt saved text does not surface a parse error to the user, but that
- * fallback belongs to `setFilterFromLens`, which returns an empty AST when
- * `safeParseAndSerialize` reports a parse error. It does not throw, so there is
- * nothing here to catch: a `try`/`catch` around this call would only swallow a
- * real, unexpected failure to install the lens's filter — leaving the user on
- * the previous lens's filter with no indication anything went wrong.
- */
-function applyFilterTextFromLens(text: string): void {
-  useFilterStore.getState().setFilterFromLens(text);
-}
-
-/**
  * Drop the trace list's keyset cursors whenever the sort that minted them
  * changes.
  *
@@ -618,12 +603,14 @@ function applyFilterTextFromLens(text: string): void {
  * store. Direction flips the comparison operator, so it invalidates cursors
  * for the same reason.
  *
- * Imperative one-way write — viewStore never subscribes to filterStore.
+ * Imperative one-way write: the view slice never subscribes to the query slice.
  */
 function dropKeysetCursorsIfSortChanged({
+  get,
   previous,
   next,
 }: {
+  get: () => ExplorerStore;
   previous: SortConfig;
   next: SortConfig;
 }): void {
@@ -633,7 +620,7 @@ function dropKeysetCursorsIfSortChanged({
   ) {
     return;
   }
-  useFilterStore.getState().resetPagination();
+  get().resetPagination();
 }
 
 const initialDismissedBuiltIns = loadDismissedBuiltInIds();
@@ -655,7 +642,10 @@ const initialActiveLens = initialLenses.find(
 );
 const initialActiveDraft = initialDrafts.get(initialActiveLensId);
 
-export const useViewStore = create<ViewState>((set, get) => ({
+export const createViewSlice: StateCreator<ExplorerStore, [], [], ViewSlice> = (
+  set,
+  get,
+) => ({
   activeLensId: initialActiveLensId,
   allLenses: initialLenses,
   sort: initialActiveDraft?.sort ?? initialActiveLens?.sort ?? DEFAULT_SORT,
@@ -682,7 +672,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
       // the silent setter — `applyQueryText` would loop back through
       // `setFilterDraft` and immediately mark the lens dirty.
       const nextFilter = draft?.filter ?? lens.filterText;
-      applyFilterTextFromLens(nextFilter);
+      get().setFilterFromLens(nextFilter);
       return {
         activeLensId: id,
         sort: draft?.sort ?? lens.sort,
@@ -720,7 +710,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
   // carrying stale cursors into a new sort — add the explicit guard there
   // rather than assuming the side effect still holds.
   setSort: (sort) => {
-    dropKeysetCursorsIfSortChanged({ previous: get().sort, next: sort });
+    dropKeysetCursorsIfSortChanged({ get, previous: get().sort, next: sort });
     set((s) => ({
       sort,
       draftState: setDraft(s.draftState, s.activeLensId, { sort }),
@@ -747,7 +737,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
     // the user ever touching a header: a grouped RowKind can't order by
     // `time` (nor `spans`/`ttft`/`size`), so those all land on `count`. That
     // is a sort change like any other, and the cursors have to go with it.
-    dropKeysetCursorsIfSortChanged({ previous: s.sort, next: sort });
+    dropKeysetCursorsIfSortChanged({ get, previous: s.sort, next: sort });
     set({
       grouping: mode,
       columnOrder: columns,
@@ -850,7 +840,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
       addons: overrides?.addons ? [...overrides.addons] : [],
       grouping: overrides?.grouping ?? state.grouping,
       sort: overrides?.sort ? { ...overrides.sort } : { ...state.sort },
-      filterText: overrides?.filterText ?? getCurrentFilterText(),
+      filterText: overrides?.filterText ?? get().queryText,
     };
     const allLenses = [...state.allLenses, newLens];
     lensSyncBridge?.create(newLens);
@@ -859,7 +849,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
     // reflects the configured shape (otherwise the user sees the old grouping
     // / columns until they switch tabs).
     if (overrides) {
-      applyFilterTextFromLens(newLens.filterText);
+      get().setFilterFromLens(newLens.filterText);
       set({
         allLenses,
         activeLensId: id,
@@ -882,7 +872,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
       set({ draftState: nextDraft });
       return;
     }
-    applyFilterTextFromLens(lens.filterText);
+    get().setFilterFromLens(lens.filterText);
     set({
       draftState: nextDraft,
       sort: lens.sort,
@@ -917,7 +907,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
     };
     const allLenses = [...state.allLenses, newLens];
     lensSyncBridge?.create(newLens);
-    applyFilterTextFromLens(newLens.filterText);
+    get().setFilterFromLens(newLens.filterText);
     set({
       allLenses,
       activeLensId: id,
@@ -952,7 +942,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
     }
     const firstLens = allLenses[0];
     if (!firstLens) return;
-    applyFilterTextFromLens(firstLens.filterText);
+    get().setFilterFromLens(firstLens.filterText);
     set({
       allLenses,
       draftState: nextDraft,
@@ -986,7 +976,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
         const target = allLenses.find((l) => l.id === persisted);
         if (target) {
           const draft = s.draftState.get(persisted);
-          applyFilterTextFromLens(draft?.filter ?? target.filterText);
+          get().setFilterFromLens(draft?.filter ?? target.filterText);
           return {
             allLenses,
             activeLensId: persisted,
@@ -1006,7 +996,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
       if (activeStillPresent) return { allLenses };
       const next = allLenses[0];
       if (!next) return { allLenses };
-      applyFilterTextFromLens(next.filterText);
+      get().setFilterFromLens(next.filterText);
       return {
         allLenses,
         activeLensId: next.id,
@@ -1016,4 +1006,4 @@ export const useViewStore = create<ViewState>((set, get) => ({
       };
     });
   },
-}));
+});

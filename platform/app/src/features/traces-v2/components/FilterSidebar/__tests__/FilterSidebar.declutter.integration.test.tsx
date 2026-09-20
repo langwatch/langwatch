@@ -61,18 +61,12 @@ vi.mock("../../../stores/uiStore", () => ({
     }),
 }));
 
-vi.mock("../../../stores/filterStore", () => ({
-  useFilterStore: (selector: (s: unknown) => unknown) =>
+vi.mock("../../../stores/explorerStore", () => ({
+  useExplorerStore: (selector: (s: unknown) => unknown) =>
     selector({
       ast: { type: "group", combinator: "and", filters: [] },
       queryText: "",
       clearAll: vi.fn(),
-    }),
-}));
-
-vi.mock("../../../stores/viewStore", () => ({
-  useViewStore: (selector: (s: unknown) => unknown) =>
-    selector({
       activeLensId: "all-traces",
       isDraft: () => false,
       revertLens: vi.fn(),

@@ -39,9 +39,8 @@ import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
 import { useDrawerStore } from "../../stores/drawerStore";
-import { useFilterStore } from "../../stores/filterStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 import { useUIStore } from "../../stores/uiStore";
-import { useViewStore } from "../../stores/viewStore";
 import { ExplorerTotal } from "./ExplorerTotal";
 import { FacetManagerPopover } from "./FacetManagerPopover";
 import { FilterSidebarSkeleton } from "./FilterSidebarSkeleton";
@@ -75,16 +74,16 @@ export const FilterSidebar: React.FC = () => {
   // both compile into the same query, so `queryText` non-empty ⇒ there's
   // something to clear, and `clearAll` resets the lot. See
   // specs/traces-v2/filter-bar-interactions.feature
-  const queryText = useFilterStore((s) => s.queryText);
-  const clearAllFilters = useFilterStore((s) => s.clearAll);
+  const queryText = useExplorerStore((s) => s.queryText);
+  const clearAllFilters = useExplorerStore((s) => s.clearAll);
   const hasActiveFilters = queryText.trim().length > 0;
   // "Reset to lens" restores the active lens's saved filter/sort/columns
   // (revertLens). Distinct from Clear (which empties) — shown only when the
   // view deviates from the lens (a local draft exists). See
   // specs/traces-v2/filter-bar-interactions.feature
-  const activeLensId = useViewStore((s) => s.activeLensId);
-  const isDraft = useViewStore((s) => s.isDraft);
-  const revertLens = useViewStore((s) => s.revertLens);
+  const activeLensId = useExplorerStore((s) => s.activeLensId);
+  const isDraft = useExplorerStore((s) => s.isDraft);
+  const revertLens = useExplorerStore((s) => s.revertLens);
   // "Reset to lens" (now lives in the lens bar) is meaningless on the All lens
   // — it IS the unfiltered baseline. Kept here only to gate the `r` shortcut.
   const canResetToLens = isDraft(activeLensId) && activeLensId !== "all-traces";

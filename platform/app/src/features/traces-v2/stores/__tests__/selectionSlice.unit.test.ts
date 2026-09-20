@@ -3,36 +3,39 @@
  * See specs/traces-v2/bulk-actions.feature.
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import { useSelectionStore } from "../selectionStore";
+import { useExplorerStore } from "../explorerStore";
 
-const selection = () => Array.from(useSelectionStore.getState().traceIds);
+const selection = () =>
+  Array.from(useExplorerStore.getState().selection.traceIds);
 
 beforeEach(() => {
-  useSelectionStore.getState().clear();
+  useExplorerStore.getState().clearSelection();
 });
 
 describe("given the trace-table selection", () => {
   describe("when ids that address no trace are selected", () => {
     /** @scenario "The selection never holds a blank or placeholder id" */
     it("keeps the real ids and drops the blank ones", () => {
-      useSelectionStore
+      useExplorerStore
         .getState()
-        .setMany(["trace-a", "", "   ", "trace-b"], true);
+        .setSelectedMany(["trace-a", "", "   ", "trace-b"], true);
 
       expect(selection()).toEqual(["trace-a", "trace-b"]);
     });
 
     /** @scenario "The selection never holds a blank or placeholder id" */
     it("refuses a blank id toggled on its own", () => {
-      useSelectionStore.getState().toggle("  ");
+      useExplorerStore.getState().toggleSelected("  ");
 
       expect(selection()).toEqual([]);
     });
 
     /** @scenario "The selection never holds a blank or placeholder id" */
     it("still takes ids back out, so nothing can get stuck", () => {
-      useSelectionStore.getState().setMany(["trace-a", "trace-b"], true);
-      useSelectionStore.getState().setMany(["trace-a", "", "trace-b"], false);
+      useExplorerStore.getState().setSelectedMany(["trace-a", "trace-b"], true);
+      useExplorerStore
+        .getState()
+        .setSelectedMany(["trace-a", "", "trace-b"], false);
 
       expect(selection()).toEqual([]);
     });

@@ -2,7 +2,7 @@ import { Box, Flex } from "@chakra-ui/react";
 import { motion } from "motion/react";
 import type React from "react";
 import { useCallback, useEffect, useRef } from "react";
-import type { PageCursor } from "../../stores/filterStore";
+import type { PageCursor } from "../../stores/querySlice";
 import { useRefreshUIStore } from "../../stores/refreshUIStore";
 import { RefreshProgressBar } from "../TracesPage/RefreshProgressBar";
 import { ColumnEducationDialog } from "./ColumnEducationDialog";

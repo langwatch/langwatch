@@ -39,11 +39,11 @@ vi.mock("../useSessionGroups", () => ({
   useSessionGroups: () => mockSessions,
 }));
 
-import { useViewStore } from "../../stores/viewStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 import { useExplorerCounts } from "../useExplorerCounts";
 
 beforeEach(() => {
-  useViewStore.setState({ grouping: "flat" });
+  useExplorerStore.setState({ grouping: "flat" });
 });
 
 describe("useExplorerCounts", () => {
@@ -66,7 +66,7 @@ describe("useExplorerCounts", () => {
 
   describe("given the Conversations lens", () => {
     it("answers the sessions read's total with no page trace ids", () => {
-      useViewStore.setState({ grouping: "by-conversation" });
+      useExplorerStore.setState({ grouping: "by-conversation" });
       const { result } = renderHook(() => useExplorerCounts());
       expect(result.current).toEqual({
         totalHits: 7,

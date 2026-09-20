@@ -43,8 +43,7 @@ vi.mock("../../../hooks/useSessionGroups", () => ({
   SESSIONS_MAX_PAGE_SIZE: 100,
 }));
 
-import { useFilterStore } from "../../../stores/filterStore";
-import { useViewStore } from "../../../stores/viewStore";
+import { useExplorerStore } from "../../../stores/explorerStore";
 import { ExplorerTotal } from "../../FilterSidebar/ExplorerTotal";
 import { Pagination } from "../Pagination";
 
@@ -58,9 +57,9 @@ function renderBoth(): void {
 }
 
 beforeEach(() => {
-  useFilterStore.getState().clearAll();
-  useFilterStore.setState({ pageSize: 50 });
-  useViewStore.setState({ grouping: "flat" });
+  useExplorerStore.getState().clearAll();
+  useExplorerStore.setState({ pageSize: 50 });
+  useExplorerStore.setState({ grouping: "flat" });
 });
 afterEach(() => cleanup());
 
@@ -80,7 +79,7 @@ describe("the Explorer's counts", () => {
 
   describe("given the Conversations lens", () => {
     it("prints the sessions read's number on both, as conversations", () => {
-      useViewStore.setState({ grouping: "by-conversation" });
+      useExplorerStore.setState({ grouping: "by-conversation" });
       renderBoth();
       expect(screen.getByTestId("explorer-total")).toHaveTextContent(
         "7 conversations",

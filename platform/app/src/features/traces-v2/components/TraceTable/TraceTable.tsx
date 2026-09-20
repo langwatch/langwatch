@@ -9,12 +9,9 @@ import {
   useSessionGroups,
 } from "../../hooks/useSessionGroups";
 import { useTraceList } from "../../hooks/useTraceList";
-import { type PageCursor, useFilterStore } from "../../stores/filterStore";
-import {
-  getEffectiveLens,
-  rowKindForGrouping,
-  useViewStore,
-} from "../../stores/viewStore";
+import { useExplorerStore } from "../../stores/explorerStore";
+import type { PageCursor } from "../../stores/querySlice";
+import { getEffectiveLens, rowKindForGrouping } from "../../stores/viewSlice";
 import { ConversationLensBody } from "./ConversationLensBody";
 import { EmptyFilterState } from "./EmptyFilterState";
 import { GroupLensBody } from "./GroupLensBody";
@@ -107,8 +104,8 @@ function shellPlaceholder(shell: TableShell): React.ReactNode | null {
  * ceiling offers to search it as one phrase").
  */
 const SearchAsOnePhraseAction: React.FC = () => {
-  const queryText = useFilterStore((s) => s.queryText);
-  const applyQueryText = useFilterStore((s) => s.applyQueryText);
+  const queryText = useExplorerStore((s) => s.queryText);
+  const applyQueryText = useExplorerStore((s) => s.applyQueryText);
   const requoted = requoteBareTerms(queryText);
   if (requoted === queryText) return null;
   return (
@@ -139,7 +136,7 @@ export const TraceTable: React.FC = () => {
   // by-conversation grouping is active.
   const sessions = useSessionGroups();
   const { totalHits } = useExplorerCounts();
-  const activeLens = useViewStore(getEffectiveLens);
+  const activeLens = useExplorerStore(getEffectiveLens);
 
   if (!activeLens) return <EmptyFilterState />;
 

@@ -1,7 +1,7 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { isInstantEvalRunActive } from "~/server/app-layer/instant-evals/run/instant-eval-explorer";
+import { useExplorerStore } from "../stores/explorerStore";
 import { useInstantEvalRunStore } from "../stores/instantEvalRunStore";
-import { useViewStore } from "../stores/viewStore";
 import { useInstantEvalRuns } from "./useInstantEvalRuns";
 import { useSessionGroups } from "./useSessionGroups";
 import { useTraceListQuery } from "./useTraceListQuery";
@@ -66,7 +66,8 @@ export function explorerCountSummary({
 export function useExplorerCounts(): ExplorerCounts {
   const list = useTraceListQuery();
   const sessions = useSessionGroups();
-  const byConversation = useViewStore((s) => s.grouping) === "by-conversation";
+  const byConversation =
+    useExplorerStore((s) => s.grouping) === "by-conversation";
   const pageTraceIds = useMemo(
     () => (byConversation ? [] : list.data.map((t) => t.traceId)),
     [byConversation, list.data],
@@ -103,6 +104,18 @@ export function useExplorerCounts(): ExplorerCounts {
         isFetching: list.isFetching,
         isPlaceholderData: list.isPlaceholderData,
       };
+  // The store keeps the last answer so a reader of the page state (the
+  // Langy `explorer.getState` action) sees the count the header shows.
+  const setResults = useExplorerStore((s) => s.setResults);
+  const { totalHits, itemNoun, isLoading } = counts;
+  useEffect(() => {
+    setResults({
+      totalHits: isLoading ? null : totalHits,
+      itemNoun,
+      pageTraceIds,
+    });
+  }, [setResults, totalHits, itemNoun, isLoading, pageTraceIds]);
+
   return {
     ...counts,
     pageTraceIds,

@@ -122,16 +122,15 @@ vi.mock("@paper-design/shaders-react", () => ({
 }));
 
 import { traceViewContextChip } from "~/features/langy/hooks/useLangyTraceViewContext";
-import { useFilterStore } from "../../../stores/filterStore";
-import { useViewStore } from "../../../stores/viewStore";
+import { useExplorerStore } from "../../../stores/explorerStore";
 import { SEARCH_BAR_PLACEHOLDER } from "../PlaceholderEditor";
 import { SearchBar } from "../SearchBar";
 import { SEARCH_HANDOFF_DRAFT } from "../searchLangyHandoff";
 
 /** The view chip the handoff attaches, built the way the page builds it. */
 function expectedViewChip(): { type: "filter"; id: string; label: string } {
-  const filter = useFilterStore.getState();
-  const view = useViewStore.getState();
+  const view = useExplorerStore.getState();
+  const filter = view;
   const lens = view.allLenses.find((l) => l.id === view.activeLensId);
   const chip = traceViewContextChip({
     queryText: filter.queryText,
@@ -152,11 +151,11 @@ function expectedViewChip(): { type: "filter"; id: string; label: string } {
 
 afterEach(() => {
   cleanup();
-  useFilterStore.getState().clearAll();
+  useExplorerStore.getState().clearAll();
 });
 
 beforeEach(() => {
-  useFilterStore.getState().clearAll();
+  useExplorerStore.getState().clearAll();
   langyMock.enabled = false;
   langyMock.panelOpen = false;
   langyMock.draft = "";
@@ -210,7 +209,7 @@ describe("<SearchBar /> wiring smoke", () => {
 
   describe("when the store has an active query", () => {
     it("renders the query text inside the placeholder", () => {
-      useFilterStore.getState().applyQueryText("@status:error");
+      useExplorerStore.getState().applyQueryText("@status:error");
       renderSearchBar();
 
       const placeholder = document.querySelector(
@@ -220,7 +219,7 @@ describe("<SearchBar /> wiring smoke", () => {
     });
 
     it("shows the clear button", () => {
-      useFilterStore.getState().applyQueryText("@status:error");
+      useExplorerStore.getState().applyQueryText("@status:error");
       renderSearchBar();
 
       expect(screen.getByText(/clear/i)).toBeInTheDocument();
@@ -229,10 +228,10 @@ describe("<SearchBar /> wiring smoke", () => {
 
   describe("when the store has a parse error", () => {
     it("records the parse error in the store", () => {
-      useFilterStore.getState().applyQueryText('@status:"unclosed');
+      useExplorerStore.getState().applyQueryText('@status:"unclosed');
       renderSearchBar();
 
-      expect(useFilterStore.getState().parseError).not.toBeNull();
+      expect(useExplorerStore.getState().parseError).not.toBeNull();
     });
   });
 });
@@ -289,7 +288,7 @@ describe("<SearchBar /> ask affordance", () => {
       });
 
       it("shows that the applied search will go with the question", () => {
-        useFilterStore.getState().applyQueryText("@status:error");
+        useExplorerStore.getState().applyQueryText("@status:error");
         renderSearchBar();
 
         fireEvent.click(screen.getByRole("button", { name: "Ask Langy" }));
@@ -301,8 +300,8 @@ describe("<SearchBar /> ask affordance", () => {
     describe("when a question is typed into the floating bar and sent", () => {
       /** @scenario "Ask Langy sends the whole view with the question" */
       it("asks Langy the question with the view and the applied search attached, and the bar dissolves", () => {
-        useFilterStore.getState().applyQueryText("@status:error");
-        const applied = useFilterStore.getState().queryText;
+        useExplorerStore.getState().applyQueryText("@status:error");
+        const applied = useExplorerStore.getState().queryText;
         const viewChip = expectedViewChip();
         renderSearchBar();
         fireEvent.click(screen.getByRole("button", { name: "Ask Langy" }));
@@ -345,8 +344,8 @@ describe("<SearchBar /> ask affordance", () => {
       });
 
       it("uses the open panel — the search attaches, no second composer floats", () => {
-        useFilterStore.getState().applyQueryText("@status:error");
-        const applied = useFilterStore.getState().queryText;
+        useExplorerStore.getState().applyQueryText("@status:error");
+        const applied = useExplorerStore.getState().queryText;
         renderSearchBar();
 
         fireEvent.click(screen.getByRole("button", { name: "Ask Langy" }));

@@ -1,24 +1,24 @@
 import { useEffect, useRef } from "react";
-import { useFilterStore } from "../stores/filterStore";
-import { useSelectionStore } from "../stores/selectionStore";
-import { useViewStore } from "../stores/viewStore";
+import { useExplorerStore } from "../stores/explorerStore";
 
 /**
- * Clears the bulk-selection set whenever the meaning of a row could shift
- * underneath the user — filter expression, time range, or active lens.
+ * Clears the bulk-selection set and the open rows whenever the meaning of a
+ * row could shift underneath the user: filter expression, time range, or
+ * active lens.
  *
  * Selection deliberately persists across pagination, sort, density, and
  * column visibility because those don't change *which* traces are shown,
  * only how they're presented.
  */
 export function useResetSelectionOnViewChange(): void {
-  const queryText = useFilterStore((s) => s.debouncedQueryText);
-  const timeFrom = useFilterStore((s) => s.debouncedTimeRange.from);
-  const timeTo = useFilterStore((s) => s.debouncedTimeRange.to);
-  const timeLabel = useFilterStore((s) => s.debouncedTimeRange.label);
-  const activeLensId = useViewStore((s) => s.activeLensId);
+  const queryText = useExplorerStore((s) => s.debouncedQueryText);
+  const timeFrom = useExplorerStore((s) => s.debouncedTimeRange.from);
+  const timeTo = useExplorerStore((s) => s.debouncedTimeRange.to);
+  const timeLabel = useExplorerStore((s) => s.debouncedTimeRange.label);
+  const activeLensId = useExplorerStore((s) => s.activeLensId);
 
-  const clear = useSelectionStore((s) => s.clear);
+  const clear = useExplorerStore((s) => s.clearSelection);
+  const setExpandedRows = useExplorerStore((s) => s.setExpandedRows);
   const firstRunRef = useRef(true);
 
   // While a relative-time label is active, from/to tick every minute
@@ -32,5 +32,6 @@ export function useResetSelectionOnViewChange(): void {
       return;
     }
     clear();
-  }, [queryText, timeKey, activeLensId, clear]);
+    setExpandedRows([]);
+  }, [queryText, timeKey, activeLensId, clear, setExpandedRows]);
 }

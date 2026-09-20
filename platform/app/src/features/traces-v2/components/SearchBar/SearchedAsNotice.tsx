@@ -3,7 +3,7 @@ import { Sparkles } from "lucide-react";
 import type React from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { requoteBareTerms } from "~/server/app-layer/traces/query-language/mutations";
-import { useFilterStore } from "../../stores/filterStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 
 /**
  * The strip under the bar after a sentence became a filter: it names the
@@ -14,9 +14,9 @@ import { useFilterStore } from "../../stores/filterStore";
  */
 export const SearchedAsNotice: React.FC = () => {
   const { project } = useOrganizationTeamProject();
-  const queryText = useFilterStore((s) => s.queryText);
-  const translation = useFilterStore((s) => s.lastAiTranslation);
-  const applyQueryText = useFilterStore((s) => s.applyQueryText);
+  const queryText = useExplorerStore((s) => s.queryText);
+  const translation = useExplorerStore((s) => s.lastAiTranslation);
+  const applyQueryText = useExplorerStore((s) => s.applyQueryText);
 
   if (
     !translation ||

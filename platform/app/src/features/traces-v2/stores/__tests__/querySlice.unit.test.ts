@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { analyzeOrGroups } from "~/server/app-layer/traces/query-language/queries";
-import { useFilterStore } from "../filterStore";
+import { useExplorerStore } from "../explorerStore";
 
 const TRANSLATION = {
   projectId: "proj_test",
@@ -12,16 +12,16 @@ beforeEach(() => {
   // Each test starts from a clean store. `clearAll` resets the
   // queryText, AST, page, AND `lastAiTranslation` (the latter is one
   // of the lifecycle paths under test).
-  useFilterStore.getState().clearAll();
+  useExplorerStore.getState().clearAll();
 });
 
 describe("toggleFacet", () => {
   describe("given an existing query and a neutral state with no orGroupLocation", () => {
     describe("when called", () => {
       it("AND-appends the new clause", () => {
-        useFilterStore.getState().applyQueryText("model:gpt-4o");
-        useFilterStore.getState().toggleFacet("status", "error");
-        expect(useFilterStore.getState().queryText).toBe(
+        useExplorerStore.getState().applyQueryText("model:gpt-4o");
+        useExplorerStore.getState().toggleFacet("status", "error");
+        expect(useExplorerStore.getState().queryText).toBe(
           "model:gpt-4o AND status:error",
         );
       });
@@ -36,11 +36,11 @@ describe("toggleFacet", () => {
         // toggle wraps both sides to preserve intent. (Cross-field OR is
         // built by typing in the filter bar — no sidebar click produces
         // this combinator any more — but the store mechanism stays.)
-        useFilterStore.getState().applyQueryText("model:gpt-4o");
-        useFilterStore
+        useExplorerStore.getState().applyQueryText("model:gpt-4o");
+        useExplorerStore
           .getState()
           .toggleFacet("status", "error", { combinator: "OR" });
-        expect(useFilterStore.getState().queryText).toBe(
+        expect(useExplorerStore.getState().queryText).toBe(
           "(model:gpt-4o) OR (status:error)",
         );
       });
@@ -50,14 +50,14 @@ describe("toggleFacet", () => {
   describe("given a query with an existing OR group and a neutral state", () => {
     describe("when called with orGroupLocation pointing at the group", () => {
       it("splices the new value into the existing group instead of appending", () => {
-        useFilterStore
+        useExplorerStore
           .getState()
           .applyQueryText("status:error OR model:gpt-4o");
-        const query = useFilterStore.getState().queryText;
-        useFilterStore.getState().toggleFacet("origin", "application", {
+        const query = useExplorerStore.getState().queryText;
+        useExplorerStore.getState().toggleFacet("origin", "application", {
           orGroupLocation: { start: 0, end: query.length },
         });
-        expect(useFilterStore.getState().queryText).toBe(
+        expect(useExplorerStore.getState().queryText).toBe(
           "status:error OR model:gpt-4o OR origin:application",
         );
       });
@@ -70,13 +70,13 @@ describe("toggleFacet", () => {
         // `status:error` is already an include — toggling cycles to
         // exclude via the standard toggleFacetInQuery path, NOT the
         // splice path. The orGroupLocation hint is ignored.
-        useFilterStore
+        useExplorerStore
           .getState()
           .applyQueryText("status:error OR model:gpt-4o");
-        useFilterStore.getState().toggleFacet("status", "error", {
+        useExplorerStore.getState().toggleFacet("status", "error", {
           orGroupLocation: { start: 0, end: 28 },
         });
-        expect(useFilterStore.getState().queryText).toContain(
+        expect(useExplorerStore.getState().queryText).toContain(
           "NOT status:error",
         );
       });
@@ -89,9 +89,9 @@ describe("toggleFacet", () => {
       it("OR-combines the two values into a parenthesised group", () => {
         // The bug fix: same-field multi-select must OR, not AND — a
         // trace's origin can't be both `sample` and `application`.
-        useFilterStore.getState().applyQueryText("origin:sample");
-        useFilterStore.getState().toggleFacet("origin", "application");
-        expect(useFilterStore.getState().queryText).toBe(
+        useExplorerStore.getState().applyQueryText("origin:sample");
+        useExplorerStore.getState().toggleFacet("origin", "application");
+        expect(useExplorerStore.getState().queryText).toBe(
           "(origin:sample OR origin:application)",
         );
       });
@@ -103,11 +103,11 @@ describe("toggleFacet", () => {
         // Precedence guard: `model:x AND origin:a OR origin:b` would bind
         // as `(model:x AND origin:a) OR origin:b` — the parens keep the
         // OR scoped to the origin field.
-        useFilterStore
+        useExplorerStore
           .getState()
           .applyQueryText("model:gpt-4o AND origin:sample");
-        useFilterStore.getState().toggleFacet("origin", "application");
-        expect(useFilterStore.getState().queryText).toBe(
+        useExplorerStore.getState().toggleFacet("origin", "application");
+        expect(useExplorerStore.getState().queryText).toBe(
           "model:gpt-4o AND (origin:sample OR origin:application)",
         );
       });
@@ -116,9 +116,9 @@ describe("toggleFacet", () => {
     describe("when a value in a DIFFERENT field is added", () => {
       /** @scenario "A value in a different facet AND-combines" */
       it("AND-combines — a different field narrows rather than ORs", () => {
-        useFilterStore.getState().applyQueryText("origin:sample");
-        useFilterStore.getState().toggleFacet("status", "error");
-        expect(useFilterStore.getState().queryText).toBe(
+        useExplorerStore.getState().applyQueryText("origin:sample");
+        useExplorerStore.getState().toggleFacet("status", "error");
+        expect(useExplorerStore.getState().queryText).toBe(
           "origin:sample AND status:error",
         );
       });
@@ -131,15 +131,15 @@ describe("toggleFacet", () => {
         // Mirror production: the location comes from `analyzeOrGroups`,
         // which reports the INNER OR expression's span (inside the
         // parens), so the splice lands before the closing `)`.
-        useFilterStore
+        useExplorerStore
           .getState()
           .applyQueryText("(origin:sample OR origin:application)");
-        const { ast } = useFilterStore.getState();
+        const { ast } = useExplorerStore.getState();
         const group = analyzeOrGroups(ast).groups[0]!;
-        useFilterStore.getState().toggleFacet("origin", "api", {
+        useExplorerStore.getState().toggleFacet("origin", "api", {
           orGroupLocation: { start: group.start, end: group.end },
         });
-        expect(useFilterStore.getState().queryText).toBe(
+        expect(useExplorerStore.getState().queryText).toBe(
           "(origin:sample OR origin:application OR origin:api)",
         );
       });
@@ -148,11 +148,11 @@ describe("toggleFacet", () => {
     describe("when a value is removed (2 → 1)", () => {
       /** @scenario "Unchecking down to one value collapses the OR group to a bare clause" */
       it("collapses the group back to a bare tag", () => {
-        useFilterStore
+        useExplorerStore
           .getState()
           .applyQueryText("(origin:sample OR origin:application)");
-        useFilterStore.getState().removeFacet("origin", "application");
-        expect(useFilterStore.getState().queryText).toBe("origin:sample");
+        useExplorerStore.getState().removeFacet("origin", "application");
+        expect(useExplorerStore.getState().queryText).toBe("origin:sample");
       });
     });
   });
@@ -162,8 +162,8 @@ describe("excludeFacet", () => {
   describe("given a neutral value", () => {
     describe("when excluded", () => {
       it("adds a NOT clause", () => {
-        useFilterStore.getState().excludeFacet("status", "error");
-        expect(useFilterStore.getState().queryText).toBe("NOT status:error");
+        useExplorerStore.getState().excludeFacet("status", "error");
+        expect(useExplorerStore.getState().queryText).toBe("NOT status:error");
       });
     });
   });
@@ -171,9 +171,9 @@ describe("excludeFacet", () => {
   describe("given an already-included value", () => {
     describe("when excluded", () => {
       it("flips the include to a NOT clause", () => {
-        useFilterStore.getState().applyQueryText("status:error");
-        useFilterStore.getState().excludeFacet("status", "error");
-        expect(useFilterStore.getState().queryText).toBe("NOT status:error");
+        useExplorerStore.getState().applyQueryText("status:error");
+        useExplorerStore.getState().excludeFacet("status", "error");
+        expect(useExplorerStore.getState().queryText).toBe("NOT status:error");
       });
     });
   });
@@ -181,9 +181,9 @@ describe("excludeFacet", () => {
   describe("given an already-excluded value", () => {
     describe("when excluded again", () => {
       it("toggles back to neutral", () => {
-        useFilterStore.getState().applyQueryText("NOT status:error");
-        useFilterStore.getState().excludeFacet("status", "error");
-        expect(useFilterStore.getState().queryText).toBe("");
+        useExplorerStore.getState().applyQueryText("NOT status:error");
+        useExplorerStore.getState().excludeFacet("status", "error");
+        expect(useExplorerStore.getState().queryText).toBe("");
       });
     });
   });
@@ -191,9 +191,9 @@ describe("excludeFacet", () => {
   describe("given another field is already filtered", () => {
     describe("when a value is excluded", () => {
       it("AND-combines the NOT clause", () => {
-        useFilterStore.getState().applyQueryText("model:gpt-4o");
-        useFilterStore.getState().excludeFacet("status", "error");
-        expect(useFilterStore.getState().queryText).toBe(
+        useExplorerStore.getState().applyQueryText("model:gpt-4o");
+        useExplorerStore.getState().excludeFacet("status", "error");
+        expect(useExplorerStore.getState().queryText).toBe(
           "model:gpt-4o AND NOT status:error",
         );
       });
@@ -204,8 +204,10 @@ describe("excludeFacet", () => {
 describe("recordAiTranslation", () => {
   describe("when called", () => {
     it("stores the translation verbatim", () => {
-      useFilterStore.getState().recordAiTranslation(TRANSLATION);
-      expect(useFilterStore.getState().lastAiTranslation).toEqual(TRANSLATION);
+      useExplorerStore.getState().recordAiTranslation(TRANSLATION);
+      expect(useExplorerStore.getState().lastAiTranslation).toEqual(
+        TRANSLATION,
+      );
     });
   });
 });
@@ -213,75 +215,75 @@ describe("recordAiTranslation", () => {
 describe("lastAiTranslation lifecycle", () => {
   describe("given a recorded translation", () => {
     beforeEach(() => {
-      useFilterStore.getState().recordAiTranslation(TRANSLATION);
+      useExplorerStore.getState().recordAiTranslation(TRANSLATION);
     });
 
     describe("when toggleFacet runs", () => {
       it("clears the translation", () => {
-        useFilterStore.getState().toggleFacet("status", "error");
-        expect(useFilterStore.getState().lastAiTranslation).toBeNull();
+        useExplorerStore.getState().toggleFacet("status", "error");
+        expect(useExplorerStore.getState().lastAiTranslation).toBeNull();
       });
     });
 
     describe("when swapOperator runs", () => {
       it("clears the translation", () => {
-        useFilterStore
+        useExplorerStore
           .getState()
           .applyQueryText("status:error AND model:gpt-4o");
-        useFilterStore.getState().recordAiTranslation(TRANSLATION); // re-set after applyQueryText cleared it
+        useExplorerStore.getState().recordAiTranslation(TRANSLATION); // re-set after applyQueryText cleared it
         // AND lives at offsets 13..16 in the trimmed string.
-        useFilterStore.getState().swapOperator(13, 16);
-        expect(useFilterStore.getState().lastAiTranslation).toBeNull();
+        useExplorerStore.getState().swapOperator(13, 16);
+        expect(useExplorerStore.getState().lastAiTranslation).toBeNull();
       });
     });
 
     describe("when setFacetValueAt runs", () => {
       it("clears the translation", () => {
-        useFilterStore.getState().applyQueryText("status:error");
-        useFilterStore.getState().recordAiTranslation(TRANSLATION);
+        useExplorerStore.getState().applyQueryText("status:error");
+        useExplorerStore.getState().recordAiTranslation(TRANSLATION);
         // Tag.location for `status:error` is 0..12.
-        useFilterStore.getState().setFacetValueAt(0, 12, "warning");
-        expect(useFilterStore.getState().lastAiTranslation).toBeNull();
+        useExplorerStore.getState().setFacetValueAt(0, 12, "warning");
+        expect(useExplorerStore.getState().lastAiTranslation).toBeNull();
       });
     });
 
     describe("when removeFacet runs", () => {
       it("clears the translation", () => {
-        useFilterStore.getState().applyQueryText("status:error");
-        useFilterStore.getState().recordAiTranslation(TRANSLATION);
-        useFilterStore.getState().removeFacet("status", "error");
-        expect(useFilterStore.getState().lastAiTranslation).toBeNull();
+        useExplorerStore.getState().applyQueryText("status:error");
+        useExplorerStore.getState().recordAiTranslation(TRANSLATION);
+        useExplorerStore.getState().removeFacet("status", "error");
+        expect(useExplorerStore.getState().lastAiTranslation).toBeNull();
       });
     });
 
     describe("when clearAll runs", () => {
       it("clears the translation", () => {
-        useFilterStore.getState().clearAll();
-        expect(useFilterStore.getState().lastAiTranslation).toBeNull();
+        useExplorerStore.getState().clearAll();
+        expect(useExplorerStore.getState().lastAiTranslation).toBeNull();
       });
     });
 
     describe("when applyQueryText runs with a non-AI mutation", () => {
       it("clears the translation", () => {
-        useFilterStore.getState().applyQueryText("model:gpt-4o");
-        expect(useFilterStore.getState().lastAiTranslation).toBeNull();
+        useExplorerStore.getState().applyQueryText("model:gpt-4o");
+        expect(useExplorerStore.getState().lastAiTranslation).toBeNull();
       });
     });
 
     describe("when setFilterFromLens runs", () => {
       it("clears the translation", () => {
-        useFilterStore.getState().setFilterFromLens("status:error");
-        expect(useFilterStore.getState().lastAiTranslation).toBeNull();
+        useExplorerStore.getState().setFilterFromLens("status:error");
+        expect(useExplorerStore.getState().lastAiTranslation).toBeNull();
       });
     });
 
     describe("when setQuery runs", () => {
       it("clears the translation", () => {
-        useFilterStore.getState().applyQueryText("status:error");
-        useFilterStore.getState().recordAiTranslation(TRANSLATION); // re-set after applyQueryText cleared it
-        const { ast } = useFilterStore.getState();
-        useFilterStore.getState().setQuery("status:error", ast);
-        expect(useFilterStore.getState().lastAiTranslation).toBeNull();
+        useExplorerStore.getState().applyQueryText("status:error");
+        useExplorerStore.getState().recordAiTranslation(TRANSLATION); // re-set after applyQueryText cleared it
+        const { ast } = useExplorerStore.getState();
+        useExplorerStore.getState().setQuery("status:error", ast);
+        expect(useExplorerStore.getState().lastAiTranslation).toBeNull();
       });
     });
   });
@@ -293,10 +295,10 @@ describe("lastAiTranslation lifecycle", () => {
         // there was no prior parse error. This is what lets the AI
         // flow `recordAiTranslation` immediately after `applyQueryText`
         // and still have the translation stick on subsequent re-renders.
-        useFilterStore.getState().applyQueryText("status:error");
-        useFilterStore.getState().recordAiTranslation(TRANSLATION);
-        useFilterStore.getState().applyQueryText("status:error");
-        expect(useFilterStore.getState().lastAiTranslation).toEqual(
+        useExplorerStore.getState().applyQueryText("status:error");
+        useExplorerStore.getState().recordAiTranslation(TRANSLATION);
+        useExplorerStore.getState().applyQueryText("status:error");
+        expect(useExplorerStore.getState().lastAiTranslation).toEqual(
           TRANSLATION,
         );
       });

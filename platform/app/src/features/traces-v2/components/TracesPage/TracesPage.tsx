@@ -29,11 +29,8 @@ import { usePreviewTracesActive } from "../../onboarding/hooks/usePreviewTracesA
 import { SpotlightOverlay } from "../../onboarding/spotlights/SpotlightOverlay";
 import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
 import { useDrawerStore } from "../../stores/drawerStore";
-import { useFilterStore } from "../../stores/filterStore";
-import {
-  SELECT_ALL_MATCHING_CAP,
-  useSelectionStore,
-} from "../../stores/selectionStore";
+import { useExplorerStore } from "../../stores/explorerStore";
+import { SELECT_ALL_MATCHING_CAP } from "../../stores/selectionSlice";
 import { useUIStore } from "../../stores/uiStore";
 import { DensityProvider } from "../DensityProvider";
 import { ExportConfigDialog } from "../ExportConfigDialog";
@@ -165,7 +162,7 @@ export const TracesPage: React.FC = () => {
   // filter.
   const prevProjectIdRef = useRef<string | null>(null);
   const closeDrawerOnSwitch = useDrawerStore((s) => s.closeDrawer);
-  const clearFilters = useFilterStore((s) => s.clearAll);
+  const clearFilters = useExplorerStore((s) => s.clearAll);
   useEffect(() => {
     const projectId = project?.id ?? null;
     const prev = prevProjectIdRef.current;
@@ -421,9 +418,9 @@ const ResultsPane: React.FC = React.memo(() => {
       ) as Record<string, string | undefined>,
     [data],
   );
-  const selectionMode = useSelectionStore((s) => s.mode);
-  const explicitCount = useSelectionStore((s) => s.traceIds.size);
-  const clearSelection = useSelectionStore((s) => s.clear);
+  const selectionMode = useExplorerStore((s) => s.selection.mode);
+  const explicitCount = useExplorerStore((s) => s.selection.traceIds.size);
+  const clearSelection = useExplorerStore((s) => s.clearSelection);
   const {
     isDialogOpen,
     openExportDialog,

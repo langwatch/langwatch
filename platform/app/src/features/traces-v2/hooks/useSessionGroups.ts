@@ -9,8 +9,7 @@ import {
   sortConversationGroups,
 } from "../components/TraceTable/conversationGroups";
 import { useSamplePreview } from "../onboarding";
-import { useFilterStore } from "../stores/filterStore";
-import { useViewStore } from "../stores/viewStore";
+import { useExplorerStore } from "../stores/explorerStore";
 import { mapSessionGroupsPayload } from "../utils/mapSessionGroupsPayload";
 import { useInstantEvalRuns } from "./useInstantEvalRuns";
 
@@ -98,7 +97,7 @@ const SERVER_SORTABLE = new Set([
  * here in a way it never was for live data.
  */
 function useSamplePreviewGroups(): ConversationGroup[] | null {
-  const sort = useViewStore((s) => s.sort);
+  const sort = useExplorerStore((s) => s.sort);
   const samplePreview = useSamplePreview();
 
   return useMemo<ConversationGroup[] | null>(() => {
@@ -123,14 +122,14 @@ function useSamplePreviewGroups(): ConversationGroup[] | null {
  */
 export function useSessionGroups(): SessionGroupsResult {
   const { project } = useOrganizationTeamProject();
-  const grouping = useViewStore((s) => s.grouping);
-  const sort = useViewStore((s) => s.sort);
-  const timeRange = useFilterStore((s) => s.debouncedTimeRange);
-  const queryText = useFilterStore((s) => s.debouncedQueryText);
-  const page = useFilterStore((s) => s.page);
-  const pageSize = useFilterStore((s) => s.pageSize);
-  const pageCursor = useFilterStore((s) => s.pageCursors[s.page]);
-  const setPage = useFilterStore((s) => s.setPage);
+  const grouping = useExplorerStore((s) => s.grouping);
+  const sort = useExplorerStore((s) => s.sort);
+  const timeRange = useExplorerStore((s) => s.debouncedTimeRange);
+  const queryText = useExplorerStore((s) => s.debouncedQueryText);
+  const page = useExplorerStore((s) => s.page);
+  const pageSize = useExplorerStore((s) => s.pageSize);
+  const pageCursor = useExplorerStore((s) => s.pageCursors[s.page]);
+  const setPage = useExplorerStore((s) => s.setPage);
   const sampleGroups = useSamplePreviewGroups();
 
   const isActive = grouping === "by-conversation";

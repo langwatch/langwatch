@@ -6,8 +6,7 @@ import {
 } from "~/server/app-layer/traces/query-language/mutations";
 import type { RouteSearchResult } from "~/server/app-layer/traces/search-router/route-search";
 import { api } from "~/utils/api";
-import { useFilterStore } from "../../stores/filterStore";
-import { useViewStore } from "../../stores/viewStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 import type { InstantEvalRoutePayload } from "../TracesPage/useInstantEvalRoute";
 
 interface UseSubmitSearchOptions {
@@ -38,8 +37,8 @@ function useApplyRoute({
   UseSubmitSearchOptions,
   "onLangy" | "onInstantEval" | "onModelUnavailable"
 >): (submit: RoutedSubmit) => void {
-  const applyQueryText = useFilterStore((s) => s.applyQueryText);
-  const recordAiTranslation = useFilterStore((s) => s.recordAiTranslation);
+  const applyQueryText = useExplorerStore((s) => s.applyQueryText);
+  const recordAiTranslation = useExplorerStore((s) => s.recordAiTranslation);
   return useCallback(
     ({ result, text, projectId, timeRange }: RoutedSubmit) => {
       switch (result.kind) {
@@ -102,7 +101,7 @@ export function useSubmitSearch({
   isRouting: boolean;
 } {
   const { project } = useOrganizationTeamProject();
-  const applyQueryText = useFilterStore((s) => s.applyQueryText);
+  const applyQueryText = useExplorerStore((s) => s.applyQueryText);
   const routeSearch = api.tracesV2.routeSearch.useMutation();
   // A second Enter before the first answer arrives supersedes it: only the
   // latest submit may touch the store.
@@ -132,7 +131,7 @@ export function useSubmitSearch({
       }
       // Read at submit time: the range the user sees is the one the search
       // runs in, not the debounced copy a pending timer may still hold.
-      const { timeRange, queryText } = useFilterStore.getState();
+      const { timeRange, queryText } = useExplorerStore.getState();
       const range = { from: timeRange.from, to: timeRange.to };
       const projectId = project.id;
       routeSearch.mutate(
@@ -141,7 +140,7 @@ export function useSubmitSearch({
           text: trimmed,
           timeRange: range,
           activeQuery: queryText,
-          lensId: useViewStore.getState().activeLensId,
+          lensId: useExplorerStore.getState().activeLensId,
           langyAvailable,
         },
         {

@@ -28,8 +28,8 @@ import { SEARCH_FIELDS } from "~/server/app-layer/traces/query-language/metadata
 import { useInstantEvalRuns } from "../../hooks/useInstantEvalRuns";
 import { useTraceFacets } from "../../hooks/useTraceFacets";
 import { usePreviewTracesActive } from "../../onboarding/hooks/usePreviewTracesActive";
+import { useExplorerStore } from "../../stores/explorerStore";
 import { useFacetHoverStore } from "../../stores/facetHoverStore";
-import { useFilterStore } from "../../stores/filterStore";
 import { useInstantEvalRunStore } from "../../stores/instantEvalRunStore";
 import { AskAiButton } from "../ai/AskAiButton";
 import {
@@ -123,14 +123,14 @@ function rankAndSlice({
 }
 
 export const SearchBar: React.FC = () => {
-  const queryText = useFilterStore((s) => s.queryText);
-  const parseError = useFilterStore((s) => s.parseError);
-  const aiError = useFilterStore((s) => s.aiError);
-  const setAiError = useFilterStore((s) => s.setAiError);
-  const dismissParseError = useFilterStore((s) => s.dismissParseError);
-  const applyQueryText = useFilterStore((s) => s.applyQueryText);
-  const clearAll = useFilterStore((s) => s.clearAll);
-  const lastAiTranslation = useFilterStore((s) => s.lastAiTranslation);
+  const queryText = useExplorerStore((s) => s.queryText);
+  const parseError = useExplorerStore((s) => s.parseError);
+  const aiError = useExplorerStore((s) => s.aiError);
+  const setAiError = useExplorerStore((s) => s.setAiError);
+  const dismissParseError = useExplorerStore((s) => s.dismissParseError);
+  const applyQueryText = useExplorerStore((s) => s.applyQueryText);
+  const clearAll = useExplorerStore((s) => s.clearAll);
+  const lastAiTranslation = useExplorerStore((s) => s.lastAiTranslation);
 
   // Cross-facet OR is built and edited entirely in the filter bar (the
   // QueryBreakdownChips render the full AND/OR/paren grouping), so it

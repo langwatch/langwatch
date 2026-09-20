@@ -2,9 +2,8 @@ import type React from "react";
 import { Pagination as PaginationBar } from "~/components/ui/Pagination";
 import { TRACE_LIST_MAX_OFFSET_ROWS } from "~/shared/traces/listWindow";
 import { useExplorerCounts } from "../../hooks/useExplorerCounts";
-import type { PageCursor } from "../../stores/filterStore";
-import { useFilterStore } from "../../stores/filterStore";
-import { useViewStore } from "../../stores/viewStore";
+import { useExplorerStore } from "../../stores/explorerStore";
+import type { PageCursor } from "../../stores/querySlice";
 import { useTraceTableScrollElement } from "./scrollContext";
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 250, 500, 1000] as const;
@@ -74,13 +73,13 @@ export const Pagination: React.FC<PaginationProps> = ({
   maxPageSize,
 }) => {
   const { totalHits, itemNoun, instantEval, summary } = useExplorerCounts();
-  const page = useFilterStore((s) => s.page);
-  const pageSize = useFilterStore((s) => s.pageSize);
-  const pageCursors = useFilterStore((s) => s.pageCursors);
-  const setPage = useFilterStore((s) => s.setPage);
-  const setPageCursor = useFilterStore((s) => s.setPageCursor);
-  const setPageSize = useFilterStore((s) => s.setPageSize);
-  const cursorOnly = useViewStore((s) => s.grouping) === "by-conversation";
+  const page = useExplorerStore((s) => s.page);
+  const pageSize = useExplorerStore((s) => s.pageSize);
+  const pageCursors = useExplorerStore((s) => s.pageCursors);
+  const setPage = useExplorerStore((s) => s.setPage);
+  const setPageCursor = useExplorerStore((s) => s.setPageCursor);
+  const setPageSize = useExplorerStore((s) => s.setPageSize);
+  const cursorOnly = useExplorerStore((s) => s.grouping) === "by-conversation";
   const scrollElement = useTraceTableScrollElement();
 
   // The size the data source actually pages by, which is what the range

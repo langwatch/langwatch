@@ -4,9 +4,9 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { InstantEvalRunReference } from "~/server/app-layer/traces/query-language/instantEvalChips";
 import { api } from "~/utils/api";
 import { useSamplePreview } from "../onboarding";
-import type { TraceListCursor } from "../stores/filterStore";
-import { useFilterStore } from "../stores/filterStore";
-import { DEFAULT_SORT, useViewStore } from "../stores/viewStore";
+import { useExplorerStore } from "../stores/explorerStore";
+import type { TraceListCursor } from "../stores/querySlice";
+import { DEFAULT_SORT } from "../stores/viewSlice";
 import type { TraceListItem } from "../types/trace";
 import { mapTraceListPayload } from "../utils/mapTraceListPayload";
 import { useInstantEvalRuns } from "./useInstantEvalRuns";
@@ -80,13 +80,13 @@ function traceListQueryInput({
 
 export function useTraceListQuery(): TraceListQueryResult {
   const { project } = useOrganizationTeamProject();
-  const timeRange = useFilterStore((s) => s.debouncedTimeRange);
-  const page = useFilterStore((s) => s.page);
-  const pageSize = useFilterStore((s) => s.pageSize);
-  const pageCursor = useFilterStore((s) => s.pageCursors[s.page]);
-  const queryText = useFilterStore((s) => s.debouncedQueryText);
-  const sort = useViewStore((s) => s.sort);
-  const grouping = useViewStore((s) => s.grouping);
+  const timeRange = useExplorerStore((s) => s.debouncedTimeRange);
+  const page = useExplorerStore((s) => s.page);
+  const pageSize = useExplorerStore((s) => s.pageSize);
+  const pageCursor = useExplorerStore((s) => s.pageCursors[s.page]);
+  const queryText = useExplorerStore((s) => s.debouncedQueryText);
+  const sort = useExplorerStore((s) => s.sort);
+  const grouping = useExplorerStore((s) => s.grouping);
   const samplePreview = useSamplePreview();
   const { evalRuns } = useInstantEvalRuns();
 

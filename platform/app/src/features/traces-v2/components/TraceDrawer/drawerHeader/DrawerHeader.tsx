@@ -44,7 +44,7 @@ import { useTraceDrawerNavigation } from "../../../hooks/useTraceDrawerNavigatio
 import { useTraceRefresh } from "../../../hooks/useTraceRefresh";
 import { useTraceResources } from "../../../hooks/useTraceResources";
 import { useDrawerStore } from "../../../stores/drawerStore";
-import { useFilterStore } from "../../../stores/filterStore";
+import { useExplorerStore } from "../../../stores/explorerStore";
 import { useFocusSectionStore } from "../../../stores/focusSectionStore";
 import { rankedErrorSpans } from "../../../utils/errorSpans";
 import {
@@ -618,12 +618,12 @@ export const DrawerHeader = memo(function DrawerHeader({
     trace.traceId,
   );
   const { pins, removePin } = usePinnedAttributes(project?.id);
-  const toggleFacet = useFilterStore((s) => s.toggleFacet);
+  const toggleFacet = useExplorerStore((s) => s.toggleFacet);
   // `applyQueryTextFromPin` is used by the auto-pinned metadata filter
   // affordance below. Pulled at the parent scope so the `useMemo` for
   // `categorizedPins` doesn't need to re-subscribe to the store on every
   // pin shape change.
-  const applyQueryTextFromPin = useFilterStore((s) => s.applyQueryText);
+  const applyQueryTextFromPin = useExplorerStore((s) => s.applyQueryText);
   const { closeDrawer, openDrawer } = useDrawer();
   // Resolve auto + user pins into a single array with category buckets so the
   // strip can group them with subtle dividers between identity / run / tag /
@@ -844,7 +844,7 @@ export const DrawerHeader = memo(function DrawerHeader({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const applyQueryText = useFilterStore((s) => s.applyQueryText);
+  const applyQueryText = useExplorerStore((s) => s.applyQueryText);
   // Build a query string from the highest-signal axes available on this trace.
   // Service + status are usually present; root span name is a strong cluster
   // signal. We quote bare strings to keep liqe happy with spaces/dashes.

@@ -12,10 +12,9 @@
  */
 import { useCallback, useEffect, useRef } from "react";
 import { useLocation } from "react-router";
-import type { TimeRange } from "../stores/filterStore";
-import { useFilterStore } from "../stores/filterStore";
-import type { LensConfig } from "../stores/viewStore";
-import { getPersistedActiveLensId, useViewStore } from "../stores/viewStore";
+import { useExplorerStore } from "../stores/explorerStore";
+import type { TimeRange } from "../stores/querySlice";
+import { getPersistedActiveLensId, type LensConfig } from "../stores/viewSlice";
 import { getPresetById } from "../utils/timeRangePresets";
 import type { BarStateOverrides, FragmentState } from "../utils/urlState";
 import {
@@ -239,18 +238,18 @@ export function useURLSync(): void {
   // had its say on" if the two are ever reordered.
   const hasAppliedFragment = useRef(false);
 
-  const queryText = useFilterStore((s) => s.queryText);
-  const timeRange = useFilterStore((s) => s.timeRange);
-  const evalRuns = useFilterStore((s) => s.evalRuns);
-  const applyQueryText = useFilterStore((s) => s.applyQueryText);
-  const setTimeRange = useFilterStore((s) => s.setTimeRange);
-  const setEvalRuns = useFilterStore((s) => s.setEvalRuns);
-  const resetPagination = useFilterStore((s) => s.resetPagination);
+  const queryText = useExplorerStore((s) => s.queryText);
+  const timeRange = useExplorerStore((s) => s.timeRange);
+  const evalRuns = useExplorerStore((s) => s.evalRuns);
+  const applyQueryText = useExplorerStore((s) => s.applyQueryText);
+  const setTimeRange = useExplorerStore((s) => s.setTimeRange);
+  const setEvalRuns = useExplorerStore((s) => s.setEvalRuns);
+  const resetPagination = useExplorerStore((s) => s.resetPagination);
 
-  const activeLensId = useViewStore((s) => s.activeLensId);
-  const allLenses = useViewStore((s) => s.allLenses);
-  const draftState = useViewStore((s) => s.draftState);
-  const selectLens = useViewStore((s) => s.selectLens);
+  const activeLensId = useExplorerStore((s) => s.activeLensId);
+  const allLenses = useExplorerStore((s) => s.allLenses);
+  const draftState = useExplorerStore((s) => s.draftState);
+  const selectLens = useExplorerStore((s) => s.selectLens);
 
   // Live bar state behind a ref so `applyFromFragment` — and therefore the
   // `popstate` listener it feeds — keeps one identity instead of being torn

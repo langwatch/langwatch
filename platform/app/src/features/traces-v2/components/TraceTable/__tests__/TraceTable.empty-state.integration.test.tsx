@@ -76,12 +76,16 @@ vi.mock("../../../hooks/useExplorerCounts", () => ({
 // gating through the same table shell.
 let mockGrouping: "flat" | "by-conversation" = "flat";
 
-vi.mock("../../../stores/viewStore", () => ({
-  useViewStore: (selector: (s: unknown) => unknown) =>
+vi.mock("../../../stores/explorerStore", () => ({
+  useExplorerStore: (selector: (s: unknown) => unknown) =>
     selector({
       activeLensId: "all-traces",
       sort: { columnId: "timestamp", direction: "desc" },
+      ...mockFilterState,
     }),
+}));
+
+vi.mock("../../../stores/viewSlice", () => ({
   getEffectiveLens: (s: { activeLensId: string }) => ({
     id: s.activeLensId,
     label: "All traces",
@@ -150,11 +154,6 @@ const mockFilterState = {
   setTimeRange: vi.fn(),
   applyQueryText: vi.fn(),
 };
-
-vi.mock("../../../stores/filterStore", () => ({
-  useFilterStore: (selector: (s: unknown) => unknown) =>
-    selector(mockFilterState),
-}));
 
 vi.mock("../QueryBreakdownChips", () => ({
   QueryBreakdownChips: () => null,

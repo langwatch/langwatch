@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useFilterStore } from "../../stores/filterStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 
 // The store's query only changes on discrete actions: Enter in the search
 // bar, a facet click, a chip removed, a range slider released. None of them
@@ -17,9 +17,9 @@ const TIME_RANGE_DEBOUNCE_MS = 300;
  * together via `commitDebounced`.
  */
 export const useDebouncedFilterCommit = (): void => {
-  const queryText = useFilterStore((s) => s.queryText);
-  const timeRange = useFilterStore((s) => s.timeRange);
-  const commitDebounced = useFilterStore((s) => s.commitDebounced);
+  const queryText = useExplorerStore((s) => s.queryText);
+  const timeRange = useExplorerStore((s) => s.timeRange);
+  const commitDebounced = useExplorerStore((s) => s.commitDebounced);
 
   useEffect(() => {
     const timer = setTimeout(commitDebounced, QUERY_DEBOUNCE_MS);

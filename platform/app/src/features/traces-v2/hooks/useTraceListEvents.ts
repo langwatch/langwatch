@@ -3,8 +3,7 @@ import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TraceEventRollup } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import { api } from "~/utils/api";
-import { useFilterStore } from "../stores/filterStore";
-import { useViewStore } from "../stores/viewStore";
+import { useExplorerStore } from "../stores/explorerStore";
 import type { TraceListItem } from "../types/trace";
 import { NO_TRACE_EVENTS } from "../types/trace";
 
@@ -31,8 +30,8 @@ export function useTraceListEvents({
   isSamplePreview?: boolean;
 }): TraceListItem[] {
   const { project } = useOrganizationTeamProject();
-  const timeRange = useFilterStore((s) => s.debouncedTimeRange);
-  const needsEvents = useViewStore(rowsNeedEvents);
+  const timeRange = useExplorerStore((s) => s.debouncedTimeRange);
+  const needsEvents = useExplorerStore(rowsNeedEvents);
 
   // Sorted so two renders of the same page share a query key regardless of
   // the sort column, and joined because the key is compared structurally.

@@ -9,8 +9,7 @@ import {
 } from "~/server/app-layer/traces/query-language/instantEvalChips";
 import { combineQueries } from "~/server/app-layer/traces/query-language/mutations";
 import { api } from "~/utils/api";
-import { useFilterStore } from "../../stores/filterStore";
-import { useViewStore } from "../../stores/viewStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 import type { InstantEvalConfirmation } from "./InstantEvalConfirmDialog";
 import type { InstantEvalRefusal } from "./InstantEvalRefusalPopover";
 
@@ -140,7 +139,7 @@ function useInstantEvalOutcome(): {
   searchWordsInstead: () => void;
   refuse: (args: { error: unknown; payload: InstantEvalRoutePayload }) => void;
 } {
-  const applyQueryText = useFilterStore((s) => s.applyQueryText);
+  const applyQueryText = useExplorerStore((s) => s.applyQueryText);
   const [confirmation, setConfirmation] =
     useState<InstantEvalConfirmation | null>(null);
   const [refusal, setRefusal] = useState<InstantEvalRefusal | null>(null);
@@ -232,14 +231,14 @@ function useInstantEvalStarter({
   applyChip: (args: PendingRoute & { runId: string }) => void;
   startRun: (args: PendingRoute & { seq: number }) => void;
 } {
-  const applyQueryText = useFilterStore((s) => s.applyQueryText);
-  const registerEvalRun = useFilterStore((s) => s.registerEvalRun);
+  const applyQueryText = useExplorerStore((s) => s.applyQueryText);
+  const registerEvalRun = useExplorerStore((s) => s.registerEvalRun);
   const start = api.tracesV2.instantEval.start.useMutation();
   const { pendingRef, setConfirmation, refuse } = outcome;
 
   const applyChip = useCallback(
     ({ payload, key, runId }: PendingRoute & { runId: string }) => {
-      const lensId = useViewStore.getState().activeLensId;
+      const lensId = useExplorerStore.getState().activeLensId;
       registerEvalRun({ key, runId });
       applyQueryText(
         combineQueries({
@@ -309,7 +308,7 @@ export function useInstantEvalRoute(): InstantEvalRouteState {
   const onInstantEvalRoute = useCallback(
     (payload: InstantEvalRoutePayload) => {
       const seq = ++seqRef.current;
-      const { timeRange, evalRuns } = useFilterStore.getState();
+      const { timeRange, evalRuns } = useExplorerStore.getState();
       const key = routeRunKey({ payload, presetId: timeRange.presetId });
       pendingRef.current = { payload, key };
       setRefusal(null);

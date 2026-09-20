@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ACTIVE_LENS_KEY } from "../viewStore";
+import { ACTIVE_LENS_KEY } from "../viewSlice";
 
 /**
  * The viewStore computes its initial active lens at module-load time from
@@ -10,7 +10,7 @@ import { ACTIVE_LENS_KEY } from "../viewStore";
  */
 async function freshStore() {
   vi.resetModules();
-  return await import("../viewStore");
+  return await import("../explorerStore");
 }
 
 describe("viewStore last-used lens persistence", () => {
@@ -23,44 +23,44 @@ describe("viewStore last-used lens persistence", () => {
 
   describe("given no stored preference", () => {
     it("defaults to the All lens", async () => {
-      const { useViewStore } = await freshStore();
-      expect(useViewStore.getState().activeLensId).toBe("all-traces");
+      const { useExplorerStore } = await freshStore();
+      expect(useExplorerStore.getState().activeLensId).toBe("all-traces");
     });
   });
 
   describe("given a stored built-in lens id", () => {
     it("restores that lens on load (cross-project, since ids are shared)", async () => {
       localStorage.setItem(ACTIVE_LENS_KEY, "conversations");
-      const { useViewStore } = await freshStore();
-      expect(useViewStore.getState().activeLensId).toBe("conversations");
+      const { useExplorerStore } = await freshStore();
+      expect(useExplorerStore.getState().activeLensId).toBe("conversations");
     });
   });
 
   describe("given a stored id that no longer matches any lens", () => {
     it("falls back to All", async () => {
       localStorage.setItem(ACTIVE_LENS_KEY, "custom-from-another-project");
-      const { useViewStore } = await freshStore();
-      expect(useViewStore.getState().activeLensId).toBe("all-traces");
+      const { useExplorerStore } = await freshStore();
+      expect(useExplorerStore.getState().activeLensId).toBe("all-traces");
     });
   });
 
   describe("when the user selects a lens", () => {
     it("persists the choice to localStorage", async () => {
-      const { useViewStore } = await freshStore();
-      useViewStore.getState().selectLens("simplified");
+      const { useExplorerStore } = await freshStore();
+      useExplorerStore.getState().selectLens("simplified");
       expect(localStorage.getItem(ACTIVE_LENS_KEY)).toBe("simplified");
-      expect(useViewStore.getState().activeLensId).toBe("simplified");
+      expect(useExplorerStore.getState().activeLensId).toBe("simplified");
     });
   });
 
   describe("given a stored custom lens id", () => {
     it("restores it once the project's saved lenses hydrate", async () => {
       localStorage.setItem(ACTIVE_LENS_KEY, "custom-abc");
-      const { useViewStore } = await freshStore();
+      const { useExplorerStore } = await freshStore();
       // Built-in only at init → falls back to All until hydration.
-      expect(useViewStore.getState().activeLensId).toBe("all-traces");
+      expect(useExplorerStore.getState().activeLensId).toBe("all-traces");
 
-      useViewStore.getState().setUserLenses([
+      useExplorerStore.getState().setUserLenses([
         {
           id: "custom-abc",
           name: "My lens",
@@ -73,16 +73,16 @@ describe("viewStore last-used lens persistence", () => {
         },
       ]);
 
-      expect(useViewStore.getState().activeLensId).toBe("custom-abc");
+      expect(useExplorerStore.getState().activeLensId).toBe("custom-abc");
     });
 
     it("does not override a lens the user picked before hydration", async () => {
       localStorage.setItem(ACTIVE_LENS_KEY, "custom-abc");
-      const { useViewStore } = await freshStore();
+      const { useExplorerStore } = await freshStore();
       // User makes an explicit choice while custom lenses are still loading.
-      useViewStore.getState().selectLens("conversations");
+      useExplorerStore.getState().selectLens("conversations");
 
-      useViewStore.getState().setUserLenses([
+      useExplorerStore.getState().setUserLenses([
         {
           id: "custom-abc",
           name: "My lens",
@@ -95,7 +95,7 @@ describe("viewStore last-used lens persistence", () => {
         },
       ]);
 
-      expect(useViewStore.getState().activeLensId).toBe("conversations");
+      expect(useExplorerStore.getState().activeLensId).toBe("conversations");
     });
   });
 });

@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { useFilterStore } from "../filterStore";
-import { useViewStore } from "../viewStore";
+import { useExplorerStore } from "../explorerStore";
 
 /**
  * Sort lives in viewStore, the keyset cursors live in filterStore, and the
@@ -21,10 +20,10 @@ const CURSOR_PAGE_3 = { sortValue: 17, traceId: "trace-c" };
 
 const FIRST_PAGE = { page: 1, pageCursors: { 1: null } };
 
-const view = () => useViewStore.getState();
+const view = () => useExplorerStore.getState();
 
 const pagination = () => {
-  const { page, pageCursors } = useFilterStore.getState();
+  const { page, pageCursors } = useExplorerStore.getState();
   return { page, pageCursors };
 };
 
@@ -33,14 +32,14 @@ function seedThirdPageSortedBy(sort: {
   columnId: string;
   direction: "asc" | "desc";
 }): void {
-  useViewStore.setState({
+  useExplorerStore.setState({
     activeLensId: "all-traces",
     grouping: "flat",
     sort,
     columnOrder: ["time", "trace", "service", "duration", "cost", "tokens"],
     draftState: new Map(),
   });
-  useFilterStore.setState({
+  useExplorerStore.setState({
     page: 3,
     pageCursors: { 1: null, 2: CURSOR_PAGE_2, 3: CURSOR_PAGE_3 },
   });
@@ -52,14 +51,14 @@ function seedSecondPageSortedBy(sort: {
   direction: "asc" | "desc";
 }): void {
   seedThirdPageSortedBy(sort);
-  useFilterStore.setState({
+  useExplorerStore.setState({
     page: 2,
     pageCursors: { 1: null, 2: CURSOR_PAGE_2 },
   });
 }
 
 beforeEach(() => {
-  useFilterStore.getState().clearAll();
+  useExplorerStore.getState().clearAll();
 });
 
 describe("viewStore sort and grouping vs. the keyset cursors", () => {
@@ -171,8 +170,8 @@ describe("viewStore sort and grouping vs. the keyset cursors", () => {
     describe("when the user switches from Sessions back to the flat list", () => {
       beforeEach(() => {
         seedSecondPageSortedBy({ columnId: "lastTurn", direction: "desc" });
-        useViewStore.setState({ grouping: "by-conversation" });
-        useFilterStore.setState({
+        useExplorerStore.setState({ grouping: "by-conversation" });
+        useExplorerStore.setState({
           page: 2,
           pageCursors: { 1: null, 2: "opaque-sessions-cursor" },
         });

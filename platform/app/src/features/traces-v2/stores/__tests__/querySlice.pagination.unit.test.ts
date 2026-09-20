@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { INITIAL_TIME_RANGE, useFilterStore } from "../filterStore";
+import { useExplorerStore } from "../explorerStore";
+import { INITIAL_TIME_RANGE } from "../querySlice";
 
 /**
  * The trace list is keyset-paged: `pageCursors[n].sortValue` is the sort value
@@ -30,22 +31,22 @@ const CURSOR_PAGE_3 = { sortValue: 1_700_000_001_000, traceId: "trace-c" };
 
 /** Put the store where a user lands after clicking Next twice. */
 function seedThirdPage(): void {
-  useFilterStore.setState({
+  useExplorerStore.setState({
     page: 3,
     pageCursors: { 1: null, 2: CURSOR_PAGE_2, 3: CURSOR_PAGE_3 },
   });
 }
 
 const pagination = () => {
-  const { page, pageCursors } = useFilterStore.getState();
+  const { page, pageCursors } = useExplorerStore.getState();
   return { page, pageCursors };
 };
 
 const FIRST_PAGE = { page: 1, pageCursors: { 1: null } };
 
 beforeEach(() => {
-  useFilterStore.getState().clearAll();
-  useFilterStore.setState({
+  useExplorerStore.getState().clearAll();
+  useExplorerStore.setState({
     pageSize: 50,
     timeRange: INITIAL_TIME_RANGE,
     debouncedTimeRange: INITIAL_TIME_RANGE,
@@ -58,28 +59,28 @@ describe("filterStore keyset cursors", () => {
 
     describe("when the query text changes", () => {
       it("drops every cursor and returns to the first batch", () => {
-        useFilterStore.getState().applyQueryText("status:error");
+        useExplorerStore.getState().applyQueryText("status:error");
         expect(pagination()).toEqual(FIRST_PAGE);
       });
     });
 
     describe("when a facet is toggled from the sidebar", () => {
       it("drops every cursor and returns to the first batch", () => {
-        useFilterStore.getState().toggleFacet("status", "error");
+        useExplorerStore.getState().toggleFacet("status", "error");
         expect(pagination()).toEqual(FIRST_PAGE);
       });
     });
 
     describe("when a lens's saved filter is applied", () => {
       it("drops every cursor and returns to the first batch", () => {
-        useFilterStore.getState().setFilterFromLens("model:gpt-5-mini");
+        useExplorerStore.getState().setFilterFromLens("model:gpt-5-mini");
         expect(pagination()).toEqual(FIRST_PAGE);
       });
     });
 
     describe("when the time range is changed", () => {
       it("drops every cursor and returns to the first batch", () => {
-        useFilterStore.getState().setTimeRange({
+        useExplorerStore.getState().setTimeRange({
           from: 1_700_000_000_000,
           to: 1_700_003_600_000,
           label: "Last 1 hour",
@@ -91,21 +92,21 @@ describe("filterStore keyset cursors", () => {
 
     describe("when the page size is changed", () => {
       it("drops every cursor — the batch boundaries have moved", () => {
-        useFilterStore.getState().setPageSize(100);
+        useExplorerStore.getState().setPageSize(100);
         expect(pagination()).toEqual(FIRST_PAGE);
       });
     });
 
     describe("when the whole filter is cleared", () => {
       it("drops every cursor and returns to the first batch", () => {
-        useFilterStore.getState().clearAll();
+        useExplorerStore.getState().clearAll();
         expect(pagination()).toEqual(FIRST_PAGE);
       });
     });
 
     describe("when a rolling preset rolls its window forward", () => {
       it("keeps the cursors — the range is the same window, just re-anchored", () => {
-        useFilterStore.getState().rollTimeRange({
+        useExplorerStore.getState().rollTimeRange({
           from: 1_700_000_060_000,
           to: 1_700_003_660_000,
           label: "Last 1 hour",
@@ -120,7 +121,7 @@ describe("filterStore keyset cursors", () => {
 
     describe("when the user steps back one page", () => {
       it("keeps the cursors so the previous batch is reachable without a refetch walk", () => {
-        useFilterStore.getState().setPage(2);
+        useExplorerStore.getState().setPage(2);
         expect(pagination()).toEqual({
           page: 2,
           pageCursors: { 1: null, 2: CURSOR_PAGE_2, 3: CURSOR_PAGE_3 },

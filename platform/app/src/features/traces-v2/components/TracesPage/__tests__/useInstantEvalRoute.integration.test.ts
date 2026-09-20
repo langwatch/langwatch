@@ -44,8 +44,7 @@ vi.mock("~/components/ui/toaster", () => ({
 }));
 
 import { instantEvalRunKey } from "~/server/app-layer/traces/query-language/instantEvalChips";
-import { useFilterStore } from "../../../stores/filterStore";
-import { useViewStore } from "../../../stores/viewStore";
+import { useExplorerStore } from "../../../stores/explorerStore";
 import {
   type InstantEvalRoutePayload,
   useInstantEvalRoute,
@@ -100,11 +99,11 @@ beforeEach(() => {
   mutations.estimate.mutate.mockClear();
   mutations.start.mutate.mockClear();
   mutations.toast.mockClear();
-  useFilterStore.getState().clearAll();
-  useFilterStore.setState({
+  useExplorerStore.getState().clearAll();
+  useExplorerStore.setState({
     timeRange: { from: 1_000, to: 2_000, label: "Last 7 days", presetId: "7d" },
   });
-  useViewStore.setState({ activeLensId: "all-traces" });
+  useExplorerStore.setState({ activeLensId: "all-traces" });
 });
 
 const expectedKey = () =>
@@ -139,10 +138,10 @@ describe("given the router handed over a question", () => {
 
       const start = lastCall(mutations.start);
       act(() => start.options.onSuccess?.({ id: "run-1", status: "queued" }));
-      expect(useFilterStore.getState().queryText).toBe(
+      expect(useExplorerStore.getState().queryText).toBe(
         'service:api AND eval:"the user is annoyed"',
       );
-      expect(useFilterStore.getState().evalRuns).toEqual({
+      expect(useExplorerStore.getState().evalRuns).toEqual({
         [expectedKey()]: "run-1",
       });
     });
@@ -186,7 +185,7 @@ describe("given the router handed over a question", () => {
       );
       act(() => result.current.searchWordsInstead());
       expect(result.current.confirmation).toBeNull();
-      expect(useFilterStore.getState().queryText).toBe(
+      expect(useExplorerStore.getState().queryText).toBe(
         'service:api AND "annoyed users"',
       );
     });
@@ -195,7 +194,7 @@ describe("given the router handed over a question", () => {
   describe("when the lens judges conversations and the target is traces", () => {
     /** @scenario "A target that differs from the lens default is written on the chip" */
     it("writes the forcing spelling on the chip", () => {
-      useViewStore.setState({ activeLensId: "conversations" });
+      useExplorerStore.setState({ activeLensId: "conversations" });
       const { result } = renderHook(() => useInstantEvalRoute());
       act(() => result.current.onInstantEvalRoute(payload));
       act(() =>
@@ -207,7 +206,7 @@ describe("given the router handed over a question", () => {
           status: "queued",
         }),
       );
-      expect(useFilterStore.getState().queryText).toBe(
+      expect(useExplorerStore.getState().queryText).toBe(
         'service:api AND eval.trace:"the user is annoyed"',
       );
     });
@@ -216,13 +215,13 @@ describe("given the router handed over a question", () => {
   describe("when a run is already registered for the scope", () => {
     /** @scenario "A run already registered for the scope is reused" */
     it("applies the chip with no estimate", () => {
-      useFilterStore
+      useExplorerStore
         .getState()
         .registerEvalRun({ key: expectedKey(), runId: "run-9" });
       const { result } = renderHook(() => useInstantEvalRoute());
       act(() => result.current.onInstantEvalRoute(payload));
       expect(mutations.estimate.mutate).not.toHaveBeenCalled();
-      expect(useFilterStore.getState().queryText).toBe(
+      expect(useExplorerStore.getState().queryText).toBe(
         'service:api AND eval:"the user is annoyed"',
       );
     });
@@ -249,10 +248,10 @@ describe("given the organization has spent its free budget", () => {
         spentUsd: 1.04,
         budgetUsd: 1,
       });
-      expect(useFilterStore.getState().queryText).toBe("");
+      expect(useExplorerStore.getState().queryText).toBe("");
       act(() => result.current.dismissRefusal());
       expect(result.current.refusal).toBeNull();
-      expect(useFilterStore.getState().queryText).toBe(
+      expect(useExplorerStore.getState().queryText).toBe(
         'service:api AND "annoyed users"',
       );
     });
@@ -277,10 +276,10 @@ describe("given the deployment has no classifier", () => {
           question: "the user is annoyed",
         });
         act(() => result.current.dismissRefusal());
-        expect(useFilterStore.getState().queryText).toBe(
+        expect(useExplorerStore.getState().queryText).toBe(
           'service:api AND "annoyed users"',
         );
-        useFilterStore.getState().clearAll();
+        useExplorerStore.getState().clearAll();
       }
     });
   });
@@ -309,7 +308,7 @@ describe("given the estimate fails for a reason the registry names", () => {
           type: "warning",
         }),
       );
-      expect(useFilterStore.getState().queryText).toBe(
+      expect(useExplorerStore.getState().queryText).toBe(
         'service:api AND "annoyed users"',
       );
     });

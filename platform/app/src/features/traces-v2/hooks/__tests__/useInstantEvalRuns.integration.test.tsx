@@ -59,9 +59,8 @@ vi.mock("../../onboarding/hooks/usePreviewTracesActive", () => ({
 
 import { instantEvalRunKey } from "~/server/app-layer/traces/query-language/instantEvalChips";
 import { instantEvalChipMark } from "../../components/SearchBar/SearchBar";
-import { useFilterStore } from "../../stores/filterStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 import { useInstantEvalRunStore } from "../../stores/instantEvalRunStore";
-import { useViewStore } from "../../stores/viewStore";
 import { useExplorerCounts } from "../useExplorerCounts";
 import { useFilteredTraceFacets } from "../useFilteredTraceFacets";
 import { useInstantEvalRunWatch } from "../useInstantEvalRunWatch";
@@ -94,13 +93,13 @@ beforeEach(() => {
     settled({ sessions: [], totalHits: 0 }),
   );
   harness.getResults = [];
-  useFilterStore.getState().clearAll();
-  useFilterStore.setState({
+  useExplorerStore.getState().clearAll();
+  useExplorerStore.setState({
     debouncedQueryText: 'service:api AND eval:"the user is annoyed"',
     debouncedTimeRange: { from: 1_000, to: 2_000 },
     evalRuns: { [key]: "run-1" },
   });
-  useViewStore.setState({ activeLensId: "all-traces", grouping: "flat" });
+  useExplorerStore.setState({ activeLensId: "all-traces", grouping: "flat" });
   useInstantEvalRunStore.setState({ runs: {}, stoppedByUser: {} });
 });
 
@@ -130,7 +129,7 @@ describe("given a chip with a registered run", () => {
   describe("when the chip has no run under its key", () => {
     /** @scenario "A chip with no registered run is pending" */
     it("sends no evalRuns and marks the chip pending", () => {
-      useFilterStore.setState({ evalRuns: {} });
+      useExplorerStore.setState({ evalRuns: {} });
       renderHook(() => useTraceListQuery());
       expect(harness.list.mock.calls.at(-1)?.[0]).not.toHaveProperty(
         "evalRuns",

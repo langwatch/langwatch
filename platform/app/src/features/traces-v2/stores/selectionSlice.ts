@@ -1,7 +1,8 @@
-import { create } from "zustand";
+import type { StateCreator } from "zustand";
+import type { ExplorerStore } from "./explorerStore";
 
 /**
- * Selection state for bulk actions on the trace table.
+ * The selection slice of the Explorer store: what the bulk actions act on.
  *
  * Two modes:
  * - "explicit": `traceIds` is the authoritative set the user picked
@@ -11,17 +12,25 @@ import { create } from "zustand";
  */
 export type SelectionMode = "explicit" | "all-matching";
 
-interface SelectionState {
+export interface Selection {
   mode: SelectionMode;
   traceIds: Set<string>;
+}
 
-  toggle: (traceId: string) => void;
-  setMany: (traceIds: string[], checked: boolean) => void;
-  enableAllMatching: () => void;
-  clear: () => void;
+export const EMPTY_SELECTION: Selection = {
+  mode: "explicit",
+  traceIds: new Set<string>(),
+};
 
-  has: (traceId: string) => boolean;
-  size: () => number;
+export interface SelectionSlice {
+  selection: Selection;
+
+  toggleSelected: (traceId: string) => void;
+  setSelectedMany: (traceIds: string[], checked: boolean) => void;
+  selectAllMatching: () => void;
+  clearSelection: () => void;
+  /** Replace the selection whole, which is what a transform does. */
+  setSelection: (selection: Selection) => void;
 }
 
 /**
@@ -33,48 +42,54 @@ interface SelectionState {
  */
 const addressesATrace = (traceId: string): boolean => traceId.trim().length > 0;
 
-export const useSelectionStore = create<SelectionState>((set, get) => ({
-  mode: "explicit",
-  traceIds: new Set<string>(),
+export const createSelectionSlice: StateCreator<
+  ExplorerStore,
+  [],
+  [],
+  SelectionSlice
+> = (set) => ({
+  selection: EMPTY_SELECTION,
 
-  toggle: (traceId) =>
+  toggleSelected: (traceId) =>
     set((state) => {
       if (!addressesATrace(traceId)) return state;
-      const next = new Set(state.traceIds);
-      if (state.mode === "all-matching") {
+      const { selection } = state;
+      const next = new Set(selection.traceIds);
+      if (selection.mode === "all-matching") {
         // Toggling a row drops out of all-matching mode and starts an
         // explicit set seeded with whatever the user is doing now.
         next.add(traceId);
-        return { mode: "explicit", traceIds: next };
+        return { selection: { mode: "explicit", traceIds: next } };
       }
       if (next.has(traceId)) next.delete(traceId);
       else next.add(traceId);
-      return { traceIds: next };
+      return { selection: { mode: selection.mode, traceIds: next } };
     }),
 
-  setMany: (traceIds, checked) =>
+  setSelectedMany: (traceIds, checked) =>
     set((state) => {
+      const { selection } = state;
       const next =
-        state.mode === "all-matching"
+        selection.mode === "all-matching"
           ? new Set<string>()
-          : new Set(state.traceIds);
+          : new Set(selection.traceIds);
       // Only an id that addresses a trace may enter; anything at all may leave,
       // so a selection can always be emptied.
       for (const id of checked ? traceIds.filter(addressesATrace) : traceIds) {
         if (checked) next.add(id);
         else next.delete(id);
       }
-      return { mode: "explicit", traceIds: next };
+      return { selection: { mode: "explicit", traceIds: next } };
     }),
 
-  enableAllMatching: () =>
-    set({ mode: "all-matching", traceIds: new Set<string>() }),
+  selectAllMatching: () =>
+    set({ selection: { mode: "all-matching", traceIds: new Set<string>() } }),
 
-  clear: () => set({ mode: "explicit", traceIds: new Set<string>() }),
+  clearSelection: () =>
+    set({ selection: { mode: "explicit", traceIds: new Set<string>() } }),
 
-  has: (traceId) => get().traceIds.has(traceId),
-  size: () => get().traceIds.size,
-}));
+  setSelection: (selection) => set({ selection }),
+});
 
 /**
  * The export endpoint enforces this same cap. We surface it client-side so the

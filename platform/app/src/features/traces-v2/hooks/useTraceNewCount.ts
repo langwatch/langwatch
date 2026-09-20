@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePageVisibility } from "~/hooks/usePageVisibility";
 import { api } from "~/utils/api";
-import { useFilterStore } from "../stores/filterStore";
+import { useExplorerStore } from "../stores/explorerStore";
 import { useRefreshUIStore } from "../stores/refreshUIStore";
 import { useSseStatusStore } from "../stores/sseStatusStore";
 import { useInstantEvalRuns } from "./useInstantEvalRuns";
@@ -35,8 +35,8 @@ function nextBackoffInterval(
 
 export function useTraceNewCount(): TraceNewCountResult {
   const { project } = useOrganizationTeamProject();
-  const timeRange = useFilterStore((s) => s.debouncedTimeRange);
-  const queryText = useFilterStore((s) => s.debouncedQueryText);
+  const timeRange = useExplorerStore((s) => s.debouncedTimeRange);
+  const queryText = useExplorerStore((s) => s.debouncedQueryText);
   const [since, setSince] = useState(() => Date.now());
   const { refresh } = useTraceListRefresh();
 

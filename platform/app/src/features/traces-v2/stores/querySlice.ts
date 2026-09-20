@@ -1,5 +1,5 @@
 import type { LiqeQuery } from "liqe";
-import { create } from "zustand";
+import type { StateCreator } from "zustand";
 import type { AiActionError } from "~/server/app-layer/traces/ai-query";
 import {
   removeEvaluatorScoreRangeInQuery,
@@ -7,15 +7,12 @@ import {
   toggleEvaluatorSubFilterInQuery,
 } from "~/server/app-layer/traces/query-language/evaluatorGroup";
 import {
-  addSameFieldOrValue,
-  addToOrGroupAtLocation,
   removeFacetValueFromQuery,
   removeFieldFromQuery,
   removeImplicitTermFromQuery,
   setFacetValueAtLocation,
   setRangeInQuery,
   swapOperatorAtLocation,
-  toggleFacetInQuery,
 } from "~/server/app-layer/traces/query-language/mutations";
 import {
   isEmptyAST,
@@ -23,10 +20,12 @@ import {
   parse,
   serialize,
 } from "~/server/app-layer/traces/query-language/parse";
+import { validateAst } from "~/server/app-layer/traces/query-language/queries";
 import {
-  getFacetValueState,
-  validateAst,
-} from "~/server/app-layer/traces/query-language/queries";
+  excludedFacetQuery,
+  toggledFacetQuery,
+} from "../actions/transforms/query";
+import type { ExplorerStore } from "./explorerStore";
 
 export interface TimeRange {
   from: number;
@@ -49,7 +48,7 @@ export interface TraceListCursor {
  */
 export type PageCursor = TraceListCursor | string;
 
-interface FilterState {
+export interface QuerySlice {
   /** The parsed query AST (liqe) — single source of truth */
   ast: LiqeQuery;
   /** Serialized query string — always in sync with ast */
@@ -268,7 +267,7 @@ function safeParseAndSerialize(text: string): ParseResult {
   }
 }
 
-function applyMutation(state: FilterState, mutate: (text: string) => string) {
+function applyMutation(state: QuerySlice, mutate: (text: string) => string) {
   const next = safeParseAndSerialize(mutate(state.queryText));
   return {
     ...next,
@@ -279,11 +278,17 @@ function applyMutation(state: FilterState, mutate: (text: string) => string) {
 }
 
 /**
- * Pure store. The lens dirty-tracking is handled by `useLensFilterDirtySync`
- * (mounted in TracesPage), which subscribes to `queryText` and updates the
- * active lens's draft. filterStore never reaches into viewStore.
+ * The query, window and pagination slice of the Explorer store. The lens
+ * dirty-tracking is handled by `useLensFilterDirtySync` (mounted in
+ * TracesPage), which subscribes to `queryText` and updates the active lens's
+ * draft; this slice never reaches into the view slice.
  */
-export const useFilterStore = create<FilterState>((set, get) => ({
+export const createQuerySlice: StateCreator<
+  ExplorerStore,
+  [],
+  [],
+  QuerySlice
+> = (set, get) => ({
   ast: EMPTY_AST,
   queryText: "",
   parseError: null,
@@ -376,74 +381,18 @@ export const useFilterStore = create<FilterState>((set, get) => ({
     }),
 
   toggleFacet: (field, value, options) =>
-    set((s) => {
-      const state = getFacetValueState(s.ast, field, value);
-      // OR-group splice path: when the field is already part of an OR
-      // group (2+ values) AND we're adding a new value, splice it into
-      // the same group via `addToOrGroupAtLocation` instead of
-      // AND-combining at the top. Removal still goes through
-      // removeFacetValueFromQuery which walks the whole AST.
-      if (state === "neutral" && options?.orGroupLocation) {
-        return applyMutation(s, (q) =>
-          addToOrGroupAtLocation({
-            currentQuery: q,
-            groupStart: options.orGroupLocation!.start,
-            groupEnd: options.orGroupLocation!.end,
-            fieldName: field,
-            value,
-          }),
-        );
-      }
-      // Same-field OR creation path: a plain click adding the SECOND
-      // value of a field has no group to splice into yet (a group needs
-      // 2+ members to exist). Folding it together with the existing bare
-      // value via OR — `origin:sample` → `(origin:sample OR
-      // origin:application)` — is the correct faceted-search default,
-      // since a field can't equal two values at once. Skipped when the
-      // caller forced `combinator: "OR"` (a cross-field Shift/Ctrl-click,
-      // which deliberately opens a new top-level OR scope instead).
-      if (state === "neutral" && options?.combinator !== "OR") {
-        return applyMutation(s, (q) =>
-          addSameFieldOrValue({ currentQuery: q, fieldName: field, value }),
-        );
-      }
-      return applyMutation(s, (q) =>
-        toggleFacetInQuery({
-          currentQuery: q,
-          fieldName: field,
-          value,
-          currentState: state,
-          combinator: options?.combinator ?? "AND",
-        }),
-      );
-    }),
+    set((s) =>
+      applyMutation(s, (queryText) =>
+        toggledFacetQuery({ queryText, field, value, ...options }),
+      ),
+    ),
 
   excludeFacet: (field, value) =>
-    set((s) => {
-      const state = getFacetValueState(s.ast, field, value);
-      // Already excluded → second press on the `−` toggles it back off.
-      if (state === "exclude") {
-        return applyMutation(s, (q) =>
-          removeFacetValueFromQuery({
-            currentQuery: q,
-            fieldName: field,
-            value,
-          }),
-        );
-      }
-      // Force exclude from neutral OR include. `toggleFacetInQuery`'s
-      // `currentState: "include"` branch first strips any existing clause
-      // for this value, then appends `NOT field:value` — exactly the
-      // "make it excluded" result we want regardless of where it started.
-      return applyMutation(s, (q) =>
-        toggleFacetInQuery({
-          currentQuery: q,
-          fieldName: field,
-          value,
-          currentState: "include",
-        }),
-      );
-    }),
+    set((s) =>
+      applyMutation(s, (queryText) =>
+        excludedFacetQuery({ queryText, field, value }),
+      ),
+    ),
 
   toggleEvaluatorSubFilter: ({ evaluatorId, field, value }) =>
     set((s) =>
@@ -557,14 +506,4 @@ export const useFilterStore = create<FilterState>((set, get) => ({
       debouncedTimeRange: s.timeRange,
     });
   },
-}));
-
-// Allow other modules to read the canonical filter text without importing
-// the React hook (used by `useLensStore` actions like create/save).
-export function getCurrentFilterText(): string {
-  try {
-    return useFilterStore.getState().queryText;
-  } catch {
-    return "";
-  }
-}
+});

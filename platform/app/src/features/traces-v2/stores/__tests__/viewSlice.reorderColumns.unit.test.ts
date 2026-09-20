@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { useViewStore } from "../viewStore";
+import { useExplorerStore } from "../explorerStore";
 
 /**
  * `reorderColumns(from, to)` is the move primitive that powers both the
@@ -11,13 +11,13 @@ import { useViewStore } from "../viewStore";
  */
 
 const seedOrder = (columnOrder: string[]) => {
-  useViewStore.setState({ columnOrder });
+  useExplorerStore.setState({ columnOrder });
 };
 
-const order = () => useViewStore.getState().columnOrder;
+const order = () => useExplorerStore.getState().columnOrder;
 
 beforeEach(() => {
-  useViewStore.setState({ draftState: new Map() });
+  useExplorerStore.setState({ draftState: new Map() });
 });
 
 describe("viewStore.reorderColumns", () => {
@@ -26,77 +26,77 @@ describe("viewStore.reorderColumns", () => {
 
     describe("when moving the middle column up by one", () => {
       it("swaps it with its predecessor", () => {
-        useViewStore.getState().reorderColumns(2, 1);
+        useExplorerStore.getState().reorderColumns(2, 1);
         expect(order()).toEqual(["a", "c", "b", "d"]);
       });
     });
 
     describe("when moving the middle column down by one", () => {
       it("swaps it with its successor", () => {
-        useViewStore.getState().reorderColumns(1, 2);
+        useExplorerStore.getState().reorderColumns(1, 2);
         expect(order()).toEqual(["a", "c", "b", "d"]);
       });
     });
 
     describe("when moving the first column up", () => {
       it("clamps and leaves the order untouched (from === to)", () => {
-        useViewStore.getState().reorderColumns(0, 0);
+        useExplorerStore.getState().reorderColumns(0, 0);
         expect(order()).toEqual(["a", "b", "c", "d"]);
       });
     });
 
     describe("when moving the last column down", () => {
       it("clamps and leaves the order untouched (from === to)", () => {
-        useViewStore.getState().reorderColumns(3, 3);
+        useExplorerStore.getState().reorderColumns(3, 3);
         expect(order()).toEqual(["a", "b", "c", "d"]);
       });
     });
 
     describe("when moving the first column to the last position", () => {
       it("splices it out and reinserts at the end", () => {
-        useViewStore.getState().reorderColumns(0, 3);
+        useExplorerStore.getState().reorderColumns(0, 3);
         expect(order()).toEqual(["b", "c", "d", "a"]);
       });
     });
 
     describe("when moving the last column to the first position", () => {
       it("splices it out and reinserts at the head", () => {
-        useViewStore.getState().reorderColumns(3, 0);
+        useExplorerStore.getState().reorderColumns(3, 0);
         expect(order()).toEqual(["d", "a", "b", "c"]);
       });
     });
 
     describe("when called with a negative fromIndex (e.g. indexOf returned -1)", () => {
       it("is a no-op — does not delete the head", () => {
-        useViewStore.getState().reorderColumns(-1, 1);
+        useExplorerStore.getState().reorderColumns(-1, 1);
         expect(order()).toEqual(["a", "b", "c", "d"]);
       });
     });
 
     describe("when called with a negative toIndex", () => {
       it("is a no-op", () => {
-        useViewStore.getState().reorderColumns(1, -1);
+        useExplorerStore.getState().reorderColumns(1, -1);
         expect(order()).toEqual(["a", "b", "c", "d"]);
       });
     });
 
     describe("when called with an out-of-range fromIndex", () => {
       it("is a no-op", () => {
-        useViewStore.getState().reorderColumns(99, 1);
+        useExplorerStore.getState().reorderColumns(99, 1);
         expect(order()).toEqual(["a", "b", "c", "d"]);
       });
     });
 
     describe("when called with an out-of-range toIndex", () => {
       it("is a no-op", () => {
-        useViewStore.getState().reorderColumns(1, 99);
+        useExplorerStore.getState().reorderColumns(1, 99);
         expect(order()).toEqual(["a", "b", "c", "d"]);
       });
     });
 
     describe("when called with the same from and to indices", () => {
       it("is a no-op", () => {
-        useViewStore.getState().reorderColumns(2, 2);
+        useExplorerStore.getState().reorderColumns(2, 2);
         expect(order()).toEqual(["a", "b", "c", "d"]);
       });
     });
@@ -107,9 +107,9 @@ describe("viewStore.reorderColumns", () => {
 
     describe("when attempting any move", () => {
       it("is a no-op for any combination", () => {
-        useViewStore.getState().reorderColumns(0, 0);
-        useViewStore.getState().reorderColumns(0, 1);
-        useViewStore.getState().reorderColumns(1, 0);
+        useExplorerStore.getState().reorderColumns(0, 0);
+        useExplorerStore.getState().reorderColumns(0, 1);
+        useExplorerStore.getState().reorderColumns(1, 0);
         expect(order()).toEqual(["only"]);
       });
     });
@@ -119,8 +119,8 @@ describe("viewStore.reorderColumns", () => {
     beforeEach(() => seedOrder(["a", "b", "c"]));
 
     it("writes the new order into the active lens's draft state", () => {
-      useViewStore.getState().reorderColumns(0, 2);
-      const { activeLensId, draftState } = useViewStore.getState();
+      useExplorerStore.getState().reorderColumns(0, 2);
+      const { activeLensId, draftState } = useExplorerStore.getState();
       expect(order()).toEqual(["b", "c", "a"]);
       expect(draftState.get(activeLensId)?.columns).toEqual(["b", "c", "a"]);
     });
@@ -130,8 +130,8 @@ describe("viewStore.reorderColumns", () => {
     beforeEach(() => seedOrder(["a", "b", "c"]));
 
     it("does not write a draft entry", () => {
-      useViewStore.getState().reorderColumns(-1, 0);
-      const { activeLensId, draftState } = useViewStore.getState();
+      useExplorerStore.getState().reorderColumns(-1, 0);
+      const { activeLensId, draftState } = useExplorerStore.getState();
       expect(draftState.get(activeLensId)?.columns).toBeUndefined();
     });
   });

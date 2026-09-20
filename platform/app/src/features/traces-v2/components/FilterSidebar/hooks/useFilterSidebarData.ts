@@ -9,6 +9,7 @@ import { useFilteredTraceFacets } from "../../../hooks/useFilteredTraceFacets";
 import { useTraceFacets } from "../../../hooks/useTraceFacets";
 import { usePreviewTracesActive } from "../../../onboarding/hooks/usePreviewTracesActive";
 import { useDensityStore } from "../../../stores/densityStore";
+import { useExplorerStore } from "../../../stores/explorerStore";
 import {
   applyLensOrder,
   useFacetLensStore,
@@ -17,7 +18,6 @@ import {
   selectVisibilityFor,
   useFacetVisibilityStore,
 } from "../../../stores/facetVisibilityStore";
-import { useFilterStore } from "../../../stores/filterStore";
 import {
   type NumericMode,
   selectNumericModesFor,
@@ -59,18 +59,18 @@ import type {
 import { facetLabel, sortBySectionOrder } from "../utils";
 
 export function useFilterSidebarData() {
-  const ast = useFilterStore((s) => s.ast);
-  const storeToggleFacet = useFilterStore((s) => s.toggleFacet);
-  const storeExcludeFacet = useFilterStore((s) => s.excludeFacet);
-  const storeSetRange = useFilterStore((s) => s.setRange);
-  const storeRemoveRange = useFilterStore((s) => s.removeRange);
-  const toggleEvaluatorSubFilter = useFilterStore(
+  const ast = useExplorerStore((s) => s.ast);
+  const storeToggleFacet = useExplorerStore((s) => s.toggleFacet);
+  const storeExcludeFacet = useExplorerStore((s) => s.excludeFacet);
+  const storeSetRange = useExplorerStore((s) => s.setRange);
+  const storeRemoveRange = useExplorerStore((s) => s.removeRange);
+  const toggleEvaluatorSubFilter = useExplorerStore(
     (s) => s.toggleEvaluatorSubFilter,
   );
-  const setEvaluatorScoreRange = useFilterStore(
+  const setEvaluatorScoreRange = useExplorerStore(
     (s) => s.setEvaluatorScoreRange,
   );
-  const removeEvaluatorScoreRange = useFilterStore(
+  const removeEvaluatorScoreRange = useExplorerStore(
     (s) => s.removeEvaluatorScoreRange,
   );
 

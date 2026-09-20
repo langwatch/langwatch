@@ -8,9 +8,8 @@ import {
   Text,
 } from "@chakra-ui/react";
 import type React from "react";
-import type { TimeRange } from "../../stores/filterStore";
-import { useFilterStore } from "../../stores/filterStore";
-import { useViewStore } from "../../stores/viewStore";
+import { useExplorerStore } from "../../stores/explorerStore";
+import type { TimeRange } from "../../stores/querySlice";
 import { QueryBreakdownChips } from "./QueryBreakdownChips";
 
 const LangWatchMark: React.FC = () => (
@@ -118,12 +117,12 @@ function rangePreset(days: number, label: string): TimeRange {
 }
 
 export const EmptyFilterState: React.FC = () => {
-  const clearAll = useFilterStore((s) => s.clearAll);
-  const queryText = useFilterStore((s) => s.queryText);
-  const timeRange = useFilterStore((s) => s.timeRange);
-  const setTimeRange = useFilterStore((s) => s.setTimeRange);
-  const activeLensId = useViewStore((s) => s.activeLensId);
-  const selectLens = useViewStore((s) => s.selectLens);
+  const clearAll = useExplorerStore((s) => s.clearAll);
+  const queryText = useExplorerStore((s) => s.queryText);
+  const timeRange = useExplorerStore((s) => s.timeRange);
+  const setTimeRange = useExplorerStore((s) => s.setTimeRange);
+  const activeLensId = useExplorerStore((s) => s.activeLensId);
+  const selectLens = useExplorerStore((s) => s.selectLens);
 
   const hasFilters = queryText.trim().length > 0;
   const rangeHours = (timeRange.to - timeRange.from) / MS_PER_HOUR;

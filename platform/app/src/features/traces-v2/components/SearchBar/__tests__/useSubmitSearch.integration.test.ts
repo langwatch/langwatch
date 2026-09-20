@@ -30,8 +30,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ project: project.current }),
 }));
 
-import { useFilterStore } from "../../../stores/filterStore";
-import { useViewStore } from "../../../stores/viewStore";
+import { useExplorerStore } from "../../../stores/explorerStore";
 import { useSubmitSearch } from "../useSubmitSearch";
 
 const handlers = {
@@ -69,8 +68,8 @@ beforeEach(() => {
   handlers.onInstantEval.mockClear();
   handlers.onModelUnavailable.mockClear();
   project.current = { id: "project-1" };
-  useFilterStore.getState().clearAll();
-  useViewStore.setState({ activeLensId: "all-traces" });
+  useExplorerStore.getState().clearAll();
+  useExplorerStore.setState({ activeLensId: "all-traces" });
 });
 
 describe("given the text has only field:value terms", () => {
@@ -79,7 +78,7 @@ describe("given the text has only field:value terms", () => {
     it("applies the query without calling the router", () => {
       const { result } = renderSubmit();
       act(() => result.current.submitSearch("status:error AND model:gpt-4o"));
-      expect(useFilterStore.getState().queryText).toBe(
+      expect(useExplorerStore.getState().queryText).toBe(
         "status:error AND model:gpt-4o",
       );
       expect(mutation.mutate).not.toHaveBeenCalled();
@@ -87,17 +86,17 @@ describe("given the text has only field:value terms", () => {
 
     /** @scenario "Enter on empty input clears the AST" */
     it("clears the query on empty text", () => {
-      useFilterStore.getState().applyQueryText("status:error");
+      useExplorerStore.getState().applyQueryText("status:error");
       const { result } = renderSubmit();
       act(() => result.current.submitSearch("   "));
-      expect(useFilterStore.getState().queryText).toBe("");
+      expect(useExplorerStore.getState().queryText).toBe("");
       expect(mutation.mutate).not.toHaveBeenCalled();
     });
 
     it("surfaces a parse error for text that does not parse", () => {
       const { result } = renderSubmit();
       act(() => result.current.submitSearch('status:"unclosed'));
-      expect(useFilterStore.getState().parseError).not.toBeNull();
+      expect(useExplorerStore.getState().parseError).not.toBeNull();
       expect(mutation.mutate).not.toHaveBeenCalled();
     });
   });
@@ -107,11 +106,11 @@ describe("given the text has bare words", () => {
   describe("when Enter is pressed", () => {
     /** @scenario "Enter on a sentence asks the router" */
     it("calls the router with the text, the visible range, the applied query and the lens", () => {
-      useFilterStore.getState().applyQueryText("model:gpt-4o");
-      useFilterStore
+      useExplorerStore.getState().applyQueryText("model:gpt-4o");
+      useExplorerStore
         .getState()
         .setTimeRange({ from: 1000, to: 2000, label: "Custom" });
-      useViewStore.setState({ activeLensId: "conversations" });
+      useExplorerStore.setState({ activeLensId: "conversations" });
       const { result } = renderSubmit();
       act(() => result.current.submitSearch("annoyed users"));
       expect(lastCall().input).toEqual({
@@ -123,7 +122,7 @@ describe("given the text has bare words", () => {
         langyAvailable: true,
       });
       // Nothing lands on the store until the router answers.
-      expect(useFilterStore.getState().queryText).toBe("model:gpt-4o");
+      expect(useExplorerStore.getState().queryText).toBe("model:gpt-4o");
     });
   });
 
@@ -139,10 +138,10 @@ describe("given the text has bare words", () => {
           decidedBy: "classifier",
         }),
       );
-      expect(useFilterStore.getState().queryText).toBe(
+      expect(useExplorerStore.getState().queryText).toBe(
         "status:error AND model:gpt-4*",
       );
-      expect(useFilterStore.getState().lastAiTranslation).toEqual({
+      expect(useExplorerStore.getState().lastAiTranslation).toEqual({
         projectId: "project-1",
         prompt: "errors from gpt-4",
         query: "status:error AND model:gpt-4*",
@@ -163,7 +162,7 @@ describe("given the text has bare words", () => {
           modelUnavailable: false,
         }),
       );
-      expect(useFilterStore.getState().queryText).toBe(
+      expect(useExplorerStore.getState().queryText).toBe(
         '"cannot connect to database"',
       );
       expect(handlers.onModelUnavailable).not.toHaveBeenCalled();
@@ -182,7 +181,7 @@ describe("given the text has bare words", () => {
           fellBackFrom: "routing",
         }),
       );
-      expect(useFilterStore.getState().queryText).toBe('"annoyed users"');
+      expect(useExplorerStore.getState().queryText).toBe('"annoyed users"');
       expect(handlers.onModelUnavailable).toHaveBeenCalledTimes(1);
     });
   });
@@ -190,7 +189,7 @@ describe("given the text has bare words", () => {
   describe("when the router answers langy", () => {
     /** @scenario "A question for the assistant goes to Langy with the view attached" */
     it("hands the question to the Langy handler and leaves the query alone", () => {
-      useFilterStore.getState().applyQueryText("status:error");
+      useExplorerStore.getState().applyQueryText("status:error");
       const { result } = renderSubmit();
       act(() => result.current.submitSearch("why did errors spike"));
       act(() =>
@@ -201,7 +200,7 @@ describe("given the text has bare words", () => {
         }),
       );
       expect(handlers.onLangy).toHaveBeenCalledWith("why did errors spike");
-      expect(useFilterStore.getState().queryText).toBe("status:error");
+      expect(useExplorerStore.getState().queryText).toBe("status:error");
     });
   });
 
@@ -247,10 +246,10 @@ describe("given the text has bare words", () => {
       const { result } = renderSubmit();
       act(() => result.current.submitSearch("annoyed users status:error"));
       act(() => lastCall().options.onError?.(new Error("network")));
-      expect(useFilterStore.getState().queryText).toBe(
+      expect(useExplorerStore.getState().queryText).toBe(
         'status:error AND "annoyed users"',
       );
-      expect(useFilterStore.getState().parseError).toBeNull();
+      expect(useExplorerStore.getState().parseError).toBeNull();
     });
   });
 
@@ -267,7 +266,7 @@ describe("given the text has bare words", () => {
           decidedBy: "classifier",
         }),
       );
-      expect(useFilterStore.getState().queryText).toBe("");
+      expect(useExplorerStore.getState().queryText).toBe("");
     });
   });
 
@@ -276,7 +275,7 @@ describe("given the text has bare words", () => {
       const { result } = renderSubmit({ isSamplePreview: true });
       act(() => result.current.submitSearch("annoyed users"));
       expect(mutation.mutate).not.toHaveBeenCalled();
-      expect(useFilterStore.getState().queryText).toBe('"annoyed users"');
+      expect(useExplorerStore.getState().queryText).toBe('"annoyed users"');
     });
   });
 });
