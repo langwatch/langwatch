@@ -36,6 +36,7 @@ import { useSubmitSearch } from "../useSubmitSearch";
 const handlers = {
   onLangy: vi.fn(),
   onInstantEval: vi.fn(),
+  onSupersede: vi.fn(),
   onModelUnavailable: vi.fn(),
 };
 
@@ -66,6 +67,7 @@ beforeEach(() => {
   mutation.mutate.mockClear();
   handlers.onLangy.mockClear();
   handlers.onInstantEval.mockClear();
+  handlers.onSupersede.mockClear();
   handlers.onModelUnavailable.mockClear();
   project.current = { id: "project-1" };
   useExplorerStore.getState().clearAll();
@@ -276,6 +278,33 @@ describe("given the text has bare words", () => {
       act(() => result.current.submitSearch("annoyed users"));
       expect(mutation.mutate).not.toHaveBeenCalled();
       expect(useExplorerStore.getState().queryText).toBe('"annoyed users"');
+    });
+  });
+});
+
+describe("given an Instant Eval estimate is still in flight", () => {
+  describe("when the next submit is not a judgement", () => {
+    /** @scenario "A new search supersedes a pending Instant Eval" */
+    it("supersedes it, whatever the new text turns out to be", () => {
+      const { result } = renderSubmit();
+
+      act(() => result.current.submitSearch("status:error"));
+      expect(handlers.onSupersede).toHaveBeenCalledTimes(1);
+
+      act(() => result.current.submitSearch(""));
+      expect(handlers.onSupersede).toHaveBeenCalledTimes(2);
+
+      act(() => result.current.submitSearch("annoyed users"));
+      expect(handlers.onSupersede).toHaveBeenCalledTimes(3);
+      act(() =>
+        lastCall().options.onSuccess?.({
+          kind: "free_text",
+          query: '"annoyed users"',
+          decidedBy: "classifier",
+          isModelUnavailable: false,
+        }),
+      );
+      expect(handlers.onInstantEval).not.toHaveBeenCalled();
     });
   });
 });

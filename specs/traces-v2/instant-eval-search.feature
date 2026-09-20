@@ -136,6 +136,13 @@ Feature: Instant Evals inside the Trace Explorer
       Then each read carries evalRuns with the question, the target and the run id
 
     @unit
+    Scenario: A registered run resets the new-count baseline
+      Given the new count has settled for a query whose chip had no run
+      When a run registers behind that chip
+      Then the baseline is dropped, because the run changed what is counted
+      And the next count is a baseline rather than a transition to compare against
+
+    @unit
     Scenario: An empty table under an unjudged chip says these results are not judged
       Given a chip whose run covered another window, lens or filter
       When the table has no rows
@@ -198,6 +205,14 @@ Feature: Instant Evals inside the Trace Explorer
       Given a run registered under the key the payload would compute
       When the Explorer receives the payload
       Then no estimate is made and the chip is applied
+
+    @integration
+    Scenario: A new search supersedes a pending Instant Eval
+      Given an estimate for one sentence is still in flight
+      When the reader submits anything else, a filter, a phrase or a question for the assistant
+      Then the pending estimate is abandoned before the new search runs
+      And it cannot come back, start a run and put its chip over what is now on screen
+      And the dialog and the refusal popover close with it
 
     @integration
     Scenario: The start binds the exact window

@@ -74,6 +74,14 @@ function refusalOf({
 
 export interface InstantEvalRouteState {
   onInstantEvalRoute: (payload: InstantEvalRoutePayload) => void;
+  /**
+   * Drops an estimate or a start still in flight, and closes the dialog and
+   * the popover with it. Called at the head of every submit: a search that
+   * lands on another route never reaches {@link onInstantEvalRoute}, so
+   * without this an estimate from the search before it would still come back,
+   * start a run and put its chip over what the reader is now looking at.
+   */
+  abandonPendingRun: () => void;
   /** The dialog's content while the cost rule asks, or null. */
   confirmation: InstantEvalConfirmation | null;
   confirmRun: () => void;
@@ -314,6 +322,13 @@ export function useInstantEvalRoute(): InstantEvalRouteState {
     startRun({ ...pending, seq: seqRef.current });
   }, [pendingRef, startRun]);
 
+  const abandonPendingRun = useCallback(() => {
+    seqRef.current += 1;
+    pendingRef.current = null;
+    setConfirmation(null);
+    setRefusal(null);
+  }, [pendingRef, setConfirmation, setRefusal]);
+
   const onInstantEvalRoute = useCallback(
     (payload: InstantEvalRoutePayload) => {
       const seq = ++seqRef.current;
@@ -359,6 +374,7 @@ export function useInstantEvalRoute(): InstantEvalRouteState {
 
   return {
     onInstantEvalRoute,
+    abandonPendingRun,
     confirmation: outcome.confirmation,
     confirmRun,
     searchWordsInstead: outcome.searchWordsInstead,

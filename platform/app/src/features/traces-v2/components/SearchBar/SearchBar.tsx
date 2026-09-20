@@ -316,6 +316,7 @@ export const SearchBar: React.FC = () => {
     isSamplePreview,
     onLangy: askLangyFromSearch,
     onInstantEval: onInstantEvalRoute,
+    onSupersede: instantEval.abandonPendingRun,
     onModelUnavailable: handleModelUnavailable,
   });
   // A text handed over by another part of the page (the empty state's "Judge

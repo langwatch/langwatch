@@ -20,6 +20,14 @@ interface UseSubmitSearchOptions {
   /** Hands the sentence to Langy as a question. */
   onLangy: (question: string) => void;
   onInstantEval: (payload: InstantEvalRoutePayload) => void;
+  /**
+   * Drops an Instant Eval estimate or start still in flight. Run at the head
+   * of every submit, whatever the new text turns out to be: only the
+   * `instant_eval` route reaches `onInstantEval`, so a filter, a phrase or a
+   * Langy answer would otherwise leave the previous estimate free to come
+   * back and charge for a run over results nobody is looking at.
+   */
+  onSupersede: () => void;
   /** Enter fell back to a phrase because no model could route it. */
   onModelUnavailable: () => void;
 }
@@ -107,6 +115,7 @@ export function useSubmitSearch({
   isSamplePreview,
   onLangy,
   onInstantEval,
+  onSupersede,
   onModelUnavailable,
 }: UseSubmitSearchOptions): {
   submitSearch: (text: string, options?: SubmitSearchOptions) => void;
@@ -128,6 +137,9 @@ export function useSubmitSearch({
     (text: string, options?: SubmitSearchOptions) => {
       const trimmed = text.trim();
       const seq = ++submitSeqRef.current;
+      // Before anything else, including the early returns: an empty bar or a
+      // plain filter supersedes a pending run just as a routed sentence does.
+      onSupersede();
       if (!trimmed) {
         applyQueryText("");
         return;
@@ -173,6 +185,7 @@ export function useSubmitSearch({
       applyRoute,
       isSamplePreview,
       isLangyAvailable,
+      onSupersede,
       project?.id,
       routeSearch,
     ],

@@ -111,6 +111,11 @@ export function useTraceNewCount(): TraceNewCountResult {
     timeRange.label,
     since,
     queryText,
+    // Part of the query identity below, so a run registering behind an eval
+    // chip changes what is counted. Without it the baseline is the count from
+    // before the chip had a run, and the 0→N pulse fires or stays quiet
+    // against the wrong context.
+    evalRuns,
   ]);
 
   const query = api.tracesV2.newCount.useQuery(
