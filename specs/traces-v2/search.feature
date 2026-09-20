@@ -1091,6 +1091,12 @@ Rule: Numbers that agree
     And on the Conversations lens the number is the sessions read's total, named in conversations
 
   @integration
+  Scenario: A total of one is named in the singular
+    Given the list read answered a total of one for the active filter
+    Then the pagination line and the sidebar total both read "1 trace"
+    And on the Conversations lens they both read "1 conversation"
+
+  @integration
   Scenario: Counts next to values are hidden until the filtered counts land
     Given the sidebar renders from the previous session's facet shape
     And the filtered counts for the active query have not arrived

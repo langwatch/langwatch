@@ -57,6 +57,10 @@ function renderBoth(): void {
 }
 
 beforeEach(() => {
+  // The reads are plain objects a test may retotal, so each one starts from
+  // the same numbers regardless of the order they run in.
+  mockList.totalHits = 1234;
+  mockSessions.totalHits = 7;
   useExplorerStore.getState().clearAll();
   useExplorerStore.setState({ pageSize: 50 });
   useExplorerStore.setState({ grouping: "flat" });
@@ -86,6 +90,36 @@ describe("the Explorer's counts", () => {
       );
       expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
         "7 conversations",
+      );
+    });
+  });
+
+  describe("given the total is one", () => {
+    /** @scenario "A total of one is named in the singular" */
+    it("names a single trace in the singular on both surfaces", () => {
+      mockList.totalHits = 1;
+      renderBoth();
+      expect(screen.getByTestId("explorer-total")).toHaveTextContent("1 trace");
+      expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
+        "1 trace",
+      );
+      expect(screen.getByTestId("explorer-total")).not.toHaveTextContent(
+        "1 traces",
+      );
+    });
+
+    it("names a single conversation in the singular on both surfaces", () => {
+      mockSessions.totalHits = 1;
+      useExplorerStore.setState({ grouping: "by-conversation" });
+      renderBoth();
+      expect(screen.getByTestId("explorer-total")).toHaveTextContent(
+        "1 conversation",
+      );
+      expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
+        "1 conversation",
+      );
+      expect(screen.getByTestId("explorer-total")).not.toHaveTextContent(
+        "1 conversations",
       );
     });
   });

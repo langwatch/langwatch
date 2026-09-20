@@ -22,6 +22,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
+import { explorerCountSummary } from "../../../hooks/explorerCountSummary";
 import { useExplorerStore } from "../../../stores/explorerStore";
 import { Pagination } from "../Pagination";
 
@@ -30,8 +31,15 @@ const CURSOR_TO_PAGE_3 = { sortValue: 1_700_000_001_000, traceId: "trace-c" };
 const SESSION_CURSOR_TO_PAGE_2 = "session-cursor-2";
 
 // The total and its noun come from the page-wide count read; this suite is
-// about page reachability, so the read is a value it sets per case.
-const mockCounts = { totalHits: 500, itemNoun: "traces" };
+// about page reachability, so the read is a value it sets per case. The copy
+// is built by the same function the page uses, so the noun and the number
+// reach the line the way they do in the app.
+const mockCounts = {
+  totalHits: 500,
+  itemNoun: "traces",
+  instantEval: null,
+  summary: "500 traces",
+};
 vi.mock("../../../hooks/useExplorerCounts", () => ({
   useExplorerCounts: () => mockCounts,
 }));
@@ -51,6 +59,11 @@ function renderPagination({
 }): void {
   mockCounts.totalHits = totalHits;
   mockCounts.itemNoun = itemNoun;
+  mockCounts.summary = explorerCountSummary({
+    totalHits,
+    itemNoun,
+    instantEval: null,
+  });
   render(
     <ChakraProvider value={defaultSystem}>
       <Pagination

@@ -72,7 +72,10 @@ export const Pagination: React.FC<PaginationProps> = ({
   isTransitioning = false,
   maxPageSize,
 }) => {
-  const { totalHits, itemNoun, instantEval, summary } = useExplorerCounts();
+  // One string for both surfaces: the pagination line and the sidebar total
+  // render the same `summary`, so neither the number nor the noun can differ
+  // between them.
+  const { totalHits, summary } = useExplorerCounts();
   const page = useExplorerStore((s) => s.page);
   const pageSize = useExplorerStore((s) => s.pageSize);
   const pageCursors = useExplorerStore((s) => s.pageCursors);
@@ -115,8 +118,7 @@ export const Pagination: React.FC<PaginationProps> = ({
       page={currentPage}
       pageSize={effectivePageSize}
       totalCount={totalHits}
-      unitLabel={itemNoun}
-      {...(instantEval ? { totalSummary: summary } : {})}
+      totalSummary={summary}
       visibleCount={visibleCount}
       pageSizeOptions={sizeOptions}
       isLoading={isLoading}

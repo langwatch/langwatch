@@ -6,6 +6,7 @@ import {
   instantEvalRunPhase,
   useInstantEvalRunStore,
 } from "../stores/instantEvalRunStore";
+import { explorerCountSummary } from "./explorerCountSummary";
 import { useInstantEvalRuns } from "./useInstantEvalRuns";
 import { useSessionGroups } from "./useSessionGroups";
 import { useTraceListQuery } from "./useTraceListQuery";
@@ -89,25 +90,6 @@ function firstUnsettledInstantEval({
     if (unsettled) return unsettled;
   }
   return null;
-}
-
-/** The totals copy: the run's counters while it judges, the plain count after. */
-export function explorerCountSummary({
-  totalHits,
-  itemNoun,
-  instantEval,
-}: {
-  totalHits: number;
-  itemNoun: string;
-  instantEval: ActiveInstantEval | null;
-}): string {
-  if (instantEval) {
-    const judged = instantEval.judged.toLocaleString();
-    const total =
-      instantEval.total === null ? "?" : instantEval.total.toLocaleString();
-    return `${instantEval.matched.toLocaleString()} matched so far · ${judged} of ${total} judged`;
-  }
-  return `${totalHits.toLocaleString()} ${itemNoun}`;
 }
 
 /**
