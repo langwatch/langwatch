@@ -152,6 +152,32 @@ Feature: Connected agents
     And the refusal names the environments that are online
 
   @unit
+  Scenario: A name with no environment picks another person's personal agent only to refuse it as owner-only
+    Given "support-agent" registered in development as the personal agent of user "u_1", with its process connected
+    When a run with no actor, or with user "u_2" as its actor, targets "connected:support-agent"
+    Then the target resolves to that agent's id
+    And the run is refused with "agent_owner_only" naming user "u_1"
+
+  @unit
+  Scenario: A name with no environment prefers a shared online agent over another person's personal one
+    Given "support-agent" registered in development as the personal agent of user "u_1" and in staging as a shared agent, with a process connected in both
+    When a run with no actor targets "connected:support-agent"
+    Then the target resolves to the staging agent's id
+
+  @unit
+  Scenario: A name with no environment ignores another person's personal agent that is offline
+    Given "support-agent" registered in development as the personal agent of user "u_1", with no process connected
+    When a run with no actor targets "connected:support-agent"
+    Then the run is refused with "agent_environment_unresolved"
+
+  @unit
+  Scenario: A name and environment naming only another person's personal agent is refused as owner-only
+    Given "support-agent" registered in development as the personal agent of user "u_1"
+    When a run with no actor targets "connected:support-agent@development"
+    Then the target resolves to that agent's id
+    And the run is refused with "agent_owner_only" naming user "u_1"
+
+  @unit
   Scenario: A name with no environment that matches no connected agent is read as an id
     Given no connected agent named "agent_1"
     When a run targets "connected:agent_1"
