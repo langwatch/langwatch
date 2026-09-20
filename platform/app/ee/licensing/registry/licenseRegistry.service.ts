@@ -10,14 +10,14 @@
  * supplies one.
  *
  * Dependencies are injected so the rules are testable without a database. The
- * Prisma bindings live in `./issuedLicense.prisma.ts`.
+ * row, the ports and the derived rules are in `./issuedLicense.ts`, writing a
+ * row in `./issuedLicenseRows.ts`, reading one back in
+ * `./issuedLicenseViews.ts`, and the Prisma bindings in
+ * `./issuedLicense.prisma.ts`.
  */
 
-import type { ConnectService } from "../connect/services";
 import { LicenseKeyInvalidError, OrganizationNotFoundError } from "../errors";
 import { generateLicenseKey } from "../licenseGenerationService";
-import { licenseTokenFromKey, registryHashForToken } from "../licenseToken";
-import type { SignedLicense } from "../types";
 import { parseLicenseKey, verifySignature } from "../validation";
 import {
   IssuedLicenseNotActiveError,
@@ -28,224 +28,17 @@ import {
   LicenseSigningNotConfiguredError,
 } from "./errors";
 import {
-  type LicenseSeatReportRepository,
-  seatQuarterKeyFor,
-} from "./seatReports";
-
-export type IssuedLicenseSource =
-  | "BACKOFFICE"
-  | "PURCHASE"
-  | "SCRIPT"
-  | "LEGACY_IMPORT";
-
-export type SeatCurrency = "USD" | "EUR";
-
-/** A registry row, as stored. */
-export interface IssuedLicenseRecord {
-  id: string;
-  licenseId: string;
-  tokenHash: string;
-  organizationId: string | null;
-  organizationName: string;
-  email: string;
-  planType: string;
-  maxMembers: number;
-  maxMembersLite: number;
-  issuedAt: Date;
-  expiresAt: Date;
-  source: IssuedLicenseSource;
-  issuedById: string | null;
-  revokedAt: Date | null;
-  revokedById: string | null;
-  revokedReason: string | null;
-  supersededAt: Date | null;
-  replacesId: string | null;
-  pendingDeliveryLicense: string | null;
-  services: string[];
-  seatOverageAllowance: number | null;
-  seatRateCents: number | null;
-  seatCurrency: SeatCurrency | null;
-  commitUsdCents: number;
-  overageEnabled: boolean;
-  overageMaxUsdCents: number | null;
-  instanceId: string | null;
-  instanceBoundAt: Date | null;
-  lastSyncAt: Date | null;
-  lastSyncVersion: string | null;
-  reportedMembers: number | null;
-  reportedMembersLite: number | null;
-  virtualKeyId: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export type IssuedLicenseStatus =
-  | "active"
-  | "revoked"
-  | "superseded"
-  | "expired";
-
-/**
- * A registry row as the backoffice reads it: the stored row without the held
- * license, plus what is derived from it.
- */
-export type IssuedLicenseView = Omit<
-  IssuedLicenseRecord,
-  "pendingDeliveryLicense"
-> & {
-  status: IssuedLicenseStatus;
-  /** The allowance in force: the override, or a fifth of the seats rounded up. */
-  effectiveSeatOverageAllowance: number;
-  /** Whether a reissued license is waiting to be delivered to its install. */
-  hasPendingDelivery: boolean;
-};
-
-/**
- * A row on the licenses screen, which also shows what the install reported in
- * the term quarter now running. Reading that costs a second query, so only the
- * list and the detail carry it; a write answers with the row alone.
- */
-export type IssuedLicenseBrowseView = IssuedLicenseView & {
-  currentQuarterSeats: {
-    quarterStartsAt: Date;
-    peakMembers: number;
-    peakMembersLite: number;
-  } | null;
-};
-
-export interface IssuedLicenseRepository {
-  create(
-    data: Omit<IssuedLicenseRecord, "id" | "createdAt" | "updatedAt">,
-  ): Promise<IssuedLicenseRecord>;
-  findById(id: string): Promise<IssuedLicenseRecord | null>;
-  findByTokenHash(tokenHash: string): Promise<IssuedLicenseRecord | null>;
-  findByVirtualKeyId(virtualKeyId: string): Promise<IssuedLicenseRecord | null>;
-  /** Every license of a customer, whatever its state. */
-  findAllByOrganization(organizationId: string): Promise<IssuedLicenseRecord[]>;
-  findAll(params: {
-    page: number;
-    pageSize: number;
-    search?: string;
-  }): Promise<{ rows: IssuedLicenseRecord[]; total: number }>;
-  update(
-    id: string,
-    data: Partial<Omit<IssuedLicenseRecord, "id" | "createdAt" | "updatedAt">>,
-  ): Promise<IssuedLicenseRecord>;
-  /**
-   * Binds the license to an install only while it has none. Answers whether
-   * this call was the one that bound it, so two installs racing leave one bound.
-   */
-  bindInstance(params: {
-    id: string;
-    instanceId: string;
-    at: Date;
-  }): Promise<boolean>;
-  /**
-   * Records the managed key only while the license has none and still is the
-   * active license of that customer on that install. Answers whether this call
-   * was the one that recorded it.
-   *
-   * The `requires` clause is what a revocation races against: it is checked in
-   * the same statement as the write, so a license revoked after the caller read
-   * the row cannot be handed a fresh, active key.
-   */
-  attachVirtualKey(params: {
-    id: string;
-    virtualKeyId: string;
-    requires: { organizationId: string; instanceId: string; activeAt: Date };
-  }): Promise<boolean>;
-  /** The license that replaced this one, when it was reissued. */
-  findByReplacesId(replacesId: string): Promise<IssuedLicenseRecord | null>;
-}
-
-/**
- * The managed gateway key a license resolves to. Ending or invalidating it is
- * what reaches a gateway that already cached the credential: both write to the
- * change feed every gateway polls.
- */
-export interface ConnectManagedKeyPort {
-  provision(params: {
-    organizationId: string;
-    licenseId: string;
-  }): Promise<{ id: string }>;
-  /** Ends the key for good. Safe to repeat. */
-  retire(params: {
-    virtualKeyId: string;
-    organizationId: string;
-    actorId: string;
-  }): Promise<void>;
-  /** Makes every gateway resolve the license again on its next call. */
-  invalidate(params: {
-    virtualKeyId: string;
-    organizationId: string;
-  }): Promise<void>;
-}
-
-export interface CustomerOrganizationPort {
-  findById(id: string): Promise<{ id: string; name: string } | null>;
-  createSelfHostedCustomer(params: {
-    name: string;
-  }): Promise<{ id: string; name: string }>;
-  markSelfHostedCustomer(id: string): Promise<void>;
-}
-
-/**
- * The customer's contract budget, which follows the commercial terms of its
- * licenses. Called after any change that can move those terms.
- */
-export interface ContractBudgetSyncPort {
-  sync(params: { organizationId: string; operatorId: string }): Promise<void>;
-}
-
-export interface LicenseRegistryDependencies {
-  repository: IssuedLicenseRepository;
-  /** What the licenses screen reads for the quarter now running. */
-  seatReports: LicenseSeatReportRepository;
-  organizations: CustomerOrganizationPort;
-  managedKeys: ConnectManagedKeyPort;
-  contractBudgets: ContractBudgetSyncPort;
-  /** The signing key from the server secret, or undefined when none is set. */
-  signingKey: () => string | undefined;
-  /** The key licenses are verified against. */
-  publicKey: string;
-  /** Encrypts a license held for delivery. */
-  encrypt: (plain: string) => string;
-  now?: () => Date;
-}
-
-/** The customer a license is issued to: one that exists, or a new one to create. */
-export type LicenseCustomer =
-  | { organizationId: string }
-  | { newOrganizationName: string };
-
-export interface LicenseTermsInput {
-  services?: ConnectService[];
-  /** Null clears the override, so the default applies again. */
-  seatOverageAllowance?: number | null;
-  seatRateCents?: number | null;
-  seatCurrency?: SeatCurrency | null;
-  commitUsdCents?: number;
-  overageEnabled?: boolean;
-  overageMaxUsdCents?: number | null;
-}
-
-/** A fifth of the licensed seats, rounded up. */
-const DEFAULT_ALLOWANCE_DIVISOR = 5;
-
-export function defaultSeatOverageAllowance(maxMembers: number): number {
-  return Math.ceil(maxMembers / DEFAULT_ALLOWANCE_DIVISOR);
-}
-
-/** Revoked wins over superseded, which wins over the term. */
-export function statusOfIssuedLicense(
-  row: Pick<IssuedLicenseRecord, "revokedAt" | "supersededAt" | "expiresAt">,
-  now: Date,
-): IssuedLicenseStatus {
-  if (row.revokedAt) return "revoked";
-  if (row.supersededAt) return "superseded";
-  if (now >= row.expiresAt) return "expired";
-  return "active";
-}
+  type IssuedLicenseBrowseView,
+  type IssuedLicenseRecord,
+  type IssuedLicenseSource,
+  type IssuedLicenseView,
+  type LicenseCustomer,
+  type LicenseRegistryDependencies,
+  type LicenseTermsInput,
+  statusOfIssuedLicense,
+} from "./issuedLicense";
+import { createIssuedLicenseRow, isUniqueViolation } from "./issuedLicenseRows";
+import { browseIssuedLicenses, issuedLicenseView } from "./issuedLicenseViews";
 
 export class LicenseRegistryService {
   private readonly now: () => Date;
@@ -282,6 +75,12 @@ export class LicenseRegistryService {
       now: this.now(),
     });
 
+    // Marked before the row exists. A license is handed over once, so the row
+    // must be the last write that can fail: the other order loses the signed
+    // license to a failure here and leaves a registry row no caller ever saw.
+    // Marking an organization that then gets no license changes nothing but a
+    // flag, and issuing again sets the same flag.
+    await this.deps.organizations.markSelfHostedCustomer(organization.id);
     const row = await this.createRow({
       licenseKey,
       organizationId: organization.id,
@@ -289,7 +88,6 @@ export class LicenseRegistryService {
       issuedById: input.operatorId,
       overrides: terms,
     });
-    await this.deps.organizations.markSelfHostedCustomer(organization.id);
     await this.syncContractBudget(row, input.operatorId);
     return { licenseKey, license: this.toView(row) };
   }
@@ -336,13 +134,16 @@ export class LicenseRegistryService {
     );
     if (!organization) throw new OrganizationNotFoundError();
 
+    // Same order as `issue`: the row is the last write. A retry after a failure
+    // here would otherwise find its own tokenHash already taken and be refused
+    // as already registered, with the organization never marked.
+    await this.deps.organizations.markSelfHostedCustomer(organization.id);
     const row = await this.createRow({
       licenseKey: input.licenseKey,
       organizationId: organization.id,
       source: "LEGACY_IMPORT",
       issuedById: input.operatorId,
     });
-    await this.deps.organizations.markSelfHostedCustomer(organization.id);
     return this.toView(row);
   }
 
@@ -362,7 +163,7 @@ export class LicenseRegistryService {
     // active with a dead key, which resolves to a refusal, and revoking again
     // finishes the job. The other order could leave a revoked license whose
     // cached credential no gateway was told to drop.
-    await this.retireManagedKey(row, input.operatorId);
+    await this.retireManagedKey({ row, actorId: input.operatorId });
     const updated = await this.deps.repository.update(row.id, {
       revokedAt: this.now(),
       revokedById: input.operatorId,
@@ -482,16 +283,18 @@ export class LicenseRegistryService {
 
     // A managed key belongs to the organization it was created on. Moving the
     // license ends it, and the next call creates one on the new organization.
-    const moves =
+    const isMovingToDifferentOrganization =
       row.organizationId !== null && row.organizationId !== organization.id;
-    if (moves) await this.retireManagedKey(row, input.operatorId);
+    if (isMovingToDifferentOrganization) {
+      await this.retireManagedKey({ row, actorId: input.operatorId });
+    }
 
     const updated = await this.deps.repository.update(row.id, {
       organizationId: organization.id,
-      ...(moves ? { virtualKeyId: null } : {}),
+      ...(isMovingToDifferentOrganization ? { virtualKeyId: null } : {}),
     });
     await this.deps.organizations.markSelfHostedCustomer(organization.id);
-    if (moves && row.organizationId) {
+    if (isMovingToDifferentOrganization && row.organizationId) {
       await this.deps.contractBudgets.sync({
         organizationId: row.organizationId,
         operatorId: input.operatorId,
@@ -502,7 +305,7 @@ export class LicenseRegistryService {
   }
 
   async getById(input: { id: string }): Promise<IssuedLicenseBrowseView> {
-    const [license] = await this.browse([await this.requireRow(input.id)]);
+    const [license] = await this.browseRows([await this.requireRow(input.id)]);
     if (!license) throw new IssuedLicenseNotFoundError();
     return license;
   }
@@ -513,34 +316,21 @@ export class LicenseRegistryService {
     search?: string;
   }): Promise<{ licenses: IssuedLicenseBrowseView[]; total: number }> {
     const { rows, total } = await this.deps.repository.findAll(input);
-    return { licenses: await this.browse(rows), total };
+    return { licenses: await this.browseRows(rows), total };
   }
 
-  /** The rows with the seats each reported in the quarter now running. */
-  private async browse(
+  private browseRows(
     rows: IssuedLicenseRecord[],
   ): Promise<IssuedLicenseBrowseView[]> {
-    const now = this.now();
-    const keys = rows.map((row) =>
-      seatQuarterKeyFor({ licenseId: row.id, issuedAt: row.issuedAt, now }),
-    );
-    const reports = await this.deps.seatReports.findByQuarters(keys);
-    const byLicense = new Map(
-      reports.map((report) => [report.licenseId, report]),
-    );
-    return rows.map((row) => {
-      const report = byLicense.get(row.id);
-      return {
-        ...this.toView(row),
-        currentQuarterSeats: report
-          ? {
-              quarterStartsAt: report.quarterStartsAt,
-              peakMembers: report.peakMembers,
-              peakMembersLite: report.peakMembersLite,
-            }
-          : null,
-      };
+    return browseIssuedLicenses({
+      rows,
+      seatReports: this.deps.seatReports,
+      now: this.now(),
     });
+  }
+
+  private toView(row: IssuedLicenseRecord): IssuedLicenseView {
+    return issuedLicenseView({ row, now: this.now() });
   }
 
   private async syncContractBudget(
@@ -554,10 +344,13 @@ export class LicenseRegistryService {
     });
   }
 
-  private async retireManagedKey(
-    row: IssuedLicenseRecord,
-    actorId: string,
-  ): Promise<void> {
+  private async retireManagedKey({
+    row,
+    actorId,
+  }: {
+    row: IssuedLicenseRecord;
+    actorId: string;
+  }): Promise<void> {
     if (!row.virtualKeyId || !row.organizationId) return;
     await this.deps.managedKeys.retire({
       virtualKeyId: row.virtualKeyId,
@@ -620,100 +413,16 @@ export class LicenseRegistryService {
     return input;
   }
 
-  private async createRow({
-    licenseKey,
-    organizationId,
-    source,
-    issuedById,
-    overrides = {},
-  }: {
+  private createRow(params: {
     licenseKey: string;
     organizationId: string | null;
     source: IssuedLicenseSource;
     issuedById: string | null;
     overrides?: Partial<IssuedLicenseRecord>;
   }): Promise<IssuedLicenseRecord> {
-    const signed = parseLicenseKey(licenseKey.trim());
-    const token = licenseTokenFromKey(licenseKey);
-    if (!signed || !token) throw new LicenseKeyInvalidError();
-
-    const tokenHash = registryHashForToken(token);
-    if (await this.deps.repository.findByTokenHash(tokenHash)) {
-      throw new LicenseAlreadyRegisteredError();
-    }
-    return this.deps.repository.create({
-      ...rowFromSignedLicense(signed),
-      tokenHash,
-      organizationId,
-      source,
-      issuedById,
-      revokedAt: null,
-      revokedById: null,
-      revokedReason: null,
-      supersededAt: null,
-      replacesId: null,
-      pendingDeliveryLicense: null,
-      services: [],
-      seatOverageAllowance: null,
-      seatRateCents: null,
-      seatCurrency: null,
-      commitUsdCents: 0,
-      overageEnabled: false,
-      overageMaxUsdCents: null,
-      instanceId: null,
-      instanceBoundAt: null,
-      lastSyncAt: null,
-      lastSyncVersion: null,
-      reportedMembers: null,
-      reportedMembersLite: null,
-      virtualKeyId: null,
-      ...overrides,
+    return createIssuedLicenseRow({
+      repository: this.deps.repository,
+      ...params,
     });
   }
-
-  private toView(row: IssuedLicenseRecord): IssuedLicenseView {
-    const { pendingDeliveryLicense, ...stored } = row;
-    return {
-      ...stored,
-      status: statusOfIssuedLicense(row, this.now()),
-      effectiveSeatOverageAllowance:
-        row.seatOverageAllowance ?? defaultSeatOverageAllowance(row.maxMembers),
-      hasPendingDelivery: pendingDeliveryLicense !== null,
-    };
-  }
-}
-
-/** What the signed license itself says, which is the source for these columns. */
-function rowFromSignedLicense(
-  signed: SignedLicense,
-): Pick<
-  IssuedLicenseRecord,
-  | "licenseId"
-  | "organizationName"
-  | "email"
-  | "planType"
-  | "maxMembers"
-  | "maxMembersLite"
-  | "issuedAt"
-  | "expiresAt"
-> {
-  return {
-    licenseId: signed.data.licenseId,
-    organizationName: signed.data.organizationName,
-    email: signed.data.email,
-    planType: signed.data.plan.type,
-    maxMembers: signed.data.plan.maxMembers,
-    maxMembersLite: signed.data.plan.maxMembersLite ?? 0,
-    issuedAt: new Date(signed.data.issuedAt),
-    expiresAt: new Date(signed.data.expiresAt),
-  };
-}
-
-/** Prisma's unique constraint violation, without importing Prisma here. */
-function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    (error as { code?: unknown }).code === "P2002"
-  );
 }

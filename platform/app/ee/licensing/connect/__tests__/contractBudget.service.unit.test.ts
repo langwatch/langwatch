@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import type { IssuedLicenseRecord } from "../../registry/licenseRegistry.service";
+import type { IssuedLicenseRecord } from "../../registry/issuedLicense";
 import { ContractBudgetService } from "../contractBudget.service";
 import { contractTermsOf } from "../contractTerms";
 import {

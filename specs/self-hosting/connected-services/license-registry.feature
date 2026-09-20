@@ -144,6 +144,18 @@ Feature: License registry
   # ============================================================================
 
   @unit
+  Scenario: The same license written twice at once is still refused by name
+    Given a license already recorded
+    When a second write of the same license key gets past the duplicate check
+    Then it is refused as already registered, not as a database error
+
+  @unit
+  Scenario: A license is written only once its customer is marked
+    Given marking the customer as a self-hosted customer fails
+    When an operator issues a license
+    Then no row is written, so issuing again is not refused as a duplicate
+
+  @unit
   Scenario: Revoking a license
     Given an active license in the registry
     When an operator revokes it with a reason
@@ -156,6 +168,12 @@ Feature: License registry
     Then a new license is signed and recorded for "ACME"
     And the new row points at the license it replaces
     And the replaced license stays valid until the install has picked up the new one
+
+  @integration
+  Scenario: The signed license stays on screen while its row refreshes
+    Given an operator reissued a license and the new one is shown to be copied
+    When the registry refetches the license the drawer is open on
+    Then the signed license is still shown
 
   @unit
   Scenario: A license past its term reads as expired

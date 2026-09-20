@@ -11,7 +11,7 @@ import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanc
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
-import type { ConnectManagedKeyPort } from "./licenseRegistry.service";
+import type { ConnectManagedKeyPort } from "./issuedLicense";
 
 const CONNECT_TEAM_NAME = "Hosted services";
 

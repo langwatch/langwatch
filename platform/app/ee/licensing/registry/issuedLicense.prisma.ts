@@ -10,7 +10,7 @@ import type {
   CustomerOrganizationPort,
   IssuedLicenseRecord,
   IssuedLicenseRepository,
-} from "./licenseRegistry.service";
+} from "./issuedLicense";
 import type {
   LicenseSeatQuarterKey,
   LicenseSeatReportRecord,

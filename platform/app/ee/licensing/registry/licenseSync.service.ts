@@ -27,7 +27,7 @@ import {
   defaultSeatOverageAllowance,
   type IssuedLicenseRecord,
   type IssuedLicenseRepository,
-} from "./licenseRegistry.service";
+} from "./issuedLicense";
 import {
   type LicenseSeatReportRepository,
   licenseTermQuarterStart,

@@ -4,7 +4,7 @@ import type {
   InstantEvalJudgement,
 } from "~/server/app-layer/instant-evals/classifier/classifier";
 import { INSTANT_EVAL_PRICING } from "~/server/app-layer/instant-evals/classifier/pricing";
-import type { IssuedLicenseRecord } from "../../registry/licenseRegistry.service";
+import type { IssuedLicenseRecord } from "../../registry/issuedLicense";
 import type { ConnectSpendEntry } from "../connectSpendBuffer";
 import { ContractBudgetService } from "../contractBudget.service";
 import {

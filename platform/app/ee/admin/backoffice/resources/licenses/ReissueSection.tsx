@@ -23,9 +23,16 @@ export function ReissueSection({ license }: { license: License }) {
 
   useEffect(() => {
     setSeats(license.maxMembers.toString());
+  }, [license]);
+
+  // Only another license clears the key shown. Reissuing refetches this one,
+  // and the license is not stored anywhere, so a reset on every refetch would
+  // take it off the screen before the operator could copy it.
+  const licenseId = license.id;
+  useEffect(() => {
     setExpires("");
     setIssuedKey(null);
-  }, [license]);
+  }, [licenseId]);
 
   return (
     <Section title="Reissue">

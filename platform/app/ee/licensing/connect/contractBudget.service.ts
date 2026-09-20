@@ -13,7 +13,7 @@ import { ValidationError } from "@langwatch/handled-error";
 import type {
   ContractBudgetSyncPort,
   IssuedLicenseRecord,
-} from "../registry/licenseRegistry.service";
+} from "../registry/issuedLicense";
 import { type ContractTerms, contractTermsOf } from "./contractTerms";
 import {
   ConnectBudgetAboveContractMaximumError,

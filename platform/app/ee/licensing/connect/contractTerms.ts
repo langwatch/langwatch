@@ -9,7 +9,7 @@
 import {
   type IssuedLicenseRecord,
   statusOfIssuedLicense,
-} from "../registry/licenseRegistry.service";
+} from "../registry/issuedLicense";
 
 export interface ContractTerms {
   /** Prepaid usage across the customer's licenses. The default cap. */

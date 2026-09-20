@@ -1,7 +1,7 @@
 /**
  * Shared stand-ins for the hosted-services unit tests.
  */
-import type { IssuedLicenseRecord } from "../../registry/licenseRegistry.service";
+import type { IssuedLicenseRecord } from "../../registry/issuedLicense";
 import type {
   ContractBudget,
   ContractBudgetStore,

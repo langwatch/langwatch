@@ -19,8 +19,8 @@ import {
 } from "../../licensing/connect/connect.prisma";
 import { createLicenseRegistryService } from "../../licensing/registry/composition";
 import { IssuedLicenseNotFoundError } from "../../licensing/registry/errors";
+import { statusOfIssuedLicense } from "../../licensing/registry/issuedLicense";
 import { PrismaIssuedLicenseRepository } from "../../licensing/registry/issuedLicense.prisma";
-import { statusOfIssuedLicense } from "../../licensing/registry/licenseRegistry.service";
 import { createCreditGrants } from "../stripe/creditGrants";
 import { createStripeClient } from "../stripe/stripeClient";
 import { prices } from "../stripe/stripePriceCatalog";

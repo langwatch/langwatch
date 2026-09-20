@@ -16,11 +16,11 @@ import {
   createContractBudgetService,
   PrismaHostedUsageReader,
 } from "../../licensing/connect/connect.prisma";
-import { PrismaIssuedLicenseRepository } from "../../licensing/registry/issuedLicense.prisma";
 import {
   type IssuedLicenseRecord,
   statusOfIssuedLicense,
-} from "../../licensing/registry/licenseRegistry.service";
+} from "../../licensing/registry/issuedLicense";
+import { PrismaIssuedLicenseRepository } from "../../licensing/registry/issuedLicense.prisma";
 import { seatQuarterKeyFor } from "../../licensing/registry/seatReports";
 import { PrismaConnectedBillingStore } from "./connectedBilling.prisma";
 import type {

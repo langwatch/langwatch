@@ -19,7 +19,7 @@ import { NANO_USD_PER_USD } from "~/server/event-sourcing/pipelines/gateway-spen
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { EmailMonthlyStatementMailer } from "~/server/mailer/connectedStatementMailer";
 import { CONTRACT_BUDGET_EXTERNAL_ID } from "../../licensing/connect/connect.prisma";
-import { statusOfIssuedLicense } from "../../licensing/registry/licenseRegistry.service";
+import { statusOfIssuedLicense } from "../../licensing/registry/issuedLicense";
 import type {
   MonthlyStatementStore,
   StatementAccount,

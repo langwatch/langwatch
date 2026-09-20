@@ -16,7 +16,7 @@ import {
   type IssuedLicenseRecord,
   type IssuedLicenseRepository,
   statusOfIssuedLicense,
-} from "./licenseRegistry.service";
+} from "./issuedLicense";
 
 export const CONNECT_CREDENTIAL_REFUSALS = {
   connect_license_token_malformed: {
@@ -156,7 +156,8 @@ export class ConnectCredentialService {
     organizationId: string;
     instanceId: string;
   }): Promise<
-    { ok: true; virtualKeyId: string } | { ok: false; code: ConnectCredentialRefusalCode }
+    | { ok: true; virtualKeyId: string }
+    | { ok: false; code: ConnectCredentialRefusalCode }
   > {
     if (row.virtualKeyId) return { ok: true, virtualKeyId: row.virtualKeyId };
 
@@ -184,7 +185,11 @@ export class ConnectCredentialService {
 
     const current = await this.deps.repository.findById(row.id);
     if (!current) return { ok: false, code: "connect_license_not_registered" };
-    const refusal = this.refusalFor({ row: current, organizationId, instanceId });
+    const refusal = this.refusalFor({
+      row: current,
+      organizationId,
+      instanceId,
+    });
     if (refusal) return { ok: false, code: refusal };
     if (!current.virtualKeyId) {
       throw new Error(

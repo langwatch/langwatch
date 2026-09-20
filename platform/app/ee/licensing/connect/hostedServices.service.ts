@@ -18,8 +18,8 @@ import {
   instantEvalPriceUsd,
 } from "~/server/app-layer/instant-evals/classifier/pricing";
 import { instantEvalQuestionSchema } from "~/server/app-layer/instant-evals/classifier/questions";
-import type { IssuedLicenseRecord } from "../registry/licenseRegistry.service";
-import { statusOfIssuedLicense } from "../registry/licenseRegistry.service";
+import type { IssuedLicenseRecord } from "../registry/issuedLicense";
+import { statusOfIssuedLicense } from "../registry/issuedLicense";
 import type { ConnectSpendEntry } from "./connectSpendBuffer";
 import type { ContractBudgetService } from "./contractBudget.service";
 import {

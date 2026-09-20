@@ -10,7 +10,7 @@
 
 import type Stripe from "stripe";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { defaultSeatOverageAllowance } from "../../licensing/registry/licenseRegistry.service";
+import { defaultSeatOverageAllowance } from "../../licensing/registry/issuedLicense";
 import { createStripeClient } from "../stripe/stripeClient";
 import type { BankTransfer } from "./connectedBilling.service";
 import { INVOICE_DAYS_UNTIL_DUE } from "./connectedBilling.service";
