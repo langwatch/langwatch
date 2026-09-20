@@ -238,9 +238,7 @@ describe("ConnectCredentialService", () => {
     });
 
     describe("when it stops being active while the call is being resolved", () => {
-      /**
-       * @scenario A license that stops being active mid-call issues no credential
-       */
+      /** @scenario A license that stops being active mid-call issues no credential */
       it.each([
         [
           "revoked",

@@ -135,9 +135,7 @@ describe("the license registry on Postgres", () => {
   });
 
   describe("when a managed key is recorded against a license that was revoked meanwhile", () => {
-    /**
-     * @scenario The managed key is recorded only while the license still admits the call
-     */
+    /** @scenario The managed key is recorded only while the license still admits the call */
     it("refuses the write and leaves the license without a key", async () => {
       const { license } = await issue("ACME Attach Race");
       const repository = new PrismaIssuedLicenseRepository(prisma);
