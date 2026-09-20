@@ -209,6 +209,65 @@ describe("searchTracesCommand()", () => {
 			expect(log.mock.calls.flat().join("\n")).not.toContain(
 				"searched for as words",
 			);
+			expect(log.mock.calls.flat().join("\n")).not.toContain("redacted");
+		});
+	});
+
+	// An email address never survives ingestion under the default privacy
+	// settings, so a search for one reads like the customer never wrote in.
+	describe("when a query carrying an email address finds nothing", () => {
+		let log: ReturnType<typeof vi.spyOn>;
+
+		beforeEach(() => {
+			log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+			mockSearch.mockResolvedValue({
+				traces: [],
+				pagination: { totalHits: 0 },
+			});
+		});
+
+		afterEach(() => {
+			log.mockRestore();
+		});
+
+		/** @scenario An email-shaped query that finds nothing explains redaction */
+		it("says email addresses are redacted and what to search by instead", async () => {
+			await searchTracesCommand({ query: "priya.raman@northwind.example" });
+
+			const printed = log.mock.calls.flat().join("\n");
+			expect(printed).toContain("redacted");
+			expect(printed).toContain("data privacy");
+		});
+
+		/** @scenario The machine document carries the hint */
+		it("puts the same hint on the machine document", async () => {
+			await searchTracesCommand({
+				query: "priya.raman@northwind.example",
+				format: "json",
+			});
+
+			const printed = log.mock.calls.flat().join("\n");
+			const document = JSON.parse(printed) as { hint?: string; traces: unknown[] };
+			expect(document.traces).toEqual([]);
+			expect(document.hint).toContain("redacted");
+		});
+
+		/** @scenario The machine document carries the hint */
+		it("adds no hint to a document that holds traces", async () => {
+			mockSearch.mockResolvedValue({
+				traces: [{ traceId: "t1" }],
+				pagination: { totalHits: 1 },
+			});
+
+			await searchTracesCommand({
+				query: "priya.raman@northwind.example",
+				format: "json",
+			});
+
+			const document = JSON.parse(log.mock.calls.flat().join("\n")) as {
+				hint?: string;
+			};
+			expect(document.hint).toBeUndefined();
 		});
 	});
 
