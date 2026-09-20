@@ -93,6 +93,14 @@ Feature: Langy drives and reads the Trace Explorer
       When explorer.getState runs on the backend
       Then the answer says source saved, the default lens and the default window
       And it carries no count
+      And a note saying these are not what is on the user's screen
+
+    @unit
+    Scenario: The skill answers a saved read with the link, not a count
+      Given the find-traces skill
+      When it reads a state whose source is saved
+      Then it says this is not the page the user is on and gives the link
+      And it takes any count from a trace search, never from the saved state
 
     @unit
     Scenario: An action that needs an open page is refused without one

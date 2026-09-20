@@ -76,6 +76,22 @@ describe("the find-traces skill", () => {
     });
   });
 
+  describe("given its section on driving the Explorer", () => {
+    /** @scenario "The skill answers a saved read with the link, not a count" */
+    it("answers a saved read with the link rather than a number it did not read", () => {
+      const section = sectionOf(
+        renderedSkill(),
+        "Step 4a: Primary, drive the Explorer",
+      );
+      const saved = section.slice(section.indexOf('A state with `source: "saved"`'));
+
+      expect(saved).toContain("not the user's screen");
+      expect(saved).toContain("this is not the page you are on");
+      expect(saved).toContain("langwatch trace search");
+      expect(saved).toContain("run the same call once more");
+    });
+  });
+
   describe("given its section on searching", () => {
     /** @scenario "The skill searches every form a concept can take before saying nothing was found" */
     it("reads the reference, lists values, names each form of feedback and widens the window", () => {
