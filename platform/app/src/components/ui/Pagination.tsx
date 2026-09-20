@@ -291,7 +291,10 @@ export function Pagination({
 
   return (
     <Grid
-      templateColumns="1fr auto 1fr"
+      // The navigator is centred while there is room. In a narrow table the
+      // empty third track gives way first, so the summary keeps its width and
+      // the page numbers sit beside it instead of under it.
+      templateColumns="minmax(max-content, 1fr) auto minmax(0, 1fr)"
       alignItems="center"
       gap={3}
       paddingX={2}
