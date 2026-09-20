@@ -1,3 +1,9 @@
+import type {
+  HandledErrorFault,
+  SerializedHandledError,
+  SerializedReason,
+} from "@langwatch/handled-error";
+
 import type { AppErrorCode } from "./app-codes.ts";
 import type { GoErrorCode, NodeErrorCode } from "./codes.generated.ts";
 import {
@@ -7,11 +13,6 @@ import {
   readHandledError,
   safeProse,
 } from "./read-handled-error.ts";
-import type {
-  HandledErrorFault,
-  SerializedHandledError,
-  SerializedReason,
-} from "@langwatch/handled-error";
 
 /**
  * The customer-facing copy for every handled-error code, keyed by code.
@@ -1929,6 +1930,13 @@ const presentations = {
     title: "Connection not found",
     describe: () =>
       "That single sign-on connection isn't one of this organization's. Reload to see the current connections.",
+  },
+  scim_protocol_refusal: {
+    // A provisioning tool reads this, not a person: the refusal comes back at
+    // the status SCIM names, and the detail is the protocol's own sentence.
+    title: "The directory request was refused",
+    describe: () =>
+      "Your identity provider's SCIM call was refused. Check the directory token it presents and the connection that token was issued for.",
   },
   scim_write_outside_connection: {
     // The identity provider is pointed at the wrong connection. Nothing about

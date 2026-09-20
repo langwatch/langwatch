@@ -36,3 +36,15 @@ Feature: SCIM 2.0 is published in the API reference
     When I read the SCIM group schema
     Then it describes a group as a LangWatch access group
     And it does not describe a group as a team
+
+  # A directory refusal used to be a plain Error: the family's own error
+  # handler rendered it, but nothing ever mounted that handler, so every
+  # refusal reached the process boundary as an unattributed 500. Measured
+  # against main on 2026-09-21: 401 there, 500 here, on all four
+  # /api/scim/v2 provisioning routes.
+  @unit
+  Scenario: A directory refusal answers its own status, never an unattributed 500
+    Given a provisioning route mounted on the process's own error boundary
+    When it is called with no bearer token
+    Then the response status is 401
+    And the body carries the refusal's stable code

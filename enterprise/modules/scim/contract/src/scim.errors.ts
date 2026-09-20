@@ -3,10 +3,22 @@ import { HandledError, NotFoundError } from "@langwatch/handled-error";
 
 import type { ScimError } from "./scim.contract.ts";
 
-/** A SCIM protocol failure; transports render its stable SCIM Error resource. */
-export class ScimProtocolError extends Error {
+/**
+ * A SCIM protocol refusal, at the status the protocol names: a missing bearer,
+ * a filter the door will not answer, a resource the connection does not own.
+ * Handled, so the framework boundary answers that status — a plain Error left
+ * every one of them reading as an unattributed 500.
+ */
+export class ScimProtocolError extends HandledError {
+  declare readonly code: "scim_protocol_refusal";
+
   constructor(readonly response: ScimError) {
-    super(response.detail);
+    const httpStatus = Number(response.status);
+    super("scim_protocol_refusal", response.detail, {
+      httpStatus: Number.isInteger(httpStatus) ? httpStatus : 400,
+      fault: httpStatus >= 500 ? "platform" : "customer",
+      meta: { scimStatus: response.status },
+    });
     this.name = "ScimProtocolError";
   }
 }

@@ -7,7 +7,7 @@
  * The /Schemas discovery copy is what an identity-provider administrator reads
  * when wiring provisioning, so it must name the right resource.
  */
-import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
+import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import type { ScimListResponse, ScimUser } from "@langwatch/enterprise-scim-contract";
 import { ENTERPRISE_FEATURE_ERRORS } from "@langwatch/entitlement-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -43,7 +43,7 @@ class DirectoryFake extends ScimServiceFake {
   }));
 }
 
-function mount() {
+function mount(onError = scimProtocolErrorHandler) {
   const scim = new DirectoryFake();
   const { app } = scimTestApp({ scim });
   const directories = new WeakMap<Request, { connectionId: string | null }>();
@@ -69,7 +69,7 @@ function mount() {
 
   const hono = runtime.mount(scimProtocolRest.router(), {
     app: () => app,
-    onError: scimProtocolErrorHandler,
+    onError,
     facts: [
       bindRestMiddleware(scimRestCredential, (c) => {
         const directory = directories.get(c.req.raw);
@@ -141,6 +141,18 @@ describe("given a directory holding this organization's SCIM bearer token", () =
         detail: "Bearer token is required",
       });
       expect(api.scim.listUsers).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a provisioning route refuses at the process's own error boundary", () => {
+    /** @scenario "A directory refusal answers its own status, never an unattributed 500" */
+    it("answers the refusal's status, because the refusal is handled", async () => {
+      const api = mount((error, context) => canonicalErrorResponse(error, context));
+
+      const response = await api.get("/api/scim/v2/Users");
+
+      expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toMatchObject({ code: "scim_protocol_refusal" });
     });
   });
 
