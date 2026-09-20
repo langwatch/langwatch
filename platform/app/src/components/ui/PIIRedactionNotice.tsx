@@ -29,8 +29,16 @@ export function PIIRedactionNotice({
  * redacted. The conversation view scans every turn it parsed and shows one
  * banner for the whole thread rather than one per message, so it needs the
  * copy and the settings link without the single-string detection.
+ *
+ * `children` replaces the sentence for a caller with something more specific
+ * to say, such as the explorer's empty state after a search for an email
+ * address; the settings link stays either way.
  */
-export function PIIRedactionAlert() {
+export function PIIRedactionAlert({
+  children,
+}: {
+  children?: React.ReactNode;
+}) {
   const settingsHref = "/settings/data-privacy";
 
   return (
@@ -38,8 +46,9 @@ export function PIIRedactionAlert() {
       <Alert.Indicator />
       <Alert.Content>
         <Alert.Description fontSize="sm">
-          Some content was redacted by this project's privacy settings (PII or
-          secrets redaction). Review them under{" "}
+          {children ??
+            "Some content was redacted by this project's privacy settings (PII or secrets redaction)."}{" "}
+          Review them under{" "}
           <Link asChild color="blue.600" textDecoration="underline">
             <NextLink href={settingsHref}>Settings</NextLink>
           </Link>
