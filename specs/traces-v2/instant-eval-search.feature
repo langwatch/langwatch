@@ -135,6 +135,19 @@ Feature: Instant Evals inside the Trace Explorer
       When the list, the facets and the new count are read
       Then each read carries evalRuns with the question, the target and the run id
 
+    @unit
+    Scenario: An empty table under an unjudged chip says these results are not judged
+      Given a chip whose run covered another window, lens or filter
+      When the table has no rows
+      Then the empty state says these results are not judged yet
+      And "Judge these results" submits the question through the search bar, with the other chips kept
+
+    @unit
+    Scenario: A search the page routed once is not classified again
+      Given a submit that names the route it already took
+      When the router receives it
+      Then the classifier is not asked and that route is built
+
     @integration
     Scenario: A chip with no registered run is pending
       Given a chip `eval:"the user is annoyed"` and no run under its key

@@ -557,3 +557,22 @@ describe("given no classifier", () => {
     });
   });
 });
+
+describe("given the caller names the route", () => {
+  describe("when the text is submitted again", () => {
+    /** @scenario "A search the page routed once is not classified again" */
+    it("builds that route without asking the classifier", async () => {
+      const classifier = answering("filter");
+      const d = deps({ classifier });
+      const result = await createSearchRouter(d).route(
+        input({ text: "annoyed users", forceKind: "instant_eval" }),
+      );
+      expect(classifier.classify).not.toHaveBeenCalled();
+      expect(d.routeWithModel).not.toHaveBeenCalled();
+      expect(result).toMatchObject({
+        kind: "instant_eval",
+        decidedBy: "caller",
+      });
+    });
+  });
+});

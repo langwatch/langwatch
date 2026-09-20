@@ -8,9 +8,12 @@ import {
   Text,
 } from "@chakra-ui/react";
 import type React from "react";
+import { queryWithoutInstantEvalChips } from "~/server/app-layer/traces/query-language/instantEvalChips";
+import { useInstantEvalRuns } from "../../hooks/useInstantEvalRuns";
 import { useExplorerStore } from "../../stores/explorerStore";
 import { useInstantEvalRunStore } from "../../stores/instantEvalRunStore";
 import type { TimeRange } from "../../stores/querySlice";
+import { useSearchSubmitRequestStore } from "../../stores/searchSubmitRequestStore";
 import { QueryBreakdownChips } from "./QueryBreakdownChips";
 
 const LangWatchMark: React.FC = () => (
@@ -49,13 +52,25 @@ export function emptyContent({
   hasFilters,
   rangeHours,
   isJudging,
+  hasUnjudgedEval = false,
 }: {
   activeLensId: string;
   hasFilters: boolean;
   rangeHours: number;
   /** An Instant Eval behind one of the query's chips is still running. */
   isJudging: boolean;
+  /** An eval chip has no run for this window, lens and filter. */
+  hasUnjudgedEval?: boolean;
 }): EmptyContent {
+  // A chip whose run covered another window or filter matches no rows here.
+  // That is not "nothing matches": these results were not judged at all.
+  if (hasUnjudgedEval) {
+    return {
+      title: "These results are not judged yet",
+      description:
+        "The Instant Eval in this search covered a different window, lens or filter. Judge these results to see which ones match.",
+    };
+  }
   // An empty table during a run is rows not judged yet, not a query that
   // matched nothing. Saying "nothing matches" here is a wrong answer for the
   // first seconds of every run.
@@ -141,6 +156,9 @@ export const EmptyFilterState: React.FC = () => {
   const isJudging = useInstantEvalRunStore((s) =>
     Object.keys(s.runs).some((runId) => !s.settled[runId]),
   );
+  const { chips: evalChips } = useInstantEvalRuns();
+  const unjudgedChip = evalChips.find((chip) => chip.runId === null);
+  const requestSubmit = useSearchSubmitRequestStore((s) => s.requestSubmit);
 
   const hasFilters = queryText.trim().length > 0;
   const rangeHours = (timeRange.to - timeRange.from) / MS_PER_HOUR;
@@ -149,13 +167,32 @@ export const EmptyFilterState: React.FC = () => {
     hasFilters,
     rangeHours,
     isJudging,
+    hasUnjudgedEval: Boolean(unjudgedChip),
   });
 
   const actions: ActionButton[] = [];
+  if (unjudgedChip) {
+    // The question goes back through the search bar as a sentence, so the run
+    // gets the same estimate, cost rule and refusals a typed one gets. The
+    // route is named: this text was a judgement once and stays one.
+    actions.push({
+      label: "Judge these results",
+      primary: true,
+      onClick: () =>
+        requestSubmit({
+          text: `${queryWithoutInstantEvalChips(queryText)} ${unjudgedChip.question}`.trim(),
+          forceKind: "instant_eval",
+        }),
+    });
+  }
   // While a run judges, the way out is Stop on the progress bar. Offering
   // "Clear filters" as the main action would throw the run's chip away.
   if (hasFilters && !isJudging) {
-    actions.push({ label: "Clear filters", onClick: clearAll, primary: true });
+    actions.push({
+      label: "Clear filters",
+      onClick: clearAll,
+      primary: !unjudgedChip,
+    });
   }
   if (activeLensId !== "all-traces") {
     actions.push({

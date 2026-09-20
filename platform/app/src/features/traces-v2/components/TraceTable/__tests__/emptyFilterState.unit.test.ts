@@ -33,6 +33,23 @@ describe("emptyContent", () => {
     });
   });
 
+  describe("given an eval chip with no run for this window", () => {
+    describe("when the table has no rows", () => {
+      /** @scenario "An empty table under an unjudged chip says these results are not judged" */
+      it("says the results are not judged instead of claiming nothing matches", () => {
+        const content = emptyContent({
+          activeLensId: "all-traces",
+          hasFilters: true,
+          rangeHours: 24,
+          isJudging: false,
+          hasUnjudgedEval: true,
+        });
+        expect(content.title).toBe("These results are not judged yet");
+        expect(content.description).toContain("Judge these results");
+      });
+    });
+  });
+
   describe("given no run is judging", () => {
     describe("when a filter matches nothing", () => {
       it("says nothing matches these filters", () => {

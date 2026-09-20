@@ -31,6 +31,7 @@ import { usePreviewTracesActive } from "../../onboarding/hooks/usePreviewTracesA
 import { useExplorerStore } from "../../stores/explorerStore";
 import { useFacetHoverStore } from "../../stores/facetHoverStore";
 import { useInstantEvalRunStore } from "../../stores/instantEvalRunStore";
+import { useSearchSubmitRequestStore } from "../../stores/searchSubmitRequestStore";
 import { AskAiButton } from "../ai/AskAiButton";
 import {
   ProviderPrimerPopover,
@@ -317,6 +318,19 @@ export const SearchBar: React.FC = () => {
     onInstantEval: onInstantEvalRoute,
     onModelUnavailable: handleModelUnavailable,
   });
+  // A text handed over by another part of the page (the empty state's "Judge
+  // these results") is submitted the way a typed one is.
+  const submitRequest = useSearchSubmitRequestStore((s) => s.request);
+  const clearSubmitRequest = useSearchSubmitRequestStore((s) => s.clear);
+  useEffect(() => {
+    if (!submitRequest) return;
+    clearSubmitRequest();
+    submitSearch(submitRequest.text, {
+      ...(submitRequest.forceKind
+        ? { forceKind: submitRequest.forceKind }
+        : {}),
+    });
+  }, [submitRequest, clearSubmitRequest, submitSearch]);
   const submitProgress = searchSubmitProgress({
     isRouting,
     isEstimating: instantEval.isEstimating,

@@ -4,7 +4,10 @@ import {
   requoteBareTerms,
   splitBareWords,
 } from "~/server/app-layer/traces/query-language/mutations";
-import type { RouteSearchResult } from "~/server/app-layer/traces/search-router/route-search";
+import type {
+  RouteSearchResult,
+  SearchRouteKind,
+} from "~/server/app-layer/traces/search-router/route-search";
 import { api } from "~/utils/api";
 import { useExplorerStore } from "../../stores/explorerStore";
 import type { InstantEvalRoutePayload } from "../TracesPage/useInstantEvalRoute";
@@ -19,6 +22,15 @@ interface UseSubmitSearchOptions {
   onInstantEval: (payload: InstantEvalRoutePayload) => void;
   /** Enter fell back to a phrase because no model could route it. */
   onModelUnavailable: () => void;
+}
+
+/** What a caller knows about a submit the user did not type. */
+export interface SubmitSearchOptions {
+  /**
+   * The route this text already took once. Skips the classifier, so a text
+   * the page knows is a judgement is judged again rather than reclassified.
+   */
+  forceKind?: SearchRouteKind;
 }
 
 interface RoutedSubmit {
@@ -113,7 +125,7 @@ export function useSubmitSearch({
   });
 
   const submitSearch = useCallback(
-    (text: string) => {
+    (text: string, options?: SubmitSearchOptions) => {
       const trimmed = text.trim();
       const seq = ++submitSeqRef.current;
       if (!trimmed) {
@@ -142,6 +154,7 @@ export function useSubmitSearch({
           activeQuery: queryText,
           lensId: useExplorerStore.getState().activeLensId,
           langyAvailable,
+          ...(options?.forceKind ? { forceKind: options.forceKind } : {}),
         },
         {
           onSuccess: (result) => {
