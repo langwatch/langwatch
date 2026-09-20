@@ -140,10 +140,19 @@ export interface IssuedLicenseRepository {
     instanceId: string;
     at: Date;
   }): Promise<boolean>;
-  /** Records the managed key only while the license has none. Same answer. */
+  /**
+   * Records the managed key only while the license has none and still is the
+   * active license of that customer on that install. Answers whether this call
+   * was the one that recorded it.
+   *
+   * The `requires` clause is what a revocation races against: it is checked in
+   * the same statement as the write, so a license revoked after the caller read
+   * the row cannot be handed a fresh, active key.
+   */
   attachVirtualKey(params: {
     id: string;
     virtualKeyId: string;
+    requires: { organizationId: string; instanceId: string; activeAt: Date };
   }): Promise<boolean>;
   /** The license that replaced this one, when it was reissued. */
   findByReplacesId(replacesId: string): Promise<IssuedLicenseRecord | null>;

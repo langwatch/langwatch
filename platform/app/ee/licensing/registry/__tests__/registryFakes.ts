@@ -111,12 +111,24 @@ export class InMemoryIssuedLicenseRepository
   async attachVirtualKey({
     id,
     virtualKeyId,
+    requires,
   }: {
     id: string;
     virtualKeyId: string;
+    requires: { organizationId: string; instanceId: string; activeAt: Date };
   }) {
     const row = this.rows.find((candidate) => candidate.id === id);
     if (!row || row.virtualKeyId !== null) return false;
+    // The same clause the table checks in the statement that writes the key.
+    if (
+      row.organizationId !== requires.organizationId ||
+      row.instanceId !== requires.instanceId ||
+      row.revokedAt !== null ||
+      row.supersededAt !== null ||
+      row.expiresAt <= requires.activeAt
+    ) {
+      return false;
+    }
     row.virtualKeyId = virtualKeyId;
     return true;
   }

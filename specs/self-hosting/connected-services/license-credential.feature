@@ -114,6 +114,27 @@ Feature: The license is the credential for hosted services
     Then the call is refused as an invalid credential
     And the registry is not queried
 
+  @unit
+  Scenario: A license that stops being active mid-call issues no credential
+    Given the license has no managed key yet
+    When it is revoked or its term ends after the call read its status and before its managed key is attached
+    Then the call is refused with the code for the state the license is now in
+    And no managed key is left active on the customer
+
+  @integration
+  Scenario: The managed key is recorded only while the license still admits the call
+    Given the license was revoked after the call read its status
+    When the managed key is recorded against it
+    Then the table refuses the write
+    And the license still has no managed key
+
+  @unit
+  Scenario: A managed key that fails to attach is ended
+    Given the license has no managed key yet
+    When recording the managed key on the license fails
+    Then the error reaches the caller
+    And the key that was created for it is ended
+
   @integration
   Scenario: Refusals do not reveal whether a license exists
     When calls present an unregistered token, a revoked token and a token bound to another instance

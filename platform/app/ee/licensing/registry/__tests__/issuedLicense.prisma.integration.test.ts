@@ -134,6 +134,42 @@ describe("the license registry on Postgres", () => {
     });
   });
 
+  describe("when a managed key is recorded against a license that was revoked meanwhile", () => {
+    /**
+     * @scenario The managed key is recorded only while the license still admits the call
+     */
+    it("refuses the write and leaves the license without a key", async () => {
+      const { license } = await issue("ACME Attach Race");
+      const repository = new PrismaIssuedLicenseRepository(prisma);
+      const requires = {
+        organizationId: license.organizationId as string,
+        instanceId: "instance-a",
+        activeAt: new Date(),
+      };
+      await prisma.issuedLicense.update({
+        where: { id: license.id },
+        data: { instanceId: "instance-a" },
+      });
+      // What the resolve path read as active, revoked before its write lands.
+      await prisma.issuedLicense.update({
+        where: { id: license.id },
+        data: { revokedAt: new Date(), revokedReason: "leaked" },
+      });
+
+      const attached = await repository.attachVirtualKey({
+        id: license.id,
+        virtualKeyId: "vk_should_not_attach",
+        requires,
+      });
+
+      expect(attached).toBe(false);
+      expect(
+        (await prisma.issuedLicense.findUnique({ where: { id: license.id } }))
+          ?.virtualKeyId,
+      ).toBeNull();
+    });
+  });
+
   describe("when the list is searched", () => {
     it("matches on the customer name without regard to case", async () => {
       await issue("Zebra Logistics");

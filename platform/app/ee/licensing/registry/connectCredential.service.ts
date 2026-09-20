@@ -106,14 +106,16 @@ export class ConnectCredentialService {
     const boundTo = await this.boundInstance({ row, instanceId });
     if (boundTo !== instanceId) return refuse("connect_wrong_instance");
 
-    const virtualKeyId = await this.managedKey({
+    const key = await this.managedKey({
       row,
       organizationId: row.organizationId,
+      instanceId,
     });
+    if (!key.ok) return refuse(key.code);
     return {
       ok: true,
       license: { ...row, organizationId: row.organizationId, instanceId },
-      virtualKeyId,
+      virtualKeyId: key.virtualKeyId,
     };
   }
 
@@ -137,40 +139,95 @@ export class ConnectCredentialService {
     return current?.instanceId ?? null;
   }
 
-  /** The license's managed key, created on first use. */
+  /**
+   * The license's managed key, created on first use.
+   *
+   * The status check in `resolve` ran before this key existed, so it cannot be
+   * what admits the call: an operator revoking in between would leave a fresh
+   * active key on a dead license. The attach carries that state into the write
+   * instead, and a lost write never returns a key.
+   */
   private async managedKey({
     row,
     organizationId,
+    instanceId,
   }: {
     row: IssuedLicenseRecord;
     organizationId: string;
-  }): Promise<string> {
-    if (row.virtualKeyId) return row.virtualKeyId;
+    instanceId: string;
+  }): Promise<
+    { ok: true; virtualKeyId: string } | { ok: false; code: ConnectCredentialRefusalCode }
+  > {
+    if (row.virtualKeyId) return { ok: true, virtualKeyId: row.virtualKeyId };
 
     const created = await this.deps.managedKeys.provision({
       organizationId,
       licenseId: row.licenseId,
     });
-    const attached = await this.deps.repository.attachVirtualKey({
-      id: row.id,
-      virtualKeyId: created.id,
-    });
-    if (attached) return created.id;
+    let attached: boolean;
+    try {
+      attached = await this.deps.repository.attachVirtualKey({
+        id: row.id,
+        virtualKeyId: created.id,
+        requires: { organizationId, instanceId, activeAt: this.now() },
+      });
+    } catch (error) {
+      await this.retire({ virtualKeyId: created.id, organizationId });
+      throw error;
+    }
+    if (attached) return { ok: true, virtualKeyId: created.id };
 
-    // A concurrent first call attached its key first. One key per license is
-    // what lets a spend row name the install, so the extra one is ended.
-    await this.deps.managedKeys.retire({
-      virtualKeyId: created.id,
-      organizationId,
-      actorId: this.deps.systemActorId,
-    });
+    // This key authenticated nothing, so it is ended either way: a concurrent
+    // first call attached its own, or the license stopped being this install's
+    // active license. One key per license is what lets a spend row name it.
+    await this.retire({ virtualKeyId: created.id, organizationId });
+
     const current = await this.deps.repository.findById(row.id);
-    if (!current?.virtualKeyId) {
+    if (!current) return { ok: false, code: "connect_license_not_registered" };
+    const refusal = this.refusalFor({ row: current, organizationId, instanceId });
+    if (refusal) return { ok: false, code: refusal };
+    if (!current.virtualKeyId) {
       throw new Error(
         `license ${row.id} has no managed key after a lost attach race`,
       );
     }
-    return current.virtualKeyId;
+    return { ok: true, virtualKeyId: current.virtualKeyId };
+  }
+
+  /** Why the license as stored now admits no call, or null when it does. */
+  private refusalFor({
+    row,
+    organizationId,
+    instanceId,
+  }: {
+    row: IssuedLicenseRecord;
+    organizationId: string;
+    instanceId: string;
+  }): ConnectCredentialRefusalCode | null {
+    if (row.organizationId !== organizationId) {
+      return "connect_license_not_registered";
+    }
+    const status = statusOfIssuedLicense(row, this.now());
+    if (status === "revoked" || status === "superseded") {
+      return "connect_license_revoked";
+    }
+    if (status === "expired") return "connect_license_expired";
+    if (row.instanceId !== instanceId) return "connect_wrong_instance";
+    return null;
+  }
+
+  private async retire({
+    virtualKeyId,
+    organizationId,
+  }: {
+    virtualKeyId: string;
+    organizationId: string;
+  }): Promise<void> {
+    await this.deps.managedKeys.retire({
+      virtualKeyId,
+      organizationId,
+      actorId: this.deps.systemActorId,
+    });
   }
 }
 

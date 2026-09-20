@@ -237,6 +237,80 @@ describe("ConnectCredentialService", () => {
       });
     });
 
+    describe("when it stops being active while the call is being resolved", () => {
+      /**
+       * @scenario A license that stops being active mid-call issues no credential
+       */
+      it.each([
+        [
+          "revoked",
+          "connect_license_revoked",
+          async (id: string) => {
+            await context.registry.revoke({
+              id,
+              operatorId: OPERATOR,
+              reason: "leaked",
+            });
+          },
+        ],
+        [
+          "expired",
+          "connect_license_expired",
+          async (_id: string) => {
+            context.travelTo(new Date(NEXT_YEAR.getTime() + 1));
+          },
+        ],
+      ] as const)(
+        "refuses with %s's code and leaves no active key when it is %s mid-call",
+        async (_label, code, interleave) => {
+          const { id, token } = await issue();
+          await context.repository.update(id, { instanceId: "instance-a" });
+          // The interleaving lands between the status check and the attach:
+          // the key exists, the license no longer admits it.
+          const provision = context.managedKeys.provision.bind(
+            context.managedKeys,
+          );
+          vi.spyOn(context.managedKeys, "provision").mockImplementation(
+            async (params) => {
+              const created = await provision(params);
+              await interleave(id);
+              return created;
+            },
+          );
+
+          const result = await context.credentials.resolve({
+            token,
+            instanceId: "instance-a",
+          });
+
+          expect(result).toEqual({ ok: false, code });
+          expect(context.managedKeys.keys.size).toBe(1);
+          expect(context.managedKeys.active()).toEqual([]);
+          expect((await context.repository.findById(id))?.virtualKeyId).toBe(
+            null,
+          );
+        },
+      );
+    });
+
+    describe("when recording the managed key on the license fails", () => {
+      /** @scenario A managed key that fails to attach is ended */
+      it("ends the key it created and lets the error through", async () => {
+        const { id, token } = await issue();
+        await context.repository.update(id, { instanceId: "instance-a" });
+        vi.spyOn(context.repository, "attachVirtualKey").mockRejectedValue(
+          new Error("the registry is unreachable"),
+        );
+
+        await expect(
+          context.credentials.resolve({ token, instanceId: "instance-a" }),
+        ).rejects.toThrow("the registry is unreachable");
+
+        expect(context.managedKeys.keys.size).toBe(1);
+        expect(context.managedKeys.active()).toEqual([]);
+      });
+    });
+
     describe("when the license term has ended", () => {
       /** @scenario An expired license is refused */
       it("refuses with connect_license_expired", async () => {

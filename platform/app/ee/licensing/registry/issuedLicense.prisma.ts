@@ -112,12 +112,25 @@ export class PrismaIssuedLicenseRepository implements IssuedLicenseRepository {
   async attachVirtualKey({
     id,
     virtualKeyId,
+    requires,
   }: {
     id: string;
     virtualKeyId: string;
+    requires: { organizationId: string; instanceId: string; activeAt: Date };
   }): Promise<boolean> {
+    // The state the caller resolved against is part of the write, so a
+    // revocation, a supersede, the term running out or a move to another
+    // customer between the read and this statement loses the key its grant.
     const { count } = await this.prisma.issuedLicense.updateMany({
-      where: { id, virtualKeyId: null },
+      where: {
+        id,
+        virtualKeyId: null,
+        organizationId: requires.organizationId,
+        instanceId: requires.instanceId,
+        revokedAt: null,
+        supersededAt: null,
+        expiresAt: { gt: requires.activeAt },
+      },
       data: { virtualKeyId },
     });
     return count === 1;
