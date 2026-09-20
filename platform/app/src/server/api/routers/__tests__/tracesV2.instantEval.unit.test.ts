@@ -30,7 +30,7 @@ describe("given the Explorer's request", () => {
       expect(input).toEqual({
         shorthand: {
           target: "threads",
-          filter: "service:api",
+          filter: "service:api AND NOT origin:langy",
           start: "2026-09-10T00:00:00.000Z",
           end: "2026-09-11T00:00:00.000Z",
           questions: [
@@ -45,7 +45,8 @@ describe("given the Explorer's request", () => {
       });
     });
 
-    it("leaves the filter out when there are no other chips", () => {
+    /** @scenario "A run judges the rows the Explorer shows" */
+    it("leaves out the origin the table hides when there are no other chips", () => {
       const input = toExplorerRunInput({
         projectId: "project-1",
         target: "traces",
@@ -54,8 +55,22 @@ describe("given the Explorer's request", () => {
         question: { instructions: "the user is annoyed" },
         limit: 500,
       });
-      expect(input.shorthand?.filter).toBeUndefined();
+      expect(input.shorthand?.filter).toBe("NOT origin:langy");
       expect(input.limit).toBe(500);
+    });
+
+    /** @scenario "A run judges the rows the Explorer shows" */
+    it("leaves a filter that names an origin as asked", () => {
+      const input = toExplorerRunInput({
+        projectId: "project-1",
+        target: "traces",
+        filter: "origin:langy OR origin:application",
+        window: { from: 1, to: 2 },
+        question: { instructions: "the user is annoyed" },
+      });
+      expect(input.shorthand?.filter).toBe(
+        "origin:langy OR origin:application",
+      );
     });
   });
 });

@@ -200,6 +200,14 @@ Feature: Instant Evals inside the Trace Explorer
       Then it is a shorthand with the window as ISO instants and one boolean question
       And the run's counters are answered in the Explorer's own shape
 
+    @unit
+    Scenario: A run judges the rows the Explorer shows
+      Given the other chips name no origin
+      When the request is turned into the run service's input
+      Then the filter leaves out the Langy origin, as the table does
+      And the run's total is a count of rows the table can show
+      And a request whose chips name an origin is left as asked
+
   # ---------------------------------------------------------------------------
   # Progress
   # ---------------------------------------------------------------------------

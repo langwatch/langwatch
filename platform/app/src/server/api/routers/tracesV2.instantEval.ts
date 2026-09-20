@@ -24,6 +24,8 @@ import {
   toInstantEvalExplorerRun,
 } from "~/server/app-layer/instant-evals/run";
 import { INSTANT_EVAL_TARGETS } from "~/server/app-layer/instant-evals/shorthand";
+import { explorerHiddenOrigins } from "~/server/app-layer/traces/hidden-origins";
+import { combineQueries } from "~/server/app-layer/traces/query-language/mutations";
 
 /** What the Explorer asks to judge: the shorthand, in the search bar's words. */
 export const explorerInstantEvalRunSchema = z.object({
@@ -49,13 +51,28 @@ export type ExplorerInstantEvalRunInput = z.infer<
 >;
 
 /** The run service's input for what the Explorer asked. */
+/**
+ * The filter a run judges: the other chips, minus the origins the Explorer
+ * hides. The table leaves Langy's own traces out unless the query names an
+ * origin, so a run over the bare chips would judge rows the table cannot
+ * show, and its total would disagree with the count beside it.
+ */
+export function explorerJudgedFilter(filter: string): string {
+  return combineQueries({
+    base: filter,
+    addition: explorerHiddenOrigins(filter)
+      .map((origin) => `NOT origin:${origin}`)
+      .join(" AND "),
+  });
+}
+
 export function toExplorerRunInput(
   input: ExplorerInstantEvalRunInput,
 ): InstantEvalRunInput {
   return {
     shorthand: {
       target: input.target,
-      ...(input.filter.trim() ? { filter: input.filter.trim() } : {}),
+      filter: explorerJudgedFilter(input.filter),
       start: new Date(input.window.from).toISOString(),
       end: new Date(input.window.to).toISOString(),
       questions: [
