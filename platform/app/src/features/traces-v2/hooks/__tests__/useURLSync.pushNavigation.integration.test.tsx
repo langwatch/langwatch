@@ -86,6 +86,19 @@ describe("useURLSync applying a same-route push while already mounted", () => {
     });
   });
 
+  describe("given a link that opens the Explorer on a filter", () => {
+    /** @scenario "Opening a View in Trace Explorer link selects no rows" */
+    it("applies the filter and leaves the selection empty", () => {
+      render(<Harness />);
+      act(() => pushHash?.("#all-traces?q=refund&preset=7d"));
+
+      const { selection } = useExplorerStore.getState();
+      expect(barState().queryText).toBe("refund");
+      expect(selection.mode).toBe("explicit");
+      expect(selection.traceIds.size).toBe(0);
+    });
+  });
+
   describe("given the URL already carries a fragment on arrival", () => {
     /** @scenario Following the link from somewhere else in the project */
     it("applies it on mount, the same query and window a same-route push would carry", () => {

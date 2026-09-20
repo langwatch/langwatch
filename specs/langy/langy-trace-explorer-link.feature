@@ -78,3 +78,10 @@ Feature: Following a Langy trace search through to the Trace Explorer
       Given Langy found more traces than the card shows
       Then the card says how many it found and how many it is showing
       And following the link shows at least every trace the card listed
+
+  @integration
+  Scenario: Opening a View in Trace Explorer link selects no rows
+    Given a card whose link names a filter and a window
+    When the user opens the link
+    Then the Explorer applies the filter and the window
+    And no row is selected and no selection bar is shown
