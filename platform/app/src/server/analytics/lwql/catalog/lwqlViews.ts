@@ -731,6 +731,14 @@ const SIMULATIONS: LangWatchQLViewDefinition = {
       sourceColumns: ["UnmetCriteria"],
     },
     {
+      name: "InconclusiveCriteria",
+      type: "Array(String)",
+      description:
+        "Criteria the judge could not decide; each is also in UnmetCriteria.",
+      gates: [],
+      sourceColumns: ["InconclusiveCriteria"],
+    },
+    {
       name: "TraceIds",
       type: "Array(String)",
       description: "Traces recorded while the run executed.",
