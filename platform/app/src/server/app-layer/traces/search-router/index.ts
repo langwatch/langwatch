@@ -20,13 +20,13 @@ import {
   generateTraceAction,
   type KnownProjectSignals,
 } from "../ai-query";
-import {
-  createSearchRouter,
-  type RouteSearchInput,
-  type RouteSearchResult,
-  type SearchRouteDecidedBy,
-  type SearchRouteKind,
-} from "./route-search";
+import type {
+  RouteSearchInput,
+  RouteSearchResult,
+  SearchRouteDecidedBy,
+  SearchRouteKind,
+} from "./contracts";
+import { createSearchRouter } from "./route-search";
 
 const KNOWN_SIGNALS_LIMIT = 20;
 

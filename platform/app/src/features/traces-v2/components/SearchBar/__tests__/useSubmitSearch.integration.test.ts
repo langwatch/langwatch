@@ -10,7 +10,7 @@
  */
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { RouteSearchResult } from "~/server/app-layer/traces/search-router/route-search";
+import type { RouteSearchResult } from "~/server/app-layer/traces/search-router/contracts";
 
 type MutateOptions = {
   onSuccess?: (result: RouteSearchResult) => void;

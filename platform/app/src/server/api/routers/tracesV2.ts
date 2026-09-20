@@ -50,7 +50,7 @@ import type {
   TraceEventRollup,
 } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import { routeSearch } from "~/server/app-layer/traces/search-router";
-import { SEARCH_ROUTE_KINDS } from "~/server/app-layer/traces/search-router/route-search";
+import { SEARCH_ROUTE_KINDS } from "~/server/app-layer/traces/search-router/contracts";
 import type { TraceListItem } from "~/server/app-layer/traces/trace-list.service";
 import {
   traceMetadataUpdateSchema,

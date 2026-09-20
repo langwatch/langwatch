@@ -7,7 +7,7 @@ import {
 import type {
   RouteSearchResult,
   SearchRouteKind,
-} from "~/server/app-layer/traces/search-router/route-search";
+} from "~/server/app-layer/traces/search-router/contracts";
 import { api } from "~/utils/api";
 import { useExplorerStore } from "../../stores/explorerStore";
 import type { InstantEvalRoutePayload } from "../TracesPage/useInstantEvalRoute";

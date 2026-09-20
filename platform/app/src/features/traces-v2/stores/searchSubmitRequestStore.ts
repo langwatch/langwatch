@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { SearchRouteKind } from "~/server/app-layer/traces/search-router/route-search";
+import type { SearchRouteKind } from "~/server/app-layer/traces/search-router/contracts";
 
 /** A text another part of the page asked the search bar to submit. */
 export interface SearchSubmitRequest {
