@@ -281,7 +281,8 @@ Feature: Instant Evals inside the Trace Explorer
     Scenario: A spent free budget opens the budget popover and the phrase search runs
       Given the organization has spent its free Instant Evals budget
       When the Explorer receives an Instant Eval payload
-      Then a closable popover anchored to the search bar says what an Instant Eval would have found
+      Then a closable popover anchored under the search bar says what an Instant Eval does, in plain sentences
+      And the text the user typed stays visible above it
       And it shows the spend against the 1 USD budget with an Upgrade link
       And "Skip" and closing both apply the phrase search
 

@@ -40,17 +40,18 @@ export function instantEvalRefusalCopy(refusal: InstantEvalRefusal): {
   body: string;
   action: { label: string; href: string };
 } {
-  const found = `An Instant Eval would have read every result and kept the ones where "${refusal.question}", so the table showed the judgement rather than the words.`;
+  const found = `An Instant Eval reads every result and keeps the ones that answer yes to: "${refusal.question}".`;
+  const meanwhile = "For now the words are searched as a phrase.";
   if (refusal.kind === "budget") {
     return {
       title: "Your free Instant Evals budget is used up",
-      body: `${found} This organization has spent ${formatUsd(refusal.spentUsd)} of its ${formatUsd(refusal.budgetUsd)} free budget. Upgrade to keep judging; the words are searched as a phrase in the meantime.`,
+      body: `${found} This organization has used ${formatUsd(refusal.spentUsd)} of its ${formatUsd(refusal.budgetUsd)} free budget. Upgrade to run it. ${meanwhile}`,
       action: { label: "Upgrade", href: UPGRADE_HREF },
     };
   }
   return {
     title: "Configure a model to judge results",
-    body: `${found} No judge is configured for this deployment yet, so the words are searched as a phrase instead.`,
+    body: `${found} No model is configured to judge results yet. Configure one to run it. ${meanwhile}`,
     action: { label: "Configure a model", href: MODEL_PROVIDERS_HREF },
   };
 }
@@ -74,7 +75,9 @@ export const InstantEvalRefusalPopover: React.FC<
       onOpenChange={(e: { open: boolean }) => {
         if (!e.open) onClose();
       }}
-      positioning={{ placement: "bottom-start" }}
+      // Below the bar and never flipped over it: the words the user just
+      // typed stay readable next to what the popover says about them.
+      positioning={{ placement: "bottom-start", gutter: 8, flip: false }}
       lazyMount
       unmountOnExit
     >

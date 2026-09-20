@@ -44,10 +44,12 @@ describe("given the organization has spent its free Instant Evals budget", () =>
         screen.getByText("Your free Instant Evals budget is used up"),
       ).toBeInTheDocument();
       expect(
-        screen.getByText(/kept the ones where "the user is annoyed"/),
+        screen.getByText(
+          /keeps the ones that answer yes to: "the user is annoyed"/,
+        ),
       ).toBeInTheDocument();
       expect(
-        screen.getByText(/spent 1.04 USD of its 1.00 USD free budget/),
+        screen.getByText(/used 1.04 USD of its 1.00 USD free budget/),
       ).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "Upgrade" })).toHaveAttribute(
         "href",
@@ -68,7 +70,9 @@ describe("given the deployment has no classifier", () => {
         question: "the user is annoyed",
       });
       expect(copy.title).toBe("Configure a model to judge results");
-      expect(copy.body).toContain("searched as a phrase instead");
+      expect(copy.body).toContain(
+        "For now the words are searched as a phrase.",
+      );
       expect(copy.action).toEqual({
         label: "Configure a model",
         href: MODEL_PROVIDERS_HREF,
