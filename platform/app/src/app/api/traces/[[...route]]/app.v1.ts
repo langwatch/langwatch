@@ -39,8 +39,8 @@ import {
 } from "~/server/traces/trace-formatting";
 import type { AuthMiddlewareVariables } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
-import { platformUrl } from "../../shared/platform-url";
 import { coerceToEpoch, flexibleDateSchema } from "../../shared/schemas";
+import { tracePlatformUrl } from "../../shared/trace-platform-url";
 import { isAttributeFacetKey, resolveFacetKey } from "./trace-facets";
 import { compileTraceFilter, MAX_TRACE_FILTER_LENGTH } from "./trace-filter";
 
@@ -398,17 +398,19 @@ export function registerTracesRoutes(
             metadata: trace.metadata,
             error: trace.error,
             evaluations: trace.evaluations,
-            platformUrl: platformUrl({
+            platformUrl: tracePlatformUrl({
               projectSlug: project.slug,
-              path: `/traces/${trace.trace_id}`,
+              traceId: trace.trace_id,
+              occurredAtMs: trace.timestamps?.started_at,
             }),
           };
         }
         return {
           ...trace,
-          platformUrl: platformUrl({
+          platformUrl: tracePlatformUrl({
             projectSlug: project.slug,
-            path: `/traces/${trace.trace_id}`,
+            traceId: trace.trace_id,
+            occurredAtMs: trace.timestamps?.started_at,
           }),
         };
       };
@@ -720,9 +722,10 @@ export function registerTracesRoutes(
           timestamps: trace.timestamps,
           metadata: trace.metadata,
           evaluations,
-          platformUrl: platformUrl({
+          platformUrl: tracePlatformUrl({
             projectSlug: project.slug,
-            path: `/traces/${resolvedTraceId}`,
+            traceId: resolvedTraceId,
+            occurredAtMs: trace.timestamps?.started_at,
           }),
         });
       }
@@ -732,9 +735,10 @@ export function registerTracesRoutes(
         ...trace,
         evaluations,
         ascii_tree: asciiTree,
-        platformUrl: platformUrl({
+        platformUrl: tracePlatformUrl({
           projectSlug: project.slug,
-          path: `/traces/${resolvedTraceId}`,
+          traceId: resolvedTraceId,
+          occurredAtMs: trace.timestamps?.started_at,
         }),
       });
     },
