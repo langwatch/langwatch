@@ -110,6 +110,20 @@ Feature: The agent commands show connected agents and run them through the relay
       When I run "langwatch agent run <id> --input '{...}'"
       Then the URL is called directly and the relay is not
 
+  Rule: A refused connected target comes with next steps
+
+    Scenario: An owner-only refusal tells the caller how to share the agent
+      Given a run refused with "agent_owner_only" and no advice from the platform
+      When the command line explains the failure
+      Then it says the agent belongs to the owner of the key that registered it
+      And it names LANGWATCH_AGENT_ENVIRONMENT as the way to share it
+
+    Scenario: An unresolved environment refusal points at the agents list and the shared environment
+      Given a run refused with "agent_environment_unresolved" and no advice from the platform
+      When the command line explains the failure
+      Then it points at `langwatch agent list`
+      And it names LANGWATCH_AGENT_ENVIRONMENT as the way to share a personal agent
+
   Rule: The help says which command serves which agent type
 
     Scenario: The tunnel command help points code agents to connectAgent

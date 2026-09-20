@@ -178,6 +178,12 @@ Feature: Connected agents
     And the run is refused with "agent_owner_only" naming user "u_1"
 
   @unit
+  Scenario: The unresolved refusal says a personal development agent is visible only to its owner
+    Given a run refused with "agent_environment_unresolved"
+    Then its remediation says an agent started in development with a personal key is visible only to its owner
+    And it names LANGWATCH_AGENT_ENVIRONMENT as the way to share it
+
+  @unit
   Scenario: A name with no environment that matches no connected agent is read as an id
     Given no connected agent named "agent_1"
     When a run targets "connected:agent_1"
