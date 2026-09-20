@@ -13,6 +13,7 @@ Environment:
 
 from __future__ import annotations
 
+import json
 import os
 from typing import Literal
 
@@ -27,8 +28,51 @@ SYSTEM_PROMPT = (
     "You are the support agent of ACME, an online shop for outdoor gear. Answer "
     "in two short sentences. The customer is on the {plan} plan: free plan "
     "customers pay for express shipping, pro plan customers get free next-day "
-    "delivery and priority refunds."
+    "delivery and priority refunds. When the customer says a colleague handles "
+    "the request, look the colleague up with lookup_colleague by email before "
+    "promising to hand anything over, and never claim to have contacted "
+    "someone the lookup did not find."
 )
+
+# The colleagues the agent can hand a request to. A scenario that reproduces
+# a handoff has to name one of these emails verbatim: a stand-in misses here,
+# and the run then fails for a reason the original conversation never had.
+COLLEAGUES: dict[str, dict[str, str]] = {
+    "priya.raman@northwind.example": {
+        "name": "Priya Raman",
+        "role": "workspace admin",
+    },
+}
+
+TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "lookup_colleague",
+            "description": (
+                "Find a colleague of the customer by email so a request can be "
+                "handed to them."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {"email": {"type": "string"}},
+                "required": ["email"],
+            },
+        },
+    }
+]
+
+
+def lookup_colleague(email: str) -> str:
+    found = COLLEAGUES.get(email.strip().lower())
+    if found is None:
+        return json.dumps({"found": False, "email": email})
+    return json.dumps({"found": True, "email": email, **found})
+
+
+# How many model calls one turn may take before the agent answers without a
+# further lookup.
+MAX_TOOL_ROUNDS = 4
 
 
 @langwatch.connect_agent(name=os.environ.get("AGENT_NAME", "support-agent"))
@@ -51,14 +95,31 @@ def support_agent(
     client = OpenAI()
     langwatch.get_current_trace().autotrack_openai_calls(client)
 
-    completion = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT.format(plan=plan)},
-            *messages,
-        ],
-    )
-    output = completion.choices[0].message.content or ""
+    history: list = [
+        {"role": "system", "content": SYSTEM_PROMPT.format(plan=plan)},
+        *messages,
+    ]
+    output = ""
+    for _ in range(MAX_TOOL_ROUNDS):
+        completion = client.chat.completions.create(
+            model=model,
+            messages=history,
+            tools=TOOLS,
+        )
+        reply = completion.choices[0].message
+        if not reply.tool_calls:
+            output = reply.content or ""
+            break
+        history.append(reply)
+        for call in reply.tool_calls:
+            arguments = json.loads(call.function.arguments or "{}")
+            history.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": call.id,
+                    "content": lookup_colleague(arguments.get("email", "")),
+                }
+            )
     return langwatch.AgentReply(
         output=output,
         session={"thread_id": thread_id, "turn": turn},

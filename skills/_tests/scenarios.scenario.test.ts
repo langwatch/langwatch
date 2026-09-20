@@ -984,5 +984,103 @@ describe("Scenarios Skill", () => {
       },
       3_600_000
     );
+
+    /** @scenario "Langy copies the identifier the agent looks up into the situation it reproduces" */
+    it.skipIf(isCI || !process.env.LANGWATCH_API_KEY || !process.env.OPENAI_API_KEY)(
+      "carries the colleague's email verbatim into the scenario it reproduces",
+      async () => {
+        const tempFolder = createSkillTestWorkDir("langwatch-skill-scenarios-grounding-");
+        console.log(`[scenarios grounding dogfood] working dir: ${tempFolder}`);
+
+        copyFixtureToWorkDir({
+          fixtureSubpath: "python-connected-agent",
+          workingDirectory: tempFolder,
+        });
+        copySkillToWorkDir(tempFolder);
+
+        const apiKey = process.env.LANGWATCH_API_KEY!.trim();
+        const endpoint = process.env.LANGWATCH_ENDPOINT?.trim();
+        fs.writeFileSync(
+          path.join(tempFolder, ".env"),
+          `LANGWATCH_API_KEY=${apiKey}\n` + (endpoint ? `LANGWATCH_ENDPOINT=${endpoint}\n` : ""),
+        );
+
+        // The one email the fixture agent can look up. The scenario has to
+        // carry it exactly: a stand-in makes the lookup miss.
+        const colleagueEmail = "priya.raman@northwind.example";
+        const agentName = `skill-test-handoff-${Date.now().toString(36)}`;
+        let running: RunningConnectedAgent | undefined;
+
+        try {
+          running = await startConnectedAgentFixture({
+            workingDirectory: tempFolder,
+            name: agentName,
+            env: process.env,
+          });
+
+          const result = await scenario.run({
+            setId: SKILL_TESTS_SET_ID,
+            name: "A reproduced failure keeps the identifiers the agent looks up",
+            description:
+              "The user's support agent is connected to LangWatch and can look a colleague up by " +
+              "email. A production conversation failed: the customer named a colleague by email and " +
+              "the agent claimed to have forwarded the request without looking anyone up. The scenarios " +
+              "skill must reproduce that failure as a platform scenario whose situation carries the " +
+              "colleague's exact email, and report the created scenario together with the proposed " +
+              "target and the question whether to run it.",
+            agents: [
+              createClaudeCodeAgent({ workingDirectory: tempFolder }),
+              scenario.userSimulatorAgent({ model: judgeModel }),
+              scenario.judgeAgent({
+                model: judgeModel,
+                criteria: [
+                  "Agent read the scenarios skill instructions before acting",
+                  "Agent created the scenario on the platform with the langwatch CLI, with the colleague's exact email in the situation text rather than a stand-in or a made-up address",
+                  "Agent reported the created scenario and, in the same reply, named the connected agent as the proposed target and asked whether to run it, instead of running unasked or asking without naming a target",
+                  "If any langwatch command failed, the agent reported the failure instead of claiming success",
+                ],
+              }),
+            ],
+            script: [
+              scenario.user(
+                `My support agent is connected to LangWatch as "${agentName}" and it is online right now. ` +
+                  "A production conversation went wrong. The customer wrote: \"I am not the workspace admin, " +
+                  `my colleague Priya Raman handles SSO, her email is ${colleagueEmail}, send her the SAML steps ` +
+                  "and loop her in.\" The agent answered \"Done, I forwarded the steps to Priya\" without " +
+                  "looking her up or calling any tool. Reproduce that failure as a platform scenario in a " +
+                  "test suite called Handoffs so we can prove the fix. Do not write test files.",
+              ),
+              scenario.agent(),
+              (state) => {
+                assertSkillWasRead(state, "scenarios");
+
+                const creates = bashCommands(state).filter((command) =>
+                  command.includes("langwatch scenario create"),
+                );
+                expect(
+                  creates.length,
+                  "Expected the agent to create the scenario on the platform with `langwatch scenario create`",
+                ).toBeGreaterThan(0);
+                expect(
+                  creates.some((command) => command.includes(colleagueEmail)),
+                  "Expected the colleague's email verbatim in the scenario's situation",
+                ).toBe(true);
+                expect(
+                  findTestFiles(tempFolder, /^test_.*\.py$|\.test\.ts$/).length,
+                  "Expected no test files: the platform approach uses the CLI only",
+                ).toBe(0);
+              },
+              scenario.judge(),
+            ],
+          });
+
+          expect(result.success).toBe(true);
+        } finally {
+          await running?.stop();
+          removeSkillTestWorkDir(tempFolder);
+        }
+      },
+      3_600_000
+    );
   });
 });

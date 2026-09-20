@@ -215,6 +215,25 @@ describe("native skill generation", () => {
   // a skill that isn't in the shipped image teaches the model to hallucinate.
   // The image's skill set is the root-compiled native set Docker overlays into
   // the Go embed directory.
+  // A reproduced failure is only a reproduction when the simulated user says
+  // what the customer said: the identifiers the agent looks up (an email, an
+  // order id) travel verbatim, and a redacted value is asked for, never
+  // invented. Both skills that write scenarios from traces carry the rule.
+  // Backs specs/langy/langy-scenario-grounding.feature.
+  describe("given the skills that reproduce a failing trace as a scenario", () => {
+    /** @scenario "A reproduced scenario carries the trace's identifiers verbatim" */
+    it("tell the agent to copy looked-up identifiers verbatim and to ask for a redacted one", () => {
+      for (const slug of ["agent-improve", "scenarios"]) {
+        const body = renderSkill(skills.find((s) => s.slug === slug)!);
+        expect(body, `${slug}: identifiers rule`).toContain(
+          "verbatim into the situation",
+        );
+        expect(body, `${slug}: redaction rule`).toContain("[REDACTED]");
+        expect(body, `${slug}: redaction rule`).toContain("never invent one");
+      }
+    });
+  });
+
   describe("given Langy's AGENTS.md routing table", () => {
     const readAgentsMd = () =>
       fs.readFileSync(
