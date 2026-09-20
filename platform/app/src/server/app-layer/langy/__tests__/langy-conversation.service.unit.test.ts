@@ -298,6 +298,45 @@ describe("LangyConversationService", () => {
         }
       });
 
+      it("reads only the recent tail, never the aggregate's whole history", async () => {
+        // An unbounded read (occurredAtFromMs 0) let a long FOREIGN
+        // conversation transfer its entire history — more work, and more
+        // time, than an absent id, which is the timing oracle this method
+        // must not emit (CWE-208). The evidence a create-in-flight can give
+        // is seconds old, so the read is bounded to the recent past.
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-05-01T00:00:00.000Z"));
+        try {
+          const findVisibleById = vi.fn().mockResolvedValue(row());
+          findVisibleById.mockResolvedValueOnce(null);
+          const reader = readerOf([startedBy("alice")]);
+          const svc = new LangyConversationService(
+            makeRepo({ findVisibleById }),
+            makeCommands(),
+            undefined,
+            reader,
+          );
+
+          const pending = svc.getById({
+            id: "c1",
+            projectId: "p1",
+            userId: "alice",
+          });
+          await vi.advanceTimersByTimeAsync(10_000);
+          await pending;
+
+          const occurredAtFromMs = reader.getEventsOccurredSince.mock
+            .calls[0]?.[3] as number;
+          expect(occurredAtFromMs).toBeGreaterThan(0);
+          // Recent: within a few minutes of now, not the epoch.
+          expect(Date.now() - occurredAtFromMs).toBeLessThanOrEqual(
+            10 * 60 * 1000,
+          );
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+
       it("still gives up honestly at the end of the budget", async () => {
         vi.useFakeTimers();
         try {

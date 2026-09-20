@@ -179,6 +179,24 @@ const CONVERSATION_EVENT_TAIL_LIMIT = 1_000;
 const DISPATCH_LAG_ATTEMPTS = 25;
 const DISPATCH_LAG_RETRY_MS = 400;
 /**
+ * How far back the visibility-evidence read looks — the only events that can
+ * answer "is a create in flight for this caller right now?" are the ones a
+ * create in flight just wrote.
+ *
+ * The evidence read exists for the window between a create being accepted and
+ * its projection row landing; a create still in that window is at most the
+ * dispatch budget old (`DISPATCH_LAG_ATTEMPTS * DISPATCH_LAG_RETRY_MS`, 10s),
+ * so a lower bound generously past that catches every in-flight create. It
+ * also bounds the read: without it the scan had no time floor and no row
+ * limit, so a long FOREIGN conversation transferred its whole history and
+ * took more work — and more time — than an absent id, the very timing signal
+ * this method exists not to emit (CWE-208). A recent-only read is O(recent)
+ * for every id alike. An old conversation's owner-establishing event falls
+ * outside the window, so the read finds no owner and gives up at the grace,
+ * exactly as an absent id does.
+ */
+const DISPATCH_EVIDENCE_WINDOW_MS = 5 * 60 * 1000;
+/**
  * How many attempts may pass with NO evidence that waiting can help before we
  * conclude the id is simply unknown.
  *
@@ -518,11 +536,20 @@ export class LangyConversationService {
   }): Promise<boolean> {
     if (!this.events) return false;
     try {
+      // Bounded to the recent past, never `0`: only a create still in the
+      // dispatch window can make waiting worthwhile, and its events are
+      // seconds old. An unbounded read let a long foreign conversation cost
+      // more than an absent id — a timing oracle (CWE-208). See
+      // DISPATCH_EVIDENCE_WINDOW_MS.
+      const occurredAtFromMs = Math.max(
+        0,
+        Date.now() - DISPATCH_EVIDENCE_WINDOW_MS,
+      );
       const events = await this.events.getEventsOccurredSince(
         id,
         { tenantId: createTenantId(projectId) },
         "langy_conversation",
-        0,
+        occurredAtFromMs,
       );
       return events.length > 0 && eventLogSaysVisible(events, userId);
     } catch (error) {
