@@ -9,6 +9,7 @@ import {
   generateScimTokenSchema,
   issuedScimTokenSchema,
   revokeScimTokenSchema,
+  scimDirectoryConnectionSchema,
   scimTokenRevokedSchema,
   scimTokenScopeSchema,
   scimTokenSummarySchema,
@@ -19,6 +20,11 @@ export const scimTokenTrpc = defineTrpcContract("scimToken")
   .query("list")
   .withInput(scimTokenScopeSchema)
   .withOutput(scimTokenSummarySchema.array())
+
+  /** The connections a token can be minted against, so the page names one. */
+  .query("connections")
+  .withInput(scimTokenScopeSchema)
+  .withOutput(scimDirectoryConnectionSchema.array())
 
   /** Mints one for a directory connection; the secret is answered once. */
   .mutation("generate")

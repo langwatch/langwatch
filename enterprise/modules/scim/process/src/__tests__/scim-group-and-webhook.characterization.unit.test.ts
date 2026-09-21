@@ -17,6 +17,7 @@ import { GrantsFake } from "./support/grants-fake.ts";
 function groupsRepository(): ScimDirectoryRepository {
   return {
     listGroupMemberIds: vi.fn(async () => ["user_1"]),
+    findGroupByExternalId: vi.fn(async () => null),
     findGroup: vi.fn(async () => ({
       id: "group_1",
       organizationId: "org_1",
@@ -24,6 +25,7 @@ function groupsRepository(): ScimDirectoryRepository {
       slug: "provisioned",
       scimSource: "scim",
       externalId: "external_1",
+      connectionId: null,
       createdAt: nowInstant(),
       updatedAt: nowInstant(),
     })),
@@ -96,6 +98,7 @@ describe("SCIM characterization: group PATCH membership and operation casing", (
     const groups = ScimDirectoryService.create({
       prisma: repo,
       grants: ScimGrantsService.create({ repository: repo, grants }),
+      identities: { assertWritable: vi.fn(async () => undefined) },
     });
     await groups.updateGroup({
       organizationId: "org_1",

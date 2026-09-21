@@ -11,7 +11,12 @@
  */
 import { moduleApi } from "@langwatch/kernel/module-api";
 
-import type { IssuedScimToken, ScimTokenEntitlement, ScimTokenSummary } from "./scim-token.ts";
+import type {
+  IssuedScimToken,
+  ScimDirectoryConnection,
+  ScimTokenEntitlement,
+  ScimTokenSummary,
+} from "./scim-token.ts";
 import type {
   ScimCreateGroupRequest,
   ScimCreateUserRequest,
@@ -51,6 +56,12 @@ export interface ScimApi {
 
   /** The organization's tokens, described. Never a value or a hash. */
   listTokens(input: { organizationId: string }): Promise<ScimTokenSummary[]>;
+  /**
+   * The organization's directory connections, as identity answers them. A
+   * token's whole write authority is the connection it names, so the page that
+   * mints one reads the choices from the module that owns them.
+   */
+  findConnections(input: { organizationId: string }): Promise<ScimDirectoryConnection[]>;
   /**
    * Mints a token for one directory connection. `connectionId` is the whole of
    * the token's write authority, so it is named rather than defaulted.

@@ -76,6 +76,7 @@ function userService(): ScimUserProvisioning {
 function directoryRepository(): ScimDirectoryRepository {
   return {
     findGroup: vi.fn(async () => null),
+    findGroupByExternalId: vi.fn(async () => null),
     listGroupMemberIds: vi.fn(async () => []),
     listGroupMembers: vi.fn(async () => []),
     addGroupMember: vi.fn(async () => undefined),
@@ -150,6 +151,7 @@ describe("ScimDirectoryService.listGroups", () => {
       const service = ScimDirectoryService.create({
         prisma: repository,
         grants: ScimGrantsService.create({ repository, grants: new GrantsFake() }),
+        identities: { assertWritable: vi.fn(async () => undefined) },
       });
 
       const refusal = await service

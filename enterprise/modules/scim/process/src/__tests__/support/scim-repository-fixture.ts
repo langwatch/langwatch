@@ -32,6 +32,7 @@ export function scimRepositoryFixture(overrides: Partial<ScimRepository> = {}): 
     addMembership: vi.fn(async () => undefined),
     removeMembership: vi.fn(async () => undefined),
     findGroup: vi.fn(async () => null),
+    findGroupByExternalId: vi.fn(async () => null),
     listGroups: vi.fn(async () => ({ rows: [], total: 0 })),
     createGroup: vi.fn(),
     renameGroup: vi.fn(async () => undefined),

@@ -49,3 +49,20 @@ export interface SsoGateLogger {
   info(context: object, message: string): void;
   warn(context: object, message: string): void;
 }
+
+/** The one line the history signal ever writes: a poll that could not read. */
+export type SsoActivityLogger = Pick<SsoGateLogger, "warn">;
+
+/**
+ * The organization's own read of its connection's history. Identity owns the
+ * facts and the words; this is the one call the administrator's page makes.
+ */
+export interface SsoConnectionHistoryReads {
+  getHistory(input: {
+    organizationId: string;
+    connectionId: string;
+    limit?: number;
+  }): Promise<
+    readonly { eventId: string; occurredAtMs: number; summary: string; carriedOver: boolean }[]
+  >;
+}

@@ -12,9 +12,14 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { ScimService, type ScimTokenEntitlement } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
+import type { OrganizationSsoConnection } from "@langwatch/identity-contract";
 import { vi } from "vitest";
 
 import { ScimApp } from "../../../app/scim.app.ts";
+import {
+  ScimConnectionsService,
+  type ScimConnectionReads,
+} from "../../../services/scim-connections.service.ts";
 
 export class ScimServiceFake extends ScimService {
   readonly verifyToken = vi.fn(
@@ -60,11 +65,16 @@ function fakePlan(type: string): Plan {
 export function scimTestApp(
   options: {
     scim?: ScimService;
+    connections?: OrganizationSsoConnection[];
     webhookSecret?: string | undefined;
     planType?: string;
   } = {},
 ) {
   const scim = options.scim ?? new ScimServiceFake();
+  const offered = options.connections ?? [];
+  const identity: ScimConnectionReads = {
+    ssoConnectionReads: () => ({ findForOrganization: () => Promise.resolve(offered) }),
+  };
   const audited: unknown[] = [];
   const entitlements: Pick<EntitlementApi, "getActivePlan"> = {
     getActivePlan: () => Promise.resolve(fakePlan(options.planType ?? "ENTERPRISE")),
@@ -77,6 +87,7 @@ export function scimTestApp(
   };
   const app = ScimApp.createWithService({
     scim,
+    connections: ScimConnectionsService.create(identity),
     entitlements,
     auditLog,
     webhookSecret: () => ("webhookSecret" in options ? options.webhookSecret : undefined),

@@ -1,12 +1,16 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { ssoSecrets, type SsoConfig } from "@langwatch/enterprise-sso-contract";
-import type { IdentityApi, SsoConnectionBackofficeApi } from "@langwatch/identity-contract";
+import type {
+  IdentityApi,
+  SsoConnectionBackofficeApi,
+  SsoConnectionHistoryApi,
+} from "@langwatch/identity-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OpsApi } from "@langwatch/ops-contract";
 import { ScopedSecrets, type SecretHandle } from "@langwatch/secrets";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";
 
@@ -121,6 +125,7 @@ export class RecordingSsoConnectionLedger implements SsoConnectionLedger, Ledger
   readonly suspendConnection = vi.fn<Ledger["suspendConnection"]>(async () => {});
   readonly resumeConnection = vi.fn<Ledger["resumeConnection"]>(async () => {});
   readonly requestTeardown = vi.fn<Ledger["requestTeardown"]>(async () => {});
+  readonly findHistory = vi.fn<Ledger["findHistory"]>(async () => null);
 }
 
 /** The gate's log lines, kept so a test can read what an operator would. */
@@ -133,9 +138,15 @@ export class RecordingSsoGateLogger implements SsoGateLogger {
   readonly warn = vi.fn<SsoGateLogger["warn"]>();
 }
 
-/** The identity peer, narrowed to the one capability sso reads off it. */
-export function createSsoTestIdentity(connections: SsoConnectionBackofficeApi): IdentityApi {
-  return createApiFixture<IdentityApi>({ ssoBackoffice: () => connections });
+/** The identity peer, narrowed to the capabilities sso reads off it. */
+export function createSsoTestIdentity(
+  connections: SsoConnectionBackofficeApi,
+  history?: SsoConnectionHistoryApi,
+): IdentityApi {
+  return createApiFixture<IdentityApi>({
+    ssoBackoffice: () => connections,
+    ...(history ? { ssoConnectionHistory: () => history } : {}),
+  });
 }
 
 export function createSsoTestApp(

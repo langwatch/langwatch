@@ -17,6 +17,7 @@ const group = {
   slug: "engineering",
   scimSource: "scim",
   externalId: "group-1",
+  connectionId: null,
   createdAt: Temporal.Instant.from("2024-01-01T00:00:00Z"),
   updatedAt: Temporal.Instant.from("2024-01-02T00:00:00Z"),
 };
@@ -24,6 +25,7 @@ const group = {
 function repository(): ScimDirectoryRepository {
   return {
     findGroup: vi.fn(async () => group),
+    findGroupByExternalId: vi.fn(async () => null),
     listGroupMemberIds: vi.fn(async () => ["user-1", "user-2"]),
     listGroupMembers: vi.fn(async () => []),
     addGroupMember: vi.fn(async () => undefined),
@@ -47,6 +49,7 @@ function harness() {
   const service = ScimDirectoryService.create({
     prisma: repo,
     grants: ScimGrantsService.create({ repository: repo, grants }),
+    identities: { assertWritable: vi.fn(async () => undefined) },
   });
   const update = (operations: unknown[]) =>
     service.updateGroup({

@@ -24,6 +24,10 @@ export const scimTokenTrpcTransport = defineTrpcRouter(ScimApi, scimTokenTrpc)
   .withPermission("organization:manage")
   .handle(({ app, input }) => app.listTokens({ organizationId: input.organizationId }))
 
+  .procedure("connections")
+  .withPermission("organization:manage")
+  .handle(({ app, input }) => app.findConnections({ organizationId: input.organizationId }))
+
   .procedure("generate")
   .withPermission("organization:manage")
   .handle(({ app, input }) =>

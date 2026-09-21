@@ -25,10 +25,13 @@ import {
   type SsoConfig,
   type SsoConfiguration,
   type SsoConnectionByIdInput,
+  type SsoConnectionHistoryEntry,
   type SsoConnectionReasonInput,
   type SsoConnectionTarget,
   type SsoDomainTarget,
+  type SsoHistoryActivity,
   type SsoOperator,
+  type SsoSetupConnectionInput,
 } from "@langwatch/enterprise-sso-contract";
 import { IdentityApi } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
@@ -40,8 +43,11 @@ import {
   buildSocialProviders,
 } from "../rules/better-auth-sso-adapter.rules.ts";
 import { SsoGateService, SsoProviderMountInspector } from "../services/sso-gate.service.ts";
+import { SsoHistoryActivityService } from "../services/sso-history-activity.service.ts";
 import type {
+  SsoActivityLogger,
   SsoConnectionLedgerOperator,
+  SsoConnectionHistoryReads,
   SsoConnectionLedger,
   SsoGateLogger,
 } from "./sso.members.ts";
@@ -165,6 +171,8 @@ export class SsoApp implements SsoApiContract {
 
   readonly #gate: SsoGateService;
   readonly #connections: SsoConnectionLedger;
+  readonly #history: SsoConnectionHistoryReads;
+  readonly #historyActivity: SsoHistoryActivityService;
   readonly #operators: OpsApi;
   readonly #users: UserApi;
   readonly #auditLog: AuditLogApi;
@@ -172,10 +180,14 @@ export class SsoApp implements SsoApiContract {
   private constructor(
     gate: SsoGateService,
     connections: SsoConnectionLedger,
+    history: SsoConnectionHistoryReads,
+    logger: SsoActivityLogger,
     dependencies: SsoSetup["dependencies"],
   ) {
     this.#gate = gate;
     this.#connections = connections;
+    this.#history = history;
+    this.#historyActivity = SsoHistoryActivityService.create({ history, logger });
     this.#operators = dependencies.operators;
     this.#users = dependencies.users;
     this.#auditLog = dependencies.auditLog;
@@ -207,8 +219,29 @@ export class SsoApp implements SsoApiContract {
         providerMountInspector: BetterAuthSsoProviderMount.create(),
       }),
       connections,
+      { getHistory: (input) => dependencies.identity.ssoConnectionHistory().getHistory(input) },
+      members.logger,
       dependencies,
     );
+  }
+
+  async findConnectionHistory(
+    input: SsoSetupConnectionInput,
+  ): Promise<SsoConnectionHistoryEntry[]> {
+    const entries = await this.#history.getHistory(input);
+
+    return entries.map((entry) => ({
+      eventId: entry.eventId,
+      occurredAtMs: entry.occurredAtMs,
+      summary: entry.summary,
+      carriedOver: entry.carriedOver,
+    }));
+  }
+
+  watchConnectionHistory(
+    input: SsoSetupConnectionInput & { signal?: AbortSignal },
+  ): AsyncGenerator<SsoHistoryActivity> {
+    return this.#historyActivity.ticks(input);
   }
 
   platformAllowed(): Promise<boolean> {

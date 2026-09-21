@@ -5,6 +5,7 @@
  * @see enterprise/modules/scim/specs/scim.feature
  */
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import type { OrganizationSsoConnection } from "@langwatch/identity-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -54,9 +55,14 @@ class TokenDirectoryFake extends ScimServiceFake {
   override readonly revokeToken = vi.fn(async () => ({ success: true }) as const);
 }
 
-function mount(options: { permits?: (permission: string) => boolean } = {}) {
+function mount(
+  options: {
+    permits?: (permission: string) => boolean;
+    connections?: OrganizationSsoConnection[];
+  } = {},
+) {
   const scim = new TokenDirectoryFake();
-  const { app } = scimTestApp({ scim });
+  const { app } = scimTestApp({ scim, connections: options.connections });
   const trpc = initTRPC.context<ScimTrpcTestContext>().create();
   const router = createTrpcRuntime<ScimTrpcTestContext>({
     root: trpc,
@@ -73,6 +79,7 @@ describe("the scimToken tRPC namespace", () => {
       const { router } = mount();
 
       expect(Object.keys(router._def.procedures).toSorted()).toEqual([
+        "connections",
         "generate",
         "list",
         "revoke",
@@ -88,7 +95,12 @@ describe("the scimToken tRPC namespace", () => {
         ]),
       );
 
-      expect(kinds).toEqual({ list: "query", generate: "mutation", revoke: "mutation" });
+      expect(kinds).toEqual({
+        list: "query",
+        connections: "query",
+        generate: "mutation",
+        revoke: "mutation",
+      });
     });
   });
 
@@ -111,7 +123,39 @@ describe("the scimToken tRPC namespace", () => {
     });
   });
 
+  describe("given the organization holds directory connections", () => {
+    describe("when the page asks which one a token could be minted against", () => {
+      /** @scenario "The connections offered are the ones the identity module holds" */
+      it("answers the connections identity holds, lifecycle state and all", async () => {
+        const { caller } = mount({
+          connections: [
+            { connectionId: "ssoconn_1", displayName: "Okta", state: "ACTIVE" },
+            { connectionId: "ssoconn_2", displayName: "Entra ID", state: "DRAFT" },
+          ],
+        });
+
+        await expect(caller.connections({ organizationId: "org_1" })).resolves.toEqual([
+          { connectionId: "ssoconn_1", displayName: "Okta", state: "ACTIVE" },
+          { connectionId: "ssoconn_2", displayName: "Entra ID", state: "DRAFT" },
+        ]);
+      });
+    });
+  });
+
   describe("given a caller who may only read the organization", () => {
+    describe("when the connections behind the mint are read", () => {
+      it("refuses, because the choice is part of minting", async () => {
+        const { caller } = mount({
+          permits: (permission) => permission === "organization:view",
+          connections: [{ connectionId: "ssoconn_1", displayName: "Okta", state: "ACTIVE" }],
+        });
+
+        await expect(caller.connections({ organizationId: "org_1" })).rejects.toMatchObject({
+          code: "FORBIDDEN",
+        });
+      });
+    });
+
     describe("when a token is minted", () => {
       it("refuses the mint, because minting is the authority to invite anybody", async () => {
         const { caller, scim } = mount({

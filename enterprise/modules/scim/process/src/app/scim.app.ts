@@ -39,6 +39,7 @@ import {
   type ScimServerConfig,
   type ScimService,
   type ScimDeliveryAdmission,
+  type ScimDirectoryConnection,
   type ScimTokenAuditEntry,
   type ScimTokenEntitlement,
   type ScimTokenSummary,
@@ -49,12 +50,14 @@ import {
   EntitlementApi,
   isEnterpriseTier,
 } from "@langwatch/entitlement-contract";
+import { IdentityApi } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { UserApi } from "@langwatch/user-contract";
 
 import { PrismaScimRepository } from "../repositories/prisma/prisma.scim.repository.ts";
 import { PostgresScimService } from "../services/postgres-scim.service.ts";
+import { ScimConnectionsService } from "../services/scim-connections.service.ts";
 import { ScimDirectoryStreamService } from "../services/scim-directory-stream.service.ts";
 import type { ScimSyncLifecycle } from "./scim.members.ts";
 
@@ -107,23 +110,27 @@ export class ScimApp implements ScimApiContract {
     governance: GovernanceRestApi,
     entitlements: EntitlementApi,
     auditLog: AuditLogApi,
+    identity: IdentityApi,
   };
   static readonly config = scimConfig;
   static readonly secrets = scimSecrets;
   static readonly reads = reads("prisma");
 
   readonly #scim: ScimService;
+  readonly #connections: ScimConnectionsService;
   readonly #entitlements: Pick<EntitlementApi, "getActivePlan">;
   readonly #auditLog: Pick<AuditLogApi, "record">;
   readonly #webhook: ScimDirectoryStreamService;
 
   private constructor(options: {
     scim: ScimService;
+    connections: ScimConnectionsService;
     entitlements: Pick<EntitlementApi, "getActivePlan">;
     auditLog: Pick<AuditLogApi, "record">;
     webhookSecret: () => string | undefined;
   }) {
     this.#scim = options.scim;
+    this.#connections = options.connections;
     this.#entitlements = options.entitlements;
     this.#auditLog = options.auditLog;
     this.#webhook = ScimDirectoryStreamService.create({
@@ -148,6 +155,7 @@ export class ScimApp implements ScimApiContract {
 
     return ScimApp.createWithService({
       scim,
+      connections: ScimConnectionsService.create(dependencies.identity),
       entitlements: dependencies.entitlements,
       auditLog: dependencies.auditLog,
       webhookSecret: () => auth0WebhookSecret,
@@ -161,6 +169,7 @@ export class ScimApp implements ScimApiContract {
    */
   static createWithService(options: {
     scim: ScimService;
+    connections: ScimConnectionsService;
     entitlements: Pick<EntitlementApi, "getActivePlan">;
     auditLog: Pick<AuditLogApi, "record">;
     webhookSecret: () => string | undefined;
@@ -172,6 +181,10 @@ export class ScimApp implements ScimApiContract {
 
   listTokens(input: { organizationId: string }): Promise<ScimTokenSummary[]> {
     return this.#scim.listTokens(input);
+  }
+
+  findConnections(input: { organizationId: string }): Promise<ScimDirectoryConnection[]> {
+    return this.#connections.findConnections(input);
   }
 
   generateToken(input: {

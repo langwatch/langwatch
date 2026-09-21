@@ -254,3 +254,46 @@ Feature: Enterprise SCIM package boundary
       Given a directory pushing a group with its own identifier
       When the group is created
       Then the answer carries that identifier back
+
+  Rule: A provisioning token is only offered the connections that could carry it
+
+    A token's whole write authority is the connection it is bound to, so the
+    page offers the organization's connections as the module that owns them
+    answers - and never one that cannot route, which authenticates perfectly
+    and provisions nobody, discovered at the provider rather than here.
+
+    @unit
+    Scenario: The connections offered are the ones the identity module holds
+      Given an organization with directory connections
+      When the settings page asks which one a token could be minted against
+      Then the connections come back with their lifecycle state
+
+    @integration
+    Scenario: Only live connections are offered when issuing a provisioning token
+      Given an organization with a live connection and one that was never turned on
+      When an administrator goes to issue a provisioning token
+      Then only the live connection is offered to bind it to
+
+    @integration
+    Scenario: A single live connection is taken without asking
+      Given exactly one connection that routes
+      When a token is generated
+      Then the mint names that connection
+
+    @integration
+    Scenario: Several live connections hold the mint until one is named
+      Given two connections that route
+      When the generate dialog opens
+      Then the mint is held until one of them is chosen
+
+    @integration
+    Scenario: An organization with nothing live says so rather than offering an empty choice
+      Given an organization whose only connection is still a draft
+      When the generate dialog opens
+      Then no token is minted and the page says a connection has to come first
+
+    @integration
+    Scenario: A token issued against a connection since retired still names it
+      Given a token issued against a connection that has been torn down
+      When the provisioning tokens are read
+      Then the token still names the connection it was issued against

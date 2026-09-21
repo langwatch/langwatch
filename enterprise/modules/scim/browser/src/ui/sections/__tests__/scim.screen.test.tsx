@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const { state, calls } = vi.hoisted(() => ({
   state: {
     rows: [] as Record<string, unknown>[],
+    connections: [] as { connectionId: string; displayName: string; state: string }[],
     minted: { token: "scim_live_secret_value" },
   },
   calls: { generate: vi.fn(), revoke: vi.fn(), invalidate: vi.fn() },
@@ -21,6 +22,7 @@ vi.mock("../../../behavior/scim-api.ts", () => ({
     useUtils: () => ({ scimToken: { list: { invalidate: calls.invalidate } } }),
     scimToken: {
       list: { useQuery: () => ({ data: state.rows, isLoading: false }) },
+      connections: { useQuery: () => ({ data: state.connections, isLoading: false }) },
       generate: {
         useMutation: () => ({
           isPending: false,
@@ -51,15 +53,37 @@ import ScimScreen from "../scim.screen.tsx";
 
 const token = (overrides: Record<string, unknown> = {}) => ({
   id: "token-1",
+  connectionId: "ssoconn_1",
   description: "Okta SCIM integration",
   createdAt: new Date("2026-01-02T00:00:00.000Z"),
   lastUsedAt: null,
   ...overrides,
 });
 
+const connection = (
+  overrides: Partial<{ connectionId: string; displayName: string; state: string }> = {},
+) => ({
+  connectionId: "ssoconn_1",
+  displayName: "Okta",
+  state: "ACTIVE",
+  ...overrides,
+});
+
+/** Opens the dialog and answers with its own submit, which mounts a tick later. */
+async function openGenerateDialog() {
+  fireEvent.click(screen.getByRole("button", { name: /generate token/i }));
+
+  return waitFor(() => {
+    const buttons = screen.getAllByRole("button", { name: /generate token/i });
+    if (buttons.length < 2) throw new Error("the dialog has not mounted yet");
+    return buttons[buttons.length - 1]!;
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   state.rows = [];
+  state.connections = [connection()];
   state.minted = { token: "scim_live_secret_value" };
 });
 
@@ -108,25 +132,87 @@ describe("given tokens exist", () => {
 });
 
 describe("when a token is generated", () => {
-  it("shows the minted value, which nothing can recover afterwards", async () => {
+  /** @scenario "A single live connection is taken without asking" */
+  it("names the connection it provisions for, which the service requires", async () => {
     renderWithScimHost(<ScimScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: /generate token/i }));
-    // The dialog mounts in a portal a tick later, so its own submit is the
-    // second button by this name rather than the one that opened it.
-    // The dialog mounts in a portal on a later tick, so its own submit is the
-    // second button by this name rather than the one that opened it.
-    const submit = await waitFor(() => {
-      const buttons = screen.getAllByRole("button", { name: /generate token/i });
-      if (buttons.length < 2) throw new Error("the dialog has not mounted yet");
-      return buttons[buttons.length - 1]!;
-    });
-    fireEvent.click(submit);
+    fireEvent.click(await openGenerateDialog());
 
     expect(calls.generate).toHaveBeenCalledWith({
       organizationId: "org-1",
+      connectionId: "ssoconn_1",
       description: void 0,
     });
     expect(await screen.findByDisplayValue("scim_live_secret_value")).toBeTruthy();
+  });
+});
+
+describe("given the organization has several live connections", () => {
+  /** @scenario "Several live connections hold the mint until one is named" */
+  it("holds the mint until one of them is named, rather than guessing", async () => {
+    state.connections = [
+      connection(),
+      connection({ connectionId: "ssoconn_2", displayName: "Entra ID" }),
+    ];
+
+    renderWithScimHost(<ScimScreen />);
+
+    const submit = await openGenerateDialog();
+    expect(submit.hasAttribute("disabled")).toBe(true);
+
+    fireEvent.change(screen.getByLabelText("Connection"), { target: { value: "ssoconn_2" } });
+    fireEvent.click(screen.getAllByRole("button", { name: /generate token/i }).at(-1)!);
+
+    expect(calls.generate).toHaveBeenCalledWith({
+      organizationId: "org-1",
+      connectionId: "ssoconn_2",
+      description: void 0,
+    });
+  });
+});
+
+describe("given no connection is live yet", () => {
+  /** @scenario "An organization with nothing live says so rather than offering an empty choice" */
+  it("says a connection has to come first instead of minting a dead token", async () => {
+    state.connections = [connection({ state: "DRAFT" })];
+
+    renderWithScimHost(<ScimScreen />);
+
+    const submit = await openGenerateDialog();
+
+    expect(submit.hasAttribute("disabled")).toBe(true);
+    expect(screen.getByText(/waiting for single sign-on/i)).toBeTruthy();
+    fireEvent.click(submit);
+    expect(calls.generate).not.toHaveBeenCalled();
+  });
+});
+
+describe("given a connection that was never turned on", () => {
+  /** @scenario "Only live connections are offered when issuing a provisioning token" */
+  it("keeps it out of the chooser, where a token against it would sync nobody", async () => {
+    state.connections = [
+      connection(),
+      connection({ connectionId: "ssoconn_2", displayName: "Entra ID", state: "DRAFT" }),
+    ];
+
+    renderWithScimHost(<ScimScreen />);
+    await openGenerateDialog();
+
+    const options = Array.from(screen.getByLabelText("Connection").querySelectorAll("option")).map(
+      (option) => option.textContent,
+    );
+    expect(options).toEqual(["Choose a connection", "Okta"]);
+  });
+});
+
+describe("given a token issued against a connection since retired", () => {
+  /** @scenario "A token issued against a connection since retired still names it" */
+  it("still names that connection, which is the row a reader needs most", () => {
+    state.connections = [connection({ state: "TORN_DOWN" })];
+    state.rows = [token()];
+
+    renderWithScimHost(<ScimScreen />);
+
+    expect(screen.getByText("Okta")).toBeTruthy();
   });
 });

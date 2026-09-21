@@ -37,6 +37,7 @@ class EnterpriseEntitlements implements Pick<EntitlementApi, "getActivePlan"> {
 
 function groupRepository(): ScimDirectoryRepository {
   return {
+    findGroupByExternalId: vi.fn(async () => null),
     findGroup: vi.fn(async () => ({
       id: "group-1",
       organizationId: "org-1",
@@ -44,6 +45,7 @@ function groupRepository(): ScimDirectoryRepository {
       slug: "engineering",
       scimSource: "scim",
       externalId: "group-1",
+      connectionId: null,
       createdAt: Temporal.Instant.from("2024-01-01T00:00:00Z"),
       updatedAt: Temporal.Instant.from("2024-01-02T00:00:00Z"),
     })),
@@ -164,6 +166,7 @@ describe("SCIM PATCH operation casing parity", () => {
     const service = ScimDirectoryService.create({
       prisma: repo,
       grants: ScimGrantsService.create({ repository: repo, grants }),
+      identities: { assertWritable: vi.fn(async () => undefined) },
     });
     await service.updateGroup({
       externalScimId: "group-1",

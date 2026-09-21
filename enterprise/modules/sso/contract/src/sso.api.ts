@@ -1,6 +1,11 @@
 import { moduleApi } from "@langwatch/kernel/module-api";
 
 import type {
+  SsoConnectionHistoryEntry,
+  SsoHistoryActivity,
+  SsoSetupConnectionInput,
+} from "./sso-setup.contract.ts";
+import type {
   ActivateSsoConnectionInput,
   BackofficeSsoConnection,
   BackofficeSsoConnectionPage,
@@ -50,6 +55,21 @@ export interface SsoApi {
   suspendConnection(input: SsoConnectionReasonInput, by: SsoOperator): Promise<void>;
   resumeConnection(input: SsoConnectionTarget, by: SsoOperator): Promise<void>;
   requestTeardown(input: SsoConnectionReasonInput, by: SsoOperator): Promise<void>;
+
+  /**
+   * What happened to one of the caller's own connections, newest first. The
+   * organization is the caller's, so this is the administrator's read rather
+   * than the operator's; identity owns the facts and the words.
+   */
+  findConnectionHistory(input: SsoSetupConnectionInput): Promise<SsoConnectionHistoryEntry[]>;
+
+  /**
+   * A tick per change to that same history, for as long as the caller listens.
+   * The signal names the connection and nothing else.
+   */
+  watchConnectionHistory(
+    input: SsoSetupConnectionInput & { signal?: AbortSignal },
+  ): AsyncGenerator<SsoHistoryActivity>;
 }
 
 export const SsoApi = moduleApi<SsoApi>()("sso");

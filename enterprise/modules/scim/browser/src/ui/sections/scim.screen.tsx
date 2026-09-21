@@ -2,12 +2,14 @@
 // Token shown exactly once; unrecoverable after dialog closes. No chrome.
 
 import {
+  Alert,
   Badge,
   Button,
   Card,
   Heading,
   HStack,
   Input,
+  NativeSelect,
   Spacer,
   Table,
   Text,
@@ -19,6 +21,7 @@ import { Key, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import { scimApi } from "../../behavior/scim-api.ts";
+import { chosenConnectionOf, isActiveConnection } from "../../model/connection-lifecycle.ts";
 import { readableDate } from "../../model/display-formatters.ts";
 import { useScimHost } from "../../model/scim-host.ts";
 import { CopyInput } from "../../ui/elements/copy-input.tsx";
@@ -34,6 +37,7 @@ export default function ScimScreen() {
 function ScimSettingsContent({ organizationId }: { organizationId: string }) {
   const host = useScimHost();
   const tokens = scimApi.scimToken.list.useQuery({ organizationId });
+  const connections = scimApi.scimToken.connections.useQuery({ organizationId });
   const generateMutation = scimApi.scimToken.generate.useMutation();
   const revokeMutation = scimApi.scimToken.revoke.useMutation();
   const queryClient = scimApi.useUtils();
@@ -45,16 +49,32 @@ function ScimSettingsContent({ organizationId }: { organizationId: string }) {
   } = useDisclosure();
 
   const [description, setDescription] = useState("");
+  const [connectionId, setConnectionId] = useState("");
   const [newToken, setNewToken] = useState<string | null>(null);
   const [tokenToRevoke, setTokenToRevoke] = useState<string | null>(null);
 
+  const connectionOptions = connections.data ?? [];
+  const labelFor = (id: string | null) =>
+    connectionOptions.find((option) => option.connectionId === id)?.displayName ?? id;
+  /**
+   * Only the connections that could carry a token: one issued against a draft,
+   * a rejected claim or a torn-down connection authenticates perfectly and
+   * provisions nobody — a dead end found at the provider rather than here.
+   */
+  const issuableConnections = connectionOptions.filter((option) =>
+    isActiveConnection({ connectionState: option.state }),
+  );
+  const hasIssuableConnection = issuableConnections.length > 0;
+  const chosenConnectionId = chosenConnectionOf({ connectionId, issuableConnections });
+
   const handleGenerate = () => {
     generateMutation.mutate(
-      { organizationId, description: description || undefined },
+      { organizationId, connectionId: chosenConnectionId, description: description || undefined },
       {
         onSuccess: (result) => {
           setNewToken(result.token);
           setDescription("");
+          setConnectionId("");
           void queryClient.scimToken.list.invalidate();
         },
         onError: (error) => host.failed({ error, fallbackTitle: "Failed to generate token" }),
@@ -122,6 +142,7 @@ function ScimSettingsContent({ organizationId }: { organizationId: string }) {
               <Table.Header>
                 <Table.Row>
                   <Table.ColumnHeader>Description</Table.ColumnHeader>
+                  <Table.ColumnHeader>Connection</Table.ColumnHeader>
                   <Table.ColumnHeader>Created</Table.ColumnHeader>
                   <Table.ColumnHeader>Last Used</Table.ColumnHeader>
                   <Table.ColumnHeader width="80px"></Table.ColumnHeader>
@@ -130,7 +151,7 @@ function ScimSettingsContent({ organizationId }: { organizationId: string }) {
               <Table.Body>
                 {tokens.data?.length === 0 && (
                   <Table.Row>
-                    <Table.Cell colSpan={4}>
+                    <Table.Cell colSpan={5}>
                       <Text color="gray.500" textAlign="center" paddingY={4}>
                         No SCIM tokens yet. Generate one to get started.
                       </Text>
@@ -144,6 +165,12 @@ function ScimSettingsContent({ organizationId }: { organizationId: string }) {
                         <Key size={14} />
                         <Text>{token.description ?? "No description"}</Text>
                       </HStack>
+                    </Table.Cell>
+                    <Table.Cell>
+                      {/* The full list resolves the name, not just the issuable
+                          ones: a retired connection is exactly the row whose
+                          name a reader needs. */}
+                      <Text>{labelFor(token.connectionId) ?? "Organization-wide"}</Text>
                     </Table.Cell>
                     <Table.Cell>{readableDate(token.createdAt).toLocaleDateString()}</Table.Cell>
                     <Table.Cell>
@@ -180,6 +207,7 @@ function ScimSettingsContent({ organizationId }: { organizationId: string }) {
           if (!open) {
             onGenerateClose();
             setDescription("");
+            setConnectionId("");
           }
         }}
       >
@@ -193,8 +221,42 @@ function ScimSettingsContent({ organizationId }: { organizationId: string }) {
           <Dialog.Body paddingBottom={6}>
             <VStack gap={4} align="start">
               <Text>
-                This token will be used by your identity provider to authenticate SCIM requests.
+                This token manages the people its connection provisioned, so choose the connection
+                your identity provider syncs from.
               </Text>
+              <VStack gap={1} align="start" width="full">
+                <Text fontWeight="600" fontSize="sm">
+                  Connection
+                </Text>
+                {hasIssuableConnection ? (
+                  <NativeSelect.Root>
+                    <NativeSelect.Field
+                      aria-label="Connection"
+                      value={chosenConnectionId}
+                      onChange={(event) => setConnectionId(event.target.value)}
+                    >
+                      <option value="">Choose a connection</option>
+                      {issuableConnections.map((option) => (
+                        <option key={option.connectionId} value={option.connectionId}>
+                          {option.displayName}
+                        </option>
+                      ))}
+                    </NativeSelect.Field>
+                    <NativeSelect.Indicator />
+                  </NativeSelect.Root>
+                ) : (
+                  <Alert.Root status="info">
+                    <Alert.Indicator />
+                    <Alert.Content>
+                      <Alert.Title>Waiting for single sign-on</Alert.Title>
+                      <Alert.Description>
+                        Finish setting up and activate an identity provider connection before
+                        issuing a directory sync token.
+                      </Alert.Description>
+                    </Alert.Content>
+                  </Alert.Root>
+                )}
+              </VStack>
               <VStack gap={1} align="start" width="full">
                 <Text fontWeight="600" fontSize="sm">
                   Description (optional)
@@ -205,9 +267,22 @@ function ScimSettingsContent({ organizationId }: { organizationId: string }) {
                   onChange={(e) => setDescription(e.target.value)}
                 />
               </VStack>
-              <Button width="full" onClick={handleGenerate} disabled={generateMutation.isPending}>
+              <Button
+                width="full"
+                onClick={handleGenerate}
+                disabled={generateMutation.isPending || !chosenConnectionId}
+              >
                 Generate Token
               </Button>
+              {/* A held button with no sentence is a dead end: the reader
+                  cannot tell whether they missed a field or found a bug. */}
+              {!generateMutation.isPending && !chosenConnectionId && (
+                <Text color="fg.muted" fontSize="xs">
+                  {hasIssuableConnection
+                    ? "Choose which connection this token provisions for, above."
+                    : "A token provisions people for one single sign-on connection, so there has to be a live one first."}
+                </Text>
+              )}
             </VStack>
           </Dialog.Body>
         </Dialog.Content>

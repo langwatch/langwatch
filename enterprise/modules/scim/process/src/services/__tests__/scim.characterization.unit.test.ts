@@ -14,7 +14,7 @@ import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
 
 const now = new Date("2026-08-25T12:00:00.000Z");
 
-function repository(overrides: Record<string, unknown> = {}): ScimRepository {
+function repository(overrides: Partial<ScimRepository> = {}): ScimRepository {
   return {
     findOrganizationBySsoDomain: vi.fn(),
     createToken: vi.fn(async () => ({ id: "token_1" })),
@@ -35,6 +35,7 @@ function repository(overrides: Record<string, unknown> = {}): ScimRepository {
     addMembership: vi.fn(async () => undefined),
     removeMembership: vi.fn(async () => undefined),
     findGroup: vi.fn(async () => null),
+    findGroupByExternalId: vi.fn(async () => null),
     listGroups: vi.fn(async () => ({ rows: [], total: 0 })),
     createGroup: vi.fn(),
     renameGroup: vi.fn(async () => undefined),
@@ -46,7 +47,7 @@ function repository(overrides: Record<string, unknown> = {}): ScimRepository {
     groupSlugExists: vi.fn(async () => false),
     listRoleBindings: vi.fn(async () => []),
     ...overrides,
-  } as ScimRepository;
+  };
 }
 
 class FixedEntitlementService implements Pick<EntitlementApi, "getActivePlan"> {

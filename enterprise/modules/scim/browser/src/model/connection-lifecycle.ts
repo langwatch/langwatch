@@ -25,3 +25,21 @@ const LIVE_STATE = "ACTIVE";
 export function isActiveConnection({ connectionState }: { connectionState: string }): boolean {
   return connectionState === LIVE_STATE;
 }
+
+/**
+ * Which connection a token is minted against. With exactly one to choose from
+ * the choice is already made and asking is an errand; with several, nothing is
+ * assumed — a token on the wrong connection has the wrong write authority.
+ */
+export function chosenConnectionOf({
+  connectionId,
+  issuableConnections,
+}: {
+  connectionId: string;
+  issuableConnections: { connectionId: string }[];
+}): string {
+  if (connectionId) return connectionId;
+  if (issuableConnections.length !== 1) return "";
+
+  return issuableConnections[0]?.connectionId ?? "";
+}

@@ -39,6 +39,21 @@ export const scimTokenRevokedSchema = z.object({ success: z.literal(true) }).str
 export const scimTokenScopeSchema = z.object({ organizationId: z.string() });
 
 /**
+ * One directory connection a token can be minted against, as the settings page
+ * offers it. Identity owns the rows; `state` is identity's lifecycle word, and
+ * which of them may carry a token is the page's reading of it.
+ */
+export const scimDirectoryConnectionSchema = z
+  .object({
+    connectionId: z.string(),
+    displayName: z.string(),
+    state: z.string(),
+  })
+  .strict();
+
+export type ScimDirectoryConnection = z.infer<typeof scimDirectoryConnectionSchema>;
+
+/**
  * What minting asks for. `connectionId` is optional on the wire and required
  * by the application, so a client that has not been updated reads the named
  * `scim_connection_required` refusal rather than a schema error.

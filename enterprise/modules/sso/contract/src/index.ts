@@ -1,5 +1,14 @@
 export { SsoApi, type SsoOperator } from "./sso.api.ts";
 export { ssoConnectionTrpc } from "./sso-connection.trpc.ts";
+export { ssoSetupTrpc } from "./sso-setup.trpc.ts";
+export {
+  ssoConnectionHistoryEntrySchema,
+  ssoHistoryActivitySchema,
+  ssoSetupConnectionSchema,
+  type SsoConnectionHistoryEntry,
+  type SsoHistoryActivity,
+  type SsoSetupConnectionInput,
+} from "./sso-setup.contract.ts";
 export {
   activateSsoConnectionInputSchema,
   backofficeSsoConnectionPageSchema,
