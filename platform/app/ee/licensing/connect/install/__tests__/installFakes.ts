@@ -29,6 +29,32 @@ export const NOW = new Date("2026-09-19T12:00:00.000Z");
 export const ORGANIZATION_ID = "org_connected";
 
 /**
+ * The identity this install presents. A UUID minted into its own database, not
+ * the organization id: one install carrying three organizations presents this
+ * one id to everything.
+ */
+export const INSTANCE_ID = "3f1c2b40-9a7e-4f2a-8f4c-6b1f0c2d9e77";
+
+/**
+ * The instance identity table of an install that has already minted one.
+ *
+ * Suites spread this into their fake Prisma client, so a call that reaches for
+ * the identity gets the same one every time rather than minting a fresh UUID
+ * that the lease it is about to verify was never signed for.
+ */
+export function instanceIdentityTable(instanceId: string = INSTANCE_ID) {
+  return {
+    findUnique: async () => ({
+      instanceId,
+      lastReportAt: null,
+      lastReportError: null,
+    }),
+    create: async () => ({ instanceId }),
+    updateMany: async () => ({ count: 1 }),
+  };
+}
+
+/**
  * A license for 50 full member seats, signed by the LangWatch key pair. It
  * names both hosted services by default, because most suites here are about
  * what a connected install does; a suite about an offline install passes
@@ -65,7 +91,7 @@ export const OFFLINE_LICENSE = mintLicense({ connectServices: [] });
 
 export function credentialOf(
   licenseKey: string,
-  instanceId: string = ORGANIZATION_ID,
+  instanceId: string = INSTANCE_ID,
 ): ConnectCredential {
   const token = licenseTokenFromKey(licenseKey);
   if (!token) throw new Error("the fixture license has no token");
@@ -75,7 +101,7 @@ export function credentialOf(
 /** A lease LangWatch signed for this license and this install. */
 export function leaseFor({
   licenseId = LICENSE.licenseData.licenseId,
-  instanceId = ORGANIZATION_ID,
+  instanceId = INSTANCE_ID,
   seatOverageAllowance = 5,
   issuedAt = NOW,
   privateKey = LANGWATCH_KEYS.privateKey,

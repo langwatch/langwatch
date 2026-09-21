@@ -8,11 +8,12 @@ import {
   RETENTION_CATEGORIES,
 } from "../../src/server/data-retention/retentionPolicy.schema";
 import { readConnectConfig } from "./connect/install/connectConfig";
+import { licenseConnectServices } from "./connect/install/connectEntitlement";
 import {
-  installInstanceId,
   readInstalledLease,
   seatAllowanceOf,
 } from "./connect/install/installedLease";
+import { readInstanceId } from "./connect/install/instanceIdentity";
 import { PUBLIC_KEY, UNLIMITED_PLAN } from "./constants";
 import { resolvePlanDefaults } from "./defaults";
 import { OrganizationNotFoundError } from "./errors";
@@ -168,9 +169,8 @@ export class LicenseHandler {
       return UNLIMITED_PLAN;
     }
 
-    return this.withSeatAllowance({
+    return await this.withSeatAllowance({
       plan: mapToPlanInfo(signedLicense.data),
-      organizationId,
       licenseKey,
       lease: organization?.connectLease,
     });
@@ -187,26 +187,44 @@ export class LicenseHandler {
    * lease we did not sign, one naming another license or another install, or
    * one past its 30 days, this is the plan main resolves.
    */
-  private withSeatAllowance({
+  private async withSeatAllowance({
     plan,
-    organizationId,
     licenseKey,
     lease,
   }: {
     plan: PlanInfo;
-    organizationId: string;
     licenseKey: string;
     lease: unknown;
-  }): PlanInfo {
+  }): Promise<PlanInfo> {
+    // No lease, no read: an install that never synced holds nothing here, and
+    // resolving a plan is not a reason to touch another table.
+    if (lease === null || lease === undefined) return plan;
     if (!readConnectConfig().permitted) {
       return plan;
     }
+
+    // Decided from the license blob, before anything is read. A license that
+    // names no hosted service never synced, so whatever sits in the lease
+    // column cannot be one LangWatch signed for it, and an offline install
+    // resolves its plan without a second query.
+    if (
+      licenseConnectServices({ licenseKey, publicKey: this.publicKey })
+        .length === 0
+    ) {
+      return plan;
+    }
+
+    // Read, never mint. A lease exists only after a sync, and a sync only after
+    // the identity was minted, so an install with no identity has no lease that
+    // could apply and this path never writes.
+    const instanceId = await readInstanceId(this.prisma);
+    if (!instanceId) return plan;
 
     const allowance = seatAllowanceOf(
       readInstalledLease({
         licenseKey,
         lease,
-        instanceId: installInstanceId(organizationId),
+        instanceId,
         publicKey: this.publicKey,
         now: new Date(),
       }),

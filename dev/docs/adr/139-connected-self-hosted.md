@@ -493,11 +493,33 @@ null. The answer and the credential are held per project and per organization
 for 30 seconds, so a run of ten thousand judgements reads the row once and an
 admin's decision takes effect without a restart.
 
-**What identifies the install.** The instance id is the organization id of the
-organization whose license is used, unless `LANGWATCH_CONNECT_INSTANCE_ID`
-names one. It survives restarts, backups and hostname changes: a restore of the
-same database keeps the identity, while a second install with a database of its
-own presents another id and is refused as `connect_wrong_instance`.
+**What identifies the install.** A UUID in `InstanceIdentity`, one row, minted
+the first time anything asks for it and never rewritten, unless
+`LANGWATCH_CONNECT_INSTANCE_ID` names one. It survives restarts, backups and
+hostname changes: a restore of the same database keeps the identity, while a
+second install with a database of its own mints another and is refused as
+`connect_wrong_instance`. Two processes minting at once both insert; one wins
+the primary key and the other re-reads the winner's id.
+
+What it replaced was `${organization.name}__${organization.id}`, the id the
+usage report has always carried. It put the customer's name in cleartext on
+every report, named one organization rather than one install, so an install
+with three organizations sent three reports nothing could join, and could not
+be matched to a license row without splitting a string.
+
+Two rules keep the table from being written by accident. `installInstanceId`
+mints; `readInstanceId` returns null where there is no row, and that is what a
+reader asks for. Resolving a seat plan and opening a settings page both read,
+so neither gives an install an identity it has not needed yet, and the seat
+path decides from the license blob before it reads anything at all.
+
+**Whether the report arrived.** The sender used to treat any resolved `fetch`
+as a success and the receiver was `.strict()`, so a receiver one release behind
+its senders refused every newer install's report and both sides looked healthy
+for as long as they ran. The receiver now drops unknown fields instead of
+refusing the report, and counts them as `unknown_fields` so a receiver running
+behind says so. The sender reads the status and writes a refusal to
+`InstanceIdentity.lastReportError`, which is what the checkup page shows.
 
 **Two refusals the host cannot name.** `connect_unreachable` carries the host
 and port an outbound rule has to allow, and `connect_budget_exhausted` says the
@@ -551,6 +573,7 @@ side. `validateLicense`, `LicenseHandler` and the seat guard import neither.
 | Env (install) | `LANGWATCH_CONNECT_DISABLED`, `LANGWATCH_CONNECT_LICENSE_ENDPOINT`, `LANGWATCH_CONNECT_GATEWAY_ENDPOINT`, `LANGWATCH_CONNECT_INSTANCE_ID`, `DISABLE_USAGE_STATS`, `SERVICE_VERSION`, `HTTPS_PROXY` |
 | Helm | `app.connect.disabled`, `app.connect.licenseEndpoint`, `app.connect.gatewayEndpoint`, `app.connect.instanceId` |
 | Entitlement | `LicenseData.connectServices`, signed into the license |
+| Instance identity | `InstanceIdentity` (one row: `instanceId`, `lastReportAt`, `lastReportError`) |
 | Install opt-out | `Organization.connectServicesDisabled` (empty by default, so an entitled service is on) |
 | Gateway host | `POST /v1/instant-evals/classify`, `GET /v1/usage`, `PUT /v1/budget` |
 | Control plane, gateway only | `POST /api/internal/gateway/connect/:operation` (HMAC signed) |

@@ -1,13 +1,21 @@
 /**
  * Daily self-hosted usage telemetry sender.
  *
- * Runs as an in-process interval loop, one send per organization,
- * following the same pattern as
- * `src/server/observability/anomalyWorker.ts`. Sends nothing when
- * DISABLE_USAGE_STATS or IS_SAAS is set.
+ * Runs as an in-process interval loop, one report per install, following the
+ * same pattern as `src/server/observability/anomalyWorker.ts`. Sends nothing
+ * when DISABLE_USAGE_STATS or IS_SAAS is set.
+ *
+ * One report, not one per organization. The identity is the UUID minted into
+ * this install's database, so an install carrying three organizations is one
+ * install here rather than three unrelated ones, and nothing about the
+ * customer travels in the identity.
+ *
+ * The response is read. It used to be thrown away, so an install whose reports
+ * were being refused looked healthy from both sides for as long as it ran; a
+ * refusal is now written to the instance row and shown on the checkup page.
  *
  * The receiver is `/api/track_usage` on app.langwatch.ai, and it stays that
- * for every install that has not switched Connect on. A connected install
+ * for every install whose license names no hosted service. A connected install
  * posts the same body to the connect host instead, so one host answers
  * everything it sends (ADR-139, section 6). These statistics are separate from
  * the license sync in both directions: DISABLE_USAGE_STATS stops these and
@@ -16,6 +24,10 @@
 
 import { readConnectConfig } from "@ee/licensing/connect/install/connectConfig";
 import { installIsEntitled } from "@ee/licensing/connect/install/connectEntitlement";
+import {
+  installInstanceId,
+  recordInstanceReport,
+} from "@ee/licensing/connect/install/instanceIdentity";
 import { createLogger } from "@langwatch/observability";
 import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
@@ -56,9 +68,12 @@ export async function usageStatsEndpoint(
   return `${readConnectConfig().licenseEndpoint}/v1/stats`;
 }
 
-async function sendUsageStatsForAllOrganizations(): Promise<void> {
-  const organizations = await prisma.organization.findMany({
-    select: { id: true, name: true },
+/** One report for the whole install, and what came back. */
+export async function sendUsageStats(
+  prismaClient: PrismaClient = prisma,
+): Promise<void> {
+  const organizations = await prismaClient.organization.findMany({
+    select: { id: true },
   });
 
   if (organizations.length === 0) {
@@ -66,35 +81,62 @@ async function sendUsageStatsForAllOrganizations(): Promise<void> {
     return;
   }
 
-  // Default to self-hosted if not specified — mirrors the old worker.
+  // Default to self-hosted if not specified, as the old worker did.
   const installMethod = process.env.INSTALL_METHOD ?? "self-hosted";
-  const endpoint = await usageStatsEndpoint();
+  const endpoint = await usageStatsEndpoint(prismaClient);
+  const instanceId = await installInstanceId(prismaClient);
 
-  for (const organization of organizations) {
-    const instanceId = `${organization.name}__${organization.id}`;
-    try {
-      const stats = await collectUsageStats({ instanceId });
-      await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          event: "daily_usage_stats",
-          install_method: installMethod,
-          hostname: process.env.BASE_HOST,
-          environment: process.env.NODE_ENV,
-          instance_id: instanceId,
-          ...stats,
-        }),
+  try {
+    const stats = await collectUsageStats({
+      organizationIds: organizations.map((organization) => organization.id),
+    });
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        event: "daily_usage_stats",
+        install_method: installMethod,
+        hostname: process.env.BASE_HOST,
+        environment: process.env.NODE_ENV,
+        instance_id: instanceId,
+        ...stats,
+      }),
+    });
+
+    if (!response.ok) {
+      // Named by status rather than by body: the body is whatever the host
+      // chose to say, and the status is what an operator can act on.
+      const refusal = `usage_report_refused_${response.status}`;
+      logger.warn(
+        { instanceId, status: response.status },
+        "usage stats refused",
+      );
+      await recordInstanceReport({
+        prisma: prismaClient,
+        error: refusal,
+        at: new Date(),
       });
-      logger.info({ instanceId }, "usage stats sent");
-    } catch (error) {
-      logger.error({ instanceId, error }, "failed to send usage stats");
-      await withScope(async (scope) => {
-        scope.setTag?.("worker", "usageStats");
-        scope.setExtra?.("instanceId", instanceId);
-        captureException(toError(error));
-      });
+      return;
     }
+
+    await recordInstanceReport({
+      prisma: prismaClient,
+      error: null,
+      at: new Date(),
+    });
+    logger.info({ instanceId }, "usage stats sent");
+  } catch (error) {
+    logger.error({ instanceId, error }, "failed to send usage stats");
+    await recordInstanceReport({
+      prisma: prismaClient,
+      error: "usage_report_unreachable",
+      at: new Date(),
+    }).catch(() => undefined);
+    await withScope(async (scope) => {
+      scope.setTag?.("worker", "usageStats");
+      scope.setExtra?.("instanceId", instanceId);
+      captureException(toError(error));
+    });
   }
 }
 
@@ -116,7 +158,7 @@ export function startUsageStatsWorker(): UsageStatsWorkerHandle | undefined {
   const tick = async () => {
     if (stopped) return;
     try {
-      await sendUsageStatsForAllOrganizations();
+      await sendUsageStats();
     } catch (error) {
       logger.warn(
         { error },

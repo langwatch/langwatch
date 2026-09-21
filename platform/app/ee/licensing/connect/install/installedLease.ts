@@ -20,20 +20,9 @@ import {
   leaseState,
   verifyLease,
 } from "../lease";
-import { readConnectConfig } from "./connectConfig";
-
 export interface InstalledLease {
   readonly payload: LeasePayload;
   readonly state: LeaseState;
-}
-
-/**
- * The identity this install presents to LangWatch: the organization id unless
- * an operator named one. The same id the gateway calls carry, because the
- * registry binds a license to one instance.
- */
-export function installInstanceId(organizationId: string): string {
-  return readConnectConfig().instanceIdOverride ?? organizationId;
 }
 
 /** The verified lease behind a stored license, or null where there is none. */

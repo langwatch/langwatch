@@ -39,8 +39,11 @@ vi.mock("../connectConfig", () => ({
 }));
 
 import { LicenseHandler } from "../../../licenseHandler";
+import { resetInstanceIdentity } from "../instanceIdentity";
 import {
   credentialOf,
+  INSTANCE_ID,
+  instanceIdentityTable,
   LANGWATCH_KEYS,
   LICENSE,
   leaseFor,
@@ -67,6 +70,7 @@ function prismaWith(lease: unknown) {
         connectLease: lease,
       })),
     },
+    instanceIdentity: instanceIdentityTable(),
   } as never;
 }
 
@@ -106,6 +110,7 @@ async function inviteAnotherFullMember({
 
 beforeEach(() => {
   connectEnabled.current = true;
+  resetInstanceIdentity();
   vi.useFakeTimers({ now: NOW });
   return () => vi.useRealTimers();
 });
@@ -315,11 +320,12 @@ describe("given an air-gapped install", () => {
 describe("given the credential the install presents", () => {
   describe("when the instance id is resolved", () => {
     /** @scenario "The instance id on sync is the one the gateway sees" */
-    it("is the organization id, and carries no organization name", () => {
+    it("is the minted identity, carrying no organization name or id", () => {
       const credential = credentialOf(LICENSE.licenseKey);
 
-      expect(credential.instanceId).toBe(ORGANIZATION_ID);
+      expect(credential.instanceId).toBe(INSTANCE_ID);
       expect(credential.instanceId).not.toContain("ACME");
+      expect(credential.instanceId).not.toContain(ORGANIZATION_ID);
     });
   });
 });

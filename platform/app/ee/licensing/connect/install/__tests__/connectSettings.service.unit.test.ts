@@ -6,7 +6,7 @@
  * @see specs/self-hosting/connected-services/connect-settings.feature
  */
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PrismaClient } from "~/generated/prisma/client";
 import { isAuditLogExempt } from "~/server/api/auditLogExemptions";
@@ -16,7 +16,10 @@ import type {
   ConnectUsage,
 } from "../connectGatewayClient";
 import { ConnectSettingsService } from "../connectSettings.service";
+import { resetInstanceIdentity } from "../instanceIdentity";
 import {
+  INSTANCE_ID,
+  instanceIdentityTable,
   LANGWATCH_KEYS,
   leaseFor,
   mintLicense,
@@ -99,6 +102,7 @@ function storeWith(row: Row) {
         })),
         update,
       },
+      instanceIdentity: instanceIdentityTable(),
     } as unknown as PrismaClient,
   };
 }
@@ -145,7 +149,7 @@ function serviceOver({
 function leaseOfRecord(issuedAt: Date = NOW) {
   return leaseFor({
     licenseId: LICENSE_ID,
-    instanceId: ORGANIZATION,
+    instanceId: INSTANCE_ID,
     seatOverageAllowance: 10,
     issuedAt,
   });
@@ -154,6 +158,10 @@ function leaseOfRecord(issuedAt: Date = NOW) {
 function syncOf(status: Awaited<ReturnType<ConnectSettingsService["status"]>>) {
   return status.deployment === "on" ? status.sync : null;
 }
+
+beforeEach(() => {
+  resetInstanceIdentity();
+});
 
 describe("given a deployment with Connect switched off", () => {
   describe("when an admin reads the Connect settings", () => {

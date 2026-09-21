@@ -37,23 +37,25 @@ describe("collectUsageStats", () => {
     vi.clearAllMocks();
   });
 
-  describe("when instanceId is invalid", () => {
-    it("throws an error", async () => {
+  describe("when the install carries no organization", () => {
+    it("throws, because there is nothing to report", async () => {
       await expect(
         collectUsageStats({
-          instanceId: "bad",
+          organizationIds: [],
           repository: repositoryOver(null),
         }),
-      ).rejects.toThrow("Invalid instance ID");
+      ).rejects.toThrow(
+        "an install with no organization has nothing to report",
+      );
     });
   });
 
-  describe("when organization has zero projects", () => {
+  describe("when the install has zero projects", () => {
     it("returns zero for traces and scenarios", async () => {
       vi.mocked(prisma.project.findMany).mockResolvedValue([]);
 
       const result = await collectUsageStats({
-        instanceId: "inst__org-1",
+        organizationIds: ["org-1"],
         repository: repositoryOver(null),
       });
 
@@ -77,13 +79,43 @@ describe("collectUsageStats", () => {
         });
 
       const result = await collectUsageStats({
-        instanceId: "inst__org-1",
+        organizationIds: ["org-1"],
         repository: repositoryOver({ query: mockClickHouseQuery }),
       });
 
       expect(result.totalTraces).toBe(200);
       expect(result.totalScenarioEvents).toBe(75);
       expect(mockClickHouseQuery).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("when the install carries two organizations", () => {
+    it("adds their counts together, because one install is one report", async () => {
+      vi.mocked(prisma.project.findMany).mockResolvedValue([
+        { id: "proj-1" },
+      ] as any);
+
+      mockClickHouseQuery
+        .mockResolvedValueOnce({
+          json: () => Promise.resolve([{ Total: "10" }]),
+        })
+        .mockResolvedValueOnce({
+          json: () => Promise.resolve([{ Total: "20" }]),
+        })
+        .mockResolvedValueOnce({
+          json: () => Promise.resolve([{ Total: "1" }]),
+        })
+        .mockResolvedValueOnce({
+          json: () => Promise.resolve([{ Total: "2" }]),
+        });
+
+      const result = await collectUsageStats({
+        organizationIds: ["org-1", "org-2"],
+        repository: repositoryOver({ query: mockClickHouseQuery }),
+      });
+
+      expect(result.totalTraces).toBe(30);
+      expect(result.totalScenarioEvents).toBe(3);
     });
   });
 
@@ -94,7 +126,7 @@ describe("collectUsageStats", () => {
       ] as any);
 
       const result = await collectUsageStats({
-        instanceId: "inst__org-1",
+        organizationIds: ["org-1"],
         repository: repositoryOver(null),
       });
 

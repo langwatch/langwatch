@@ -7,10 +7,10 @@
  * organization has none of its own. An organization with neither cannot use
  * Connect, which is the same rule that governs every other licensed surface.
  *
- * The instance id defaults to the organization id. It survives restarts,
- * backups and hostname changes, and a second install restored from another
- * database presents a different one, which is what the host refuses as
- * `connect_wrong_instance`.
+ * The instance id is the one minted into this install's own database. It
+ * survives restarts, backups and hostname changes, and a second install
+ * restored from another database presents a different one, which is what the
+ * host refuses as `connect_wrong_instance`.
  */
 
 import { env } from "~/env.mjs";
@@ -18,7 +18,7 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import { licenseTokenFromKey } from "../../licenseToken";
 import { readConnectConfig } from "./connectConfig";
 import type { ConnectCredential } from "./connectTransport";
-import { installInstanceId } from "./installedLease";
+import { installInstanceId } from "./instanceIdentity";
 
 export async function resolveConnectCredential({
   prisma,
@@ -41,5 +41,5 @@ export async function resolveConnectCredential({
   const token = licenseTokenFromKey(licenseKey);
   if (!token) return null;
 
-  return { token, instanceId: installInstanceId(organizationId) };
+  return { token, instanceId: await installInstanceId(prisma) };
 }

@@ -60959,7 +60959,9 @@ app:
     # Every value here is optional. Set none of them and the license decides.
     gatewayEndpoint: "https://gateway.langwatch.ai"
     licenseEndpoint: "https://connect.langwatch.ai"
-    # Set this only when you have a reason to name the identity yourself.
+    # Set this only when you have a reason to name the identity yourself. The
+    # default is minted once into this install's own database and never
+    # rewritten, so it survives restarts, backups and hostname changes.
     instanceId: ""
 ```
 
@@ -60970,7 +60972,7 @@ The chart writes these as environment variables on the app and the workers. Set 
 | `LANGWATCH_CONNECT_DISABLED` | off | Switches hosted services and usage reporting off entirely. With it on, the install builds no client and opens no connection to LangWatch, whatever its license says. |
 | `LANGWATCH_CONNECT_GATEWAY_ENDPOINT` | `https://gateway.langwatch.ai` | Where hosted services are called. |
 | `LANGWATCH_CONNECT_LICENSE_ENDPOINT` | `https://connect.langwatch.ai` | Where the daily license sync goes. |
-| `LANGWATCH_CONNECT_INSTANCE_ID` | the id of the organization whose license is used | The identity this install presents on both hosts. |
+| `LANGWATCH_CONNECT_INSTANCE_ID` | a UUID minted into this install's own database | The identity this install presents on both hosts. |
 | `SERVICE_VERSION` | the app image tag | The release this install reports. The chart sets it for you. |
 
 Both endpoints must be `https`; plain `http` is accepted for a loopback host only, for a developer running both sides on one machine. Restart the app and the workers after changing any of them.

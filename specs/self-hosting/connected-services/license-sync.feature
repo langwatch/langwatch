@@ -13,7 +13,7 @@ Feature: License sync
   So that I am never blocked from adding a colleague and never emailed a key again
 
   Background:
-    Given a self-hosted install with Connect enabled
+    Given a self-hosted install whose license names a hosted service
     And an organization with a valid license for 50 seats that LangWatch has registered
 
   # ============================================================================
@@ -31,6 +31,47 @@ Feature: License sync
     When the daily sync runs
     Then it sends the same instance id the install presents to the hosted services
     And the instance id does not contain the organization name
+
+  @unit
+  Scenario: The instance identity names the install, not an organization
+    Given an install carrying three organizations
+    When anything asks this install for its identity
+    Then one identity is answered, a random UUID minted into this install's own database
+    And it carries no organization name and no organization id
+    And asking again answers the same one, whichever organization asked
+
+  @unit
+  Scenario: Two processes minting the identity at once end with one identity
+    Given an install that has never presented an identity
+    When two processes mint one at the same time
+    Then the one that loses the write takes the identity the winner minted
+
+  @unit
+  Scenario: An operator can name the identity this install presents
+    Given a deployment configuration that names an instance id
+    When anything asks this install for its identity
+    Then the named one is answered and nothing is minted
+
+  @unit
+  Scenario: A refused usage report is recorded rather than logged and forgotten
+    Given the last usage report was accepted
+    When LangWatch refuses the next one
+    Then the refusal is recorded against this install
+    And the day the last report was accepted is left where it was
+
+  @integration
+  Scenario: The receiver accepts a report carrying a field it has never heard of
+    Given a receiver running an older release than the install
+    When the install posts a report naming a metric the receiver does not know
+    Then the report is accepted
+    And the unknown field is dropped before anything is recorded
+    And the report is recorded with a count of how many fields were dropped
+
+  @integration
+  Scenario: The receiver accepts a report missing fields it expects
+    Given a receiver running a newer release than the install
+    When the install posts a report without the metrics added since
+    Then the report is accepted with the fields it did send
 
   @unit
   Scenario: Product statistics stay optional and separate

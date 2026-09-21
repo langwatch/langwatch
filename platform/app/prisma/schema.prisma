@@ -6331,3 +6331,29 @@ model ConnectedStatement {
   @@unique([accountId, month])
   @@index([accountId])
 }
+
+/// The identity this install presents to LangWatch (ADR-139, section 2).
+///
+/// Exactly one row, minted on first use and never rewritten. It survives
+/// restarts, backups and hostname changes, and an install restored into
+/// another database mints another one, which is what the registry refuses as
+/// the wrong instance.
+///
+/// It replaced an identity built from the organization name and id, which
+/// leaked the customer's name in cleartext, named one organization rather than
+/// one install, and could not be joined to a license row without splitting a
+/// string.
+model InstanceIdentity {
+  /// Fixed, so this table holds one row. A second insert loses the race on the
+  /// primary key and re-reads the winner's id.
+  id              String    @id @default("self")
+  /// A random UUID. Carries nothing about the customer.
+  instanceId      String    @unique
+  createdAt       DateTime  @default(now())
+  /// When the usage report last reached LangWatch, and why the last attempt
+  /// did not. Both are what the checkup page reads to say whether reporting
+  /// works, which nothing recorded before: the sender logged success as soon
+  /// as `fetch` resolved and never looked at the response.
+  lastReportAt    DateTime?
+  lastReportError String?
+}

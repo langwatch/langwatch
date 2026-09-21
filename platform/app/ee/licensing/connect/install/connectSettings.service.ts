@@ -31,7 +31,8 @@ import {
   getConnectGatewayClient,
 } from "./connectGatewayClient";
 import type { ConnectCredential } from "./connectTransport";
-import { installInstanceId, readInstalledLease } from "./installedLease";
+import { readInstalledLease } from "./installedLease";
+import { readInstanceId } from "./instanceIdentity";
 
 /** What a refused read came back as, for the page to render. */
 export interface ConnectRefusal {
@@ -100,7 +101,7 @@ export class ConnectSettingsService {
       deployment: "on",
       gatewayHost: new URL(config.gatewayEndpoint).host,
       enabledServices: entitled.filter((service) => !disabled.has(service)),
-      sync: this.syncOf({ organizationId, organization }),
+      sync: await this.syncOf(organization),
     } as const;
 
     if (!credential) {
@@ -243,23 +244,25 @@ export class ConnectSettingsService {
    * expired lease is still reported, because "the allowance was withdrawn on
    * this day" is the answer an admin is looking for.
    */
-  private syncOf({
-    organizationId,
-    organization,
-  }: {
-    organizationId: string;
-    organization: ConnectOrganizationRow | null;
-  }): ConnectSyncView {
+  private async syncOf(
+    organization: ConnectOrganizationRow | null,
+  ): Promise<ConnectSyncView> {
     const licenseKey = organization?.license ?? null;
-    const installed = licenseKey
-      ? readInstalledLease({
-          licenseKey,
-          lease: organization?.connectLease,
-          instanceId: installInstanceId(organizationId),
-          publicKey: this.deps.publicKey ?? PUBLIC_KEY,
-          now: this.deps.now?.() ?? new Date(),
-        })
+    // Read, never mint: opening a settings page is not a reason to give this
+    // install an identity it has not needed yet.
+    const instanceId = licenseKey
+      ? await readInstanceId(this.deps.prisma)
       : null;
+    const installed =
+      licenseKey && instanceId
+        ? readInstalledLease({
+            licenseKey,
+            lease: organization?.connectLease,
+            instanceId,
+            publicKey: this.deps.publicKey ?? PUBLIC_KEY,
+            now: this.deps.now?.() ?? new Date(),
+          })
+        : null;
 
     return {
       lastSyncAt: organization?.connectLastSyncAt?.toISOString() ?? null,

@@ -168,8 +168,10 @@ describe("a license minted by main before this change", () => {
     });
 
     it("carries no allowance and reads no lease", async () => {
-      // A lease on the row is not enough on its own: with Connect off the plan
-      // is the plain licensed one, whatever a previous connected run left.
+      // A lease on the row is not enough on its own. This license names no
+      // hosted service, so it never synced, so nothing in that column can be
+      // a lease LangWatch signed for it: the plan is the plain licensed one
+      // and no other table is read to decide that.
       const withLease = new LicenseHandler({
         prisma: offlinePrisma(fixture.licenseKey, {
           payload: { seatOverageAllowance: 500 },

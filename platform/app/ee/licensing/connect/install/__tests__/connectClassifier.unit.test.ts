@@ -15,7 +15,14 @@ import {
   STATE_TTL_MS,
 } from "../connectClassifier";
 import { readConnectConfig } from "../connectConfig";
-import { LANGWATCH_KEYS, LICENSE, mintLicense } from "./installFakes";
+import { resetInstanceIdentity } from "../instanceIdentity";
+import {
+  INSTANCE_ID,
+  instanceIdentityTable,
+  LANGWATCH_KEYS,
+  LICENSE,
+  mintLicense,
+} from "./installFakes";
 
 const env = vi.hoisted(() => ({}) as Record<string, unknown>);
 
@@ -67,6 +74,7 @@ function prismaWith(row: Row) {
           license: row.license,
         })),
       },
+      instanceIdentity: instanceIdentityTable(),
     } as unknown as PrismaClient,
   };
 }
@@ -108,6 +116,7 @@ function judge(classifier: ConnectInstantEvalClassifier) {
 beforeEach(() => {
   for (const key of Object.keys(env)) delete env[key];
   process.env.LANGWATCH_LICENSE_PUBLIC_KEY = LANGWATCH_KEYS.publicKey;
+  resetInstanceIdentity();
 });
 
 describe("given an organization whose license names no hosted judging", () => {
@@ -176,7 +185,7 @@ describe("given an organization whose license names hosted judging", () => {
       });
       expect(call).toHaveBeenCalledWith(
         expect.objectContaining({
-          credential: expect.objectContaining({ instanceId: ORGANIZATION }),
+          credential: expect.objectContaining({ instanceId: INSTANCE_ID }),
           text: "the customer wrote in",
           questions: [QUESTION],
         }),

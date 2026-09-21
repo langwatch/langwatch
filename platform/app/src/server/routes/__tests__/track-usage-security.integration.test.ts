@@ -96,7 +96,11 @@ describe("POST /api/track_usage", () => {
       expect(capture).toHaveBeenCalledWith({
         distinctId: "acme__org_1",
         event: "daily_usage_stats",
-        properties: { ...VALID_STATS_FIELDS, totalTraces: 42 },
+        properties: {
+          ...VALID_STATS_FIELDS,
+          totalTraces: 42,
+          unknown_fields: 0,
+        },
       });
     });
   });
@@ -122,24 +126,34 @@ describe("POST /api/track_usage", () => {
   });
 
   describe("when the body carries a property outside the known schema", () => {
-    it("rejects with 400 rather than forwarding the extra field", async () => {
+    /** @scenario "The receiver accepts a report carrying a field it has never heard of" */
+    it("accepts the report and drops the extra field before recording it", async () => {
+      // A newer install naming a metric this release has never heard of is
+      // the ordinary case, not an attack: refusing it would take that
+      // install's telemetry with it, permanently. Dropping the field keeps
+      // the security property, because nothing outside the known set is ever
+      // recorded, and the count says the senders are ahead of this receiver.
       const res = await request({
         body: dailyUsageStatsBody({ injected_marker: "attacker-controlled" }),
       });
 
-      expect(res.status).toBe(400);
-      expect(capture).not.toHaveBeenCalled();
+      expect(res.status).toBe(200);
+      expect(capture).toHaveBeenCalledTimes(1);
+      const properties = capture.mock.calls[0]?.[0]?.properties as Record<
+        string,
+        unknown
+      >;
+      expect(properties.injected_marker).toBeUndefined();
+      expect(properties.unknown_fields).toBe(1);
     });
   });
 
   describe("when an older self-hosted sender omits stat fields this receiver added later", () => {
+    /** @scenario "The receiver accepts a report missing fields it expects" */
     it("accepts the partial report rather than 400ing every field-set drift", async () => {
-      // usageStatsWorker.ts is a stable receiver contract — self-hosted
-      // instances at any historical version hit it, so a shape older than
-      // today's collectUsageStats.ts (e.g. before totalScenarioEvents was
-      // added) must still be accepted. The worker never checks the response
-      // status, so a 400 here would silently and permanently drop that
-      // instance's telemetry with no operator-visible symptom.
+      // This is a stable receiver contract: self-hosted instances at any
+      // version hit it, so a shape older than today's collectUsageStats.ts,
+      // from before totalScenarioEvents was added, must still be accepted.
       const res = await request({
         body: {
           event: "daily_usage_stats",
@@ -152,7 +166,7 @@ describe("POST /api/track_usage", () => {
       expect(capture).toHaveBeenCalledWith({
         distinctId: "legacy-sender__org_1",
         event: "daily_usage_stats",
-        properties: { totalTraces: 1 },
+        properties: { totalTraces: 1, unknown_fields: 0 },
       });
     });
   });
