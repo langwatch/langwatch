@@ -12,6 +12,7 @@ import type { LangWatchQLQueryResult, LangWatchQLSchema } from "@langwatch/analy
  */
 export const SCHEMA_RESPONSE: LangWatchQLSchema = {
   database: "analytics",
+  appFunctions: [],
   datasets: [
     {
       name: "analytics.traces_daily",

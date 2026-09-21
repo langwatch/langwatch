@@ -2,3 +2,7 @@ export type { InstantEvalServerConfig } from "./instant-eval.config.ts";
 export { instantEvalConfig } from "./instant-eval.config.ts";
 export { instantEvalTrpc } from "./instant-eval.trpc.ts";
 export * from "./instant-eval.api.ts";
+export * from "./instant-eval.errors.ts";
+export * from "./instant-eval-judging.ts";
+export * from "./instant-eval-limits.ts";
+export * from "./instant-eval.schemas.ts";

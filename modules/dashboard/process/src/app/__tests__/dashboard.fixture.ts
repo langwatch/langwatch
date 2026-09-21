@@ -25,7 +25,7 @@ export const FULLY_PERMITTED: LangWatchQLProtections = {
 export function createDashboardTestAnalytics(overrides: Partial<AnalyticsApi> = {}): AnalyticsApi {
   return createApiFixture<AnalyticsApi>({
     isLangWatchQLAvailable: () => true,
-    describeLangWatchQLSchema: () => ({ database: "analytics", datasets: [] }),
+    describeLangWatchQLSchema: () => ({ database: "analytics", datasets: [], appFunctions: [] }),
     validateLangWatchQL: (_input: LangWatchQLValidationInput) => undefined,
     executeLangWatchQL: async (_input: LangWatchQLExecuteInput) =>
       ({

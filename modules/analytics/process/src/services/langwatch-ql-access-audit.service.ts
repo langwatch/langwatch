@@ -37,6 +37,22 @@ export class LangWatchQLAccessAuditService {
   }
 
   /**
+   * Audits that the restricted identity holds no function-management grant:
+   * calling a SQL UDF needs none, and one here would let customer SQL replace
+   * the projection UDFs hydration trusts. Empty is the healthy state.
+   */
+  appFunctionGrantAuditQuery({ names }: { names: LangWatchQLNames }): string {
+    accessModel.assertNames(names);
+
+    return (
+      `SELECT access_type FROM system.grants\n` +
+      `WHERE user_name = ${clickHouseLiteral(names.restrictedUser)}\n` +
+      `  AND access_type ILIKE '%FUNCTION%'\n` +
+      `ORDER BY access_type`
+    );
+  }
+
+  /**
    * Audits row-policy coverage from the server rather than from a hand-written list: every
    * object the restricted identity holds a `SELECT` grant on must be scoped to one tenant, in
    * one of exactly two ways.

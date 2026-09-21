@@ -4,8 +4,18 @@
  * the permission needed; datasets with no readable column are absent.
  */
 
-import type { LangWatchQLProtections, LangWatchQLSchema } from "@langwatch/analytics-contract";
+import type {
+  LangWatchQLProtections,
+  LangWatchQLSchema,
+  LangWatchQLSchemaAppFunction,
+} from "@langwatch/analytics-contract";
 
+import {
+  LWQL_APP_FUNCTION_CATALOG,
+  lwqlAppFunctionCap,
+  lwqlAppFunctionSignature,
+} from "../rules/langwatch-ql-app-function-catalog.rules.ts";
+import type { LangWatchQLAppFunctionDefinition } from "../rules/langwatch-ql-app-function-shapes.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules.ts";
 import {
   LangWatchQLCatalogShapesService,
@@ -79,16 +89,56 @@ export class LangWatchQLSchemaService {
   }
 
   /**
-   * The LangWatchQL schema, scoped to what one caller's permissions unlock.
+   * The app functions, scoped to what this caller's permissions unlock, from
+   * the same held-permission set the validator's policy is built from — so the
+   * endpoint cannot publish one as available that the validator would refuse.
    */
+  describeAppFunctions({
+    database,
+    protections,
+    appFunctions = LWQL_APP_FUNCTION_CATALOG,
+    isInstantEvalsEnabled = false,
+  }: {
+    database: string;
+    protections: LangWatchQLProtections;
+    appFunctions?: readonly LangWatchQLAppFunctionDefinition[];
+    /** Whether this project may call an eval function. Off unless it is asked. */
+    isInstantEvalsEnabled?: boolean;
+  }): readonly LangWatchQLSchemaAppFunction[] {
+    const held = catalogShapes.heldPermissions(protections);
+
+    return appFunctions.map((definition) => ({
+      name: definition.name,
+      kind: definition.kind,
+      signature: lwqlAppFunctionSignature(definition),
+      description: definition.description,
+      returns: definition.returns,
+      encoding: definition.encoding,
+      keyKind: definition.keyKind,
+      cap: lwqlAppFunctionCap(definition),
+      gates: definition.gates,
+      // Two conditions for an eval function, both about whether the call would
+      // work: the caller's permissions, and whether this project may judge at
+      // all. Publishing one as available where nothing can answer it puts a
+      // caller in front of a query that always comes back null.
+      available:
+        definition.gates.every((gate) => held.has(gate)) &&
+        (definition.kind !== "eval" || isInstantEvalsEnabled),
+      exampleSql: definition.example(database),
+    }));
+  }
+
+  /** The LangWatchQL schema, scoped to what one caller's permissions unlock. */
   describe({
     database,
     protections,
     views = LWQL_VIEW_CATALOG,
+    isInstantEvalsEnabled = false,
   }: {
     database: string;
     protections: LangWatchQLProtections;
     views?: readonly LangWatchQLViewDefinition[];
+    isInstantEvalsEnabled?: boolean;
   }): LangWatchQLSchema {
     const withheld = new Set(catalogShapes.gatedColumns({ protections, views }));
 
@@ -111,6 +161,7 @@ export class LangWatchQLSchemaService {
         })),
         exampleSql: this.exampleSql({ database, view }),
       })),
+      appFunctions: this.describeAppFunctions({ database, protections, isInstantEvalsEnabled }),
     };
   }
 }

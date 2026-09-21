@@ -5,9 +5,11 @@
  */
 
 import { clickHouseLiteral } from "../rules/langwatch-ql-sql-literal.rules.ts";
+import { LangWatchQLAppFunctionStatementsService } from "../services/langwatch-ql-app-function-statements.service.ts";
 import { LangWatchQLSqlTextService } from "../services/langwatch-ql-sql-text.service.ts";
 
 const sqlText = LangWatchQLSqlTextService.create();
+const appFunctionStatements = LangWatchQLAppFunctionStatementsService.create();
 
 /** Column names of the key-map table, which this module owns end to end. */
 export const KEY_MAP_COLUMNS = {
@@ -301,16 +303,26 @@ export class LangWatchQLAccessModelService {
     password,
     lwqlTables,
     limits = DEFAULT_LWQL_RESOURCE_LIMITS,
+    includeAppFunctions = true,
   }: {
     names: LangWatchQLNames;
     password: string;
     lwqlTables: LangWatchQLTable[];
     limits?: LangWatchQLResourceLimits;
+    /**
+     * Whether the app functions' UDFs are created. Off only where a create
+     * would land on one replica of several.
+     */
+    includeAppFunctions?: boolean;
   }): string[] {
     this.assertNames(names);
 
     return [
       `CREATE DATABASE IF NOT EXISTS ${names.database}`,
+      // The app functions' projection UDFs, alongside the other object
+      // creation and before the grants: they depend on nothing, and calling a
+      // SQL UDF needs no grant, so nothing below refers back to them.
+      ...(includeAppFunctions ? appFunctionStatements.functionStatements() : []),
       this.keyMapTableStatement({ names }),
       this.settingsProfileStatement({ names, limits }),
       this.restrictedUserStatement({ names, password }),

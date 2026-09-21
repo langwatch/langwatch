@@ -9161,6 +9161,9 @@ importers:
       '@langwatch/onboarding-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/redis-client':
+        specifier: workspace:*
+        version: link:../../../packages/redis-client
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*

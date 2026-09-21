@@ -43,6 +43,7 @@
     "@langwatch/trace-contract": "workspace:*",
     "hono": "catalog:",
     "hono-openapi": "catalog:",
+    "undici": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

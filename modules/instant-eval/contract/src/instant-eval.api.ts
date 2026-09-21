@@ -1,6 +1,70 @@
 import { moduleApi } from "@langwatch/kernel/module-api";
+import type { Instant } from "@langwatch/time";
 
-/** The instant-eval capability. Operations arrive with the port of the process half. */
-export interface InstantEvalApi {}
+import type { InstantEvalJudgmentStatus } from "./instant-eval-limits.ts";
+import type { InstantEvalResultsWire, InstantEvalRunWire } from "./instant-eval.schemas.ts";
+
+/** One run's counters, which is all a chip and a progress bar read. */
+export interface InstantEvalRunProgress {
+  readonly id: string;
+  readonly status: InstantEvalRunWire["status"];
+  readonly total: number | null;
+  readonly progress: number;
+  readonly matched: number | null;
+  readonly failed: number;
+  readonly skipped: number;
+  /** The code of the failure that ended the run, when one did. */
+  readonly error: string | null;
+  readonly priceUsd: number;
+  readonly finishedAtMs: number | null;
+}
+
+/**
+ * The Instant Evals capability: one LangWatchQL statement judged as a job, so
+ * every read is a poll of what the pipeline wrote. Creating, estimating,
+ * cancelling and sampling arrive with the run service they call.
+ */
+export interface InstantEvalApi {
+  /** Whether this project may run Instant Evals at all. */
+  isEnabled(input: { projectId: string }): Promise<boolean>;
+
+  /**
+   * The product decision alone, whatever the deployment has configured: a
+   * released project with no judge still gets the "configure a model" primer.
+   */
+  isReleased(input: { projectId: string }): Promise<boolean>;
+
+  /** The project's runs, newest first. Empty when it has none. */
+  findRuns(input: {
+    projectId: string;
+    limit: number;
+    /** With `beforeId`: the two together are the list's cursor. */
+    before?: Instant;
+    beforeId?: string;
+  }): Promise<InstantEvalRunWire[]>;
+
+  getRun(input: { projectId: string; runId: string }): Promise<InstantEvalRunWire>;
+
+  /** One page of a run's judgements. */
+  getResultsPage(input: {
+    projectId: string;
+    runId: string;
+    limit: number;
+    questionId?: string;
+    isMatched?: boolean;
+    status?: InstantEvalJudgmentStatus;
+    cursor?: string;
+  }): Promise<InstantEvalResultsWire>;
+
+  /**
+   * The counters of the runs a client named, dropping ids it may not read.
+   * Lenient by design: the read carrying them is the list the user is looking
+   * at, and a refusal there would blank the table for a chip matching nothing.
+   */
+  findRunProgress(input: {
+    projectId: string;
+    runIds: readonly string[];
+  }): Promise<InstantEvalRunProgress[]>;
+}
 
 export const InstantEvalApi = moduleApi<InstantEvalApi>()("instant-eval");

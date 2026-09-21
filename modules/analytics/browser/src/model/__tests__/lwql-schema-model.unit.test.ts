@@ -55,6 +55,7 @@ describe("mapping the LangWatchQL schema response", () => {
       it("offers nothing at all for a response that carries nothing", () => {
         const model = lwqlSchemaModel({
           database: "analytics",
+          appFunctions: [],
           datasets: [],
         });
 

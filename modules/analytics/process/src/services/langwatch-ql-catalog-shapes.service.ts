@@ -167,6 +167,11 @@ export class LangWatchQLCatalogShapesService {
 
   private constructor() {}
 
+  /** The content permissions this caller holds. */
+  heldPermissions(protections: LangWatchQLProtections): ReadonlySet<FieldProtection> {
+    return heldPermissions(protections);
+  }
+
   /**
    * Whether a column carries captured customer content. An arrow instance
    * property (not a prototype method) since tests extract this unbound.

@@ -84,10 +84,40 @@ export const langWatchQLSchemaDatasetSchema = z
   .strict();
 export type LangWatchQLSchemaDataset = z.infer<typeof langWatchQLSchemaDatasetSchema>;
 
+/** One app function as the schema endpoint publishes it. */
+export const langWatchQLSchemaAppFunctionSchema = z
+  .object({
+    name: z.string(),
+    /** `conversation_bounded(thread_key, max_tokens, until_trace_id)`. */
+    signature: z.string(),
+    description: z.string(),
+    /** ClickHouse type of the hydrated column, which the result re-declares. */
+    returns: z.string(),
+    /** `json` for a payload a consumer should parse back, `text` for prose. */
+    encoding: z.string(),
+    /** What the first argument names, which is what the cap counts. */
+    keyKind: z.string(),
+    /**
+     * Whether the value is read from a trace or judged by a model: the two
+     * cost different things, a read against a metered classification per row.
+     */
+    kind: z.enum(["extraction", "eval"]),
+    /** How many distinct keys of that kind one run may read. */
+    cap: z.number(),
+    /** Permissions that must all be held to call it. Empty for an ungated one. */
+    gates: z.array(z.string()).readonly(),
+    available: z.boolean(),
+    exampleSql: z.string(),
+  })
+  .strict();
+export type LangWatchQLSchemaAppFunction = z.infer<typeof langWatchQLSchemaAppFunctionSchema>;
+
 export const langWatchQLSchema = z
   .object({
     database: z.string(),
     datasets: z.array(langWatchQLSchemaDatasetSchema).readonly(),
+    /** Last, so every field a consumer already read keeps the position it had. */
+    appFunctions: z.array(langWatchQLSchemaAppFunctionSchema).readonly(),
   })
   .strict();
 export type LangWatchQLSchema = z.infer<typeof langWatchQLSchema>;
