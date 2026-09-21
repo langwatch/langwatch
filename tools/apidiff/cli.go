@@ -528,7 +528,20 @@ func (specs *fetchedSpecs) diffAndUnion() ([]openapidiff.Change, []Operation, er
 	if err != nil {
 		return nil, nil, fmt.Errorf("base spec: %w", err)
 	}
-	return changes, UnionOperations(operationsA, operationsB), nil
+	return withoutVersionMounts(changes), UnionOperations(operationsA, operationsB), nil
+}
+
+// withoutVersionMounts drops the spec changes that only describe a URL version
+// mount, for the same reason the union drops the operations (VersionMountPath).
+func withoutVersionMounts(changes []openapidiff.Change) []openapidiff.Change {
+	kept := make([]openapidiff.Change, 0, len(changes))
+	for _, change := range changes {
+		if VersionMountPath(change.Path) {
+			continue
+		}
+		kept = append(kept, change)
+	}
+	return kept
 }
 
 // emitReport writes the machine report and ledger files and the stdout

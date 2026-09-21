@@ -3,6 +3,7 @@ package apidiff
 import (
 	"encoding/json"
 	"net/http"
+	"reflect"
 	"testing"
 
 	"github.com/langwatch/langwatch/tools/openapidiff"
@@ -283,5 +284,73 @@ func TestUnionPrefersCandidateSchema(t *testing.T) {
 	}
 	if requiredB, _ := merged.BodySchemaB["required"].([]any); len(requiredB) != 1 {
 		t.Fatalf("base schema = %#v, want its own single required field", merged.BodySchemaB)
+	}
+}
+
+/** @scenario "A family carrying its own version segment is the real surface" */
+func TestVersionMountPath(t *testing.T) {
+	t.Parallel()
+	mounts := []string{
+		"/api/annotations/latest",
+		"/api/annotations/latest/trace/{id}",
+		"/api/api-keys/2026-08-07",
+		"/api/secrets/2026-08-24/{id}",
+		"/api/governance/2026-08-07/ingestion-templates",
+	}
+	for _, path := range mounts {
+		if !VersionMountPath(path) {
+			t.Errorf("%s: want version mount", path)
+		}
+	}
+	// A family that carries its OWN version segment is the real surface, and a
+	// date that is not in the mount position is a real segment.
+	surfaces := []string{
+		"/api/scim/v2/Users",
+		"/api/otel/v1/traces",
+		"/api/webhooks/v1/endpoints",
+		"/api/gateway/v1/budgets",
+		"/api/annotations",
+		"/api/prompts/{id}/versions/{versionId}/restore",
+		"/api/reports/monthly/2026-08-07",
+		"/api/latest",
+		"",
+	}
+	for _, path := range surfaces {
+		if VersionMountPath(path) {
+			t.Errorf("%s: want real surface, got version mount", path)
+		}
+	}
+}
+
+/** @scenario "A URL version mount never enters the comparison" */
+func TestUnionOperationsDropsVersionMounts(t *testing.T) {
+	t.Parallel()
+	a := []Operation{
+		{Method: "GET", Path: "/api/annotations"},
+		{Method: "GET", Path: "/api/annotations/latest"},
+		{Method: "GET", Path: "/api/annotations/2026-08-07"},
+		{Method: "GET", Path: "/api/scim/v2/Users"},
+	}
+	b := []Operation{{Method: "GET", Path: "/api/annotations"}}
+
+	union := UnionOperations(a, b)
+
+	var paths []string
+	for _, operation := range union {
+		paths = append(paths, operation.Path)
+	}
+	want := []string{"/api/annotations", "/api/scim/v2/Users"}
+	if !reflect.DeepEqual(paths, want) {
+		t.Fatalf("union paths = %v, want %v", paths, want)
+	}
+}
+
+// The /api/v1 alias is collapsed before the mount test, so a versioned mount
+// reached through the alias is dropped too.
+func TestUnionOperationsDropsAliasedVersionMounts(t *testing.T) {
+	t.Parallel()
+	union := UnionOperations([]Operation{{Method: "GET", Path: "/api/v1/annotations/latest"}}, nil)
+	if len(union) != 0 {
+		t.Fatalf("union = %v, want empty", union)
 	}
 }

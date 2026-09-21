@@ -190,3 +190,23 @@ Feature: apidiff boots its instances through haven
       Then both sides are retargeted at the sacrificial user instead
       And the probe still travels the same route with the same credential, so coverage is kept whole
       And the organization bearer still authenticates when the run re-reads it at the end
+
+  # Versioning is negotiated through the X-API-Version header. The URL forms
+  # /api/<family>/latest/... and /api/<family>/<YYYY-MM-DD>/... are a supported
+  # convenience fallback the document keeps publishing, but no application is
+  # built against them, so a difference on one is the mount working rather than
+  # drift. Measured on run 24 of 2026-09-21: 412 of 615 findings were version
+  # mounts, including all 58 permission-diff:404-200 rows that had been queued
+  # for a baselining decision — they needed skipping, not a baseline.
+  @unit
+  Scenario: A URL version mount never enters the comparison
+    Given a family mounted at its bare path and at its latest and dated forms
+    When the operation union is built
+    Then only the bare path is compared
+    And the version mounts are neither probed nor counted as skipped
+
+  @unit
+  Scenario: A family carrying its own version segment is the real surface
+    Given a family mounted at /api/scim/v2
+    When the operation union is built
+    Then that family is compared like any other

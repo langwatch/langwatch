@@ -146,6 +146,19 @@ deterministic summary, or the machine report with `-json` (optionally to
   side documenting neither is probed at the canonical bare form anyway, so an
   undocumented-but-mounted route still shows up. The transcript records both
   probed paths.
+- **URL version mounts are skipped, never reported.** Versioning is negotiated
+  through the `X-API-Version` header; `/api/<family>/latest/...` and
+  `/api/<family>/<YYYY-MM-DD>/...` are a supported convenience fallback the
+  document still publishes, but nothing is built against them, so a difference
+  on one is the mount doing its job rather than drift. Such an operation never
+  enters the union — not probed, not skipped, not a ledger row — and the spec
+  changes that only describe one are dropped with it (`VersionMountPath`,
+  `spec.go`). The test is positional, so a family carrying its OWN version
+  segment (`/api/scim/v2`, `/api/otel/v1`, `/api/webhooks/v1`) is the real
+  surface and stays, and a literal date deeper in a path stays a real segment.
+  Measured on run 24 of 2026-09-21: 412 of 615 findings and 346 of 739 spec
+  changes were version mounts, including every one of the 58
+  `permission-diff:404-200` rows that were queued for a baselining decision.
 - Status codes compare by CLASS (2xx/3xx/4xx/5xx): same-class differences
   (400 vs 422, 403 vs 401) are suppressed — the error envelope is
   handlederror's domain — and error bodies (both sides ≥ 400) are never

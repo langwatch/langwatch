@@ -69,6 +69,29 @@ func CanonicalAliasPath(path string) string {
 	return "/api/" + rest
 }
 
+// VersionMountPath reports whether a path is one of the URL version mounts a
+// family serves as a convenience fallback — "/api/<family>/latest/..." and
+// "/api/<family>/<YYYY-MM-DD>/...". Versioning is negotiated through the
+// X-API-Version header; the document still publishes these mounts, but no
+// client is built against them, so a difference on one is the mount doing its
+// job rather than drift. Matched in the mount position only, so a literal date
+// deeper in a path stays a real segment. Expects the canonical alias form.
+func VersionMountPath(path string) bool {
+	segments := strings.Split(strings.TrimPrefix(path, "/"), "/")
+	if len(segments) < 3 || segments[0] != "api" {
+		return false
+	}
+	return segments[2] == "latest" || dateVersionSegment(segments[2])
+}
+
+// dateVersionSegment matches the dated management version, "2026-08-07".
+func dateVersionSegment(segment string) bool {
+	if len(segment) != 10 || segment[4] != '-' || segment[7] != '-' {
+		return false
+	}
+	return allDigits(segment[:4]) && allDigits(segment[5:7]) && allDigits(segment[8:10])
+}
+
 func allDigits(text string) bool {
 	for _, character := range text {
 		if character < '0' || character > '9' {
@@ -550,6 +573,12 @@ func UnionOperations(a, b []Operation) []Operation {
 	merger.ingest(a, true)
 	result := make([]Operation, 0, len(merger.order))
 	for _, id := range merger.order {
+		// A URL version mount never enters the union: not probed, not skipped,
+		// not a ledger row. Reporting one would report the fallback rather than
+		// the surface a client is built against.
+		if VersionMountPath(id.path) {
+			continue
+		}
 		result = append(result, *merger.merged[id])
 	}
 	sortOperations(result)
