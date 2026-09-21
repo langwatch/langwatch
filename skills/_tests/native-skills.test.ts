@@ -211,15 +211,8 @@ describe("native skill generation", () => {
     });
   });
 
-  // AGENTS.md tells Langy which skill to invoke per user intent. A row naming
-  // a skill that isn't in the shipped image teaches the model to hallucinate.
-  // The image's skill set is the root-compiled native set Docker overlays into
-  // the Go embed directory.
-  // A scenario is a simulation, so the identifiers it needs are invented
-  // rather than copied out of the trace, named in the situation so the
-  // simulated user cannot improvise a different value on every run, and
-  // backed by a record the agent's lookup can find. Both skills that write
-  // scenarios from traces carry the rule.
+  // The rule is prose, and prose gets reworded. This gate is what keeps a
+  // rewording from dropping it out of the compiled copies Langy reads.
   // Backs specs/langy/langy-scenario-grounding.feature.
   describe("given the skills that reproduce a failing trace as a scenario", () => {
     /** @scenario "A reproduced scenario invents its identifiers and seeds the lookup" */
@@ -240,6 +233,10 @@ describe("native skill generation", () => {
     });
   });
 
+  // AGENTS.md tells Langy which skill to invoke per user intent. A row naming
+  // a skill that isn't in the shipped image teaches the model to hallucinate.
+  // The image's skill set is the root-compiled native set Docker overlays into
+  // the Go embed directory.
   describe("given Langy's AGENTS.md routing table", () => {
     const readAgentsMd = () =>
       fs.readFileSync(
