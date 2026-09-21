@@ -13,8 +13,7 @@ export function LicenseDetails({ license }: { license: License }) {
       <Detail label="License id">{license.licenseId}</Detail>
       <Detail label="Plan">{license.planType}</Detail>
       <Detail label="Seats">
-        {license.maxMembers} full, {license.maxMembersLite} lite, allowance{" "}
-        {license.effectiveSeatOverageAllowance}
+        {license.maxMembers} full, {license.maxMembersLite} lite
       </Detail>
       <Detail label="Issued">{formatDate(license.issuedAt)}</Detail>
       <Detail label="Term ends">{formatDate(license.expiresAt)}</Detail>
@@ -40,13 +39,6 @@ export function LicenseDetails({ license }: { license: License }) {
           `${license.reportedMembers ?? 0} full, ${license.reportedMembersLite ?? 0} lite`
         ) : (
           <EmptyCell>none</EmptyCell>
-        )}
-      </Detail>
-      <Detail label="Quarter peak">
-        {license.currentQuarterSeats ? (
-          `${license.currentQuarterSeats.peakMembers} full, ${license.currentQuarterSeats.peakMembersLite} lite since ${formatDate(license.currentQuarterSeats.quarterStartsAt)}`
-        ) : (
-          <EmptyCell>nothing reported this quarter</EmptyCell>
         )}
       </Detail>
       {license.revokedAt ? (

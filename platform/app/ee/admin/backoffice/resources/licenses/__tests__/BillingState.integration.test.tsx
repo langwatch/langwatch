@@ -51,9 +51,8 @@ function overview(patch: Partial<BillingOverview> = {}): BillingOverview {
       licensed: 50,
       reported: 51,
       lastSyncAt: SYNCED_AT,
-      currentQuarterPeak: 53,
     },
-    trueUps: [],
+    seatChanges: [],
     ...patch,
   } as BillingOverview;
 }
@@ -75,9 +74,7 @@ describe("the connected billing panel", () => {
       expect(screen.getByText("1000.00 USD")).toBeTruthy();
       expect(screen.getByText("420.00 USD")).toBeTruthy();
       expect(screen.getByText("on, up to 500.00 USD")).toBeTruthy();
-      expect(
-        screen.getByText(/50 licensed, 51 reported, 53 peak this quarter/),
-      ).toBeTruthy();
+      expect(screen.getByText(/50 licensed, 51 reported/)).toBeTruthy();
       expect(
         screen.getByText(
           `${SYNCED_AT.toLocaleDateString()} ${SYNCED_AT.toLocaleTimeString()}`,
@@ -99,7 +96,6 @@ describe("the connected billing panel", () => {
                   currency: "EUR",
                   amountCents: 3_100_000,
                   status: "open",
-                  rolledForwardTo: null,
                   paidOutOfBandAt: null,
                   termStartsAt: TERM_START,
                 },
@@ -109,7 +105,6 @@ describe("the connected billing panel", () => {
                   currency: "USD",
                   amountCents: 5_000,
                   status: "paid",
-                  rolledForwardTo: null,
                   paidOutOfBandAt: null,
                   termStartsAt: null,
                 },
@@ -148,26 +143,26 @@ describe("the connected billing panel", () => {
     });
   });
 
-  describe("given a quarter that closed without a sync", () => {
-    /** @scenario A customer that never synced is flagged, not invoiced on a guess */
-    it("badges the customer for follow-up", () => {
+  describe("given a seat change whose invoice is still pending", () => {
+    /** @scenario A seat invoice that failed at the payment provider is retried without doubling */
+    it("badges the customer so finance knows an invoice is still coming", () => {
       renderState(
         overview({
-          trueUps: [
+          seatChanges: [
             {
               licenseId: "il_1",
-              quarterStartsAt: TERM_START,
-              addedSeats: 0,
-              amountCents: 0,
+              changedAt: TERM_START,
+              addedSeats: 3,
+              amountCents: 90_000,
               currency: "EUR",
-              state: "flagged",
+              state: "intent",
               stripeInvoiceId: null,
             },
           ],
         }),
       );
 
-      expect(screen.getByText("Seat true-up needs follow-up")).toBeTruthy();
+      expect(screen.getByText("Seat invoice pending")).toBeTruthy();
     });
   });
 });

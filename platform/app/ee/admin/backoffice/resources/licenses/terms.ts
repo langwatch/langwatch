@@ -11,7 +11,6 @@ export const centsToDollars = (cents: number | null | undefined): string =>
 
 export interface TermsForm {
   services: Service[];
-  seatOverageAllowance: string;
   seatRate: string;
   seatCurrency: "USD" | "EUR";
   commit: string;
@@ -24,7 +23,6 @@ export function termsFormFrom(license: License | null | undefined): TermsForm {
     services: (license?.services ?? []).filter((service): service is Service =>
       (SERVICES as readonly string[]).includes(service),
     ),
-    seatOverageAllowance: license?.seatOverageAllowance?.toString() ?? "",
     seatRate: centsToDollars(license?.seatRateCents),
     seatCurrency: license?.seatCurrency ?? "USD",
     commit: centsToDollars(license?.commitUsdCents ?? 0),
@@ -33,13 +31,35 @@ export function termsFormFrom(license: License | null | undefined): TermsForm {
   };
 }
 
+/** The share of the commit the overage maximum is prefilled with when overage is switched on. */
+const SUGGESTED_OVERAGE_SHARE = 0.25;
+
+/**
+ * What the overage maximum reads when an operator switches overage on with
+ * the field empty: a quarter of the commit, as a suggestion they can edit.
+ * There is no default maximum on the registry; only the license carries one.
+ */
+export function suggestedOverageMax(commit: string): string {
+  const cents = dollarsToCents(commit);
+  if (cents === null || cents <= 0) return "";
+  return centsToDollars(Math.round(cents * SUGGESTED_OVERAGE_SHARE));
+}
+
+/** The form after the overage switch moved, with the maximum prefilled once. */
+export function withOverageEnabled(
+  form: TermsForm,
+  overageEnabled: boolean,
+): TermsForm {
+  const overageMax =
+    overageEnabled && form.overageMax.trim() === ""
+      ? suggestedOverageMax(form.commit)
+      : form.overageMax;
+  return { ...form, overageEnabled, overageMax };
+}
+
 export function termsPayload(form: TermsForm) {
   return {
     services: form.services,
-    seatOverageAllowance:
-      form.seatOverageAllowance.trim() === ""
-        ? null
-        : Number(form.seatOverageAllowance),
     seatRateCents: dollarsToCents(form.seatRate),
     seatCurrency: form.seatRate.trim() === "" ? null : form.seatCurrency,
     commitUsdCents: dollarsToCents(form.commit) ?? 0,

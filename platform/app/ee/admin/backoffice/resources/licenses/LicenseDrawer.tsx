@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Drawer } from "~/components/ui/drawer";
 import { api } from "~/utils/api";
 import { BillingSection } from "./BillingSection";
+import { ChangeSeatsSection } from "./ChangeSeatsSection";
 import { LicenseDetails } from "./LicenseDetails";
 import { LicenseDrawerActions } from "./LicenseDrawerActions";
 import { LinkOrganizationSection } from "./LinkOrganizationSection";
@@ -73,6 +74,9 @@ function LicenseDrawerBody({
       )}
       <TermsSection license={license} />
       <BillingSection license={license} />
+      {license.status === "active" ? (
+        <ChangeSeatsSection license={license} />
+      ) : null}
       {license.status === "active" || license.status === "expired" ? (
         <ReissueSection license={license} />
       ) : null}

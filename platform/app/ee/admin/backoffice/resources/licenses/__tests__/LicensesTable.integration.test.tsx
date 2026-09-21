@@ -54,7 +54,6 @@ function license(overrides: Partial<License>): License {
     supersededAt: null,
     replacesId: null,
     services: ["instant_evals"],
-    seatOverageAllowance: null,
     seatRateCents: null,
     seatCurrency: null,
     commitUsdCents: 0,
@@ -70,9 +69,7 @@ function license(overrides: Partial<License>): License {
     createdAt: ISSUED,
     updatedAt: ISSUED,
     status: "active",
-    effectiveSeatOverageAllowance: 10,
     hasPendingDelivery: false,
-    currentQuarterSeats: null,
     ...overrides,
   } as License;
 }
@@ -103,7 +100,6 @@ describe("LicensesTable", () => {
       expect(screen.getAllByText("ACME Rockets")).toHaveLength(3);
       expect(screen.getAllByText("ENTERPRISE")).toHaveLength(3);
       expect(screen.getAllByText("50")).toHaveLength(3);
-      expect(screen.getAllByText("+10 allowance")).toHaveLength(3);
       expect(screen.getAllByText(TERM_END.toLocaleDateString())).toHaveLength(
         3,
       );
@@ -123,25 +119,20 @@ describe("LicensesTable", () => {
 
   describe("given a license whose install has synced", () => {
     /** @scenario The backoffice lists licenses with their state */
-    it("shows when it last did, the seats it reported and the quarter's peak", () => {
+    it("shows when it last did and the seats it reported", () => {
       renderTable([
         license({
           lastSyncAt: SYNCED_AT,
           lastSyncVersion: "1.42.0",
           reportedMembers: 51,
           reportedMembersLite: 3,
-          currentQuarterSeats: {
-            quarterStartsAt: ISSUED,
-            peakMembers: 53,
-            peakMembersLite: 4,
-          },
         }),
       ]);
 
       expect(
         screen.getByText(`${SYNCED_AT.toLocaleDateString()} (1.42.0)`),
       ).toBeTruthy();
-      expect(screen.getByText("51 in use, 53 peak this quarter")).toBeTruthy();
+      expect(screen.getByText("51 in use")).toBeTruthy();
     });
   });
 });

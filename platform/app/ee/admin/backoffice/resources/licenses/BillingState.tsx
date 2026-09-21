@@ -40,9 +40,6 @@ export function BillingState({ overview }: { overview: BillingOverview }) {
           {seats.reported === null
             ? "none reported"
             : `${seats.reported} reported`}
-          {seats.currentQuarterPeak === null
-            ? ""
-            : `, ${seats.currentQuarterPeak} peak this quarter`}
         </Detail>
         <Detail label="Last sync">
           {seats.lastSyncAt ? (
@@ -59,20 +56,21 @@ export function BillingState({ overview }: { overview: BillingOverview }) {
           )}
         </Detail>
       </SimpleGrid>
-      <FlaggedTrueUps overview={overview} />
+      <PendingSeatChanges overview={overview} />
     </VStack>
   );
 }
 
-function FlaggedTrueUps({ overview }: { overview: BillingOverview }) {
-  const flagged = overview.trueUps.filter((row) => row.state === "flagged");
-  if (flagged.length === 0) return null;
+/** A seat change whose invoice the payment provider has not confirmed yet. */
+function PendingSeatChanges({ overview }: { overview: BillingOverview }) {
+  const pending = overview.seatChanges.filter((row) => row.state === "intent");
+  if (pending.length === 0) return null;
   return (
     <HStack gap={2}>
-      <Badge colorPalette="orange">Seat true-up needs follow-up</Badge>
+      <Badge colorPalette="orange">Seat invoice pending</Badge>
       <Text fontSize="xs" color="fg.muted">
-        {flagged.length} quarter(s) closed without a sync, so no seats were
-        invoiced on a guess.
+        {pending.length} seat change(s) still waiting for the payment provider.
+        The daily billing tick retries them.
       </Text>
     </HStack>
   );

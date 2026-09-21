@@ -37,8 +37,9 @@ export function ReissueSection({ license }: { license: License }) {
   return (
     <Section title="Reissue">
       <Text fontSize="sm" color="fg.muted">
-        Signs a replacement with new seats or a new term. The current license
-        stays valid until the install picks the new one up over sync.
+        Signs a replacement for a new term, which is how a license is renewed.
+        The current license stays valid until the install picks the new one up
+        over sync. Seats mid-term are changed above.
       </Text>
       <ReissueFields
         seats={seats}

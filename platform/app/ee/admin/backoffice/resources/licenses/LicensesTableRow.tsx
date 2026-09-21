@@ -23,13 +23,7 @@ export function LicensesTableRow({
         <CustomerCell license={license} />
       </Table.Cell>
       <Table.Cell>{license.planType}</Table.Cell>
-      <Table.Cell>
-        {license.maxMembers}
-        <Text as="span" fontSize="xs" color="fg.muted">
-          {" "}
-          +{license.effectiveSeatOverageAllowance} allowance
-        </Text>
-      </Table.Cell>
+      <Table.Cell>{license.maxMembers}</Table.Cell>
       <Table.Cell>{formatDate(license.expiresAt)}</Table.Cell>
       <Table.Cell>
         <StatusBadge status={license.status} />
@@ -72,10 +66,9 @@ function CustomerCell({ license }: { license: License }) {
   );
 }
 
-/** When the install last reported, what it reported, and the quarter's peak. */
+/** When the install last reported, and what it reported. */
 function SyncCell({ license }: { license: License }) {
   if (!license.lastSyncAt) return <EmptyCell>never synced</EmptyCell>;
-  const quarter = license.currentQuarterSeats;
   return (
     <VStack align="start" gap={0}>
       <Text>
@@ -84,7 +77,6 @@ function SyncCell({ license }: { license: License }) {
       </Text>
       <Text fontSize="xs" color="fg.muted">
         {license.reportedMembers ?? 0} in use
-        {quarter ? `, ${quarter.peakMembers} peak this quarter` : ""}
       </Text>
     </VStack>
   );

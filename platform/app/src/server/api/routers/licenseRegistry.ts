@@ -88,7 +88,6 @@ const licenseTarget = z.object({ id: z.string().min(1) });
 
 const termsInput = z.object({
   services: z.array(z.enum(CONNECT_SERVICES)).optional(),
-  seatOverageAllowance: z.number().int().min(0).nullable().optional(),
   seatRateCents: z.number().int().min(0).nullable().optional(),
   seatCurrency: z.enum(["USD", "EUR"]).nullable().optional(),
   commitUsdCents: z.number().int().min(0).optional(),
@@ -276,6 +275,41 @@ export const licenseRegistryRouter = createTRPCRouter({
           replaces: input.id,
           maxMembers: result.license.maxMembers,
           expiresAt: input.expiresAt.toISOString(),
+        },
+        targetKind: "issuedLicense",
+        targetId: result.license.id,
+      });
+      return result;
+    }),
+
+  /**
+   * Changes the seats of a running license. The replacement is signed for the
+   * same term and delivered over sync; seats that went up are invoiced
+   * prorated to the end of the term.
+   */
+  changeSeats: protectedProcedure
+    .input(licenseTarget.extend({ maxMembers: seatLimits.maxMembers }))
+    .noPermission(NO_PERMISSION)
+    .mutation(async ({ ctx, input }) => {
+      const operator = requireOperator(
+        ctx.session.user.impersonator ?? ctx.session.user,
+      );
+      const result = await audited({
+        operatorId: operator.userId,
+        action: "licenseRegistry.changeSeats",
+        args: { replaces: input.id, maxMembers: input.maxMembers },
+        targetId: input.id,
+        run: () =>
+          service().changeSeats({ ...input, operatorId: operator.userId }),
+      });
+      await auditLog({
+        userId: operator.userId,
+        action: "licenseRegistry.changeSeats",
+        args: {
+          replaces: input.id,
+          previousMaxMembers: result.previousMaxMembers,
+          maxMembers: result.license.maxMembers,
+          billing: result.billing,
         },
         targetKind: "issuedLicense",
         targetId: result.license.id,

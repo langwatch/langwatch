@@ -6,7 +6,7 @@ import {
   SimpleGrid,
   VStack,
 } from "@chakra-ui/react";
-import type { TermsForm } from "./terms";
+import { type TermsForm, withOverageEnabled } from "./terms";
 import { SERVICE_LABELS, SERVICES } from "./types";
 
 type SetTerm = <K extends keyof TermsForm>(change: {
@@ -33,7 +33,13 @@ export function TermsFields({
       <ServicesField form={form} set={set} />
       <SimpleGrid columns={2} gap={3} width="full">
         <SeatFields form={form} set={set} />
-        <UsageFields form={form} set={set} />
+        <UsageFields
+          form={form}
+          set={set}
+          onOverageEnabled={(enabled) =>
+            onChange(withOverageEnabled(form, enabled))
+          }
+        />
       </SimpleGrid>
     </VStack>
   );
@@ -73,18 +79,6 @@ function SeatFields({ form, set }: { form: TermsForm; set: SetTerm }) {
   return (
     <>
       <Field.Root>
-        <Field.Label>Seat overage allowance</Field.Label>
-        <Input
-          type="number"
-          min={0}
-          value={form.seatOverageAllowance}
-          onChange={(event) =>
-            set({ key: "seatOverageAllowance", value: event.target.value })
-          }
-          placeholder="Default: a fifth of the seats, rounded up"
-        />
-      </Field.Root>
-      <Field.Root>
         <Field.Label>Seat rate per year</Field.Label>
         <HStack>
           <Input
@@ -117,7 +111,15 @@ function SeatFields({ form, set }: { form: TermsForm; set: SetTerm }) {
   );
 }
 
-function UsageFields({ form, set }: { form: TermsForm; set: SetTerm }) {
+function UsageFields({
+  form,
+  set,
+  onOverageEnabled,
+}: {
+  form: TermsForm;
+  set: SetTerm;
+  onOverageEnabled: (enabled: boolean) => void;
+}) {
   return (
     <>
       <Field.Root>
@@ -139,10 +141,7 @@ function UsageFields({ form, set }: { form: TermsForm; set: SetTerm }) {
             <NativeSelect.Field
               value={form.overageEnabled ? "on" : "off"}
               onChange={(event) =>
-                set({
-                  key: "overageEnabled",
-                  value: event.target.value === "on",
-                })
+                onOverageEnabled(event.target.value === "on")
               }
             >
               <option value="off">Off</option>
@@ -160,6 +159,7 @@ function UsageFields({ form, set }: { form: TermsForm; set: SetTerm }) {
               set({ key: "overageMax", value: event.target.value })
             }
             placeholder="Maximum (USD)"
+            data-testid="overage-max"
           />
         </HStack>
       </Field.Root>
