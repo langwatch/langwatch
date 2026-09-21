@@ -50,7 +50,13 @@ vi.mock("~/utils/api", () => ({
         offer: { invalidate: invalidateOffer },
         mine: { invalidate: invalidateMine },
       },
-      user: { secureAccountNudge: { invalidate: vi.fn() } },
+      user: {
+        secureAccountNudge: {
+          invalidate: vi.fn(),
+          cancel: vi.fn(),
+          setData: vi.fn(),
+        },
+      },
     }),
     joinRequests: {
       offer: { useQuery: () => offerRef.current },
