@@ -9,16 +9,29 @@ export const prismaTableCatalogue = {
   "IdentifierReservation": "IdentifierReservation",
   "IdentityProjectionCursor": "IdentityProjectionCursor",
   "TwoFactor": "TwoFactor",
+  "SignInAttemptLock": "SignInAttemptLock",
   "Passkey": "Passkey",
   "MfaEnrollment": "MfaEnrollment",
   "SsoConnection": "SsoConnection",
+  "SsoConnectionRegistrationSlot": "SsoConnectionRegistrationSlot",
+  "SsoConnectionReproofCursor": "SsoConnectionReproofCursor",
+  "SsoCredential": "SsoCredential",
+  "SsoVerifiedDomain": "SsoVerifiedDomain",
+  "SsoVerifiedDomainHolder": "SsoVerifiedDomainHolder",
+  "SsoAuthenticationActivity": "SsoAuthenticationActivity",
+  "SsoProvider": "SsoProvider",
+  "SsoBreakGlassBinding": "SsoBreakGlassBinding",
+  "SsoActivationRecoveryReservation": "SsoActivationRecoveryReservation",
   "JoinRequest": "JoinRequest",
   "TeamUser": "TeamUser",
   "OrganizationUser": "OrganizationUser",
   "Team": "Team",
   "Organization": "Organization",
+  "ScimRequestLog": "ScimRequestLog",
   "ScimToken": "ScimToken",
   "ScimExternalId": "ScimExternalId",
+  "ScimUserResource": "ScimUserResource",
+  "ScimDirectoryUser": "ScimDirectoryUser",
   "ScimSyncState": "ScimSyncState",
   "Project": "Project",
   "Department": "Department",
@@ -176,15 +189,16 @@ export const prismaModelFieldCatalogue = {
     "userId",
     "expires",
     "user",
-    "impersonating",
     "ipAddress",
     "userAgent",
     "identifierId",
     "amr",
+    "impersonating",
     "actorUserId",
     "subjectUserId",
     "impersonationReason",
     "impersonationExpiresAt",
+    "lastSeenAt",
     "createdAt",
     "updatedAt"
   ],
@@ -206,6 +220,7 @@ export const prismaModelFieldCatalogue = {
     "passkeys",
     "teamMemberships",
     "orgMemberships",
+    "scimUserResources",
     "createdAt",
     "updatedAt",
     "lastLoginAt",
@@ -214,6 +229,7 @@ export const prismaModelFieldCatalogue = {
     "tracesExplorerTourDismissedAt",
     "langyCodeAccessPreference",
     "passkeyNudgeDismissedAt",
+    "joinOfferDismissedDomains",
     "Annotation",
     "shareLinks",
     "Workflow",
@@ -305,6 +321,17 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt"
   ],
+  "SignInAttemptLock": [
+    "id",
+    "identifierHash",
+    "failedCount",
+    "lockedUntil",
+    "consecutiveLockouts",
+    "heldForReview",
+    "userId",
+    "createdAt",
+    "updatedAt"
+  ],
   "Passkey": [
     "id",
     "name",
@@ -346,14 +373,24 @@ export const prismaModelFieldCatalogue = {
     "type",
     "state",
     "claimedDomains",
+    "domainClaims",
     "approvedDomains",
     "verifiedDomains",
+    "lapsedDomains",
     "domainVerifications",
     "pendingVerification",
     "idpMetadata",
+    "arrivalPolicy",
     "allowsJit",
+    "arrivalPolicyDecidedAt",
     "source",
     "testLoginAccountId",
+    "replacesConnectionId",
+    "migrationPhase",
+    "graceStartedAt",
+    "routeChangedAt",
+    "finalizationRequestedAt",
+    "finalizedAt",
     "rejection",
     "createdBy",
     "tearDownAfter",
@@ -362,7 +399,77 @@ export const prismaModelFieldCatalogue = {
     "acceptedAt",
     "projectionVersion",
     "createdAt",
+    "updatedAt",
+    "reproofCursor"
+  ],
+  "SsoConnectionRegistrationSlot": [
+    "organizationId",
+    "kind",
+    "connectionId",
+    "replacesConnectionId",
+    "commandId",
+    "createdAt",
     "updatedAt"
+  ],
+  "SsoConnectionReproofCursor": [
+    "connectionId",
+    "lastReproofAt",
+    "connection"
+  ],
+  "SsoCredential": [
+    "id",
+    "organizationId",
+    "connectionId",
+    "kind",
+    "ciphertext",
+    "createdAt",
+    "updatedAt"
+  ],
+  "SsoVerifiedDomain": [
+    "domain",
+    "organizationId",
+    "holders"
+  ],
+  "SsoVerifiedDomainHolder": [
+    "domain",
+    "connectionId",
+    "organizationId",
+    "ownership"
+  ],
+  "SsoAuthenticationActivity": [
+    "id",
+    "organizationId",
+    "connectionId",
+    "userId",
+    "authenticatedAt"
+  ],
+  "SsoProvider": [
+    "id",
+    "issuer",
+    "oidcConfig",
+    "samlConfig",
+    "userId",
+    "providerId",
+    "organizationId",
+    "domain"
+  ],
+  "SsoBreakGlassBinding": [
+    "id",
+    "organizationId",
+    "userId",
+    "grantedByUserId",
+    "grantedAt",
+    "expiresAt",
+    "supersededAt",
+    "renewedFromId",
+    "warnedDays",
+    "createdAt"
+  ],
+  "SsoActivationRecoveryReservation": [
+    "commandId",
+    "organizationId",
+    "connectionId",
+    "createdAt"
   ],
   "JoinRequest": [
     "id",
@@ -403,7 +510,9 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt",
     "departmentId",
-    "disabledAt"
+    "disabledAt",
+    "pendingSsoGrantId",
+    "membershipStamp"
   ],
   "Team": [
     "id",
@@ -437,6 +546,10 @@ export const prismaModelFieldCatalogue = {
     "usageSpendingMaxLimit",
     "maxSessionDurationDays",
     "mfaRequired",
+    "lockoutAfterFailedAttempts",
+    "lockoutMinutes",
+    "sessionIdleTimeoutMinutes",
+    "sessionMaxLifetimeMinutes",
     "signupData",
     "signedDPA",
     "elasticsearchNodeUrl",
@@ -464,6 +577,7 @@ export const prismaModelFieldCatalogue = {
     "notifications",
     "subscriptions",
     "scimTokens",
+    "scimRequestLog",
     "promptTags",
     "groups",
     "roleBindings",
@@ -482,17 +596,31 @@ export const prismaModelFieldCatalogue = {
     "githubPullRequests",
     "githubBranchPrChecks"
   ],
+  "ScimRequestLog": [
+    "id",
+    "organizationId",
+    "organization",
+    "connectionId",
+    "method",
+    "resource",
+    "status",
+    "reason",
+    "detail",
+    "occurredAt"
+  ],
   "ScimToken": [
     "id",
     "organizationId",
     "organization",
     "connectionId",
     "hashedToken",
+    "hashScheme",
     "description",
     "createdAt",
     "lastUsedAt"
   ],
   "ScimExternalId": [
+    "organizationId",
     "id",
     "connectionId",
     "externalId",
@@ -500,6 +628,22 @@ export const prismaModelFieldCatalogue = {
     "user",
     "createdAt",
     "updatedAt"
+  ],
+  "ScimUserResource": [
+    "organizationId",
+    "userId",
+    "user",
+    "userName",
+    "name",
+    "active",
+    "deletedAt",
+    "createdAt",
+    "updatedAt"
+  ],
+  "ScimDirectoryUser": [
+    "organizationId",
+    "connectionId",
+    "userId"
   ],
   "ScimSyncState": [
     "id",
@@ -1320,7 +1464,6 @@ export const prismaModelFieldCatalogue = {
     "id",
     "createdAt",
     "userId",
-    "actorUserId",
     "projectId",
     "organizationId",
     "action",
@@ -1329,6 +1472,7 @@ export const prismaModelFieldCatalogue = {
     "ipAddress",
     "userAgent",
     "metadata",
+    "actorUserId",
     "targetKind",
     "targetId",
     "before",
@@ -1693,6 +1837,7 @@ export const prismaModelFieldCatalogue = {
     "id",
     "organizationId",
     "billingMonth",
+    "meter",
     "lastReportedTotal",
     "pendingReportedTotal",
     "consecutiveFailures",
@@ -2334,6 +2479,7 @@ export const prismaRelationCatalogue = {
     "passkeys": "Passkey",
     "teamMemberships": "TeamUser",
     "orgMemberships": "OrganizationUser",
+    "scimUserResources": "ScimUserResource",
     "Annotation": "Annotation",
     "shareLinks": "ShareLink",
     "Workflow": "Workflow",
@@ -2376,11 +2522,29 @@ export const prismaRelationCatalogue = {
   "TwoFactor": {
     "user": "User"
   },
+  "SignInAttemptLock": {},
   "Passkey": {
     "user": "User"
   },
   "MfaEnrollment": {},
-  "SsoConnection": {},
+  "SsoConnection": {
+    "reproofCursor": "SsoConnectionReproofCursor"
+  },
+  "SsoConnectionRegistrationSlot": {},
+  "SsoConnectionReproofCursor": {
+    "connection": "SsoConnection"
+  },
+  "SsoCredential": {},
+  "SsoVerifiedDomain": {
+    "holders": "SsoVerifiedDomainHolder"
+  },
+  "SsoVerifiedDomainHolder": {
+    "ownership": "SsoVerifiedDomain"
+  },
+  "SsoAuthenticationActivity": {},
+  "SsoProvider": {},
+  "SsoBreakGlassBinding": {},
+  "SsoActivationRecoveryReservation": {},
   "JoinRequest": {},
   "TeamUser": {
     "assignedRole": "CustomRole",
@@ -2408,6 +2572,7 @@ export const prismaRelationCatalogue = {
     "notifications": "Notification",
     "subscriptions": "Subscription",
     "scimTokens": "ScimToken",
+    "scimRequestLog": "ScimRequestLog",
     "promptTags": "PromptTag",
     "groups": "Group",
     "roleBindings": "RoleBinding",
@@ -2423,12 +2588,19 @@ export const prismaRelationCatalogue = {
     "githubPullRequests": "GithubPullRequest",
     "githubBranchPrChecks": "GithubBranchPullRequestCheck"
   },
+  "ScimRequestLog": {
+    "organization": "Organization"
+  },
   "ScimToken": {
     "organization": "Organization"
   },
   "ScimExternalId": {
     "user": "User"
   },
+  "ScimUserResource": {
+    "user": "User"
+  },
+  "ScimDirectoryUser": {},
   "ScimSyncState": {},
   "Project": {
     "team": "Team",
