@@ -1969,6 +1969,7 @@ const presentations = {
     describe: () =>
       "Your organization's plan doesn't include this. Talk to your account team about upgrading.",
   },
+  evaluation_not_found: { title: "Evaluation not found" },
   project_permission_denied: {
     // Names the permission when the server sent one: "ask an admin for access"
     // is an errand with no address, whereas "ask an admin for `datasets:manage`"
@@ -1980,6 +1981,11 @@ const presentations = {
         ? `Ask an organization admin to grant you "${permission}" on this project.`
         : "Ask an organization admin to grant you access to this project.";
     },
+  },
+  evaluation_trace_not_evaluatable: {
+    title: "This trace cannot be evaluated",
+    describe: () =>
+      "The trace has no content an evaluator can read. Pick another trace, or wait for this one to finish arriving.",
   },
   permission_denied: {
     // The ADR-092 engine's one denial code (authorize() / .permission()). Names

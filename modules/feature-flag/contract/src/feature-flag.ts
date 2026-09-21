@@ -147,6 +147,13 @@ export const FEATURE_FLAGS = [
 
   // ----- PRODUCT -----
   {
+    key: "release_instant_evals",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Gates the LangWatchQL eval functions, the judged columns that classify a conversation, a trace or any text a query projects, while they are experimental. Off by default; enable per project or organization via a targeting rule. A deployment with no classifier configured keeps them unavailable whatever this says.",
+  },
+  {
     key: "release_lwql_workbench",
     scope: "PRODUCT",
     defaultValue: false,
