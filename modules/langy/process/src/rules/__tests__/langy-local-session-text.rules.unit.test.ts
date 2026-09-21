@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   connectMessage,
+  connectTurnIdempotencyKey,
   conversationTitle,
   conversationUrl,
   disconnectMessage,
@@ -126,6 +127,15 @@ describe("connectMessage", () => {
     /** @scenario "The line that says the folder connected repeats nothing from the card" */
     it("says only that the local folder is connected", () => {
       expect(connectMessage()).toBe("Local folder connected");
+    });
+  });
+});
+
+describe("connectTurnIdempotencyKey", () => {
+  describe("when a connection starts the turn directly, or its owed turn starts it later", () => {
+    it("names the same key for both, so only one of them ever starts a turn", () => {
+      expect(connectTurnIdempotencyKey("lcr_1")).toBe(connectTurnIdempotencyKey("lcr_1"));
+      expect(connectTurnIdempotencyKey("lcr_1")).not.toBe(connectTurnIdempotencyKey("lcr_2"));
     });
   });
 });

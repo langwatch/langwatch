@@ -68,6 +68,8 @@ export type SessionKeyBinding = z.infer<typeof sessionKeyBindingSchema>;
 /** What approving one request hands back to the command line. */
 export interface ApprovedControlRequest {
   request: StoredControlRequest;
+  /** The slug of the request's own project, for the conversation's address. */
+  projectSlug: string;
   sessionKey: string;
   apiKeyId: string;
 }
@@ -79,12 +81,13 @@ export type ControlRequestKeyMinter = (args: {
   organizationId: string;
 }) => Promise<{ token: string; apiKeyId: string }>;
 
-/** The one project fact this service reads: which organization owns it. Rejects
- * rather than answering null: a project row with no organization is broken
- * data, not a normal absence, so it degrades to unknown error + trace id
- * (ADR-045) at the caller's own boundary. */
+/** The two project facts this service reads: its slug and which organization
+ * owns it. Reads for the request's own project, never the caller's, so a
+ * device login on a personal project still approves for the team project the
+ * conversation lives on. */
 export type ControlRequestProjects = Readonly<{
   getOrganizationId(projectId: string): Promise<string>;
+  getSlug(projectId: string): Promise<string>;
 }>;
 
 export interface ControlRequestServiceOptions {
@@ -181,7 +184,7 @@ export class ControlRequestService {
     // The index is scored by expiry, so the list read drops a request that is
     // over even while the record it points at is still there to explain why.
     await this.store.zadd({
-      key: userRequestsKey(projectId, userId),
+      key: userRequestsKey(userId),
       score: request.expiresAt,
       member: request.id,
       ttlSeconds: Math.ceil((this.ttlMs + RECORD_GRACE_MS) / 1000),
@@ -191,17 +194,18 @@ export class ControlRequestService {
   }
 
   /**
-   * The caller's own open requests in one project, newest first. Expired
-   * members are dropped from the index on the way.
+   * The caller's own open requests, newest first: every project's, or one
+   * project's when `projectId` is given. Expired members are dropped from
+   * the index on the way.
    */
   async listOpen({
-    projectId,
     userId,
+    projectId,
   }: {
-    projectId: string;
     userId: string;
+    projectId?: string;
   }): Promise<StoredControlRequest[]> {
-    const key = userRequestsKey(projectId, userId);
+    const key = userRequestsKey(userId);
     const now = this.now();
     await this.store.zremrangebyscore(key, now);
     const ids = await this.store.zrangebyscore(key, now);
@@ -223,7 +227,10 @@ export class ControlRequestService {
         continue;
       }
 
-      if (request.userId !== userId || request.projectId !== projectId) {
+      if (request.userId !== userId) {
+        continue;
+      }
+      if (projectId !== undefined && request.projectId !== projectId) {
         continue;
       }
 
@@ -313,8 +320,15 @@ export class ControlRequestService {
     }
   }
 
+  /** Whether an approval spent this request. The mark outlives the request. */
+  async wasApproved(requestId: string): Promise<boolean> {
+    return (await this.store.tryGet(controlRequestClaimKey(requestId))) !== null;
+  }
+
   /**
-   * Spends one request and mints the command line's session key.
+   * Spends one request and mints the command line's session key. The key is
+   * minted for the request's own project, whatever project the caller's
+   * login is on.
    * @throws {LangyLocalRequestInvalidError} unknown, another user's, or spent
    * @throws {LangyLocalRequestExpiredError} the 15 minutes are over
    */
@@ -325,7 +339,8 @@ export class ControlRequestService {
   }: {
     requestId: string;
     userId: string;
-    projectId: string;
+    /** When given, the request must be this project's. */
+    projectId?: string;
   }): Promise<ApprovedControlRequest> {
     const request = await this.requireOwn({ requestId, userId, projectId });
     const claimed = await this.store.setIfAbsent(
@@ -337,11 +352,11 @@ export class ControlRequestService {
       throw new LangyLocalRequestInvalidError({ requestId });
     }
 
-    const organizationId = await this.organizationOf(request.projectId);
+    const project = await this.projectOf(request.projectId);
     const minted = await this.mintSessionKey({
       userId: request.userId,
       projectId: request.projectId,
-      organizationId,
+      organizationId: project.organizationId,
     });
     await this.store.set(
       sessionKeyBindingKey(minted.apiKeyId),
@@ -367,7 +382,12 @@ export class ControlRequestService {
       "control request approved, session key minted",
     );
 
-    return { request, sessionKey: minted.token, apiKeyId: minted.apiKeyId };
+    return {
+      request,
+      projectSlug: project.slug,
+      sessionKey: minted.token,
+      apiKeyId: minted.apiKeyId,
+    };
   }
 
   /** Drops a request the developer refused in the terminal. */
@@ -378,7 +398,8 @@ export class ControlRequestService {
   }: {
     requestId: string;
     userId: string;
-    projectId: string;
+    /** When given, the request must be this project's. */
+    projectId?: string;
   }): Promise<StoredControlRequest> {
     const request = await this.requireOwn({ requestId, userId, projectId });
     await this.forget(request);
@@ -394,12 +415,16 @@ export class ControlRequestService {
   }: {
     requestId: string;
     userId: string;
-    projectId: string;
+    projectId?: string;
   }): Promise<StoredControlRequest> {
     const request = await this.read(requestId);
     // A request that belongs to somebody else answers exactly like one that
     // never existed, so the id cannot be used to probe another person's chat.
-    if (!request || request.userId !== userId || request.projectId !== projectId) {
+    if (
+      !request ||
+      request.userId !== userId ||
+      (projectId !== undefined && request.projectId !== projectId)
+    ) {
       throw new LangyLocalRequestInvalidError({ requestId });
     }
 
@@ -412,14 +437,19 @@ export class ControlRequestService {
 
   private async forget(request: StoredControlRequest): Promise<void> {
     await this.store.del(controlRequestKey(request.id));
-    await this.store.zrem(userRequestsKey(request.projectId, request.userId), request.id);
+    await this.store.zrem(userRequestsKey(request.userId), request.id);
   }
 
   /**
-   * The organization the project belongs to. A row saying otherwise is
-   * broken data, so it degrades to unknown error + trace id (ADR-045).
+   * The project's slug and the organization it belongs to. A row saying
+   * otherwise is broken data, so it degrades to unknown error + trace id
+   * (ADR-045).
    */
-  private async organizationOf(projectId: string): Promise<string> {
-    return this.projects.getOrganizationId(projectId);
+  private async projectOf(projectId: string): Promise<{ slug: string; organizationId: string }> {
+    const [slug, organizationId] = await Promise.all([
+      this.projects.getSlug(projectId),
+      this.projects.getOrganizationId(projectId),
+    ]);
+    return { slug, organizationId };
   }
 }

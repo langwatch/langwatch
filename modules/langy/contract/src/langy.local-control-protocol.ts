@@ -21,6 +21,7 @@ export const LOCAL_TOOL_NAMES = [
   "local_grep",
   "local_find",
   "local_ls",
+  "local_langwatch_env",
 ] as const;
 export type LocalToolName = (typeof LOCAL_TOOL_NAMES)[number];
 
@@ -40,10 +41,20 @@ export const localWriteParamsSchema = z.object({
   content: z.string(),
 });
 
-export const localEditReplaceSchema = z.object({
-  oldText: z.string().min(1),
-  newText: z.string(),
-});
+/**
+ * One edit: either a replacement of text the file already holds, or text
+ * appended at the end of the file, which is how a line is added without an
+ * anchor (an empty `oldText` is refused).
+ */
+export const localEditReplaceSchema = z.union([
+  z.object({
+    oldText: z.string().min(1),
+    newText: z.string(),
+  }),
+  z.object({
+    append: z.string().min(1),
+  }),
+]);
 
 export const localEditParamsSchema = z.object({
   path: z.string().min(1).max(4096),
@@ -79,6 +90,17 @@ export const localLsParamsSchema = z.object({
   limit: z.number().int().positive().max(20_000).optional(),
 });
 
+/**
+ * The CLI fetches the project's ingest key with the developer's own login and
+ * writes LANGWATCH_API_KEY and LANGWATCH_ENDPOINT into the env file the app
+ * loads. The key stays on the machine: it never appears in the call, the
+ * result or the transcript.
+ */
+export const localLangwatchEnvParamsSchema = z.object({
+  /** Relative to the shared folder; the app's `.env` when omitted. */
+  path: z.string().min(1).max(4096).optional(),
+});
+
 export const localToolCallSchema = z.discriminatedUnion("tool", [
   z.object({ tool: z.literal("local_read"), params: localReadParamsSchema }),
   z.object({ tool: z.literal("local_write"), params: localWriteParamsSchema }),
@@ -87,6 +109,10 @@ export const localToolCallSchema = z.discriminatedUnion("tool", [
   z.object({ tool: z.literal("local_grep"), params: localGrepParamsSchema }),
   z.object({ tool: z.literal("local_find"), params: localFindParamsSchema }),
   z.object({ tool: z.literal("local_ls"), params: localLsParamsSchema }),
+  z.object({
+    tool: z.literal("local_langwatch_env"),
+    params: localLangwatchEnvParamsSchema,
+  }),
 ]);
 export type LocalToolCall = z.infer<typeof localToolCallSchema>;
 
@@ -99,6 +125,11 @@ export const workspaceInfoSchema = z.object({
   root: z.string().min(1).max(4096),
   /** The last path segment, what the chip shows. */
   name: z.string().min(1).max(255),
+  /**
+   * False when the folder is not a git repository, so the branch, remote and
+   * dirty facts do not apply; absent when git itself could not be run.
+   */
+  gitRepository: z.boolean().optional(),
   gitBranch: z.string().max(255).optional(),
   gitRemote: z.string().max(2048).optional(),
   gitDirty: z.boolean().optional(),
@@ -213,6 +244,7 @@ export const LOCAL_CALL_ERROR_CODES = [
   "timeout",
   "exec_failed",
   "not_found",
+  "key_refused",
 ] as const;
 export type LocalCallErrorCode = (typeof LOCAL_CALL_ERROR_CODES)[number];
 

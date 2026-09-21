@@ -11,6 +11,7 @@ import {
   callResultKey,
   controlRequestClaimKey,
   controlRequestKey,
+  owedConnectTurnKey,
   pendingCallsKey,
   policyKey,
   presenceKey,
@@ -29,7 +30,8 @@ describe("given the local control key family", () => {
         policyKey("conv_1"),
         controlRequestKey("lcr_1"),
         controlRequestClaimKey("lcr_1"),
-        userRequestsKey("proj_1", "user_1"),
+        userRequestsKey("user_1"),
+        owedConnectTurnKey("conv_1"),
         sessionKeyBindingKey("key_1"),
         callKey("lcall_1"),
         callResultKey("lcall_1"),
@@ -54,9 +56,15 @@ describe("given the local control key family", () => {
     });
   });
 
-  describe("when two users hold requests in one project", () => {
+  describe("when two users hold requests", () => {
     it("keeps each person's open requests under their own key", () => {
-      expect(userRequestsKey("proj_1", "user_a")).not.toEqual(userRequestsKey("proj_1", "user_b"));
+      expect(userRequestsKey("user_a")).not.toEqual(userRequestsKey("user_b"));
+    });
+  });
+
+  describe("when a folder is owed a connect turn", () => {
+    it("names the conversation, so another chat owes none of it", () => {
+      expect(owedConnectTurnKey("conv_a")).not.toEqual(owedConnectTurnKey("conv_b"));
     });
   });
 });

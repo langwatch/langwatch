@@ -42,6 +42,7 @@ import {
 } from "../rules/langy-local-session-contract.rules.ts";
 import {
   connectMessage,
+  connectTurnIdempotencyKey,
   conversationTitle,
   conversationUrl,
 } from "../rules/langy-local-session-text.rules.ts";
@@ -341,8 +342,14 @@ export class LocalControlSessionCoreService {
   }
 
   /**
-   * Records the connection and starts the turn that says so. A turn already
-   * in flight is not a failure — it picks the folder up on its next call.
+   * Records the connection and starts the turn that says so.
+   *
+   * A turn already in flight is not a failure: the developer connected while
+   * Langy was working, and the running turn picks the folder up on its next
+   * call. That reading is folded from events, though, so a turn that ended
+   * seconds ago can still read as in flight with no turn left to pick the
+   * folder up. The connect turn is then owed, and the turn's end starts it
+   * unless the turn reached the folder first.
    */
   async afterRegister(session: ControlSession): Promise<void> {
     const workspace = await this.presence.read(session.conversationId);
@@ -366,13 +373,19 @@ export class LocalControlSessionCoreService {
         conversationId: session.conversationId,
         userId: session.userId,
         text: connectMessage(),
-        idempotencyKey: `local-connect:${session.requestId}`,
+        idempotencyKey: connectTurnIdempotencyKey(session.requestId),
       });
     } catch (error) {
       if (LangyTurnInProgressError.is(error)) {
+        await this.presence.oweConnectTurn({
+          conversationId: session.conversationId,
+          projectId: session.projectId,
+          userId: session.userId,
+          requestId: session.requestId,
+        });
         logger.info(
           { conversationId: session.conversationId },
-          "folder connected while a turn was running, no second turn started",
+          "folder connected while a turn read as in flight; the connect turn is owed when that turn ends",
         );
 
         return;

@@ -22,6 +22,15 @@ export type ConnectedWorkspace = z.infer<typeof connectedWorkspaceSchema>;
  */
 export type PresenceHeartbeat = "refreshed" | "restored" | "replaced";
 
+/** The connect turn a folder is owed, and whose turn it is started as. */
+export const owedConnectTurnSchema = z.object({
+  projectId: z.string(),
+  userId: z.string(),
+  requestId: z.string(),
+  owedAt: z.number(),
+});
+export type OwedConnectTurn = z.infer<typeof owedConnectTurnSchema>;
+
 /**
  * Which folder is shared with which conversation, right now (ADR-129). A
  * service depends on this abstract surface, never on the concrete Redis or
@@ -48,4 +57,22 @@ export abstract class LangyLocalPresence {
 
   /** Records the developer's choice about the permission cards. */
   abstract writePolicy(input: { conversationId: string; skipPermissions: boolean }): Promise<void>;
+
+  /**
+   * Records that the folder is owed the turn that says it is connected: the
+   * terminal connected while the turn before still read as in flight, so
+   * that turn's end is what starts it.
+   */
+  abstract oweConnectTurn(
+    input: Omit<OwedConnectTurn, "owedAt"> & { conversationId: string },
+  ): Promise<void>;
+
+  /** The connect turn this folder is owed, or nothing when none is. */
+  abstract readOwedConnectTurn(conversationId: string): Promise<OwedConnectTurn | null>;
+
+  /**
+   * Forgets the owed turn: a turn placed a call on the folder, the owed turn
+   * started, or the folder is gone.
+   */
+  abstract settleOwedConnectTurn(conversationId: string): Promise<void>;
 }

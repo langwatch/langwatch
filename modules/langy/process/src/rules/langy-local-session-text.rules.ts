@@ -24,6 +24,15 @@ export function connectMessage(): string {
   return LANGY_LOCAL_CONNECT_NOTICE;
 }
 
+/**
+ * The idempotency key of the turn one connection starts, whether the
+ * connection started it directly or the turn before it ended first: the
+ * same key, so the two paths can never both start one.
+ */
+export function connectTurnIdempotencyKey(requestId: string): string {
+  return `local-connect:${requestId}`;
+}
+
 /** The line the transcript carries when the folder goes away—folder NAME, not path. */
 export function disconnectMessage(
   workspace: { name: string; root: string },

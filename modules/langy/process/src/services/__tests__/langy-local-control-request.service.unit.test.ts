@@ -24,8 +24,11 @@ let store: SessionStateStore;
 let mint: ReturnType<typeof vi.fn>;
 let service: ControlRequestService;
 
-/** The one project read the service makes, and nothing else. */
-const projects = { getOrganizationId: async () => "org_1" };
+/** The two project reads the service makes, and nothing else. */
+const projects = {
+  getOrganizationId: async () => "org_1",
+  getSlug: async () => "acme-shop",
+};
 
 function create(
   overrides: Partial<{ userId: string; conversationId: string }> = {},
@@ -123,11 +126,51 @@ describe("given a code access card that asked for a folder", () => {
       });
       const binding = await service.readKeyBinding(approved.apiKeyId);
       expect(binding).toMatchObject({ conversationId, projectId, userId });
+      expect(approved.projectSlug).toBe("acme-shop");
 
       await expect(
         service.approve({ requestId: request.id, userId, projectId }),
       ).rejects.toMatchObject({ code: "langy_local_request_invalid" });
       expect(mint).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the login is on another project than the conversation", () => {
+    /** @scenario "A login on my personal project lists a request raised on a team project" */
+    it("lists the request by the person, and approves it for the request's own project", async () => {
+      const request = await create();
+
+      const mine = await service.listOpen({ userId });
+      expect(mine.map((row) => row.id)).toEqual([request.id]);
+      expect(await service.listOpen({ userId, projectId: "proj_personal" })).toEqual([]);
+
+      const approved = await service.approve({ requestId: request.id, userId });
+      expect(mint).toHaveBeenCalledWith({
+        userId,
+        projectId,
+        organizationId: "org_1",
+      });
+      expect(await service.readKeyBinding(approved.apiKeyId)).toMatchObject({ projectId });
+      expect(approved.projectSlug).toBe("acme-shop");
+    });
+
+    it("refuses the approval when a named project is not the request's", async () => {
+      const request = await create();
+
+      await expect(
+        service.approve({ requestId: request.id, userId, projectId: "proj_personal" }),
+      ).rejects.toMatchObject({ code: "langy_local_request_invalid" });
+    });
+  });
+
+  describe("when an approval already spent a request", () => {
+    it("reports it as approved, even after the request itself is forgotten", async () => {
+      const request = await create();
+      expect(await service.wasApproved(request.id)).toBe(false);
+
+      await service.approve({ requestId: request.id, userId, projectId });
+
+      expect(await service.wasApproved(request.id)).toBe(true);
     });
   });
 

@@ -1,6 +1,6 @@
 import type { LangyAnalyticsEventRecord } from "../langy-analytics-event.repository.ts";
 import type { LangyTurnAccess, LangyTurnHandoff } from "../langy-live-turn.repository.ts";
-import type { ConnectedWorkspace } from "../langy-local-presence.repository.ts";
+import type { ConnectedWorkspace, OwedConnectTurn } from "../langy-local-presence.repository.ts";
 import type { LangyStreamRead } from "../langy-token-buffer.repository.ts";
 
 /**
@@ -16,6 +16,7 @@ export class LangyMemoryStore {
   readonly resourceLinks = new Map<string, Map<string, string>>();
   readonly presence = new Map<string, ConnectedWorkspace>();
   readonly presencePolicy = new Map<string, boolean>();
+  readonly owedConnectTurns = new Map<string, OwedConnectTurn>();
   readonly streams = new Map<string, LangyStreamRead[]>();
   readonly endedStreams = new Set<string>();
   readonly heartbeats = new Map<string, number>();

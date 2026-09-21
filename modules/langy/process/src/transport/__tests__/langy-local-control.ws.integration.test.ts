@@ -8,6 +8,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 
 import type { UpgradeHandler } from "@langwatch/api";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 import {
   LangyTurnInProgressError,
@@ -19,7 +20,6 @@ import {
   SessionStateStoreFactory,
 } from "@langwatch/redis-client";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import WebSocket from "ws";
@@ -148,7 +148,10 @@ function upgradeRouterFor(server: Server) {
 function testPorts(store: SessionStateStore) {
   const runtime = RedisLangyLocalControlRuntimeRepository.create({
     store,
-    projects: { getOrganizationId: async () => organizationId },
+    projects: {
+      getOrganizationId: async () => organizationId,
+      getSlug: async () => "acme-shop",
+    },
     mintSessionKey: async ({ userId: owner }) => {
       const token = `sk-lw-${nanoid(48)}`;
       const apiKeyId = `key_${nanoid(10)}`;

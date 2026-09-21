@@ -87,6 +87,9 @@ export class LocalCallDispatcherService {
     timeoutMs: number;
   }): Promise<StoredLocalCall> {
     await this.requireWorkspace(conversationId);
+    // A turn that reaches the folder is the turn the connect message was for,
+    // so the folder is owed no turn of its own.
+    await this.presence.settleOwedConnectTurn(conversationId);
 
     const createdAt = this.now();
     const stored = {

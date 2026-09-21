@@ -79,6 +79,26 @@ Feature: Langy asks how to reach the customer's code, once
       When I reopen the conversation before the folder connects
       Then the card still shows the command and the countdown
 
+    # The waiting line is a claim that a terminal can approve something. The
+    # platform says whether that is true: the request is open, it expired, it
+    # was declined in the terminal, or the share it opened has ended. The card
+    # waits only on an open request, so a reload shows what the platform knows.
+
+    @unit
+    Scenario Outline: The platform says what became of the conversation's latest request
+      Given the conversation's latest request to share a folder <history>
+      When the card reads the folder state
+      Then the request reads as <state>
+
+      Examples:
+        | history                                        | state    |
+        | is within its fifteen minutes                  | open     |
+        | was approved and the folder is connected       | approved |
+        | is past its fifteen minutes                    | expired  |
+        | was declined in the terminal before it expired | declined |
+        | was approved and the share has ended           | ended    |
+        | never existed                                  | none     |
+
     @integration
     Scenario: A card that cannot read the folder state says so and offers to try again
       Given the read of my folder state fails

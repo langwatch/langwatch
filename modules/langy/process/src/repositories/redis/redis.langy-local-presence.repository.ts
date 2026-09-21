@@ -4,15 +4,21 @@
  * heartbeat, so a sleeping machine reads offline with no explicit deregister.
  */
 
-import { PRESENCE_TTL_MS } from "@langwatch/langy-contract";
+import { CONNECT_TURN_OWED_TTL_MS, PRESENCE_TTL_MS } from "@langwatch/langy-contract";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { nowInstant } from "@langwatch/time";
 
-import { policyKey, presenceKey } from "../../rules/langy-local-control-keys.rules.ts";
+import {
+  owedConnectTurnKey,
+  policyKey,
+  presenceKey,
+} from "../../rules/langy-local-control-keys.rules.ts";
 import {
   connectedWorkspaceSchema,
   type ConnectedWorkspace,
   LangyLocalPresence,
+  type OwedConnectTurn,
+  owedConnectTurnSchema,
   type PresenceHeartbeat,
 } from "../langy-local-presence.repository.ts";
 
@@ -96,6 +102,7 @@ export class LangyLocalPresenceRedisRepository extends LangyLocalPresence {
     if (instanceId && current.instanceId !== instanceId) return null;
     await this.store.del(presenceKey(conversationId));
     await this.store.del(policyKey(conversationId));
+    await this.store.del(owedConnectTurnKey(conversationId));
     return current;
   }
 
@@ -119,6 +126,29 @@ export class LangyLocalPresenceRedisRepository extends LangyLocalPresence {
     await this.store.set(policyKey(conversationId), "1", POLICY_TTL_SECONDS);
   }
 
+  async oweConnectTurn({
+    conversationId,
+    ...owed
+  }: Omit<OwedConnectTurn, "owedAt"> & { conversationId: string }): Promise<void> {
+    const record: OwedConnectTurn = { ...owed, owedAt: this.now() };
+    await this.store.set(
+      owedConnectTurnKey(conversationId),
+      JSON.stringify(record),
+      Math.ceil(CONNECT_TURN_OWED_TTL_MS / 1000),
+    );
+  }
+
+  async readOwedConnectTurn(conversationId: string): Promise<OwedConnectTurn | null> {
+    const raw = await this.store.tryGet(owedConnectTurnKey(conversationId));
+    if (!raw) return null;
+    const parsed = safeParseOwed(raw);
+    return parsed;
+  }
+
+  async settleOwedConnectTurn(conversationId: string): Promise<void> {
+    await this.store.del(owedConnectTurnKey(conversationId));
+  }
+
   private ttlSeconds(): number {
     return Math.ceil(this.presenceTtlMs / 1000);
   }
@@ -127,6 +157,15 @@ export class LangyLocalPresenceRedisRepository extends LangyLocalPresence {
 function safeParse(raw: string): ConnectedWorkspace | null {
   try {
     const parsed = connectedWorkspaceSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+function safeParseOwed(raw: string): OwedConnectTurn | null {
+  try {
+    const parsed = owedConnectTurnSchema.safeParse(JSON.parse(raw));
     return parsed.success ? parsed.data : null;
   } catch {
     return null;
