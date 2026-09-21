@@ -46,7 +46,7 @@ describe("passkey removal serialization retries", () => {
     });
   });
 
-  it("propagates an exhausted conflict after four attempts", async () => {
+  it("propagates an exhausted conflict after five attempts", async () => {
     const { removal, transaction } = repository();
     const conflict = driverConflict();
     transaction.mockRejectedValue(conflict);
@@ -54,16 +54,15 @@ describe("passkey removal serialization retries", () => {
     await expect(
       removal.deleteIfAnotherWayInRemains({ passkeyId: "passkey_1" }),
     ).rejects.toBe(conflict);
-    expect(transaction).toHaveBeenCalledTimes(4);
+    expect(transaction).toHaveBeenCalledTimes(5);
   });
 
   it("waits a random slice of a growing window between attempts", () => {
-    // Both sides of a race are told at the same moment, so a retry with no
-    // wait puts them straight back into the same microsecond. Each attempt
-    // draws from its own window rather than from a fixed delay, which is what
-    // separates them.
-    for (const attempt of [0, 1, 2]) {
-      const ceiling = 5 * 2 ** attempt;
+    // The loser is told before the winner commits, so the window has to be
+    // long enough for that transaction to finish and random enough that two
+    // requests told at the same moment do not come back together.
+    for (const attempt of [0, 1, 2, 3]) {
+      const ceiling = 50 * 2 ** attempt;
       const draws = Array.from({ length: 50 }, () =>
         serializationRetryDelayMs(attempt),
       );

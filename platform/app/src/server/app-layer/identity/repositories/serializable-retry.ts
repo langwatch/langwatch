@@ -1,22 +1,26 @@
 import { z } from "zod";
 import { Prisma } from "~/generated/prisma/client";
 
-const MAX_SERIALIZATION_ATTEMPTS = 4;
+const MAX_SERIALIZATION_ATTEMPTS = 5;
 
 /** The first retry window. Attempt N waits a random slice of this doubled N
- *  times, so the whole budget is a few tens of milliseconds at worst. */
-const RETRY_BASE_DELAY_MS = 5;
+ *  times, so the whole budget is under a second at worst. */
+const RETRY_BASE_DELAY_MS = 50;
 
 /**
  * How long to wait before trying again, as a random point inside a window
  * that doubles each attempt.
  *
- * The randomness is the part that matters. Both sides of a race get the
- * conflict at the same moment, so retrying straight away puts them back in
- * the same microsecond, and four attempts can be spent before either one
- * gets through. A random wait separates them on the first retry. The growth
- * keeps a genuinely busy row from starving rather than making one click
- * noticeably slower.
+ * Two things set the size of the window. Postgres tells the loser it lost
+ * before the winner has committed, so a retry that starts a millisecond later
+ * reads the same state the first attempt read, writes the same row and loses
+ * again: the wait has to outlast a whole transaction, not a scheduler tick.
+ * And both sides are told at the same moment, so the wait has to be random,
+ * or two racing requests keep landing in the same instant together.
+ *
+ * A removal that hits no conflict waits for none of this. One that does pays
+ * a few hundred milliseconds at most, which no person notices, and the growth
+ * keeps a genuinely busy row from starving.
  */
 export function serializationRetryDelayMs(attempt: number): number {
   return Math.random() * RETRY_BASE_DELAY_MS * 2 ** attempt;
@@ -64,8 +68,8 @@ export function isSerializationConflict(error: unknown): boolean {
  * attempt reads the state the winner left and decides again from it, which is
  * the answer the person would have got had they clicked a moment later.
  *
- * Bounded at four attempts, each after a short random pause
- * (`serializationRetryDelayMs`). A conflict that survives four rounds is not a
+ * Bounded at five attempts, each after a random pause
+ * (`serializationRetryDelayMs`). A conflict that survives all five is not a
  * race between two clicks any more, and burying it under further retries
  * would hide a real problem rather than smooth one over.
  */
