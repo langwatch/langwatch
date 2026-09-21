@@ -517,3 +517,18 @@ regexes = [
   '''^bc1qqv9pzxqlyckngw6zf9g9whn9dsaqaxas$''',
   '''^bc1qqv9pzxqlyckngw6zf9g9whn9d3eh4qvg8d8phl$''',
 ]
+
+# One row of the self-hosted instance drawer's usage list, as it stood in commit
+# dece2163. The property was named `key` there and held the name of a field in a
+# usage report, which is the `key: "<value>"` shape `generic-api-key` fires on.
+# The property is called `field` now, so nothing in the tree matches, but the
+# commit stays in the branch's history and a range scan still reads it.
+#
+# Scoped by VALUE and ANCHORED as well as by path, matched with AND, so any
+# other high-entropy string in that file is still reported.
+[[allowlists]]
+description = "A usage-report field name in an instance drawer row list, before the property was renamed"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''platform/app/ee/admin/backoffice/resources/instances/types\.ts''']
+regexes = ['''^scenario_runs_28d$''']
