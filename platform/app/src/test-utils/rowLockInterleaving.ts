@@ -13,6 +13,11 @@
  * A write whose conditions sit in a subquery rather than against the table
  * passes the re-check on its own older snapshot and wins anyway, which is the
  * failure this catches.
+ *
+ * Both sides of a race need their conditions on the table: a claim that can
+ * wait behind a differently shaped conditional write on the same row (a
+ * revoke, a release, a takeover) is only exclusive once that write is stated
+ * the same way, because either statement can be the one that parks.
  */
 
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";

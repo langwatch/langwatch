@@ -177,6 +177,11 @@ export class PrismaActivationCodes implements ActivationCodeRepository {
     });
   }
 
+  /**
+   * The release and the revoke below are the other conditional writes that
+   * meet `claimSingleUse` on one row, so they take the same SQL shape: a race
+   * has two statements and either can be the one that waits on the lock.
+   */
   async releaseClaim({
     id,
     instanceId,
@@ -184,14 +189,16 @@ export class PrismaActivationCodes implements ActivationCodeRepository {
     id: string;
     instanceId: string;
   }): Promise<void> {
-    await this.prisma.activationCode.updateMany({
-      where: { id, redeemedByInstanceId: instanceId },
-      data: {
-        redeemedAt: null,
-        redeemedByInstanceId: null,
-        redemptionCount: { decrement: 1 },
-      },
-    });
+    await this.prisma.$executeRaw`
+      -- @tenancy: addressed by primary key, as in claimSingleUse above.
+      UPDATE "ActivationCode"
+         SET "redeemedAt" = NULL,
+             "redeemedByInstanceId" = NULL,
+             "redemptionCount" = "redemptionCount" - 1,
+             "updatedAt" = now()
+       WHERE "id" = ${id}
+         AND "redeemedByInstanceId" = ${instanceId}
+    `;
   }
 
   async revoke({
@@ -203,11 +210,15 @@ export class PrismaActivationCodes implements ActivationCodeRepository {
     at: Date;
     revokedById: string;
   }): Promise<ActivationCodeRecord | null> {
-    const { count } = await this.prisma.activationCode.updateMany({
-      where: { id, revokedAt: null },
-      data: { revokedAt: at, revokedById },
-    });
-    if (count !== 1) return this.findById(id);
+    await this.prisma.$executeRaw`
+      -- @tenancy: addressed by primary key, as in claimSingleUse above.
+      UPDATE "ActivationCode"
+         SET "revokedAt" = ${at},
+             "revokedById" = ${revokedById},
+             "updatedAt" = now()
+       WHERE "id" = ${id}
+         AND "revokedAt" IS NULL
+    `;
     return this.findById(id);
   }
 }
