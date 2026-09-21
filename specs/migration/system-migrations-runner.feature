@@ -136,6 +136,48 @@ Feature: Running system migrations across organizations
     And runtime processes do not start
     And the next start retries the pass
 
+  # ═══ Re-driving after startup ═════════════════════════════════════════
+  # The preflight converges once and then stops. Every stored status but
+  # `finalized` and `rolled_back` is re-entrant, so a tenant that parks an
+  # hour into a worker's life heals on the very next pass — except that on a
+  # fleet which stays up there WAS no next pass, only the next deploy or an
+  # operator clicking "run a pass". So a worker carries a cadence of its own,
+  # driving the same pass the preflight and that click drive. It converges on
+  # nothing and reads no progress count, so a tenant that parks again every
+  # time costs one attempt per cadence and wedges nothing.
+
+  @unit
+  Scenario: A worker re-drives a parked tenant without being asked
+    Given a tenant parked after startup had already finished
+    When the worker's re-drive cadence comes round
+    Then a pass runs and attempts that tenant again
+    And a tenant that parks again is simply attempted again next time
+
+  @unit
+  Scenario: A recurring reconciliation keeps running on a long-lived worker
+    Given a migration whose held outcome is recurring reconciliation
+    When the worker's re-drive cadence comes round
+    Then its tenants are re-proved again
+
+  @unit
+  Scenario: A fleet with nothing to re-drive does not sweep
+    Given every tenant is finalized or pinned to its legacy path
+    When the worker's re-drive cadence comes round
+    Then the stored state is asked whether anything could still move
+    And no pass runs
+
+  @unit
+  Scenario: Only a worker re-drives
+    Given a process that does not run the worker stack
+    When it starts
+    Then it never drives a migration pass of its own
+
+  @unit
+  Scenario: A re-drive that fails does not end the cadence
+    Given a pass that fails outright after startup
+    When the cadence comes round again
+    Then another pass is attempted
+
   # D04 records the configured legacy route WITHOUT treating the old domain
   # string as ownership evidence, which is what let it join the shared
   # registry: existing sign-in stays compatible, while activation, linking and

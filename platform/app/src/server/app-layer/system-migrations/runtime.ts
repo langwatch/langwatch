@@ -24,6 +24,7 @@ import {
 } from "../authz/authz-engine.migration";
 import { authzGrantsCommands } from "../authz/ledger";
 import { PrismaAuthzMigrationRepository } from "../authz/repositories/authz-migration.prisma.repository";
+import type { ProcessRole } from "../config";
 import {
   connectionGrandfatherMigration,
   identifierBackfillMigration,
@@ -34,6 +35,7 @@ import {
   migrationRunsOnThisInstallation,
   organizationMigrates,
 } from "./cohort";
+import { SystemMigrationRedriveService } from "./redrive";
 import { RedisMigrationLeaseRepository } from "./repositories/migration-lease.redis.repository";
 import { PrismaOrganizationTenantSource } from "./repositories/organization-tenant-source.prisma.repository";
 import { PrismaSystemMigrationEnrollmentRepository } from "./repositories/system-migration-enrollment.prisma.repository";
@@ -317,6 +319,52 @@ function userMigrationsForThisInstallation(): SystemMigration[] {
   );
 }
 
+function organizationMigrationsForThisInstallation(): SystemMigration[] {
+  return registeredMigrations().filter((migration) =>
+    migrationRunsOnThisInstallation({
+      isSaaS: env.IS_SAAS === true,
+      runsAutomaticallyOnSelfHosted: migration.runsAutomaticallyOnSelfHosted,
+    }),
+  );
+}
+
+/**
+ * The names a pass on THIS installation could still move, both axes. The
+ * re-drive's gate asks the state table about exactly these: a row belonging
+ * to a migration this installation does not run is not work waiting, it is
+ * another deployment's row in a shared table, and sweeping for it would keep
+ * the gate permanently open.
+ */
+export function migrationNamesForThisInstallation(): string[] {
+  return [
+    ...organizationMigrationsForThisInstallation(),
+    ...userMigrationsForThisInstallation(),
+  ].map((migration) => migration.name);
+}
+
+/**
+ * The periodic re-drive (D2): a worker-only cadence over the pass above, so
+ * a tenant that parks an hour after boot heals itself instead of waiting for
+ * the next deploy or an operator's click. Composed here because this is the
+ * one place the runner meets Prisma, and gated on the state table so an
+ * installation with nothing parked or held pays one row read per tick.
+ */
+export function createSystemMigrationRedrive({
+  processRole,
+}: {
+  processRole: ProcessRole | undefined;
+}): SystemMigrationRedriveService {
+  return new SystemMigrationRedriveService({
+    processRole,
+    logger: createLogger("langwatch:system-migrations:redrive"),
+    hasTenantAwaitingRedrive: () =>
+      systemMigrationState.hasTenantAwaitingRedrive({
+        migrationNames: migrationNamesForThisInstallation(),
+      }),
+    runPass: () => runSystemMigrationPass(),
+  });
+}
+
 function mergeSummaries(
   a: MigrationPassSummary,
   b: MigrationPassSummary,
@@ -469,12 +517,7 @@ export async function runSystemMigrationPass(args?: {
     lease: new RedisMigrationLeaseRepository(redis),
     tenants: new PrismaOrganizationTenantSource(prisma),
     cohort: await migrationPassCohort(),
-    migrations: registeredMigrations().filter((migration) =>
-      migrationRunsOnThisInstallation({
-        isSaaS: env.IS_SAAS === true,
-        runsAutomaticallyOnSelfHosted: migration.runsAutomaticallyOnSelfHosted,
-      }),
-    ),
+    migrations: organizationMigrationsForThisInstallation(),
   });
   // The USER-rooted leg (ADR-101 §6): the same lease, state table and
   // enrollment rows, driven over users. Both legs' cohorts resolve BEFORE

@@ -371,6 +371,7 @@ import { PlanProviderService } from "./subscription/plan-provider";
 import { createSelfHostedPlanProvider } from "./subscription/self-hosted-plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import { SuiteRunService } from "./suites/suite-run.service";
+import { createSystemMigrationRedrive } from "./system-migrations/runtime";
 import { startTopicClusteringBootSeeds } from "./topic-clustering/bootSeeds";
 import { clusterTopicsForProject } from "./topic-clustering/clustering";
 import { NullTopicRepository } from "./topic-clustering/repositories/null-topic.repository";
@@ -1300,6 +1301,15 @@ export function initializeDefaultApp(options?: {
     : undefined;
   scheduler?.start();
 
+  // The system-migration re-drive: the boot preflight converges and stops, so
+  // without a cadence a tenant that parks an hour into a worker's life stays
+  // parked until the next deploy or an operator's click. Worker-only, gated on
+  // the state table, and driving the very same pass — see redrive.ts.
+  const systemMigrationRedrive = createSystemMigrationRedrive({
+    processRole: config.processRole,
+  });
+  systemMigrationRedrive.start();
+
   // ADR-044 Phase 3c: register the report handler so a due report ScheduledJob
   // renders + dispatches on schedule (worker-only, same notify pipeline as
   // alerts). The scheduler registry is a process singleton.
@@ -1925,6 +1935,10 @@ export function initializeDefaultApp(options?: {
       close: () => scheduler.stop(),
     });
   }
+  gracefulCloseables.push({
+    name: "system-migration-redrive",
+    close: () => systemMigrationRedrive.stop(),
+  });
   gracefulCloseables.push({
     name: "prisma",
     close: () => prisma.$disconnect(),

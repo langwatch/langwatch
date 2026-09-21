@@ -153,6 +153,31 @@ export class PrismaSystemMigrationStateRepository
     return row !== null;
   }
 
+  /**
+   * Is there a tenant a later pass could still move? `parked` and `migrated`
+   * are exactly the two re-entrant stored statuses: the runner re-attempts
+   * both on every pass, while `finalized` and `rolled_back` are terminal and
+   * a tenant with no record at all is driven by the boot preflight. This is
+   * what the periodic re-drive asks before sweeping the fleet, so an
+   * installation whose tenants have all latched pays one indexed row read per
+   * tick instead of a pass. `findFirst` stops at the first match.
+   */
+  async hasTenantAwaitingRedrive({
+    migrationNames,
+  }: {
+    migrationNames: readonly string[];
+  }): Promise<boolean> {
+    if (migrationNames.length === 0) return false;
+    const row = await this.prisma.systemMigrationTenantState.findFirst({
+      where: {
+        migrationName: { in: [...migrationNames] },
+        status: { in: ["parked", "migrated"] },
+      },
+      select: { tenantId: true },
+    });
+    return row !== null;
+  }
+
   /** Ops rollup: how many tenants sit in each status for one migration. */
   async findStatusCounts({
     migrationName,
