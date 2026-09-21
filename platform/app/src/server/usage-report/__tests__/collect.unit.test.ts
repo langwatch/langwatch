@@ -66,8 +66,17 @@ function prismaOver({
   const client: Record<string, unknown> = {};
   for (const name of MODELS) client[name] = emptyModel();
 
-  (client.user as ReturnType<typeof emptyModel>).findMany = vi.fn(
-    async () => emails.map((email) => ({ email })) as never,
+  // Email domains are grouped by Postgres, so the stand-in answers the raw
+  // query the way the database would: one row per domain with its count, and
+  // never an address.
+  const grouped = new Map<string, number>();
+  for (const email of emails) {
+    const domain = email.split("@")[1]?.toLowerCase().trim();
+    if (!domain) continue;
+    grouped.set(domain, (grouped.get(domain) ?? 0) + 1);
+  }
+  client.$queryRaw = vi.fn(async () =>
+    [...grouped].map(([domain, count]) => ({ domain, count })),
   );
   client.project = {
     ...emptyModel(),

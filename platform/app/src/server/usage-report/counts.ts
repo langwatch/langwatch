@@ -242,20 +242,28 @@ export async function onboardingLadder({
  * The part after the `@`, counted, and nothing else: no address, no name, no
  * individual. `acme.com: 14` says who to support and who to talk to, and says
  * nothing about anyone in particular.
+ *
+ * The split and the count happen in Postgres, so no address is ever read into
+ * the application process. On an install with tens of thousands of users that
+ * is the difference between a grouped scan and materialising every address in
+ * memory once a day, and it is what lets the docs page say the report is built
+ * without the addresses being handled.
  */
 export async function userEmailDomains(
   prisma: PrismaClient,
 ): Promise<Record<string, number>> {
-  const users = await prisma.user.findMany({
-    where: { email: { not: null } },
-    select: { email: true },
-  });
+  const rows = await prisma.$queryRaw<{ domain: string; count: number }[]>`
+    SELECT split_part(lower(trim("email")), '@', 2) AS domain,
+           count(*)::int AS count
+      FROM "User"
+     WHERE "email" IS NOT NULL
+     GROUP BY 1
+  `;
 
   const counts: Record<string, number> = {};
-  for (const user of users) {
-    const domain = user.email?.split("@")[1]?.toLowerCase().trim();
-    if (!domain) continue;
-    counts[domain] = (counts[domain] ?? 0) + 1;
+  for (const row of rows) {
+    if (!row.domain) continue;
+    counts[row.domain] = (counts[row.domain] ?? 0) + row.count;
   }
   return counts;
 }
