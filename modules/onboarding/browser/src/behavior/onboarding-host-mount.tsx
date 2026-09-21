@@ -15,13 +15,48 @@ import {
   type OnboardingActor,
   type OnboardingFailureNotice,
   type OnboardingFlagReading,
+  type OnboardingGovernanceCapability,
+  type OnboardingLangyCapability,
   type OnboardingRouteReading,
   type OnboardingScope,
   type OnboardingSessionStatus,
+  type OnboardingSidebarCapability,
   type OnboardingSuccessNotice,
 } from "../model/onboarding-host.ts";
 import { writeToClipboard } from "./browser-clipboard.ts";
 import { useOnboardingOrganizationGraph } from "./onboarding-organization-graph.ts";
+
+/**
+ * Inert until the shell wires `langy`/`sidebar`/`governance` through
+ * `UiCapabilities` (handoff §10) — not a code defect in the meantime.
+ */
+const INERT_LANGY: OnboardingLangyCapability = {
+  dock() {
+    /* no panel to dock until the shell wires the langy capability */
+  },
+  queueKickoff() {
+    /* no panel to hand the kickoff to until the shell wires the langy capability */
+  },
+  onScopeAnnounced() {
+    return () => undefined;
+  },
+};
+const INERT_SIDEBAR: OnboardingSidebarCapability = {
+  expandGroup() {
+    /* no sidebar capability wired yet */
+  },
+  collapseGroup() {
+    /* no sidebar capability wired yet */
+  },
+  restoreAll() {
+    /* no sidebar capability wired yet */
+  },
+};
+const INERT_GOVERNANCE: OnboardingGovernanceCapability = {
+  setSampleChoice() {
+    /* no governance capability wired yet */
+  },
+};
 
 /** Same order-sensitive derivation the sibling `authorize`/`api-key` mounts use. */
 function sessionStatusOf(hasActor: boolean, isSettled: boolean): OnboardingSessionStatus {
@@ -46,6 +81,9 @@ class CapabilityOnboardingHost extends OnboardingHostApi {
       projectApiKey: string | undefined;
       succeeded: (notice: OnboardingSuccessNotice) => void;
       failed: (failure: OnboardingFailureNotice) => void;
+      langy: OnboardingLangyCapability;
+      sidebar: OnboardingSidebarCapability;
+      governance: OnboardingGovernanceCapability;
     },
   ) {
     super();
@@ -121,6 +159,18 @@ class CapabilityOnboardingHost extends OnboardingHostApi {
     if (typeof window === "undefined" || !window.matchMedia) return false;
     return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   }
+
+  langy(): OnboardingLangyCapability {
+    return this.deps.langy;
+  }
+
+  sidebar(): OnboardingSidebarCapability {
+    return this.deps.sidebar;
+  }
+
+  governance(): OnboardingGovernanceCapability {
+    return this.deps.governance;
+  }
 }
 
 export default function OnboardingHostMount({ children }: { children?: ReactNode }) {
@@ -166,6 +216,9 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
         projectApiKey: graph.activeProject?.project.apiKey ?? void 0,
         succeeded: (notice) => feedback.succeeded(notice),
         failed: (failure) => feedback.failed(failure),
+        langy: INERT_LANGY,
+        sidebar: INERT_SIDEBAR,
+        governance: INERT_GOVERNANCE,
       }),
     [
       scope,

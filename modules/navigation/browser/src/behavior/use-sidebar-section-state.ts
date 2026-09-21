@@ -1,6 +1,11 @@
 /** Sidebar group open state, remembered per device; storage key unchanged on purpose */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+
+import {
+  getSidebarSectionOverride,
+  subscribeSidebarSectionOverrides,
+} from "./sidebar-section-store.ts";
 
 export const getSidebarSectionStorageKey = (id: string) =>
   `langwatch:main-sidebar-section:${id}:expanded:v1`;
@@ -13,6 +18,9 @@ export const useSidebarSectionState = ({
   defaultExpanded: boolean;
 }) => {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  const override = useSyncExternalStore(subscribeSidebarSectionOverrides, () =>
+    getSidebarSectionOverride(id),
+  );
 
   useEffect(() => {
     const savedPreference = window.localStorage.getItem(getSidebarSectionStorageKey(id));
@@ -29,5 +37,5 @@ export const useSidebarSectionState = ({
     window.localStorage.setItem(getSidebarSectionStorageKey(id), String(nextExpanded));
   };
 
-  return { isExpanded, toggleSection };
+  return { isExpanded: override ?? isExpanded, toggleSection };
 };

@@ -11,16 +11,19 @@ import { navigationApi } from "./behavior/navigation-api.ts";
 export const navigationWeb = defineWebModule("navigation")
   .withApi(navigationApi)
   .withScreens({
-  "pages/index": {
-    load: () => import("./ui/sections/navigation/landing.screen.tsx"),
-  },
-  "pages/not-found": {
-    load: () => import("./ui/sections/navigation/not-found.screen.tsx"),
-  },
-  "pages/settings/not-found": {
-    load: () => import("./ui/sections/navigation/not-found.screen.tsx"),
-  },
-  "pages/@project/[...path]/index": {
-    load: () => import("./ui/sections/navigation/project-redirect.screen.tsx"),
-  },
-});
+    "pages/index": {
+      load: () => import("./ui/sections/navigation/landing.screen.tsx"),
+    },
+    "pages/not-found": {
+      load: () => import("./ui/sections/navigation/not-found.screen.tsx"),
+    },
+    "pages/settings/not-found": {
+      load: () => import("./ui/sections/navigation/not-found.screen.tsx"),
+    },
+    "pages/@project/[...path]/index": {
+      load: () => import("./ui/sections/navigation/project-redirect.screen.tsx"),
+    },
+  })
+  .withCapabilities({
+    sidebar: { load: () => import("./behavior/sidebar-capability.ts") },
+  });

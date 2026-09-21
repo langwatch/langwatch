@@ -61,6 +61,45 @@ export type OnboardingSuccessNotice = {
   readonly description?: string;
 };
 
+/**
+ * A landing's kickoff brief, exactly as the tour builds it
+ * (`features/guided-onboarding/model/kickoff.ts`). Typed here so the host
+ * capability's signature is checked, without the host importing the panel.
+ */
+export type OnboardingLangyKickoff = Readonly<Record<string, unknown>> & {
+  readonly path: string;
+};
+
+/**
+ * Langy panel operations, so no screen imports `modules/langy/browser`
+ * directly — a peer, published through its own `withCapabilities` slot.
+ * ARCHITECTURE.md §10.1 "a capability travels by declaration".
+ */
+export type OnboardingLangyCapability = {
+  /** Opens the panel docked to the sidebar, before a tour or a kickoff. */
+  dock(): void;
+  /** Hands the panel a kickoff brief once its scope is announced. */
+  queueKickoff(kickoff: OnboardingLangyKickoff): void;
+  /**
+   * Fires once the panel announces `organizationId`'s scope; returns the
+   * unsubscribe, for a kickoff still pending when the host unmounts.
+   */
+  onScopeAnnounced(organizationId: string, callback: () => void): () => void;
+};
+
+/** Sidebar group fold/expand/restore, published by navigation's declaration. */
+export type OnboardingSidebarCapability = {
+  expandGroup(id: string): void;
+  collapseGroup(id: string): void;
+  /** Drops every override; each group returns to its remembered preference. */
+  restoreAll(): void;
+};
+
+/** The governance sample-data toggle a tour flips on and off. */
+export type OnboardingGovernanceCapability = {
+  setSampleChoice(choice: boolean): void;
+};
+
 export type OnboardingFailureNotice = {
   /**
    * The failure itself, which the composition's presentation registry turns
@@ -129,6 +168,15 @@ export abstract class OnboardingHostApi {
 
   /** Whether this reader asked their operating system for less motion. */
   abstract prefersReducedMotion(): boolean;
+
+  /** Langy panel control for a guided landing; see {@link OnboardingLangyCapability}. */
+  abstract langy(): OnboardingLangyCapability;
+
+  /** Sidebar group fold/expand/restore; see {@link OnboardingSidebarCapability}. */
+  abstract sidebar(): OnboardingSidebarCapability;
+
+  /** The governance sample-data toggle; see {@link OnboardingGovernanceCapability}. */
+  abstract governance(): OnboardingGovernanceCapability;
 }
 
 const OnboardingHostContext = createContext<OnboardingHostApi | undefined>(void 0);
