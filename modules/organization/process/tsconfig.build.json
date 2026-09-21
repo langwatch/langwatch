@@ -63,6 +63,9 @@
       "path": "../../../packages/observability/tsconfig.build.json"
     },
     {
+      "path": "../../onboarding/contract/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
     },
     {

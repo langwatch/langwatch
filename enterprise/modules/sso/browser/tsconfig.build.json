@@ -36,6 +36,9 @@
       "path": "../../../../packages/time/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/trace/browser-kit/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/ui-kernel/tsconfig.build.json"
     }
   ]

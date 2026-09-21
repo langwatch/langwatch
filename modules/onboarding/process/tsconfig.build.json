@@ -27,10 +27,19 @@
       "path": "../../../packages/kernel/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/observability/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/redis-client/tsconfig.build.json"
+      "path": "../../organization/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/secrets/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/time/tsconfig.build.json"
     }
   ]
 }

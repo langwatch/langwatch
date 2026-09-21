@@ -3013,6 +3013,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time
+      '@langwatch/trace-browser-kit':
+        specifier: workspace:*
+        version: link:../../../../modules/trace/browser-kit
       '@langwatch/ui-kernel':
         specifier: workspace:*
         version: link:../../../../packages/ui-kernel
@@ -9158,13 +9161,28 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../packages/kernel
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../../../packages/observability
       '@langwatch/onboarding-contract':
         specifier: workspace:*
         version: link:../contract
-      '@langwatch/redis-client':
+      '@langwatch/organization-contract':
         specifier: workspace:*
-        version: link:../../../packages/redis-client
+        version: link:../../organization/contract
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../../../packages/secrets
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../packages/time
+      posthog-node:
+        specifier: 'catalog:'
+        version: 5.48.1(rxjs@7.8.2)
     devDependencies:
+      '@langwatch/api-fixture':
+        specifier: workspace:*
+        version: link:../../../packages/api-fixture
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
@@ -9562,6 +9580,9 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../packages/kernel
+      '@langwatch/onboarding-contract':
+        specifier: workspace:*
+        version: link:../../onboarding/contract
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
@@ -9623,6 +9644,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
+      '@langwatch/onboarding-contract':
+        specifier: workspace:*
+        version: link:../../onboarding/contract
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../contract
@@ -12130,6 +12154,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/authz-contract':
+        specifier: workspace:*
+        version: link:../../authz/contract
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config

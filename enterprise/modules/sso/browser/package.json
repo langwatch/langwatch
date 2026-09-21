@@ -25,6 +25,7 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/trace-browser-kit": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
     "lucide-react": "catalog:"
   },

@@ -33,6 +33,9 @@
       "path": "../../../packages/kernel/tsconfig.build.json"
     },
     {
+      "path": "../../onboarding/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../project/contract/tsconfig.build.json"
     },
     {
