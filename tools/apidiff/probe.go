@@ -261,8 +261,8 @@ func (engine *probeEngine) probeOperation(operation Operation) []Finding {
 	// values its OWN instance minted.
 	pathA, pathB := operation.SidePaths()
 	target := probeTarget{
-		pathA:   substitutePath(pathA, paramsA.pathValues),
-		pathB:   substitutePath(pathB, paramsB.pathValues),
+		pathA:   substitutePath(pathA, paramsA.pathValues, operation.Path),
+		pathB:   substitutePath(pathB, paramsB.pathValues, operation.Path),
 		queryA:  paramsA.query,
 		queryB:  paramsB.query,
 		headers: headers,
@@ -653,13 +653,43 @@ func resolveParams(operation Operation, symbols *SymbolTable, idsOnly bool) (res
 	return params, ""
 }
 
-// substitutePath replaces {param} placeholders in one side's path form.
-func substitutePath(template string, values map[string]string) string {
+// substitutePath replaces {param} placeholders in one side's path form. Values
+// are resolved under the CANDIDATE's parameter names (the merged operation's),
+// so a side that spells the same parameter differently — base
+// "/api/projects/{id}", candidate "/api/projects/{projectId}" — is filled
+// positionally against `canonical`. Pairing keeps arity in the key, so the two
+// templates always carry the same number of placeholders in the same order.
+// Without the fallback that side is sent its template verbatim.
+func substitutePath(template string, values map[string]string, canonical string) string {
 	path := template
 	for name, value := range values {
 		path = strings.ReplaceAll(path, "{"+name+"}", url.PathEscape(value))
 	}
+	if !strings.Contains(path, "{") {
+		return path
+	}
+	canonicalNames := pathPlaceholders(canonical)
+	for index, name := range pathPlaceholders(template) {
+		if index >= len(canonicalNames) {
+			break
+		}
+		value, ok := values[canonicalNames[index]]
+		if !ok {
+			continue
+		}
+		path = strings.Replace(path, "{"+name+"}", url.PathEscape(value), 1)
+	}
 	return path
+}
+
+// pathPlaceholders lists a template's {param} names, in order.
+func pathPlaceholders(template string) []string {
+	matches := pathParameter.FindAllString(template, -1)
+	names := make([]string, 0, len(matches))
+	for _, match := range matches {
+		names = append(names, strings.Trim(match, "{}"))
+	}
+	return names
 }
 
 // paramResolver resolves parameters for one operation; idsOnly restricts

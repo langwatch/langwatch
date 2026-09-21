@@ -500,3 +500,39 @@ func TestOneSidedResolutionIsRecordedAsAHarnessSkip(t *testing.T) {
 		t.Fatalf("the base must not be probed with the candidate's id: %v", seenB)
 	}
 }
+
+/** @scenario "A side that spells a parameter differently is still given the value" */
+func TestSubstitutePathFillsARenamedParameterPositionally(t *testing.T) {
+	t.Parallel()
+	values := map[string]string{"projectId": "local-dev-project"}
+
+	// The candidate's own spelling resolves by name.
+	if got := substitutePath("/api/projects/{projectId}", values, "/api/projects/{projectId}"); got != "/api/projects/local-dev-project" {
+		t.Errorf("candidate path = %q", got)
+	}
+	// The base spells it {id}; without the positional fallback it was sent the
+	// template verbatim and answered 404 against a literal "{id}".
+	if got := substitutePath("/api/projects/{id}", values, "/api/projects/{projectId}"); got != "/api/projects/local-dev-project" {
+		t.Errorf("base path = %q, want the value filled positionally", got)
+	}
+}
+
+func TestSubstitutePathFillsEveryPositionInOrder(t *testing.T) {
+	t.Parallel()
+	values := map[string]string{"projectId": "p1", "chartId": "c1"}
+	got := substitutePath(
+		"/api/projects/{org}/charts/{chart}", values,
+		"/api/projects/{projectId}/charts/{chartId}",
+	)
+	if got != "/api/projects/p1/charts/c1" {
+		t.Errorf("path = %q, want both filled in order", got)
+	}
+}
+
+func TestSubstitutePathLeavesAnUnresolvedPlaceholder(t *testing.T) {
+	t.Parallel()
+	got := substitutePath("/api/projects/{id}", map[string]string{}, "/api/projects/{projectId}")
+	if got != "/api/projects/{id}" {
+		t.Errorf("path = %q, want the template when nothing resolved", got)
+	}
+}

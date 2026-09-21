@@ -120,8 +120,8 @@ func (engine *probeEngine) ownerTarget(operation Operation) (probeTarget, bool) 
 	}
 	pathA, pathB := operation.SidePaths()
 	return probeTarget{
-		pathA:   substitutePath(pathA, paramsA.pathValues),
-		pathB:   substitutePath(pathB, paramsB.pathValues),
+		pathA:   substitutePath(pathA, paramsA.pathValues, operation.Path),
+		pathB:   substitutePath(pathB, paramsB.pathValues, operation.Path),
 		queryA:  paramsA.query,
 		queryB:  paramsB.query,
 		headers: authHeaders(operation, engine.options.Schemes, engine.options.Keys),
@@ -265,8 +265,8 @@ func (engine *probeEngine) permissionProbe(operation Operation) []Finding {
 	}
 	pathA, pathB := operation.SidePaths()
 	target := probeTarget{
-		pathA:  substitutePath(pathA, paramsA.pathValues),
-		pathB:  substitutePath(pathB, paramsB.pathValues),
+		pathA:  substitutePath(pathA, paramsA.pathValues, operation.Path),
+		pathB:  substitutePath(pathB, paramsB.pathValues, operation.Path),
 		queryA: paramsA.query,
 		queryB: paramsB.query,
 	}

@@ -239,3 +239,15 @@ Feature: apidiff boots its instances through haven
     When the two sides are compared
     Then both are masked
     And the resource's own type still compares
+
+  # Pairing on the erased template made the two sides one operation, but the
+  # resolved values keep the CANDIDATE's parameter names, so the base's own
+  # template was left unsubstituted and probed as a literal "{id}". Measured on
+  # run 26 of 2026-09-21: GET and DELETE /api/projects/{projectId} answered
+  # 404 on the base against the literal placeholder, reported as drift.
+  @unit
+  Scenario: A side that spells a parameter differently is still given the value
+    Given the base and the candidate name one path parameter differently
+    When each side's path is built
+    Then both carry the resolved value
+    And a placeholder nothing resolved is left as it was
