@@ -1,7 +1,7 @@
 import type { Logger } from "@langwatch/observability";
 import type { MigrationPassSummary } from "@langwatch/system-migrations";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ProcessRole } from "../config";
+import type { ProcessRole } from "../../config";
 import { SystemMigrationRedriveService } from "../redrive";
 
 const INTERVAL_MS = 60_000;
