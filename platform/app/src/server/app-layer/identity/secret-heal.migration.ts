@@ -1,9 +1,13 @@
 import type { IdentitySecretCarryService } from "@langwatch/identity-server";
-import type { SystemMigration, TenantMigrationOutcome } from "@langwatch/system-migrations";
+import type {
+  SystemMigration,
+  TenantMigrationOutcome,
+} from "@langwatch/system-migrations";
 
 /** Its own state-table key, separate from the backfill's on purpose — see
  *  the class docblock. Never rename. */
-export const IDENTITY_SECRET_HEAL_MIGRATION_NAME = "identity-d01-secret-heal" as const;
+export const IDENTITY_SECRET_HEAL_MIGRATION_NAME =
+  "identity-d01-secret-heal" as const;
 
 /**
  * The reverse leg of the bridge mirror, as a pass (ADR-116 §4).
@@ -41,9 +45,15 @@ export class IdentitySecretHealMigration implements SystemMigration {
   readonly runsAutomaticallyOnSelfHosted = true;
   readonly enrolledAutomatically = true;
 
-  constructor(private readonly secrets: Pick<IdentitySecretCarryService, "carryForUser">) {}
+  constructor(
+    private readonly secrets: Pick<IdentitySecretCarryService, "carryForUser">,
+  ) {}
 
-  async migrateTenant({ tenantId }: { tenantId: string }): Promise<TenantMigrationOutcome> {
+  async migrateTenant({
+    tenantId,
+  }: {
+    tenantId: string;
+  }): Promise<TenantMigrationOutcome> {
     const outcome = await this.secrets.carryForUser({ userId: tenantId });
     // Deliberately never `finalized`. There is no state in which this user
     // can no longer need repairing — not while both branches can write a

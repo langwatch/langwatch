@@ -147,65 +147,65 @@ describe("GrantsAuthzReadRepository", () => {
     });
 
     /** @scenario "Migrated custom bindings retain their permission restrictions" */
-    it.each(["ORGANIZATION", "TEAM", "PROJECT"] as const)(
-      "collects the canonical custom key beside legacy ADMIN at %s scope",
-      async (scopeType) => {
-        const scopeIds = {
-          ORGANIZATION: "org-1",
-          TEAM: "team-1",
-          PROJECT: "project-1",
-        };
-        const repository = new GrantsAuthzReadRepository(
-          clientFor({
-            organizationUser: { findFirst: member() },
-            grant: {
-              findMany: vi.fn().mockResolvedValue([
-                grantRow({
-                  roleKey: "custom:restricted",
-                  legacyRole: "ADMIN",
-                  scopeType,
-                  scopeId: scopeIds[scopeType],
-                }),
-              ]),
-            },
-          }),
-        );
-        const bindings = await repository.findUserBindings({
-          userId: "alice",
-          organizationId: "org-1",
-        });
-        const grants = {
-          principal: { type: "user", id: "alice" } as const,
-          organizationId: "org-1",
-          organizationRole: "MEMBER" as const,
-          isOrgMember: true,
-          membershipDisabled: false,
-          bindings,
-          customRolePermissions: new Map([["restricted", ["traces:view"]]]),
-        };
-        const scope = {
-          type: "project",
-          id: "project-1",
-          teamId: "team-1",
-          organizationId: "org-1",
-        } as const;
-        const engine = new AuthzEngine();
-        expect(
-          engine.decide({ grants, permission: "traces:view", scope }).allowed,
-        ).toBe(true);
-        expect(
-          engine.decide({ grants, permission: "project:delete", scope })
-            .allowed,
-        ).toBe(false);
-        expect(
-          engine.decide({
-            grants: { ...grants, customRolePermissions: new Map() },
-            permission: "traces:view",
-            scope,
-          }).allowed,
-        ).toBe(false);
-      },
-    );
+    it.each([
+      "ORGANIZATION",
+      "TEAM",
+      "PROJECT",
+    ] as const)("collects the canonical custom key beside legacy ADMIN at %s scope", async (scopeType) => {
+      const scopeIds = {
+        ORGANIZATION: "org-1",
+        TEAM: "team-1",
+        PROJECT: "project-1",
+      };
+      const repository = new GrantsAuthzReadRepository(
+        clientFor({
+          organizationUser: { findFirst: member() },
+          grant: {
+            findMany: vi.fn().mockResolvedValue([
+              grantRow({
+                roleKey: "custom:restricted",
+                legacyRole: "ADMIN",
+                scopeType,
+                scopeId: scopeIds[scopeType],
+              }),
+            ]),
+          },
+        }),
+      );
+      const bindings = await repository.findUserBindings({
+        userId: "alice",
+        organizationId: "org-1",
+      });
+      const grants = {
+        principal: { type: "user", id: "alice" } as const,
+        organizationId: "org-1",
+        organizationRole: "MEMBER" as const,
+        isOrgMember: true,
+        membershipDisabled: false,
+        bindings,
+        customRolePermissions: new Map([["restricted", ["traces:view"]]]),
+      };
+      const scope = {
+        type: "project",
+        id: "project-1",
+        teamId: "team-1",
+        organizationId: "org-1",
+      } as const;
+      const engine = new AuthzEngine();
+      expect(
+        engine.decide({ grants, permission: "traces:view", scope }).allowed,
+      ).toBe(true);
+      expect(
+        engine.decide({ grants, permission: "project:delete", scope }).allowed,
+      ).toBe(false);
+      expect(
+        engine.decide({
+          grants: { ...grants, customRolePermissions: new Map() },
+          permission: "traces:view",
+          scope,
+        }).allowed,
+      ).toBe(false);
+    });
 
     it("preserves member and viewer role keys", async () => {
       const repository = new GrantsAuthzReadRepository(
