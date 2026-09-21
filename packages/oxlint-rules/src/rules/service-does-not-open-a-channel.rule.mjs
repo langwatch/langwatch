@@ -34,7 +34,7 @@ function conduitFor(specifier) {
 
 function isService(file) {
   return (
-    file.role === "server" &&
+    file.role === "process" &&
     file.isProduction &&
     Boolean(file.sourcePath?.startsWith("services/"))
   );

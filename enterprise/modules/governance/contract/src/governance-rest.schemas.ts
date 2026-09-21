@@ -44,7 +44,9 @@ export const governanceRestCloneTemplateSchema = z.object({
   source_template_id: z.string(),
 });
 
-export const governanceRestTemplateParamsSchema = z.object({ id: z.string().min(1) });
+export const governanceRestTemplateParamsSchema = z.object({
+  ingestionTemplateId: z.string().min(1),
+});
 
 export const governanceRestTemplateListSchema = z.object({
   data: z.array(ingestionTemplateDtoSchema),

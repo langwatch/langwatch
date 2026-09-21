@@ -7,13 +7,13 @@ import { z } from "zod";
  */
 export const storedObjectFileRouteScopedParamsSchema = z.object({
   projectId: z.string(),
-  id: z.string(),
+  storedObjectId: z.string(),
 });
 export type StoredObjectFileRouteScopedParams = z.infer<
   typeof storedObjectFileRouteScopedParamsSchema
 >;
 
-export const storedObjectFileRouteIdParamsSchema = z.object({ id: z.string() });
+export const storedObjectFileRouteIdParamsSchema = z.object({ storedObjectId: z.string() });
 export type StoredObjectFileRouteIdParams = z.infer<typeof storedObjectFileRouteIdParamsSchema>;
 
 /**

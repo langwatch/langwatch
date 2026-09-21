@@ -210,7 +210,7 @@ export const langyLocalControlRest = defineRestRouter(LangyApi)
     );
   })
 
-  .post("/api/langy/control/requests/:id/approve", "approveLangyControlRequest")
+  .post("/api/langy/control/requests/:requestId/approve", "approveLangyControlRequest")
   .withPermission("langy:create")
   .withParams(langyControlIdParamsSchema)
   .withInput(approveControlRequestBodySchema)
@@ -225,7 +225,7 @@ export const langyLocalControlRest = defineRestRouter(LangyApi)
   .handle(async ({ input, request }, members) => {
     const auth = controlUser(request);
     const approved = await members.runtime().requests.approve({
-      requestId: input.id,
+      requestId: input.requestId,
       userId: auth.userId,
       projectId: auth.projectId,
     });
@@ -243,7 +243,7 @@ export const langyLocalControlRest = defineRestRouter(LangyApi)
     );
   })
 
-  .post("/api/langy/control/requests/:id/cancel", "cancelLangyControlRequest")
+  .post("/api/langy/control/requests/:requestId/cancel", "cancelLangyControlRequest")
   .withPermission("langy:create")
   .withParams(langyControlIdParamsSchema)
   .withRawResponse({ produces: "application/json" })
@@ -256,13 +256,16 @@ export const langyLocalControlRest = defineRestRouter(LangyApi)
   .handle(async ({ input, request }, members) => {
     const auth = controlUser(request);
     await members.runtime().requests.cancel({
-      requestId: input.id,
+      requestId: input.requestId,
       userId: auth.userId,
       projectId: auth.projectId,
     });
-    return Response.json(langyControlCancelResultSchema.parse({ id: input.id, cancelled: true }), {
-      status: 200,
-    });
+    return Response.json(
+      langyControlCancelResultSchema.parse({ id: input.requestId, cancelled: true }),
+      {
+        status: 200,
+      },
+    );
   })
 
   .build();

@@ -4,8 +4,8 @@ import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
   features: {
-    agent: { layoutVersion: 0, roles: { contract: {}, server: {} } },
-    experiment: { layoutVersion: 0, roles: { contract: {}, server: {} } },
+    agent: { layoutVersion: 0, roles: { contract: {}, process: {} } },
+    experiment: { layoutVersion: 0, roles: { contract: {}, process: {} } },
   },
 });
 

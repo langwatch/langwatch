@@ -351,7 +351,7 @@ export const organizationManagementRest: Readonly<{
     };
   })
 
-  .delete("/invites/:id", "revokeOrganizationInvite")
+  .delete("/invites/:inviteId", "revokeOrganizationInvite")
   .withPermission("organization:manage")
   .withParams(organizationManagementRestInviteIdParamsSchema)
   .withOutput(organizationManagementRestSuccessSchema)
@@ -362,7 +362,7 @@ export const organizationManagementRest: Readonly<{
   })
   .withMiddleware(organizationManagementEnterpriseGate)
   .handle(async ({ app, input, scope }) => {
-    await app.revokeInvitation({ organizationId: scope.id, inviteId: input.id });
+    await app.revokeInvitation({ organizationId: scope.id, inviteId: input.inviteId });
 
     return { success: true as const };
   })

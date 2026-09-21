@@ -234,22 +234,22 @@ export const boundaryRule = defineRule({
           // the real adapter or repository it runs against, which is the point of
           // the test rather than a layering breach.
           const appliesLayeringRules =
-            !escaped && productionSource && classification.role === "server";
+            !escaped && productionSource && classification.role === "process";
 
           if (appliesLayeringRules) {
             const targetWorkspacePath = relative(context.cwd, targetPath).split(sep).join("/");
             const importer = classification.workspacePath;
             const apiImportsImplementation =
-              /\/server\/src\/api\//.test(importer) &&
-              /\/server\/src\/(?:adapters|migrations|projections|repositories|stores)\//.test(
+              /\/process\/src\/api\//.test(importer) &&
+              /\/process\/src\/(?:adapters|migrations|projections|repositories|stores)\//.test(
                 `/${targetWorkspacePath}`,
               );
             const serviceImportsOuterLayer =
-              /\/server\/src\/services\//.test(importer) &&
-              /\/server\/src\/(?:api|migrations)\//.test(`/${targetWorkspacePath}`);
+              /\/process\/src\/services\//.test(importer) &&
+              /\/process\/src\/(?:api|migrations)\//.test(`/${targetWorkspacePath}`);
             const serviceImportsConcreteAdapter =
-              /\/server\/src\/services\//.test(importer) &&
-              /\/server\/src\/(?:adapters\/|repositories\/[^/]+\/|stores\/[^/]+\/)/.test(
+              /\/process\/src\/services\//.test(importer) &&
+              /\/process\/src\/(?:adapters\/|repositories\/[^/]+\/|stores\/[^/]+\/)/.test(
                 `/${targetWorkspacePath}`,
               );
             if (apiImportsImplementation) {
@@ -286,10 +286,10 @@ export const boundaryRule = defineRule({
         // publishes one for the browser features that render it. Either way
         // only a recognized test source may walk through it.
         const testSeamRole =
-          (target.pkg.role === "server" &&
-            (classification.role === "other" || classification.role === "server")) ||
-          (target.pkg.role === "web" &&
-            (classification.role === "other" || classification.role === "web"));
+          (target.pkg.role === "process" &&
+            (classification.role === "other" || classification.role === "process")) ||
+          (target.pkg.role === "browser" &&
+            (classification.role === "other" || classification.role === "browser"));
         const testSupportImport =
           testSeamRole &&
           subpath === "./testing" &&
@@ -300,8 +300,8 @@ export const boundaryRule = defineRule({
         // therefore not collaboration between features, and the bare package entry
         // and every other subpath stay private.
         const webSurfaceImport =
-          target.pkg.role === "web" &&
-          classification.role === "web" &&
+          target.pkg.role === "browser" &&
+          classification.role === "browser" &&
           /^\.\/surfaces\/[^/]+$/.test(subpath);
         const targetExports = target.pkg.exports;
         if (!targetExports.has(subpath)) {
@@ -336,15 +336,15 @@ export const boundaryRule = defineRule({
         if (classification.role === "contract" && target.pkg.role !== "contract") {
           context.report({ node, messageId: "contractRuntime", data: { specifier } });
         }
-        if (classification.role === "web" && target.pkg.role === "server") {
+        if (classification.role === "browser" && target.pkg.role === "process") {
           context.report({ node, messageId: "webImportsServer", data: { specifier } });
         }
-        if (classification.role === "server" && target.pkg.role === "web") {
+        if (classification.role === "process" && target.pkg.role === "browser") {
           context.report({ node, messageId: "serverImportsBrowser", data: { specifier } });
         }
         const importsServerOutsideCompositionRoot =
           classification.role === "other" &&
-          target.pkg.role === "server" &&
+          target.pkg.role === "process" &&
           !isFeatureServerCompositionRoot(classification.workspacePath) &&
           !testSupportImport;
 
@@ -358,7 +358,7 @@ export const boundaryRule = defineRule({
         /generated\/prisma|generated-prisma|prisma\/client/.test(specifier);
       if (prismaImport && classification.feature) {
         const allowed =
-          classification.role === "server" &&
+          classification.role === "process" &&
           /\/src\/repositories\/prisma\//.test(`/${classification.workspacePath}`);
         if (!allowed) {
           context.report({ node, messageId: "prismaContainment", data: { specifier } });
@@ -387,12 +387,12 @@ export const boundaryRule = defineRule({
       }
 
       const webImportsServerRuntime =
-        productionSource && classification.role === "web" && (nodeRuntime || serverRuntime);
+        productionSource && classification.role === "browser" && (nodeRuntime || serverRuntime);
 
       if (webImportsServerRuntime) {
         context.report({ node, messageId: "webImportsServer", data: { specifier } });
       }
-      if (productionSource && classification.role === "server" && browserRuntime) {
+      if (productionSource && classification.role === "process" && browserRuntime) {
         context.report({ node, messageId: "serverImportsBrowser", data: { specifier } });
       }
       if (

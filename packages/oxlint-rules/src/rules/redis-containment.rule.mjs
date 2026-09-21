@@ -22,7 +22,7 @@ const REDIS_NATIVE_PACKAGE =
  */
 function redisPackageOf(workspacePath) {
   const feature = workspacePath.match(
-    /^(enterprise\/)?modules\/([^/]+)\/(contract|server|web)\/src\/(.+)$/,
+    /^(enterprise\/)?modules\/([^/]+)\/(contract|process|browser|browser-kit)\/src\/(.+)$/,
   );
   if (feature) {
     return { kind: feature[3], feature: feature[2], relative: feature[4], workspacePath };
@@ -59,7 +59,7 @@ function isStrictRedisAdapter(pkg) {
   if (pkg.kind === "application" || pkg.kind === "enterprise-composition") {
     return pkg.relative.endsWith(".adapter.ts");
   }
-  if (pkg.kind !== "server") return false;
+  if (pkg.kind !== "process") return false;
   if (pkg.relative.startsWith("repositories/redis/")) return true;
   // Named for the store it wraps: `postgres.*.adapter.ts` reaching for Redis is
   // the leak this rule exists to catch, not a second seam.

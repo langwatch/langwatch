@@ -132,7 +132,7 @@ function collisionIndex(cwd) {
 }
 
 function isFeatureWebSource(file) {
-  return file.role === "web" && file.sourcePath !== undefined;
+  return file.role === "browser" && file.sourcePath !== undefined;
 }
 
 export const designSystemExportCollisionRule = defineRule({

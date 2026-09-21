@@ -4,8 +4,8 @@ import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
   features: {
-    agent: { roles: { contract: {}, server: {}, web: {} } },
-    project: { roles: { contract: {}, server: {}, web: {} } },
+    agent: { roles: { contract: {}, process: {}, browser: {} } },
+    project: { roles: { contract: {}, process: {}, browser: {} } },
   },
 });
 
@@ -19,9 +19,9 @@ describe("given package-boundaries", () => {
   it("allows a cross-feature web dependency through the surfaces/<id> door", () => {
     const fixture = createFixtureWorkspace({
       features: {
-        annotation: { roles: { web: {} } },
+        annotation: { roles: { browser: {} } },
         organization: {
-          roles: { web: { exports: ["./surfaces/personal-workspace-features"] } },
+          roles: { browser: { exports: ["./surfaces/personal-workspace-features"] } },
         },
       },
     });
@@ -42,9 +42,9 @@ describe("given package-boundaries", () => {
   it("rejects a cross-feature web dependency outside the surfaces/<id> door", () => {
     const fixture = createFixtureWorkspace({
       features: {
-        annotation: { roles: { web: {} } },
+        annotation: { roles: { browser: {} } },
         organization: {
-          roles: { web: { exports: ["./personal-workspace-features"] } },
+          roles: { browser: { exports: ["./personal-workspace-features"] } },
         },
       },
     });

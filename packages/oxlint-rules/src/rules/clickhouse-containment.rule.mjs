@@ -27,7 +27,7 @@ const CLICKHOUSE_NATIVE_PACKAGE = /^packages\/(?:clickhouse-client|process-store
  */
 function clickhousePackageOf(workspacePath) {
   const feature = workspacePath.match(
-    /^(enterprise\/)?modules\/([^/]+)\/(contract|server|web)\/src\/(.+)$/,
+    /^(enterprise\/)?modules\/([^/]+)\/(contract|process|browser|browser-kit)\/src\/(.+)$/,
   );
   if (feature) {
     return { kind: feature[3], feature: feature[2], relative: feature[4], workspacePath };
@@ -64,7 +64,7 @@ function isStrictClickhouseAdapter(pkg) {
   if (pkg.kind === "application" || pkg.kind === "enterprise-composition") {
     return pkg.relative.endsWith(".adapter.ts");
   }
-  if (pkg.kind !== "server") return false;
+  if (pkg.kind !== "process") return false;
   if (pkg.relative.startsWith("repositories/clickhouse/")) return true;
   // Named for the store it wraps: `postgres.*.adapter.ts` reaching for
   // ClickHouse is the leak this rule exists to catch, not a second seam.

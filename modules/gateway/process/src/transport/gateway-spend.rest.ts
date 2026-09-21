@@ -15,6 +15,12 @@ import { generate } from "@langwatch/ksuid";
 import { Temporal, nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
+import type { GatewayBudgetSpend, GatewaySettlementPolicy } from "../app/gateway.members.ts";
+import {
+  SPEND_BUCKETS,
+  SPEND_GROUP_BY_KEYS,
+  type SpendGroupByKey,
+} from "../repositories/gateway-spend-events.repository.ts";
 import { GatewaySpendCursorAdapter } from "../rules/gateway-spend-cursor.rules.ts";
 import {
   GatewaySpendFiltersAdapter,
@@ -26,12 +32,6 @@ import {
   GatewaySpendGroupingAdapter,
   MAX_GROUP_BY_KEYS,
 } from "../rules/gateway-spend-grouping.rules.ts";
-import type { GatewayBudgetSpend, GatewaySettlementPolicy } from "../app/gateway.members.ts";
-import {
-  SPEND_BUCKETS,
-  SPEND_GROUP_BY_KEYS,
-  type SpendGroupByKey,
-} from "../repositories/gateway-spend-events.repository.ts";
 /**
  * @see ADR-072 (pull gates under the same plan flag as push)
  * Billing reconciliation REST on `/api/gateway/v1`, shared with the
@@ -681,7 +681,7 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
     };
   })
 
-  .get("/api/gateway/v1/end-users/:id/spend", "getGatewayEndUserSpend")
+  .get("/api/gateway/v1/end-users/:endUserId/spend", "getGatewayEndUserSpend")
   .withParams(endUserSpendParamsSchema)
   .withQuery(endUserSpendQuerySchema)
   .withPermission("gatewaySpend:view")
@@ -694,7 +694,7 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
     responses: spendResponses,
   })
   .handle(async ({ app, input, scope }) => {
-    const endUserId = input.id;
+    const endUserId = input.endUserId;
     const now = nowInstant().epochMilliseconds;
     const fromMs = input.from ?? now - END_USER_WINDOWS[input.window];
     const toMs = input.to ?? now;

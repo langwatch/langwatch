@@ -96,7 +96,7 @@ export const organizationGroupRestAddMemberSchema = z.object({
   userId: z.string().min(1, "userId is required"),
 });
 
-export const organizationGroupRestParamsSchema = z.object({ id: z.string().min(1) });
+export const organizationGroupRestParamsSchema = z.object({ groupId: z.string().min(1) });
 
 export const organizationGroupRestMemberParamsSchema = z.object({
   ...organizationGroupRestParamsSchema.shape,

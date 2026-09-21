@@ -106,17 +106,21 @@ export const agentLegacyRest: Readonly<{
     return response(agent, app, facts.projectSlug);
   })
 
-  .get("/:id", "getAgent")
+  .get("/:agentId", "getAgent")
   .withParams(agentRestParamsSchema)
   .withPermission("project:view")
   .withOutput(legacyResponse)
   .withDocs({ summary: "Get an agent; superseded by /api/v1/agents", hide: true })
   .withMiddleware(projectRestFacts)
   .handle(async ({ app, input, scope }, facts) =>
-    response(await app.getById({ ...input, projectId: scope.id }), app, facts.projectSlug),
+    response(
+      await app.getById({ ...input, id: input.agentId, projectId: scope.id }),
+      app,
+      facts.projectSlug,
+    ),
   )
 
-  .patch("/:id", "updateAgent")
+  .patch("/:agentId", "updateAgent")
   .withParams(agentRestParamsSchema)
   .withInput(updateAgentRequestSchema)
   .withPermission("project:update")
@@ -124,16 +128,20 @@ export const agentLegacyRest: Readonly<{
   .withDocs({ summary: "Update an agent; superseded by /api/v1/agents", hide: true })
   .withMiddleware(projectRestFacts)
   .handle(async ({ app, input, scope }, facts) =>
-    response(await app.update({ ...input, projectId: scope.id }), app, facts.projectSlug),
+    response(
+      await app.update({ ...input, id: input.agentId, projectId: scope.id }),
+      app,
+      facts.projectSlug,
+    ),
   )
 
-  .delete("/:id", "archiveAgent")
+  .delete("/:agentId", "archiveAgent")
   .withParams(agentRestParamsSchema)
   .withPermission("project:delete")
   .withOutput(archiveResultSchema)
   .withDocs({ summary: "Archive an agent; superseded by /api/v1/agents", hide: true })
   .handle(async ({ app, input, scope }) => {
-    const agent = await app.archive({ ...input, projectId: scope.id });
+    const agent = await app.archive({ ...input, id: input.agentId, projectId: scope.id });
 
     return { id: agent.id, name: agent.name, type: agent.type, archivedAt: agent.archivedAt };
   })

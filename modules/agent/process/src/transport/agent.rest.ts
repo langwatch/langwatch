@@ -89,9 +89,7 @@ function response(
  * caller at mount time (`LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB`); it must never
  * be read at module load, or every deployment gets the protocol default.
  */
-export function createAgentRest(
-  relayMaxPayloadMb?: number,
-): Readonly<{
+export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
   protocol: "rest";
   namespace: string;
   router: () => RestTransportDeclaration<AgentApi>;
@@ -144,7 +142,7 @@ export function createAgentRest(
         return response(agent, app, facts.projectSlug);
       })
 
-      .get("/:id", "getAgent")
+      .get("/:agentId", "getAgent")
       .withParams(agentRestParamsSchema)
       .withPermission("project:view")
       .withOutput(agentResponseSchema)
@@ -153,6 +151,7 @@ export function createAgentRest(
       .handle(async ({ app, input, scope }, facts) => {
         const agent = await app.getById({
           ...input,
+          id: input.agentId,
           projectId: scope.id,
           viewerUserId: facts.viewerUserId,
         });
@@ -160,7 +159,7 @@ export function createAgentRest(
         return response(agent, app, facts.projectSlug);
       })
 
-      .patch("/:id", "updateAgent")
+      .patch("/:agentId", "updateAgent")
       .withParams(agentRestParamsSchema)
       .withInput(updateAgentRequestSchema)
       .withPermission("project:update")
@@ -168,9 +167,9 @@ export function createAgentRest(
       .withDocs({ summary: "Update an authored agent" })
       .withMiddleware(projectRestFacts)
       .handle(async ({ app, input, scope }, facts) => {
-        await app.update({ ...input, projectId: scope.id });
+        await app.update({ ...input, id: input.agentId, projectId: scope.id });
         const agent = await app.getById({
-          id: input.id,
+          id: input.agentId,
           projectId: scope.id,
           viewerUserId: facts.viewerUserId,
         });
@@ -178,7 +177,7 @@ export function createAgentRest(
         return response(agent, app, facts.projectSlug);
       })
 
-      .put("/:id", "replaceAgent")
+      .put("/:agentId", "replaceAgent")
       .withParams(agentRestParamsSchema)
       .withInput(updateAgentRequestSchema)
       .withPermission("project:update")
@@ -186,9 +185,9 @@ export function createAgentRest(
       .withDocs({ summary: "Update an authored agent; PUT retains partial update semantics" })
       .withMiddleware(projectRestFacts)
       .handle(async ({ app, input, scope }, facts) => {
-        await app.update({ ...input, projectId: scope.id });
+        await app.update({ ...input, id: input.agentId, projectId: scope.id });
         const agent = await app.getById({
-          id: input.id,
+          id: input.agentId,
           projectId: scope.id,
           viewerUserId: facts.viewerUserId,
         });
@@ -196,28 +195,28 @@ export function createAgentRest(
         return response(agent, app, facts.projectSlug);
       })
 
-      .delete("/:id", "archiveAgent")
+      .delete("/:agentId", "archiveAgent")
       .withParams(agentRestParamsSchema)
       .withPermission("project:delete")
       .withOutput(archiveResultSchema)
       .withDocs({ summary: "Archive an agent while keeping its runs" })
       .handle(async ({ app, input, scope }) => {
-        const agent = await app.archive({ ...input, projectId: scope.id });
+        const agent = await app.archive({ ...input, id: input.agentId, projectId: scope.id });
 
         return { id: agent.id, name: agent.name, type: agent.type, archivedAt: agent.archivedAt };
       })
 
-      .post("/:id/test", "testAgent")
+      .post("/:agentId/test", "testAgent")
       .withParams(agentRestParamsSchema)
       .withPermission("scenarios:create")
       .withOutput(agentTestRunResponseSchema)
       .withDocs({ summary: "Schedule a scripted test run and return its run identifiers" })
       .withMiddleware(projectRestFacts)
       .handle(({ app, input, scope }, facts) =>
-        app.testRun({ agentId: input.id, projectId: scope.id, actorId: facts.actorId }),
+        app.testRun({ agentId: input.agentId, projectId: scope.id, actorId: facts.actorId }),
       )
 
-      .post("/:id/call", "callConnectedAgent")
+      .post("/:agentId/call", "callConnectedAgent")
       .withParams(agentRestParamsSchema)
       .withInput(relayCallBodySchema)
       .withPermission("scenarios:create")
@@ -231,7 +230,7 @@ export function createAgentRest(
       .withMiddleware(projectRestFacts, agentTraceparent)
       .handle(({ app, input, scope, signal }, facts, header) =>
         app.call(
-          { ...input, projectId: scope.id },
+          { ...input, id: input.agentId, projectId: scope.id },
           { viewerUserId: facts.viewerUserId, traceparent: header, signal },
         ),
       )

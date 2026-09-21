@@ -79,14 +79,14 @@ function defineSecretRest(
       return secrets.map(toSecretPublic);
     })
 
-    .get("/:id", operations.get)
+    .get("/:secretId", operations.get)
     .withParams(secretPublicParamsSchema)
     .withQuery(secretPublicListInputSchema)
     .withPermission("secrets:view")
     .withOutput(secretPublicSchema)
     .withDocs({ summary: "Get project-secret metadata" })
     .handle(async ({ app, input, scope }) =>
-      toSecretPublic(await app.get({ projectId: scope.id, id: input.id })),
+      toSecretPublic(await app.get({ projectId: scope.id, id: input.secretId })),
     )
 
     .post("/", operations.create)
@@ -108,7 +108,7 @@ function defineSecretRest(
       ),
     )
 
-    .put("/:id", operations.update)
+    .put("/:secretId", operations.update)
     .withParams(secretPublicParamsSchema)
     .withInput(secretPublicUpdateInputSchema)
     .withPermission("secrets:manage")
@@ -121,13 +121,13 @@ function defineSecretRest(
     .handle(async ({ app, input, scope, actor }) =>
       toSecretPublic(
         await app.update(
-          { projectId: scope.id, id: input.id, value: input.value },
+          { projectId: scope.id, id: input.secretId, value: input.value },
           callerOf(actor),
         ),
       ),
     )
 
-    .delete("/:id", operations.delete)
+    .delete("/:secretId", operations.delete)
     .withParams(secretPublicParamsSchema)
     .withInput(secretPublicDeleteInputSchema)
     .withPermission("secrets:manage")
@@ -135,9 +135,9 @@ function defineSecretRest(
     .withDocs({ summary: "Delete a project secret" })
     .withBodyLimit(secretBodyLimit)
     .handle(async ({ app, input, scope }) => {
-      await app.delete({ projectId: scope.id, id: input.id });
+      await app.delete({ projectId: scope.id, id: input.secretId });
 
-      return { id: input.id, deleted: true as const };
+      return { id: input.secretId, deleted: true as const };
     })
     .build();
 }

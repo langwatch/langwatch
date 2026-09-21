@@ -8,7 +8,7 @@ import { unwrap } from "./zod-schema-origin.mjs";
 // every other side of the wire ends up with a hand-written copy that drifts.
 
 const TRANSPORT_SOURCE =
-  /^(?:enterprise\/)?modules\/([^/]+)\/server\/src\/transport\/.+\.[cm]?[jt]sx?$/;
+  /^(?:enterprise\/)?modules\/([^/]+)\/process\/src\/transport\/.+\.[cm]?[jt]sx?$/;
 const GENERATED = /(?:^|\/)(?:generated|dist|node_modules)\/|(?:\.generated|\.d)\.[cm]?[jt]sx?$/;
 
 function moduleOf(workspacePath) {

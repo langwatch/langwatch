@@ -79,7 +79,7 @@ export const featureSourceSubjectRule = defineRule({
   },
   create(context, file) {
     const source = file.strictSource;
-    if (!source || (source.role !== "contract" && source.role !== "server")) return {};
+    if (!source || (source.role !== "contract" && source.role !== "process")) return {};
     if (source.sourcePath === "index.ts") return {};
     if (!SUBJECT_ARTIFACT.test(source.sourcePath)) return {};
 

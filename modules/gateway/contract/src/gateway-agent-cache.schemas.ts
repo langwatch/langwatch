@@ -20,7 +20,7 @@ function utf8ByteLength(value: string): number {
 }
 
 export const gatewayAgentCacheNameParamsSchema = z.object({
-  name: z
+  agentCacheName: z
     .string()
     .min(1, "name is required")
     .max(MAX_AGENT_CACHE_NAME_LENGTH, "name is too long")

@@ -20,7 +20,7 @@ const REFUSING_STATUS = /^[45]\d\d$/;
 function isServerTransport(file) {
   return (
     file.isProduction &&
-    (file.role === "server" || file.kind === "application") &&
+    (file.role === "process" || file.kind === "application") &&
     !BOUNDARY.test(file.sourcePath ?? "")
   );
 }

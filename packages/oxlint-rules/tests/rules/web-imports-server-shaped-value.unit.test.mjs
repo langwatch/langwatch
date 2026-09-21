@@ -3,7 +3,7 @@ import { webImportsServerShapedValueRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
-  features: { auth: { layoutVersion: 0, roles: { web: {}, server: {} } } },
+  features: { auth: { layoutVersion: 0, roles: { browser: {}, process: {} } } },
 });
 
 afterAll(() => workspace.cleanup());

@@ -3,7 +3,7 @@ import { handledErrorOutsideContractRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
-  features: { agent: { layoutVersion: 0, roles: { contract: {}, server: {} } } },
+  features: { agent: { layoutVersion: 0, roles: { contract: {}, process: {} } } },
 });
 
 afterAll(() => workspace.cleanup());

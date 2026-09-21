@@ -52,4 +52,4 @@ export const dashboardRestReorderSchema = z.object({
   dashboardIds: z.array(z.string().min(1)).min(1, "dashboardIds must not be empty"),
 });
 
-export const dashboardRestParamsSchema = z.object({ id: z.string().min(1) });
+export const dashboardRestParamsSchema = z.object({ dashboardId: z.string().min(1) });

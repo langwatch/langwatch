@@ -330,7 +330,7 @@ export const apiKeyRest: Readonly<{
     };
   })
 
-  .get("/:id", "getApiKey")
+  .get("/:apiKeyId", "getApiKey")
   .withParams(apiKeyRestParamsSchema)
   .withPermission("organization:view")
   .withOutput(apiKeyRestDetailSchema)
@@ -353,7 +353,7 @@ export const apiKeyRest: Readonly<{
   .handle(async ({ app, input, scope }, caller) =>
     detailOf(
       await app.getByIdForCaller({
-        id: input.id,
+        id: input.apiKeyId,
         organizationId: scope.id,
         callerUserId: caller.userId,
         callerCanReadAnyKey: await callerCanReadAnyKey({
@@ -365,7 +365,7 @@ export const apiKeyRest: Readonly<{
     ),
   )
 
-  .patch("/:id", "updateApiKey")
+  .patch("/:apiKeyId", "updateApiKey")
   .withParams(apiKeyRestParamsSchema)
   .withInput(apiKeyRestUpdateSchema)
   .withPermission("organization:manage")
@@ -398,7 +398,7 @@ export const apiKeyRest: Readonly<{
 
     try {
       await app.update({
-        id: input.id,
+        id: input.apiKeyId,
         callerUserId: caller.userId,
         callerIsAdmin: isAdmin,
         organizationId: scope.id,
@@ -413,7 +413,7 @@ export const apiKeyRest: Readonly<{
       // names nothing this caller can reach. A 403 here would confirm it names
       // a real key.
       if (error instanceof ApiKeyNotOwnedError) {
-        throw new ApiKeyNotFoundError(input.id, { reasons: [error] });
+        throw new ApiKeyNotFoundError(input.apiKeyId, { reasons: [error] });
       }
       throw error;
     }
@@ -423,7 +423,7 @@ export const apiKeyRest: Readonly<{
     // adminness alone decides the ownership branch.
     return detailOf(
       await app.getByIdForCaller({
-        id: input.id,
+        id: input.apiKeyId,
         organizationId: scope.id,
         callerUserId: caller.userId,
         callerCanReadAnyKey: isAdmin,
@@ -431,7 +431,7 @@ export const apiKeyRest: Readonly<{
     );
   })
 
-  .delete("/:id", "revokeApiKey")
+  .delete("/:apiKeyId", "revokeApiKey")
   .withParams(apiKeyRestParamsSchema)
   .withPermission("organization:manage")
   .withOutput(apiKeyRestRevokedSchema)
@@ -456,7 +456,7 @@ export const apiKeyRest: Readonly<{
     // Real adminness, so revoke() can enforce its owner-only path: without
     // this, any organization:manage holder could revoke anyone's key.
     await app.revoke({
-      id: input.id,
+      id: input.apiKeyId,
       callerUserId: caller.userId,
       callerIsAdmin: await callerIsAdmin({ app, caller, organizationId: scope.id }),
       organizationId: scope.id,

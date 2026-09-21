@@ -12,7 +12,7 @@ import { createFixtureWorkspace } from "../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
   features: {
-    agent: { roles: { contract: {}, server: {}, web: {} } },
+    agent: { roles: { contract: {}, process: {}, browser: {} } },
   },
 });
 
@@ -28,8 +28,8 @@ const CASES = [
   {
     path: "modules/agent/process/src/services/agent.service.ts",
     expected: {
-      role: "server",
-      kind: "server",
+      role: "process",
+      kind: "process",
       feature: "agent",
       enterprise: false,
       relative: "src/services/agent.service.ts",
@@ -41,7 +41,7 @@ const CASES = [
         enterprise: false,
         feature: "agent",
         name: "agent.service.ts",
-        role: "server",
+        role: "process",
         sourcePath: "services/agent.service.ts",
       },
     },
@@ -66,24 +66,24 @@ const CASES = [
   },
   {
     path: "modules/agent/process/src/repositories/prisma/agent.repository.ts",
-    expected: { role: "server", kind: "server", isPrismaSeam: true, isServiceModule: false },
+    expected: { role: "process", kind: "process", isPrismaSeam: true, isServiceModule: false },
   },
   {
     path: "modules/agent/process/src/adapters/postgres.agent.adapter.ts",
-    expected: { role: "server", isPrismaSeam: true },
+    expected: { role: "process", isPrismaSeam: true },
   },
   {
     path: "modules/agent/process/src/adapters/redis.agent.adapter.ts",
-    expected: { role: "server", isPrismaSeam: false },
+    expected: { role: "process", isPrismaSeam: false },
   },
   {
     path: "modules/agent/process/src/services/__tests__/agent.service.unit.test.ts",
-    expected: { role: "server", isTest: true, isProduction: false, strictSource: undefined },
+    expected: { role: "process", isTest: true, isProduction: false, strictSource: undefined },
   },
   {
     path: "modules/agent/process/tests/wiring.integration.test.ts",
     expected: {
-      role: "server",
+      role: "process",
       relative: "tests/wiring.integration.test.ts",
       sourcePath: undefined,
       isTest: true,
@@ -147,7 +147,7 @@ describe("given the one classification every rule gates on", () => {
         enterprise: true,
         feature: "governance",
         isServiceModule: true,
-        role: "server",
+        role: "process",
       });
     });
   });

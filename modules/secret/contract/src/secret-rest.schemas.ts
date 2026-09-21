@@ -28,7 +28,7 @@ export type SecretPublic = z.infer<typeof secretPublicSchema>;
 export const secretPublicListInputSchema = z.object({ projectId: z.string().min(1) }).strict();
 export type SecretPublicListInput = z.infer<typeof secretPublicListInputSchema>;
 
-export const secretPublicParamsSchema = z.object({ id: secretIdSchema }).strict();
+export const secretPublicParamsSchema = z.object({ secretId: secretIdSchema }).strict();
 export type SecretPublicParams = z.infer<typeof secretPublicParamsSchema>;
 
 /**

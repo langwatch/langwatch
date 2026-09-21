@@ -72,7 +72,7 @@ export const roleBindingRestUpdateSchema = z.object({
 });
 export type RoleBindingRestUpdate = z.infer<typeof roleBindingRestUpdateSchema>;
 
-export const roleBindingRestParamsSchema = z.object({ id: z.string().min(1) });
+export const roleBindingRestParamsSchema = z.object({ roleBindingId: z.string().min(1) });
 export type RoleBindingRestParams = z.infer<typeof roleBindingRestParamsSchema>;
 
 export const roleBindingRestDeletedSchema = z.object({ success: z.literal(true) });

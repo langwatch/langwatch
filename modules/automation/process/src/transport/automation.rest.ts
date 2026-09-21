@@ -86,7 +86,7 @@ export function createAutomationRest(): Readonly<{
         );
       })
 
-      .get("/:id", "getApiTriggersById")
+      .get("/:triggerId", "getApiTriggersById")
       .withParams(automationRestIdParamsSchema)
       .withPermission("triggers:view")
       .responds({ 200: automationRestResponseSchema, 404: badRequestSchema })
@@ -96,7 +96,7 @@ export function createAutomationRest(): Readonly<{
       })
       .withMiddleware(projectRestFacts)
       .handle(({ app, input, scope }, project) =>
-        readAutomation({ app, id: input.id, projectId: scope.id, project }),
+        readAutomation({ app, id: input.triggerId, projectId: scope.id, project }),
       )
 
       // Creating asks for `triggers:create`; `:manage` still implies it, so no
@@ -131,7 +131,7 @@ export function createAutomationRest(): Readonly<{
         return automationWire({ app, projectSlug: project.projectSlug, trigger });
       })
 
-      .patch("/:id", "patchApiTriggersById")
+      .patch("/:triggerId", "patchApiTriggersById")
       .withParams(automationRestIdParamsSchema)
       .withInput(automationRestUpdateInputSchema)
       .withPermission("triggers:update")
@@ -146,7 +146,7 @@ export function createAutomationRest(): Readonly<{
       )
 
       // Destruction deliberately stays at `:manage`.
-      .delete("/:id", "deleteApiTriggersById")
+      .delete("/:triggerId", "deleteApiTriggersById")
       .withParams(automationRestIdParamsSchema)
       .withPermission("triggers:manage")
       .responds({ 200: automationRestDeletedSchema, 404: badRequestSchema })
@@ -155,7 +155,7 @@ export function createAutomationRest(): Readonly<{
         description: "Delete (soft-delete) a trigger",
       })
       .handle(({ app, input, scope }) =>
-        removeAutomation({ app, id: input.id, projectId: scope.id }),
+        removeAutomation({ app, id: input.triggerId, projectId: scope.id }),
       )
       .build()
   );
@@ -197,7 +197,7 @@ async function readAutomation(args: {
  */
 async function editAutomation(args: {
   app: AutomationApi;
-  input: { id: string } & z.infer<typeof automationRestUpdateInputSchema>;
+  input: { triggerId: string } & z.infer<typeof automationRestUpdateInputSchema>;
   projectId: string;
   project: ProjectFacts;
 }): Promise<typeof NOT_FOUND | { status: 200; body: AutomationRestResponse }> {
@@ -210,9 +210,9 @@ async function editAutomation(args: {
     );
   }
 
-  logger.info({ projectId, triggerId: input.id }, "Updating trigger");
+  logger.info({ projectId, triggerId: input.triggerId }, "Updating trigger");
 
-  const existing = await app.findLiveById({ triggerId: input.id, projectId });
+  const existing = await app.findLiveById({ triggerId: input.triggerId, projectId });
 
   if (!existing) return NOT_FOUND;
 
@@ -230,11 +230,11 @@ async function editAutomation(args: {
 
 /** Only the fields the body actually carried: an absent one changes nothing. */
 function updateCommandFor(args: {
-  input: { id: string } & z.infer<typeof automationRestUpdateInputSchema>;
+  input: { triggerId: string } & z.infer<typeof automationRestUpdateInputSchema>;
   projectId: string;
 }): UpdateTriggerCommand {
   const { input, projectId } = args;
-  const command: UpdateTriggerCommand = { id: input.id, projectId };
+  const command: UpdateTriggerCommand = { id: input.triggerId, projectId };
 
   if (input.name !== undefined) command.name = input.name;
   if (input.active !== undefined) command.active = input.active;

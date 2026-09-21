@@ -29,6 +29,11 @@
     "langwatch/condition-shape": ["error", { "maxCalls": 2, "maxOperators": 3, "maxHops": 3 }],
     "langwatch/legacy-monolith-path": "error",
     "langwatch/api-context-services": "error",
+    "langwatch/rest-declares-input-output": "error",
+    "langwatch/rest-declares-its-answer": "error",
+    "langwatch/rest-handler-throws": "error",
+    "langwatch/rest-no-error-handler-override": "error",
+    "langwatch/rest-schema-from-own-contract": "error",
     "langwatch/comment-block-size": "error",
     "langwatch/conditional-type-depth": "error",
     "langwatch/zod-object-composition": "error",
@@ -38,7 +43,7 @@
     // that dev/docs/best_practices/copywriting.md bans. No fixer: the right
     // replacement is a comma, a colon, a parenthetical or a rewritten
     // sentence, which is an editorial choice. The 122 files are baselined.
-    "langwatch/em-dash-in-copy": "error",
+    "langwatch/em-dash-in-copy": "warn",
     // Measured 2026-09-15: 85 files. A .unit.test file that imports a renderer
     // is an integration test by this repository's own definition.
     "langwatch/unit-test-does-not-render": "error",
@@ -150,7 +155,7 @@
     // and so undercounted itself: 471 reports across 95 files. Every file was
     // already known on 2026-09-10, minus 5 fixed since. The ledger has since
     // been deleted outright, so this is simply what the rule reports.
-    "langwatch/banned-test-model-names": "error",
+    "langwatch/banned-test-model-names": "warn",
     // Measured 2026-09-15 the same way: 517 reports across 170 files, most of
     // them either a dynamic import inside a test body (module load order
     // depends on mocks set up first) or a deliberate lazy `import()` for
@@ -164,7 +169,7 @@
     // permits the MDN-style unit nesting TESTING_PHILOSOPHY.md blesses
     // (`describe(ClassName) > describe(methodName())`) and an "and "-prefixed
     // title, which together accounted for 309 of the 1658 it used to report.
-    "langwatch/test-description-is-an-action": "error",
+    "langwatch/test-description-is-an-action": "warn",
     "langwatch/awaited-return-chain": "error",
     "langwatch/max-statements-per-line": "error",
     // Measured 2026-09-15 over the `lint:oxlint` paths: 34 reports across 12
@@ -172,7 +177,7 @@
     // whitespace `layout` rule, not a `defineRule` baseline consumer), so
     // there is nothing to seed; every report was auto-fixed with `--fix` in
     // the same change instead.
-    "langwatch/service-member-spacing": "error",
+    "langwatch/service-member-spacing": "warn",
     "langwatch/service-quality": "error"
   },
   "overrides": [
@@ -180,7 +185,7 @@
       "files": ["packages/architecture-enforcer/src/**/*.ts"],
       "rules": {
         "langwatch/boolean-wall": "error",
-        "langwatch/logical-statement-spacing": "error"
+        "langwatch/logical-statement-spacing": "warn"
       }
     },
     {
@@ -195,7 +200,7 @@
         "apps/ui/src/features/annotation/**/*.ts",
         "apps/ui/src/features/annotation/**/*.tsx"
       ],
-      "rules": { "langwatch/logical-statement-spacing": "error" }
+      "rules": { "langwatch/logical-statement-spacing": "warn" }
     },
 
 

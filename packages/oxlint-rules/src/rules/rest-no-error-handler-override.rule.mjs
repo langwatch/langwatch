@@ -9,7 +9,7 @@ import { defineRule } from "../define-rule.mjs";
 const BANNED = "RestErrorHandler";
 
 function isServerSource(file) {
-  return file.isProduction && file.role === "server";
+  return file.isProduction && file.role === "process";
 }
 
 export const restNoErrorHandlerOverrideRule = defineRule({

@@ -16,7 +16,7 @@ const HANDLER_TYPES = new Set(["ArrowFunctionExpression", "FunctionExpression"])
 const BANNED_ENVELOPE_IMPORTS = new Set(["jsonResponse", "rateLimitedResponse"]);
 
 function isRestOrTransportSource(file) {
-  if (!file.isProduction || file.role !== "server") return false;
+  if (!file.isProduction || file.role !== "process") return false;
 
   const path = file.sourcePath ?? "";
 

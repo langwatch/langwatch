@@ -108,7 +108,7 @@ function featureModuleKind(normalized) {
   );
   if (contract) return { suffix: "Service", abstract: true, concrete: false };
 
-  const server = normalized.match(/^(?:enterprise\/)?modules\/[^/]+\/server\/src\/(.+)$/);
+  const server = normalized.match(/^(?:enterprise\/)?modules\/[^/]+\/process\/src\/(.+)$/);
   if (!server) return undefined;
   const path = server[1];
   if (/^app\/[^/]+\.app\.ts$/.test(path)) {

@@ -6,7 +6,7 @@ import { defineRule } from "../define-rule.mjs";
 // behaviour, and behaviour belongs on the app as a method, not smuggled in as
 // a resolved-per-request fact.
 
-const GOVERNED_TRANSPORT = /^modules\/[^/]+\/server\/src\/transport\/[^/]+\.(?:rest|trpc)\.ts$/;
+const GOVERNED_TRANSPORT = /^modules\/[^/]+\/process\/src\/transport\/[^/]+\.(?:rest|trpc)\.ts$/;
 const RESERVED_NAME = /effect|capabilit|client|builder|report/i;
 
 function isGoverned(workspacePath) {

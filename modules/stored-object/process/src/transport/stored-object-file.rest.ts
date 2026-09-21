@@ -147,7 +147,7 @@ export const storedObjectFileRest = defineRestRouter(StoredObjectFileApi)
   .withCredential("browser")
   .withAddressing("literal", { v1Twin: true })
 
-  .get("/api/files/:projectId/:id", "readProjectStoredObjectBytes")
+  .get("/api/files/:projectId/:storedObjectId", "readProjectStoredObjectBytes")
   .withParams(storedObjectFileRouteScopedParamsSchema)
   .withQuery(storedObjectFileRouteFilenameQuerySchema)
   .withAccess(deferredScope({ reason: OWNER_RESOLVED_IN_HANDLER }))
@@ -157,20 +157,25 @@ export const storedObjectFileRest = defineRestRouter(StoredObjectFileApi)
     serveStoredObjectBytes({
       app,
       request,
-      id: input.id,
+      id: input.storedObjectId,
       claimedProjectId: input.projectId,
       requestedFilename: input.filename,
     }),
   )
 
-  .get("/api/files/:id", "readStoredObjectBytes")
+  .get("/api/files/:storedObjectId", "readStoredObjectBytes")
   .withParams(storedObjectFileRouteIdParamsSchema)
   .withQuery(storedObjectFileRouteFilenameQuerySchema)
   .withAccess(deferredScope({ reason: OWNER_RESOLVED_IN_HANDLER }))
   .withRawResponse({ produces: SERVED_MEDIA_TYPES })
   .methods(["GET", "HEAD"])
   .handle(async ({ app, input, request }) =>
-    serveStoredObjectBytes({ app, request, id: input.id, requestedFilename: input.filename }),
+    serveStoredObjectBytes({
+      app,
+      request,
+      id: input.storedObjectId,
+      requestedFilename: input.filename,
+    }),
   )
   .build();
 

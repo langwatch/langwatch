@@ -175,7 +175,9 @@ export const organizationManagementRestListMembersQuerySchema = z.object({
 });
 
 export const organizationManagementRestUserIdParamsSchema = z.object({ userId: z.string().min(1) });
-export const organizationManagementRestInviteIdParamsSchema = z.object({ id: z.string().min(1) });
+export const organizationManagementRestInviteIdParamsSchema = z.object({
+  inviteId: z.string().min(1),
+});
 
 export const organizationManagementRestSuccessSchema = z.object({ success: z.literal(true) });
 

@@ -55,7 +55,7 @@ export function layerOf(sourcePath) {
  * A specifier naming another module's server package always crosses.
  */
 export function crossingFor({ layer, sourcePath, specifier }) {
-  if (/^@langwatch\/[a-z0-9-]+-server(?:\/|$)/.test(specifier)) return "another module";
+  if (/^@langwatch\/[a-z0-9-]+-process(?:\/|$)/.test(specifier)) return "another module";
 
   const target = targetLayer({ sourcePath, specifier });
   if (!target || target === layer) return undefined;

@@ -3,10 +3,10 @@ import { defineRule } from "../define-rule.mjs";
 
 // Ruling (Alex, 2026-09-10): outside its own package a module is its App,
 // reached through the contract's Api token, and nothing else. Importing a
-// repository or a service straight out of `@langwatch/<m>-server` from
+// repository or a service straight out of `@langwatch/<m>-process` from
 // another package is exactly the shape this rule refuses.
 
-const PACKAGE_SPECIFIER = /^@langwatch\/(enterprise-)?([a-z0-9][a-z0-9-]*)-server$/;
+const PACKAGE_SPECIFIER = /^@langwatch\/(enterprise-)?([a-z0-9][a-z0-9-]*)-process$/;
 const RELATIVE_TARGET = /^(enterprise\/)?modules\/([^/]+)\/server\//;
 
 function packageNameOf(specifier) {

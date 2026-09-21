@@ -3,7 +3,7 @@ import { danglingBarrelExportRule, resetDanglingResolutionCache } from "../../sr
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
-  features: { agent: { layoutVersion: 0, roles: { server: {}, web: {} } } },
+  features: { agent: { layoutVersion: 0, roles: { process: {}, browser: {} } } },
   files: {
     "modules/agent/process/src/index.ts": "export const barrel = 1;\n",
     "modules/agent/process/src/services/agent.service.ts": "export const agent = 1;\n",

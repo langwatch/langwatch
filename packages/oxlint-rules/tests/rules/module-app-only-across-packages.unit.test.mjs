@@ -4,8 +4,8 @@ import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
   features: {
-    department: { layoutVersion: 0, roles: { contract: {}, server: {} } },
-    governance: { layoutVersion: 0, roles: { contract: {}, server: {} }, enterprise: true },
+    department: { layoutVersion: 0, roles: { contract: {}, process: {} } },
+    governance: { layoutVersion: 0, roles: { contract: {}, process: {} }, enterprise: true },
   },
 });
 
@@ -98,7 +98,7 @@ describe("given a file outside a module's server package", () => {
     /** @scenario "A relative import into another module's server package is banned" */
     it("reports reachThroughApi", () => {
       const found = report(
-        'import { DepartmentService } from "../../../../governance/server/src/app/department.service.ts";',
+        'import { DepartmentService } from "../../../../governance/process/src/app/department.service.ts";',
         "modules/department/process/src/app/department.app.ts",
       );
 

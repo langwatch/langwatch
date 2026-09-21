@@ -30,7 +30,7 @@ export const queryBoolean = z
 
 /** The run plan a `/run-plans/:id` route addresses. */
 export const runPlanIdParamsSchema = z.object({
-  id: z.string().min(1).describe("The run plan id."),
+  runPlanId: z.string().min(1).describe("The run plan id."),
 });
 
 export const runPlanListQuerySchema = z.object({
@@ -46,7 +46,7 @@ export const runPlanArchiveResultSchema = z.object({
 
 /** The test suite a `/test-suites/:id` route addresses. */
 export const testSuiteIdParamsSchema = z.object({
-  id: z.string().min(1).describe("The test suite id."),
+  testSuiteId: z.string().min(1).describe("The test suite id."),
 });
 
 export const testSuiteListQuerySchema = z.object({
@@ -251,5 +251,5 @@ export const suiteRunResultSchema = z.object({
   created: z.boolean().optional(),
 });
 
-export const suiteAliasIdParamsSchema = z.object({ id: z.string().min(1) });
+export const suiteAliasIdParamsSchema = z.object({ suiteId: z.string().min(1) });
 export const archivedSuiteSchema = z.object({ id: z.string(), archived: z.boolean() });

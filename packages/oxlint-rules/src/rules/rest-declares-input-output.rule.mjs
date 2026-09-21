@@ -18,7 +18,7 @@ const FUNCTION_BOUNDARY = new Set([
 
 function isRestTransportSource(file) {
   return (
-    file.isProduction && file.role === "server" && (file.sourcePath ?? "").endsWith(".rest.ts")
+    file.isProduction && file.role === "process" && (file.sourcePath ?? "").endsWith(".rest.ts")
   );
 }
 

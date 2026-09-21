@@ -69,7 +69,7 @@ export const organizationTeamRestAddMemberSchema = z.object({
 });
 
 /** The path a route addressing one team carries. */
-export const organizationTeamRestParamsSchema = z.object({ id: z.string().min(1) });
+export const organizationTeamRestParamsSchema = z.object({ teamId: z.string().min(1) });
 
 /** The path a route addressing one member of one team carries. */
 export const organizationTeamRestMemberParamsSchema = z.object({

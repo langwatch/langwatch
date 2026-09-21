@@ -4,7 +4,7 @@ import { defineRule } from "../define-rule.mjs";
 // `<feature>.<rest|trpc>.ts`; legacy `src/api/<surface>/` families remain valid.
 function isFeatureApi(file) {
   return (
-    file.role === "server" &&
+    file.role === "process" &&
     /^(?:src\/(?:transport|api)\/[^/]+\/.+\.api|src\/transport\/[a-z0-9-]+\.(?:rest|trpc))\.ts$/.test(
       file.relative ?? "",
     )

@@ -6,7 +6,7 @@ import { defineRule } from "../define-rule.mjs";
 // `createLogger` with the error as a field instead.
 
 const GOVERNED_SOURCE =
-  /^apps\/(?:api|worker|tasks)\/src\/|^(?:enterprise\/)?modules\/[^/]+\/server\/src\/|^packages\/[^/]+\/src\//;
+  /^apps\/(?:api|worker|tasks)\/src\/|^(?:enterprise\/)?modules\/[^/]+\/process\/src\/|^packages\/[^/]+\/src\//;
 const EXCLUDED =
   /(?:^|\/)__tests__(?:\/|$)|\.(?:test|spec|unit|integration|e2e)\.[cm]?[jt]sx?$|^packages\/observability\/src\/boot-guard\.ts$/;
 const ERRORISH_NAME = /^(?:err|error|e|cause|exception)$/;

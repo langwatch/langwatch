@@ -27,7 +27,7 @@ export const evaluatorWireSchema = z.object({
 });
 
 export const evaluatorIdParamsSchema = z.object({
-  id: z.string().min(1).describe("The evaluator id."),
+  evaluatorId: z.string().min(1).describe("The evaluator id."),
 });
 
 export const evaluatorIdOrSlugParamsSchema = z.object({

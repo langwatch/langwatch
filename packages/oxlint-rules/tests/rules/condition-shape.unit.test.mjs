@@ -3,7 +3,7 @@ import { conditionShapeRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
-  features: { agent: { layoutVersion: 0, roles: { contract: {}, server: {}, web: {} } } },
+  features: { agent: { layoutVersion: 0, roles: { contract: {}, process: {}, browser: {} } } },
 });
 
 afterAll(() => workspace.cleanup());

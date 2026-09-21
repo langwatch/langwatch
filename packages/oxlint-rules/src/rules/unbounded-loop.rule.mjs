@@ -6,7 +6,7 @@ import { defineRule } from "../define-rule.mjs";
 // named budget; a poll runs while time remains.
 
 function isStrictServerSource(file) {
-  return file.role === "server" && Boolean(file.strictSource);
+  return file.role === "process" && Boolean(file.strictSource);
 }
 
 function isLiteralTrue(node) {

@@ -3,12 +3,12 @@ import { restDeclaresItsAnswerRule } from "../../src/rules/rest-declares-its-ans
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
-  features: { agent: { roles: { contract: {}, server: {} } } },
+  features: { agent: { roles: { contract: {}, process: {} } } },
 });
 
 afterAll(() => workspace.cleanup());
 
-function report(code, filename = "modules/agent/server/src/transport/agent.rest.ts") {
+function report(code, filename = "modules/agent/process/src/transport/agent.rest.ts") {
   return runRule(restDeclaresItsAnswerRule, { code, cwd: workspace.cwd, filename });
 }
 

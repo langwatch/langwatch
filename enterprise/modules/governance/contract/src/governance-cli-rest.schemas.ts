@@ -41,7 +41,7 @@ export const governanceCliIngestionKeyRequestSchema = z.object({
   device_label: z.string().min(1).max(128).optional(),
 });
 
-export const governanceCliSourceParamsSchema = z.object({ id: z.string().min(1) });
+export const governanceCliSourceParamsSchema = z.object({ sourceId: z.string().min(1) });
 
 export const governanceCliKeyLookupParamsSchema = z.object({ lookup_id: z.string().min(1) });
 

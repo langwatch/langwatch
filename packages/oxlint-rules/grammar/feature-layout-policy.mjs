@@ -8,7 +8,6 @@ export const NAME = "[a-z0-9]+(?:-[a-z0-9]+)*";
 const NAME_RE = new RegExp(`^${NAME}$`);
 
 export const CANONICAL_ARTIFACTS = new Set([
-  "adapter",
   "app",
   "api",
   "channel",
@@ -21,7 +20,6 @@ export const CANONICAL_ARTIFACTS = new Set([
   "events",
   "intent",
   "migration",
-  "port",
   "process",
   "projection",
   "queries",
@@ -43,7 +41,6 @@ export const TEST_LEVELS = new Set(["unit", "integration", "e2e"]);
 export const TEST_DIRECTORY = /(?:^|\/)__tests__\//;
 
 export const SERVER_QUALIFIED_ARTIFACTS = new Set([
-  "adapter",
   "channel",
   "mapper",
   "repository",
@@ -227,7 +224,6 @@ export const ARTIFACT_PARTS = new Set([
   "fixture",
   "mapper",
   "migration",
-  "port",
   "process",
   "projection",
   "queries",

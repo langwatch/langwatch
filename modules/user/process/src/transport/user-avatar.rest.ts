@@ -48,7 +48,7 @@ export const userAvatarRest = defineRestRouter(UserApi)
   .withCredential("browser")
   .withAddressing("literal", { v1Twin: false })
 
-  .get("/api/user-avatar/:projectId/:id", "readUserAvatarBytes")
+  .get("/api/user-avatar/:projectId/:userAvatarId", "readUserAvatarBytes")
   .withParams(userAvatarRestParamsSchema)
   .withAccess(deferredScope({ reason: OWNER_IS_IN_THE_PATH }))
   .withMiddleware(userAvatarCaller)
@@ -66,7 +66,7 @@ export const userAvatarRest = defineRestRouter(UserApi)
     let result: UserAvatarObjectRead;
 
     try {
-      result = await app.readAvatarObject({ projectId: input.projectId, id: input.id });
+      result = await app.readAvatarObject({ projectId: input.projectId, id: input.userAvatarId });
     } catch {
       return jsonResponse({ error: "avatar temporarily unavailable" }, 502);
     }
@@ -74,11 +74,11 @@ export const userAvatarRest = defineRestRouter(UserApi)
     // A missing row, and ANY object that is not a user avatar, earn the SAME
     // refusal: `purpose` says what the object is for and `owner_kind` says what
     // produced it, and an object carrying one without the other is no avatar.
-    if (!isUserAvatar(result)) throw new UserAvatarNotFoundError(input.id);
+    if (!isUserAvatar(result)) throw new UserAvatarNotFoundError(input.userAvatarId);
 
     // The row is an avatar but the bytes are gone. The same refusal again, so
     // this route never confirms an id exists to a caller it would not serve.
-    if (result.status === "missing") throw new UserAvatarNotFoundError(input.id);
+    if (result.status === "missing") throw new UserAvatarNotFoundError(input.userAvatarId);
 
     return avatarBytes(result);
   })

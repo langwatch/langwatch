@@ -108,10 +108,10 @@ async function updateEvaluator(params: {
   projectId: string;
 }): Promise<z.infer<typeof evaluatorWireSchema>> {
   const { app, input, projectId } = params;
-  logger.info({ projectId, evaluatorId: input.id }, "Updating evaluator");
+  logger.info({ projectId, evaluatorId: input.evaluatorId }, "Updating evaluator");
 
-  const existing = await app.findById({ id: input.id, projectId });
-  if (!existing) throw new EvaluatorNotFoundError(input.id);
+  const existing = await app.findById({ id: input.evaluatorId, projectId });
+  if (!existing) throw new EvaluatorNotFoundError(input.evaluatorId);
 
   const existingConfig = (existing.config as Record<string, unknown> | null) ?? {};
   const existingType = existingConfig.evaluatorType;
@@ -126,7 +126,7 @@ async function updateEvaluator(params: {
   if (input.name !== void 0) data.name = input.name;
   if (input.config !== void 0) data.config = { ...existingConfig, ...input.config };
 
-  const updated = await app.update({ id: input.id, projectId, data });
+  const updated = await app.update({ id: input.evaluatorId, projectId, data });
   const enriched = await app.getByIdWithFields({ id: updated.id, projectId });
   logger.info({ projectId, evaluatorId: enriched.id }, "Successfully updated evaluator");
 
@@ -214,7 +214,7 @@ export function createEvaluatorRest(): EvaluatorRestDeclaration {
         createEvaluator({ app, input, project, projectId: scope.id }),
       )
 
-      .put("/:id", "putApiEvaluatorsById")
+      .put("/:evaluatorId", "putApiEvaluatorsById")
       .withParams(evaluatorIdParamsSchema)
       .withInput(updateEvaluatorInputSchema)
       .withPermission("evaluations:update")
@@ -229,7 +229,7 @@ export function createEvaluatorRest(): EvaluatorRestDeclaration {
       )
 
       // Archiving deliberately stays at `:manage`.
-      .delete("/:id", "deleteApiEvaluatorsById")
+      .delete("/:evaluatorId", "deleteApiEvaluatorsById")
       .withParams(evaluatorIdParamsSchema)
       .withPermission("evaluations:manage")
       .withOutput(archivedEvaluatorResponseSchema)
@@ -238,7 +238,7 @@ export function createEvaluatorRest(): EvaluatorRestDeclaration {
         responses: notFound,
       })
       .handle(({ app, input, scope }) =>
-        archiveEvaluator({ app, id: input.id, projectId: scope.id }),
+        archiveEvaluator({ app, id: input.evaluatorId, projectId: scope.id }),
       )
       .build()
   );

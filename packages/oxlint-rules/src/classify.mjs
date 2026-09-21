@@ -10,18 +10,18 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 /** @typedef {object} FileClassification - File metadata for the feature-layout classifier. */
 
-const FEATURE_SOURCE = /^(enterprise\/)?modules\/([^/]+)\/(contract|server|web)\/(.+)$/;
+const FEATURE_SOURCE = /^(enterprise\/)?modules\/([^/]+)\/(contract|process|browser|browser-kit)\/(.+)$/;
 const APPLICATION_SOURCE = /^apps\/([^/]+)\/src\/(.+)$/;
 const ENTERPRISE_COMPOSITION_SOURCE =
   /^enterprise\/packages\/composition\/(api|worker)\/src\/(.+)$/;
 const SHARED_PACKAGE_SOURCE = /^packages\/(config|design-system)\/src\/(.+)$/;
 const SHARED_PACKAGE = /^packages\/(config|design-system|eventing|group-queue)\//;
 const PACKAGE_SOURCE_OR_TESTS = /^(src|tests)\//;
-const SERVICE_MODULE = /^(enterprise\/)?modules\/[^/]+\/server\/src\/services\/.+\.service\.ts$/;
+const SERVICE_MODULE = /^(enterprise\/)?modules\/[^/]+\/process\/src\/services\/.+\.service\.ts$/;
 const PRISMA_REPOSITORY_SEAM =
-  /^(?:enterprise\/)?modules\/[^/]+\/server\/src\/repositories\/prisma\/.+\.repository\.ts$/;
+  /^(?:enterprise\/)?modules\/[^/]+\/process\/src\/repositories\/prisma\/.+\.repository\.ts$/;
 const POSTGRES_ADAPTER_SEAM =
-  /^(?:enterprise\/)?modules\/[^/]+\/server\/src\/adapters\/postgres\.[^/]+\.adapter\.ts$/;
+  /^(?:enterprise\/)?modules\/[^/]+\/process\/src\/adapters\/postgres\.[^/]+\.adapter\.ts$/;
 const TEST_FILE = /\.(?:test|spec|unit|integration|e2e)\.[cm]?[jt]sx?$/;
 const TEST_DIRECTORY = /(?:^|\/)(?:__tests__|__mocks__|tests)(?:\/|$)/;
 
@@ -41,7 +41,7 @@ export function workspacePathOf(cwd, filename) {
 }
 
 function strictSourceOf({ enterprise, feature, relative: packageRelative, role }) {
-  if (role !== "contract" && role !== "server" && role !== "web") return undefined;
+  if (role !== "contract" && role !== "process" && role !== "browser") return undefined;
   if (!packageRelative?.startsWith("src/")) return undefined;
   const sourcePath = packageRelative.slice("src/".length);
   if (TEST_DIRECTORY.test(sourcePath)) return undefined;

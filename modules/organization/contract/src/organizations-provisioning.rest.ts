@@ -16,7 +16,9 @@ export const organizationsProvisioningRestCreateSchema = z.object({
   adminApiKeyName: z.string().trim().min(1).max(100).optional(),
 });
 
-export const organizationsProvisioningRestParamsSchema = z.object({ id: z.string().min(1) });
+export const organizationsProvisioningRestParamsSchema = z.object({
+  organizationId: z.string().min(1),
+});
 
 /** One organization, as every route here reports it. */
 export const organizationsProvisioningRestSummarySchema = z.object({

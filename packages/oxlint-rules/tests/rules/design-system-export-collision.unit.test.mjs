@@ -4,7 +4,7 @@ import { designSystemExportCollisionRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
-  features: { agent: { layoutVersion: 0, roles: { web: {} } } },
+  features: { agent: { layoutVersion: 0, roles: { browser: {} } } },
   files: {
     "packages/design-system/package.json": JSON.stringify({
       name: "@langwatch/design-system",

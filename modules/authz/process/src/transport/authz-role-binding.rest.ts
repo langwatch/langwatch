@@ -159,7 +159,7 @@ export const authzRoleBindingRest: Readonly<{
     return { ...binding, ...(hasLegacyAccessNotice ? { hasLegacyAccessNotice: true } : {}) };
   })
 
-  .patch("/:id", "updateRoleBinding")
+  .patch("/:roleBindingId", "updateRoleBinding")
   .withParams(roleBindingRestParamsSchema)
   .withInput(roleBindingRestUpdateSchema)
   .withPermission("organization:manage")
@@ -174,7 +174,7 @@ export const authzRoleBindingRest: Readonly<{
     const organizationId = organization.organizationId;
     const updated = await app.updateBinding({
       organizationId,
-      bindingId: input.id,
+      bindingId: input.roleBindingId,
       role: input.role,
       ...(input.customRoleId !== undefined ? { customRoleId: input.customRoleId } : {}),
       actor: organization.actor,
@@ -192,7 +192,7 @@ export const authzRoleBindingRest: Readonly<{
     return binding;
   })
 
-  .delete("/:id", "deleteRoleBinding")
+  .delete("/:roleBindingId", "deleteRoleBinding")
   .withParams(roleBindingRestParamsSchema)
   .withPermission("organization:manage")
   .withOutput(roleBindingRestDeletedSchema)
@@ -205,7 +205,7 @@ export const authzRoleBindingRest: Readonly<{
   .handle(async ({ app, input }, organization) => {
     await app.deleteBinding({
       organizationId: organization.organizationId,
-      bindingId: input.id,
+      bindingId: input.roleBindingId,
       actor: organization.actor,
     });
 

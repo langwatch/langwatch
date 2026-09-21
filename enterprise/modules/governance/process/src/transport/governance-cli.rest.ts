@@ -62,7 +62,7 @@ export const governanceCliRest = defineRestRouter(GovernanceRestApi)
   .handle(({ app, input }, { authorization }) =>
     app.cliIngestionSources({ authorization, includeArchived: input.include_archived }),
   )
-  .get("/api/auth/cli/governance/ingest/sources/:id/events", "listCliIngestionSourceEvents")
+  .get("/api/auth/cli/governance/ingest/sources/:sourceId/events", "listCliIngestionSourceEvents")
   .withParams(governanceCliSourceParamsSchema)
   .withQuery(governanceCliSourceEventsQuerySchema)
   .withAccess(CLI_DOOR)
@@ -71,18 +71,18 @@ export const governanceCliRest = defineRestRouter(GovernanceRestApi)
   .handle(({ app, input }, { authorization }) =>
     app.cliIngestionSourceEvents({
       authorization,
-      sourceId: input.id,
+      sourceId: input.sourceId,
       limit: input.limit,
       beforeIso: input.before_iso,
     }),
   )
-  .get("/api/auth/cli/governance/ingest/sources/:id/health", "readCliIngestionSourceHealth")
+  .get("/api/auth/cli/governance/ingest/sources/:sourceId/health", "readCliIngestionSourceHealth")
   .withParams(governanceCliSourceParamsSchema)
   .withAccess(CLI_DOOR)
   .withHeaders(governanceCliHeadersSchema)
   .responds(governanceCliAnswers)
   .handle(({ app, input }, { authorization }) =>
-    app.cliIngestionSourceHealth({ authorization, sourceId: input.id }),
+    app.cliIngestionSourceHealth({ authorization, sourceId: input.sourceId }),
   )
   .get("/api/auth/cli/governance/status", "readCliGovernanceStatus")
   .withAccess(CLI_DOOR)

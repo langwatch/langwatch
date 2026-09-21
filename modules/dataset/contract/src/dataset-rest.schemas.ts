@@ -66,7 +66,7 @@ export const datasetRestLegacyEntriesSchema = z
   .meta({ id: "DatasetPostEntries" });
 
 export const datasetRestSlugOrIdParamsSchema = z.object({ slugOrId: z.string() });
-export const datasetRestSlugParamsSchema = z.object({ slug: z.string() });
+export const datasetRestSlugParamsSchema = z.object({ datasetSlug: z.string() });
 
 /** The dataset as this family answers it: the stored row plus its platform URL. */
 export const datasetRestSummarySchema = z.object({

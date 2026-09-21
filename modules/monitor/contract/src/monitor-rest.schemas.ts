@@ -5,7 +5,7 @@ import { monitorApiMappingsSchema } from "./monitor-trpc.schemas.ts";
 import { monitorExecutionModeSchema } from "./monitor.ts";
 
 export const monitorRestIdParamsSchema = z.object({
-  id: z.string().min(1).describe("The monitor id."),
+  monitorId: z.string().min(1).describe("The monitor id."),
 });
 
 export const monitorRestPreconditionsSchema = z.array(

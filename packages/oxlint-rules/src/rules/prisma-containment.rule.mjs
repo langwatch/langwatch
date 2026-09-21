@@ -21,7 +21,7 @@ const APPLICATION_ROOTS = new Set(["ui", "api", "worker", "server"]);
  */
 function prismaPackageOf(workspacePath) {
   const feature = workspacePath.match(
-    /^(enterprise\/)?modules\/([^/]+)\/(contract|server|web)\/src\/(.+)$/,
+    /^(enterprise\/)?modules\/([^/]+)\/(contract|process|browser|browser-kit)\/src\/(.+)$/,
   );
   if (feature) {
     return { kind: feature[3], feature: feature[2], relative: feature[4], workspacePath };
@@ -58,14 +58,14 @@ function isStrictPrismaAdapter(pkg) {
   if (pkg.kind === "application" || pkg.kind === "enterprise-composition") {
     return isCompositionPrismaSeam(pkg.relative);
   }
-  if (pkg.kind !== "server") return false;
+  if (pkg.kind !== "process") return false;
   if (pkg.relative.startsWith("repositories/prisma/")) return true;
   return /^adapters\/postgres\.[^/]+\.adapter\.ts$/.test(pkg.relative);
 }
 
 function isPrismaRepositoryRegistry(pkg) {
   return (
-    pkg.kind === "server" &&
+    pkg.kind === "process" &&
     /^repositories\/[a-z0-9-]+(?:-repositories)?\.registry\.ts$/.test(pkg.relative)
   );
 }

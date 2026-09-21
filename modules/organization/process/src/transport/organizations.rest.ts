@@ -67,7 +67,7 @@ export const organizationsProvisioningRest: Readonly<{
     })),
   }))
 
-  .get("/:id", "getOrganizationById")
+  .get("/:organizationId", "getOrganizationById")
   .withAccess({
     kind: "authenticated",
     reason:
@@ -81,8 +81,8 @@ export const organizationsProvisioningRest: Readonly<{
       "Read one organization's provisioning summary, self-hosted instance administrators only.",
   })
   .handle(async ({ app, input }) => {
-    const organization = await app.findProvisioningSummary(input.id);
-    if (!organization) throw new NotFoundError("not_found", "Organization", input.id);
+    const organization = await app.findProvisioningSummary(input.organizationId);
+    if (!organization) throw new NotFoundError("not_found", "Organization", input.organizationId);
 
     return {
       organization: { ...organization, createdAt: toDate(organization.createdAt) },

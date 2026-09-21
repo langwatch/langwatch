@@ -69,7 +69,7 @@ export const featureSourceLayoutRule = defineRule({
     contractServerArtifact: {
       what: "`{{name}}` is a server artifact: contract source may not hold `.adapter`, `.api`, `.mapper`, `.migration`, `.port`, `.projection`, `.repository` or `.store` files.",
       fix:
-        "Move it into `modules/<feature>/server/src/`: `.repository`, `.store` and"
+        "Move it into `modules/<feature>/process/src/`: `.repository`, `.store` and"
         + " `.mapper` under `repositories/`, `.adapter` under `repositories/<backend>/`"
         + " or `channels/<tier>/`, `.projection` under `eventing/`, `.migration` under"
         + " `migrations/`, a `.port` rewritten as the `repositories/<subject>.repository.ts`"
@@ -112,7 +112,7 @@ export const featureSourceLayoutRule = defineRule({
 
     if (role === "contract") return contractVisitors(context, source);
 
-    if (role !== "server") return {};
+    if (role !== "process") return {};
 
     if (PROCESS_MANAGER_SERVICE_PATTERN.test(sourcePath)) {
       return {

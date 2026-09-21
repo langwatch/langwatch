@@ -3,7 +3,7 @@ import { serviceLoadsItsOwnConfigRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
-  features: { auth: { layoutVersion: 0, roles: { contract: {}, server: {} } } },
+  features: { auth: { layoutVersion: 0, roles: { contract: {}, process: {} } } },
 });
 
 afterAll(() => workspace.cleanup());

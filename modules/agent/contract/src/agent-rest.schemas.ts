@@ -6,7 +6,7 @@ import { CONNECTED_AGENT_NOT_SELECTABLE_REASONS } from "./connected-agent.select
 import { connectedAgentInstanceSchema } from "./connected-agent.view.ts";
 
 export const agentRestParamsSchema = z.object({
-  id: z.string().min(1).describe("The agent id."),
+  agentId: z.string().min(1).describe("The agent id."),
 });
 
 export const agentRestQuerySchema = z.object({

@@ -123,10 +123,10 @@ const parseOptionalPositiveInt = (value: string | undefined) => {
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
 };
 
-const slugParamsSchema = z.object({ slug: z.string().min(1) });
+const slugParamsSchema = z.object({ experimentSlug: z.string().min(1) });
 const runIdParamsSchema = z.object({ runId: z.string().min(1) });
 const slugVersionParamsSchema = z.object({
-  slug: z.string().min(1),
+  experimentSlug: z.string().min(1),
   version: z.string().min(1),
 });
 
@@ -189,7 +189,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .withVersion(MANAGEMENT_API_VERSION)
 
   // ── POST /:slug/run  (CI/CD execution) ────────────────────────────────
-  .post("/:slug/run", "postApiExperimentsBySlugRun")
+  .post("/:experimentSlug/run", "postApiExperimentsBySlugRun")
   .withParams(slugParamsSchema)
   // The body is read unparsed: an empty one is a full run, malformed JSON is
   // a 400 in this family's own words, and `runInputsBodySchema` parses what
@@ -215,7 +215,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .withMiddleware(projectRestFacts, experimentWorkbenchCredential)
   .handle(
     async ({ app, input, raw, request, scope }, project, credential): Promise<RestRawResult> => {
-      const { slug } = input;
+      const { experimentSlug: slug } = input;
 
       const experiments = app.experiments();
 
@@ -574,7 +574,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   })
 
   // ── GET /:slug/workbench-state ───────────────────────────────────────
-  .get("/:slug/workbench-state", "getApiExperimentsBySlugWorkbenchState")
+  .get("/:experimentSlug/workbench-state", "getApiExperimentsBySlugWorkbenchState")
   .withParams(slugParamsSchema)
   .withQuery(workbenchStateQuerySchema)
   .withPermission("experiments:view")
@@ -593,7 +593,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
     },
   })
   .handle(async ({ app, input, scope }) => {
-    const { slug } = input;
+    const { experimentSlug: slug } = input;
 
     const workbench = await app.experiments().getWorkbenchState({ projectId: scope.id, slug });
 
@@ -610,7 +610,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   })
 
   // ── PUT /:slug/workbench-state ───────────────────────────────────────
-  .put("/:slug/workbench-state", "putApiExperimentsBySlugWorkbenchState")
+  .put("/:experimentSlug/workbench-state", "putApiExperimentsBySlugWorkbenchState")
   .withParams(slugParamsSchema)
   .withInput(saveWorkbenchStateBodySchema)
   .withPermission("experiments:update")
@@ -635,7 +635,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   })
   .withMiddleware(projectRestFacts, experimentWorkbenchCredential)
   .handle(async ({ app, input, scope }, _project, credential) => {
-    const { slug } = input;
+    const { experimentSlug: slug } = input;
 
     const saved = await app.experiments().saveWorkbenchState(
       {
@@ -652,7 +652,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   })
 
   // ── GET /:slug/versions ─────────────────────────────────────────────
-  .get("/:slug/versions", "getApiExperimentsBySlugVersions")
+  .get("/:experimentSlug/versions", "getApiExperimentsBySlugVersions")
   .withParams(slugParamsSchema)
   .withQuery(listVersionsQuerySchema)
   .withPermission("experiments:view")
@@ -671,7 +671,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
     },
   })
   .handle(async ({ app, input, scope }) => {
-    const { slug } = input;
+    const { experimentSlug: slug } = input;
 
     const experiments = app.experiments();
     const workbench = await experiments.getWorkbenchState({ projectId: scope.id, slug });
@@ -708,7 +708,10 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   })
 
   // ── POST /:slug/versions/:version/restore ────────────────────────────
-  .post("/:slug/versions/:version/restore", "postApiExperimentsBySlugVersionsByVersionRestore")
+  .post(
+    "/:experimentSlug/versions/:version/restore",
+    "postApiExperimentsBySlugVersionsByVersionRestore",
+  )
   .withParams(slugVersionParamsSchema)
   .withPermission("experiments:update")
   .withRawResponse({ produces: "application/json" })
@@ -728,7 +731,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   })
   .withMiddleware(projectRestFacts, experimentWorkbenchCredential)
   .handle(async ({ app, input, scope }, _project, credential) => {
-    const { slug, version } = input;
+    const { experimentSlug: slug, version } = input;
 
     const experiments = app.experiments();
     const workbench = await experiments.getWorkbenchState({ projectId: scope.id, slug });

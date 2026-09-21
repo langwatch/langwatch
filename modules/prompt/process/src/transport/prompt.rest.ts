@@ -174,7 +174,7 @@ export const promptRest = defineRestRouter(PromptApi)
   // decides which version the customer's live traffic resolves to. That is a
   // deployment, and it belongs with the grain that administers the prompt
   // rather than with the one that edits its text.
-  .put("/api/prompts/:id{.+?}/tags/:tag", "putApiPromptsByIdTagsByTag")
+  .put("/api/prompts/:promptId{.+?}/tags/:tag", "putApiPromptsByIdTagsByTag")
   .withParams(idTagParamsSchema)
   .withInput(assignTagInputSchema)
   .withPermission("prompts:manage")
@@ -193,7 +193,7 @@ export const promptRest = defineRestRouter(PromptApi)
     },
   })
   .handle(async ({ app, input, scope }, project) => {
-    const { id, tag, versionId } = input;
+    const { promptId: id, tag, versionId } = input;
 
     logger.info(
       { projectId: scope.id, promptId: id, tag, versionId },
@@ -356,7 +356,7 @@ export const promptRest = defineRestRouter(PromptApi)
     }
   })
 
-  .get("/api/prompts/:id{.+?}/versions", "getApiPromptsByIdVersions")
+  .get("/api/prompts/:promptId{.+?}/versions", "getApiPromptsByIdVersions")
   .withParams(idParamsSchema)
   .withPermission("prompts:view")
   .withOutput(z.array(promptWireSchema))
@@ -371,16 +371,16 @@ export const promptRest = defineRestRouter(PromptApi)
     },
   })
   .handle(async ({ app, input, scope }, project) => {
-    logger.info({ projectId: scope.id, promptId: input.id }, "Getting versions for prompt");
+    logger.info({ projectId: scope.id, promptId: input.promptId }, "Getting versions for prompt");
 
     const versions = await app.getAllVersions({
-      idOrHandle: input.id,
+      idOrHandle: input.promptId,
       projectId: scope.id,
       organizationId: project.organizationId,
     });
 
     logger.info(
-      { projectId: scope.id, promptId: input.id, versionCount: versions.length },
+      { projectId: scope.id, promptId: input.promptId, versionCount: versions.length },
       "Successfully retrieved prompt versions",
     );
 
@@ -393,7 +393,7 @@ export const promptRest = defineRestRouter(PromptApi)
   // Restore (rollback to) a specific version - a new version of a prompt that
   // already exists, i.e. an update of that prompt.
   .post(
-    "/api/prompts/:id{.+?}/versions/:versionId/restore",
+    "/api/prompts/:promptId{.+?}/versions/:versionId/restore",
     "postApiPromptsByIdVersionsByVersionIdRestore",
   )
   .withParams(idVersionParamsSchema)
@@ -414,7 +414,7 @@ export const promptRest = defineRestRouter(PromptApi)
   })
   .handle(async ({ app, input, scope }, project) => {
     logger.info(
-      { projectId: scope.id, promptId: input.id, versionId: input.versionId },
+      { projectId: scope.id, promptId: input.promptId, versionId: input.versionId },
       "Restoring prompt version",
     );
 
@@ -428,7 +428,7 @@ export const promptRest = defineRestRouter(PromptApi)
     });
 
     logger.info(
-      { projectId: scope.id, promptId: input.id, versionId: input.versionId },
+      { projectId: scope.id, promptId: input.promptId, versionId: input.versionId },
       "Successfully restored prompt version",
     );
 
@@ -438,7 +438,7 @@ export const promptRest = defineRestRouter(PromptApi)
     };
   })
 
-  .get("/api/prompts/:id{.+}", "getApiPromptsById")
+  .get("/api/prompts/:promptId{.+}", "getApiPromptsById")
   .withParams(idParamsSchema)
   .withQuery(promptWindowQuerySchema)
   .withPermission("prompts:view")
@@ -460,7 +460,7 @@ export const promptRest = defineRestRouter(PromptApi)
   .handle(async ({ app, input, scope }, project) => {
     try {
       // Parse shorthand syntax (e.g., "pizza-prompt:production" or "pizza-prompt:2")
-      const shorthand = parsePromptShorthand(input.id);
+      const shorthand = parsePromptShorthand(input.promptId);
 
       // The two window parameters stay unrefused by their schema: a caller that
       // sends `version=abc` is answered by the conflict and shorthand rules
@@ -574,7 +574,7 @@ export const promptRest = defineRestRouter(PromptApi)
     }
   })
 
-  .post("/api/prompts/:id{.+?}/sync", "postApiPromptsByIdSync")
+  .post("/api/prompts/:promptId{.+?}/sync", "postApiPromptsByIdSync")
   .withParams(idParamsSchema)
   .withInput(syncInputSchema)
   .withPermission("prompts:manage")
@@ -591,7 +591,7 @@ export const promptRest = defineRestRouter(PromptApi)
     },
   })
   .handle(async ({ app, input, scope }, project) => {
-    const { id, ...data } = input;
+    const { promptId: id, ...data } = input;
 
     logger.info({ projectId: scope.id, promptId: id }, "Syncing prompt with local content");
 
@@ -634,7 +634,7 @@ export const promptRest = defineRestRouter(PromptApi)
     }
   })
 
-  .put("/api/prompts/:id{.+}", "putApiPromptsById")
+  .put("/api/prompts/:promptId{.+}", "putApiPromptsById")
   .withParams(idParamsSchema)
   .withInput(updatePromptInputSchema)
   .withPermission("prompts:update")
@@ -654,7 +654,7 @@ export const promptRest = defineRestRouter(PromptApi)
     },
   })
   .handle(async ({ app, input, scope }, project) => {
-    const { id, tags, ...data } = input;
+    const { promptId: id, tags, ...data } = input;
 
     if (Object.keys(data).length === 0) {
       throw new HTTPException(422, { message: "At least one field is required" });
@@ -697,7 +697,7 @@ export const promptRest = defineRestRouter(PromptApi)
     }
   })
 
-  .delete("/api/prompts/:id{.+}", "deleteApiPromptsById")
+  .delete("/api/prompts/:promptId{.+}", "deleteApiPromptsById")
   .withParams(idParamsSchema)
   .withPermission("prompts:manage")
   .withOutput(successSchema)
@@ -711,16 +711,16 @@ export const promptRest = defineRestRouter(PromptApi)
     },
   })
   .handle(async ({ app, input, scope }, project) => {
-    logger.info({ projectId: scope.id, promptId: input.id }, "Deleting prompt");
+    logger.info({ projectId: scope.id, promptId: input.promptId }, "Deleting prompt");
 
     const result = await app.deletePrompt({
-      idOrHandle: input.id,
+      idOrHandle: input.promptId,
       projectId: scope.id,
       organizationId: project.organizationId,
     });
 
     logger.info(
-      { projectId: scope.id, promptId: input.id, success: result.success },
+      { projectId: scope.id, promptId: input.promptId, success: result.success },
       "Successfully deleted prompt",
     );
 

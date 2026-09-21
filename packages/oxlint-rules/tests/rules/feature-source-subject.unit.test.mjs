@@ -4,8 +4,8 @@ import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
   features: {
-    agent: { layoutVersion: 0, roles: { server: {} } },
-    project: { layoutVersion: 0, roles: { server: {} } },
+    agent: { layoutVersion: 0, roles: { process: {} } },
+    project: { layoutVersion: 0, roles: { process: {} } },
   },
   catalogue: { project: ["project"] },
 });
@@ -32,7 +32,7 @@ describe("given a strict feature source file claiming another feature's subject"
         path: "services/project.service.ts",
         subject: "project",
         owner: "project",
-        role: "server",
+        role: "process",
       });
       expect(found[0].message).toContain("modules/project/process/src/services/project.service.ts");
       expect(found[0].message).toContain("feature-move");

@@ -7,7 +7,7 @@ import { isEnvironmentObject, staticPropertyName } from "./secrets-through-sourc
 // caller already held instead of being handed one validated config.
 
 const SERVICE_OR_ADAPTER_SOURCE =
-  /^(?:enterprise\/)?modules\/[^/]+\/server\/src\/(?:services|adapters)\/.+\.[cm]?[jt]sx?$/;
+  /^(?:enterprise\/)?modules\/[^/]+\/process\/src\/(?:services|adapters)\/.+\.[cm]?[jt]sx?$/;
 const CONFIG_FUNCTION_NAMES = new Set(["loadConfig", "resolveConfig", "readConfig"]);
 
 function isFunctionLike(node) {

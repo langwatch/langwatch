@@ -3,7 +3,7 @@ import { noBootHookOutsideGuardRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
-  features: { agent: { layoutVersion: 0, roles: { server: {} } } },
+  features: { agent: { layoutVersion: 0, roles: { process: {} } } },
 });
 
 afterAll(() => workspace.cleanup());

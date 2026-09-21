@@ -158,7 +158,7 @@ export const teamsRest: Readonly<{
     ),
   )
 
-  .get("/:id", "getTeam")
+  .get("/:teamId", "getTeam")
   .withPermission("team:view")
   .withParams(organizationTeamRestParamsSchema)
   .withOutput(organizationTeamRestSchema)
@@ -169,13 +169,13 @@ export const teamsRest: Readonly<{
   .handle(async ({ app, input, scope }) =>
     teamResponse(
       await app.getTeam({
-        teamId: input.id,
+        teamId: input.teamId,
         organizationId: scope.id,
       }),
     ),
   )
 
-  .patch("/:id", "updateTeam")
+  .patch("/:teamId", "updateTeam")
   .withPermission("team:manage")
   .withParams(organizationTeamRestParamsSchema)
   .withInput(organizationTeamRestUpdateSchema)
@@ -187,14 +187,14 @@ export const teamsRest: Readonly<{
   .handle(async ({ app, input, scope }) =>
     teamResponse(
       await app.updateTeam({
-        teamId: input.id,
+        teamId: input.teamId,
         organizationId: scope.id,
         ...(input.name === undefined ? {} : { name: input.name }),
       }),
     ),
   )
 
-  .delete("/:id", "archiveTeam")
+  .delete("/:teamId", "archiveTeam")
   .withPermission("team:manage")
   .withParams(organizationTeamRestParamsSchema)
   .withOutput(organizationTeamRestArchivedSchema)
@@ -204,7 +204,7 @@ export const teamsRest: Readonly<{
   })
   .handle(async ({ app, input, scope }) => {
     const team = await app.archiveTeam({
-      teamId: input.id,
+      teamId: input.teamId,
       organizationId: scope.id,
     });
 
@@ -215,7 +215,7 @@ export const teamsRest: Readonly<{
     };
   })
 
-  .get("/:id/members", "listTeamMembers")
+  .get("/:teamId/members", "listTeamMembers")
   .withPermission("team:view")
   .withParams(organizationTeamRestParamsSchema)
   .withOutput(organizationTeamRestMemberListSchema)
@@ -227,21 +227,21 @@ export const teamsRest: Readonly<{
     // Reads the team first so a team outside the organization is a 404 rather
     // than an empty membership list.
     await app.getTeam({
-      teamId: input.id,
+      teamId: input.teamId,
       organizationId: scope.id,
     });
 
     const bindings = await app.listTeamMemberBindings({
       organizationId: scope.id,
-      teamIds: [input.id],
+      teamIds: [input.teamId],
     });
 
     return {
-      data: (bindings.get(input.id) ?? []).map(memberResponse),
+      data: (bindings.get(input.teamId) ?? []).map(memberResponse),
     };
   })
 
-  .post("/:id/members", "addTeamMember")
+  .post("/:teamId/members", "addTeamMember")
   .withPermission("team:manage")
   .withParams(organizationTeamRestParamsSchema)
   .withInput(organizationTeamRestAddMemberSchema)
@@ -258,7 +258,7 @@ export const teamsRest: Readonly<{
         : { type: "system" as const, id: null };
 
     await app.addTeamMember({
-      teamId: input.id,
+      teamId: input.teamId,
       organizationId: scope.id,
       userId: input.userId,
       role: input.role,
@@ -268,7 +268,7 @@ export const teamsRest: Readonly<{
     return { success: true };
   })
 
-  .delete("/:id/members/:userId", "removeTeamMember")
+  .delete("/:teamId/members/:userId", "removeTeamMember")
   .withPermission("team:manage")
   .withParams(organizationTeamRestMemberParamsSchema)
   .withOutput(organizationTeamRestSuccessSchema)
@@ -279,7 +279,7 @@ export const teamsRest: Readonly<{
   .handle(async ({ app, input, scope, actor }) => {
     await app.removeTeamMember(
       {
-        teamId: input.id,
+        teamId: input.teamId,
         organizationId: scope.id,
         userId: input.userId,
       },
@@ -289,7 +289,7 @@ export const teamsRest: Readonly<{
     return { success: true };
   })
 
-  .get("/:id/projects", "listTeamProjects")
+  .get("/:teamId/projects", "listTeamProjects")
   .withPermission("team:view")
   .withParams(organizationTeamRestParamsSchema)
   .withOutput(organizationTeamRestProjectListSchema)
@@ -299,14 +299,14 @@ export const teamsRest: Readonly<{
   })
   .handle(async ({ app, input, scope }) => {
     await app.getTeam({
-      teamId: input.id,
+      teamId: input.teamId,
       organizationId: scope.id,
     });
 
     return {
       data: await app.listProjectsByTeam({
         organizationId: scope.id,
-        teamId: input.id,
+        teamId: input.teamId,
       }),
     };
   })

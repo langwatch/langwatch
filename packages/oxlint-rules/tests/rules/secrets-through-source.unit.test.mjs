@@ -3,7 +3,7 @@ import { secretsThroughSourceRule } from "../../src/rules/secrets-through-source
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
-  features: { agent: { layoutVersion: 0, roles: { server: {} } } },
+  features: { agent: { layoutVersion: 0, roles: { process: {} } } },
 });
 
 afterAll(() => workspace.cleanup());

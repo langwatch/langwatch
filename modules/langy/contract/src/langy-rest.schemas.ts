@@ -98,7 +98,7 @@ export const langyLocalStartWaitRequestSchema =
 // ── the local-control REST family, `/api/langy/control` ────────────────────
 
 export const langyControlIdParamsSchema = z.object({
-  id: z.string().min(1).describe("The control request id."),
+  requestId: z.string().min(1).describe("The control request id."),
 });
 
 export const langyControlCancelResultSchema = z.object({

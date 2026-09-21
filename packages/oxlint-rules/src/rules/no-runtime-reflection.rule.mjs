@@ -7,7 +7,7 @@ import { defineRule } from "../define-rule.mjs";
 // builds a throwaway double for a test rather than production behaviour.
 
 const GOVERNED_SOURCE =
-  /^(?:enterprise\/)?modules\/[^/]+\/(?:contract|server|web)\/src\/|^apps\/api\/src\/features\/|^apps\/worker\/src\/app\//;
+  /^(?:enterprise\/)?modules\/[^/]+\/(?:contract|process|browser|browser-kit)\/src\/|^apps\/api\/src\/features\/|^apps\/worker\/src\/app\//;
 const EXCLUDED = /(?:^|\/)__tests__(?:\/|$)|^packages\/test-harness\//;
 const REFLECT_MEMBERS = new Set(["get", "set", "has", "apply", "construct", "deleteProperty"]);
 const WHITESPACE = /\s+/g;

@@ -53,7 +53,7 @@ export type RoleRest = z.infer<typeof roleRestSchema>;
 
 export const roleRestListSchema = z.object({ roles: z.array(roleRestSchema) });
 
-export const roleRestParamsSchema = z.object({ id: z.string().min(1) });
+export const roleRestParamsSchema = z.object({ roleId: z.string().min(1) });
 
 export const roleRestCreateSchema = z.object({
   name: z.string().trim().min(1).max(100),

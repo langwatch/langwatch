@@ -10,7 +10,7 @@ const STORE_SPECIFIER = /^\.?prisma\/client(?:\/|$)|^@prisma\/client(?:\/|$)/;
 
 function isChannel(file) {
   return (
-    file.role === "server" && file.isProduction && Boolean(file.sourcePath?.startsWith("channels/"))
+    file.role === "process" && file.isProduction && Boolean(file.sourcePath?.startsWith("channels/"))
   );
 }
 

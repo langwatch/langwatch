@@ -61,6 +61,7 @@ import {
   restDeclaresInputOutputRule,
   restHandlerThrowsRule,
   restDeclaresItsAnswerRule,
+  restPathParamIsSemanticRule,
   restNoErrorHandlerOverrideRule,
   secretsThroughSourceRule,
   serviceClassesRule,
@@ -117,6 +118,8 @@ export const rules = {
   "rest-handler-throws": restHandlerThrowsRule,
 
   "rest-declares-its-answer": restDeclaresItsAnswerRule,
+
+  "rest-path-param-is-semantic": restPathParamIsSemanticRule,
 
   "rest-no-error-handler-override": restNoErrorHandlerOverrideRule,
   "service-loads-its-own-config": serviceLoadsItsOwnConfigRule,

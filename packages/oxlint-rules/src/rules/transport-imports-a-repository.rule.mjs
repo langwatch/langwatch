@@ -6,7 +6,7 @@ import { defineRule } from "../define-rule.mjs";
 // repository has walked round all three, and no reviewer reading the route
 // can see that it did.
 
-const GOVERNED = /^(?:enterprise\/)?modules\/[^/]+\/server\/src\/transport\//;
+const GOVERNED = /^(?:enterprise\/)?modules\/[^/]+\/process\/src\/transport\//;
 const REPOSITORY_FOLDER = /(?:^|\/)repositories\//;
 const REPOSITORY_MODULE = /\.repository(?:\.[cm]?[jt]sx?)?$/;
 const REPOSITORY_NAME = /Repository$/;

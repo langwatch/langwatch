@@ -179,7 +179,7 @@ function isOneOrThrowGet(name, returnType) {
 }
 
 export function isFallibleResultModule(file) {
-  if (file.role !== "contract" && file.role !== "server") return false;
+  if (file.role !== "contract" && file.role !== "process") return false;
   if (!file.relative?.startsWith("src/")) return false;
   return FALLIBLE_RESULT_MODULE.test(file.relative);
 }

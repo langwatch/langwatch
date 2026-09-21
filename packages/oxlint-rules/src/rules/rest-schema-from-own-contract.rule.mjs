@@ -12,7 +12,7 @@ const CONTRACT_SOURCE = /^@langwatch\/(enterprise-)?([a-z0-9]+(?:-[a-z0-9]+)*)-c
 const HANDLER_BODY = new Set(["FunctionDeclaration", "FunctionExpression", "ArrowFunctionExpression"]);
 
 function isRestTransportSource(file) {
-  return file.isProduction && file.role === "server" && /\.(rest|trpc)\.ts$/.test(file.sourcePath ?? "");
+  return file.isProduction && file.role === "process" && /\.(rest|trpc)\.ts$/.test(file.sourcePath ?? "");
 }
 
 /** The module specifier an identifier was imported from; undefined otherwise. */

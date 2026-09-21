@@ -12,7 +12,7 @@ const CONTEXT_NAMES = new Set(["c", "ctx", "context"]);
 const HANDLER_TYPES = new Set(["ArrowFunctionExpression", "FunctionExpression"]);
 
 function isRestTransportSource(file) {
-  return file.isProduction && file.role === "server" && /\.rest\.ts$/.test(file.sourcePath ?? "");
+  return file.isProduction && file.role === "process" && /\.rest\.ts$/.test(file.sourcePath ?? "");
 }
 
 /** The banned symbol a call or `new` expression spells, or undefined for anything else. */

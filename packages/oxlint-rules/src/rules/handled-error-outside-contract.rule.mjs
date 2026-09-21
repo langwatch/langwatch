@@ -4,7 +4,7 @@ import { defineRule } from "../define-rule.mjs";
 // both sides need the class - it cannot live in the server package the
 // client may not import.
 
-const SERVER_SOURCE = /^(?:enterprise\/)?modules\/([^/]+)\/server\/src\/.+\.[cm]?[jt]sx?$/;
+const SERVER_SOURCE = /^(?:enterprise\/)?modules\/([^/]+)\/process\/src\/.+\.[cm]?[jt]sx?$/;
 
 function moduleOf(workspacePath) {
   return workspacePath.match(SERVER_SOURCE)?.[1];

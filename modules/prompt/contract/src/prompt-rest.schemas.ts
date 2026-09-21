@@ -138,10 +138,10 @@ export const documentedSyncResultSchema = z.object({
     })
     .optional(),
 });
-export const idParamsSchema = z.object({ id: z.string() });
-export const idTagParamsSchema = z.object({ id: z.string(), tag: z.string() });
+export const idParamsSchema = z.object({ promptId: z.string() });
+export const idTagParamsSchema = z.object({ promptId: z.string(), tag: z.string() });
 export const tagParamsSchema = z.object({ tag: z.string() });
-export const idVersionParamsSchema = z.object({ id: z.string(), versionId: z.string() });
+export const idVersionParamsSchema = z.object({ promptId: z.string(), versionId: z.string() });
 export const promptWindowQuerySchema = z.object({
   version: z.coerce.number().int().nonnegative().optional(),
   tag: z.string().optional(),

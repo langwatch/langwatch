@@ -8,7 +8,7 @@ import { defineRule } from "../define-rule.mjs";
 
 function isRepository(file) {
   return (
-    file.role === "server" && file.isProduction && Boolean(file.sourcePath?.startsWith("repositories/"))
+    file.role === "process" && file.isProduction && Boolean(file.sourcePath?.startsWith("repositories/"))
   );
 }
 

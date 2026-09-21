@@ -74,7 +74,7 @@ function kebabCaseRename(name) {
 }
 
 function suggestFilename(source) {
-  if (source.role === "server") {
+  if (source.role === "process") {
     const qualifierFix = qualifierPrefixRename(source.name);
     if (qualifierFix) return qualifierFix;
   }
@@ -95,7 +95,7 @@ export const featureSourceFilenameRule = defineRule({
     if (!source) return {};
     if (!/\.[cm]?[jt]sx?$/.test(source.name)) return {};
     const valid =
-      source.role === "server"
+      source.role === "process"
         ? isStrictServerFilename(source.name)
         : isLowerKebabFilename(source.name);
     if (valid) return {};

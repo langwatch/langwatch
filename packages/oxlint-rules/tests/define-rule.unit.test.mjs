@@ -3,7 +3,7 @@ import { defineRule, renderMessage, renderTemplate } from "../src/define-rule.mj
 import { createFixtureWorkspace, runRule } from "../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
-  features: { agent: { layoutVersion: 0, roles: { server: {}, web: {} } } },
+  features: { agent: { layoutVersion: 0, roles: { process: {}, browser: {} } } },
 });
 
 afterAll(() => workspace.cleanup());
@@ -106,7 +106,7 @@ describe("given a rule declared through defineRule", () => {
   describe("when applies rejects the file", () => {
     it("returns no visitors at all", () => {
       const rule = ruleReportingOn("FunctionDeclaration", {
-        applies: (file) => file.role === "web",
+        applies: (file) => file.role === "browser",
       });
       const found = runRule(rule, {
         code: "export function alpha() { return 1; }",
@@ -119,7 +119,7 @@ describe("given a rule declared through defineRule", () => {
 
     it("still runs on a file it accepts", () => {
       const rule = ruleReportingOn("FunctionDeclaration", {
-        applies: (file) => file.role === "web",
+        applies: (file) => file.role === "browser",
       });
       const found = runRule(rule, {
         code: "export function alpha() { return 1; }",

@@ -3,7 +3,7 @@ import { typeOnlyValueImportRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
-  features: { agent: { layoutVersion: 0, roles: { server: {} } } },
+  features: { agent: { layoutVersion: 0, roles: { process: {} } } },
   files: {
     "modules/agent/process/src/services/agent.types.ts": "export interface AgentConfig {}\n",
     "modules/agent/process/src/services/agent.mixed.ts":

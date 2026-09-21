@@ -44,7 +44,7 @@ const tokenSummarySchema = z.object({
   lastUsedAt: z.date().nullable(),
 });
 
-const idParamsSchema = z.object({ id: z.string().min(1) });
+const idParamsSchema = z.object({ scimTokenId: z.string().min(1) });
 
 const createTokenSchema = z.object({
   description: z.string().trim().min(1).max(255).optional(),
@@ -119,7 +119,7 @@ export const scimTokenRest = defineRestRouter(ScimApi)
     };
   })
 
-  .delete("/:id", "revokeScimToken")
+  .delete("/:scimTokenId", "revokeScimToken")
   .withParams(idParamsSchema)
   .withPermission("organization:manage")
   .withOutput(z.object({ success: z.literal(true) }))
@@ -130,13 +130,13 @@ export const scimTokenRest = defineRestRouter(ScimApi)
   })
   .withMiddleware(scimTokenRestActor)
   .handle(async ({ app, input, scope }, actor) => {
-    await app.revokeToken({ organizationId: scope.id, tokenId: input.id });
+    await app.revokeToken({ organizationId: scope.id, tokenId: input.scimTokenId });
 
     app.recordTokenAudit({
       organizationId: scope.id,
       actorId: actor.actorId,
       action: "management.scimToken.delete",
-      args: { tokenId: input.id },
+      args: { tokenId: input.scimTokenId },
     });
 
     return { success: true as const };

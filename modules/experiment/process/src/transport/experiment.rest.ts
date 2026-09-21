@@ -111,7 +111,7 @@ export const experimentRest = defineRestRouter(ExperimentApi)
   // Read one experiment, by the slug the list route just handed the caller.
   // The id is accepted too rather than refused, since the same list row
   // carries both and a caller reaching for `id` is not making a mistake.
-  .get("/:slug", "getApiExperimentsBySlug")
+  .get("/:experimentSlug", "getApiExperimentsBySlug")
   .withParams(slugParamsSchema)
   .withPermission("experiments:view")
   .withOutput(experimentSummarySchema)
@@ -123,7 +123,10 @@ export const experimentRest = defineRestRouter(ExperimentApi)
     errors: [{ status: 404, description: "No experiment with that slug or id in this project" }],
   })
   .handle(async ({ app, input, scope }) => {
-    const experiment = await app.getBySlugOrId({ projectId: scope.id, slugOrId: input.slug });
+    const experiment = await app.getBySlugOrId({
+      projectId: scope.id,
+      slugOrId: input.experimentSlug,
+    });
     const [withRuns] = await app.withRunAggregates({
       projectId: scope.id,
       experiments: [experiment],

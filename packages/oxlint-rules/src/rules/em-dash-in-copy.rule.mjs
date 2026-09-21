@@ -13,7 +13,7 @@ const EM_DASH = "—";
 const EM_DASH_NEAR_WORD = /\w[^—\n]*—|—[^—\n]*\w/;
 const HAS_LETTER = /[A-Za-z]/;
 const CUSTOMER_FACING_TSX =
-  /^(?:apps\/ui\/src|(?:enterprise\/)?modules\/[^/]+\/web)\/.*\.tsx$/;
+  /^(?:apps\/ui\/src|(?:enterprise\/)?modules\/[^/]+\/browser)\/.*\.tsx$/;
 const EXCERPT_RADIUS = 20;
 
 function isCustomerFacingTsx(file) {

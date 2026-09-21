@@ -245,7 +245,7 @@ async function updateSuite(params: {
   projectSlug: string;
 }): Promise<SuiteResponseWithPlatformUrl> {
   const { app, projectId } = params;
-  const { id, scope, ...fields } = params.input;
+  const { suiteId: id, scope, ...fields } = params.input;
   logger.info({ projectId, suiteId: id }, "Updating suite");
 
   // Whether this id names a test suite, and what a test suite refuses, is the
@@ -296,7 +296,7 @@ async function runSuite(params: {
   surface: string | null;
 }): Promise<z.infer<typeof suiteRunResultSchema>> {
   const { app, input, projectId } = params;
-  logger.info({ projectId, suiteId: input.id }, "Running suite");
+  logger.info({ projectId, suiteId: input.suiteId }, "Running suite");
 
   // A project key belongs to no person, so it records no actor. A user-bound
   // key records the person it belongs to, through the surface the request
@@ -322,7 +322,7 @@ async function scheduleRun(params: {
   actor: RunActorArgument;
 }): Promise<z.infer<typeof suiteRunResultSchema>> {
   const { app, input, projectId, idempotencyKey, actor } = params;
-  const found = await app.getByIdOrTestSuite({ id: input.id, projectId });
+  const found = await app.getByIdOrTestSuite({ id: input.suiteId, projectId });
   if (found.kind !== "test_suite" && input.targets !== undefined) {
     throw storedTargetsRefusal("run");
   }
@@ -332,7 +332,7 @@ async function scheduleRun(params: {
       ? await app.runPlan({
           projectId,
           config: {
-            scope: { mode: "test_suites", testSuiteIds: [input.id] },
+            scope: { mode: "test_suites", testSuiteIds: [input.suiteId] },
             targets: input.targets ?? [],
           },
           idempotencyKey,
@@ -341,7 +341,7 @@ async function scheduleRun(params: {
           ...(actor !== undefined && { actor }),
         })
       : await app.run({
-          id: input.id,
+          id: input.suiteId,
           projectId,
           idempotencyKey,
           parameters: input.parameters,
@@ -426,7 +426,7 @@ export function createSuitesAliasRest(): Readonly<{
       )
 
       // ── Get Suite ──────────────────────────────────────────────
-      .get("/:id", "getApiSuitesById")
+      .get("/:suiteId", "getApiSuitesById")
       .withParams(suiteAliasIdParamsSchema)
       .withPermission("scenarios:view")
       .withOutput(suiteResponseWithPlatformUrlSchema)
@@ -438,7 +438,7 @@ export function createSuitesAliasRest(): Readonly<{
       .handle(({ app, input: params, scope }, project) =>
         getSuite({
           app,
-          id: params.id,
+          id: params.suiteId,
           projectId: scope.id,
           projectSlug: project.projectSlug,
         }),
@@ -465,7 +465,7 @@ export function createSuitesAliasRest(): Readonly<{
 
       // ── Update Suite ─────────────────────────────────────────── `:update` for the same
       // reason as `:create` above.
-      .patch("/:id", "patchApiSuitesById")
+      .patch("/:suiteId", "patchApiSuitesById")
       .withParams(suiteAliasIdParamsSchema)
       .withInput(updateSuiteInputSchema)
       .withPermission("scenarios:update")
@@ -483,7 +483,7 @@ export function createSuitesAliasRest(): Readonly<{
 
       // ── Duplicate Suite ──────────────────────────────────────── A duplicate is a create:
       // it leaves the source suite untouched and produces a new one.
-      .post("/:id/duplicate", "postApiSuitesByIdDuplicate")
+      .post("/:suiteId/duplicate", "postApiSuitesByIdDuplicate")
       .withParams(suiteAliasIdParamsSchema)
       .withPermission("scenarios:create")
       .withOutput(suiteResponseWithPlatformUrlSchema)
@@ -493,7 +493,7 @@ export function createSuitesAliasRest(): Readonly<{
       .handle(({ app, input: params, scope }, project) =>
         duplicateSuite({
           app,
-          id: params.id,
+          id: params.suiteId,
           projectId: scope.id,
           projectSlug: project.projectSlug,
         }),
@@ -502,7 +502,7 @@ export function createSuitesAliasRest(): Readonly<{
       // ── Run Suite ────────────────────────────────────────────── RUNNING A SUITE IS NOT
       // ADMINISTERING IT. The run creates scenario runs; the suite definition, its scenarios
       // and its targets are left exactly as they were.
-      .post("/:id/run", "postApiSuitesByIdRun")
+      .post("/:suiteId/run", "postApiSuitesByIdRun")
       .withParams(suiteAliasIdParamsSchema)
       .withInput(runSuiteInputSchema)
       .withPermission("scenarios:create")
@@ -525,7 +525,7 @@ export function createSuitesAliasRest(): Readonly<{
 
       // ── Delete (Archive) Suite ───────────────────────────────── Archiving deliberately
       // stays at `:manage` — it is the only grain that carries destruction.
-      .delete("/:id", "deleteApiSuitesById")
+      .delete("/:suiteId", "deleteApiSuitesById")
       .withParams(suiteAliasIdParamsSchema)
       .withPermission("scenarios:manage")
       .withOutput(archivedSuiteSchema)
@@ -535,7 +535,7 @@ export function createSuitesAliasRest(): Readonly<{
         responses: notFound,
       })
       .handle(({ app, input: params, scope }) =>
-        archiveSuite({ app, id: params.id, projectId: scope.id }),
+        archiveSuite({ app, id: params.suiteId, projectId: scope.id }),
       )
       .build()
   );

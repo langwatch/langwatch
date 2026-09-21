@@ -3,7 +3,7 @@ import { jsxFromHookRule } from "../../src/rules/jsx-from-hook.rule.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
-  features: { agent: { layoutVersion: 0, roles: { web: {} } } },
+  features: { agent: { layoutVersion: 0, roles: { browser: {} } } },
 });
 
 afterAll(() => workspace.cleanup());

@@ -59,7 +59,7 @@ export type ApiResponseModelProviders = z.infer<typeof apiResponseModelProviders
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** The path parameter every item address of this family names. */
-export const modelDefaultsRestParamsSchema = z.object({ id: z.string().min(1) });
+export const modelDefaultsRestParamsSchema = z.object({ modelDefaultId: z.string().min(1) });
 
 const scopeAttachmentSchema = z.object({
   scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),

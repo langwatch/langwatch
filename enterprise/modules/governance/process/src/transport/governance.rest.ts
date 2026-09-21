@@ -148,7 +148,7 @@ export const governanceRest = defineRestRouter(GovernanceRestApi)
    * Carries the canonical `ottl_rules` — what the member list blanks — so one
    * row at a time is gated exactly as the admin list is.
    */
-  .get("/ingestion-templates/:id", "getIngestionTemplate")
+  .get("/ingestion-templates/:ingestionTemplateId", "getIngestionTemplate")
   .withParams(governanceRestTemplateParamsSchema)
   .withPermission("aiTools:manage")
   .withOutput(governanceRestTemplateDetailSchema)
@@ -165,7 +165,7 @@ export const governanceRest = defineRestRouter(GovernanceRestApi)
 
     return {
       ingestion_template: toTemplateDto(
-        await app.getIngestionTemplate({ projectId: scope.id, id: input.id }),
+        await app.getIngestionTemplate({ projectId: scope.id, id: input.ingestionTemplateId }),
       ),
     };
   })
@@ -206,7 +206,7 @@ export const governanceRest = defineRestRouter(GovernanceRestApi)
     return { ingestion_template: toTemplateDto(row) };
   })
 
-  .patch("/ingestion-templates/:id/ottl-rules", "updateIngestionTemplateOttlRules")
+  .patch("/ingestion-templates/:ingestionTemplateId/ottl-rules", "updateIngestionTemplateOttlRules")
   .withParams(governanceRestTemplateParamsSchema)
   .withInput(governanceRestUpdateOttlRulesSchema)
   .withPermission("aiTools:manage")
@@ -221,14 +221,14 @@ export const governanceRest = defineRestRouter(GovernanceRestApi)
   })
   .handle(async ({ app, input, scope }, facts, surface) => {
     const row = await app.updateIngestionTemplateOttlRules(
-      { id: input.id, ottlRules: input.ottl_rules },
+      { id: input.ingestionTemplateId, ottlRules: input.ottl_rules },
       callerOf({ projectId: scope.id, facts, surface }),
     );
 
     return { ingestion_template: toTemplateDto(row) };
   })
 
-  .delete("/ingestion-templates/:id", "archiveIngestionTemplate")
+  .delete("/ingestion-templates/:ingestionTemplateId", "archiveIngestionTemplate")
   .withParams(governanceRestTemplateParamsSchema)
   .withPermission("aiTools:manage")
   .withOutput(governanceRestTemplateArchivedSchema)
@@ -242,7 +242,7 @@ export const governanceRest = defineRestRouter(GovernanceRestApi)
   })
   .handle(async ({ app, input, scope }, facts, surface) => {
     await app.archiveIngestionTemplate(
-      { id: input.id },
+      { id: input.ingestionTemplateId },
       callerOf({ projectId: scope.id, facts, surface }),
     );
 
