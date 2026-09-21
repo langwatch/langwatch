@@ -101,12 +101,16 @@ describe("given tenants at every stage of a two-migration pass", () => {
   });
 
   afterAll(async () => {
-    // Scoped by tenant as well as migration: the multitenancy guard refuses a
-    // bulk write that names no tenant, because one would rewrite every
-    // tenant's migration state rather than the rows this file seeded.
-    await prisma.systemMigrationTenantState.deleteMany({
-      where: { migrationName: { in: BOTH }, tenantId: { in: EVERY_TENANT } },
-    });
+    // One call per tenant, because the multitenancy guard wants a bulk write
+    // to name ONE tenant: it tests `typeof where.tenantId === "string"`, so an
+    // `in` list over this file's tenants reads as migration-wide and is
+    // refused. A migration-wide delete would drop every tenant's `finalized`
+    // latch and return switched-over organizations to their legacy path.
+    for (const tenantId of EVERY_TENANT) {
+      await prisma.systemMigrationTenantState.deleteMany({
+        where: { migrationName: { in: BOTH }, tenantId },
+      });
+    }
     await prisma.organization.deleteMany({
       where: { id: { in: EVERY_TENANT } },
     });
