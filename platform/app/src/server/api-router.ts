@@ -63,6 +63,7 @@ import { app as apiDiscoveryApp } from "./routes/api-discovery";
 import { app as authApp } from "./routes/auth";
 import { app as authCliApp } from "./routes/auth-cli";
 import { app as bugReportsApp } from "./routes/bug-reports";
+import { app as checkupApp } from "./routes/checkup";
 import { app as collectorApp } from "./routes/collector";
 import { app as connectApp } from "./routes/connect";
 import { app as cronApp } from "./routes/cron";
@@ -122,6 +123,7 @@ export function createApiRouter() {
   api.route("/", datasetGenerateApp); // /api/dataset/generate (before datasetApp's /:slugOrId)
   api.route("/", workflowsApp); // /api/workflows/code-completion, /post_event
   api.route("/", healthChecksApp); // /api/health/collector, /evaluations, etc.
+  api.route("/", checkupApp); // /api/checkup, /api/checkup/run
 
   api.route("/", agentsApp); // /api/v1/agents, connect and call included
   api.route("/", agentsAliasApp); // deprecated alias: /api/agents

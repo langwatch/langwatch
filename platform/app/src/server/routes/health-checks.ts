@@ -60,7 +60,7 @@ const tokenResolver = TokenResolver.create(prisma);
  * Returns either a refusal carrying the `status` and JSON `body` to answer with,
  * or the resolved project plus that raw token.
  */
-async function authenticateProject(c: {
+export async function authenticateProject(c: {
   req: { header: (name: string) => string | undefined };
 }) {
   const xAuthToken = c.req.header("x-auth-token");

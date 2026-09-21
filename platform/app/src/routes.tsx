@@ -179,6 +179,10 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/settings/connect")),
       },
       {
+        path: "/settings/checkup",
+        ...page(() => import("./pages/settings/checkup")),
+      },
+      {
         path: "/settings/members",
         ...page(() => import("./pages/settings/members")),
       },

@@ -6416,6 +6416,10 @@ model InstanceIdentity {
   /// Hostname, which names the customer's own network and so has a switch of
   /// its own rather than travelling with its category.
   hostnameOptOut        Boolean @default(false)
+  /// The report schema version an administrator last dismissed the startup
+  /// notice for. Zero on a fresh install, so the notice shows once when the
+  /// install starts reporting and again whenever the dictionary changes shape.
+  startupNoticeAcknowledgedSchemaVersion Int @default(0)
 }
 
 /// One self-hosted install, as its daily usage report describes it (ADR-139,

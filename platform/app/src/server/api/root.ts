@@ -27,6 +27,7 @@ import { authzRouter } from "./routers/authz";
 import { automationRouter } from "./routers/automations";
 import { batchRecordRouter } from "./routers/batchRecord";
 import { bugReportsRouter } from "./routers/bugReports";
+import { checkupRouter } from "./routers/checkup";
 import { codingAgentsRouter } from "./routers/codingAgents";
 import { connectRouter } from "./routers/connect";
 import { connectedBillingRouter } from "./routers/connectedBilling";
@@ -180,6 +181,7 @@ const coreRouters = {
   licenseEnforcement: licenseEnforcementRouter,
   selfHostedInstances: selfHostedInstancesRouter,
   connect: connectRouter,
+  checkup: checkupRouter,
   connectedBilling: connectedBillingRouter,
   scimOversight: scimOversightRouter,
   scimReconciliation: scimReconciliationRouter,
