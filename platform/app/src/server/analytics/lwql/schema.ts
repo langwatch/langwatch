@@ -41,12 +41,21 @@
 
 import type { FieldProtection } from "../../traces/projection/catalog";
 import type { Protections } from "../../traces/protections";
+import {
+  type LangWatchQLAppFunctionDefinition,
+  type LangWatchQLAppFunctionEncoding,
+  type LangWatchQLAppFunctionKeyKind,
+  LWQL_APP_FUNCTION_CATALOG,
+  lwqlAppFunctionCap,
+  lwqlAppFunctionSignature,
+} from "./appFunctions/catalog";
 import { LWQL_VIEW_CATALOG } from "./catalog/lwqlViews";
 import {
   type LangWatchQLColumnUnit,
   type LangWatchQLViewDefinition,
   lwqlColumnGates,
   lwqlGatedColumns,
+  lwqlHeldPermissions,
   lwqlVisibleViews,
 } from "./catalog/types";
 import { LWQL_ALLOWED_FUNCTION_NAMES } from "./validation/functions";
@@ -108,6 +117,44 @@ export interface LangWatchQLSchemaView {
   readonly exampleSql: string;
 }
 
+/**
+ * One app function, as the schema endpoint publishes it.
+ *
+ * Published for the same reason the columns are, and with the same rule: a
+ * function this caller cannot use stays *listed*, carrying `available: false`
+ * and its gates, because the gate kind is what makes the refusal actionable to
+ * an agent with no UI to fall back on.
+ */
+export interface LangWatchQLSchemaAppFunction {
+  readonly name: string;
+  /** `conversation_bounded(thread_key, max_tokens, until_trace_id)`. */
+  readonly signature: string;
+  readonly description: string;
+  /** ClickHouse type of the hydrated column, which the result re-declares. */
+  readonly returns: string;
+  /**
+   * How to read the returned string: `json` for a payload a consumer should
+   * parse back, `text` for prose.
+   */
+  readonly encoding: LangWatchQLAppFunctionEncoding;
+  /** What the first argument names, which is what the cap counts. */
+  readonly keyKind: LangWatchQLAppFunctionKeyKind;
+  /**
+   * Whether the value is read from a trace or judged by a model.
+   *
+   * Published because the two cost different things: an extraction function is
+   * a read, and an eval function is a metered classification per row.
+   */
+  readonly kind: "extraction" | "eval";
+  /** How many distinct keys of that kind one run may read. */
+  readonly cap: number;
+  /** Permissions that must *all* be held to call it. Empty for an ungated one. */
+  readonly gates: readonly FieldProtection[];
+  readonly available: boolean;
+  /** A runnable query, naming only columns every caller can select. */
+  readonly exampleSql: string;
+}
+
 /** The LangWatchQL schema as one caller sees it. */
 export interface LangWatchQLSchema {
   /** Database every view name is qualified with. */
@@ -120,6 +167,17 @@ export interface LangWatchQLSchema {
    * validator enforces cannot drift.
    */
   readonly functions: readonly string[];
+  /**
+   * The app functions a projection may call.
+   *
+   * A section rather than columns on a view: a function is not a property of
+   * one view — `llm_readable_trace` reads a trace id from wherever the caller
+   * found one — and listing it under each would publish the same entry five
+   * times. Separate from `functions` because these are not ClickHouse
+   * functions: they are resolved by the app after the query runs, and each
+   * carries its own gates, cap and encoding.
+   */
+  readonly appFunctions: readonly LangWatchQLSchemaAppFunction[];
 }
 
 /**
@@ -178,10 +236,15 @@ export function describeLangWatchQLSchema({
   database,
   protections,
   views = LWQL_VIEW_CATALOG,
+  appFunctions = LWQL_APP_FUNCTION_CATALOG,
+  instantEvalsEnabled = false,
 }: {
   database: string;
   protections: Protections;
   views?: readonly LangWatchQLViewDefinition[];
+  appFunctions?: readonly LangWatchQLAppFunctionDefinition[];
+  /** Whether this project may call an eval function. Off unless it is asked. */
+  instantEvalsEnabled?: boolean;
 }): LangWatchQLSchema {
   const withheld = new Set(lwqlGatedColumns({ protections, views }));
   return {
@@ -204,5 +267,54 @@ export function describeLangWatchQLSchema({
       })),
       exampleSql: lwqlExampleSql({ database, view }),
     })),
+    // Last, so every field a consumer already read keeps the position it had.
+    appFunctions: describeLangWatchQLAppFunctions({
+      database,
+      protections,
+      appFunctions,
+      instantEvalsEnabled,
+    }),
   };
+}
+
+/**
+ * The app functions, scoped to what this caller's permissions unlock.
+ *
+ * `available` is derived from the same held-permission set the validator's
+ * policy is built from, so the endpoint cannot publish a function as available
+ * that the validator would then refuse — the one inconsistency this section
+ * must not have.
+ */
+export function describeLangWatchQLAppFunctions({
+  database,
+  protections,
+  appFunctions = LWQL_APP_FUNCTION_CATALOG,
+  instantEvalsEnabled = false,
+}: {
+  database: string;
+  protections: Protections;
+  appFunctions?: readonly LangWatchQLAppFunctionDefinition[];
+  /** Whether this project may call an eval function. Off unless it is asked. */
+  instantEvalsEnabled?: boolean;
+}): readonly LangWatchQLSchemaAppFunction[] {
+  const held = lwqlHeldPermissions(protections);
+  return appFunctions.map((definition) => ({
+    name: definition.name,
+    kind: definition.kind,
+    signature: lwqlAppFunctionSignature(definition),
+    description: definition.description,
+    returns: definition.returns,
+    encoding: definition.encoding,
+    keyKind: definition.keyKind,
+    cap: lwqlAppFunctionCap(definition),
+    gates: definition.gates,
+    // Two conditions for an eval function, and both are about whether the call
+    // would work: the caller's permissions, and whether this project may judge
+    // at all. Publishing one as available where nothing can answer it puts a
+    // caller in front of a query that always comes back null.
+    available:
+      definition.gates.every((gate) => held.has(gate)) &&
+      (definition.kind !== "eval" || instantEvalsEnabled),
+    exampleSql: definition.example(database),
+  }));
 }

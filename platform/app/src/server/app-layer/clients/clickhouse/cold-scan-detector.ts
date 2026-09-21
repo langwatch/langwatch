@@ -85,6 +85,12 @@ export const TIME_PARTITIONED_TABLES = {
   langy_analytics_events: ["OccurredAt"],
   langy_messages: ["CreatedAt"],
   stored_objects: ["created_at"],
+  // Instant Eval judgements: month-partitioned on `CreatedAt`, and kept
+  // indefinitely by default, so the cold end of this table grows without
+  // bound. A read by run id alone is not a sort-key range that prunes
+  // anything, since `RunId` sits behind `TenantId` and nothing bounds the
+  // partition, so every read ranges on `CreatedAt` as well.
+  instant_eval_judgments: ["CreatedAt"],
 } as const satisfies Record<string, readonly string[]>;
 
 /** Strip line and block comments so they can't hide or fake a predicate. */

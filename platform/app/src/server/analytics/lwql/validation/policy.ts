@@ -85,6 +85,38 @@ export interface LangWatchQLPolicy {
    */
   readonly gatedColumns: readonly string[];
   /**
+   * Content permissions the caller *holds*, which is the positive form of
+   * {@link LangWatchQLPolicy.gatedColumns}.
+   *
+   * Both are needed, and they are not redundant. A column is gated when its own
+   * declared gates are not all held, so the withheld *set* is all the walk
+   * needs to refuse a column reference. An app function has no column to look
+   * up: what the walk has to answer is "does this caller hold `input` and
+   * `output`", and a list of withheld column names cannot answer it — a
+   * deployment whose catalog happened to expose no output-gated column would
+   * produce an empty withheld set and admit every function.
+   *
+   * Fail-closed like the derivation it comes from: an unresolved `Protections`
+   * holds nothing, so every gated function is refused rather than admitted.
+   */
+  readonly heldPermissions?: readonly string[];
+  /**
+   * Whether this caller may call an eval function.
+   *
+   * Its own field rather than another entry in
+   * {@link LangWatchQLPolicy.heldPermissions}, because it is not a permission:
+   * it is a product flag on the project **and** the presence of a classifier on
+   * the deployment, resolved together by
+   * `~/server/app-layer/instant-evals/access.ts`. Folding it into the
+   * permission set would let a caller's redaction protections decide whether a
+   * feature exists.
+   *
+   * Absent means off, so a caller that never asks the question never gets the
+   * functions — which is the right default for the save path, where a statement
+   * is being stored rather than run.
+   */
+  readonly instantEvalsEnabled?: boolean;
+  /**
    * Database an unqualified table name resolves to — the same one the executor
    * connects with. Omit it and unqualified names are matched as written.
    */
@@ -108,6 +140,8 @@ export interface LangWatchQLPolicy {
 export interface ResolvedLangWatchQLPolicy {
   readonly allowedTables: ReadonlySet<string>;
   readonly gatedColumns: ReadonlySet<string>;
+  readonly heldPermissions: ReadonlySet<string>;
+  readonly instantEvalsEnabled: boolean;
   readonly reservedDatabases: ReadonlySet<string>;
   readonly defaultDatabase: string;
   readonly limits: LangWatchQLLimits;
@@ -155,6 +189,8 @@ export function resolveLangWatchQLPolicy(
     gatedColumns: new Set(
       policy.gatedColumns.map((column) => column.trim().toLowerCase()),
     ),
+    heldPermissions: new Set(policy.heldPermissions ?? []),
+    instantEvalsEnabled: policy.instantEvalsEnabled === true,
     reservedDatabases: new Set(RESERVED_DATABASES),
     defaultDatabase,
     limits: policy.limits ?? DEFAULT_LWQL_LIMITS,

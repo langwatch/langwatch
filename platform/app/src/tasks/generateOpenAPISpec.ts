@@ -21,6 +21,7 @@ import { app as gatewaySpendApp } from "../app/api/gateway-spend/[[...route]]/ap
 import { app as governanceApp } from "../app/api/governance/[[...route]]/app";
 import { app as graphsApp } from "../app/api/graphs/[[...route]]/app";
 import { app as groupsApp } from "../app/api/groups/[[...route]]/app";
+import { app as instantEvalsApp } from "../app/api/instant-evals/[[...route]]/app";
 import { app as langyControlApp } from "../app/api/langy-control/[[...route]]/app";
 import { app as meApp } from "../app/api/me/[[...route]]/app";
 import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/app";
@@ -133,6 +134,7 @@ const APP_DERIVED_PREFIXES = [
   "/api/secrets",
   "/api/simulation-runs",
   "/api/suites",
+  "/api/v1/instant-evals",
   "/api/v1/run-plans",
   "/api/v1/test-suites",
   "/api/teams",
@@ -281,6 +283,8 @@ export default async function execute() {
   const simulationRunsSpec = await generateSpecs(simulationRunsApp);
   console.log("Building suites spec...");
   const suitesSpec = await generateSpecs(suitesApp);
+  console.log("Building instant evals spec...");
+  const instantEvalsSpec = await generateSpecs(instantEvalsApp);
   console.log("Building run plans spec...");
   const runPlansSpec = await generateSpecs(runPlansApp);
   console.log("Building test suites spec...");
@@ -339,6 +343,7 @@ export default async function execute() {
       secretsSpec,
       simulationRunsSpec,
       suitesSpec,
+      instantEvalsSpec,
       runPlansSpec,
       testSuitesSpec,
       teamsSpec,

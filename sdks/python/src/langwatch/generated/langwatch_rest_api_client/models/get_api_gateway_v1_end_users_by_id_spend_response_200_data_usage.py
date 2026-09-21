@@ -18,9 +18,13 @@ class GetApiGatewayV1EndUsersByIdSpendResponse200DataUsage:
         cache_read_input_tokens (int):
         cache_creation_input_tokens (int):
         reasoning_tokens (int):
-        input_image_tokens (int): Image tokens billed on the input side, 0 when the request carried no image. Priced at its own rate and disjoint from input_tokens, which never includes it.
-        output_image_tokens (int): Image tokens the answer was billed for, 0 when the answer held no image. Priced at its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so a reconciler reading output_tokens alone sees none of the image traffic.
-        image_count (int): Images the request carried, 0 when it carried none. Display only: no rate prices it, so it never belongs in a cost sum.
+        input_image_tokens (int): Image tokens billed on the input side, 0 when the request carried no image. Priced at
+            its own rate and disjoint from input_tokens, which never includes it.
+        output_image_tokens (int): Image tokens the answer was billed for, 0 when the answer held no image. Priced at
+            its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render
+            here, so a reconciler reading output_tokens alone sees none of the image traffic.
+        image_count (int): Images the request carried, 0 when it carried none. Display only: no rate prices it, so it
+            never belongs in a cost sum.
     """
 
     input_tokens: int

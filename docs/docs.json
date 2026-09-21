@@ -168,6 +168,7 @@
                   "user-events/custom"
                 ]
               },
+              "features/querying-your-data",
               "features/automations",
               "features/embedded-analytics"
             ]
@@ -198,6 +199,17 @@
                 "pages": [
                   "evaluations/online-evaluation/overview",
                   "evaluations/online-evaluation/setup-monitors"
+                ]
+              },
+              {
+                "group": "Instant Evals",
+                "pages": [
+                  "features/instant-evals/overview",
+                  "features/instant-evals/questions",
+                  "features/instant-evals/targets",
+                  "features/instant-evals/results",
+                  "features/instant-evals/limits-and-cost",
+                  "features/instant-evals/cli"
                 ]
               },
               {
@@ -1046,6 +1058,7 @@
             "group": "Traces",
             "pages": [
               "api-reference/traces/overview",
+              "api-reference/traces/discover-what-the-trace-filter-fields-ho",
               "api-reference/traces/search",
               "api-reference/traces/get-trace",
               "api-reference/traces/get-transcript",
@@ -1260,6 +1273,20 @@
             ]
           },
           {
+            "group": "Instant Evals",
+            "pages": [
+              "api-reference/instant-evals/overview",
+              "api-reference/instant-evals/estimate-a-run",
+              "api-reference/instant-evals/create-instant-evals",
+              "api-reference/instant-evals/list-instant-evals",
+              "api-reference/instant-evals/get-instant-evals",
+              "api-reference/instant-evals/read-a-run-s-results",
+              "api-reference/instant-evals/sample-a-run",
+              "api-reference/instant-evals/cancel-a-run",
+              "api-reference/instant-evals/running-an-instant-eval"
+            ]
+          },
+          {
             "group": "Run Plans",
             "pages": [
               "api-reference/run-plans/overview",
@@ -1390,8 +1417,10 @@
             "group": "Query",
             "pages": [
               "api-reference/query/overview",
+              "api-reference/query/discover-both-query-languages",
               "api-reference/query/discover-the-queryable-langwatchql-schema",
-              "api-reference/query/run-a-langwatchql-query"
+              "api-reference/query/run-a-langwatchql-query",
+              "api-reference/query/extraction-functions"
             ]
           },
           {
@@ -1670,7 +1699,11 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1789733979",
+      "source": "/features/instant-evals/shorthand",
+      "destination": "/features/instant-evals/targets"
+    },
+    {
+      "source": "/ci/cache/busted/1789807595",
       "destination": "/introduction"
     },
     {

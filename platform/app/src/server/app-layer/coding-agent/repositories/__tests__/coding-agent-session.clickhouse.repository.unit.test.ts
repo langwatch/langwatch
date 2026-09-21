@@ -51,6 +51,7 @@ function rowWith(over: Partial<CodingAgentSessionRow>): CodingAgentSessionRow {
     updatedAt: 0,
     traceIds: [],
     metricSeries: [],
+    usageByContext: [],
     stepStartedAt: [],
     subAgentIds: [],
     steps: [],

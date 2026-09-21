@@ -58,6 +58,7 @@ export const LWQL_HAND_WRITTEN_SOURCE_TABLES = [
   "evaluation_analytics_rollup",
   "coding_agent_sessions",
   "coding_agent_session_events",
+  "instant_eval_judgments",
 ] as const;
 
 /** Every domain override, merged into the single map `deriveDefaultCatalog` reads. */

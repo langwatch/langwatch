@@ -278,6 +278,12 @@ import {
   ssoBreakGlass,
   ssoEngineProviderDerivation,
 } from "./identity/runtime";
+import { LoggingInstantEvalSpendRecorder } from "./instant-evals/instant-eval-spend.recorder";
+import { createInstantEvalRunPortFromEnv } from "./instant-evals/run";
+import { ClickHouseInstantEvalJudgmentsRepository } from "./instant-evals/run/instant-eval-judgments.repository";
+import { ClickHouseInstantEvalRunProjectionStore } from "./instant-evals/run/instant-eval-run.projection-store";
+import { ClickHouseInstantEvalRunRepository } from "./instant-evals/run/instant-eval-run.repository";
+import { createInstantEvalSpendRecorderFromEnv } from "./instant-evals/spend";
 import { LangyConversationService } from "./langy/langy-conversation.service";
 import {
   createLangyTrustedMessageReader,
@@ -469,6 +475,21 @@ export function initializeDefaultApp(options?: {
       throw new Error(`ClickHouse not available for tenant ${tenantId}`);
     return client;
   };
+
+  // ADR-137: one runs store and one judgements store, handed to the
+  // pipeline's run port and to the App, so the run surface never resolves a
+  // client of its own. The spend recorder is the logging default until the
+  // gateway spend pipeline binds its own.
+  const instantEvalRuns = new ClickHouseInstantEvalRunRepository({
+    resolveClient: resolveClickHouseClient,
+  });
+  const instantEvalJudgments = new ClickHouseInstantEvalJudgmentsRepository(
+    resolveClickHouseClient,
+  );
+  // The spend spine when it is registered, a log line when it is not: the
+  // pipelines register after this container is built, so the choice is made
+  // per record rather than here.
+  const instantEvalSpend = createInstantEvalSpendRecorderFromEnv();
 
   // Clustering reads ClickHouse directly (its query has no repository yet), so
   // it takes the resolver as a parameter. Bound once here, then handed to both
@@ -1025,6 +1046,9 @@ export function initializeDefaultApp(options?: {
       new EmailJoinRequestNotifier(prisma, processStore),
       joinMembership(),
     ),
+    instantEvalRun: new ClickHouseInstantEvalRunProjectionStore(
+      instantEvalRuns,
+    ),
     topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
       prisma,
     ),
@@ -1459,6 +1483,13 @@ export function initializeDefaultApp(options?: {
             runContext: { runId, page },
           }),
       },
+    },
+    instantEvals: {
+      runPort: createInstantEvalRunPortFromEnv({
+        runs: instantEvalRuns,
+        judgments: instantEvalJudgments,
+        spend: instantEvalSpend,
+      }),
     },
     enterprisePipelines: {
       prisma,
@@ -2009,6 +2040,11 @@ export function initializeDefaultApp(options?: {
       topics,
       runPage: runClusteringPage,
     },
+    instantEvals: {
+      runs: instantEvalRuns,
+      judgments: instantEvalJudgments,
+      spend: instantEvalSpend,
+    },
     gateway: {
       budgets: gatewayBudgetRepository,
       virtualKeySpend: gatewayVirtualKeySpendRepository,
@@ -2391,6 +2427,17 @@ export function createTestApp(overrides?: TestAppOverrides): App {
       webhookEvents: undefined,
     },
     filters: { options: new FilterService(null) },
+    instantEvals: {
+      runs: new ClickHouseInstantEvalRunRepository({
+        resolveClient: async () => {
+          throw new Error("ClickHouse is not available in the test app");
+        },
+      }),
+      judgments: new ClickHouseInstantEvalJudgmentsRepository(async () => {
+        throw new Error("ClickHouse is not available in the test app");
+      }),
+      spend: new LoggingInstantEvalSpendRecorder(),
+    },
     clickhouse: {
       enabled: false,
       resolveClient: async () => {
@@ -2638,6 +2685,13 @@ export function createTestApp(overrides?: TestAppOverrides): App {
         recordClusteringRunFailed: noop,
         recordTopics: noop,
       } as AppCommands["topicClustering"],
+      instantEvals: {
+        requestRun: noop,
+        recordPlanned: noop,
+        recordPageJudged: noop,
+        requestCancel: noop,
+        recordFinished: noop,
+      } as AppCommands["instantEvals"],
       ...createNoopEnterprisePipelineCommands(),
       billing: {
         reportUsageForMonth: noop,

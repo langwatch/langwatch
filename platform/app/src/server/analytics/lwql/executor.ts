@@ -37,6 +37,7 @@ import {
   isClickHouseObjectAccessDeniedError,
   isClickHouseObjectMissingError,
   isClickHouseResultTooLargeError,
+  isClickHouseUnknownFunctionError,
   isClickHouseUnknownIdentifierError,
   translateClickHouseQueryError,
   unknownIdentifierFromError,
@@ -47,6 +48,7 @@ import {
   lwqlDerivedConnectionFromEnv,
 } from "./connection";
 import {
+  LangWatchQLAppFunctionUnavailableError,
   LangWatchQLProvisioningIncompleteError,
   LangWatchQLResultTooLargeError,
   LangWatchQLUnavailableError,
@@ -90,6 +92,17 @@ export interface LangWatchQLExecutionRequest {
   readonly parameters?: Readonly<Record<string, unknown>>;
   /** The caller's tenant capability, sent as the one changeable setting. */
   readonly tenantCapability: string;
+  /**
+   * Whether this statement calls an app function.
+   *
+   * Only used to read `UNKNOWN_FUNCTION` correctly. The validator's allowlist
+   * also admits native ClickHouse functions, and the BYO contract pins no
+   * server version, so an older server can refuse a native-only query with the
+   * same error. Mapping that to "the extraction functions are not provisioned"
+   * would name the wrong cause and hand the caller an action that changes
+   * nothing.
+   */
+  readonly usesAppFunctions?: boolean;
 }
 
 /**
@@ -104,6 +117,27 @@ export interface LangWatchQLResultLimits {
   readonly maxRows: number;
   /** The hard JSON byte ceiling; a result past it is refused, never cut. */
   readonly maxResultBytes: number;
+  /**
+   * Byte budget for the result *after* the app-function hydration stage has
+   * replaced keys with values.
+   *
+   * A second, much larger ceiling rather than a raised `maxResultBytes`,
+   * because the two bound different things. The database returns a page of
+   * keys, which is small by construction; the application then puts a
+   * conversation or a whole trace in each of them, which is where a response
+   * reaches megabytes. Bounding only the first would let the second grow
+   * unbounded; bounding both with one number would refuse ordinary key-only
+   * queries to make room for hydrated ones.
+   */
+  readonly maxHydratedBytes: number;
+  /**
+   * Byte ceiling for a single hydrated value.
+   *
+   * One trace in a page of a hundred can be far larger than the rest. Cutting
+   * that cell and saying so costs the caller one value; letting it consume the
+   * whole result ceiling would cost them the ninety-nine rows after it.
+   */
+  readonly maxHydratedValueBytes: number;
 }
 
 /**
@@ -116,6 +150,8 @@ export interface LangWatchQLResultLimits {
 export const DEFAULT_LWQL_RESULT_LIMITS: LangWatchQLResultLimits = {
   maxRows: LWQL_MAX_RESULT_ROWS,
   maxResultBytes: LWQL_MAX_RESULT_BYTES,
+  maxHydratedBytes: 32_000_000,
+  maxHydratedValueBytes: 4_000_000,
 };
 
 /** A finished execution. Every row the database returned; the service bounds them. */
@@ -203,9 +239,11 @@ const LWQL_MAX_OPEN_CONNECTIONS = 10;
 function refusalFor({
   error,
   durationMs,
+  usesAppFunctions,
 }: {
   error: unknown;
   durationMs: number;
+  usesAppFunctions: boolean;
 }): unknown {
   // An unknown table/database or an access refusal cannot be the caller's SQL:
   // the validator only lets catalog-approved names reach this point. Both mean
@@ -239,6 +277,18 @@ function refusalFor({
       reasons: [toError(error)],
     });
   }
+  // An unknown function in a statement that calls one of ours cannot be the
+  // caller's either: the catalog is what the provisioning DDL is generated
+  // from, so the server is missing the projection UDFs this API declares,
+  // which is a deployment gap rather than anything a customer wrote. A
+  // statement that calls none falls through to the ordinary translation: there
+  // the unknown name is a native function this server is too old for, and
+  // saying "extraction functions unavailable" would misname it.
+  if (usesAppFunctions && isClickHouseUnknownFunctionError(error)) {
+    return new LangWatchQLAppFunctionUnavailableError({
+      reasons: [toError(error)],
+    });
+  }
   return translateClickHouseQueryError(error, durationMs);
 }
 
@@ -263,7 +313,7 @@ export function createLangWatchQLExecutor(
   });
 
   return {
-    async execute({ sql, parameters, tenantCapability }) {
+    async execute({ sql, parameters, tenantCapability, usesAppFunctions }) {
       const startedAt = Date.now();
       try {
         const resultSet = await client.query({
@@ -288,7 +338,11 @@ export function createLangWatchQLExecutor(
           },
         };
       } catch (error) {
-        throw refusalFor({ error, durationMs: Date.now() - startedAt });
+        throw refusalFor({
+          error,
+          durationMs: Date.now() - startedAt,
+          usesAppFunctions: usesAppFunctions === true,
+        });
       }
     },
 

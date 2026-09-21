@@ -185,8 +185,9 @@ export const CAPABILITY_CATALOG = {
     noun: { singular: "analytics query", plural: "analytics" },
   },
   // The LangWatchQL door (`langwatch query <sql>`): a headless coding agent
-  // runs analytics SQL. The result is an aggregate addressed by the statement,
-  // so it re-runs from the stored query, same as `analytics`.
+  // runs analytics SQL, and `langwatch query reference` describes both query
+  // languages. The result is an aggregate addressed by the statement, so it
+  // re-runs from the stored query, same as `analytics`.
   query: {
     surface: "analytics",
     digestStrategy: "query-ref",
@@ -239,6 +240,14 @@ export const CAPABILITY_CATALOG = {
     surface: "simulations",
     digestStrategy: "id-ref",
     noun: { singular: "run plan", plural: "run plans" },
+  },
+  // An Instant Eval run judges one LangWatchQL statement across the project's
+  // history. Its result is addressed by the run id, and it belongs to the
+  // evaluations surface: the question it asked of every row is an eval.
+  "instant-eval": {
+    surface: "evaluations",
+    digestStrategy: "id-ref",
+    noun: { singular: "instant eval run", plural: "instant eval runs" },
   },
   prompt: {
     surface: "prompts",

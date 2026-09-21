@@ -467,6 +467,137 @@ const presentations = {
     describe: () =>
       "We can't read what was stored for it. Rebuild the widget and save it again.",
   },
+  instant_eval_query_budget_exceeded: {
+    title: "That's too much text to judge in one query",
+    describe: () =>
+      "Ask for fewer rows, or extract less text from each one. To judge the whole selection, run it as a job instead.",
+  },
+  instant_eval_questions_too_long: {
+    title: "Those questions leave no room for the text",
+    describe: () =>
+      "The questions alone fill what the judge can read at once. Shorten them, or ask fewer of them in one query.",
+  },
+  instant_eval_classifier_unavailable: {
+    title: "The judgements couldn't be made right now",
+    describe: () =>
+      "The query ran, but nothing could be judged. Try again in a moment.",
+  },
+  instant_eval_not_enabled: {
+    title: "Instant Evals aren't available yet",
+    describe: () =>
+      "This project can't run Instant Evals. Ask us to turn them on for your workspace.",
+  },
+  instant_eval_not_found: {
+    title: "That run doesn't exist",
+    describe: () =>
+      "The run may have been deleted, or the id may belong to another project.",
+  },
+  instant_eval_query_invalid: {
+    title: "That query can't run as a job",
+    describe: (error) => {
+      const parameters = error.meta.parameters;
+      // The named parameters are the whole of the fix, so the copy repeats them
+      // rather than sending the reader back to the statement to guess which
+      // ones a job cannot fill.
+      return Array.isArray(parameters) && parameters.length > 0
+        ? `Remove ${parameters.join(", ")} from the query and run it again.`
+        : "Edit the query and run it again.";
+    },
+  },
+  instant_eval_query_missing_columns: {
+    title: "That query is missing what a run needs",
+    describe: (error) =>
+      error.meta.isEvalFunctionMissing === true
+        ? "Add an eval function to the query's SELECT list, such as eval(...) over the text you want judged."
+        : "Add TraceId to the query's SELECT list so each judgement can be tied back to its trace.",
+  },
+  instant_eval_row_cap_exceeded: {
+    title: "That's more rows than one run may judge",
+    describe: (error) => {
+      const cap = error.meta.cap;
+      const maxCap = error.meta.maxCap;
+      if (typeof cap !== "number") return "Ask for fewer rows.";
+      // Two different asks: below the ceiling an upgrade lifts it, at the
+      // ceiling nothing does, and saying "upgrade" there would sell something
+      // that changes nothing.
+      return typeof maxCap === "number" && cap < maxCap
+        ? `This plan judges up to ${cap.toLocaleString()} rows in one run. Lower the limit, or upgrade to judge up to ${maxCap.toLocaleString()}.`
+        : `A run judges up to ${cap.toLocaleString()} rows. Split the selection across more than one run.`;
+    },
+  },
+  instant_eval_free_budget_exhausted: {
+    title: "Your free Instant Evals budget is used up",
+    // Both numbers are on the error, and the reader is deciding whether to
+    // upgrade, so the sentence says what the free allowance was and where
+    // upgrading is done rather than leaving them to find the plan page.
+    describe: (error) => {
+      const budget = error.meta.budgetUsd;
+      const allowance =
+        typeof budget === "number" ? `$${budget.toFixed(2)}` : "the free";
+      return `Organizations without a paid plan can judge up to ${allowance} of text in total. Upgrade your plan under Settings, Subscription to keep running Instant Evals.`;
+    },
+  },
+  instant_eval_already_finished: {
+    title: "That run is already over",
+    describe: () => "There is nothing left to cancel.",
+  },
+  instant_eval_estimate_unavailable: {
+    title: "We couldn't work out the size of this run",
+    describe: () =>
+      "The estimate failed on our side. Try again, or start the run without one.",
+  },
+  instant_eval_stalled: {
+    title: "That run stopped making progress",
+    describe: () =>
+      "It was stopped after fifteen minutes without a judged page. Run it again, and narrow the query if it keeps happening.",
+  },
+  lwql_app_function_key_cap: {
+    title: "That's too many records to read at once",
+    describe: (error) => {
+      // The cap is per key kind, so the copy names the kind the run broke
+      // rather than always saying "conversations": a trace or span cap
+      // rejection that talks about conversations sends the reader looking in
+      // the wrong place.
+      const kind = error.meta.keyKind;
+      const noun =
+        kind === "thread"
+          ? "conversations"
+          : kind === "span"
+            ? "model calls"
+            : kind === "trace"
+              ? "traces"
+              : "records";
+      const cap = error.meta.cap;
+      const capped =
+        typeof cap === "number"
+          ? `A single run can read ${cap.toLocaleString()} ${noun}.`
+          : `A single run can only read so many ${noun}.`;
+      return `${capped} Lower the row limit, group the query more coarsely, or run it in pages.`;
+    },
+  },
+  lwql_app_function_read_budget: {
+    title: "That's too much trace content to read at once",
+    describe: (error) => {
+      const budget = error.meta.budgetBytes;
+      const sized =
+        typeof budget === "number"
+          ? `A single run can read ${Math.round(budget / 1_000_000).toLocaleString()} MB of trace content.`
+          : "A single run can only read so much trace content.";
+      return `${sized} Lower the row limit, or run the query in pages.`;
+    },
+  },
+  lwql_app_function_hydration_failed: {
+    // Deliberately says nothing about retrying a different way: the query
+    // itself was fine, so there is nothing for the reader to change.
+    title: "We couldn't read the trace content",
+    describe: () =>
+      "The query ran, but we couldn't load the conversations or traces it asked for. This is a temporary problem on our side. Try again shortly, or contact support if it persists.",
+  },
+  lwql_app_function_unavailable: {
+    title: "Extraction functions aren't available here yet",
+    describe: () =>
+      "This deployment hasn't finished setting up the functions this query uses. Ask your workspace administrator to redeploy, or contact support.",
+  },
   lwql_unavailable: {
     // Names the workspace administrator first: on a self-hosted deployment
     // the reader's own operator controls whether this is provisioned, and
@@ -2892,6 +3023,14 @@ const presentations = {
   },
   // The one sharer-facing code here: raised when someone tries to mint a trace
   // link while the project has sharing switched off.
+  trace_attribute_values_withheld: {
+    title: "You cannot read the values behind this attribute",
+    // Two rules land here and they have different remedies, so the copy names
+    // both rather than sending half the readers to the wrong setting.
+    describe: () =>
+      "Attribute values can carry prompts and completions, so they are listed only where you can read captured content and where no attribute policy restricts this key. Ask a project admin about captured input and output, or about the attribute access policy. Filtering on a named field such as model or status works either way.",
+  },
+
   trace_sharing_disabled: {
     title: "Sharing is turned off for this project",
     describe: () =>

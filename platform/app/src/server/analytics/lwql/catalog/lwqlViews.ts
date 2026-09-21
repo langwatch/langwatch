@@ -2733,6 +2733,165 @@ const CODING_AGENT_SESSION_EVENTS: LangWatchQLViewDefinition = {
  * and `traces` rather than resident anywhere of their own, so each needs a
  * derived view over tables already here, not a mapping.
  */
+/**
+ * Judgments: one row per Instant Eval run, trace and question.
+ *
+ * The only dataset in the catalog with no content gate at all, and that is a
+ * property of what it holds rather than an omission: a judgement is a
+ * probability, a score or a label, and the text it was formed from is never
+ * copied here. There is nothing for the input or output permission to withhold,
+ * so declaring one would gate a column that carries no content.
+ *
+ * It is also the only dataset the *caller* caused to exist. Every other one is
+ * a projection of traffic; this one holds the answers to a question the caller
+ * asked, which is why the follow-up is an ordinary join back to `traces` rather
+ * than a second product surface.
+ *
+ * The table's `Error` column is off-catalog, like every other free-text error
+ * carrier here. `Status` says whether a row was judged, and the run's own
+ * results endpoint is where the reason for a skip is read.
+ */
+const JUDGMENTS: LangWatchQLViewDefinition = {
+  name: "judgments",
+  sourceTable: "instant_eval_judgments",
+  description:
+    "One row per Instant Eval run, trace and question, with the verdict the judge gave.",
+  gates: [],
+  grain:
+    "one row per (TenantId, RunId, TraceId, SpanId, QuestionId), latest version only",
+  joinKeys: ["TenantId", "TraceId"],
+  timeColumn: "CreatedAt",
+  freshness: PROJECTION_FRESHNESS,
+  dedup: {
+    keyColumns: ["TenantId", "RunId", "TraceId", "SpanId", "QuestionId"],
+    versionColumn: "UpdatedAt",
+  },
+  columns: [
+    {
+      name: "TenantId",
+      type: "String",
+      description: "Project the judgement belongs to.",
+      gates: [],
+      sourceColumns: ["TenantId"],
+    },
+    {
+      name: "RunId",
+      type: "String",
+      description: "The Instant Eval run that asked the question.",
+      gates: [],
+      sourceColumns: ["RunId"],
+    },
+    {
+      name: "TraceId",
+      type: "String",
+      description: "Trace whose text was judged.",
+      gates: [],
+      sourceColumns: ["TraceId"],
+    },
+    {
+      name: "QuestionId",
+      type: "String",
+      description:
+        "The question, named by the output column the run's statement aliased it to.",
+      gates: [],
+      sourceColumns: ["QuestionId"],
+    },
+    {
+      name: "ThreadId",
+      type: "String",
+      description:
+        "Conversation the judged text came from, empty when the statement judged a trace rather than a thread.",
+      gates: [],
+      sourceColumns: ["ThreadId"],
+    },
+    {
+      name: "SpanId",
+      type: "String",
+      description:
+        "Span the judged text came from, empty unless the statement judged one span.",
+      gates: [],
+      sourceColumns: ["SpanId"],
+    },
+    {
+      name: "Kind",
+      type: "LowCardinality(String)",
+      description: "What was asked: boolean, score or category.",
+      gates: [],
+      sourceColumns: ["Kind"],
+    },
+    {
+      name: "Status",
+      type: "LowCardinality(String)",
+      description:
+        "Whether it was answered: judged, skipped or failed. A skip is an answer of `we did not judge this`.",
+      gates: [],
+      sourceColumns: ["Status"],
+    },
+    {
+      name: "Passed",
+      type: "Nullable(UInt8)",
+      description:
+        "Whether a boolean question's probability cleared its threshold. Null for the other kinds.",
+      gates: [],
+      sourceColumns: ["Passed"],
+    },
+    {
+      name: "Score",
+      type: "Nullable(Float64)",
+      description:
+        "The probability-weighted mean inside the declared range, for a score question.",
+      gates: [],
+      sourceColumns: ["Score"],
+    },
+    {
+      name: "Label",
+      type: "String",
+      description: "The most likely option, for a category question.",
+      gates: [],
+      sourceColumns: ["Label"],
+    },
+    {
+      name: "Probability",
+      type: "Nullable(Float64)",
+      description:
+        "Probability of yes for a boolean question, or of the chosen label for a category one. The judge is calibrated, so 0.9 means nine times in ten.",
+      gates: [],
+      sourceColumns: ["Probability"],
+    },
+    {
+      name: "Probabilities",
+      type: "String",
+      description:
+        "Every option's probability for a category question, as a JSON object of option name to probability. Empty for the other kinds.",
+      gates: [],
+      sourceColumns: ["Probabilities"],
+    },
+    {
+      name: "OccurredAt",
+      type: "DateTime64(3)",
+      description:
+        "When the judged row happened, carried from the statement so a judgement can be joined to a trace inside a bounded period.",
+      gates: [],
+      sourceColumns: ["OccurredAt"],
+    },
+    {
+      name: "CreatedAt",
+      type: "DateTime64(3)",
+      description:
+        "When the judgement was written. Filter on this to prune partitions.",
+      gates: [],
+      sourceColumns: ["CreatedAt"],
+    },
+    {
+      name: "UpdatedAt",
+      type: "DateTime64(3)",
+      description: "When this version of the judgement was written.",
+      gates: [],
+      sourceColumns: ["UpdatedAt"],
+    },
+  ],
+};
+
 export const LWQL_VIEW_CATALOG: readonly LangWatchQLViewDefinition[] = [
   TRACES,
   SPANS,
@@ -2746,6 +2905,7 @@ export const LWQL_VIEW_CATALOG: readonly LangWatchQLViewDefinition[] = [
   CODING_AGENT_SESSIONS,
   CODING_AGENT_SESSION_EVENTS,
   CODING_TOOL_RESULTS,
+  JUDGMENTS,
   ...LWQL_DERIVED_CATALOG,
   ...LWQL_POSTGRES_CATALOG,
 ];

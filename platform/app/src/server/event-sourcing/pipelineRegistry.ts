@@ -80,7 +80,9 @@ import {
 } from "~/server/onboarding/project-active-day";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
+import { queryInstantEvalSpendTotal } from "../../../ee/billing/services/instantEvalSpendQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
+import { meters } from "../../../ee/billing/stripe/stripePriceCatalog";
 import type { TriggerService } from "../app-layer/automations/trigger.service";
 import type { BillingCheckpointService } from "../app-layer/billing/billingCheckpoint.service";
 import type { BroadcastService } from "../app-layer/broadcast/broadcast.service";
@@ -130,6 +132,10 @@ import { runEvaluation } from "../evaluations/runEvaluation";
 import type { AutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
 import { createEvaluationAlertTriggerMatchHandler } from "../event-sourcing/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
 import { createGraphTriggerActivityHandler } from "../event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
+import type {
+  InstantEvalOutcomeCommands,
+  InstantEvalRunPort,
+} from "../event-sourcing/pipelines/instant-eval-processing/process-manager";
 import { createLangyEffectPorts } from "../event-sourcing/pipelines/langy-conversation-processing/process-manager/langyEffectPorts";
 import type {
   TopicClusteringOutcomeCommands,
@@ -216,6 +222,8 @@ import { createGovernanceEventsPipeline } from "./pipelines/governance-events/pi
 import { createIdentityPipeline } from "./pipelines/identity/pipeline";
 import type { IdentityFoldState } from "./pipelines/identity/projections/identityState.foldProjection";
 import type { MfaFoldState } from "./pipelines/identity/projections/mfaEnrollmentState.foldProjection";
+import { createInstantEvalProcessingPipeline } from "./pipelines/instant-eval-processing/pipeline";
+import type { InstantEvalRunProjectionState } from "./pipelines/instant-eval-processing/projections/instantEvalRun.stateProjection";
 import { createJoinRequestPipeline } from "./pipelines/join-requests/pipeline";
 import type { JoinRequestLifecyclePort } from "./pipelines/join-requests/process-manager/joinRequestLifecycle.process";
 import type { JoinRequestFoldState } from "./pipelines/join-requests/projections/joinRequestState.foldProjection";
@@ -415,6 +423,8 @@ export interface PipelineRepositories {
    * domain's dispatcher scopes its leases via `processNames`).
    */
   processStore: ProcessStore;
+  /** An Instant Eval run's counters, on its own ClickHouse row (ADR-137). */
+  instantEvalRun: StateProjectionStore<InstantEvalRunProjectionState>;
   /** Per-project topic clustering run status (ADR-051, Postgres). */
   topicClusteringRunStatus: StateProjectionStore<TopicClusteringRunStatusData>;
   /** Per-project topic clustering run history (audit; bounded). */
@@ -494,6 +504,10 @@ export interface PipelineRegistryDeps {
   topicClustering: {
     /** Runs one clustering page (the ADR-051 effect's domain function). */
     runPort: TopicClusteringRunPort;
+  };
+  instantEvals: {
+    /** Plans a run, judges one page, finishes it (ADR-137). */
+    runPort: InstantEvalRunPort;
   };
   enterprisePipelines: EnterprisePipelineSetConfig;
   projects: ProjectService;
@@ -823,6 +837,8 @@ export class PipelineRegistry {
       this.registerLangyConversationPipeline();
     const { pipeline: topicClusteringPipeline } =
       this.registerTopicClusteringPipeline();
+    const { pipeline: instantEvalPipeline } =
+      this.registerInstantEvalPipeline();
     const enterprisePipelines = registerEnterprisePipelineSet({
       ...this.deps.enterprisePipelines,
       eventSourcing: this.deps.eventSourcing,
@@ -956,12 +972,49 @@ export class PipelineRegistry {
       suiteRuns: mapCommands(suiteRunPipeline.commands),
       langy: mapCommands(langyConversationPipeline.commands),
       topicClustering: mapCommands(topicClusteringPipeline.commands),
+      instantEvals: mapCommands(instantEvalPipeline.commands),
       ...enterprisePipelines.commands,
       billing: mapCommands(billingPipeline.commands),
       automations: automationCommands,
       /** Late-bind the execution pool for the simulationRunExecution process manager. */
       scenarioExecutionPool,
     };
+  }
+
+  /**
+   * ADR-137: the Instant Eval run as a builder-mounted process manager. The
+   * pipeline declares the topology; the registry injects the domain port and
+   * late-binds the outcome commands, which are this same pipeline's own write
+   * surface and exist only after `.build()`.
+   */
+  private registerInstantEvalPipeline() {
+    let outcomeCommands: InstantEvalOutcomeCommands | null = null;
+
+    const pipeline = this.deps.eventSourcing.register(
+      createInstantEvalProcessingPipeline({
+        instantEvalRunStore: this.deps.repositories.instantEvalRun,
+        dispatch: {
+          runPort: this.deps.instantEvals.runPort,
+          commands: () => {
+            if (!outcomeCommands) {
+              throw new Error(
+                "Instant Eval outcome commands used before the pipeline finished registering",
+              );
+            }
+            return outcomeCommands;
+          },
+        },
+      }),
+    );
+
+    const commands = mapCommands(pipeline.commands);
+    outcomeCommands = {
+      recordPlanned: (args) => commands.recordPlanned(args),
+      recordPageJudged: (args) => commands.recordPageJudged(args),
+      recordFinished: (args) => commands.recordFinished(args),
+    };
+
+    return { pipeline };
   }
 
   /**
@@ -2033,6 +2086,9 @@ export class PipelineRegistry {
       billingCheckpoints: this.deps.billingCheckpoints,
       getUsageReportingService: () => this.deps.usageReportingService,
       queryBillableEventsTotal,
+      queryInstantEvalSpendTotal,
+      isInstantEvalMeterProvisioned: () =>
+        meters.INSTANT_EVAL_USD !== undefined,
       selfDispatch: (data) => {
         const pipeline = this.deps.eventSourcing.getPipeline(
           BILLING_REPORTING_PIPELINE_NAME,

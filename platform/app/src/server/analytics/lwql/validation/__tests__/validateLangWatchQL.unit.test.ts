@@ -856,6 +856,23 @@ describe("validateLangWatchQL", () => {
       ["LIMIT_TOO_HIGH", "SELECT TraceId FROM traces LIMIT 10001"],
       ["NESTING_TOO_DEEP", "SELECT ((((((TraceId)))))) FROM traces"],
       ["UNSUPPORTED_SYNTAX", "SELECT TraceId FROM traces PASTE JOIN spans"],
+      [
+        "APP_FUNCTION_POSITION",
+        "SELECT TraceId FROM traces WHERE thread_traces(ConversationId) = 'x'",
+      ],
+      [
+        "APP_FUNCTION_NAME_CASE",
+        "SELECT THREAD_TRACES(ConversationId) AS ids FROM traces",
+      ],
+      [
+        "APP_FUNCTION_ALIAS_REQUIRED",
+        "SELECT thread_traces(ConversationId) FROM traces",
+      ],
+      ["APP_FUNCTION_ARGUMENT", "SELECT thread_traces() AS ids FROM traces"],
+      [
+        "APP_FUNCTION_GATED",
+        "SELECT conversation(ConversationId) AS transcript FROM traces",
+      ],
     ] as [
       LangWatchQLViolationCode,
       string,
@@ -895,6 +912,11 @@ describe("validateLangWatchQL", () => {
         "LIMIT_REQUIRED_PER_BRANCH",
         "NESTING_TOO_DEEP",
         "UNSUPPORTED_SYNTAX",
+        "APP_FUNCTION_POSITION",
+        "APP_FUNCTION_NAME_CASE",
+        "APP_FUNCTION_ALIAS_REQUIRED",
+        "APP_FUNCTION_ARGUMENT",
+        "APP_FUNCTION_GATED",
       ]);
       expect([...covered].sort()).toEqual([...LWQL_VIOLATION_CODES].sort());
     });

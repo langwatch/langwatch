@@ -476,6 +476,31 @@ async function seedTenant({
     ),
   });
 
+  // One judgement per seeded trace: the judgments view reads this table, and
+  // an isolation read over a view whose table is empty proves nothing.
+  await admin.insert({
+    table: `${database}.instant_eval_judgments`,
+    format: "JSONEachRow",
+    values: traceIds.map((traceId, index) => ({
+      TenantId: tenantId,
+      RunId: `${tenantId}-instant-eval-run`,
+      TraceId: traceId,
+      QuestionId: "annoyed",
+      ThreadId: `${tenantId}-thread`,
+      SpanId: "",
+      Kind: "boolean",
+      Status: "judged",
+      Passed: index % 2,
+      Score: null,
+      Label: "",
+      Probability: 0.5 + index / 100,
+      Probabilities: "",
+      Error: "",
+      OccurredAt: SEED_AT,
+      CreatedAt: SEED_AT,
+    })),
+  });
+
   await admin.insert({
     table: `${database}.evaluation_analytics_rollup`,
     format: "JSONEachRow",
@@ -618,6 +643,7 @@ async function seedTenant({
     "experiment_run_items",
     "simulation_run_metrics_rollup",
     "gateway_budget_scope_totals",
+    "instant_eval_judgments",
   ]);
   const remainingSourceTables = new Set(
     LWQL_VIEW_CATALOG.filter((view) => !isPostgresResident(view))

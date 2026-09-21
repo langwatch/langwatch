@@ -234,6 +234,23 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Query simulation run results. List runs, get batch summaries, and retrieve individual run details.",
   },
   {
+    name: "Instant Evals",
+    dirName: "instant-evals",
+    pathPrefixes: ["/api/v1/instant-evals"],
+    overviewDescription:
+      "Judge a LangWatchQL statement across your whole production history as a job. Start a run, price one before you start it, poll its progress, read its judgements page by page, sample the text that was judged, and cancel a run that is still going.",
+    endpointOrder: [
+      "POST /api/v1/instant-evals/estimate",
+      "POST /api/v1/instant-evals",
+      "GET /api/v1/instant-evals",
+      "GET /api/v1/instant-evals/{id}",
+      "GET /api/v1/instant-evals/{id}/results",
+      "GET /api/v1/instant-evals/{id}/sample",
+      "POST /api/v1/instant-evals/{id}/cancel",
+    ],
+    extraPages: ["api-reference/instant-evals/running-an-instant-eval"],
+  },
+  {
     name: "Run Plans",
     dirName: "run-plans",
     pathPrefixes: ["/api/v1/run-plans"],
@@ -321,6 +338,9 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     pathPrefixes: ["/api/v1/query"],
     overviewDescription:
       "Run a read-only LangWatchQL SELECT over your project's analytics datasets, or discover which datasets and columns your key can query.",
+    // The extraction functions are a feature of the query language rather than
+    // an endpoint, so no OpenAPI operation describes them.
+    extraPages: ["api-reference/query/extraction-functions"],
   },
   {
     name: "Secrets",

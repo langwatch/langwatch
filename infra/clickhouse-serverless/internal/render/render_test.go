@@ -710,3 +710,52 @@ func TestRenderAll_LWQLNamedCollectionDefaultsPgUser(t *testing.T) {
 		t.Errorf("user must default to lwql_ro when unset\n--- actual ---\n%s", server)
 	}
 }
+
+// The LangWatchQL app functions are SQL user-defined functions created by DDL,
+// and a CREATE FUNCTION writes the local disk store of whichever replica ran it.
+// In replicated mode the store has to live in Keeper instead, or two of the
+// three replicas answer UNKNOWN_FUNCTION for a function the third has.
+// @scenario "A replicated chart-managed server stores the functions in Keeper"
+func TestRenderAll_LWQLUserDefinedStoreInKeeperForReplicated(t *testing.T) {
+	dir := t.TempDir()
+	input := replicatedInput()
+	input.LWQLPassword = "lwql-secret"
+	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+
+	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
+		t.Fatalf("RenderAll: %v", err)
+	}
+
+	serverData, err := os.ReadFile(filepath.Join(dir, "config.d/lwql-server.yaml"))
+	if err != nil {
+		t.Fatalf("read config.d/lwql-server.yaml: %v", err)
+	}
+	server := string(serverData)
+	if !strings.Contains(server, "user_defined_zookeeper_path: /clickhouse/user_defined") {
+		t.Errorf("replicated mode must move the SQL function store into Keeper\n--- actual ---\n%s", server)
+	}
+}
+
+// On a single node there is no Keeper to reach, so declaring the path would
+// point the function store at an ensemble that is not there. The control for
+// the test above: without it, a renderer that always wrote the path would pass
+// that one and be wrong here.
+// @scenario "A single-node server stores them on local disk"
+func TestRenderAll_LWQLUserDefinedStoreLocalForStandalone(t *testing.T) {
+	dir := t.TempDir()
+	input := testInput()
+	input.LWQLPassword = "lwql-secret"
+	computed := config.ComputeFromResources(input.CPU, input.RAMBytes, input)
+
+	if err := render.RenderAll(testLogger(), input, computed, dir); err != nil {
+		t.Fatalf("RenderAll: %v", err)
+	}
+
+	serverData, err := os.ReadFile(filepath.Join(dir, "config.d/lwql-server.yaml"))
+	if err != nil {
+		t.Fatalf("read config.d/lwql-server.yaml: %v", err)
+	}
+	if strings.Contains(string(serverData), "user_defined_zookeeper_path") {
+		t.Errorf("standalone mode must leave the SQL function store on local disk\n--- actual ---\n%s", string(serverData))
+	}
+}

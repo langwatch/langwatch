@@ -1,0 +1,176 @@
+---
+title: Instant Evals targets and statements
+sidebarTitle: Targets and statements
+keywords: langwatch, instant evals, target, threads, traces, llm spans, trace filter, langwatchql statement, eval functions, conversation, llm_readable_trace
+description: What one judged row is, how the time window and the trace filter narrow the rows, the LangWatchQL statement each target writes for you, and how to write your own.
+---
+
+## What is a target
+
+A target is one of `traces`, `threads` or `llm-spans`. It sets what one judged row is and which text the judge reads for it. Pass it as `--target` on the CLI or `target` on the API; the default is `traces`.
+
+| Target | One row is | What the judge reads | Pick it for |
+|---|---|---|---|
+| `traces` | One trace | A digest of the trace's spans, 8,000 tokens at most: the failed spans, the model calls, then the slowest | Questions about what the agent did on one turn: tools called, errors, tests run |
+| `threads` | One conversation | The whole transcript, the way the trace drawer renders it | Questions about how a conversation went: tone, resolution, what the customer asked for |
+| `llm-spans` | One LLM call | The input and output messages of that call | Questions about one prompt: whether the model was asked two things at once, whether it followed the system prompt |
+
+A conversation is one row when its traces share a `gen_ai.conversation.id`. A project that does not set one has no rows under `threads`, so ask for `traces` instead.
+
+## The time window
+
+```bash
+langwatch instant-eval run "the customer sounds annoyed" --target threads --last 30d
+langwatch instant-eval run "the customer sounds annoyed" --target threads \
+  --start 2026-09-01T00:00:00Z --end 2026-09-08T00:00:00Z
+```
+
+`--last` takes a number and a unit, `30m`, `24h`, `7d` or `2w`, and defaults to `7d`. `--start` and `--end` take an ISO 8601 timestamp or epoch milliseconds. The window is written into the statement as two bound instants, `start_at` and `end_at`, so a run that pages through its rows several times reads one fixed selection.
+
+## Narrowing the rows with a trace filter
+
+```bash
+langwatch instant-eval run "the agent called an external HTTP API" \
+  --filter 'service:checkout AND cost:>0.01' --last 7d
+```
+
+`--filter` takes the same syntax as the Trace Explorer's search bar, with `AND`, `OR`, `NOT`, parentheses, `*` wildcards on `model`, and ranges such as `cost:>0.01` and `duration:[100 TO 500]`. Under `threads` a conversation is judged when any of its traces matches; under `llm-spans` a call is judged when its trace matches.
+
+| Group | Fields you can filter on |
+|---|---|
+| Identity | `traceId`, `traceName`, `service`, `origin`, `user`, `customer`, `conversation`, `scenarioRun` |
+| Classification | `topic`, `subtopic`, `label`, `model`, `status:error` |
+| Cost and size | `cost`, `duration`, `tokens`, `promptTokens`, `completionTokens`, `tokensPerSecond`, `ttft`, `ttlt`, `spans`, `tokensEstimated` |
+| Prompts | `selectedPrompt`, `lastUsedPrompt`, `promptVersion` |
+| Attributes | `trace.attribute.<key>` |
+| Free text | A bare word, matched against the captured input, the captured output and the trace name |
+
+Fields that read spans, evaluations, events, annotations or scenario runs are refused by name, with the list above in the refusal, because dropping the condition would charge you for rows you meant to leave out. Ask for those with a statement of your own instead.
+
+| Group | Refused fields |
+|---|---|
+| Spans | `spanId`, `spanName`, `spanType`, `spanStatus`, `rootSpanType`, `span.attribute.<key>`, `containsAi` |
+| Evaluations | `eval`, `evaluator`, `evaluatorLabel`, `evaluatorPassed`, `evaluatorScore`, `evaluatorStatus`, `evaluatorVerdict`, `guardrail` |
+| Events and annotations | `event`, `event.attribute.<key>`, `annotation`, `feedback` |
+| Scenario runs | `scenario`, `scenarioSet`, `scenarioBatch`, `scenarioStatus`, `scenarioVerdict` |
+| Errors | `error`, `errorMessage`, `status:ok`, `status:warning` |
+
+## The statement a target writes
+
+Every run is one [LangWatchQL](/api-reference/query/overview) statement. A target plus your questions expands into one, the run stores it, and `run` prints it under `Statement:` with the two window values under `Parameters:`. Each question becomes one column, named after the question.
+
+`traces`, with one yes or no question:
+
+```sql
+SELECT
+  TraceId,
+  Attributes['gen_ai.conversation.id'] AS ThreadId,
+  OccurredAt,
+  eval(llm_readable_trace(TraceId, 8000), 'the customer sounds annoyed') AS q1
+FROM analytics.traces
+WHERE OccurredAt >= {start_at:DateTime}
+  AND OccurredAt < {end_at:DateTime}
+ORDER BY TraceId
+```
+
+`threads`, one row per conversation, addressed by the conversation's last trace:
+
+```sql
+SELECT
+  argMax(m.TraceId, m.OccurredAt) AS TraceId,
+  m.ConversationId AS ThreadId,
+  max(m.OccurredAt) AS OccurredAt,
+  eval(conversation(m.ConversationId), 'the customer sounds annoyed') AS q1
+FROM analytics.trace_metrics AS m
+WHERE m.OccurredAt >= {start_at:DateTime}
+  AND m.OccurredAt < {end_at:DateTime}
+  AND m.ConversationId != ''
+GROUP BY m.ConversationId
+ORDER BY ThreadId
+```
+
+`llm-spans`, one row per model call:
+
+```sql
+SELECT
+  TraceId,
+  SpanId,
+  StartTime AS OccurredAt,
+  eval(llm_messages_span(TraceId, SpanId), 'the model was asked to do two things at once') AS q1
+FROM analytics.spans
+WHERE StartTime >= {start_at:DateTime}
+  AND StartTime < {end_at:DateTime}
+  AND SpanAttributes['langwatch.span.type'] = 'llm'
+ORDER BY TraceId, SpanId
+```
+
+A `--filter` on `traces` goes into that `WHERE`. On `threads` and `llm-spans` it goes into a subquery over `analytics.traces` with the same window, because the trace's attributes are not columns of the conversation or span views.
+
+## What is the token budget per row
+
+Under `traces` the digest is cut to 8,000 tokens. Under `threads` and `llm-spans` the text goes to the judge whole, up to the judge's own ceiling of about 31,000 tokens once your questions are counted in. A long conversation therefore costs more than a short one, and the estimate measures your rows as they are.
+
+When a conversation is over the ceiling, you still get a verdict: LangWatch keeps the opening and closing turns and puts a marker in the middle with the number of turns left out, so a question about how the conversation ended still reads the ending. To choose the budget yourself, write the statement with `conversation_bounded`, which cuts the same way at the size you name:
+
+```sql
+eval(conversation_bounded(m.ConversationId, 8000, ''), 'the customer left angry') AS q1
+```
+
+## Writing your own statement
+
+Take the statement a run printed, edit it, and send it back with `--sql`.
+
+### Run it before you judge it
+
+Run the statement through `langwatch query` first to see the rows before you pay to judge them. It needs the two window values the run printed:
+
+```bash
+langwatch query "$(cat annoyed.sql)" \
+  --param start_at="2026-09-11 00:00:00" \
+  --param end_at="2026-09-18 00:00:00"
+
+langwatch instant-eval run --sql-file annoyed.sql \
+  --param start_at="2026-09-11 00:00:00" \
+  --param end_at="2026-09-18 00:00:00" \
+  --limit 10000
+```
+
+### What a statement needs
+
+A statement is a run when:
+
+- it projects `TraceId` and at least one eval function column
+- it projects `SpanId` too when it has one row per span, so you get one verdict per span
+- it has an `ORDER BY` when you use a `LIMIT`, so every pass over the rows reads the same set
+
+Send either `--sql` or `--target`, not both. Use `--param` only with your own statement.
+
+### Text functions
+
+The text to judge is one of these functions over the row's key:
+
+| Function | Text |
+|---|---|
+| `conversation(ConversationId)` | The whole thread as one transcript: the system prompt once, then one section per turn |
+| `conversation_bounded(ConversationId, max_tokens, until_trace_id)` | The same transcript under a token budget, opening and closing turns kept. Pass `''` as `until_trace_id` to read the whole thread, or a trace id to stop there, so a judgement reads only what the agent had seen |
+| `llm_readable_trace(TraceId, max_tokens)` | The trace as a span digest, cut to the budget by keeping the structure and expanding the failed spans, then the model calls, then the slowest |
+| `llm_messages(TraceId)` | The chat messages of the trace's main LLM call, as JSON `{input, output}` |
+| `llm_input_messages(TraceId)` | The request side only: the history the model was given on this turn |
+| `llm_output_messages(TraceId)` | The response side only: everything the agent did from the last request on, tool calls included |
+| `llm_messages_span(TraceId, SpanId)` | The chat messages of one named span |
+| `trace_json(TraceId)` | The whole trace as one JSON object, spans included |
+
+### Eval functions
+
+The question is one of these functions over that text:
+
+| Function | Answer |
+|---|---|
+| `eval(text, 'question')` | The probability the statement is true of the text, 0 to 1 |
+| `eval_criteria(text, 'question', ['what counts as yes', 'what does not'])` | The same, with the boundary spelled out |
+| `eval_passed(text, 'question', 0.7)` | 1 or 0 against the threshold you give |
+| `eval_score(text, 'question', 1, 5)` | The probability-weighted mean on a whole-numbered scale of at most ten levels |
+| `eval_category(text, 'question', ['refund: wants money back', 'bug: reports something broken'])` | The name of the most likely option |
+| `eval_category_probs(text, 'question', [...])` | Every option's probability, as a JSON object |
+
+The same functions work in a plain `langwatch query`, which judges the rows the query returns and charges for them the same way. A run is how you take one past the query's page size, up to the row cap.

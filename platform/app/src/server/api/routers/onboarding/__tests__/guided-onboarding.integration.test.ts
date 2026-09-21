@@ -162,7 +162,7 @@ describe("onboarding guided state", () => {
     /** @scenario "an organization without guided state returns the empty default" */
     it("reads the empty default before anything was recorded", async () => {
       const state = await callerFor(owner).getGuidedState({ organizationId });
-      expect(state).toEqual({ paths: [], donePaths: [] });
+      expect(state).toEqual({ variant: "guided", paths: [], donePaths: [] });
     });
   });
 
@@ -180,6 +180,11 @@ describe("onboarding guided state", () => {
 
       const signupData = await storedSignupData(result.organizationId);
       expect(signupData).toEqual({ companyType: "company" });
+
+      const state = await callerFor(classic).getGuidedState({
+        organizationId: result.organizationId,
+      });
+      expect(state.variant).toBeNull();
     });
   });
 

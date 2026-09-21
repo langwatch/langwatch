@@ -20,6 +20,13 @@
 
 export { KEY_MAP_COLUMNS, type LangWatchQLNames } from "./accessModel";
 export {
+  type LangWatchQLAppFunctionConflict,
+  type LangWatchQLServerFunctionRow,
+  lwqlAppFunctionConflicts,
+  lwqlAppFunctionCreateQuery,
+  lwqlAppFunctionReconciliationQuery,
+} from "./appFunctionStatements";
+export {
   lwqlViewSetupStatements,
   SHIPPED_LWQL_DEDUP,
 } from "./catalogStatements";
@@ -37,11 +44,13 @@ export {
   withTenancyOptOut,
 } from "./productionProvisioning";
 export {
+  canProvisionAppFunctions,
   type LwqlPostgresReaderMode,
   type LwqlSelfProvisionEnv,
   lwqlPostgresEndpointFromDatabaseUrl,
   lwqlPostgresReaderModeFromEnv,
   lwqlSelfProvisionFromEnv,
+  probeAppFunctionStore,
   selfHostedClickHouseProvisioningStatements,
   selfHostedPostgresReaderStatements,
 } from "./selfProvisioning";

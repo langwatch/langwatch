@@ -66,6 +66,7 @@ function staticBranchSessions(
             userId: "agent-reported-user",
             gitBranch: "feat/linkage",
             gitBranches: ["feat/linkage"],
+            usageByContext: [],
             title: "",
           }),
         ),

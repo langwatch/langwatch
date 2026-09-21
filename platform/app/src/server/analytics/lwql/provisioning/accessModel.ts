@@ -50,6 +50,7 @@ import {
   type LangWatchQLResourceLimits,
 } from "../limits";
 import { assertIdentifier, clickHouseLiteral } from "../sqlText";
+import { lwqlAppFunctionStatements } from "./appFunctionStatements";
 
 /**
  * Server-level ClickHouse config declaring the `custom_` settings prefix.
@@ -527,11 +528,18 @@ export function lwqlClickHouseSetupStatements({
   lwqlTables,
   limits = DEFAULT_LWQL_RESOURCE_LIMITS,
   sourceDatabase,
+  includeAppFunctions = true,
 }: {
   names: LangWatchQLNames;
   password: string;
   lwqlTables: LangWatchQLTable[];
   limits?: LangWatchQLResourceLimits;
+  /**
+   * Whether the app functions' UDFs are created. Off only where a create
+   * would land on one replica of several; see `canProvisionAppFunctions` in
+   * `./selfProvisioning.ts`.
+   */
+  includeAppFunctions?: boolean;
   /**
    * Database the key-map table actually lives in. Defaults to
    * {@link LangWatchQLNames.database}, matching the test harness's convention
@@ -548,6 +556,11 @@ export function lwqlClickHouseSetupStatements({
   assertNames(names);
   return [
     `CREATE DATABASE IF NOT EXISTS ${names.database}`,
+    // The app functions' projection UDFs. Alongside the other object creation
+    // and before the grants: they depend on nothing, and calling a SQL UDF
+    // needs no grant, so nothing below refers back to them. See
+    // `./appFunctionStatements.ts` for why they are SQL rather than config.
+    ...(includeAppFunctions ? lwqlAppFunctionStatements() : []),
     lwqlKeyMapTableStatement({ names, sourceDatabase }),
     lwqlSettingsProfileStatement({ names, limits }),
     lwqlRestrictedUserStatement({ names, password }),
@@ -684,6 +697,34 @@ export function lwqlPolicyCoverageQuery({
  */
 export function auditedSettingValue(value: string): string {
   return `'${value}'`;
+}
+
+/**
+ * Audits that the restricted identity holds no function-management grant.
+ *
+ * The third audit beside {@link lwqlPolicyCoverageQuery} and
+ * {@link definerViewAuditQuery}, neither of which looks at functions at all.
+ * Calling a SQL UDF needs no grant — measured: the restricted identity's 30
+ * grant rows hold nothing matching `%FUNCTION%` and the call still works under
+ * `readonly = 1` — so there is never a reason for this identity to hold one,
+ * and a grant that appeared here would let customer-written SQL replace the
+ * very projection UDFs the hydration stage trusts. Returns rows of
+ * `{ access_type }`; empty is the healthy state. Run as an administrative user.
+ *
+ * @see ./appFunctionStatements.ts — the functions this audit is about
+ */
+export function lwqlAppFunctionGrantAuditQuery({
+  names,
+}: {
+  names: LangWatchQLNames;
+}): string {
+  assertNames(names);
+  return (
+    `SELECT access_type FROM system.grants\n` +
+    `WHERE user_name = ${clickHouseLiteral(names.restrictedUser)}\n` +
+    `  AND access_type ILIKE '%FUNCTION%'\n` +
+    `ORDER BY access_type`
+  );
 }
 
 /**

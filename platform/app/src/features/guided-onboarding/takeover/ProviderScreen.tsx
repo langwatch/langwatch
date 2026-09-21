@@ -520,9 +520,7 @@ function ConnectedCredentialsPanel({
                     py={1}
                     cursor="pointer"
                     _hover={{
-                      borderColor: picked
-                        ? "frontDoor.action"
-                        : "border.emphasized",
+                      borderColor: picked ? "auth.detail" : "border.emphasized",
                     }}
                   >
                     {picked && <Sparkles size={11} />}

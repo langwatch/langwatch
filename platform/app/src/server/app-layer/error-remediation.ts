@@ -217,6 +217,105 @@ const registry = {
       "Contact support to have it enabled for this workspace",
     ],
   },
+  instant_eval_questions_too_long: {
+    tips: [
+      "Read `meta.questionTokens` against `meta.stateTokens`; the questions alone fill the judge's state, so no text could be sent beside them",
+      "Shorten the question texts, or split them across several eval calls run as separate queries",
+    ],
+  },
+  instant_eval_query_budget_exceeded: {
+    tips: [
+      "Read `meta.estimatedTokens` against `meta.budget`; that is the text the whole query would send to be judged, summed across its rows",
+      "Lower the query's LIMIT, or extract less text per row by passing a smaller token budget to the extraction function inside the eval call",
+      "To judge the whole selection rather than a sample, run the same statement as a job instead of on this endpoint",
+    ],
+  },
+  instant_eval_classifier_unavailable: {
+    tips: [
+      "The query itself was accepted and ran; judging the text it projected is what failed",
+      "Retry shortly; if it persists, the judgements can be made later by running the same statement as a job",
+    ],
+  },
+  instant_eval_not_enabled: {
+    tips: [
+      "Instant Evals are behind a release flag; ask LangWatch to enable them for this project",
+    ],
+  },
+  instant_eval_not_found: {
+    tips: [
+      "Read `meta.runId`; no run of the authenticated project carries that id",
+      "List the project's runs to find the id you meant",
+    ],
+  },
+  instant_eval_query_invalid: {
+    tips: [
+      "Read `meta.parameters`; those names are set by whichever surface shows a chart, and a job has no surface to fill them",
+      "Write the period into the statement's own WHERE clause instead of declaring the dashboard parameters",
+    ],
+  },
+  instant_eval_query_missing_columns: {
+    tips: [
+      "Read `meta.missing`; a run needs TraceId so every judgement can be tied back to its trace",
+      "Project at least one eval function, such as `eval(conversation_bounded(ConversationId, 8000, ''), '…') AS annoyed`",
+      "ThreadId, SpanId and OccurredAt are optional and are carried onto the judgements when the statement projects them",
+    ],
+  },
+  instant_eval_row_cap_exceeded: {
+    tips: [
+      "Read `meta.cap` against `meta.maxCap`; the first is what this plan judges in one run and the second is the ceiling any plan offers",
+      "Lower the requested limit, or split the selection across more than one run with a keyset predicate on (TraceId, SpanId) where the statement projects SpanId, and on TraceId alone where it does not",
+    ],
+  },
+  instant_eval_free_budget_exhausted: {
+    tips: [
+      "Read `meta.spentUsd` against `meta.budgetUsd`; the organization has spent its free Instant Evals allowance across every project",
+      "Upgrade the organization to a paid plan under Settings, Subscription; judged queries and runs are then billed per input token",
+    ],
+  },
+  instant_eval_already_finished: {
+    tips: [
+      "Read `meta.status`; the run reached that state before the cancel arrived",
+    ],
+  },
+  instant_eval_estimate_unavailable: {
+    tips: [
+      "The statement was accepted; working out how many rows it matches is what failed",
+      "Retry shortly, or start the run without an estimate and read its total once it is planned",
+    ],
+  },
+  instant_eval_stalled: {
+    tips: [
+      "The run went fifteen minutes without a judged page and was stopped",
+      "Run it again; if it stalls repeatedly, narrow the statement so each page reads less",
+    ],
+  },
+  lwql_app_function_key_cap: {
+    tips: [
+      "Read `meta.cap` and `meta.distinct`; the query needs more distinct keys than one run may read",
+      "Lower the query's LIMIT, or group more coarsely so fewer conversations, traces or spans are projected",
+      "To read them all, page with a keyset predicate on the dataset's time column and trace id and run the query once per page",
+      "`meta.keyKind` says which cap it was, and `meta.functions` which calls count against it; the schema endpoint publishes every cap",
+    ],
+  },
+  lwql_app_function_read_budget: {
+    tips: [
+      "Read `meta.budgetBytes` and `meta.readBytes`; the traces the query names weigh more than one run may read",
+      "Lower the query's LIMIT so each run names fewer traces, and page with a keyset predicate on the dataset's time column and trace id",
+      "The budget counts the traces' stored content, so a query over long conversations needs smaller pages than one over short ones",
+    ],
+  },
+  lwql_app_function_hydration_failed: {
+    tips: [
+      "The query itself was accepted and ran; loading the conversation or trace content it projected is what failed",
+      "This is a platform-side failure, not a query to rewrite; retry shortly, and contact support if it persists",
+    ],
+  },
+  lwql_app_function_unavailable: {
+    tips: [
+      "The app functions are not provisioned on this deployment, so retrying the same query will not help",
+      "They are created at deploy time; a redeploy converges them, and the query works unchanged afterwards",
+    ],
+  },
   lwql_provisioning_incomplete: {
     tips: [
       "The deployment's LangWatchQL access is provisioned, but the identity's grants on one dataset this query needs are incomplete",

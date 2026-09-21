@@ -138,6 +138,24 @@ const PARAMETERIZED_CODES = new Set([
 ]);
 
 /**
+ * Codes RECORDED ON A ROW rather than thrown, and read back later.
+ *
+ * `instant_eval_stalled` is the reason an Instant Eval run ended without
+ * finishing: the process manager's wake handler discovers a run that went
+ * fifteen minutes without a judged page, and the run's own `error` column
+ * carries the code from then on. Nothing throws it, because by the time it is
+ * known there is no request to refuse: the caller left when the job was
+ * accepted, and they read the code off the run.
+ *
+ * It still reaches a customer and still needs copy, keyed by the same code the
+ * column holds, so the orphan check must not call that copy dead. The bar for
+ * adding one: a durable column holds the code, and a surface renders the
+ * registry entry from it. A code that only ever appears in a log line is not
+ * one of these and should not be in `APP_ERROR_CODES` at all.
+ */
+const RUN_STATUS_CODES = new Set(["instant_eval_stalled"]);
+
+/**
  * Codes MINTED BY BETTER-AUTH ITSELF, not by a `HandledError` subclass.
  *
  * `LastWayInGuard` (`src/server/better-auth/last-way-in.ts`) throws
@@ -309,6 +327,7 @@ describe("APP_ERROR_CODES", () => {
           !RELAYED_META_CODES.has(code) &&
           !CLIENT_MINTED_CODES.has(code) &&
           !PARAMETERIZED_CODES.has(code) &&
+          !RUN_STATUS_CODES.has(code) &&
           !BETTER_AUTH_PASSTHROUGH_CODES.has(code),
       );
 

@@ -678,7 +678,7 @@ export function lwqlGatedColumns({
   protections: Protections;
   views: readonly LangWatchQLViewDefinition[];
 }): readonly string[] {
-  const held = heldPermissions(protections);
+  const held = lwqlHeldPermissions(protections);
   const withheld = views.flatMap((view) =>
     view.columns
       .filter((column) =>
@@ -695,8 +695,17 @@ export function lwqlGatedColumns({
  * Fail-closed: only an explicit `true` counts, so the shape
  * `getUserProtectionsForProject` returns when the policy resolver is down
  * grants nothing.
+ *
+ * The positive twin of {@link lwqlGatedColumns}, and three callers need it. A
+ * gated *column* can be decided from the withheld set alone, because a column
+ * is in it or it is not; an app function has no column to look up, so the only
+ * question there is which permissions the caller holds. The query reference
+ * answers the same question one level up: whether a published EXAMPLE is
+ * runnable by this caller. Deriving either from the protections a second time
+ * is how they would come to disagree with the schema about who may read a cost
+ * column.
  */
-function heldPermissions(
+export function lwqlHeldPermissions(
   protections: Protections,
 ): ReadonlySet<FieldProtection> {
   const held = new Set<FieldProtection>();
@@ -726,7 +735,7 @@ export function lwqlVisibleViews({
   protections: Protections;
   views: readonly LangWatchQLViewDefinition[];
 }): readonly LangWatchQLViewDefinition[] {
-  const held = heldPermissions(protections);
+  const held = lwqlHeldPermissions(protections);
   return views.filter((view) =>
     view.columns.some((column) =>
       lwqlColumnGates({ view, column }).every((gate) => held.has(gate)),

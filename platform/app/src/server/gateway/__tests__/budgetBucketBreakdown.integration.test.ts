@@ -34,6 +34,7 @@ import {
   type BucketSpend,
   GatewayBudgetClickHouseRepository,
 } from "../budget.clickhouse.repository";
+import { currentPeriodStart } from "../budgetPeriod";
 import { PROVIDER_BUCKET_SEPARATOR } from "../budgetResolution.service";
 
 const suffix = nanoid(8);
@@ -44,8 +45,26 @@ const PROVIDER_KEY = `prov-openai-${suffix}`;
 
 const LIMIT_USD = "1.00";
 
-/** The instant every debit is written at and every read is anchored to. */
-const NOW = new Date();
+/**
+ * The instant every debit is written at and every read is anchored to, held
+ * clear of the calendar-day boundary.
+ *
+ * The DAY rollup files a debit under the period its own timestamp falls in,
+ * and one fixture below writes a minute before this anchor. With the anchor
+ * a few seconds past midnight that minute lands in yesterday while the read
+ * asks about today, and the bucket vanishes from an assertion that has
+ * nothing to do with period boundaries. Anchoring late in the previous day
+ * instead keeps every fixture timestamp in one period and in the past.
+ */
+const NOW = awayFromDayBoundary(new Date());
+
+function awayFromDayBoundary(now: Date): Date {
+  const marginMs = 5 * 60_000;
+  const dayStartMs = currentPeriodStart("DAY", now).getTime();
+  return now.getTime() - dayStartMs >= marginMs
+    ? now
+    : new Date(dayStartMs - marginMs);
+}
 
 function templateFor(args: {
   id: string;

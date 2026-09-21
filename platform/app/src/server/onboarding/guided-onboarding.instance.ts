@@ -16,9 +16,9 @@ export type GuidedOnboardingStateView = GuidedOnboardingState & {
   gatewayUrl?: string;
 };
 
-export function withInstanceFacts(
-  state: GuidedOnboardingState,
-): GuidedOnboardingStateView {
+export function withInstanceFacts<S extends GuidedOnboardingState>(
+  state: S,
+): S & GuidedOnboardingStateView {
   const base = env.LW_GATEWAY_PUBLIC_URL ?? env.LW_GATEWAY_BASE_URL;
   return base ? { ...state, gatewayUrl: ensureGatewayV1BaseUrl(base) } : state;
 }

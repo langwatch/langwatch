@@ -72,6 +72,7 @@ import {
   closeLocalControlRuntime,
   getLocalControlRuntime,
 } from "~/server/langy-local-control/runtime";
+import { getTestProject } from "~/utils/testUtils";
 import { createInnerTRPCContext } from "../../trpc";
 import { langyRouter } from "../langy";
 
@@ -87,6 +88,15 @@ let userId: string;
 let commands: { name: string; data: Record<string, unknown> }[] = [];
 /** The model the conversation last ran on, as the projection would hold it. */
 let lastModel: string | null;
+/** The latest request on the conversation's durable log, as the fold reads it. */
+let latestRequest: {
+  requestId: string;
+  expiresAt: number;
+  approved: boolean;
+} | null;
+
+/** Whether the caller owns the conversation, or reads one a teammate shared. */
+let isOwnConversation: boolean;
 
 function conversationRow(id: string) {
   return {
@@ -94,7 +104,7 @@ function conversationRow(id: string) {
     title: "Instrument tracing",
     currentTurnId: null,
     lastModel,
-    isOwn: true,
+    isOwn: isOwnConversation,
   };
 }
 
@@ -179,10 +189,14 @@ beforeAll(async () => {
           id === conversationId || id === otherConversationId
             ? conversationRow(id)
             : null,
+        getLatestLocalControlRequest: async () => latestRequest,
       },
     },
     commands: {
       langy: {
+        requestLocalControl: async (data: Record<string, unknown>) => {
+          commands.push({ name: "local_control_requested", data });
+        },
         changeLocalPolicy: async (data: Record<string, unknown>) => {
           commands.push({ name: "local_policy_changed", data });
         },
@@ -202,6 +216,8 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   commands = [];
+  latestRequest = null;
+  isOwnConversation = true;
   lastModel = "anthropic/claude-fable-5-1";
   skipDecision.current = {
     allowed: false,
@@ -575,6 +591,239 @@ describe("given a folder shared with the conversation", () => {
           conversationId: otherConversationId,
         }),
       ).toMatchObject({ connected: false, workspace: null });
+    });
+  });
+});
+
+describe("given a teammate's shared conversation with its folder connected", () => {
+  const notFound = { message: expect.stringMatching(/not found/i) };
+
+  beforeEach(async () => {
+    await shareFolder();
+    const runtime = getLocalControlRuntime();
+    for (const open of await runtime.requests.listOpen({ userId })) {
+      await runtime.requests.cancel({ requestId: open.id, userId });
+    }
+  });
+
+  describe("when the reader acts on the folder", () => {
+    /** @scenario "A teammate reading a shared conversation cannot act on its folder" */
+    it("answers not found and leaves the card, the policy, the folder and the requests alone", async () => {
+      const { waitId } = await permissionCard();
+      skipDecision.current = {
+        allowed: true,
+        provider: "anthropic",
+        modelId: "claude-fable-5-1",
+      };
+      isOwnConversation = false;
+
+      await expect(
+        caller().answerLocalPermission({
+          projectId,
+          conversationId,
+          waitId,
+          decision: "allow_once",
+        }),
+      ).rejects.toMatchObject(notFound);
+      await expect(
+        caller().setLocalPolicy({
+          projectId,
+          conversationId,
+          skipPermissions: true,
+        }),
+      ).rejects.toMatchObject(notFound);
+      await expect(
+        caller().disconnectLocalWorkspace({ projectId, conversationId }),
+      ).rejects.toMatchObject(notFound);
+      await expect(
+        caller().renewLocalControlRequest({ projectId, conversationId }),
+      ).rejects.toMatchObject(notFound);
+
+      const runtime = getLocalControlRuntime();
+      expect((await runtime.waits.read(waitId))?.state).toBe("pending");
+      expect(await runtime.presence.read(conversationId)).toMatchObject({
+        workspace: { name: "acme-app" },
+      });
+      expect(await runtime.requests.listOpen({ userId })).toEqual([]);
+      expect(
+        commands.filter((command) => command.name !== "user_wait_started"),
+      ).toEqual([]);
+    });
+  });
+
+  describe("when the reader opens the conversation", () => {
+    /** @scenario "A teammate reading a shared conversation still sees its folder state" */
+    it("reads the folder as connected", async () => {
+      isOwnConversation = false;
+
+      expect(
+        await caller().getLocalWorkspace({ projectId, conversationId }),
+      ).toMatchObject({ connected: true });
+    });
+  });
+});
+
+describe("given the code access card reads what became of its request", () => {
+  const FIFTEEN_MINUTES = 15 * 60 * 1000;
+
+  beforeEach(async () => {
+    const runtime = getLocalControlRuntime();
+    for (const open of await runtime.requests.listOpen({ userId })) {
+      await runtime.requests.cancel({ requestId: open.id, userId });
+    }
+  });
+
+  describe("when a terminal can still approve the request", () => {
+    it("reads as open, with the request the card counts down", async () => {
+      const request = await getLocalControlRuntime().requests.create({
+        projectId,
+        projectName: "Local Control Project",
+        userId,
+        conversationId,
+        conversationTitle: "Instrument tracing",
+        conversationUrl: `/?langyConversation=${conversationId}`,
+      });
+
+      expect(
+        await caller().getLocalWorkspace({ projectId, conversationId }),
+      ).toMatchObject({
+        requestState: "open",
+        pendingRequest: expect.objectContaining({ id: request.id }),
+      });
+    });
+  });
+
+  describe("when the request expired while the developer was away", () => {
+    it("reads as expired off the conversation's own log", async () => {
+      latestRequest = {
+        requestId: `lcr_gone_${ns}`,
+        expiresAt: Date.now() - 1000,
+        approved: false,
+      };
+
+      expect(
+        await caller().getLocalWorkspace({ projectId, conversationId }),
+      ).toMatchObject({
+        connected: false,
+        pendingRequest: null,
+        requestState: "expired",
+      });
+    });
+  });
+
+  describe("when the request was declined in the terminal", () => {
+    it("reads as declined", async () => {
+      latestRequest = {
+        requestId: `lcr_declined_${ns}`,
+        expiresAt: Date.now() + FIFTEEN_MINUTES,
+        approved: false,
+      };
+
+      expect(
+        await caller().getLocalWorkspace({ projectId, conversationId }),
+      ).toMatchObject({ requestState: "declined" });
+    });
+  });
+
+  describe("when the share the request opened has ended", () => {
+    it("reads as ended", async () => {
+      latestRequest = {
+        requestId: `lcr_ended_${ns}`,
+        expiresAt: Date.now() + FIFTEEN_MINUTES,
+        approved: true,
+      };
+
+      expect(
+        await caller().getLocalWorkspace({ projectId, conversationId }),
+      ).toMatchObject({ requestState: "ended" });
+    });
+  });
+
+  describe("when the folder is connected", () => {
+    it("reads as approved", async () => {
+      await shareFolder();
+      latestRequest = {
+        requestId: `lcr_${ns}`,
+        expiresAt: Date.now() + FIFTEEN_MINUTES,
+        approved: true,
+      };
+
+      expect(
+        await caller().getLocalWorkspace({ projectId, conversationId }),
+      ).toMatchObject({ connected: true, requestState: "approved" });
+    });
+  });
+});
+
+describe("given a code access card whose request is over", () => {
+  let project: { id: string; name: string; slug: string };
+
+  beforeAll(async () => {
+    project = await getTestProject(`langy-renew-${ns}`);
+  });
+
+  beforeEach(async () => {
+    const runtime = getLocalControlRuntime();
+    for (const open of await runtime.requests.listOpen({ userId })) {
+      await runtime.requests.cancel({ requestId: open.id, userId });
+    }
+  });
+
+  describe("when the developer tries again", () => {
+    /** @scenario "A fresh request reaches the terminal that is already waiting" */
+    it("opens a request the developer's terminal lists, and records it on the log", async () => {
+      const renewed = await caller().renewLocalControlRequest({
+        projectId: project.id,
+        conversationId,
+      });
+
+      const open = await getLocalControlRuntime().requests.listOpen({ userId });
+      expect(open).toHaveLength(1);
+      expect(open[0]).toMatchObject({
+        conversationId,
+        projectId: project.id,
+        projectName: project.name,
+        userId,
+      });
+      expect(open[0]?.conversationUrl).toContain(project.slug);
+      expect(renewed.expiresAt).toBe(
+        new Date(open[0]!.expiresAt).toISOString(),
+      );
+      expect(
+        commands.find((command) => command.name === "local_control_requested")
+          ?.data,
+      ).toMatchObject({
+        tenantId: project.id,
+        conversationId,
+        requestId: open[0]!.id,
+        userId,
+        expiresAt: open[0]!.expiresAt,
+      });
+      expect(
+        await caller().getLocalWorkspace({
+          projectId: project.id,
+          conversationId,
+        }),
+      ).toMatchObject({ requestState: "open" });
+    });
+  });
+
+  describe("when the conversation is not the developer's", () => {
+    /** @scenario "A fresh request can only be opened on my own conversation" */
+    it("answers not found and records nothing", async () => {
+      await expect(
+        caller().renewLocalControlRequest({
+          projectId: project.id,
+          conversationId: `conv-foreign-${ns}`,
+        }),
+      ).rejects.toMatchObject({ message: expect.stringMatching(/not found/i) });
+
+      expect(
+        await getLocalControlRuntime().requests.listOpen({ userId }),
+      ).toEqual([]);
+      expect(
+        commands.some((command) => command.name === "local_control_requested"),
+      ).toBe(false);
     });
   });
 });
