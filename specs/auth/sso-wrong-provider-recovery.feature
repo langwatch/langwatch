@@ -76,3 +76,21 @@ Feature: Recover from a wrong-provider sign-in without a redirect loop
     Then they see a banner telling them to sign out and sign in again with their work email address
     And the banner offers a sign-out action
     And the banner does not link to the settings page
+
+  # A stale flag can also be cleared in bulk, ahead of the member's next
+  # sign-in, so nobody has to wait on a sign-in that may never happen to fire
+  # the clearing branch above.
+
+  @unit
+  Scenario: A one-off cleanup clears the reminder for members who already sign in the right way
+    Given a member whose account still carries a stale "needs to link SSO" flag
+    And the member already holds a sign-in that matches their organization's required method
+    When the one-off cleanup runs
+    Then the member's stale flag is cleared
+
+  @unit
+  Scenario: The cleanup leaves the reminder for members who have not yet signed in the right way
+    Given a member whose account still carries a stale "needs to link SSO" flag
+    And the member holds no sign-in that matches their organization's required method
+    When the one-off cleanup runs
+    Then the member's flag is left in place
