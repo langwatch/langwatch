@@ -8,6 +8,7 @@
  *
  * @see ../selfHostedInstance.service.ts
  * @see specs/self-hosting/connected-services/instance-registry.feature
+ * @see specs/self-hosting/connected-services/self-hosted-lead-signals.feature
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -21,48 +22,6 @@ import type {
 
 const NOW = new Date("2026-09-21T12:00:00.000Z");
 const INSTANCE = "3f1c2b40-9a7e-4f2a-8f4c-6b1f0c2d9e77";
-
-function storeOver(rows: SelfHostedInstanceRecord[] = []) {
-  const upserts: InstanceRowUpsert[] = [];
-  const reports: InstanceReportInsert[] = [];
-  return {
-    upserts,
-    reports,
-    repository: {
-      upsert: vi.fn(async (row: InstanceRowUpsert) => {
-        upserts.push(row);
-      }),
-      appendReport: vi.fn(async (report: InstanceReportInsert) => {
-        reports.push(report);
-      }),
-      findAll: vi.fn(async () => ({ rows, total: rows.length })),
-      findById: vi.fn(
-        async (id: string) => rows.find((r) => r.id === id) ?? null,
-      ),
-      findReports: vi.fn(async () => []),
-    },
-  };
-}
-
-function serviceOver({
-  store,
-  owner = null,
-  names = {},
-}: {
-  store: ReturnType<typeof storeOver>;
-  owner?: {
-    organizationId: string | null;
-    issuedLicenseId: string | null;
-  } | null;
-  names?: Record<string, string | undefined>;
-}) {
-  return new SelfHostedInstanceService({
-    repository: store.repository,
-    owners: { findByInstanceId: vi.fn(async () => owner) },
-    organizations: { findNames: vi.fn(async () => names) },
-    now: () => NOW,
-  });
-}
 
 function recordOf(
   overrides: Partial<SelfHostedInstanceRecord> = {},
@@ -87,8 +46,85 @@ function recordOf(
     hostnameReported: true,
     reportCount: 4,
     lastUnknownFields: 0,
+    raisedSignals: [],
     ...overrides,
   };
+}
+
+/**
+ * A store that actually stores, so a read-back after the upsert answers what
+ * the upsert wrote. The service reads the row back before announcing, and a
+ * stub that forgot would make that path untestable.
+ */
+function storeOver(rows: SelfHostedInstanceRecord[] = []) {
+  const upserts: InstanceRowUpsert[] = [];
+  const reports: InstanceReportInsert[] = [];
+  const byInstance = new Map(rows.map((row) => [row.instanceId, row]));
+
+  return {
+    upserts,
+    reports,
+    repository: {
+      upsert: vi.fn(async (row: InstanceRowUpsert) => {
+        upserts.push(row);
+        const existing = byInstance.get(row.instanceId);
+        byInstance.set(row.instanceId, {
+          ...recordOf({ instanceId: row.instanceId }),
+          ...(existing ?? {}),
+          ...row,
+          firstSeenAt: existing?.firstSeenAt ?? row.lastSeenAt,
+          reportCount: (existing?.reportCount ?? 0) + 1,
+        });
+      }),
+      appendReport: vi.fn(async (report: InstanceReportInsert) => {
+        reports.push(report);
+      }),
+      findAll: vi.fn(async () => {
+        const all = [...byInstance.values()];
+        return { rows: all, total: all.length };
+      }),
+      findById: vi.fn(
+        async (id: string) =>
+          [...byInstance.values()].find((row) => row.id === id) ?? null,
+      ),
+      findByInstanceId: vi.fn(
+        async (instanceId: string) => byInstance.get(instanceId) ?? null,
+      ),
+      findReports: vi.fn(async () => []),
+    },
+  };
+}
+
+/** A stand-in for the CRM that records what it was asked and what it was told. */
+function crmSpy(hasAccount = false) {
+  return {
+    hasAccountOnDomain: vi.fn(async () => hasAccount),
+    announce: vi.fn(async () => undefined),
+  };
+}
+
+function serviceOver({
+  store,
+  owner = null,
+  names = {},
+  crm = crmSpy(),
+}: {
+  store: ReturnType<typeof storeOver>;
+  owner?: {
+    organizationId: string | null;
+    issuedLicenseId: string | null;
+    expiresAt: Date | null;
+  } | null;
+  names?: Record<string, string | undefined>;
+  crm?: ReturnType<typeof crmSpy> | null;
+}) {
+  return new SelfHostedInstanceService({
+    repository: store.repository,
+    owners: { findByInstanceId: vi.fn(async () => owner) },
+    organizations: { findNames: vi.fn(async () => names) },
+    crm,
+    now: () => NOW,
+  });
 }
 
 const FULL_REPORT = {
@@ -105,6 +141,10 @@ const FULL_REPORT = {
   first_project_at: "2026-01-02T00:00:00.000Z",
   totalTraces: 98_000,
 };
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 describe("given a report from an install that has never reported", () => {
   describe("when it is written down", () => {
@@ -176,7 +216,11 @@ describe("given an install holding a license bound to this instance", () => {
       const store = storeOver();
       await serviceOver({
         store,
-        owner: { organizationId: "org-acme", issuedLicenseId: "license-1" },
+        owner: {
+          organizationId: "org-acme",
+          issuedLicenseId: "license-1",
+          expiresAt: new Date("2027-09-21T00:00:00.000Z"),
+        },
       }).recordReport({
         instanceId: INSTANCE,
         properties: FULL_REPORT,
@@ -214,6 +258,56 @@ describe("given an install reporting only the standard and operational blocks", 
       expect(store.upserts[0]?.optionalMetricsReported).toBe(false);
       expect(store.upserts[0]?.hostnameReported).toBe(false);
       expect(store.upserts[0]?.userEmailDomains).toBeNull();
+    });
+  });
+});
+
+describe("given a report that raises a signal", () => {
+  describe("when it is written down", () => {
+    /** @scenario "A raised signal reaches Slack with the install behind it" */
+    it("records the signal on the row and announces it once", async () => {
+      const store = storeOver();
+      const crm = crmSpy(true);
+
+      const raised = await serviceOver({ store, crm }).recordReport({
+        instanceId: INSTANCE,
+        properties: { ...FULL_REPORT, users: 40 },
+        unknownFields: 0,
+        receivedAt: NOW,
+      });
+
+      expect(raised).toContain("seats_crossed_threshold");
+      expect(raised).toContain("domain_has_cloud_account");
+      expect(store.upserts[0]?.raisedSignals).toEqual(raised);
+      expect(crm.announce).toHaveBeenCalledTimes(1);
+      // The largest domain is the one that names the company.
+      expect(crm.announce.mock.calls[0]?.[0]).toMatchObject({
+        leadingDomain: "acme.test",
+        signals: raised,
+      });
+    });
+  });
+});
+
+describe("given an install that already raised the domain signal", () => {
+  describe("when its report arrives", () => {
+    /** @scenario "The lookup for an already-raised signal is not made again" */
+    it("does not ask Cloud about that domain again", async () => {
+      const store = storeOver([
+        recordOf({ raisedSignals: ["domain_has_cloud_account"] }),
+      ]);
+      const crm = crmSpy(true);
+
+      const raised = await serviceOver({ store, crm }).recordReport({
+        instanceId: INSTANCE,
+        properties: FULL_REPORT,
+        unknownFields: 0,
+        receivedAt: NOW,
+      });
+
+      expect(crm.hasAccountOnDomain).not.toHaveBeenCalled();
+      expect(raised).toEqual([]);
+      expect(crm.announce).not.toHaveBeenCalled();
     });
   });
 });
@@ -262,8 +356,4 @@ describe("given an install that is not in the registry", () => {
       expect(found).toBeNull();
     });
   });
-});
-
-beforeEach(() => {
-  vi.clearAllMocks();
 });

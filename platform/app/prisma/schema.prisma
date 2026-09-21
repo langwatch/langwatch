@@ -6426,6 +6426,11 @@ model SelfHostedInstance {
   reportCount       Int @default(0)
   lastUnknownFields Int @default(0)
 
+  /// The lead signals already raised for this install. A signal on this list
+  /// is never raised again, which is what keeps a large install from
+  /// reporting that it is large every morning.
+  raisedSignals String[] @default([])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

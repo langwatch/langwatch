@@ -13,6 +13,11 @@
  */
 
 import { usageFieldsOfCategory } from "~/server/usage-report/dictionary";
+import type { SelfHostedCrm } from "../crm/selfHostedCrm";
+import {
+  type SelfHostedSignal,
+  signalsRaisedBy,
+} from "../crm/selfHostedSignals";
 import {
   type IncomingReport,
   type InstanceOwnerLookup,
@@ -64,6 +69,24 @@ function domains(value: unknown): Record<string, number> | null {
   return Object.keys(counts).length > 0 ? counts : null;
 }
 
+/**
+ * The domain the largest share of an install's users are on, which is the one
+ * that names the company. The rest are contractors, personal addresses and
+ * whoever else has an account.
+ */
+function largestDomain(counts: Record<string, number> | null): string | null {
+  if (!counts) return null;
+  let leading: string | null = null;
+  let best = 0;
+  for (const [domain, count] of Object.entries(counts)) {
+    if (count > best) {
+      leading = domain;
+      best = count;
+    }
+  }
+  return leading;
+}
+
 function carriesOptionalCategory(properties: ReportProperties): boolean {
   return Object.keys(properties).some((key) => OPTIONAL_KEYS.has(key));
 }
@@ -74,6 +97,8 @@ export class SelfHostedInstanceService {
       repository: SelfHostedInstanceRepository;
       owners: InstanceOwnerLookup;
       organizations: OrganizationNameLookup;
+      /** Absent where nothing is listening, such as a self-hosted receiver. */
+      crm?: SelfHostedCrm | null;
       now?: () => Date;
     },
   ) {}
@@ -83,19 +108,45 @@ export class SelfHostedInstanceService {
   }
 
   /**
-   * Writes one report down: the install's row, and the report itself.
+   * Writes one report down: the install's row, the report itself, and whatever
+   * the report says that somebody should hear about.
    *
-   * The caller decides what a failure here means. It is called from a public
-   * route, where refusing the report would take the install with it, so the
-   * route swallows the failure and answers as though the report had landed.
+   * Returns the signals it raised, which is what a test asserts on and what a
+   * caller can log. The caller decides what a failure here means. It is called
+   * from a public route, where refusing the report would take the install with
+   * it, so the route swallows the failure and answers as though the report had
+   * landed.
    */
   async recordReport({
     instanceId,
     properties,
     unknownFields,
     receivedAt,
-  }: IncomingReport): Promise<void> {
-    const owner = await this.deps.owners.findByInstanceId(instanceId);
+  }: IncomingReport): Promise<SelfHostedSignal[]> {
+    const [previous, owner] = await Promise.all([
+      this.deps.repository.findByInstanceId(instanceId),
+      this.deps.owners.findByInstanceId(instanceId),
+    ]);
+
+    const reportedDomains = domains(properties.user_email_domains);
+    const leadingDomain = largestDomain(reportedDomains);
+    const alreadyRaised = previous?.raisedSignals ?? [];
+
+    // With nothing listening there is nothing to raise, and a signal recorded
+    // as raised without being announced would be lost rather than delayed.
+    const signals = this.deps.crm
+      ? signalsRaisedBy({
+          properties,
+          firstSeenAt: previous?.firstSeenAt ?? null,
+          alreadyRaised,
+          license: owner ? { expiresAt: owner.expiresAt } : null,
+          domainHasCloudAccount: await this.cloudAccountOnDomain({
+            leadingDomain,
+            alreadyRaised,
+          }),
+          now: receivedAt,
+        })
+      : [];
 
     await this.deps.repository.upsert({
       instanceId,
@@ -109,11 +160,12 @@ export class SelfHostedInstanceService {
       reportSchemaVersion: whole(properties.report_schema_version),
       organizationId: owner?.organizationId ?? null,
       issuedLicenseId: owner?.issuedLicenseId ?? null,
-      userEmailDomains: domains(properties.user_email_domains),
+      userEmailDomains: reportedDomains,
       latestReport: properties,
       optionalMetricsReported: carriesOptionalCategory(properties),
       hostnameReported: text(properties.hostname) !== null,
       lastUnknownFields: unknownFields,
+      raisedSignals: [...alreadyRaised, ...signals],
     });
 
     await this.deps.repository.appendReport({
@@ -124,6 +176,39 @@ export class SelfHostedInstanceService {
       unknownFields,
       payload: properties,
     });
+
+    if (signals.length > 0 && this.deps.crm) {
+      const stored = await this.deps.repository.findByInstanceId(instanceId);
+      if (stored) {
+        await this.deps.crm.announce({
+          signals,
+          instance: stored,
+          leadingDomain,
+          organizationId: owner?.organizationId ?? null,
+        });
+      }
+    }
+
+    return signals;
+  }
+
+  /**
+   * Whether the company running this install already has a Cloud account.
+   *
+   * Asked only while the answer can still change anything: once the signal has
+   * been raised it is never raised again, so a daily report would otherwise pay
+   * for a lookup whose answer is already on the row.
+   */
+  private async cloudAccountOnDomain({
+    leadingDomain,
+    alreadyRaised,
+  }: {
+    leadingDomain: string | null;
+    alreadyRaised: readonly string[];
+  }): Promise<boolean> {
+    if (!leadingDomain || !this.deps.crm) return false;
+    if (alreadyRaised.includes("domain_has_cloud_account")) return false;
+    return this.deps.crm.hasAccountOnDomain(leadingDomain);
   }
 
   /** Installs by most recent activity, which is the order an operator wants. */

@@ -49,6 +49,7 @@ function recordOf(row: Row): SelfHostedInstanceRecord {
     hostnameReported: row.hostnameReported,
     reportCount: row.reportCount,
     lastUnknownFields: row.lastUnknownFields,
+    raisedSignals: row.raisedSignals,
   };
 }
 
@@ -70,10 +71,12 @@ export class PrismaSelfHostedInstances implements SelfHostedInstanceRepository {
       userEmailDomains: (row.userEmailDomains ??
         null) as Prisma.InputJsonValue | null,
       userDomains: Object.keys(row.userEmailDomains ?? {}),
+      raisedSignals: row.raisedSignals,
       latestReport: row.latestReport as Prisma.InputJsonValue,
       optionalMetricsReported: row.optionalMetricsReported,
       hostnameReported: row.hostnameReported,
       lastUnknownFields: row.lastUnknownFields,
+      raisedSignals: row.raisedSignals,
     };
 
     await this.prisma.selfHostedInstance.upsert({
@@ -126,6 +129,15 @@ export class PrismaSelfHostedInstances implements SelfHostedInstanceRepository {
   async findById(id: string): Promise<SelfHostedInstanceRecord | null> {
     const row = await this.prisma.selfHostedInstance.findUnique({
       where: { id },
+    });
+    return row ? recordOf(row) : null;
+  }
+
+  async findByInstanceId(
+    instanceId: string,
+  ): Promise<SelfHostedInstanceRecord | null> {
+    const row = await this.prisma.selfHostedInstance.findUnique({
+      where: { instanceId },
     });
     return row ? recordOf(row) : null;
   }
@@ -185,12 +197,13 @@ export class PrismaInstanceOwners implements InstanceOwnerLookup {
     const license = await this.prisma.issuedLicense.findFirst({
       where: { instanceId, revokedAt: null },
       orderBy: { instanceBoundAt: "desc" },
-      select: { id: true, organizationId: true },
+      select: { id: true, organizationId: true, expiresAt: true },
     });
     if (!license) return null;
     return {
       organizationId: license.organizationId,
       issuedLicenseId: license.id,
+      expiresAt: license.expiresAt,
     };
   }
 }

@@ -103,6 +103,26 @@ export type LicensePurchaseNotificationPayload = {
   currency: string;
 };
 
+/**
+ * One thing a self-hosted install did that somebody should hear about
+ * (ADR-139, section 10). Raised once per install, never once per report.
+ */
+export type SelfHostedSignalNotificationPayload = {
+  /** The sentence at the top of the message. */
+  headline: string;
+  /** The install's own id, which is what the backoffice is searched by. */
+  instanceId: string;
+  /** The customer, when a license binds this install to one. */
+  organizationName?: string | null;
+  /** The company domain most of its users are on, when it reports domains. */
+  leadingDomain?: string | null;
+  version?: string | null;
+  users?: number | null;
+  traces28d?: number | null;
+  /** Where to open the install in the backoffice. */
+  instanceUrl: string;
+};
+
 export type SignupNotificationPayload = {
   userName?: string | null;
   userEmail?: string | null;

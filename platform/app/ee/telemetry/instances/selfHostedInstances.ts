@@ -20,6 +20,8 @@ export interface IncomingReport {
 export interface InstanceOwner {
   organizationId: string | null;
   issuedLicenseId: string | null;
+  /** When the term ends, which is what the expiring signal reads. */
+  expiresAt: Date | null;
 }
 
 /** What one report writes onto an install's row. */
@@ -40,6 +42,8 @@ export interface InstanceRowUpsert {
   optionalMetricsReported: boolean;
   hostnameReported: boolean;
   lastUnknownFields: number;
+  /** Every signal raised for this install so far, including the new ones. */
+  raisedSignals: string[];
 }
 
 /** One report row of the history. */
@@ -73,6 +77,7 @@ export interface SelfHostedInstanceRecord {
   hostnameReported: boolean;
   reportCount: number;
   lastUnknownFields: number;
+  raisedSignals: string[];
 }
 
 /** What the backoffice adds to a row before it reaches the screen. */
@@ -120,6 +125,10 @@ export interface SelfHostedInstanceRepository {
     search?: string;
   }): Promise<{ rows: SelfHostedInstanceRecord[]; total: number }>;
   findById(id: string): Promise<SelfHostedInstanceRecord | null>;
+  /** The row as it stood before this report, or null on a first report. */
+  findByInstanceId(
+    instanceId: string,
+  ): Promise<SelfHostedInstanceRecord | null>;
   /** The history of one install, newest first. */
   findReports(input: { instanceId: string; limit: number }): Promise<
     {

@@ -39,6 +39,7 @@ CREATE TABLE "SelfHostedInstance" (
     "hostnameReported" BOOLEAN NOT NULL DEFAULT true,
     "reportCount" INTEGER NOT NULL DEFAULT 0,
     "lastUnknownFields" INTEGER NOT NULL DEFAULT 0,
+    "raisedSignals" TEXT[] DEFAULT ARRAY[]::TEXT[],
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 

@@ -38,6 +38,7 @@ function upsertOf(
     optionalMetricsReported: true,
     hostnameReported: true,
     lastUnknownFields: 0,
+    raisedSignals: [],
     ...overrides,
   };
 }

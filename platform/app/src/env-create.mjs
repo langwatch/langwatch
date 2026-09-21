@@ -801,6 +801,9 @@ export function createEnvConfig() {
       SLACK_PLAN_LIMIT_CHANNEL: z.string().optional(),
       SLACK_CHANNEL_SIGNUPS: z.string().optional(),
       SLACK_CHANNEL_SUBSCRIPTIONS: z.string().optional(),
+      // Where self-hosted lead signals go (ADR-139). Falls back to
+      // SLACK_CHANNEL_SIGNUPS when unset, so a signal is never posted nowhere.
+      SLACK_CHANNEL_SELF_HOSTED: z.string().optional(),
       // Agent issue-report alerts (bot token of the LangWatch Agents Slack
       // app; alerts are skipped entirely when unset)
       SLACK_BUG_REPORTS_BOT_TOKEN: z.string().optional(),
@@ -1020,6 +1023,7 @@ export function createEnvConfig() {
       SLACK_BUG_REPORTS_CHANNEL: process.env.SLACK_BUG_REPORTS_CHANNEL,
       SLACK_CHANNEL_SIGNUPS: process.env.SLACK_CHANNEL_SIGNUPS,
       SLACK_CHANNEL_SUBSCRIPTIONS: process.env.SLACK_CHANNEL_SUBSCRIPTIONS,
+      SLACK_CHANNEL_SELF_HOSTED: process.env.SLACK_CHANNEL_SELF_HOSTED,
       AUTH0_SCIM_WEBHOOK_SECRET: process.env.AUTH0_SCIM_WEBHOOK_SECRET,
     },
     /**

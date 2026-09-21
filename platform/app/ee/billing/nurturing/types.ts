@@ -106,6 +106,24 @@ export interface CioOrgTraits {
   onboarding_paths?: string;
   onboarding_primary_path?: string;
   guided_onboarding_completed_paths?: string;
+
+  // Self-hosted (ADR-139, section 10). Set from the daily usage report of an
+  // install whose license binds it to this organization, so a customer running
+  // LangWatch on their own infrastructure is segmented on what that install
+  // actually does rather than on their Cloud account, which may be empty.
+  /** Whether a self-hosted install reports against this organization. */
+  self_hosted?: boolean;
+  self_hosted_version?: string;
+  /** docker, helm, or whatever the install says it was installed with. */
+  self_hosted_install_method?: string;
+  self_hosted_users?: number;
+  self_hosted_projects?: number;
+  self_hosted_traces_28d?: number;
+  self_hosted_active_users_28d?: number;
+  self_hosted_first_seen_at?: string;
+  self_hosted_last_report_at?: string;
+  /** Comma list of the signals raised so far, in the order they were raised. */
+  self_hosted_signals?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -130,7 +148,14 @@ export type CioEventName =
   | "onboarding_path_coding_agents"
   | "onboarding_path_gateway"
   | "onboarding_path_governance"
-  | "guided_onboarding_path_completed";
+  | "guided_onboarding_path_completed"
+  // Self-hosted lead signals (ADR-139, section 10). One per install, not one
+  // per report: a campaign keyed on these fires when something changed.
+  | "self_hosted_seats_crossed_threshold"
+  | "self_hosted_sustained_ingestion"
+  | "self_hosted_licensed_feature_without_license"
+  | "self_hosted_license_expiring"
+  | "self_hosted_domain_has_cloud_account";
 
 // ---------------------------------------------------------------------------
 // Batch call discriminated union
