@@ -9345,8 +9345,8 @@
             "TenantId",
             "AuditLogId",
             "UserId",
-            "ActorUserId",
             "OrganizationId",
+            "ActorUserId",
             "TargetId"
           ],
           "timeColumn": "CreatedAt",
@@ -9385,14 +9385,6 @@
               "available": true
             },
             {
-              "name": "ActorUserId",
-              "type": "Nullable(String)",
-              "description": "ActorUserId",
-              "unit": null,
-              "gates": [],
-              "available": true
-            },
-            {
               "name": "OrganizationId",
               "type": "Nullable(String)",
               "description": "OrganizationId",
@@ -9426,6 +9418,14 @@
               "gates": [
                 "output"
               ],
+              "available": true
+            },
+            {
+              "name": "ActorUserId",
+              "type": "Nullable(String)",
+              "description": "WHO REALLY DID IT, when that is not `userId`.",
+              "unit": null,
+              "gates": [],
               "available": true
             },
             {
