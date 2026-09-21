@@ -1227,13 +1227,6 @@ model Organization {
   /// (ADR-139, section 2). A license that names no service reaches nothing,
   /// whatever this column holds.
   connectServicesDisabled String[]                      @default([])
-  /// The signed lease the last successful license sync answered with (ADR-139,
-  /// section 6). Written only after it verified against the public key the
-  /// install embeds, for this license and this install, so a lease that was
-  /// edited or minted elsewhere never lands here. It carries the seat overage
-  /// allowance and the two dates that withdraw it, which is why no timestamp
-  /// in this database decides how long the allowance lasts.
-  connectLease           Json?
   /// When the last license sync succeeded.
   connectLastSyncAt      DateTime?
   /// The code of the failure the last sync ended on, cleared on the next
@@ -1315,8 +1308,6 @@ model IssuedLicense {
 
   /// Hosted services this license may call, such as `instant_evals`.
   services             String[]  @default([])
-  /// Seats the install may go over by. Null means a fifth of `maxMembers`, rounded up.
-  seatOverageAllowance Int?
   /// The annual rate of one seat, in cents of `seatCurrency`. Needed to prorate added seats.
   seatRateCents        Int?
   seatCurrency         Currency?
@@ -1402,27 +1393,6 @@ model ActivationCode {
   @@index([expiresAt])
 }
 
-/// The seats one license reported in one quarter of its term, kept at the
-/// highest figure reported. The quarterly seat true-up invoices from this, so
-/// a customer that adds seats for a week pays for them even if the install
-/// drops back before the quarter ends.
-model LicenseSeatReport {
-  id              String   @id @default(nanoid())
-  /// The `IssuedLicense` row. A plain column ref, like `replacesId`:
-  /// relationMode="prisma" carries no foreign keys.
-  licenseId       String
-  /// Start of the term quarter, counted in three-month steps from the
-  /// license's own `issuedAt` rather than from the calendar year.
-  quarterStartsAt DateTime
-  peakMembers     Int
-  peakMembersLite Int
-  firstReportedAt DateTime
-  lastReportedAt  DateTime
-
-  @@unique([licenseId, quarterStartsAt])
-  @@index([licenseId])
-}
-
 /// How a connected customer is invoiced (ADR-139, section 7): one payment
 /// provider customer, one quarterly usage subscription in USD, and the
 /// commercial terms the annual invoice was raised from.
@@ -1484,7 +1454,7 @@ enum ConnectedCreditGrantKind {
 model ConnectedCreditGrant {
   id                  String                   @id @default(nanoid())
   /// The `ConnectedBillingAccount` row. A plain column ref, like
-  /// `LicenseSeatReport.licenseId`: relationMode="prisma" carries no foreign keys.
+  /// `IssuedLicense.replacesId`: relationMode="prisma" carries no foreign keys.
   accountId           String
   /// The grant at the payment provider. Unique, so a retry records one row.
   stripeCreditGrantId String                   @unique
@@ -1504,14 +1474,14 @@ model ConnectedCreditGrant {
 enum ConnectedInvoiceKind {
   /// The one-off invoice raised at onboarding or renewal: seats and commit.
   annual
-  /// Seats added during a quarter, prorated to the end of the term.
-  seat_trueup
+  /// Seats added mid-term, prorated to the end of the term.
+  seat_change
   /// A quarter of metered hosted usage.
   usage
 }
 
 /// An invoice LangWatch raised for a connected customer, as the backoffice
-/// reads it and as roll-forward decides whether it already acted on one.
+/// reads it.
 model ConnectedInvoice {
   id              String               @id @default(nanoid())
   /// The `ConnectedBillingAccount` row, as a plain column ref.
@@ -1522,12 +1492,7 @@ model ConnectedInvoice {
   amountCents     Int
   /// The provider's own status: `draft`, `open`, `paid`, `void` or `uncollectible`.
   status          String
-  /// The pending invoice item a small usage invoice was carried into. Set once,
-  /// so the same invoice is never rolled forward twice.
-  rolledForwardTo String?
   paidOutOfBandAt DateTime?
-  /// Which quarter a seat true-up invoice settles.
-  quarterStartsAt DateTime?
   termStartsAt    DateTime?
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @default(now()) @updatedAt
@@ -6321,52 +6286,49 @@ model IdentityMatchSuggestion {
   @@index([organizationId, score])
 }
 
-/// What the quarterly seat true-up of one connected license decided for one
-/// term quarter (ADR-139, section 7).
+/// What a mid-term seat change of one connected license owes (ADR-141,
+/// section 7): the seats added on the reissued license, invoiced prorated to
+/// the end of the term.
 ///
 /// The row is written before the payment provider is called and completed
-/// after it, so a call that failed halfway is retried without inventing a
-/// second invoice. The unique pair keeps one quarter to one decision.
-model ConnectedSeatTrueUp {
+/// after it, so a call that failed halfway is retried by the daily billing
+/// tick without inventing a second invoice. One row per reissued license.
+model ConnectedSeatChange {
   id              String                   @id @default(nanoid())
-  /// The `IssuedLicense` row. A plain column ref, like `LicenseSeatReport`:
-  /// relationMode="prisma" carries no foreign keys.
-  licenseId       String
-  /// Start of the term quarter, counted in three-month steps from the
-  /// license's own `issuedAt`.
-  quarterStartsAt DateTime
-  /// The highest seat count the license reported in that quarter.
-  peakSeats       Int
-  /// The peak minus the seats already invoiced for this term.
+  /// The reissued `IssuedLicense` row that carries the new seat count. A
+  /// plain column ref, like `replacesId`: relationMode="prisma" carries no
+  /// foreign keys.
+  licenseId       String                   @unique
+  /// The `ConnectedBillingAccount` row the invoice is raised against.
+  accountId       String
+  /// When the seats changed, which is the day the proration counts from.
+  changedAt       DateTime
+  /// Seats on the new license above the seats on the one it replaced.
   addedSeats      Int
-  /// The prorated amount, in cents of `currency`. Zero when nothing is owed.
+  /// What one added seat costs for the rest of the term, in cents of `currency`.
+  unitAmountCents Int
+  /// `unitAmountCents` times `addedSeats`. Zero when nothing is owed.
   amountCents     Int
   currency        Currency
   /// The one-off invoice the added seats were billed on.
   stripeInvoiceId String?
-  state           ConnectedSeatTrueUpState
+  state           ConnectedSeatChangeState
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([licenseId, quarterStartsAt])
+  @@index([accountId])
   @@index([state])
 }
 
-/// How the quarterly seat true-up ended for one license quarter.
-enum ConnectedSeatTrueUpState {
-  /// Recorded before the payment provider was called. A retry resumes here.
+/// How the invoicing of one seat change ended.
+enum ConnectedSeatChangeState {
+  /// Recorded before the payment provider was called. The daily tick retries it.
   intent
   /// The added seats were invoiced.
   invoiced
-  /// The quarter closed with no seats to add.
+  /// The change owed nothing: the term had no days left or the seat rate is zero.
   nothing_to_invoice
-  /// The license did not sync during the quarter, so its peak is not known.
-  /// Shown in the backoffice for an operator to follow up.
-  flagged
-  /// A license with no seat overage allowance that never synced. It is
-  /// settled by the annual true-up instead.
-  skipped
 }
 
 /// The monthly usage statement one connected customer was sent (ADR-139,
@@ -6451,7 +6413,7 @@ model SelfHostedInstance {
   reportSchemaVersion Int?
 
   /// The customer, and the license that named them. Plain column refs rather
-  /// than relations, like `LicenseSeatReport.licenseId`: relationMode="prisma"
+  /// than relations, like `IssuedLicense.replacesId`: relationMode="prisma"
   /// carries no foreign keys, and the receiver resolves both from the license
   /// registry rather than from the report.
   organizationId  String?

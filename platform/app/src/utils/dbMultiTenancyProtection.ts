@@ -318,14 +318,15 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       return null;
     },
   },
-  // The seats one license reported in one quarter (ADR-141). It carries no
-  // organizationId: its parent `IssuedLicense` row names the customer, and the
-  // sync that writes it has only just resolved that row from a token. Every
-  // query names the license, which is what keeps a bare findMany from walking
-  // every customer's seat history.
-  LicenseSeatReport: {
+  // What a mid-term seat change of one connected license owes (ADR-141). It
+  // carries no organizationId: the reissued `IssuedLicense` row names the
+  // customer, and the `ConnectedBillingAccount` row it is invoiced against
+  // does too. The daily tick retries the rows still in `intent`, which is the
+  // one read that names neither; it is bounded by that state.
+  ConnectedSeatChange: {
     validateWhere: (where) => {
-      const reason = "requires a row id or licenseId in the where clause";
+      const reason =
+        "requires a row id, licenseId, accountId or state in the where clause";
       if (!where) return reason;
       const ok = validateRecursive(
         where,
@@ -335,8 +336,11 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
           (c.licenseId &&
             Array.isArray(c.licenseId.in) &&
             c.licenseId.in.length > 0) ||
-          // The compound unique, as `findUnique` spells it.
-          typeof c.licenseId_quarterStartsAt?.licenseId === "string",
+          typeof c.accountId === "string" ||
+          (c.accountId &&
+            Array.isArray(c.accountId.in) &&
+            c.accountId.in.length > 0) ||
+          typeof c.state === "string",
       );
       return ok ? null : reason;
     },
@@ -347,38 +351,8 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
         if (typeof record.licenseId !== "string") {
           return "create requires a licenseId in the data payload";
         }
-      }
-      return null;
-    },
-  },
-  // What the quarterly seat true-up decided for one license quarter
-  // (ADR-141). Scoped like `LicenseSeatReport` above and for the same reason:
-  // the parent `IssuedLicense` row names the customer. The backoffice reads it
-  // for the licenses it already listed, so it passes `licenseId: { in: [...] }`
-  // rather than filtering on `state` alone.
-  ConnectedSeatTrueUp: {
-    validateWhere: (where) => {
-      const reason = "requires a row id or licenseId in the where clause";
-      if (!where) return reason;
-      const ok = validateRecursive(
-        where,
-        (c) =>
-          hasIdOrInPredicate(c) ||
-          typeof c.licenseId === "string" ||
-          (c.licenseId &&
-            Array.isArray(c.licenseId.in) &&
-            c.licenseId.in.length > 0) ||
-          // The compound unique, as `findUnique` spells it.
-          typeof c.licenseId_quarterStartsAt?.licenseId === "string",
-      );
-      return ok ? null : reason;
-    },
-    validateCreateData: (data) => {
-      const records = Array.isArray(data) ? data : [data];
-      for (const record of records) {
-        if (!record) return "create requires a data payload";
-        if (typeof record.licenseId !== "string") {
-          return "create requires a licenseId in the data payload";
+        if (typeof record.accountId !== "string") {
+          return "create requires an accountId in the data payload";
         }
       }
       return null;

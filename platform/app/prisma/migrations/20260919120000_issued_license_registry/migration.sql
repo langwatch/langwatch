@@ -52,7 +52,6 @@ CREATE TABLE "IssuedLicense" (
     "replacesId" TEXT,
     "pendingDeliveryLicense" TEXT,
     "services" TEXT[] DEFAULT ARRAY[]::TEXT[],
-    "seatOverageAllowance" INTEGER,
     "seatRateCents" INTEGER,
     "seatCurrency" "Currency",
     "commitUsdCents" INTEGER NOT NULL DEFAULT 0,

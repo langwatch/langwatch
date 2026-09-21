@@ -1,32 +1,33 @@
 -- IRREVERSIBLE: no down step. Reversing it would drop the connected billing
--- tables with every true-up intent, statement and invoice reference in them,
--- which is what says a customer was already invoiced for a quarter. Replaying
--- against Stripe after such a rollback would invoice twice. Rolling the code
--- back is safe, the tables stay unread.
+-- tables with every seat change intent, statement and invoice reference in
+-- them, which is what says a customer was already invoiced for a change.
+-- Replaying against Stripe after such a rollback would invoice twice. Rolling
+-- the code back is safe, the tables stay unread.
 --
--- Invoice billing for a connected self-hosted customer (ADR-139, section 7).
+-- Invoice billing for a connected self-hosted customer (ADR-141, section 7).
 --
 -- Additive only: new tables and enums. A self-hosted install gets them and
 -- keeps them empty, because every row here is written on LangWatch Cloud.
 
 -- CreateEnum
-CREATE TYPE "ConnectedSeatTrueUpState" AS ENUM ('intent', 'invoiced', 'nothing_to_invoice', 'flagged', 'skipped');
+CREATE TYPE "ConnectedSeatChangeState" AS ENUM ('intent', 'invoiced', 'nothing_to_invoice');
 
 -- CreateTable
-CREATE TABLE "ConnectedSeatTrueUp" (
+CREATE TABLE "ConnectedSeatChange" (
     "id" TEXT NOT NULL,
     "licenseId" TEXT NOT NULL,
-    "quarterStartsAt" TIMESTAMP(3) NOT NULL,
-    "peakSeats" INTEGER NOT NULL,
+    "accountId" TEXT NOT NULL,
+    "changedAt" TIMESTAMP(3) NOT NULL,
     "addedSeats" INTEGER NOT NULL,
+    "unitAmountCents" INTEGER NOT NULL,
     "amountCents" INTEGER NOT NULL,
     "currency" "Currency" NOT NULL,
     "stripeInvoiceId" TEXT,
-    "state" "ConnectedSeatTrueUpState" NOT NULL,
+    "state" "ConnectedSeatChangeState" NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "ConnectedSeatTrueUp_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "ConnectedSeatChange_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -40,10 +41,13 @@ CREATE TABLE "ConnectedStatement" (
 );
 
 -- CreateIndex
-CREATE INDEX "ConnectedSeatTrueUp_state_idx" ON "ConnectedSeatTrueUp"("state");
+CREATE UNIQUE INDEX "ConnectedSeatChange_licenseId_key" ON "ConnectedSeatChange"("licenseId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "ConnectedSeatTrueUp_licenseId_quarterStartsAt_key" ON "ConnectedSeatTrueUp"("licenseId", "quarterStartsAt");
+CREATE INDEX "ConnectedSeatChange_accountId_idx" ON "ConnectedSeatChange"("accountId");
+
+-- CreateIndex
+CREATE INDEX "ConnectedSeatChange_state_idx" ON "ConnectedSeatChange"("state");
 
 -- CreateIndex
 CREATE INDEX "ConnectedStatement_accountId_idx" ON "ConnectedStatement"("accountId");
@@ -55,7 +59,7 @@ CREATE UNIQUE INDEX "ConnectedStatement_accountId_month_key" ON "ConnectedStatem
 CREATE TYPE "ConnectedCreditGrantKind" AS ENUM ('commit', 'added', 'renewal');
 
 -- CreateEnum
-CREATE TYPE "ConnectedInvoiceKind" AS ENUM ('annual', 'seat_trueup', 'usage');
+CREATE TYPE "ConnectedInvoiceKind" AS ENUM ('annual', 'seat_change', 'usage');
 
 -- CreateTable
 CREATE TABLE "ConnectedBillingAccount" (
@@ -104,9 +108,7 @@ CREATE TABLE "ConnectedInvoice" (
     "currency" "Currency" NOT NULL,
     "amountCents" INTEGER NOT NULL,
     "status" TEXT NOT NULL,
-    "rolledForwardTo" TEXT,
     "paidOutOfBandAt" TIMESTAMP(3),
-    "quarterStartsAt" TIMESTAMP(3),
     "termStartsAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
