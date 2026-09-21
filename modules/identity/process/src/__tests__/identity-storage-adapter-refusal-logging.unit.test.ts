@@ -17,6 +17,12 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
   createLogger: () => logged,
 }));
 
+// This package runs with `isolate: false`, so a sibling that loaded the
+// storage adapter first would have captured the REAL logger at module scope
+// and the mock above would reach nothing. Resetting makes the import below
+// re-evaluate the chain against it, whatever ran earlier.
+vi.resetModules();
+
 const { identityStack, signUp } = await import("./support/storage-adapter-stack.ts");
 
 const EMAIL = "member@acme.com";

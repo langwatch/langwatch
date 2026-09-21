@@ -17,6 +17,12 @@ export abstract class SsoConnectionReadRepository {
   abstract tryFindDomainOwner(args: {
     domain: string;
   }): Promise<{ connectionId: string; organizationId: string } | null>;
+
+  /**
+   * Every connection an organization holds, newest first. The read a peer
+   * module is answered from: nobody outside identity queries these rows.
+   */
+  abstract findForOrganization(args: { organizationId: string }): Promise<SsoConnectionState[]>;
 }
 
 /**

@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 /**
  * A real `OpsApp` over memory repositories, fixture peers and a literal
@@ -8,7 +9,6 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 
 import { MemoryOpsRepositories } from "../../repositories/memory/memory.ops.repositories.ts";
@@ -80,35 +80,6 @@ export function createOpsTestInfrastructure(
     explainClients: { findClient: () => null },
     findOpsApiKey: () => null,
     isProduction: false,
-    anomalyHardTierAlert: { notify: async () => {} },
-    opsReplayRuntime: {
-      create: () => {
-        throw new Error("replay runtime is not configured for this test");
-      },
-    },
-    opsSnapshotRedis: {
-      eval: async () => null,
-      set: async () => null,
-      tryGet: async () => null,
-      incr: async () => 0,
-    },
-    opsWorker: {
-      tryStartAnomalyWorker: () => undefined,
-      tryStartUsageStatsWorker: () => undefined,
-      tryStartQueueMetricsWriter: () => undefined,
-    },
-    organizationDataplane: { dataplaneFor: () => ({ kind: "shared" }) },
-    queuePayloadDecoder: { tryDecode: async () => null },
-    schedulerWake: { wake: () => undefined },
-    storageStatsMetrics: {
-      beginTick: () => {},
-      recordTable: () => {},
-      recordDisk: () => {},
-      recordBackupStatus: () => {},
-      recordLastBackup: () => {},
-    },
-    usageStatsErrorReporter: { capture: async () => {} },
-    usageStatsTelemetryClient: { send: async () => {} },
     ...overrides,
   };
 }

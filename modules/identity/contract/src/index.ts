@@ -175,6 +175,11 @@ export {
   type BreakGlassWarningDay,
   breakGlassWarningsDue,
 } from "./break-glass.ts";
+export {
+  SSO_CONNECTION_HISTORY_LIMIT,
+  type OrganizationSsoConnection,
+  type SsoConnectionHistoryEntryView,
+} from "./sso-connection-history.ts";
 export { IdentityEmailService } from "./identity-email.service.ts";
 export {
   coarseColleagueCount,
@@ -395,7 +400,15 @@ export {
   signInProvedSecondFactor,
   TOTP_AMR,
 } from "./mfa-condition.ts";
-export { signedInWithFor, signInMethodLabelFor, type SignedInWith } from "./session-claims.ts";
+export {
+  deriveSessionAmr,
+  localFactorsForPath,
+  signedInWithFor,
+  signInMethodLabelFor,
+  signInProviderForPath,
+  type SignedInWith,
+  type SignInPathReading,
+} from "./session-claims.ts";
 export {
   PASSWORD_MAXIMUM_BYTES,
   PASSWORD_MINIMUM_LENGTH,

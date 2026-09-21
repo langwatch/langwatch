@@ -83,6 +83,14 @@ export {
 } from "./repositories/sso-break-glass.repository.ts";
 export { breakGlassHolderEligibility } from "./rules/break-glass-eligibility.rules.ts";
 export {
+  SsoConnectionHistoryRepository,
+  type SsoConnectionHistoryEntry,
+} from "./repositories/sso-connection-history.repository.ts";
+export { EventingSsoConnectionHistoryRepository } from "./repositories/eventing/eventing.sso-connection-history.repository.ts";
+export { ssoConnectionHistoryCopy } from "./rules/sso-connection-history-copy.rules.ts";
+export { SsoConnectionHistoryService } from "./services/sso-connection-history.service.ts";
+export { OrganizationSsoConnectionsService } from "./services/organization-sso-connections.service.ts";
+export {
   RequiresLocalDoorAndBinding,
   SsoBreakGlassService,
   type SsoBreakGlassServiceDeps,

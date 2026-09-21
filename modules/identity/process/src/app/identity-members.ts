@@ -1,5 +1,6 @@
 import type { JoinRequestAudience } from "../repositories/join-request-audience.repository.ts";
 import type { ScimSyncReadRepository } from "../repositories/scim-sync.repository.ts";
+import type { SsoConnectionHistoryRepository } from "../repositories/sso-connection-history.repository.ts";
 import type { SsoPlatformOperatorRepository } from "../repositories/sso-connection.repository.ts";
 import type { IdentityLedger } from "../rules/identity-ledger.rules.ts";
 import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules.ts";
@@ -47,6 +48,12 @@ export type IdentityInfrastructure = Readonly<{
    * capability refuses by name rather than answering emptily.
    */
   ssoConnectionLedger: SsoConnectionLedger | null;
+  /**
+   * One connection's own log, read. Null where the process composed no event
+   * stack — the history refuses by name rather than reading as empty, which
+   * would be indistinguishable from a connection nothing ever happened to.
+   */
+  ssoConnectionHistory: SsoConnectionHistoryRepository | null;
   /** The folded state of one connection's directory sync (D08). */
   scimSyncs: ScimSyncReadRepository;
 }>;

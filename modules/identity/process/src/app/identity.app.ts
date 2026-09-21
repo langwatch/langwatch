@@ -24,10 +24,12 @@ import { JoinRequestGuardsService } from "../services/join-request-guards.servic
 import { JoinRequestNotificationService } from "../services/join-request-notification.service.ts";
 import { LocalDoorBreakGlassBindingAdapter } from "../services/local-door-break-glass-binding.service.ts";
 import { MfaGuardsService } from "../services/mfa-guards.service.ts";
+import { OrganizationSsoConnectionsService } from "../services/organization-sso-connections.service.ts";
 import { CachedIdentityLatch } from "../services/per-subject-cached-latch.service.ts";
 import { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";
 import { SsoConnectionBackofficeService } from "../services/sso-connection-backoffice.service.ts";
 import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
+import { SsoConnectionHistoryService } from "../services/sso-connection-history.service.ts";
 import { SsoConnectionService } from "../services/sso-connection.service.ts";
 import { IdentityIdentifierBackfillMigrationAdapter } from "../services/system-migration-identity-identifier-backfill.service.ts";
 import { IdentitySecretHealMigrationAdapter } from "../services/system-migration-identity-secret-heal.service.ts";
@@ -65,6 +67,8 @@ type IdentityAppParts = {
   ssoConnections: SsoConnectionService | null;
   ssoConnectionGuards: SsoConnectionGuardsService;
   ssoBackoffice: SsoConnectionBackofficeService | null;
+  ssoConnectionHistory: SsoConnectionHistoryService | null;
+  ssoConnectionReads: OrganizationSsoConnectionsService;
   scimSyncGuards: ScimSyncGuardsService;
 };
 
@@ -142,12 +146,20 @@ export class IdentityApp implements IdentityApi {
     const ssoConnections = infrastructure.ssoConnectionLedger
       ? SsoConnectionService.create(ssoConnectionGuards, infrastructure.ssoConnectionLedger)
       : null;
-    const ssoBackoffice = ssoConnections
-      ? SsoConnectionBackofficeService.create({
-          reads: setup.repositories.ssoBackoffice,
-          connections: () => ssoConnections,
-        })
+    const ssoConnectionHistory = infrastructure.ssoConnectionHistory
+      ? SsoConnectionHistoryService.create({ history: infrastructure.ssoConnectionHistory })
       : null;
+    const ssoBackoffice =
+      ssoConnections && ssoConnectionHistory
+        ? SsoConnectionBackofficeService.create({
+            reads: setup.repositories.ssoBackoffice,
+            connections: () => ssoConnections,
+            history: () => ssoConnectionHistory,
+          })
+        : null;
+    const ssoConnectionReads = OrganizationSsoConnectionsService.create({
+      connections: setup.repositories.ssoConnections,
+    });
     const scimSyncGuards = ScimSyncGuardsService.create({ syncs: infrastructure.scimSyncs });
 
     return new IdentityApp({
@@ -165,6 +177,8 @@ export class IdentityApp implements IdentityApi {
       ssoConnections,
       ssoConnectionGuards,
       ssoBackoffice,
+      ssoConnectionHistory,
+      ssoConnectionReads,
       scimSyncGuards,
     });
   }
@@ -264,6 +278,17 @@ export class IdentityApp implements IdentityApi {
       throw new IdentityCapabilityUnavailableError("SSO connection backoffice");
     }
     return this.#parts.ssoBackoffice;
+  }
+
+  ssoConnectionHistory(): SsoConnectionHistoryService {
+    if (!this.#parts.ssoConnectionHistory) {
+      throw new IdentityCapabilityUnavailableError("SSO connection history");
+    }
+    return this.#parts.ssoConnectionHistory;
+  }
+
+  ssoConnectionReads(): OrganizationSsoConnectionsService {
+    return this.#parts.ssoConnectionReads;
   }
 
   scimSyncGuards(): ScimSyncGuardsService {

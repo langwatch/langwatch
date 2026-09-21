@@ -1,4 +1,5 @@
 import {
+  type SsoConnectionHistoryEntryView,
   type SsoConnectionLifecycleState,
   type SsoConnectionState,
   type SsoDomainVerification,
@@ -8,6 +9,7 @@ import { nowInstant } from "@langwatch/time";
 
 import type { SsoConnectionBackofficeRepository } from "../repositories/sso-connection-backoffice.repository.ts";
 import { newSsoConnectionCommandId, newSsoConnectionId } from "../rules/sso-connection-id.rules.ts";
+import type { SsoConnectionHistoryService } from "./sso-connection-history.service.ts";
 import type { SsoConnectionService } from "./sso-connection.service.ts";
 
 /**
@@ -55,6 +57,9 @@ export class SsoConnectionBackofficeService {
   static create(deps: {
     reads: SsoConnectionBackofficeRepository;
     connections: () => SsoConnectionService;
+    /** The same words the organization's own page reads, because the events
+     *  are the same events. */
+    history: () => SsoConnectionHistoryService;
   }): SsoConnectionBackofficeService {
     return new SsoConnectionBackofficeService(deps);
   }
@@ -63,6 +68,7 @@ export class SsoConnectionBackofficeService {
     private readonly deps: {
       reads: SsoConnectionBackofficeRepository;
       connections: () => SsoConnectionService;
+      history: () => SsoConnectionHistoryService;
     },
   ) {}
 
@@ -104,6 +110,30 @@ export class SsoConnectionBackofficeService {
     return SsoConnectionBackofficeService.toBackofficeConnection({
       state,
       organizationName: names.get(state.organizationId) ?? null,
+    });
+  }
+
+  /**
+   * One connection's raw history. The organization is resolved from the
+   * connection rather than taken from the caller: this surface names a
+   * connection, never a tenant.
+   */
+  async findHistory({
+    connectionId,
+    limit,
+  }: {
+    connectionId: string;
+    limit?: number;
+  }): Promise<SsoConnectionHistoryEntryView[] | null> {
+    const state = await this.deps.reads.tryFindById({ connectionId });
+    if (!state) {
+      return null;
+    }
+
+    return this.deps.history().getHistory({
+      organizationId: state.organizationId,
+      connectionId,
+      limit,
     });
   }
 

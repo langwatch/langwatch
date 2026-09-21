@@ -44,6 +44,16 @@ export class InMemoryConnections implements SsoConnectionReadRepository {
     return null;
   }
 
+  async findForOrganization({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<SsoConnectionState[]> {
+    return [...this.states.values()]
+      .filter((state) => state.organizationId === organizationId)
+      .toSorted((left, right) => right.createdAtMs - left.createdAtMs);
+  }
+
   /** Fold facts in, exactly as the projection would. */
   apply({
     connectionId,

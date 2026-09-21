@@ -13,6 +13,10 @@ import {
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 
 import type { SsoConnectionEvent } from "../eventing/sso-connection-state.projection.ts";
+import {
+  EventingSsoConnectionHistoryRepository,
+  type SsoConnectionEventReads,
+} from "../repositories/eventing/eventing.sso-connection-history.repository.ts";
 import { PrismaIdentityProjectionRepository } from "../repositories/prisma/prisma.identity-projection.repository.ts";
 import { PrismaIdentityReservationRepository } from "../repositories/prisma/prisma.identity-reservations.repository.ts";
 import { PrismaIdentitySecretCarryRepository } from "../repositories/prisma/prisma.identity-secret-carry.repository.ts";
@@ -259,6 +263,27 @@ function ssoConnectionLedger(options: {
   });
 }
 
+/**
+ * How the history reaches this process's log, resolved per read so a stack
+ * that is not up yet at compose time still answers later.
+ */
+function ssoConnectionHistoryStore(options: {
+  eventing: EventSourcing;
+}): () => Promise<SsoConnectionEventReads> {
+  const { eventing } = options;
+  return async () => {
+    const store = eventing.getEventStore<SsoConnectionEvent>();
+    if (!store) {
+      // A plain Error on purpose (error doctrine): the reader cannot act on
+      // an unavailable event stack, so this degrades to a retryable failure.
+      throw new Error(
+        "sso connection history cannot read: the event-sourcing stack is unavailable",
+      );
+    }
+    return store;
+  };
+}
+
 /** What this process hands `IdentityApp` at boot, built from its own members and config. */
 export function buildIdentityInfrastructure(input: {
   prisma: ProcessMembers["prisma"];
@@ -302,6 +327,14 @@ export function buildIdentityInfrastructure(input: {
       operators,
     }),
     ssoConnectionLedger: ssoConnectionLedger({ prisma, eventing }),
+    // Absent where this process composed no event stack: the history refuses
+    // by name rather than reading as empty, which is indistinguishable from
+    // a connection nothing ever happened to.
+    ssoConnectionHistory: eventing.isEnabled
+      ? EventingSsoConnectionHistoryRepository.create({
+          eventStore: ssoConnectionHistoryStore({ eventing }),
+        })
+      : null,
     scimSyncs: PrismaScimSyncProjectionRepository.create(prisma),
   };
 }

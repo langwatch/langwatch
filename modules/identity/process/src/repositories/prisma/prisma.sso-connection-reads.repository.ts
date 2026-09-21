@@ -50,6 +50,18 @@ export class PrismaSsoConnectionReadRepository implements SsoConnectionReadRepos
     });
     return row === null ? null : { connectionId: row.id, organizationId: row.organizationId };
   }
+
+  async findForOrganization({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<SsoConnectionState[]> {
+    const rows = await this.prisma.ssoConnection.findMany({
+      where: { organizationId },
+      orderBy: { createdAt: "desc" },
+    });
+    return rows.map((row) => PrismaSsoConnectionProjectionRepository.rowToConnection(row));
+  }
 }
 
 /**

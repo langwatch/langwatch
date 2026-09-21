@@ -1,7 +1,7 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import { IdentityApi } from "@langwatch/identity-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { identityServer } from "../../identity.server.ts";
@@ -10,8 +10,7 @@ describe("identity verification installation", () => {
   it("composes the ceremony behind IdentityApi and keeps an unlatched user from spending a proof", async () => {
     const runtime = await createApp({ role: "api" })
       .withModules([withMemoryRepositories(identityServer)])
-      .withConfig({ identity: { adminEmails: [] } })
-      .withMembers({ registersPipelines: false })
+      .withMembers({ producesPipelines: false, adminEmails: [] })
       .withRelational(createApiFixture<PrismaClient>())
       .withEventing(new EventSourcing({ enabled: false }))
       .boot();

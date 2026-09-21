@@ -38,6 +38,16 @@ export class MemorySsoConnectionReadRepository implements SsoConnectionReadRepos
       : null;
   }
 
+  async findForOrganization({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<SsoConnectionState[]> {
+    return [...this.store.ssoConnections.values()]
+      .filter((connection) => connection.organizationId === organizationId)
+      .toSorted((left, right) => right.createdAtMs - left.createdAtMs);
+  }
+
   private verifiedDomains(connection: SsoConnectionState): readonly string[] {
     const domains = Reflect.get(connection, "verifiedDomains");
 

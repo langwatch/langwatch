@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { BrowserSessionApi } from "@langwatch/auth-contract";
 import { createTenantId } from "@langwatch/eventing";
@@ -9,7 +10,6 @@ import {
 } from "@langwatch/group-queue/operational";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import Redis, { type Redis as RedisClient } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -51,8 +51,8 @@ class NoopAuthService implements BrowserSessionApi {
   async endBrowserSession(): Promise<{ ended: number }> {
     return { ended: 0 };
   }
-  async isWithinBudget(): Promise<boolean> {
-    return false;
+  async isWithinBudget(): Promise<Readonly<{ allowed: boolean }>> {
+    return { allowed: false };
   }
   async route(): Promise<never> {
     throw new Error("not configured");
@@ -84,6 +84,16 @@ class NoopAuthService implements BrowserSessionApi {
   async revokeBrowserSession(): Promise<void> {}
 
   async revokeOtherBrowserSessions(): Promise<void> {}
+
+  offersPasskeys(): boolean {
+    return false;
+  }
+
+  async findCliAccessSession(): Promise<null> {
+    return null;
+  }
+
+  async revokeCliAccessToken(): Promise<void> {}
 }
 
 /**

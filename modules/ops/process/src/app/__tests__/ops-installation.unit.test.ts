@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * The feature installs: a process booting it over memory gets a working
@@ -15,7 +16,6 @@ import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { createTestLogger } from "@langwatch/test-harness";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
@@ -37,7 +37,6 @@ function process(role: "api" | "worker") {
         apiKey: undefined,
         metricsApiKey: undefined,
         clickhouseOpsUrl: undefined,
-        adminEmails: OPS_STAFF_ADDRESS,
         legacySsoStringWritesRetired: false,
         usageStats: { disabled: false, installMethod: undefined },
         collectClickHouseBackupMetrics: true,
@@ -45,6 +44,7 @@ function process(role: "api" | "worker") {
       },
     })
     .withMember("nodeEnvironment", undefined)
+    .withMember("adminEmails", [OPS_STAFF_ADDRESS])
     .withRelational(new PrismaClient({ accelerateUrl: "prisma://localhost/test" }))
     .withAnalytical(memberWithoutStore<ClickHouseQueryClient>())
     .withKeyvalue(memberWithoutStore<RedisConnection>())

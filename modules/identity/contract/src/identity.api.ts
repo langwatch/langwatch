@@ -59,6 +59,10 @@ import type {
   RevokeScimSyncCommandData,
 } from "./scim-sync-commands.ts";
 import type { ScimSyncFactInput } from "./scim-sync.ts";
+import type {
+  OrganizationSsoConnection,
+  SsoConnectionHistoryEntryView,
+} from "./sso-connection-history.ts";
 
 /** One abandoned-newborn sweep pass (ADR-116 §3). */
 export interface IdentityNewbornSweepSummary {
@@ -191,6 +195,27 @@ export interface SsoConnectionApi {
   grandfatherConnection(input: GrandfatherConnectionCommandData): Promise<unknown[]>;
 }
 
+/**
+ * The SSO connections an organization holds, read by a peer module. Identity
+ * owns these rows; nobody else queries them.
+ */
+export interface SsoConnectionReadsApi {
+  findForOrganization(args: { organizationId: string }): Promise<OrganizationSsoConnection[]>;
+}
+
+/**
+ * One connection's own history, in words. Both the organization's page and
+ * the back office read through this: who may reach it is the transport's
+ * question, and the organization it is scoped to the caller's.
+ */
+export interface SsoConnectionHistoryApi {
+  getHistory(args: {
+    organizationId: string;
+    connectionId: string;
+    limit?: number;
+  }): Promise<SsoConnectionHistoryEntryView[]>;
+}
+
 /** The backoffice read/write surface over SSO connections. */
 export interface SsoConnectionBackofficeApi {
   list(args: {
@@ -199,6 +224,12 @@ export interface SsoConnectionBackofficeApi {
     search?: string;
   }): Promise<IdentityBackofficeSsoConnectionList>;
   findById(args: { connectionId: string }): Promise<IdentityBackofficeSsoConnection | null>;
+  /** One connection's history, the organization resolved from the connection
+   *  rather than taken from the caller. Null for one that does not exist. */
+  findHistory(args: {
+    connectionId: string;
+    limit?: number;
+  }): Promise<SsoConnectionHistoryEntryView[] | null>;
   registerConnection(args: {
     organizationId: string;
     type: string;
@@ -312,6 +343,8 @@ export interface IdentityApi {
   ssoConnections(): SsoConnectionApi;
   ssoConnectionGuards(): SsoConnectionGuardsApi;
   ssoBackoffice(): SsoConnectionBackofficeApi;
+  ssoConnectionHistory(): SsoConnectionHistoryApi;
+  ssoConnectionReads(): SsoConnectionReadsApi;
   scimSyncGuards(): ScimSyncGuardsApi;
 }
 

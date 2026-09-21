@@ -49,6 +49,9 @@ export type OpsProcessMembers = Readonly<{
   logger: Logger;
   /** The process's own fact (§6), for the EXPLAIN fail-closed rule. */
   nodeEnvironment: string | undefined;
+  /** Who reaches the back office — the deployment's own list, named raw
+   *  because it is a fact about the installation, not a store. */
+  adminEmails: readonly string[];
 }>;
 
 /** One operator explorer, refused by name on every method. */

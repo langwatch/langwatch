@@ -31,8 +31,8 @@ export class AuthStub implements BrowserSessionApi {
   async endBrowserSession(): Promise<{ ended: number }> {
     return { ended: 0 };
   }
-  async isWithinBudget(): Promise<boolean> {
-    return false;
+  async isWithinBudget(): Promise<Readonly<{ allowed: boolean }>> {
+    return { allowed: false };
   }
   async route(): Promise<never> {
     throw new Error("not configured");
@@ -56,6 +56,16 @@ export class AuthStub implements BrowserSessionApi {
   revokeAllBrowserSessions = vi.fn(async () => undefined);
   revokeBrowserSession = vi.fn(async () => undefined);
   revokeOtherBrowserSessions = vi.fn(async () => undefined);
+
+  offersPasskeys(): boolean {
+    return false;
+  }
+
+  async findCliAccessSession(): Promise<null> {
+    return null;
+  }
+
+  async revokeCliAccessToken(): Promise<void> {}
 }
 
 export class RepositoryStub extends AdminBackofficeRepository {
