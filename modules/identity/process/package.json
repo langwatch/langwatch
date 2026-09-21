@@ -36,6 +36,7 @@
     "@langwatch/actor": "workspace:*",
     "@langwatch/audit-log-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/egress": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
