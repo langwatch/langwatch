@@ -63,6 +63,14 @@ export const LWQL_POSTGRES_SKIPPED_MODELS: PostgresSkipMap = {
   Passkey: "no tenant column: identity — a user's WebAuthn passkey",
   MfaEnrollment: "no tenant column: identity — a user's MFA enrollment state",
   ScimExternalId: "no tenant column: identity — a SCIM external id for a user",
+  SignInAttemptLock:
+    "no tenant column: identity — consecutive failed sign-ins and the lock they earn, keyed on the typed address",
+  SsoAuthenticationActivity:
+    "no tenant column: identity — a member's successful SSO callback, keyed to a user",
+  ScimUserResource:
+    "no tenant column: identity — a directory's profile for a user, never a project's data",
+  ScimDirectoryUser:
+    "no tenant column: identity — which SSO connection manages a user",
 
   // Access-control plumbing — membership, roles, grants and keys the row policy
   // already reads; exposing them would leak the isolation mechanism.
@@ -84,6 +92,24 @@ export const LWQL_POSTGRES_SKIPPED_MODELS: PostgresSkipMap = {
   ScimToken: "access-control plumbing: a SCIM provisioning token",
   ScimSyncState: "access-control plumbing: SCIM sync bookkeeping",
   SsoConnection: "access-control plumbing: an SSO connection config",
+  SsoConnectionRegistrationSlot:
+    "access-control plumbing: SSO connection registration lock",
+  SsoConnectionReproofCursor:
+    "access-control plumbing: SSO domain re-proof sweep position",
+  SsoCredential:
+    "access-control plumbing: SSO credential ciphertext, never customer analytics",
+  SsoVerifiedDomain:
+    "access-control plumbing: an SSO provider's verified domain",
+  SsoVerifiedDomainHolder:
+    "access-control plumbing: which SSO connection may use a verified domain",
+  SsoProvider:
+    "access-control plumbing: better-auth's SSO provider row (OIDC/SAML config)",
+  SsoBreakGlassBinding:
+    "access-control plumbing: the named person who may sign in without the identity provider",
+  SsoActivationRecoveryReservation:
+    "access-control plumbing: reservation of a recovery path during SSO activation",
+  ScimRequestLog:
+    "access-control plumbing: SCIM request evidence log (ADR-126)",
   ProjectSecret:
     "access-control plumbing: project secrets, never customer analytics",
   AnnotationQueueMembers:

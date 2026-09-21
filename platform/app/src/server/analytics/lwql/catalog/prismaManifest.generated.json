@@ -362,15 +362,6 @@
 					}
 				},
 				{
-					"name": "impersonating",
-					"columnName": "impersonating",
-					"type": "Json",
-					"kind": "scalar",
-					"isList": false,
-					"isOptional": true,
-					"documentation": ""
-				},
-				{
 					"name": "ipAddress",
 					"columnName": "ipAddress",
 					"type": "String",
@@ -407,13 +398,22 @@
 					"documentation": "What the sign-in that minted this session PROVED, as RFC 8176 method\nreferences (D06). Empty on every session minted before the column, and\non any ordinary password sign-in. An organization that requires a second\nfactor reads this when a member reaches its data; it is never read at\nmint and never ends a session."
 				},
 				{
+					"name": "impersonating",
+					"columnName": "impersonating",
+					"type": "Json",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "The legacy impersonation payload. NOTHING READS OR WRITES IT any more -\nthe {actor, subject} columns below replaced it, and the migration beside\nthem ended every session that still carried a value.\n\nIt stays for ONE release, and that is the whole reason it is still here.\n`prisma migrate deploy` runs at container start, so the first pod of a\nnew release drops a column while the previous release's pods are still\nserving - and those pods select this column on EVERY authenticated\nrequest and fail closed when the row does not come back. Dropping it in\nthe same release that stops reading it signs everybody out for the length\nof the rollout. Expand now, contract next release."
+				},
+				{
 					"name": "actorUserId",
 					"columnName": "actorUserId",
 					"type": "String",
 					"kind": "scalar",
 					"isList": false,
 					"isOptional": true,
-					"documentation": ""
+					"documentation": "The impersonation claims (D06), aligned with the authz Principal\n{actor, subject}. The actor is the operator who really made the request\nand the subject is the person whose access they are borrowing; both are\nrecorded on every authorization decision, so the audit trail can answer\nwho really did it. These replace the legacy `impersonating` JSON blob,\nwhich is dropped in the release AFTER this one.\n\nNULL on every ordinary session, which is all of them: an impersonation\nis a handful of rows at a time and nothing else reads these columns."
 				},
 				{
 					"name": "subjectUserId",
@@ -431,7 +431,7 @@
 					"kind": "scalar",
 					"isList": false,
 					"isOptional": true,
-					"documentation": ""
+					"documentation": "Why the operator started it. Required to start one\n(specs/features/backoffice-user-impersonation-reason.feature) and kept\nbeside both people rather than only in the audit log, so a request under\nimpersonation carries its own justification."
 				},
 				{
 					"name": "impersonationExpiresAt",
@@ -440,7 +440,16 @@
 					"kind": "scalar",
 					"isList": false,
 					"isOptional": true,
-					"documentation": ""
+					"documentation": "When the borrowed access lapses. A session outlives its impersonation\nwindow: past this the claims are ignored and the operator is themselves\nagain, with nothing ended."
+				},
+				{
+					"name": "lastSeenAt",
+					"columnName": "lastSeenAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "When this session was last used, for the idle timeout an organization\nmay set (GAC-10, specs/identity/org-session-lifetime.feature).\n\nA COLUMN OF OUR OWN rather than `updatedAt`, because better-auth rolls a\nlive session's expiry once per `updateAge` - a day - so `updatedAt` is\nactivity to the nearest day and cannot tell an idle hour from an idle\nminute. Written only for sessions whose owner belongs to an organization\nthat has set a window, and then at most once per quarter-window, so a\ndeployment where nobody has turned this on writes it never.\n\nNULL on every session minted before the column and on every session\nunder no window at all. A null READS AS `updatedAt`, which better-auth\nkeeps rolled to within a day of the last use. That fallback is\nconservative in the direction that matters - `updatedAt` is never\nearlier than the real last use, so it can only ever judge a session MORE\nactive than it was, never less - and it is what lets a window turned on\ntoday end the sessions that have been idle since February instead of\nwaiting a day for a stamp they have never had."
 				},
 				{
 					"name": "createdAt",
@@ -657,6 +666,20 @@
 					}
 				},
 				{
+					"name": "scimUserResources",
+					"columnName": "scimUserResources",
+					"type": "ScimUserResource",
+					"kind": "relation",
+					"isList": true,
+					"isOptional": false,
+					"documentation": "",
+					"relation": {
+						"fields": [],
+						"references": [],
+						"to": "ScimUserResource"
+					}
+				},
+				{
 					"name": "createdAt",
 					"columnName": "createdAt",
 					"type": "DateTime",
@@ -727,6 +750,15 @@
 					"isList": false,
 					"isOptional": true,
 					"documentation": "When this person last said \"not now\" to being offered a passkey\n(ADR-120). On the account rather than in browser storage for two\nreasons: a per-browser record forgets on a new device, which is exactly\nwhere the offer should be MORE eager, and an interval nobody can enforce\nis not an interval. NULL means never asked."
+				},
+				{
+					"name": "joinOfferDismissedDomains",
+					"columnName": "joinOfferDismissedDomains",
+					"type": "String",
+					"kind": "scalar",
+					"isList": true,
+					"isOptional": false,
+					"documentation": "The domains this person has said \"no thanks\" to being offered their\ncolleagues on (D12). Per domain rather than one flag: somebody who\nchanges jobs and verifies a second address should be offered their new\nemployer's organization, not silenced forever by a decision they made\nabout the old one. Empty means never dismissed anything."
 				},
 				{
 					"name": "Annotation",
@@ -1666,6 +1698,95 @@
 			]
 		},
 		{
+			"name": "SignInAttemptLock",
+			"tableName": "SignInAttemptLock",
+			"documentation": "Consecutive failed sign-ins, and the lock they earn (GAC-09).\nSpec: specs/identity/org-account-lockout.feature.\n\nKEYED ON THE ADDRESS THAT WAS TYPED, NOT ON A USER, and that is the whole\ndesign. We already answer \"no such account\" and \"wrong password\" with one\nrefusal so that sign-in cannot be used to discover who has an account. A\nlock that existed only for real accounts would put that back: five wrong\nguesses saying \"locked\" for one address and \"incorrect\" for another tells\nan attacker which addresses are worth attacking. So an address with\nnothing behind it gets a row, a count and a lock exactly like one that\nresolves, and both answer identically.\n\n`identifierHash` is a KEYED hash of the normalised address, never the\naddress. The key is the deployment's own secret, so this table cannot be\nlifted and reversed into the list of every address anybody has ever tried\nto sign in as - which is what it would otherwise become, including every\ntypo and every address that has no account here at all.\n\nRow-truth, deliberately (ADR-101 R12): this is protocol state read and\nwritten on the sign-in path, like TwoFactor's own counters next door. The\nEVIDENCE an auditor reads is the identity event emitted when a lock is\ntaken, which is durable; these rows are reaped once they stop meaning\nanything.",
+			"primaryKey": ["id"],
+			"fields": [
+				{
+					"name": "id",
+					"columnName": "id",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "identifierHash",
+					"columnName": "identifierHash",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "Keyed hash of the normalised address. Never the address itself."
+				},
+				{
+					"name": "failedCount",
+					"columnName": "failedCount",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "Consecutive failures since the last success. Reset by a success, not by\ntime - \"five consecutive\", not five ever."
+				},
+				{
+					"name": "lockedUntil",
+					"columnName": "lockedUntil",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "When the current lock lifts. Null when not locked."
+				},
+				{
+					"name": "consecutiveLockouts",
+					"columnName": "consecutiveLockouts",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "Locks taken since the last success. At five this stops lifting by\nitself and becomes an incident - see `heldForReview`."
+				},
+				{
+					"name": "heldForReview",
+					"columnName": "heldForReview",
+					"type": "Boolean",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "Held past its lock because the count of locks reached the ceiling the\ncontrol names. Cleared by an administrator, or by the owner proving\nmailbox control through a password reset - the second is what keeps a\nheld account from being a denial of service anyone can inflict by\ntyping a colleague's address wrong often enough."
+				},
+				{
+					"name": "userId",
+					"columnName": "userId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "Whose account this resolved to at the time, when it resolved to one.\nNull for an address with no account - those rows are the reason this is\nnullable, and the reason this table is not hung off User."
+				},
+				{
+					"name": "createdAt",
+					"columnName": "createdAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "updatedAt",
+					"columnName": "updatedAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				}
+			]
+		},
+		{
 			"name": "Passkey",
 			"tableName": "Passkey",
 			"documentation": "The passkey plugin's own table (D07). Protocol state, like TwoFactor: the\npublic key and the signature counter are the plugin's to read and write.\nA passkey also becomes an `Identifier` row with provider `passkey`, which\nis what makes it a sign-in method like any other - this table is the\ncredential, that one is the identity.\n\n`aaguid` names the authenticator MODEL, never a device or a person, and is\nonly present at registration. Privacy-preserving platforms report all\nzeroes, so a label derived from it is best-effort by construction.",
@@ -2017,6 +2138,15 @@
 					"documentation": ""
 				},
 				{
+					"name": "domainClaims",
+					"columnName": "domainClaims",
+					"type": "Json",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "[{ domain, state, claimedAtMs, claimedByActorId, decidedAtMs,\ndecidedByActorId, authority, waitedMs, note }] - every claim this\nconnection has made and how long each waited to be decided. The tier-3\napproval queue is a read of this column, and the epic's Open Q2 wants\nthat latency measured from the day the queue exists."
+				},
+				{
 					"name": "approvedDomains",
 					"columnName": "approvedDomains",
 					"type": "String",
@@ -2035,13 +2165,22 @@
 					"documentation": "The only domains that ever route, and only while state is ACTIVE."
 				},
 				{
+					"name": "lapsedDomains",
+					"columnName": "lapsedDomains",
+					"type": "String",
+					"kind": "scalar",
+					"isList": true,
+					"isOptional": false,
+					"documentation": "The subset of `verifiedDomains` whose published record stayed missing\nthrough its grace window (ADR-123). They still ROUTE - everyone already\nhere signs in unchanged - and they stop vouching for anybody NEW: no\nprovisioning on first sign-in, no walking in by domain. A column rather\nthan a read of the JSON below, because both questions are asked on a\nsign-in path and have to be one indexed predicate."
+				},
+				{
 					"name": "domainVerifications",
 					"columnName": "domainVerifications",
 					"type": "Json",
 					"kind": "scalar",
 					"isList": false,
 					"isOptional": false,
-					"documentation": "[{ domain, method, actorId, verifiedAtMs }] - what proved each verified\ndomain, and who. Kept on the row rather than only in the log so that an\noperator-attested domain can never be read as one the customer proved."
+					"documentation": "[{ domain, method, actorId, verifiedAtMs, proofState, firstAbsentAtMs,\ngraceEndsAtMs }] - what proved each verified domain, who, and whether\nthat evidence is still there. Kept on the row rather than only in the\nlog so that an operator-attested domain can never be read as one the\ncustomer proved, and a wavering one never as one nothing is doubting."
 				},
 				{
 					"name": "pendingVerification",
@@ -2062,13 +2201,31 @@
 					"documentation": ""
 				},
 				{
+					"name": "arrivalPolicy",
+					"columnName": "arrivalPolicy",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "admit | request | refuse - what this connection does with somebody who\nsigns in through it and is not a member yet (ADR-117 3). Stated at\nregistration and changed by the setup journey, so it is never absent\nand no reader has to decide what absence means. This was two fields\nfor a while - a boolean `allowsJit` beside it, kept in step by the\nfold - and they disagreed about the middle answer."
+				},
+				{
 					"name": "allowsJit",
 					"columnName": "allowsJit",
 					"type": "Boolean",
 					"kind": "scalar",
 					"isList": false,
 					"isOptional": false,
-					"documentation": ""
+					"documentation": "DEAD, AND STAYING FOR ONE RELEASE. Nothing reads or writes this; the\nrouting repository derives the same answer from `arrivalPolicy`. It is\ndeclared so the schema still describes the table, and left in place so\nthe PREVIOUS release's pods — which select it by name on every\nconnection read — keep working through the rollout. Dropping it in the\nrelease that stopped reading it would stop single sign-on routing and\nthe connection projection for the length of the deploy. Dropped by\n`20260827120000_drop_sso_connection_allows_jit` in the next one."
+				},
+				{
+					"name": "arrivalPolicyDecidedAt",
+					"columnName": "arrivalPolicyDecidedAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "When somebody CHOSE the policy above, and null while the registration\ndefault stands. A different fact from the policy rather than a second\ncopy of it: a connection always has a behaviour, and separately\nsomebody has or has not decided on it. Going live waits for the\ndeciding - \"turn everybody away\" is a decision too."
 				},
 				{
 					"name": "source",
@@ -2083,6 +2240,60 @@
 					"name": "testLoginAccountId",
 					"columnName": "testLoginAccountId",
 					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "replacesConnectionId",
+					"columnName": "replacesConnectionId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "The grandfathered connection this direct connection replaces. Null for\nordinary connections and for the grandfathered predecessor itself.\n\nPartial uniqueness for nonterminal replacements is installed by the\nflattened migration; Prisma cannot express that predicate here."
+				},
+				{
+					"name": "migrationPhase",
+					"columnName": "migrationPhase",
+					"type": "SsoConnectionMigrationPhase",
+					"kind": "enum",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "SETUP | GRACE_LEGACY | GRACE_DIRECT | FINALIZING | FINALIZED.\nNull means this connection is not a legacy-to-direct replacement."
+				},
+				{
+					"name": "graceStartedAt",
+					"columnName": "graceStartedAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "routeChangedAt",
+					"columnName": "routeChangedAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "When an administrator last selected the normal route. This is audit\nevidence only: routing is derived from `migrationPhase`, never recency."
+				},
+				{
+					"name": "finalizationRequestedAt",
+					"columnName": "finalizationRequestedAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "finalizedAt",
+					"columnName": "finalizedAt",
+					"type": "DateTime",
 					"kind": "scalar",
 					"isList": false,
 					"isOptional": true,
@@ -2163,6 +2374,566 @@
 				{
 					"name": "updatedAt",
 					"columnName": "updatedAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "reproofCursor",
+					"columnName": "reproofCursor",
+					"type": "SsoConnectionReproofCursor",
+					"kind": "relation",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "",
+					"relation": {
+						"fields": [],
+						"references": [],
+						"to": "SsoConnectionReproofCursor"
+					}
+				}
+			]
+		},
+		{
+			"name": "SsoConnectionRegistrationSlot",
+			"tableName": "SsoConnectionRegistrationSlot",
+			"documentation": "The one-statement pre-event registration lock. `SsoConnection` remains\nevent truth; this row only decides which command may append that truth.\nA slot whose projected connection is terminal may be atomically replaced.",
+			"primaryKey": ["organizationId", "kind"],
+			"fields": [
+				{
+					"name": "organizationId",
+					"columnName": "organizationId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "kind",
+					"columnName": "kind",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "legacy | direct"
+				},
+				{
+					"name": "connectionId",
+					"columnName": "connectionId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "replacesConnectionId",
+					"columnName": "replacesConnectionId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "commandId",
+					"columnName": "commandId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "createdAt",
+					"columnName": "createdAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "updatedAt",
+					"columnName": "updatedAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				}
+			]
+		},
+		{
+			"name": "SsoConnectionReproofCursor",
+			"tableName": "SsoConnectionReproofCursor",
+			"documentation": "Operational round-robin position for ADR-123's domain re-proof sweep.\n\nThis is deliberately not a column on `SsoConnection`: that row is a\nwhole-row event projection and its fold is its only writer, while a\nhealthy re-read states no fact. Keeping the scheduling cursor beside the\nprojection preserves both rules and still lets a fixed-size sweep revisit\nevery connection, including one whose proof has started wavering.",
+			"primaryKey": ["connectionId"],
+			"fields": [
+				{
+					"name": "connectionId",
+					"columnName": "connectionId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "lastReproofAt",
+					"columnName": "lastReproofAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "connection",
+					"columnName": "connection",
+					"type": "SsoConnection",
+					"kind": "relation",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "",
+					"relation": {
+						"fields": ["connectionId"],
+						"references": ["id"],
+						"to": "SsoConnection"
+					}
+				}
+			]
+		},
+		{
+			"name": "SsoCredential",
+			"tableName": "SsoCredential",
+			"documentation": "The values an `SsoConnection`'s credential references point AT (D09 - see\nspecs/identity/sso-idp-termination.feature).\n\nThe aggregate has always carried `clientIdRef` / `secretRef` / `certRefs`\nrather than values, because a fact may not carry a secret (ADR-101 §4).\nUntil D09 there was nothing behind the references and every writer passed\nnull. This is the thing behind them.\n\n`ciphertext` is AES-256-GCM under the deployment's `CREDENTIALS_SECRET`,\nthe same key every other credential in the product is kept under. Nothing\nreads a row except the projection that builds the engine's dialing\nconfiguration; no surface renders one back.\n\nWritten by the command path rather than the fold, and that split is\ndeliberate: the VALUE is not event truth and cannot be, so the log records\nWHEN a credential changed (a new reference in a new fact) and never what\nit was. A replay rebuilds every reference from the log and finds the value\nstill here.",
+			"primaryKey": ["id"],
+			"fields": [
+				{
+					"name": "id",
+					"columnName": "id",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "organizationId",
+					"columnName": "organizationId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "connectionId",
+					"columnName": "connectionId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "The connection whose registration minted this. Not a relation, matching\n`SsoConnection` itself: a projection rebuilt from events must not depend\non relational state the log does not carry."
+				},
+				{
+					"name": "kind",
+					"columnName": "kind",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "oidc-client-id | oidc-client-secret | saml-idp-config"
+				},
+				{
+					"name": "ciphertext",
+					"columnName": "ciphertext",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "createdAt",
+					"columnName": "createdAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "updatedAt",
+					"columnName": "updatedAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				}
+			]
+		},
+		{
+			"name": "SsoVerifiedDomain",
+			"tableName": "SsoVerifiedDomain",
+			"documentation": "better-auth's single sign-on plugin's provider table (D09), and a\nPROJECTION of the connection log rather than a second source of truth.\n\nThe plugin owns the columns and the reads: it is the only thing that\nspeaks OpenID Connect discovery or reads a SAML assertion, and it dials\nwhat it finds here. What it never does is decide that a row should exist —\nthat is folded from `SsoConnection`'s events by the same projection that\nwrites the connection head, in the same transaction, so a replay rebuilds\nboth together and a row can never outlive the connection that justified\nit. Nothing else writes here.\n\n`providerId` is the CONNECTION ID rather than the name the customer typed.\nThe plugin's column is globally unique, and two organizations both calling\ntheir provider `okta` must both be able to.\n\n`oidcConfig` and `samlConfig` are the plugin's own JSON documents, rebuilt\non every fold from `SsoCredential` — the vault is where the material\nlives, and this row is a derived copy the engine can read synchronously.\n\nSEALED AT REST, under the same key the vault uses. The document carries\nthe client secret the derivation reads OUT of the vault, so a plaintext\ncopy here would hand every customer's live identity-provider credential\nto anybody holding a database dump — the exact threat `SsoCredential`\nexists to defeat, reopened one table over. A stored value announces its\nform (`enc:v1:`), so a row written before the seal existed still opens;\nthe one reader is the identity storage adapter, on the path that dials.\nThe reader tolerates both forms, so this needs no backfill — but a pod\nwithout it cannot read a sealed row, so it must not be rolled back past.\nWHO OWNS A PROVED DOMAIN, as a row the database can refuse twice.\n\n\"First verifier owns\" was enforced by reading `findDomainOwner` and then\nwriting the fact — two different aggregates, so the per-connection queue\nnever ordered them against each other, and `SsoConnection.verifiedDomains`\nis a `String[]` with only a GIN index behind it, which enforces nothing.\nTwo organizations proving `acme.com` at the same moment both read \"nobody\nowns it\" and both committed; the sign-in router then picked between two\nlive connections by planner order, so a member of one company could be\nhanded to another company's identity provider — and with `arrivalPolicy`\non `admit`, provisioned into it.\n\nThe legacy single-domain model had this: `Organization.ssoDomain` is\n`@unique`. The multi-domain rewrite dropped the guarantee, and self-serve\nproof is what made the race reachable by customers rather than by two\noperators working at once.\n\n`domain` is the primary key, so a second organization loses on the\nconstraint rather than on a check it raced. Connection holders are\nseparate because an exact predecessor/replacement pair must coexist\nduring migration. Both are projected with the connection head.",
+			"primaryKey": ["domain"],
+			"fields": [
+				{
+					"name": "domain",
+					"columnName": "domain",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "organizationId",
+					"columnName": "organizationId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "holders",
+					"columnName": "holders",
+					"type": "SsoVerifiedDomainHolder",
+					"kind": "relation",
+					"isList": true,
+					"isOptional": false,
+					"documentation": "",
+					"relation": {
+						"fields": [],
+						"references": [],
+						"to": "SsoVerifiedDomainHolder"
+					}
+				}
+			]
+		},
+		{
+			"name": "SsoVerifiedDomainHolder",
+			"tableName": "SsoVerifiedDomainHolder",
+			"documentation": "A connection currently entitled to use an organization-owned verified\ndomain. Usually there is one holder. During an Auth0 migration there are\nexactly two: the grandfathered predecessor and its direct replacement.\n\nThe projection repository enforces that relationship before inserting a\nsecond holder. The flattened migration also installs partial unique live\nlegacy/direct slots on `SsoConnection`, closing concurrent third-writer\nraces that Prisma cannot describe declaratively.",
+			"primaryKey": ["domain", "connectionId"],
+			"fields": [
+				{
+					"name": "domain",
+					"columnName": "domain",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "connectionId",
+					"columnName": "connectionId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "organizationId",
+					"columnName": "organizationId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "ownership",
+					"columnName": "ownership",
+					"type": "SsoVerifiedDomain",
+					"kind": "relation",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "",
+					"relation": {
+						"fields": ["domain", "organizationId"],
+						"references": ["domain", "organizationId"],
+						"to": "SsoVerifiedDomain"
+					}
+				}
+			]
+		},
+		{
+			"name": "SsoAuthenticationActivity",
+			"tableName": "SsoAuthenticationActivity",
+			"documentation": "A successful callback through one SSO connection. Identifier.lastUsedAt\nalso advances during routing and resolution, so it cannot prove that a\nmember actually authenticated through the replacement before cutover.",
+			"primaryKey": ["id"],
+			"fields": [
+				{
+					"name": "id",
+					"columnName": "id",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "organizationId",
+					"columnName": "organizationId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "connectionId",
+					"columnName": "connectionId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "userId",
+					"columnName": "userId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "authenticatedAt",
+					"columnName": "authenticatedAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				}
+			]
+		},
+		{
+			"name": "SsoProvider",
+			"tableName": "SsoProvider",
+			"documentation": "",
+			"primaryKey": ["id"],
+			"fields": [
+				{
+					"name": "id",
+					"columnName": "id",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "issuer",
+					"columnName": "issuer",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "oidcConfig",
+					"columnName": "oidcConfig",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "samlConfig",
+					"columnName": "samlConfig",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "userId",
+					"columnName": "userId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "providerId",
+					"columnName": "providerId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "organizationId",
+					"columnName": "organizationId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "domain",
+					"columnName": "domain",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				}
+			]
+		},
+		{
+			"name": "SsoBreakGlassBinding",
+			"tableName": "SsoBreakGlassBinding",
+			"documentation": "A way back in (D05 - see specs/identity/sso-onboarding-tiers.feature).\n\nOne named person who may still sign in without the identity provider\nwhile their organization's sign-in belongs to one, and the date on which\nthat stops. Activation asks whether such a person exists, because the\nfailure it prevents is the only one that cannot be recovered from inside\nthe product: a misconfigured connection goes live, every member is handed\nto an identity provider that will not authenticate them, and nobody is\nleft who can turn it off.\n\nRows are immutable except for `supersededAt` and `warnedDays`. A renewal\nwrites a NEW row naming the one it replaced, so the date a way in\npreviously ended is still readable in the history - which is what makes a\nrenewal auditable rather than a column somebody moved.\n\nNo relation to Organization or User, matching the identity heads above:\nthe binding is the record of who could get in, and a cascade would erase\nexactly the history a lockout post-mortem reads.",
+			"primaryKey": ["id"],
+			"fields": [
+				{
+					"name": "id",
+					"columnName": "id",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "organizationId",
+					"columnName": "organizationId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "userId",
+					"columnName": "userId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "Who holds the way in."
+				},
+				{
+					"name": "grantedByUserId",
+					"columnName": "grantedByUserId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "Who granted it. A way back in is never self-served."
+				},
+				{
+					"name": "grantedAt",
+					"columnName": "grantedAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "expiresAt",
+					"columnName": "expiresAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "supersededAt",
+					"columnName": "supersededAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "Set when a renewal replaced this row; the row itself is never edited."
+				},
+				{
+					"name": "renewedFromId",
+					"columnName": "renewedFromId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "The binding this one renewed, so the previous end date stays readable."
+				},
+				{
+					"name": "warnedDays",
+					"columnName": "warnedDays",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": true,
+					"isOptional": false,
+					"documentation": "Which of the fourteen, seven and one day warnings have been sent, so a\nsweep that runs twice in a day never says the same thing twice."
+				},
+				{
+					"name": "createdAt",
+					"columnName": "createdAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				}
+			]
+		},
+		{
+			"name": "SsoActivationRecoveryReservation",
+			"tableName": "SsoActivationRecoveryReservation",
+			"documentation": "A durable claim on one live recovery path while activation is between its\nguard and projected ACTIVE fact. It has no expiry: only projection of the\nmatching activation, or an explicit cancellation, may consume it.",
+			"primaryKey": ["commandId"],
+			"fields": [
+				{
+					"name": "commandId",
+					"columnName": "commandId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "organizationId",
+					"columnName": "organizationId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "connectionId",
+					"columnName": "connectionId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "createdAt",
+					"columnName": "createdAt",
 					"type": "DateTime",
 					"kind": "scalar",
 					"isList": false,
@@ -2532,6 +3303,24 @@
 					"isList": false,
 					"isOptional": true,
 					"documentation": "Set when an admin disables this membership to stay within the licensed\nseat count. The person loses access to this organization only, keeps\ntheir role, department and everything they did, and frees their seat.\nReversible: re-enabling restores access if a seat is available.\nSeat counting excludes disabled memberships. See\nseat-reconciliation.feature."
+				},
+				{
+					"name": "pendingSsoGrantId",
+					"columnName": "pendingSsoGrantId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "Stable grant intent for an unfinished automatic SSO admission.\nCleared after the authoritative grant is observed; never inferred from missing access."
+				},
+				{
+					"name": "membershipStamp",
+					"columnName": "membershipStamp",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "A new generation for each membership lifetime. Stamped USER grant facts\nmust match the current active membership before they can be projected;\nremoving and rejoining therefore cannot revive a delayed old attach."
 				}
 			]
 		},
@@ -2861,6 +3650,42 @@
 					"documentation": "Every member of this organization can prove a second factor (D06). A\nMEMBERSHIP CONDITION, not a session policy: it is asked when a member\nreaches this organization's data, it holds the ones who cannot prove\none at an enrollment gate for THIS organization alone, and it ends no\nsession, ever. Turning it on signs nobody out.\nSpec: specs/identity/mfa-and-session-shape.feature."
 				},
 				{
+					"name": "lockoutAfterFailedAttempts",
+					"columnName": "lockoutAfterFailedAttempts",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "How many consecutive failed sign-ins lock an account (GAC-09).\n0 = never lock, which is the default and what every organization that\nhas not asked for this keeps. Counts EVERY credential together - a\npassword, a one-time code, a backup code, a passkey - because five per\nfactor hands an attacker one budget per factor.\nSpec: specs/identity/org-account-lockout.feature."
+				},
+				{
+					"name": "lockoutMinutes",
+					"columnName": "lockoutMinutes",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "How long a lock lasts, in minutes. Ignored while the threshold is 0."
+				},
+				{
+					"name": "sessionIdleTimeoutMinutes",
+					"columnName": "sessionIdleTimeoutMinutes",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "How long a BROWSER session may sit idle before it ends, in minutes\n(GAC-10). 0 = no idle timeout. Activity rolls the window, which is the\n\"refreshed every hour\" half of the control.\n\nA day for organizations created from now on; organizations that predate\nthe column keep 0 and are unchanged, because the migration adds the\ncolumn at zero and moves the default afterwards.\n\nNOT `maxSessionDurationDays`, which bounds CLI and device sessions and\nis enforced when the CLI refreshes. Two surfaces, two lifetimes, two\ndecisions an administrator makes separately.\nSpec: specs/identity/org-session-lifetime.feature."
+				},
+				{
+					"name": "sessionMaxLifetimeMinutes",
+					"columnName": "sessionMaxLifetimeMinutes",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "The ceiling on a browser session from the moment it was minted, in\nminutes, which no amount of activity extends. 0 = no ceiling, the\ndefault. Offered beside the idle timeout because a session kept alive\nforever by a polling page is not really bounded."
+				},
+				{
 					"name": "signupData",
 					"columnName": "signupData",
 					"type": "Json",
@@ -3124,6 +3949,20 @@
 					}
 				},
 				{
+					"name": "scimRequestLog",
+					"columnName": "scimRequestLog",
+					"type": "ScimRequestLog",
+					"kind": "relation",
+					"isList": true,
+					"isOptional": false,
+					"documentation": "",
+					"relation": {
+						"fields": [],
+						"references": [],
+						"to": "ScimRequestLog"
+					}
+				},
+				{
 					"name": "promptTags",
 					"columnName": "promptTags",
 					"type": "PromptTag",
@@ -3349,6 +4188,109 @@
 			]
 		},
 		{
+			"name": "ScimRequestLog",
+			"tableName": "ScimRequestLog",
+			"documentation": "Every SCIM request we could attribute, and what we answered (ADR-126).\n\nEVIDENCE, NOT TRUTH. A request authors nothing — an HTTP round trip that\nwas refused decided nothing — so this is a table and not an event: nothing\ndownstream derives from it, rebuilding the world from the log must not\ndepend on how often a provider retried a GET, and rows age out of a\nretention window an event log would never have.\n\nNO ROW FOR A REQUEST WE CANNOT ATTRIBUTE. A token that does not verify is\nanswered 401 and recorded nowhere: we do not know whose organization to\nfile it under, and a table unauthenticated traffic can write is a table\nanybody on the internet can fill. What answers that case instead is\n`ScimToken.lastUsedAt` being null. The 403 IS recorded — a lapsed plan is\na credential we recognize.\n\nTHE PAYLOAD RULE HOLDS. A method, a resource name, a status, a reason slug\nand our own sentence. Never a token, never a header, never a provider's\nraw message — the same reason `scim_apply_failed` carries a code and not a\nmessage.",
+			"primaryKey": ["id"],
+			"fields": [
+				{
+					"name": "id",
+					"columnName": "id",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "organizationId",
+					"columnName": "organizationId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "organization",
+					"columnName": "organization",
+					"type": "Organization",
+					"kind": "relation",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "",
+					"relation": {
+						"fields": ["organizationId"],
+						"references": ["id"],
+						"to": "Organization"
+					}
+				},
+				{
+					"name": "connectionId",
+					"columnName": "connectionId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "Null when the refusal resolved an organization and stopped before the\nconnection — a lapsed plan is answered off the token alone."
+				},
+				{
+					"name": "method",
+					"columnName": "method",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "resource",
+					"columnName": "resource",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "The SCIM resource asked for (\"Users\", \"Users/:id\", \"Groups\"), never the\nraw path: a path carries ids and query strings, and this is read by\npeople rather than matched by machines."
+				},
+				{
+					"name": "status",
+					"columnName": "status",
+					"type": "Int",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "reason",
+					"columnName": "reason",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "A stable slug, only on a refusal, so a reader branches on this and never\non the sentence beside it."
+				},
+				{
+					"name": "detail",
+					"columnName": "detail",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "Our own short sentence, customer-safe."
+				},
+				{
+					"name": "occurredAt",
+					"columnName": "occurredAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				}
+			]
+		},
+		{
 			"name": "ScimToken",
 			"tableName": "ScimToken",
 			"documentation": "",
@@ -3402,7 +4344,16 @@
 					"kind": "scalar",
 					"isList": false,
 					"isOptional": false,
-					"documentation": ""
+					"documentation": "UNIQUE, and that is a tenancy boundary rather than tidiness.\n\nThe lookup that turns a bearer token into an organization is keyed on\nthis column alone — it has to be, since the token is the only thing the\ncaller presents. While every token was 32 random bytes a collision was\nimpossible and the missing constraint cost nothing. An administrator may\nnow supply a value they already hold, so two organizations CAN choose the\nsame string, and without this the lookup would answer with whichever row\nthe planner reached first: one customer's directory provisioning and\ndeleting another customer's people."
+				},
+				{
+					"name": "hashScheme",
+					"columnName": "hashScheme",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "How `hashedToken` was derived, so the two schemes can coexist while\ntokens minted under the old one are still in use.\n\n`sha256` is a bare digest, which is correct for 32 random bytes and wrong\nfor a value a person chose — a database dump of those is a wordlist away\nfrom live credentials. `hmac-sha256` is keyed on the deployment's own\nsecret, so a dump on its own is inert. Every new row is the latter."
 				},
 				{
 					"name": "description",
@@ -3439,6 +4390,15 @@
 			"documentation": "D08 — who the directory means, per connection.\n\nThe identity provider's own identifier for a person, which is what\nsurvives their email changing: an address is not identity, people change\ntheirs, and the same person carries different identifiers on two different\nconnections. So the PAIR is the key and `externalId` alone never is.\n\nNo relation to `SsoConnection` (that projection carries no foreign keys);\nthe `User` relation is real, so a deleted user takes their directory\nidentities with them rather than stranding a mapping that resolves to\nnobody.",
 			"primaryKey": ["id"],
 			"fields": [
+				{
+					"name": "organizationId",
+					"columnName": "organizationId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
 				{
 					"name": "id",
 					"columnName": "id",
@@ -3502,6 +4462,135 @@
 					"name": "updatedAt",
 					"columnName": "updatedAt",
 					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				}
+			]
+		},
+		{
+			"name": "ScimUserResource",
+			"tableName": "ScimUserResource",
+			"documentation": "Directory profile and lifecycle are tenant facts, independent of the shared account.",
+			"primaryKey": ["organizationId", "userId"],
+			"fields": [
+				{
+					"name": "organizationId",
+					"columnName": "organizationId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "userId",
+					"columnName": "userId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "user",
+					"columnName": "user",
+					"type": "User",
+					"kind": "relation",
+					"isList": false,
+					"isOptional": false,
+					"documentation": "",
+					"relation": {
+						"fields": ["userId"],
+						"references": ["id"],
+						"to": "User"
+					}
+				},
+				{
+					"name": "userName",
+					"columnName": "userName",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "name",
+					"columnName": "name",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "active",
+					"columnName": "active",
+					"type": "Boolean",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "deletedAt",
+					"columnName": "deletedAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": ""
+				},
+				{
+					"name": "createdAt",
+					"columnName": "createdAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "updatedAt",
+					"columnName": "updatedAt",
+					"type": "DateTime",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				}
+			]
+		},
+		{
+			"name": "ScimDirectoryUser",
+			"tableName": "ScimDirectoryUser",
+			"documentation": "A connection's managed users, including resources without an externalId.\nScalar keys only; readers exclude users that no longer exist.",
+			"primaryKey": ["connectionId", "userId"],
+			"fields": [
+				{
+					"name": "organizationId",
+					"columnName": "organizationId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "connectionId",
+					"columnName": "connectionId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": false,
+					"documentation": ""
+				},
+				{
+					"name": "userId",
+					"columnName": "userId",
+					"type": "String",
 					"kind": "scalar",
 					"isList": false,
 					"isOptional": false,
@@ -11023,15 +12112,6 @@
 					"documentation": ""
 				},
 				{
-					"name": "actorUserId",
-					"columnName": "actorUserId",
-					"type": "String",
-					"kind": "scalar",
-					"isList": false,
-					"isOptional": true,
-					"documentation": ""
-				},
-				{
 					"name": "projectId",
 					"columnName": "projectId",
 					"type": "String",
@@ -11102,6 +12182,15 @@
 					"isList": false,
 					"isOptional": true,
 					"documentation": ""
+				},
+				{
+					"name": "actorUserId",
+					"columnName": "actorUserId",
+					"type": "String",
+					"kind": "scalar",
+					"isList": false,
+					"isOptional": true,
+					"documentation": "WHO REALLY DID IT, when that is not `userId`.\n\nUnder an impersonation the session's `user.id` is the SUBJECT — the\ncustomer whose access an operator is borrowing — so a row naming only\n`userId` filed the operator's act against the customer. An operator\ngranting a permanent way into somebody's organization appeared, in the\nonly durable record of it, to be that somebody.\n\nNull on an ordinary request, where the two would be the same person and\nsaying so twice adds nothing. ADR-118 / D06: every decision names both."
 				},
 				{
 					"name": "targetKind",
@@ -19562,6 +20651,16 @@
 		}
 	],
 	"enums": [
+		{
+			"name": "SsoConnectionMigrationPhase",
+			"values": [
+				"SETUP",
+				"GRACE_LEGACY",
+				"GRACE_DIRECT",
+				"FINALIZING",
+				"FINALIZED"
+			]
+		},
 		{
 			"name": "TeamUserRole",
 			"values": ["ADMIN", "MEMBER", "VIEWER", "CUSTOM"]

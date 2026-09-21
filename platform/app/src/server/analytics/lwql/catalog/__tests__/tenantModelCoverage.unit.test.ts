@@ -31,7 +31,7 @@ import { LWQL_PRISMA_MANIFEST } from "../prismaManifest";
 import type { PrismaManifest } from "../prismaSchema";
 
 const DERIVED_MODEL_COUNT = 93;
-const SKIPPED_MODEL_COUNT = 37;
+const SKIPPED_MODEL_COUNT = 50;
 
 const modelNames = LWQL_PRISMA_MANIFEST.models.map((model) => model.name);
 const tableByModel = new Map(
