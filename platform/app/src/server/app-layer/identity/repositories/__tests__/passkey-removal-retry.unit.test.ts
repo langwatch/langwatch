@@ -2,6 +2,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { describe, expect, it, vi } from "vitest";
 import { Prisma, PrismaClient } from "~/generated/prisma/client";
 import { PrismaPasskeyRemovalRepository } from "../passkey-removal.prisma.repository";
+import { serializationRetryDelayMs } from "../serializable-retry";
 
 function driverConflict() {
   return Object.assign(new Error("TransactionWriteConflict"), {
@@ -54,6 +55,24 @@ describe("passkey removal serialization retries", () => {
       removal.deleteIfAnotherWayInRemains({ passkeyId: "passkey_1" }),
     ).rejects.toBe(conflict);
     expect(transaction).toHaveBeenCalledTimes(4);
+  });
+
+  it("waits a random slice of a growing window between attempts", () => {
+    // Both sides of a race are told at the same moment, so a retry with no
+    // wait puts them straight back into the same microsecond. Each attempt
+    // draws from its own window rather than from a fixed delay, which is what
+    // separates them.
+    for (const attempt of [0, 1, 2]) {
+      const ceiling = 5 * 2 ** attempt;
+      const draws = Array.from({ length: 50 }, () =>
+        serializationRetryDelayMs(attempt),
+      );
+      for (const delay of draws) {
+        expect(delay).toBeGreaterThanOrEqual(0);
+        expect(delay).toBeLessThan(ceiling);
+      }
+      expect(new Set(draws).size).toBeGreaterThan(1);
+    }
   });
 
   it("does not retry unrelated driver failures", async () => {

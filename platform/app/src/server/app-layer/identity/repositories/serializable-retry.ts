@@ -3,6 +3,28 @@ import { Prisma } from "~/generated/prisma/client";
 
 const MAX_SERIALIZATION_ATTEMPTS = 4;
 
+/** The first retry window. Attempt N waits a random slice of this doubled N
+ *  times, so the whole budget is a few tens of milliseconds at worst. */
+const RETRY_BASE_DELAY_MS = 5;
+
+/**
+ * How long to wait before trying again, as a random point inside a window
+ * that doubles each attempt.
+ *
+ * The randomness is the part that matters. Both sides of a race get the
+ * conflict at the same moment, so retrying straight away puts them back in
+ * the same microsecond, and four attempts can be spent before either one
+ * gets through. A random wait separates them on the first retry. The growth
+ * keeps a genuinely busy row from starving rather than making one click
+ * noticeably slower.
+ */
+export function serializationRetryDelayMs(attempt: number): number {
+  return Math.random() * RETRY_BASE_DELAY_MS * 2 ** attempt;
+}
+
+const wait = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
 /**
  * Postgres reports a serialization failure two different ways depending on
  * which layer notices it: Prisma's own `P2034`, and the driver adapter's
@@ -42,7 +64,8 @@ export function isSerializationConflict(error: unknown): boolean {
  * attempt reads the state the winner left and decides again from it, which is
  * the answer the person would have got had they clicked a moment later.
  *
- * Bounded at four attempts. A conflict that survives four rounds is not a
+ * Bounded at four attempts, each after a short random pause
+ * (`serializationRetryDelayMs`). A conflict that survives four rounds is not a
  * race between two clicks any more, and burying it under further retries
  * would hide a real problem rather than smooth one over.
  */
@@ -57,6 +80,7 @@ export async function withSerializationRetry<T>(
         attempt + 1 < MAX_SERIALIZATION_ATTEMPTS &&
         isSerializationConflict(error)
       ) {
+        await wait(serializationRetryDelayMs(attempt));
         continue;
       }
       throw error;
