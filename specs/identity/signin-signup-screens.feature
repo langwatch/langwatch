@@ -508,6 +508,24 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     Then nothing is promoted and nothing is badged
     And the methods stay in the order the decision named
 
+  # The dial cannot write the badge — a consent screen somebody backs out of
+  # would wear it forever — so the method is parked and only a session may
+  # promote it. Nothing on the sign-in screen can be what notices: a federated
+  # callback returns the browser to wherever the sign-in was heading, and that
+  # screen is never mounted again. The session fetch is the one thing every
+  # landing passes through, so it is where the promotion belongs.
+  @unit
+  Scenario: A social provider that got me in is badged, wherever the callback lands
+    Given I dialled a social provider and it signed me in
+    When the browser lands anywhere in the app holding a session
+    Then that provider is badged the next time the door is drawn
+
+  @unit
+  Scenario: A social provider I backed out of is never badged
+    Given I dialled a social provider and abandoned it before it signed me in
+    When the browser comes back with no session
+    Then nothing is badged
+
   # Every button on the rail is live, or it is not there. A screen that drew a
   # provider the deployment never mounted would be offering a door that opens
   # onto an error, and the person pressing it has no way to know that before

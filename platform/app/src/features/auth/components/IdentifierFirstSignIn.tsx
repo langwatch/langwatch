@@ -20,7 +20,6 @@ import { signUpHref } from "../logic/carriedEmail";
 import type { AuthDepth } from "../logic/groundPalette";
 import { usePublishAuthStage } from "../logic/groundStage";
 import {
-  promotePendingMethod,
   readLastUsedMethodId,
   rememberPendingMethod,
 } from "../logic/lastUsedMethod";
@@ -159,10 +158,12 @@ export function IdentifierFirstSignIn() {
 
   useEffect(() => {
     if (!session) return;
-    // A session is the only proof a federated hand-off worked, and this is
-    // where the browser lands holding one.
+    // The promotion moved to the session fetch itself: a federated callback
+    // returns the browser to the app root, not here, so this effect was never
+    // the place a federated hand-off landed. Reading the badge after that
+    // promotion also makes this report name the method that just got the
+    // person in, rather than the one before it.
     report.signedIn(readLastUsedMethodId() ?? "unknown");
-    promotePendingMethod();
     replaceLocation(safeRedirectTarget(callbackUrl));
   }, [session, callbackUrl, report]);
 
