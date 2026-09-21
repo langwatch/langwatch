@@ -15,10 +15,13 @@ and changing the deployment's default provider are separate actions.
 
 ## Upgrading an existing installation
 
-Identity and access migrations run automatically before the upgraded runtime
-starts serving. Keep the current provider configuration and credentials during
-the upgrade. See the [upgrade guide](/self-hosting/upgrade#automatic-identity-and-access-migration)
-for failure diagnostics.
+Identity and access migrations run automatically as the app starts, one
+organization at a time. An organization that migrates cleanly is switched
+over immediately; one whose historical data needs attention is held on its
+existing sign-in path without blocking the deployment. Keep the current
+provider configuration and credentials during the upgrade. See the
+[upgrade guide](/self-hosting/upgrade#automatic-identity-and-access-migration)
+for what still blocks startup and how to check and retry a held organization.
 
 ## Before you start
 

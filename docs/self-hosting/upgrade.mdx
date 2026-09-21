@@ -11,19 +11,40 @@ description: "How to upgrade LangWatch to the latest version"
 
 ## Automatic identity and access migration
 
-Identity and access migrations run automatically during startup. The new app
-does not begin serving until the authorization, identifier, and existing SSO
-data have migrated and passed their consistency checks. No preparatory release
-or manual migration pass is required.
+Identity and access migrations run automatically during startup, organization
+by organization. A tenant whose authorization, identifier, and existing SSO
+data migrate cleanly is switched over. No preparatory release or manual
+migration pass is required.
+
+A tenant whose historical data disagrees with the migrated result is **held**
+on its existing legacy sign-in path — nothing is changed or discarded — and
+the app still starts and serves it as before. A tenant whose migration throws
+is **parked** the same way, also without blocking startup. Both are retried
+automatically: the next restart re-drives them from the start of its own
+preflight, and an operator can also trigger a pass, or target one
+organization, without waiting for a restart — see
+[Check the migration results](#check-the-migration-results) below.
+
+Startup still refuses to serve traffic in three cases: the migration runner
+itself fails outright, the queue behind it fails to drain, or the fleet makes
+no progress for 25 passes (about two minutes — for example because Redis is
+unreachable, or another process holds every claim). In all three the process
+exits non-zero and the next start retries from scratch.
 
 Keep the current identity-provider configuration, callback URLs, and
 `CREDENTIALS_SECRET` during the upgrade. The migration preserves the existing
 SSO route; switching providers remains a separate operation.
 
-Take a fresh database backup, deploy normally, and watch the startup logs. If
-the migration finds inconsistent historical data, startup stops before the new
-runtime serves traffic. The diagnostics below help resolve those exceptional
-cases; they are not a routine preflight.
+Take a fresh database backup and deploy normally. The diagnostics below help
+resolve held or parked tenants; they are not a routine preflight.
+
+## Check the migration results
+
+Sign in with an operator account from `ADMIN_EMAILS` and open **Ops >
+Migrations** (`/ops/migrations`). It lists every registered migration with
+Held and Parked counts, and lets you search for an organization to inspect
+its status, target a migration run for it, or kick a fresh pass immediately
+rather than waiting for the next restart.
 
 The live connection indexes deliberately refuse duplicate slots rather than
 silently choosing a connection. `REJECTED`, `DRAFT`, and `CLAIMED` still occupy
