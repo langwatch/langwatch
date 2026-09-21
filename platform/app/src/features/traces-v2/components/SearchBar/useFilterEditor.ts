@@ -742,6 +742,11 @@ export function useFilterEditor({
     const keepFocus = editor.isFocused;
     isProgrammaticRef.current = true;
     editor.commands.setContent(buildDocument(queryText));
+    // `setContent` leaves a selection across the document it wrote. A bar
+    // that is not focused then has the browser paint that selection over the
+    // chips, which turns an eval chip from green to a washed grey, so put the
+    // caret at the end instead.
+    editor.commands.setTextSelection(editor.state.doc.content.size);
     if (keepFocus) editor.commands.focus("end");
     // Programmatic changes skip the refresh that measures the hint's anchor,
     // and a bar that keeps focus keeps showing the hint: measure it here, or
