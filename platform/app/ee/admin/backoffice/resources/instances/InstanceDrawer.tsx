@@ -84,13 +84,15 @@ function InstanceDetails({ instance }: { instance: SelfHostedInstance }) {
           {ACTIVITY_LABELS[instance.activity]}
         </Badge>
       </Detail>
-      <Detail label="Release">{instance.version ?? "—"}</Detail>
+      <Detail label="Release">{instance.version ?? "not reported"}</Detail>
       <Detail label="Installed with">
-        {instance.installMethod ?? "—"}
+        {instance.installMethod ?? "not reported"}
         {instance.chartVersion ? ` ${instance.chartVersion}` : ""}
       </Detail>
       <Detail label="Hostname">{instance.hostname ?? "not reported"}</Detail>
-      <Detail label="Environment">{instance.environment ?? "—"}</Detail>
+      <Detail label="Environment">
+        {instance.environment ?? "not reported"}
+      </Detail>
       <Detail label="First seen">{formatDate(instance.firstSeenAt)}</Detail>
       <Detail label="Last report">{formatDateTime(instance.lastSeenAt)}</Detail>
       <Detail label="Reports received">{instance.reportCount}</Detail>
@@ -98,13 +100,13 @@ function InstanceDetails({ instance }: { instance: SelfHostedInstance }) {
         <CustomerValue instance={instance} />
       </Detail>
       <Detail label="Users">
-        {reportNumber(instance.latestReport, "users") ?? "—"}
+        {reportNumber(instance.latestReport, "users") ?? "not reported"}
       </Detail>
       <Detail label="Projects">
-        {reportNumber(instance.latestReport, "projects") ?? "—"}
+        {reportNumber(instance.latestReport, "projects") ?? "not reported"}
       </Detail>
       <Detail label="Sign-in">
-        {reportText(instance.latestReport, "auth_method") ?? "—"}
+        {reportText(instance.latestReport, "auth_method") ?? "not reported"}
         {reportText(instance.latestReport, "sso_provider")
           ? ` via ${reportText(instance.latestReport, "sso_provider")}`
           : ""}
@@ -179,10 +181,10 @@ function LadderSection({ instance }: { instance: SelfHostedInstance }) {
   return (
     <Section title="Getting started">
       <VStack align="start" gap={1} width="full">
-        {ONBOARDING_LADDER.map(({ key, label }) => {
-          const reached = reportDate(instance.latestReport, key);
+        {ONBOARDING_LADDER.map(({ field, label }) => {
+          const reached = reportDate(instance.latestReport, field);
           return (
-            <HStack key={key} gap={3} width="full">
+            <HStack key={field} gap={3} width="full">
               <Box
                 width="8px"
                 height="8px"
@@ -204,9 +206,9 @@ function LadderSection({ instance }: { instance: SelfHostedInstance }) {
 }
 
 function UsageSection({ instance }: { instance: SelfHostedInstance }) {
-  const rows = USAGE_ROWS.map(({ key, label }) => ({
+  const rows = USAGE_ROWS.map(({ field, label }) => ({
     label,
-    value: reportNumber(instance.latestReport, key),
+    value: reportNumber(instance.latestReport, field),
   })).filter((row) => row.value !== null);
 
   return (
@@ -260,7 +262,7 @@ function HistorySection({
             {reports.map((report) => (
               <Table.Row key={report.id}>
                 <Table.Cell>{formatDateTime(report.receivedAt)}</Table.Cell>
-                <Table.Cell>{report.version ?? "—"}</Table.Cell>
+                <Table.Cell>{report.version ?? "not reported"}</Table.Cell>
                 <Table.Cell>{report.unknownFields}</Table.Cell>
               </Table.Row>
             ))}
