@@ -761,6 +761,10 @@ export class GatewayApp implements GatewayApi {
     return this.#internalProtocol.submitSpendCommands(...args);
   }
 
+  recordPricedSpend(...args: Parameters<GatewayInternalProtocolService["recordPricedSpend"]>) {
+    return this.#internalProtocol.recordPricedSpend(...args);
+  }
+
   reserveRealtimeSession(
     ...args: Parameters<GatewayInternalProtocolService["reserveRealtimeSession"]>
   ) {

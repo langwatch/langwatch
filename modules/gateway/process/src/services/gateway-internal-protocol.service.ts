@@ -7,6 +7,8 @@ import {
   type GatewayInternalSpendCommandName,
   type GatewayInternalSpendCommandRecord,
   type GatewayInternalProtocol,
+  type GatewayPricedSpend,
+  type GatewayPricedSpendResult,
   type SpendUsage,
 } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
@@ -21,6 +23,7 @@ import type {
 import {
   admitSpendWireSchema,
   confirmSpendWireSchema,
+  EMPTY_SPEND_USAGE,
   failSpendWireSchema,
 } from "../eventing/gateway-spend-commands.process.ts";
 import type { GatewayInternalStoreRepository } from "../repositories/gateway-internal-store.repository.ts";
@@ -188,6 +191,19 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
     const unregistered = await sendSpendCommands(pipeline.commands, perCommand);
     if (unregistered) return { status: "unregistered", command: unregistered } as const;
     return { status: "accepted", accepted: records.length - rejected.length, rejected } as const;
+  }
+
+  /**
+   * Appends one outcome the caller priced itself. Straight onto the pipeline's
+   * `confirmSpend`, not through the drain path: that re-rates every outcome
+   * against the model registry, which holds no entry for a judgement.
+   */
+  async recordPricedSpend(input: GatewayPricedSpend): Promise<GatewayPricedSpendResult> {
+    const sender = this.#members.spend?.commands.confirmSpend;
+    if (!sender) return { status: "unavailable" } as const;
+    await sender.send(pricedSpendCommandData(input));
+
+    return { status: "recorded" } as const;
   }
 
   async reserveRealtimeSession(
@@ -364,6 +380,35 @@ function toSpendCommandData(
       },
       rating,
     ),
+  };
+}
+
+/**
+ * The spine's confirmed-outcome shape for a self-priced outcome: no admission
+ * in front of it, no virtual key and no provider, and the price and its stamp
+ * exactly as the caller resolved them.
+ */
+function pricedSpendCommandData(input: GatewayPricedSpend): Record<string, unknown> {
+  return {
+    gateway_request_id: input.requestId,
+    occurred_at: input.occurredAt,
+    tenantId: input.projectId,
+    model: input.model,
+    model_provider_id: "",
+    usage: { ...EMPTY_SPEND_USAGE, input_tokens: input.inputTokens },
+    rate_version: input.rateVersion,
+    duration_ms: 0,
+    organization_id: input.organizationId,
+    virtual_key_id: "",
+    end_user_id: "",
+    trace_id: "",
+    request_type: input.requestType,
+    labels: [],
+    metadata: input.metadata ?? "",
+    admitted_at: 0,
+    cost_nano_usd: input.costNanoUsd,
+    principal_user_id: "",
+    team_id: input.teamId,
   };
 }
 

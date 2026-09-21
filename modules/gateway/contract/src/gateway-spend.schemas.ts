@@ -155,6 +155,35 @@ export const spendUsageSchema = z.object({
 });
 export type SpendUsage = z.infer<typeof spendUsageSchema>;
 
+/**
+ * A confirmed outcome whose price its own caller resolved: a brokered voice
+ * session or a judged query has no model in the registry, so the spine takes
+ * the figure as given rather than re-rating it. @see ADR-045
+ */
+export interface GatewayPricedSpend {
+  /** Addresses the outcome; a repeat under the same id is one event. */
+  readonly requestId: string;
+  readonly projectId: string;
+  readonly organizationId: string;
+  readonly teamId: string;
+  /** How the ledger, the budgets and the meters group this spend. */
+  readonly requestType: string;
+  readonly model: string;
+  /** The stamp of the rating that produced the price. Never empty. */
+  readonly rateVersion: string;
+  readonly inputTokens: number;
+  /** The CUSTOMER price, which is what every ledger consumer charges. */
+  readonly costNanoUsd: number;
+  /** JSON the row carries beside the price. Empty when there is none. */
+  readonly metadata?: string;
+  /** Epoch milliseconds. */
+  readonly occurredAt: number;
+}
+
+/** Whether the outcome reached the spine. Unavailable on a deployment with no
+ *  spend pipeline registered, which is a fact about the process, not a fault. */
+export type GatewayPricedSpendResult = { status: "recorded" } | { status: "unavailable" };
+
 /** One billing event in the canonical envelope shared by pull and webhook delivery. */
 export const gatewaySpendEnvelopeSchema = z.object({
   id: z.string(),

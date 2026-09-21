@@ -210,7 +210,7 @@ const endUserSpendQuerySchema = z.object({
   virtual_key_id: z.string().min(1).max(100).optional(),
 });
 
-const endUserSpendParamsSchema = z.object({ id: z.string().min(1) });
+const endUserSpendParamsSchema = z.object({ endUserId: z.string().min(1) });
 
 // ── Response DTO schemas ───────────────────────────────────────────────
 // These mirror the shapes the handlers below return. Without them the

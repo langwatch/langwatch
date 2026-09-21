@@ -36,7 +36,7 @@ export const INSTANT_EVAL_ESTIMATE_SAMPLE = 50;
  */
 export interface InstantEvalTextSource {
   texts(input: {
-    caller: LangWatchQLCaller;
+    project: LangWatchQLCaller;
     protections: LangWatchQLProtections;
     sql: string;
     parameters?: Readonly<Record<string, unknown>>;
@@ -155,7 +155,7 @@ export class InstantEvalEstimateService {
     if (traceIds.length === 0) return { total, sample: [] };
 
     const sample = await this.textSource.texts({
-      caller,
+      project: caller,
       protections,
       sql: accepted.sql,
       parameters: accepted.parameters,

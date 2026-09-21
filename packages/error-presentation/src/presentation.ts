@@ -4469,6 +4469,13 @@ const presentations = {
       return "Try again, or pick a different model.";
     },
   },
+  lwql_app_function_hydration_failed: {
+    // Deliberately says nothing about retrying a different way: the query
+    // itself was fine, so there is nothing for the reader to change.
+    title: "We couldn't read the trace content",
+    describe: () =>
+      "The query ran, but we couldn't load the conversations or traces it asked for. This is a temporary problem on our side. Try again shortly, or contact support if it persists.",
+  },
   lwql_app_function_key_cap: {
     title: "That's too many records to read at once",
     describe: (error) => {
@@ -4492,6 +4499,22 @@ const presentations = {
           : `A single run can only read so many ${noun}.`;
       return `${capped} Lower the row limit, group the query more coarsely, or run it in pages.`;
     },
+  },
+  lwql_app_function_read_budget: {
+    title: "That's too much trace content to read at once",
+    describe: (error) => {
+      const budget = error.meta.budgetBytes;
+      const sized =
+        typeof budget === "number"
+          ? `A single run can read ${Math.round(budget / 1_000_000).toLocaleString()} MB of trace content.`
+          : "A single run can only read so much trace content.";
+      return `${sized} Lower the row limit, or run the query in pages.`;
+    },
+  },
+  lwql_app_function_unavailable: {
+    title: "Extraction functions aren't available here yet",
+    describe: () =>
+      "This deployment hasn't finished setting up the functions this query uses. Ask your workspace administrator to redeploy, or contact support.",
   },
   agent_error: {
     title: "Something went wrong mid-answer",

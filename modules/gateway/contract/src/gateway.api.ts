@@ -20,7 +20,12 @@ import type {
   UpdateGatewayGuardrailInput,
 } from "./gateway-guardrail.ts";
 import type { GatewayInternalSpendCommandRecord } from "./gateway-internal.schemas.ts";
-import type { SpendFilters, SpendUsage } from "./gateway-spend.schemas.ts";
+import type {
+  GatewayPricedSpend,
+  GatewayPricedSpendResult,
+  SpendFilters,
+  SpendUsage,
+} from "./gateway-spend.schemas.ts";
 import type {
   ArchiveGatewayBudgetInput,
   CreateGatewayBudgetInput,
@@ -579,6 +584,13 @@ export interface GatewayApi extends GatewayInternalProtocol {
   }): Promise<GatewayApplicableBudget[]>;
   /** Whether a person belongs to this organization. */
   isOrganizationMember(input: { organizationId: string; userId: string }): Promise<boolean>;
+
+  /**
+   * Appends one confirmed outcome the caller priced itself. The spine takes
+   * the price as given: a judgement's model is not in the registry, so the
+   * drain path's re-rating would answer zero for it.
+   */
+  recordPricedSpend(input: GatewayPricedSpend): Promise<GatewayPricedSpendResult>;
 
   /**
    * One page of the spend-event ledger for a project, newest first, with

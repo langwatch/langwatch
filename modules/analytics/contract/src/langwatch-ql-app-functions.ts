@@ -8,6 +8,13 @@
 export type LangWatchQLAppFunctionOption = string | number | readonly string[];
 
 /**
+ * The parameter a text hydration binds the traces it wants to. Reserved: a
+ * statement that binds it has its value overwritten by the one the hydration
+ * is about.
+ */
+export const LWQL_HYDRATION_TRACE_IDS_PARAMETER = "lwql_hydration_trace_ids";
+
+/**
  * The extraction call nested inside an eval call, the usual way to write one.
  * The identity UDFs leave the inner function's key in the column, so hydration
  * runs the extraction first and judges what it produced.

@@ -896,6 +896,33 @@ const registry = {
       "Lower the requested limit, or split the selection across more than one run with a keyset predicate on (TraceId, SpanId) where the statement projects SpanId, and on TraceId alone where it does not",
     ],
   },
+  lwql_app_function_key_cap: {
+    tips: [
+      "Read `meta.cap` and `meta.distinct`; the query needs more distinct keys than one run may read",
+      "Lower the query's LIMIT, or group more coarsely so fewer conversations, traces or spans are projected",
+      "To read them all, page with a keyset predicate on the dataset's time column and trace id and run the query once per page",
+      "`meta.keyKind` says which cap it was, and `meta.functions` which calls count against it; the schema endpoint publishes every cap",
+    ],
+  },
+  lwql_app_function_read_budget: {
+    tips: [
+      "Read `meta.budgetBytes` and `meta.readBytes`; the traces the query names weigh more than one run may read",
+      "Lower the query's LIMIT so each run names fewer traces, and page with a keyset predicate on the dataset's time column and trace id",
+      "The budget counts the traces' stored content, so a query over long conversations needs smaller pages than one over short ones",
+    ],
+  },
+  lwql_app_function_hydration_failed: {
+    tips: [
+      "The query itself was accepted and ran; loading the conversation or trace content it projected is what failed",
+      "This is a platform-side failure, not a query to rewrite; retry shortly, and contact support if it persists",
+    ],
+  },
+  lwql_app_function_unavailable: {
+    tips: [
+      "The app functions are not provisioned on this deployment, so retrying the same query will not help",
+      "They are created at deploy time; a redeploy converges them, and the query works unchanged afterwards",
+    ],
+  },
 } as const satisfies Record<string, RemediationEntry>;
 
 export type RemediationCode = keyof typeof registry;
