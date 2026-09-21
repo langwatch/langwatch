@@ -64,10 +64,8 @@ vi.mock("../../hooks/useOrganizationTeamProject", () => ({
   // Membership is deliberately false whenever a team is present in these
   // tests — the case under test is "no team yet" (unanswered) versus
   // "answered, and not on the team" versus "answered, and on the team".
-  userBelongsToTeam: (
-    team: { id: string } | undefined,
-    _userId: string,
-  ) => !!team,
+  userBelongsToTeam: (team: { id: string } | undefined, _userId: string) =>
+    !!team,
 }));
 
 vi.mock("../../hooks/usePublicEnv", () => ({

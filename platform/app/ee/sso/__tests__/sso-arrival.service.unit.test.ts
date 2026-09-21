@@ -321,7 +321,8 @@ describe("given an account that is not a connection at all", () => {
  * change: every case below still asserts the decision stays declined.
  */
 describe("given an arrival this connection was never going to admit", () => {
-  const REASON_MESSAGE = "a single sign-on arrival was not considered for admission";
+  const REASON_MESSAGE =
+    "a single sign-on arrival was not considered for admission";
 
   describe("when the account id is not connection-shaped at all", () => {
     it("logs once with reason not_a_connection_id and admits nobody", async () => {

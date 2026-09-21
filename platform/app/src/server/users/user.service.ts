@@ -1,10 +1,10 @@
 import { CliTokenRevocationService } from "@ee/governance/services/cliTokenRevocation.service";
+import { PrismaLegacySsoOrganizationRepository } from "@ee/sso/legacy-sso-organization.prisma.repository";
 import {
   extractEmailDomain,
   matchesConfiguredSsoProvider,
   type OrganizationSsoProviderLookup,
 } from "@ee/sso/matching";
-import { PrismaLegacySsoOrganizationRepository } from "@ee/sso/legacy-sso-organization.prisma.repository";
 
 import type { PrismaClient, User } from "~/generated/prisma/client";
 

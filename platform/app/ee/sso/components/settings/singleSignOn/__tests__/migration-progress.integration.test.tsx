@@ -32,8 +32,8 @@ vi.mock("~/utils/api", () => ({
 }));
 
 import {
-  migrationBlockers,
   finalizationBlockers,
+  migrationBlockers,
 } from "@ee/sso/sso-migration.rules";
 import {
   MigrationProgress,
@@ -214,7 +214,9 @@ describe("given a replacement with a successful test sign-in", () => {
 
       expect(screen.getByText("Member 0")).toBeDefined();
       expect(
-        screen.queryByRole("button", { name: /Finish|Switch back|Switch sign-in/ }),
+        screen.queryByRole("button", {
+          name: /Finish|Switch back|Switch sign-in/,
+        }),
       ).toBeNull();
     });
   });

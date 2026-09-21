@@ -139,9 +139,7 @@ describe("given the member still needs to switch to single sign-on", () => {
     expect(
       screen.getByText(/Sign out, then sign in again by entering your work/),
     ).toBeInTheDocument();
-    expect(
-      container.querySelector('a[href="/settings/security"]'),
-    ).toBeNull();
+    expect(container.querySelector('a[href="/settings/security"]')).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
     expect(signOut).toHaveBeenCalled();

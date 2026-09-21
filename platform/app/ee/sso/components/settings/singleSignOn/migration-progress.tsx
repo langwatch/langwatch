@@ -40,18 +40,19 @@ interface UpdateNames {
  * Every phase says WHO IS SIGNING IN RIGHT NOW first, because that is the only
  * fact on this screen that can wake somebody at night.
  */
-const PHASE_STATUS: Record<SsoMigrationPhase, (names: UpdateNames) => string> = {
-  SETUP: ({ previous }) =>
-    `Everyone still signs in through ${previous}. Set the new connection up and test it, and nothing changes for your members until you switch over.`,
-  GRACE_LEGACY: ({ previous }) =>
-    `Everyone still signs in through ${previous}. Switch sign-in over when the new connection is ready.`,
-  GRACE_DIRECT: ({ previous, replacement }) =>
-    `Everyone signs in through ${replacement}. You can switch back to ${previous} until you finish the update.`,
-  FINALIZING: ({ previous }) =>
-    `Finishing the update. Access through ${previous} is being taken away.`,
-  FINALIZED: ({ previous, replacement }) =>
-    `Everyone signs in through ${replacement}. ${previous} no longer signs anybody in.`,
-};
+const PHASE_STATUS: Record<SsoMigrationPhase, (names: UpdateNames) => string> =
+  {
+    SETUP: ({ previous }) =>
+      `Everyone still signs in through ${previous}. Set the new connection up and test it, and nothing changes for your members until you switch over.`,
+    GRACE_LEGACY: ({ previous }) =>
+      `Everyone still signs in through ${previous}. Switch sign-in over when the new connection is ready.`,
+    GRACE_DIRECT: ({ previous, replacement }) =>
+      `Everyone signs in through ${replacement}. You can switch back to ${previous} until you finish the update.`,
+    FINALIZING: ({ previous }) =>
+      `Finishing the update. Access through ${previous} is being taken away.`,
+    FINALIZED: ({ previous, replacement }) =>
+      `Everyone signs in through ${replacement}. ${previous} no longer signs anybody in.`,
+  };
 
 /** The same five phases as a chip, for the cards that only have room for a
  *  word. Exported because the Authentication overview wears the same one —
@@ -112,7 +113,10 @@ const PHASE_CHIP: Record<
  */
 const UPDATE_CHECKS: Record<
   string,
-  { act: (names: UpdateNames & { unlinked: number }) => string; condition: string }
+  {
+    act: (names: UpdateNames & { unlinked: number }) => string;
+    condition: string;
+  }
 > = {
   "direct-route-not-selected": {
     act: () => "Switch sign-in over to your new connection.",
@@ -136,7 +140,8 @@ const UPDATE_CHECKS: Record<
   "legacy-activity-not-quiet": {
     act: ({ previous }) =>
       `Wait for seven days with nobody signing in through ${previous}.`,
-    condition: "Nobody has signed in through the previous provider for seven days.",
+    condition:
+      "Nobody has signed in through the previous provider for seven days.",
   },
   "scim-needs-repointing": {
     act: () => "Point your directory sync at the new connection.",
@@ -169,7 +174,8 @@ const UPDATE_CHECKS: Record<
   "members-not-verified-on-replacement": {
     act: () =>
       "Every current member needs a verified sign-in on the new connection before access through the previous provider is taken away.",
-    condition: "Every current member has a verified sign-in on the new connection.",
+    condition:
+      "Every current member has a verified sign-in on the new connection.",
   },
 };
 

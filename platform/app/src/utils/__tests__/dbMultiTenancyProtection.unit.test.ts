@@ -579,7 +579,10 @@ describe("guardProjectId — SCOPED_MODELS (SystemMigrationTenantState)", () => 
     it("passes the guard - a finite list of migrations is as bounded as one", async () => {
       await expect(
         guardedStateRepository().hasTenantAwaitingRedrive({
-          migrationNames: ["authz-team-user-backfill", "identity-account-linkage"],
+          migrationNames: [
+            "authz-team-user-backfill",
+            "identity-account-linkage",
+          ],
         }),
       ).resolves.toBe(false);
     });

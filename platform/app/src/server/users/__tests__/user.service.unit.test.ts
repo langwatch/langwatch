@@ -142,9 +142,10 @@ describe("UserService", () => {
   describe("getSsoStatus()", () => {
     describe("given the flag is not set", () => {
       it("reports not pending without reading accounts", async () => {
-        (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
-          { pendingSsoSetup: false, email: "andrei@acme.com" },
-        );
+        (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
+          pendingSsoSetup: false,
+          email: "andrei@acme.com",
+        });
 
         const result = await service.getSsoStatus({ id: "user-1" });
 
@@ -155,12 +156,17 @@ describe("UserService", () => {
 
     describe("given the flag is set and the user holds no sign-in matching the organization's single sign-on", () => {
       it("reports pending", async () => {
-        (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
-          { pendingSsoSetup: true, email: "andrei@acme.com" },
-        );
+        (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
+          pendingSsoSetup: true,
+          email: "andrei@acme.com",
+        });
         (
           (prisma as any).organization.findUnique as ReturnType<typeof vi.fn>
-        ).mockResolvedValue({ id: "org_1", name: "Acme", ssoProvider: "auth0" });
+        ).mockResolvedValue({
+          id: "org_1",
+          name: "Acme",
+          ssoProvider: "auth0",
+        });
         (
           (prisma as any).account.findMany as ReturnType<typeof vi.fn>
         ).mockResolvedValue([
@@ -175,12 +181,17 @@ describe("UserService", () => {
 
     describe("given the flag is set and the user already holds a matching sign-in (pin is a provider name)", () => {
       it("reports not pending", async () => {
-        (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
-          { pendingSsoSetup: true, email: "andrei@acme.com" },
-        );
+        (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
+          pendingSsoSetup: true,
+          email: "andrei@acme.com",
+        });
         (
           (prisma as any).organization.findUnique as ReturnType<typeof vi.fn>
-        ).mockResolvedValue({ id: "org_1", name: "Acme", ssoProvider: "auth0" });
+        ).mockResolvedValue({
+          id: "org_1",
+          name: "Acme",
+          ssoProvider: "auth0",
+        });
         (
           (prisma as any).account.findMany as ReturnType<typeof vi.fn>
         ).mockResolvedValue([
@@ -197,9 +208,10 @@ describe("UserService", () => {
       // The trap: comparing the pin to the account by equality would miss
       // this — the pin is only a PREFIX of the account's id.
       it("reports not pending", async () => {
-        (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
-          { pendingSsoSetup: true, email: "andrei@acme.com" },
-        );
+        (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
+          pendingSsoSetup: true,
+          email: "andrei@acme.com",
+        });
         (
           (prisma as any).organization.findUnique as ReturnType<typeof vi.fn>
         ).mockResolvedValue({
@@ -221,12 +233,17 @@ describe("UserService", () => {
 
     describe("given the user holds several accounts and only the second matches", () => {
       it("reports not pending with exactly one organization lookup", async () => {
-        (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
-          { pendingSsoSetup: true, email: "andrei@acme.com" },
-        );
+        (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
+          pendingSsoSetup: true,
+          email: "andrei@acme.com",
+        });
         (
           (prisma as any).organization.findUnique as ReturnType<typeof vi.fn>
-        ).mockResolvedValue({ id: "org_1", name: "Acme", ssoProvider: "auth0" });
+        ).mockResolvedValue({
+          id: "org_1",
+          name: "Acme",
+          ssoProvider: "auth0",
+        });
         (
           (prisma as any).account.findMany as ReturnType<typeof vi.fn>
         ).mockResolvedValue([
@@ -237,9 +254,7 @@ describe("UserService", () => {
         const result = await service.getSsoStatus({ id: "user-1" });
 
         expect(result).toEqual({ pendingSsoSetup: false });
-        expect(
-          (prisma as any).organization.findUnique,
-        ).toHaveBeenCalledOnce();
+        expect((prisma as any).organization.findUnique).toHaveBeenCalledOnce();
       });
     });
   });

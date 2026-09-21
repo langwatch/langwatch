@@ -92,7 +92,9 @@ describe("isStorableSpanReceived", () => {
         event: createSpanReceivedEvent({
           tenantId: "project-unstorable",
           spanId: "bbbb0000000000ff",
-          startTimeUnixNano: String(1_700_000_000_500n * 1_000_000n * 1_000_000n),
+          startTimeUnixNano: String(
+            1_700_000_000_500n * 1_000_000n * 1_000_000n,
+          ),
         }),
         logger,
         consumer: "test",

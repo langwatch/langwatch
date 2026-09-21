@@ -141,9 +141,9 @@ describe("given an organization that registered its own identity provider", () =
         "Switched over",
       );
       expect(
-        screen.getByRole("link", { name: "Where it stands" }).getAttribute(
-          "href",
-        ),
+        screen
+          .getByRole("link", { name: "Where it stands" })
+          .getAttribute("href"),
       ).toBe("/settings/authentication/provider");
       // The invitation is gone: this organization has already taken it.
       expect(screen.queryByTestId("sso-update-notice")).toBeNull();

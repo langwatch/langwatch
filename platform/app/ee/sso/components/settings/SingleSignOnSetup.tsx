@@ -310,8 +310,8 @@ function UpdatePromises({ current }: { current: string }) {
         connection up and test it.
       </Text>
       <Text fontSize="sm" color="fg.muted">
-        Nothing changes for your members until an administrator switches
-        sign-in over.
+        Nothing changes for your members until an administrator switches sign-in
+        over.
       </Text>
       <Text fontSize="sm" color="fg.muted">
         You can switch back to {current} at any point before you finish the
