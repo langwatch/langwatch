@@ -117,7 +117,7 @@ export class ModelProviderKeysService extends ModelProviderCredentialPolicy {
   mergeHeaders(input: { incoming: Header[]; stored: Header[] }): Header[] {
     const incomingKeys = new Set(input.incoming.map(({ key }) => key));
 
-    return input.incoming.flatMap((header, index) => {
+    const merged = input.incoming.flatMap((header, index) => {
       if (header.value !== MASKED_KEY_PLACEHOLDER) {
         return [header];
       }
@@ -133,11 +133,25 @@ export class ModelProviderKeysService extends ModelProviderCredentialPolicy {
 
       return positionIsAvailable ? [{ key: header.key, value: storedAtPosition.value }] : [];
     });
+
+    // A header is spent as an HTTP header and nowhere else, and http.client
+    // refuses a name or value whose edges carry whitespace — with no
+    // query-string variant to launder it the way an API key has.
+    return trimHeaders(merged);
   }
 
   maskHeaders(value: Header[]): Header[] {
     return value.map(({ key }) => ({ key, value: MASKED_KEY_PLACEHOLDER }));
   }
+}
+
+/**
+ * Strip the whitespace around every header name and value. Whitespace inside
+ * a value is left alone — "Bearer abc" is legitimate, " Bearer abc" is a
+ * value http.client refuses to send at all.
+ */
+function trimHeaders(headers: Header[]): Header[] {
+  return headers.map(({ key, value }) => ({ key: key.trim(), value: value.trim() }));
 }
 
 function providerDefinition(provider: string): ModelProviderDefinition {

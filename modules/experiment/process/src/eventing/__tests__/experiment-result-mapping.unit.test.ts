@@ -545,4 +545,99 @@ describe("given an evaluator node inside a studio workflow", () => {
       );
     });
   });
+
+  describe("when a component evaluator reports cost", () => {
+    it("keeps a reported zero cost on a processed verdict", () => {
+      const event = evaluatorResultOf(
+        mapEvaluatorResult("target-1.eval-1", 0, {
+          status: "success",
+          outputs: { passed: true, score: 1.0 },
+          cost: 0,
+        }),
+      );
+
+      expect(event.result).toHaveProperty("cost", { currency: "USD", amount: 0 });
+    });
+  });
+
+  // Spec: specs/experiments-v3/evaluator-skipped-status.feature
+  describe("when a component evaluator declined the row", () => {
+    /** @scenario "A skipped verdict from a component evaluator is reported as skipped" */
+    it("reports the verdict as skipped with its reason and no score", () => {
+      const result = mapEvaluatorResult("target-1.eval-1", 3, {
+        status: "success",
+        outputs: {
+          status: "skipped",
+          details: "Total tokens exceed the maximum of 64000: 70000",
+        },
+        timestamps: { started_at: 1000, finished_at: 1200 },
+      });
+
+      expect(result).toEqual({
+        type: "evaluator_result",
+        rowIndex: 3,
+        targetId: "target-1",
+        evaluatorId: "eval-1",
+        result: {
+          status: "skipped",
+          details: "Total tokens exceed the maximum of 64000: 70000",
+        },
+        duration: 200,
+      });
+    });
+
+    it("keeps what the judge spent before declining", () => {
+      const event = evaluatorResultOf(
+        mapEvaluatorResult("target-1.eval-1", 0, {
+          status: "success",
+          outputs: { status: "skipped", details: "the two passes disagreed" },
+          cost: 0.002,
+        }),
+      );
+
+      expect(event.result).toEqual({
+        status: "skipped",
+        details: "the two passes disagreed",
+        cost: { currency: "USD", amount: 0.002 },
+      });
+    });
+
+    it("keeps a reported zero cost apart from an unreported one", () => {
+      const reportedZero = evaluatorResultOf(
+        mapEvaluatorResult("target-1.eval-1", 0, {
+          status: "success",
+          outputs: { status: "skipped", details: "nothing to evaluate" },
+          cost: 0,
+        }),
+      );
+      const unreported = evaluatorResultOf(
+        mapEvaluatorResult("target-1.eval-1", 1, {
+          status: "success",
+          outputs: { status: "skipped", details: "nothing to evaluate" },
+        }),
+      );
+
+      expect(reportedZero.result).toHaveProperty("cost", { currency: "USD", amount: 0 });
+      expect(unreported.result).not.toHaveProperty("cost");
+    });
+  });
+
+  describe("when a workflow evaluator declined the row", () => {
+    /** @scenario "A skipped verdict from a workflow evaluator is reported as skipped" */
+    it("reports the verdict as skipped with its reason", () => {
+      const result = mapWorkflowEvaluatorResult(2, "target-1", "eval-1", "Faithfulness", {
+        status: "success",
+        outputs: { status: "skipped", details: "No contexts to evaluate" },
+      });
+
+      expect(result).toEqual({
+        type: "evaluator_result",
+        rowIndex: 2,
+        targetId: "target-1",
+        evaluatorId: "eval-1",
+        evaluatorName: "Faithfulness",
+        result: { status: "skipped", details: "No contexts to evaluate" },
+      });
+    });
+  });
 });

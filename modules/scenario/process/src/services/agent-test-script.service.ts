@@ -31,17 +31,17 @@ export class AgentTestScriptAdapter {
 
   /**
    * The agents and steps of an agent test run: user says the message, agent
-   * answers, run succeeds. When the target greets on connect
-   * (`isAgentSpeaksFirst`), it opens with the agent's turn first instead.
+   * answers, run succeeds. When the target greets on connect (an inbound
+   * `callDirection`), it opens with the agent's turn first instead.
    */
   build({
     adapter,
     script,
-    isAgentSpeaksFirst = false,
+    doesAgentGreetFirst = false,
   }: {
     adapter: ScenarioRunner.AgentAdapter;
     script: ScriptedRun;
-    isAgentSpeaksFirst?: boolean;
+    doesAgentGreetFirst?: boolean;
   }): {
     agents: ScenarioRunner.AgentAdapter[];
     script: ScenarioRunner.ScriptStep[];
@@ -49,7 +49,7 @@ export class AgentTestScriptAdapter {
     return {
       agents: [adapter, new ScriptedUserAgent()],
       script: [
-        ...(isAgentSpeaksFirst ? [ScenarioRunner.agent()] : []),
+        ...(doesAgentGreetFirst ? [ScenarioRunner.agent()] : []),
         ScenarioRunner.user(script.userMessage),
         ScenarioRunner.agent(),
         ScenarioRunner.succeed("The agent answered"),

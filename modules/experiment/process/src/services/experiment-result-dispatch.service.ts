@@ -252,7 +252,7 @@ export class ExperimentResultDispatchService {
       score: scored?.score ?? null,
       label: scored?.label ?? null,
       passed: scored?.passed ?? null,
-      details: result.status === "skipped" ? null : (result.details ?? null),
+      details: result.details ?? null,
       cost: billed?.cost?.amount ?? null,
       inputs: event.inputs ?? null,
       duration: event.duration ?? null,

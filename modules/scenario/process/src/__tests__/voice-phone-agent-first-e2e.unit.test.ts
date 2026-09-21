@@ -1,18 +1,18 @@
 /**
  * @vitest-environment node
+ * An inbound phone target's greeting-first script, executed against a
+ * recording executor so the assertion is on runtime turn order, not shape.
  * @see specs/features/agents/voice-phone.feature
- * "Agent speaks first": a phone target that greets on connect opens with the
- * agent's own turn, captured as turn one, before the normal simulator loop.
  */
 
 import * as ScenarioRunner from "@langwatch/scenario";
 import type { TargetAdapterData } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { buildIsAgentSpeaksFirstScript } from "../rules/agent-first-script.rules.ts";
+import { buildAgentGreetsFirstScript } from "../rules/agent-first-script.rules.ts";
 
-/** A phone voice target's prefetched data, greeting on connect or not. */
-function phoneVoiceData(isAgentSpeaksFirst: boolean): TargetAdapterData {
+/** A phone voice target's prefetched data, inbound (greets on connect) or outbound. */
+function phoneVoiceData(callDirection: "inbound" | "outbound"): TargetAdapterData {
   return {
     type: "voice",
     agentId: "agent_row_1",
@@ -20,7 +20,7 @@ function phoneVoiceData(isAgentSpeaksFirst: boolean): TargetAdapterData {
       transport: "phone",
       agentId: "+14155550123",
       credential: null,
-      isAgentSpeaksFirst,
+      callDirection,
     },
     callerEnv: {},
     maxCallSeconds: 300,
@@ -66,36 +66,38 @@ function fakeExecutor() {
   return { calls, executor };
 }
 
-describe("buildIsAgentSpeaksFirstScript", () => {
-  describe('given a phone target whose agent greets on connect and "Agent speaks first" is on', () => {
-    /** @scenario "A callee that greets on connect opens the call when Agent speaks first is on" */
-    it("opens the run with the agent's turn, then proceeds to the simulator/judge loop", async () => {
-      const script = buildIsAgentSpeaksFirstScript(phoneVoiceData(true));
+describe("buildAgentGreetsFirstScript", () => {
+  describe("given an inbound phone target whose agent greets on connect", () => {
+    /** @scenario "An inbound agent that greets on connect opens the call" */
+    it("opens with the greeting, then the caller's reply and the agent's response, before proceeding", async () => {
+      const script = buildAgentGreetsFirstScript(phoneVoiceData("inbound"));
 
-      // The run opens with the agent's greeting turn, then hands over.
+      // The run opens with the agent's greeting, the caller's reply and the
+      // agent's response — all scheduled explicitly — before handing over.
       expect(script).toBeDefined();
-      expect(script).toHaveLength(2);
+      expect(script).toHaveLength(4);
 
       const { calls, executor } = fakeExecutor();
       for (const step of script!) {
         await step({} as never, executor as never);
       }
 
-      // First the callee greets (agent turn), then the normal loop runs to a
-      // conclusion (proceed) — so the caller replies only after the greeting.
-      expect(calls).toEqual(["agent", "proceed"]);
+      // Greeting, caller reply, agent response, then the normal loop takes
+      // over (proceed) — the judge can only be reached after the caller has
+      // actually spoken, not on the greeting alone.
+      expect(calls).toEqual(["agent", "user", "agent", "proceed"]);
     });
   });
 
-  describe('given a phone target with "Agent speaks first" off', () => {
+  describe("given an outbound phone target", () => {
     it("keeps the default cast: no agent-first script", () => {
-      expect(buildIsAgentSpeaksFirstScript(phoneVoiceData(false))).toBeUndefined();
+      expect(buildAgentGreetsFirstScript(phoneVoiceData("outbound"))).toBeUndefined();
     });
   });
 
   describe("given an ElevenLabs voice target", () => {
     it("never adds an agent-first script (the behavior is phone-only)", () => {
-      expect(buildIsAgentSpeaksFirstScript(elevenLabsVoiceData())).toBeUndefined();
+      expect(buildAgentGreetsFirstScript(elevenLabsVoiceData())).toBeUndefined();
     });
   });
 
@@ -109,7 +111,7 @@ describe("buildIsAgentSpeaksFirstScript", () => {
         headers: [],
         secrets: {},
       };
-      expect(buildIsAgentSpeaksFirstScript(httpData)).toBeUndefined();
+      expect(buildAgentGreetsFirstScript(httpData)).toBeUndefined();
     });
   });
 

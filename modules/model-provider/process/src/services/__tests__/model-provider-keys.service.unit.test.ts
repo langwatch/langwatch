@@ -73,6 +73,15 @@ describe("ModelProviderKeysService", () => {
       }),
     ).toEqual([{ key: "X-Real", value: "real-value" }]);
   });
+
+  it("strips whitespace around a header name and value", () => {
+    expect(
+      policy.mergeHeaders({
+        stored: [],
+        incoming: [{ key: " X-Real ", value: " real-value " }],
+      }),
+    ).toEqual([{ key: "X-Real", value: "real-value" }]);
+  });
 });
 
 /**

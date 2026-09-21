@@ -16,13 +16,45 @@ export const phoneTransportSchema = z.object({
     .string()
     .trim()
     .regex(E164_PHONE_PATTERN, "Enter the number in E.164 form, like +14155550123"),
-  isAgentSpeaksFirst: z.boolean().default(false),
+  /**
+   * Which way the call goes, which decides who speaks first: "inbound" opens
+   * with the agent's own turn (it greets on connect); "outbound" (default)
+   * opens with the caller, once the agent places the call.
+   */
+  callDirection: z.enum(["inbound", "outbound"]).default("outbound"),
 });
 
-export const voiceAgentConfigSchema = z.discriminatedUnion("transport", [
+const voiceAgentConfigUnion = z.discriminatedUnion("transport", [
   elevenLabsConvaiTransportSchema,
   phoneTransportSchema,
 ]);
+
+/**
+ * Maps a stored config's legacy `isAgentSpeaksFirst`/`agentSpeaksFirst`
+ * booleans onto `callDirection: "inbound"` and strips the legacy keys; an
+ * explicit `callDirection` always wins.
+ */
+function normalizeLegacyVoiceConfig(input: unknown): unknown {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) {
+    return input;
+  }
+  const source = input as Record<string, unknown>;
+  const isLegacyInboundRequested =
+    source.callDirection === undefined &&
+    (source.isAgentSpeaksFirst === true || source.agentSpeaksFirst === true);
+  const normalized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(source)) {
+    if (key === "isAgentSpeaksFirst" || key === "agentSpeaksFirst") continue;
+    normalized[key] = value;
+  }
+  if (isLegacyInboundRequested) normalized.callDirection = "inbound";
+  return normalized;
+}
+
+export const voiceAgentConfigSchema = z.preprocess(
+  normalizeLegacyVoiceConfig,
+  voiceAgentConfigUnion,
+);
 export type VoiceAgentConfig = z.infer<typeof voiceAgentConfigSchema>;
 
 export const parseVoiceAgentConfig = (config: unknown): VoiceAgentConfig =>

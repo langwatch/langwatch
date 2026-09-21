@@ -3,6 +3,7 @@ from contextlib import contextmanager
 from langevals_core.litellm_patch import azure_api_version
 from typing import List, Optional
 from langevals_core.base_evaluator import (
+    MAX_TOKENS_HARD_LIMIT,
     BaseEvaluator,
     EvaluationResult,
     EvaluatorSettings,
@@ -100,7 +101,7 @@ def check_max_tokens(
             contexts=contexts,
         ),
     )
-    max_tokens = min(settings.max_tokens, 16384)
+    max_tokens = min(settings.max_tokens, MAX_TOKENS_HARD_LIMIT)
     if total_tokens > max_tokens:
         return EvaluationResultSkipped(
             details=f"Total tokens exceed the maximum of {max_tokens}: {total_tokens}"

@@ -59,11 +59,11 @@ export interface TraceEvaluationDispatch {
 }
 
 /**
- * Why an online-evaluator dispatch was refused: `depth_direct` is a trace
- * whose evaluation would evaluate an evaluation; `parent_in_subtree` is a
- * trace whose parent is already inside the subtree being evaluated.
+ * Why an online-evaluator dispatch was refused: `depth_direct` reads the
+ * incoming span, `depth_fold` reads the same check off the folded trace state
+ * on the deferred-origin path, `parent_in_subtree` is an already-covered parent.
  */
-export type TraceEvaluationLoopBlockReason = "depth_direct" | "parent_in_subtree";
+export type TraceEvaluationLoopBlockReason = "depth_direct" | "depth_fold" | "parent_in_subtree";
 
 /** What an operator can see about evaluations the loop guards refused. A port
  * because different processes export differently: app uses prom-client, packages

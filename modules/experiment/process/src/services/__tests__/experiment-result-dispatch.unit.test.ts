@@ -103,4 +103,18 @@ describe("buildEvaluatorResultDispatch", () => {
       expect(dispatch.cost).toBeNull();
     });
   });
+
+  /** @scenario "The stored row keeps the reason a row was skipped" */
+  it("records why the row was skipped", () => {
+    const dispatch = buildEvaluatorResultDispatch({
+      ...base,
+      result: {
+        status: "skipped",
+        details: "Total tokens exceed the maximum of 64000: 70000",
+      },
+    } as never);
+
+    expect(dispatch.status).toBe("skipped");
+    expect(dispatch.details).toBe("Total tokens exceed the maximum of 64000: 70000");
+  });
 });

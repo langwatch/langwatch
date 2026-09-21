@@ -80,6 +80,7 @@ export function createEvaluationTriggerSubscriber(
       if (
         await causalityLoopGuardFired({
           event,
+          foldState,
           tenantId,
           traceId,
           featureFlags: deps.featureFlags,
@@ -130,16 +131,20 @@ function hasReachedProcessingCap({
   return true;
 }
 
-/** Causality loop guard: depth >= 1 (evaluator-emitted) skips dispatch. Depth
- * 0 triggers normally. Kill-switch flag for rollback. */
+/**
+ * Causality loop guard: depth >= 1 (evaluator-emitted) skips dispatch, depth 0
+ * triggers normally. A non-span event falls back to the folded depth.
+ */
 async function causalityLoopGuardFired({
   event,
+  foldState,
   tenantId,
   traceId,
   featureFlags,
   metrics,
 }: {
   event: TraceProcessingEvent;
+  foldState: TraceSummaryData;
   tenantId: string;
   traceId: string;
   featureFlags: FeatureFlagApi;
@@ -157,11 +162,9 @@ async function causalityLoopGuardFired({
     return false;
   }
 
-  if (!isSpanReceivedEvent(event)) return false;
-
-  const reason = detectCausalityLoop({
-    spanAttributes: event.data.span.attributes,
-  });
+  const reason = isSpanReceivedEvent(event)
+    ? detectCausalityLoop({ spanAttributes: event.data.span.attributes })
+    : detectFoldedCausalityLoop({ foldState });
   if (!reason) return false;
 
   // Tenant attribution lives in the structured log line, not the metric
@@ -186,6 +189,18 @@ export function detectCausalityLoop(params: {
 }): TraceEvaluationLoopBlockReason | null {
   const depth = extractCausalityDepthFromOtlpAttrs(params.spanAttributes);
   if (depth >= 1) return "depth_direct";
+  return null;
+}
+
+/**
+ * Causality-loop detection on the deferred-origin path (`origin_resolved`,
+ * no span payload) — reads the depth the fold already accumulated instead.
+ */
+export function detectFoldedCausalityLoop(params: {
+  foldState: Pick<TraceSummaryData, "attributes">;
+}): TraceEvaluationLoopBlockReason | null {
+  const depth = Number(params.foldState.attributes?.[CAUSALITY_DEPTH_ATTR]);
+  if (Number.isFinite(depth) && depth >= 1) return "depth_fold";
   return null;
 }
 

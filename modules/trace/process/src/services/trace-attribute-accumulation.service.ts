@@ -6,7 +6,10 @@ import {
   TRACE_OUTPUT_MEDIA_REFERENCE_ATTRIBUTE,
 } from "../app/trace.members.ts";
 import { parseJsonStringArray } from "../rules/trace-summary-attributes.rules.ts";
-import { TraceAttributeExtractionService } from "./trace-attribute-extraction.service.ts";
+import {
+  RESERVED_CAUSALITY_DEPTH,
+  TraceAttributeExtractionService,
+} from "./trace-attribute-extraction.service.ts";
 import { TraceOriginService } from "./trace-origin.service.ts";
 
 /**
@@ -62,6 +65,7 @@ export class TraceAttributeAccumulationService {
 
     this.unionLabels({ merged, spanAttrs, state });
     this.unionPromptIds({ merged, spanAttrs, state });
+    this.maxCausalityDepth({ merged, spanAttrs, state });
     this.mergeMetadataObjects({ merged, spanAttrs, state });
     this.preferUserModelMetadata({ merged, spanAttrs });
 
@@ -128,6 +132,28 @@ export class TraceAttributeAccumulationService {
 
     // Remove the per-span key so it doesn't leak into trace-level attributes
     delete merged["langwatch.prompt.id"];
+  }
+
+  /**
+   * Causality depth: highest across spans, not first-wins. A trace can mix
+   * application spans (depth 0) with evaluator-emitted ones (depth >= 1);
+   * depth means "has this trace been through the evaluator", so it only climbs.
+   */
+  private maxCausalityDepth({
+    merged,
+    spanAttrs,
+    state,
+  }: {
+    merged: Record<string, string>;
+    spanAttrs: Record<string, string>;
+    state: TraceSummaryData;
+  }): void {
+    const depths = [state.attributes[RESERVED_CAUSALITY_DEPTH], spanAttrs[RESERVED_CAUSALITY_DEPTH]]
+      .map((v) => Number(v))
+      .filter((d) => Number.isFinite(d));
+    if (depths.length > 0) {
+      merged[RESERVED_CAUSALITY_DEPTH] = String(Math.max(...depths));
+    }
   }
 
   /**

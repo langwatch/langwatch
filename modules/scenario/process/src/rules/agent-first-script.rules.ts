@@ -1,5 +1,5 @@
 /**
- * `isAgentSpeaksFirst` opens the run with the agent's own turn, capturing a
+ * `agentGreetsFirst` opens the run with the agent's own turn, capturing a
  * phone greeting sent instantly on connect, before the normal simulator loop.
  * @see specs/features/agents/voice-phone.feature
  */
@@ -8,26 +8,31 @@ import * as ScenarioRunner from "@langwatch/scenario";
 import type { TargetAdapterData } from "@langwatch/scenario-contract";
 
 /**
- * Phone agents may greet the instant the call connects, so the run must
- * capture that greeting before the user simulator speaks.
+ * An inbound phone agent answers and greets the instant the call connects, so
+ * the run must capture that greeting before the user simulator speaks.
  */
-export function isAgentSpeaksFirst(adapterData: TargetAdapterData): boolean {
+export function agentGreetsFirst(adapterData: TargetAdapterData): boolean {
   return (
     adapterData.type === "voice" &&
     adapterData.voiceTarget.transport === "phone" &&
-    adapterData.voiceTarget.isAgentSpeaksFirst
+    adapterData.voiceTarget.callDirection === "inbound"
   );
 }
 
 /**
- * The script that makes the agent under test greet first, or `undefined` when
- * the target does not ask for it (every other run keeps its default cast, which
- * opens with the user simulator).
+ * The script for a greeting-first target, or `undefined` when it does not
+ * apply. A bare `agent()` + `proceed()` skips straight to Judge; scheduling
+ * `user()`/`agent()` explicitly guarantees a caller reply before any verdict.
  */
-export function buildIsAgentSpeaksFirstScript(
+export function buildAgentGreetsFirstScript(
   adapterData: TargetAdapterData,
 ): ScenarioRunner.ScriptStep[] | undefined {
-  return isAgentSpeaksFirst(adapterData)
-    ? [ScenarioRunner.agent(), ScenarioRunner.proceed()]
+  return agentGreetsFirst(adapterData)
+    ? [
+        ScenarioRunner.agent(),
+        ScenarioRunner.user(),
+        ScenarioRunner.agent(),
+        ScenarioRunner.proceed(),
+      ]
     : undefined;
 }

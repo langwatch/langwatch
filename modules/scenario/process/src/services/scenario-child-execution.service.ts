@@ -10,8 +10,8 @@ import { type TracerProvider, trace } from "@opentelemetry/api";
 
 import type { ScenarioHttp } from "../app/scenario.app.ts";
 import {
-  buildIsAgentSpeaksFirstScript,
-  isAgentSpeaksFirst,
+  agentGreetsFirst,
+  buildAgentGreetsFirstScript,
 } from "../rules/agent-first-script.rules.ts";
 import { buildRemoteTraceRunConfig } from "../rules/remote-trace-run.rules.ts";
 import { selectRoleModelParams } from "../rules/scenario-role-model.rules.ts";
@@ -72,7 +72,7 @@ function buildRunCast({
     return AgentTestScriptAdapter.create().build({
       adapter,
       script: jobData.script,
-      isAgentSpeaksFirst: isAgentSpeaksFirst(jobData.adapterData),
+      doesAgentGreetFirst: agentGreetsFirst(jobData.adapterData),
     });
   }
   const { nlpServiceUrl, scenario } = jobData;
@@ -85,10 +85,11 @@ function buildRunCast({
     litellmParams: roleModelParams.judge,
     nlpServiceUrl,
   });
-  // A phone agent that greets on connect opens the run with its own turn (so
-  // the greeting is captured first), then hands over to the simulator/judge
-  // loop; every other run keeps the default cast, which opens with the caller.
-  const isAgentSpeaksFirstScript = buildIsAgentSpeaksFirstScript(jobData.adapterData);
+  // An inbound phone agent that greets on connect opens the run with its own
+  // turn (so the greeting is captured first), then hands over to the
+  // simulator/judge loop; every other run keeps the default cast, which opens
+  // with the caller.
+  const agentGreetsFirstScript = buildAgentGreetsFirstScript(jobData.adapterData);
   return {
     agents: [
       adapter,
@@ -98,7 +99,26 @@ function buildRunCast({
         model: judgeModel,
       }),
     ],
-    ...(isAgentSpeaksFirstScript ? { script: isAgentSpeaksFirstScript } : {}),
+    ...(agentGreetsFirstScript ? { script: agentGreetsFirstScript } : {}),
+  };
+}
+
+/**
+ * The `maxTurns` override to pass to `ScenarioRunner.run`, if any. A judge-driven
+ * agent-first run spends its opening turn on the greeting and the caller's
+ * reply, unjudged, so it gets one extra turn to keep the same judged budget.
+ */
+function buildMaxTurnsRunConfig({
+  jobData,
+  scenarioMaxTurns,
+}: {
+  jobData: ChildProcessJobData;
+  scenarioMaxTurns: number | null | undefined;
+}): { maxTurns?: number } {
+  const bumpForGreeting = !jobData.script && agentGreetsFirst(jobData.adapterData);
+  if (scenarioMaxTurns == null && !bumpForGreeting) return {};
+  return {
+    maxTurns: (scenarioMaxTurns ?? ScenarioRunner.DEFAULT_MAX_TURNS) + (bumpForGreeting ? 1 : 0),
   };
 }
 
@@ -152,7 +172,10 @@ async function executeScenarioChildValue({
         langwatchEndpoint,
         langwatchApiKey,
       }),
-      ...(scenario.maxTurns != null && { maxTurns: scenario.maxTurns }),
+      ...buildMaxTurnsRunConfig({
+        jobData,
+        scenarioMaxTurns: scenario.maxTurns,
+      }),
       ...(scenario.minTurns != null && { minTurns: scenario.minTurns }),
       metadata: {
         langwatch: {

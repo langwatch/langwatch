@@ -19,6 +19,7 @@ import {
 import {
   createEvaluationTriggerSubscriber,
   detectCausalityLoop,
+  detectFoldedCausalityLoop,
 } from "../evaluation-trigger.subscriber.ts";
 import { MAX_PROCESSED_SPANS } from "../trace-summary.projection.ts";
 
@@ -99,6 +100,21 @@ function spanEvent(
       },
     },
     metadata: { spanId: "span-1", traceId: "trace-1" },
+  } as unknown as TraceProcessingEvent;
+}
+
+function originResolvedEvent(): TraceProcessingEvent {
+  return {
+    id: "event-2",
+    aggregateId: "trace-1",
+    aggregateType: "trace",
+    tenantId: "tenant-1",
+    createdAt: Date.now(),
+    occurredAt: Date.now(),
+    type: "lw.obs.trace.origin_resolved",
+    version: 1,
+    data: {},
+    metadata: { traceId: "trace-1" },
   } as unknown as TraceProcessingEvent;
 }
 
@@ -710,6 +726,55 @@ describe("detectCausalityLoop (pure) — verbatim spec titles", () => {
       spanAttributes: [{ key: "service.name", value: { stringValue: "x" } }],
     });
     expect(reason).toBeNull();
+  });
+});
+
+describe("detectFoldedCausalityLoop (pure) — the deferred-origin path", () => {
+  it("returns depth_fold when the fold state carries a depth >= 1", () => {
+    const reason = detectFoldedCausalityLoop({
+      foldState: { attributes: { "langwatch.reserved.causality_depth": "1" } },
+    });
+    expect(reason).toBe("depth_fold");
+  });
+
+  it("returns null when the folded depth is 0", () => {
+    const reason = detectFoldedCausalityLoop({
+      foldState: { attributes: { "langwatch.reserved.causality_depth": "0" } },
+    });
+    expect(reason).toBeNull();
+  });
+
+  it("returns null when no causality depth was ever folded", () => {
+    const reason = detectFoldedCausalityLoop({ foldState: { attributes: {} } });
+    expect(reason).toBeNull();
+  });
+});
+
+describe("createEvaluationTriggerSubscriber — the deferred-origin loop guard", () => {
+  /** @scenario "A trace already produced by the evaluator does not start another evaluation round" */
+  it("skips dispatch on origin_resolved when the fold carries a causality depth", async () => {
+    const { built, dispatch, metrics } = subscriber({});
+    const state = foldState({
+      attributes: {
+        "langwatch.origin": "evaluation",
+        "langwatch.reserved.causality_depth": "1",
+      },
+    });
+
+    await run(built, originResolvedEvent(), state);
+
+    expect(dispatch.sent).toEqual([]);
+    expect(metrics.blocked).toEqual(["depth_fold"]);
+  });
+
+  /** @scenario "An ordinary trace still starts its evaluations when its origin settles late" */
+  it("dispatches on origin_resolved when the fold carries no causality depth", async () => {
+    const { built, dispatch } = subscriber({});
+    const state = foldState({ attributes: { "langwatch.origin": "application" } });
+
+    await run(built, originResolvedEvent(), state);
+
+    expect(dispatch.sent).toHaveLength(1);
   });
 });
 

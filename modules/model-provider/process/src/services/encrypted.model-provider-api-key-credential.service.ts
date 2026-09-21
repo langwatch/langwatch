@@ -1,3 +1,4 @@
+import { EXACT_CREDENTIAL_FIELDS } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 
 import {
@@ -28,6 +29,19 @@ function isKeyBag(value: unknown): value is Record<string, unknown> {
 }
 
 /**
+ * Strips the whitespace around every credential in a bag, except
+ * {@link EXACT_CREDENTIAL_FIELDS}, healed once here on read.
+ */
+function trimCredentials(bag: Record<string, unknown>): Record<string, unknown> {
+  const trimmed: Record<string, unknown> = {};
+  for (const [name, value] of Object.entries(bag)) {
+    trimmed[name] =
+      typeof value === "string" && !EXACT_CREDENTIAL_FIELDS.has(name) ? value.trim() : value;
+  }
+  return trimmed;
+}
+
+/**
  * Reads a ModelProvider's `customKeys` column.
  */
 
@@ -50,7 +64,7 @@ function parseDecrypted(raw: string, cipher: ModelProviderCredentialCipher): Cus
   }
   try {
     const parsed: unknown = JSON.parse(plaintext);
-    return isKeyBag(parsed) ? { state: "read", keys: parsed } : UNREADABLE;
+    return isKeyBag(parsed) ? { state: "read", keys: trimCredentials(parsed) } : UNREADABLE;
   } catch (error) {
     // The error NAME only, never the error itself. A SyntaxError from
     // JSON.parse quotes the input it choked on, and the input here is the
@@ -74,7 +88,7 @@ export class EncryptedModelProviderCredentialAdapter extends ModelProviderCreden
   static readCustomKeys(raw: unknown, cipher: ModelProviderCredentialCipher): CustomKeysRead {
     if (raw === null || raw === undefined) return ABSENT;
     if (typeof raw === "object") {
-      return isKeyBag(raw) ? { state: "read", keys: raw } : UNREADABLE;
+      return isKeyBag(raw) ? { state: "read", keys: trimCredentials(raw) } : UNREADABLE;
     }
     if (typeof raw !== "string") return UNREADABLE;
     return parseDecrypted(raw, cipher);

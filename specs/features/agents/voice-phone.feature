@@ -423,13 +423,13 @@ Feature: Voice agents: reach an agent by phone
     Then the run error names that recorded reason rather than a generic message
 
   # ---------------------------------------------------------------------------
-  # Agent speaks first (scenario#995, scenario#992 — some agents greet on connect)
+  # Inbound call direction (scenario#995, scenario#992 — inbound agents greet on connect)
   # ---------------------------------------------------------------------------
 
   @e2e
-  Scenario: A callee that greets on connect opens the call when Agent speaks first is on
+  Scenario: An inbound agent that greets on connect opens the call
     Given a phone target whose agent greets as soon as the call connects
-    And "Agent speaks first" is turned on for that target and saved
+    And the call direction is set to inbound for that target and saved
     When a scenario run places the call
     Then the callee's greeting is recorded as the first turn of the conversation
     And the simulator's first line is spoken only after the greeting ends, and replies to it

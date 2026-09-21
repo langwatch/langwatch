@@ -2414,7 +2414,7 @@ wheels = [
 
 [[package]]
 name = "langevals"
-version = "3.0.0"
+version = "3.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
@@ -2522,7 +2522,7 @@ dev = [
 
 [[package]]
 name = "langevals-azure"
-version = "3.0.0"
+version = "3.1.0"
 source = { editable = "evaluators/azure" }
 dependencies = [
     { name = "azure-ai-contentsafety" },
@@ -2551,7 +2551,7 @@ test = [
 
 [[package]]
 name = "langevals-core"
-version = "3.0.0"
+version = "3.1.0"
 source = { editable = "langevals_core" }
 dependencies = [
     { name = "anyio" },
@@ -2592,7 +2592,7 @@ dev = [{ name = "ipykernel", specifier = ">=6.29.4" }]
 
 [[package]]
 name = "langevals-langevals"
-version = "3.0.0"
+version = "3.1.0"
 source = { editable = "evaluators/langevals" }
 dependencies = [
     { name = "dspy" },
@@ -2631,7 +2631,7 @@ test = [
 
 [[package]]
 name = "langevals-lingua"
-version = "3.0.0"
+version = "3.1.0"
 source = { editable = "evaluators/lingua" }
 dependencies = [
     { name = "langevals-core" },
@@ -2745,7 +2745,7 @@ dev = [
 
 [[package]]
 name = "langevals-openai"
-version = "3.0.0"
+version = "3.1.0"
 source = { editable = "evaluators/openai" }
 dependencies = [
     { name = "langevals-core" },
@@ -2774,7 +2774,7 @@ test = [
 
 [[package]]
 name = "langevals-presidio"
-version = "3.0.0"
+version = "3.1.0"
 source = { editable = "evaluators/presidio" }
 dependencies = [
     { name = "en-core-web-lg" },
@@ -2811,7 +2811,7 @@ test = [
 
 [[package]]
 name = "langevals-ragas"
-version = "3.0.0"
+version = "3.1.0"
 source = { editable = "evaluators/ragas" }
 dependencies = [
     { name = "langchain-community" },

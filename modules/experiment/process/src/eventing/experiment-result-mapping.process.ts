@@ -220,6 +220,75 @@ const persistableInputs = (
 };
 
 /**
+ * What the evaluator spent, as the result carries it. An absent cost is not a
+ * zero cost: 0 says it spent nothing, absent says it does not know, and the
+ * stored row keeps them apart.
+ */
+const billedCost = (cost: number | undefined): { currency: "USD"; amount: number } | undefined =>
+  typeof cost === "number" ? { currency: "USD", amount: cost } : undefined;
+
+/**
+ * The result of an evaluator that declined the row. The reason travels in
+ * details; whatever it spent before declining is kept, since a skip is not
+ * an error and may still have cost something.
+ */
+const skippedResult = (executionState: {
+  outputs?: Record<string, unknown>;
+  cost?: number;
+}): SingleEvaluationResult => {
+  const cost = billedCost(executionState.cost);
+  return {
+    status: "skipped",
+    ...(typeof executionState.outputs?.details === "string" && executionState.outputs.details
+      ? { details: executionState.outputs.details }
+      : {}),
+    ...(cost ? { cost } : {}),
+  };
+};
+
+/**
+ * The result of an evaluator that failed outright, either at execution or by
+ * returning an error status. A recognised 401/403 carries a customer-facing
+ * domain error; anything else stays an opaque failure.
+ */
+const errorResult = (
+  executionError: string | undefined,
+  outputs: Record<string, unknown> | undefined,
+): SingleEvaluationResult & { domainError?: ReturnType<EvaluatorExecutionError["serialize"]> } => {
+  const rawErrorDetails =
+    executionError ?? (outputs?.details as string | undefined) ?? "Unknown evaluator error";
+  const classifiedDomainError = classifyEvaluatorExecutionError(rawErrorDetails);
+  return {
+    status: "error",
+    error_type: "EvaluatorError",
+    details: rawErrorDetails,
+    traceback: [],
+    ...(classifiedDomainError ? { domainError: classifiedDomainError.serialize() } : {}),
+  };
+};
+
+/**
+ * The result of an evaluator that scored the row, strips a guardrail's score
+ * on request, and keeps `details` only when it is a non-empty string (a null
+ * default would otherwise stick around after the field is cleared).
+ */
+const processedResult = (
+  executionState: { outputs?: Record<string, unknown>; cost?: number },
+  options?: { stripScore?: boolean },
+): SingleEvaluationResult => ({
+  status: "processed",
+  score: options?.stripScore ? undefined : coerceScore(executionState.outputs?.score),
+  passed: coercePassed(executionState.outputs?.passed),
+  label:
+    typeof executionState.outputs?.label === "string" ? executionState.outputs.label : undefined,
+  details:
+    typeof executionState.outputs?.details === "string" && executionState.outputs.details
+      ? executionState.outputs.details
+      : undefined,
+  cost: billedCost(executionState.cost),
+});
+
+/**
  * Maps an evaluator completion event to an evaluator_result SSE event.
  *
  * @param options.stripScore - If true, the score will be omitted from the result
@@ -252,47 +321,19 @@ export const mapEvaluatorResult = (
 
   const duration = durationOf(executionState.timestamps);
 
-  // Build SingleEvaluationResult
   // Check for errors: either execution-level error OR evaluator returned error status in outputs
-  const hasExecutionError = !!executionState.error;
-  const hasEvaluatorError = executionState.outputs?.status === "error";
+  const hasEvaluatorError = !!executionState.error || executionState.outputs?.status === "error";
 
-  const rawErrorDetails =
-    executionState.error ??
-    (executionState.outputs?.details as string | undefined) ??
-    "Unknown evaluator error";
-  const classifiedDomainError = classifyEvaluatorExecutionError(rawErrorDetails);
-
-  const result: SingleEvaluationResult & {
+  let result: SingleEvaluationResult & {
     domainError?: ReturnType<EvaluatorExecutionError["serialize"]>;
-  } =
-    hasExecutionError || hasEvaluatorError
-      ? {
-          status: "error",
-          error_type: "EvaluatorError",
-          details: rawErrorDetails,
-          traceback: [],
-          ...(classifiedDomainError ? { domainError: classifiedDomainError.serialize() } : {}),
-        }
-      : {
-          status: "processed",
-          // Strip score for guardrail-type evaluators where score is just 0 or 1
-          score: options?.stripScore ? undefined : coerceScore(executionState.outputs?.score),
-          passed: coercePassed(executionState.outputs?.passed),
-          label:
-            typeof executionState.outputs?.label === "string"
-              ? executionState.outputs.label
-              : undefined,
-          // Only include details when it's a non-empty string.
-          // Python's EvaluationResultWithMetadata always serializes details
-          // (default None -> null), so we filter out null/undefined to prevent
-          // the "sticky details" bug where details appears even after removal.
-          details:
-            typeof executionState.outputs?.details === "string" && executionState.outputs.details
-              ? executionState.outputs.details
-              : undefined,
-          cost: executionState.cost ? { currency: "USD", amount: executionState.cost } : undefined,
-        };
+  };
+  if (hasEvaluatorError) {
+    result = errorResult(executionState.error, executionState.outputs);
+  } else if (executionState.outputs?.status === "skipped") {
+    result = skippedResult(executionState);
+  } else {
+    result = processedResult(executionState, options);
+  }
 
   return {
     type: "evaluator_result",
@@ -425,6 +466,39 @@ export const mapThrownErrorEvent = ({
 };
 
 /**
+ * The result of a workflow evaluator node that failed, on the same coded
+ * handled channel as `mapTargetResult`. See `nodeErrorToDomainError`.
+ */
+const workflowErrorResult = (executionState: {
+  outputs?: Record<string, unknown>;
+  error?: string;
+  nodeErrorCode?: string;
+  upstream_status?: number;
+  trace_id?: string;
+}): EvaluationV3EvaluatorResult => {
+  const domainError = executionState.nodeErrorCode
+    ? nodeErrorToDomainError({
+        errorType: executionState.nodeErrorCode,
+        message: executionState.error,
+        upstreamStatus: executionState.upstream_status,
+        traceId: executionState.trace_id,
+      })
+    : undefined;
+  return {
+    status: "error",
+    error_type: "EvaluatorError",
+    details:
+      executionState.error ??
+      (typeof executionState.outputs?.details === "string"
+        ? executionState.outputs.details
+        : undefined) ??
+      "Unknown evaluator error",
+    traceback: [],
+    ...(domainError ? { domainError } : {}),
+  };
+};
+
+/**
  * Maps a studio workflow evaluator node's execution state to an evaluator_result event.
  * Unlike mapEvaluatorResult, this handles stringy score/passed values through coercion.
  */
@@ -448,51 +522,19 @@ export const mapWorkflowEvaluatorResult = (
     trace_id?: string;
   },
 ): EvaluationV3Event => {
-  const hasExecutionError = !!executionState.error;
   const hasEvaluatorError =
-    executionState.status === "error" || executionState.outputs?.status === "error";
+    !!executionState.error ||
+    executionState.status === "error" ||
+    executionState.outputs?.status === "error";
 
-  // A coded engine failure travels the handled channel, exactly as on the
-  // target side (`mapTargetResult`): the client renders registry copy for the
-  // code and keeps `details` for the raw-text popover. See
-  // `nodeErrorToDomainError`.
-  const domainError = executionState.nodeErrorCode
-    ? nodeErrorToDomainError({
-        errorType: executionState.nodeErrorCode,
-        message: executionState.error,
-        upstreamStatus: executionState.upstream_status,
-        traceId: executionState.trace_id,
-      })
-    : undefined;
-
-  const result: EvaluationV3EvaluatorResult =
-    hasExecutionError || hasEvaluatorError
-      ? {
-          status: "error",
-          error_type: "EvaluatorError",
-          details:
-            executionState.error ??
-            (typeof executionState.outputs?.details === "string"
-              ? executionState.outputs.details
-              : undefined) ??
-            "Unknown evaluator error",
-          traceback: [],
-          ...(domainError ? { domainError } : {}),
-        }
-      : {
-          status: "processed",
-          score: coerceScore(executionState.outputs?.score),
-          passed: coercePassed(executionState.outputs?.passed),
-          label:
-            typeof executionState.outputs?.label === "string"
-              ? executionState.outputs.label
-              : undefined,
-          details:
-            typeof executionState.outputs?.details === "string" && executionState.outputs.details
-              ? executionState.outputs.details
-              : undefined,
-          cost: executionState.cost ? { currency: "USD", amount: executionState.cost } : undefined,
-        };
+  let result: EvaluationV3EvaluatorResult;
+  if (hasEvaluatorError) {
+    result = workflowErrorResult(executionState);
+  } else if (executionState.outputs?.status === "skipped") {
+    result = skippedResult(executionState);
+  } else {
+    result = processedResult(executionState);
+  }
 
   return {
     type: "evaluator_result",

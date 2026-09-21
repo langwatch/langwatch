@@ -24,6 +24,16 @@ export function isSecretCredentialField(key: string): boolean {
 }
 
 /**
+ * Credentials whose exact bytes are the contract, exempt from the read-time
+ * whitespace trim: each is cryptographic key material (an HMAC/SigV4 signing
+ * key), where one changed byte changes every signature computed from it.
+ */
+export const EXACT_CREDENTIAL_FIELDS: ReadonlySet<string> = new Set([
+  "AWS_SECRET_ACCESS_KEY",
+  "ELEVENLABS_WEBHOOK_SECRET",
+]);
+
+/**
  * The credential field names a provider definition declares. Must unwrap refined/optional
  * schemas across both zod 3 (`ZodEffects`/`innerType()`) and zod 4 (`.unwrap()`/`_def.innerType`)
  * spellings, or affected providers silently render an empty credential form.

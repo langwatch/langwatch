@@ -62,4 +62,42 @@ describe("TraceAttributeAccumulationService", () => {
       ).toEqual(["span-2"]);
     });
   });
+
+  describe("given spans mixing application and evaluator-emitted causality depths", () => {
+    /** @scenario "A trace keeps the highest evaluator depth any of its spans carried" */
+    it("keeps the highest depth regardless of which span folds first", () => {
+      const service = TraceAttributeAccumulationService.create(TraceOriginService.create());
+      const state = createInitState();
+
+      const applicationSpan = createTestSpan({
+        spanId: "span-1",
+        spanAttributes: { "langwatch.reserved.causality_depth": 0 },
+      });
+      state.attributes = service.accumulateAttributes({
+        state,
+        span: applicationSpan,
+        outputSource: "test",
+        inputIsFallback: false,
+        outputIsFallback: false,
+        inputMediaRefs: null,
+        outputMediaRefs: null,
+      });
+
+      const evaluatorSpan = createTestSpan({
+        spanId: "span-2",
+        spanAttributes: { "langwatch.reserved.causality_depth": 1 },
+      });
+      state.attributes = service.accumulateAttributes({
+        state,
+        span: evaluatorSpan,
+        outputSource: "test",
+        inputIsFallback: false,
+        outputIsFallback: false,
+        inputMediaRefs: null,
+        outputMediaRefs: null,
+      });
+
+      expect(state.attributes["langwatch.reserved.causality_depth"]).toBe("1");
+    });
+  });
 });

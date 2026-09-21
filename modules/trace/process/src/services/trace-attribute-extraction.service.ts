@@ -15,6 +15,22 @@ import {
 const VERCEL_METADATA_PREFIX = "ai.telemetry.metadata.";
 
 /**
+ * Depth of the evaluator causality chain a span was emitted under, stamped by
+ * nlpgo's BaggageAttributeProcessor. Folded by accumulation and read by the
+ * evaluation-trigger loop guard, so both sides must name the same key.
+ */
+export const RESERVED_CAUSALITY_DEPTH = "langwatch.reserved.causality_depth";
+
+/** Arrives as an int on the OTLP path and a string on others; anything else,
+ *  including blank or fractional strings, is not a depth. */
+function causalityDepthOf(raw: unknown): number | undefined {
+  if (typeof raw === "number") return Number.isInteger(raw) ? raw : undefined;
+  if (typeof raw !== "string" || raw.trim() === "") return undefined;
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) ? parsed : undefined;
+}
+
+/**
  * Metadata names that identify a trace rather than describe it, and the
  * trace-summary key each one fills. Both spellings are accepted because the
  * REST collector accepts both and callers copy whichever they already use.
@@ -241,6 +257,14 @@ export class TraceAttributeExtractionService {
     const evaluationRunId = findStringAttribute(spanAttrs, "evaluation.run_id");
     if (evaluationRunId) {
       result["evaluation.run_id"] = evaluationRunId;
+    }
+
+    // Depth of the evaluator causality chain, stamped by nlpgo's baggage span
+    // processor. Blank/fractional values are dropped rather than coerced,
+    // since Number("") is a finite 0 and a depth counts evaluator hops.
+    const depth = causalityDepthOf(spanAttrs[RESERVED_CAUSALITY_DEPTH]);
+    if (depth !== undefined) {
+      result[RESERVED_CAUSALITY_DEPTH] = String(depth);
     }
   }
 

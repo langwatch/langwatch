@@ -137,6 +137,29 @@ describe("readCustomKeys", () => {
       });
     });
   });
+
+  describe("given a credential padded with whitespace", () => {
+    it("strips the padding on read", () => {
+      const stored = encrypt(JSON.stringify({ OPENAI_API_KEY: " sk-secret " }));
+      expect(readCustomKeys(stored)).toEqual({
+        state: "read",
+        keys: { OPENAI_API_KEY: "sk-secret" },
+      });
+    });
+
+    it("leaves a non-string field untouched", () => {
+      const stored = encrypt(JSON.stringify({ MANAGED: true }));
+      expect(readCustomKeys(stored)).toEqual({ state: "read", keys: { MANAGED: true } });
+    });
+
+    it("keeps the padding on a credential whose exact bytes are the contract", () => {
+      const stored = encrypt(JSON.stringify({ AWS_SECRET_ACCESS_KEY: " padded-secret " }));
+      expect(readCustomKeys(stored)).toEqual({
+        state: "read",
+        keys: { AWS_SECRET_ACCESS_KEY: " padded-secret " },
+      });
+    });
+  });
 });
 
 describe("EncryptedModelProviderCredentialAdapter", () => {
