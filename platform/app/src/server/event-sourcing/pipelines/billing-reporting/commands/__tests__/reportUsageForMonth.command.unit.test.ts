@@ -163,9 +163,13 @@ async function createHandler() {
     queryBillableEventsTotal: mockQueryBillableEventsTotal,
     queryInstantEvalSpendTotal: mockQueryInstantEvalSpendTotal,
     isInstantEvalMeterProvisioned: () => isInstantEvalMeterProvisioned,
+    connectedUsageCeiling: mockConnectedUsageCeiling,
     selfDispatch: mockSelfDispatch,
   });
 }
+
+/** What a connected contract may still report this month; null for no cap. */
+const mockConnectedUsageCeiling = vi.fn(async () => null as number | null);
 
 /** Whether the catalog maps the Instant Evals meter; cases flip it. */
 let isInstantEvalMeterProvisioned = true;
@@ -801,6 +805,34 @@ describe("ReportUsageForMonthCommand", () => {
             }),
           ],
         }),
+      );
+    });
+
+    /** @scenario "Usage past the prepaid commit never reaches the invoice" */
+    it("reports the commit, not the few cents the gateway let through past it", async () => {
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(
+        usageBilledOrg({ contract: "connected" }),
+      );
+      mockQueryBillableEventsTotal.mockResolvedValue(0);
+      // 500.80 USD spent against a 500 USD commit with overage off.
+      mockQueryInstantEvalSpendTotal.mockResolvedValue(5_008_000);
+      mockConnectedUsageCeiling.mockResolvedValueOnce(5_000_000);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).toHaveBeenCalledWith(
+        expect.objectContaining({
+          events: [
+            expect.objectContaining({
+              eventName: INSTANT_EVAL_METER,
+              value: 500,
+            }),
+          ],
+        }),
+      );
+      expect(mockBillingCheckpoints.confirm).toHaveBeenCalledWith(
+        expect.objectContaining({ lastReportedTotal: 5_000_000 }),
       );
     });
 

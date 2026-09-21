@@ -21,6 +21,8 @@ export interface ContractTerms {
   services: string[];
   /** When the last of the counted terms ends, or null when none counts. */
   termEndsAt: Date | null;
+  /** When the first of the counted terms began, or null when none counts. */
+  termStartsAt: Date | null;
 }
 
 /**
@@ -53,12 +55,14 @@ export function contractTermsOf({
     ),
   );
   const ends = counted.map((license) => license.expiresAt.getTime());
+  const starts = counted.map((license) => license.issuedAt.getTime());
   return {
     commitUsdCents,
     maximumUsdCents: commitUsdCents + overageUsdCents,
     overageEnabled: counted.some((license) => license.overageEnabled),
     services: [...new Set(counted.flatMap((license) => license.services))],
     termEndsAt: ends.length > 0 ? new Date(Math.max(...ends)) : null,
+    termStartsAt: starts.length > 0 ? new Date(Math.min(...starts)) : null,
   };
 }
 
