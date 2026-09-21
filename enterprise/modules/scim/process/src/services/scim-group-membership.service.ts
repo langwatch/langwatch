@@ -98,6 +98,33 @@ export class ScimGroupMembershipService {
     }
   }
 
+  /**
+   * Everyone a patch would write to: the members its operations name, plus the
+   * group's current members when one of them replaces the whole list — a
+   * replacement removes whoever it leaves out, which is a write against them.
+   */
+  async membersTouchedByPatch(input: {
+    groupId: string;
+    operations: readonly ScimPatchOperation[];
+  }): Promise<string[]> {
+    const touched = new Set<string>();
+    let replacesMembers = false;
+
+    for (const operation of input.operations) {
+      const named = this.membersNamedBy(operation);
+      for (const id of named.ids) touched.add(id);
+      replacesMembers ||= named.replacesMembers;
+    }
+
+    if (replacesMembers) {
+      for (const id of await this.repository.listGroupMemberIds({ groupId: input.groupId })) {
+        touched.add(id);
+      }
+    }
+
+    return [...touched];
+  }
+
   async applyPatch(input: {
     group: ScimGroupRecord;
     organizationId: string;
@@ -154,6 +181,32 @@ export class ScimGroupMembershipService {
       organizationId: input.organizationId,
       memberIds: instruction.ids,
     });
+  }
+
+  /** Who one operation writes to, and whether it restates the whole list. */
+  private membersNamedBy(operation: ScimPatchOperation): {
+    ids: string[];
+    replacesMembers: boolean;
+  } {
+    const normalizedOp = operation.op.toLowerCase();
+    if (normalizedOp === "add" && operation.path === "members") {
+      return { ids: this.memberIds(operation.value), replacesMembers: false };
+    }
+
+    if (normalizedOp === "remove" && operation.path?.startsWith("members")) {
+      return {
+        ids: this.memberIdsFromPath(operation.path, operation.value),
+        replacesMembers: false,
+      };
+    }
+
+    if (normalizedOp !== "replace") return { ids: [], replacesMembers: false };
+
+    const instruction = this.requestedMemberIds(operation);
+
+    return instruction.kind === "list"
+      ? { ids: instruction.ids, replacesMembers: true }
+      : { ids: [], replacesMembers: false };
   }
 
   private async renameIfRequested(

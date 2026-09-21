@@ -3,9 +3,10 @@
  * The server half of `scimToken.*`: the settings page's door onto the same
  * application the management REST family reaches.
  *
- * Every procedure takes `organization:manage`: a SCIM token writes members
- * into the organization, so minting one is the same authority as inviting
- * anybody.
+ * Minting and revoking a directory token takes `sso:manage` (ADR-122): a token
+ * is the whole write authority a directory holds over an organization's
+ * membership. Reading the list, and the connections a token can be minted
+ * against, is seeing rather than managing, so both take `sso:view`.
  *
  * The Enterprise plan gate is NOT declared here, and it is not gone: it ran
  * SECOND, after the permission check, so that a caller who does not belong to
@@ -21,15 +22,15 @@ import { ScimApi, scimTokenTrpc } from "@langwatch/enterprise-scim-contract";
 
 export const scimTokenTrpcTransport = defineTrpcRouter(ScimApi, scimTokenTrpc)
   .procedure("list")
-  .withPermission("organization:manage")
+  .withPermission("sso:view")
   .handle(({ app, input }) => app.listTokens({ organizationId: input.organizationId }))
 
   .procedure("connections")
-  .withPermission("organization:manage")
+  .withPermission("sso:view")
   .handle(({ app, input }) => app.findConnections({ organizationId: input.organizationId }))
 
   .procedure("generate")
-  .withPermission("organization:manage")
+  .withPermission("sso:manage")
   .handle(({ app, input }) =>
     app.generateToken({
       organizationId: input.organizationId,
@@ -39,7 +40,7 @@ export const scimTokenTrpcTransport = defineTrpcRouter(ScimApi, scimTokenTrpc)
   )
 
   .procedure("revoke")
-  .withPermission("organization:manage")
+  .withPermission("sso:manage")
   .handle(({ app, input }) =>
     app.revokeToken({ organizationId: input.organizationId, tokenId: input.tokenId }),
   )

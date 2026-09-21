@@ -97,7 +97,7 @@ describe("the organization's own single sign-on surface", () => {
     /** @scenario "The live subscription is gated exactly like the read it refreshes" */
     it("is refused to the same reader the history itself refuses", async () => {
       const { caller } = await harness({
-        permits: (permission) => permission === "organization:view",
+        permits: (permission) => permission === "sso:view",
       });
 
       const refusal = await Promise.resolve(caller.onHistoryActivity(TARGET))
@@ -111,11 +111,11 @@ describe("the organization's own single sign-on surface", () => {
     });
   });
 
-  describe("given a reader who may only see the organization", () => {
+  describe("given a reader who may see single sign-on but not manage it", () => {
     /** @scenario "Seeing the history takes managing single sign-on, not only seeing it" */
     it("refuses, because the history is nearer an audit trail than a state", async () => {
       const { caller, getHistory } = await harness({
-        permits: (permission) => permission === "organization:view",
+        permits: (permission) => permission === "sso:view",
       });
 
       await expect(caller.getHistory(TARGET)).rejects.toMatchObject({ code: "FORBIDDEN" });

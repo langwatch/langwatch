@@ -104,7 +104,7 @@ describe("the scimToken tRPC namespace", () => {
     });
   });
 
-  describe("given a caller holding organization:manage", () => {
+  describe("given a caller holding sso:manage", () => {
     describe("when a token is minted for a connection", () => {
       it("passes the connection through, and answers the secret once", async () => {
         const { caller, scim } = mount();
@@ -144,7 +144,7 @@ describe("the scimToken tRPC namespace", () => {
 
   describe("given a caller who may only read the organization", () => {
     describe("when the connections behind the mint are read", () => {
-      it("refuses, because the choice is part of minting", async () => {
+      it("refuses, because reading them takes seeing single sign-on", async () => {
         const { caller } = mount({
           permits: (permission) => permission === "organization:view",
           connections: [{ connectionId: "ssoconn_1", displayName: "Okta", state: "ACTIVE" }],
@@ -167,6 +167,40 @@ describe("the scimToken tRPC namespace", () => {
         });
         expect(scim.generateToken).not.toHaveBeenCalled();
       });
+    });
+  });
+
+  describe("given a reader who may see single sign-on but not manage it (ADR-122)", () => {
+    const seeing = { permits: (permission: string) => permission === "sso:view" };
+
+    it("reads the tokens, because listing them hands out no value", async () => {
+      const { caller } = mount(seeing);
+
+      await expect(caller.list({ organizationId: "org_1" })).resolves.toEqual([]);
+    });
+
+    it("reads the connections a token could be minted against", async () => {
+      const { caller } = mount({
+        ...seeing,
+        connections: [{ connectionId: "ssoconn_1", displayName: "Okta", state: "ACTIVE" }],
+      });
+
+      await expect(caller.connections({ organizationId: "org_1" })).resolves.toEqual([
+        { connectionId: "ssoconn_1", displayName: "Okta", state: "ACTIVE" },
+      ]);
+    });
+
+    it("is offered no control: the mint and the revoke both take managing", async () => {
+      const { caller, scim } = mount(seeing);
+
+      await expect(caller.generate({ organizationId: "org_1" })).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
+      await expect(
+        caller.revoke({ organizationId: "org_1", tokenId: "token_1" }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      expect(scim.generateToken).not.toHaveBeenCalled();
+      expect(scim.revokeToken).not.toHaveBeenCalled();
     });
   });
 });

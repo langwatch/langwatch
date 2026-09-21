@@ -35,5 +35,5 @@ export function useSsoHost(): SsoHostApi {
   return host;
 }
 
-/** The grant the organization's authentication page asked for, unchanged. */
-export const SSO_PAGE_PERMISSION = "organization:manage";
+/** Seeing the page is `sso:view`; its controls take `sso:manage` (ADR-122). */
+export const SSO_PAGE_PERMISSION = "sso:view";

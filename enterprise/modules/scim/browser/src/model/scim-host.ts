@@ -44,5 +44,5 @@ export function useScimHost(): ScimHostApi {
   return host;
 }
 
-/** The grant the platform page asked for, unchanged. */
-export const SCIM_PAGE_PERMISSION = "organization:manage";
+/** Seeing the page is `sso:view`; minting a token takes `sso:manage` (ADR-122). */
+export const SCIM_PAGE_PERMISSION = "sso:view";

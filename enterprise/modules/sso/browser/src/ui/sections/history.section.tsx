@@ -10,6 +10,7 @@ import { Badge, Box, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { nowInstant, toDate, Temporal } from "@langwatch/time";
 
 import { ssoApi } from "../../behavior/sso-api.ts";
+import { useHistoryActivity } from "../../behavior/use-history-activity.ts";
 import { groupHistoryByDay, type HistoryDayEntry } from "../../model/history-days.ts";
 import { SettingsCard } from "../elements/settings-card.tsx";
 
@@ -32,6 +33,9 @@ export function HistorySection({
   connectionId: string;
 }) {
   const history = ssoApi.ssoSetup.getHistory.useQuery({ organizationId, connectionId });
+
+  // Live while this panel is on screen and nowhere else.
+  useHistoryActivity({ organizationId, connectionId });
 
   const rows = history.data ?? [];
   // Read at render: "Today" and "Yesterday" are facts about when the page is

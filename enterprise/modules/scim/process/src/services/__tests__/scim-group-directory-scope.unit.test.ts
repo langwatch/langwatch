@@ -27,6 +27,8 @@ import { ScimGrantsService } from "../scim-grants.service.ts";
 const ORGANIZATION = "org-1";
 const OKTA = "connection-okta";
 const ENTRA = "connection-entra";
+/** A person some other directory asserted, whom this one may not write. */
+const FOREIGN = "foreign-user";
 
 function group(overrides: Partial<ScimGroupRecord> = {}): ScimGroupRecord {
   return {
@@ -334,5 +336,87 @@ describe("a group belongs to the connection that pushed it", () => {
 
       expect(identities.assertWritable).not.toHaveBeenCalled();
     });
+
+    /** @scenario "Group membership writes respect directory ownership" */
+    it.each(["post", "put", "patch-add", "patch-remove", "patch-replace", "delete"])(
+      "refuses a member a sibling directory owns, through %s, before writing anything",
+      async (verb) => {
+        const { repository } = repositoryOver(
+          verb === "post" ? [] : [group({ connectionId: OKTA })],
+        );
+        repository.listGroupMemberIds = vi.fn(async () => [FOREIGN]);
+        const identities = {
+          assertWritable: vi.fn(async ({ userId }: { connectionId: string; userId: string }) => {
+            if (userId === FOREIGN) throw new ScimWriteOutsideConnectionError({ userId });
+          }),
+        };
+
+        const refusal = await foreignMemberWrite({
+          verb,
+          service: serviceOver(repository, identities),
+        }).catch((error: unknown) => error);
+
+        expect(refusal).toBeInstanceOf(ScimWriteOutsideConnectionError);
+        expect(repository.createGroup).not.toHaveBeenCalled();
+        expect(repository.renameGroup).not.toHaveBeenCalled();
+        expect(repository.deleteGroup).not.toHaveBeenCalled();
+        expect(repository.addGroupMember).not.toHaveBeenCalled();
+        expect(repository.removeGroupMembers).not.toHaveBeenCalled();
+      },
+    );
   });
 });
+
+/** Which member operation each patch verb stands for. */
+const PATCH_OPS: Record<string, string> = { "patch-remove": "remove", "patch-replace": "replace" };
+
+/** The same foreign member, named through each write the protocol offers. */
+function foreignMemberWrite({
+  verb,
+  service,
+}: {
+  verb: string;
+  service: ScimDirectoryService;
+}): Promise<unknown> {
+  const target = { organizationId: ORGANIZATION, connectionId: OKTA };
+  if (verb === "post") {
+    return service.createGroup({
+      ...target,
+      request: {
+        schemas: ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+        displayName: "Engineering",
+        members: [{ value: FOREIGN }],
+      },
+    });
+  }
+
+  if (verb === "put") {
+    return service.replaceGroup({
+      ...target,
+      externalScimId: "group-1",
+      request: {
+        schemas: ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+        displayName: "Engineering",
+        members: [{ value: FOREIGN }],
+      },
+    });
+  }
+
+  if (verb === "delete") {
+    return service.deleteGroup({ ...target, externalScimId: "group-1" });
+  }
+
+  const op = PATCH_OPS[verb] ?? "add";
+
+  return service.updateGroup({
+    ...target,
+    externalScimId: "group-1",
+    patchRequest: {
+      schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+      Operations: [
+        { op: "add", path: "members", value: [{ value: "user-3" }] },
+        { op, path: "members", value: [{ value: FOREIGN }] },
+      ],
+    },
+  });
+}

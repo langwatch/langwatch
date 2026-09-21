@@ -214,9 +214,14 @@ export class ScimDirectoryService {
       return this.scimError({ status: "404", detail: "Group not found" });
     }
 
+    // A replacement writes to whoever it leaves out as much as to whoever it
+    // names, so the members already in the group are authorized too.
     await this.authorizeMembers({
       connectionId,
-      memberIds: (request.members ?? []).map((member) => member.value),
+      memberIds: [
+        ...(await this.prisma.listGroupMemberIds({ groupId: group.id })),
+        ...(request.members ?? []).map((member) => member.value),
+      ],
     });
     if (request.displayName !== group.name) {
       await this.prisma.renameGroup({ id: group.id, name: request.displayName });
@@ -250,6 +255,16 @@ export class ScimDirectoryService {
       return this.scimError({ status: "404", detail: "Group not found" });
     }
 
+    // Every operation is authorized before any of them is applied: a patch
+    // naming one person this directory owns and one it does not writes neither.
+    await this.authorizeMembers({
+      connectionId,
+      memberIds: await this.membership.membersTouchedByPatch({
+        groupId: group.id,
+        operations: patchRequest.Operations,
+      }),
+    });
+
     for (const operation of patchRequest.Operations) {
       await this.membership.applyPatch({ group, operation, organizationId });
     }
@@ -274,6 +289,11 @@ export class ScimDirectoryService {
       return this.scimError({ status: "404", detail: "Group not found" });
     }
 
+    // Deleting a group unmembers everyone in it, so a directory that does not
+    // own one of them may not delete it — asked before anything is written.
+    const memberIds = await this.prisma.listGroupMemberIds({ groupId: group.id });
+    await this.authorizeMembers({ connectionId, memberIds });
+
     // The grants the group carried go first and carry instant enforcement:
     // an IdP that deletes a group has taken that access away. Reconciled to
     // the empty set, so a repeated delete emits nothing.
@@ -282,10 +302,7 @@ export class ScimDirectoryService {
       desired: [],
       actor: { type: "system", id: SYSTEM_ACTORS.scim },
     });
-    await this.membership.remove({
-      groupId: group.id,
-      userIds: await this.prisma.listGroupMemberIds({ groupId: group.id }),
-    });
+    await this.membership.remove({ groupId: group.id, userIds: memberIds });
     await this.prisma.deleteGroup({ id: group.id });
 
     return;

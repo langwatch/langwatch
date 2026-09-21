@@ -5,19 +5,24 @@
  * read apart from an empty history, and never hides carried-over evidence.
  */
 
-import { cleanup, screen } from "@testing-library/react";
+import { act, cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+type ActivityOptions = { onData?: (data: { connectionId: string }) => void };
 
 const { state } = vi.hoisted(() => ({
   state: {
     entries: [] as Record<string, unknown>[],
     isLoading: false,
     isError: false,
+    invalidate: vi.fn(),
+    activity: void 0 as { input: unknown; options: ActivityOptions } | undefined,
   },
 }));
 
 vi.mock("../../../behavior/sso-api.ts", () => ({
   ssoApi: {
+    useUtils: () => ({ ssoSetup: { getHistory: { invalidate: state.invalidate } } }),
     ssoSetup: {
       getHistory: {
         useQuery: () => ({
@@ -25,6 +30,11 @@ vi.mock("../../../behavior/sso-api.ts", () => ({
           isLoading: state.isLoading,
           isError: state.isError,
         }),
+      },
+      onHistoryActivity: {
+        useSubscription: (input: unknown, options: ActivityOptions) => {
+          state.activity = { input, options };
+        },
       },
     },
   },
@@ -47,6 +57,8 @@ beforeEach(() => {
   state.entries = [];
   state.isLoading = false;
   state.isError = false;
+  state.activity = void 0;
+  state.invalidate.mockClear();
 });
 
 afterEach(cleanup);
@@ -91,6 +103,25 @@ describe("given nothing has happened yet", () => {
     renderWithSsoHost(<HistorySection {...TARGET} />);
 
     expect(screen.getByText(/nothing has happened to this connection yet/i)).toBeTruthy();
+  });
+});
+
+describe("given something happens while the panel is open", () => {
+  /** @scenario "The identity provider page refreshes its history when something changes" */
+  it("re-reads the history it already had permission to see, and renders nothing of the signal", () => {
+    state.entries = [entry()];
+
+    const { container } = renderWithSsoHost(<HistorySection {...TARGET} />);
+    const before = container.textContent;
+
+    expect(state.activity?.input).toEqual(TARGET);
+
+    act(() => {
+      state.activity?.options.onData?.({ connectionId: TARGET.connectionId });
+    });
+
+    expect(state.invalidate).toHaveBeenCalledWith(TARGET);
+    expect(container.textContent).toBe(before);
   });
 });
 

@@ -98,6 +98,13 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     Then the push is refused with code scim_write_outside_connection and status 403
     And that person is unchanged
 
+  @unit @regression
+  Scenario: Group membership writes respect directory ownership
+    Given a group belongs to one directory and a member belongs to a sibling directory
+    When the first directory adds or removes that member through POST PUT PATCH or DELETE
+    Then the write is refused with scim_write_outside_connection
+    And no membership is changed by the refused operation
+
   # Proven at the service layer, with Prisma mocked
   # (ee/scim/__tests__/scim-token.service.unit.test.ts): the delete is scoped
   # to this connection's own tokens and the sync lifecycle folds to REVOKED

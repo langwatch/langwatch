@@ -12,11 +12,11 @@ import { SsoApi, ssoSetupTrpc } from "@langwatch/enterprise-sso-contract";
 
 export const ssoSetupTrpcTransport = defineTrpcRouter(SsoApi, ssoSetupTrpc)
   .procedure("getHistory")
-  .withPermission("organization:manage")
+  .withPermission("sso:manage")
   .handle(({ app, input }) => app.findConnectionHistory(input))
 
   .procedure("onHistoryActivity")
-  .withPermission("organization:manage")
+  .withPermission("sso:manage")
   .handle(({ app, input, signal }) =>
     app.watchConnectionHistory({
       organizationId: input.organizationId,
