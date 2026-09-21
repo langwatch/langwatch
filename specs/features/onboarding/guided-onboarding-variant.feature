@@ -259,17 +259,16 @@ Feature: Guided onboarding variant
 
   # ============================================================================
   # Persisting the guided state
+  #
+  # The record lives in Organization.signupData, a column the organization
+  # module owns; onboarding reaches it only through
+  # OrganizationApi.readGuidedOnboardingState/writeGuidedOnboardingState, so
+  # its storage round-trip is organization's own test surface, not this one.
   # ============================================================================
 
   @unit
-  Scenario: the memory and Redis guided onboarding repositories answer alike
-    Given a guided onboarding repository, over memory or over Redis
-    When no record has been written for an organization
-    Then a read answers absence with null
-    And a written record reads back exactly as written, independent of every other organization's
-
-  @unit
-  Scenario: a corrupted stored blob reads as absent rather than a crash
-    Given a value in Redis for an organization's key that is not a guided onboarding record
-    When the repository reads that organization's state
-    Then the read answers null instead of throwing
+  Scenario: an unknown path is refused before any organization call
+    Given a guided onboarding service over an organization capability that refuses every call
+    When a path named "billing" is completed, begun or recorded
+    Then the request fails with the code "guided_onboarding_path_unknown"
+    And the organization capability is never called

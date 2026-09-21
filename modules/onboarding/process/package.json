@@ -21,10 +21,15 @@
   },
   "dependencies": {
     "@langwatch/kernel": "workspace:*",
+    "@langwatch/observability": "workspace:*",
     "@langwatch/onboarding-contract": "workspace:*",
-    "@langwatch/redis-client": "workspace:*"
+    "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "posthog-node": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/api-fixture": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
