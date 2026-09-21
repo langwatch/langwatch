@@ -10,14 +10,7 @@ import (
 	"strconv"
 )
 
-/**
- * The SCIM verbs a reconciliation needs beyond `POST`.
- *
- * `scim_push.go` speaks create and list-one-page, which is all a replay ever
- * needed. A sync also has to replace a record, retire one, and — the one that
- * actually bites at scale — read a collection that does not fit in a single
- * response.
- */
+// SCIM requests for paginated reads, replacement, and deactivation.
 
 // scimPageSize is what each list request asks for. A hundred is what Okta and
 // Entra use, so a receiving side tuned for them is exercised the way they will
@@ -29,40 +22,13 @@ const scimPageSize = 100
 // directory of half a million, which is far past anything worth simulating.
 const maxSCIMPages = 5000
 
-/**
- * fetchTargetUsers reads the target's whole Users collection.
- *
- * FOLLOWS startIndex UNTIL THE PAGE COMES BACK SHORT, and cross-checks against
- * `totalResults` when the target sends one. Reading only the first page was
- * the bug this exists to avoid: against a directory of five thousand it would
- * have reported ninety-nine hundred departures on every run, because everybody
- * past the first page matched nobody.
- */
-func fetchTargetUsers(
-	ctx context.Context,
-	client *http.Client,
-	at scimTarget,
-) ([]targetUser, error) {
-	var held []targetUser
-	startIndex := 1
-	for page := 0; page < maxSCIMPages; page++ {
-		resources, total, err := scimFetchPage(ctx, client, scimPageRequest{
-			URL: at.URL + "/Users", Token: at.Token,
-			StartIndex: startIndex, Count: scimPageSize,
-		})
-		if err != nil {
-			return nil, err
-		}
-		held = append(held, readTargetUsers(resources)...)
-		// A short page is the end of the collection. A target that reports a
-		// total we have already reached is the end too, which catches the one
-		// that pads its last page.
-		if len(resources) < scimPageSize || (total > 0 && len(held) >= total) {
-			return held, nil
-		}
-		startIndex += len(resources)
+// fetchTargetUsers reads the full directory before planning changes.
+func fetchTargetUsers(ctx context.Context, client *http.Client, at scimTarget) ([]targetUser, error) {
+	resources, err := scimFetchList(ctx, client, scimGet{URL: at.URL + "/Users", Token: at.Token})
+	if err != nil {
+		return nil, err
 	}
-	return held, fmt.Errorf("target kept paging past %d pages", maxSCIMPages)
+	return readTargetUsers(resources), nil
 }
 
 // readTargetUsers lifts one page of resources into the shape matching needs,

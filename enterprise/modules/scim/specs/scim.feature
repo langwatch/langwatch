@@ -61,3 +61,45 @@ Feature: Enterprise SCIM package boundary
       Given a deployment that configured no webhook secret
       When the webhook is delivered
       Then the response does not distinguish the path from one that was never served
+
+  Rule: A filter the directory cannot honour is refused, never widened
+
+    Both listings match on one attribute each. A filter naming any other
+    attribute used to read as no filter at all, so a provider asking for one
+    person was answered with the whole organization and read the first row back
+    as the person it asked about.
+
+    @unit
+    Scenario: A user listing filtered by an unsupported attribute is refused
+      Given a directory listing users
+      When the provider filters by an attribute the listing cannot match
+      Then the listing is refused with invalidFilter at 400
+
+    @unit
+    Scenario: A group listing filtered by an unsupported expression is refused
+      Given a directory listing groups
+      When the provider sends an expression richer than equality
+      Then the listing is refused with invalidFilter at 400
+
+    @unit
+    Scenario: A user listing filtered by userName matches without regard to case
+      Given a directory listing users
+      When the provider filters by userName
+      Then the listing narrows to that address
+
+  Rule: A name is patched one half at a time
+
+    SCIM carries a name as two parts and this product stores one string, so a
+    patch naming only the surname keeps the forename it did not mention.
+
+    @unit
+    Scenario: A patch naming only the surname keeps the forename
+      Given a member stored as one display name
+      When the directory patches only the family name
+      Then the stored name keeps its given name
+
+    @unit
+    Scenario: A patch sending the family name as a dotted path is applied
+      Given a member stored as one display name
+      When the directory patches name.familyName with a scalar value
+      Then the stored name is updated rather than silently accepted

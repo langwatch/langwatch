@@ -31,6 +31,11 @@ export class ScimUserProfileService {
     return new ScimUserProfileService(options.users, options.auth);
   }
 
+  /** The stored display name, for a PATCH that names only one half of it. */
+  async storedName(id: string): Promise<string> {
+    return (await this.users.findById({ id }))?.name ?? "";
+  }
+
   async updateProfile(input: UpdateUserProfileInput): Promise<UserProfile> {
     const previous = input.email === undefined ? null : await this.users.findById({ id: input.id });
     const updated = await this.users.updateProfile(input);

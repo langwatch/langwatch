@@ -11,6 +11,8 @@ import type {
 } from "@langwatch/enterprise-scim-contract";
 
 import type { ScimGroupRecord, ScimRepository } from "../repositories/scim.repository.ts";
+import { parseScimFilter } from "../rules/scim-filter.rules.ts";
+import { assertScimOrganizationId } from "../rules/scim-organization-scope.rules.ts";
 import { ScimGrantsService } from "./scim-grants.service.ts";
 import {
   ScimGroupMembershipService,
@@ -77,11 +79,15 @@ export class ScimDirectoryService {
     count?: number;
     excludeMembers?: boolean;
   }): Promise<ScimListResponse<ScimGroup>> {
-    const displayNameFilter = this.parseDisplayNameFilter(filter);
+    assertScimOrganizationId(organizationId);
+    const parsed = parseScimFilter({ filter, supported: ["displayName"] });
+    if (!parsed.ok) {
+      return this.scimError({ status: "400", scimType: "invalidFilter", detail: parsed.detail });
+    }
 
     const { rows: groups, total: totalCount } = await this.prisma.listGroups({
       organizationId,
-      displayName: displayNameFilter ?? undefined,
+      displayName: parsed.term?.value,
       startIndex,
       count,
     });
@@ -281,21 +287,20 @@ export class ScimDirectoryService {
     };
   }
 
-  private parseDisplayNameFilter(filter?: string): string | null {
-    if (!filter) {
-      return null;
-    }
-
-    const match = filter.match(/^displayName\s+eq\s+"([^"]+)"$/);
-
-    return match?.[1] ?? null;
-  }
-
-  private scimError({ status, detail }: { status: string; detail: string }): never {
+  private scimError({
+    status,
+    detail,
+    scimType,
+  }: {
+    status: string;
+    detail: string;
+    scimType?: string;
+  }): never {
     throw new ScimProtocolError({
       schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
       status,
       detail,
+      ...(scimType === undefined ? {} : { scimType }),
     });
   }
 }

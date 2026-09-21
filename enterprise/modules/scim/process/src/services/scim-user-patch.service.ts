@@ -3,6 +3,12 @@
 import type { ScimPatchOperation } from "@langwatch/enterprise-scim-contract";
 import type { UserApi } from "@langwatch/user-contract";
 
+import {
+  mergeNameParts,
+  namePartsIn,
+  namesAName,
+  type MergedScimName,
+} from "../rules/scim-name.rules.ts";
 import { ScimCostCenterService } from "./scim-cost-center.service.ts";
 import { ScimDeprovisionService } from "./scim-deprovision.service.ts";
 import { ScimUserProfileService } from "./scim-user-profile.service.ts";
@@ -62,22 +68,38 @@ export class ScimUserPatchService {
       return;
     }
 
-    if (!isRecord(input.operation.value)) {
-      return;
+    const merged = await this.mergedName(input);
+    const value = isRecord(input.operation.value) ? input.operation.value : void 0;
+
+    if (value && "active" in value) {
+      await this.updateActive(input, value.active);
     }
 
-    const updates = this.profileUpdates(input.operation.value);
-    if (updates.hasActive) {
-      await this.updateActive(input, updates.active);
-    }
-
-    if (updates.name !== void 0 || updates.email !== void 0) {
+    const email = typeof value?.userName === "string" ? value.userName : void 0;
+    if (merged.changed || email !== void 0) {
       await this.profiles.updateProfile({
         id: input.id,
-        ...(updates.name !== void 0 ? { name: updates.name } : {}),
-        ...(updates.email !== void 0 ? { email: updates.email } : {}),
+        ...(merged.changed ? { name: merged.name } : {}),
+        ...(email !== void 0 ? { email } : {}),
       });
     }
+  }
+
+  /**
+   * The stored name with whichever half this operation named merged over it —
+   * a surname patch keeps the forename it did not mention. ADR-002.
+   */
+  private async mergedName(input: {
+    id: string;
+    operation: ScimPatchOperation;
+  }): Promise<MergedScimName> {
+    const parts = namePartsIn({
+      path: input.operation.path,
+      value: input.operation.value,
+    });
+    if (!namesAName(parts)) return { changed: false };
+
+    return mergeNameParts({ current: await this.profiles.storedName(input.id), ...parts });
   }
 
   private async updateActive(
@@ -104,39 +126,5 @@ export class ScimUserPatchService {
     }
 
     await this.users.reactivate({ id: input.id });
-  }
-
-  private profileUpdates(value: Record<string, unknown>): {
-    hasActive: boolean;
-    active?: unknown;
-    name?: string;
-    email?: string;
-  } {
-    const email = typeof value.userName === "string" ? value.userName : undefined;
-    const name = this.readName(value);
-
-    return {
-      hasActive: "active" in value,
-      ...("active" in value ? { active: value.active } : {}),
-      ...(name ? { name } : {}),
-      ...(email ? { email } : {}),
-    };
-  }
-
-  private readName(value: Record<string, unknown>): string | undefined {
-    const compoundName = value.name;
-    if (isRecord(compoundName)) {
-      return this.joinName(compoundName.givenName, compoundName.familyName);
-    }
-
-    return this.joinName(value["name.givenName"], value["name.familyName"]);
-  }
-
-  private joinName(givenName: unknown, familyName: unknown): string | undefined {
-    const parts = [givenName, familyName].filter(
-      (part): part is string => typeof part === "string" && part.length > 0,
-    );
-
-    return parts.length > 0 ? parts.join(" ") : undefined;
   }
 }

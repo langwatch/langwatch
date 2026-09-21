@@ -38,12 +38,9 @@ export type ScimUserProvisioning = ScimUserActivation &
   ScimUserProfileReadWrite &
   Pick<UserApi, "findByEmail" | "create">;
 import type { ScimSyncLifecycle } from "../app/scim.members.ts";
-import {
-  isUniqueViolation,
-  nameFromScimRequest,
-  scimUserOf,
-  parseUserNameFilter,
-} from "../rules/scim-user.rules.ts";
+import { parseScimFilter } from "../rules/scim-filter.rules.ts";
+import { assertScimOrganizationId } from "../rules/scim-organization-scope.rules.ts";
+import { isUniqueViolation, nameFromScimRequest, scimUserOf } from "../rules/scim-user.rules.ts";
 
 export class ScimProvisioningService {
   private readonly prisma: ScimRepository;
@@ -289,11 +286,15 @@ export class ScimProvisioningService {
     startIndex?: number;
     count?: number;
   }): Promise<ScimListResponse<ScimUser>> {
-    const emailFilter = parseUserNameFilter(filter);
+    assertScimOrganizationId(organizationId);
+    const parsed = parseScimFilter({ filter, supported: ["userName"] });
+    if (!parsed.ok) {
+      return this.scimError({ status: "400", scimType: "invalidFilter", detail: parsed.detail });
+    }
 
     const { rows: memberships, total: totalCount } = await this.prisma.listMemberships({
       organizationId,
-      email: emailFilter ?? undefined,
+      email: parsed.term?.value,
       startIndex,
       count,
     });
@@ -446,11 +447,20 @@ export class ScimProvisioningService {
     return scimUserOf(user);
   }
 
-  private scimError({ status, detail }: { status: string; detail: string }): never {
+  private scimError({
+    status,
+    detail,
+    scimType,
+  }: {
+    status: string;
+    detail: string;
+    scimType?: string;
+  }): never {
     throw new ScimProtocolError({
       schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
       status,
       detail,
+      ...(scimType === undefined ? {} : { scimType }),
     });
   }
 }

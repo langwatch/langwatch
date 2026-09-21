@@ -172,11 +172,18 @@ func syncDirectory(ctx context.Context, run syncRun) SyncResult {
 	result.Failures, result.FailureCount = writes.failures, writes.failureCount
 
 	if opts.Groups {
-		result.GroupsWritten = syncGroups(ctx, client, syncGroupWrite{
-			base: base, token: target.Token, tenant: t, opts: opts,
+		groups := syncGroups(ctx, client, syncGroupWrite{
+			base: base, token: target.Token, tenant: t,
 		})
+		result.GroupsWritten = groups.created + groups.updated
+		result.FailureCount += groups.failureCount
+		result.Failures = append(result.Failures, groups.failures...)
+		if len(result.Failures) > maxReportedFailures {
+			result.Failures = result.Failures[:maxReportedFailures]
+		}
+		writes.requests += groups.requests
 	}
-	finishSync(&result, started, writes.requests+result.GroupsWritten)
+	finishSync(&result, started, writes.requests)
 	return result
 }
 
@@ -213,16 +220,7 @@ type plannedUpdate struct {
  * the same people again.
  */
 func planSync(local []*User, held []targetUser, mode SyncMode) syncPlan {
-	byExternal := map[string]targetUser{}
-	byUserName := map[string]targetUser{}
-	for _, h := range held {
-		if h.externalID != "" {
-			byExternal[h.externalID] = h
-		}
-		if h.userName != "" {
-			byUserName[strings.ToLower(h.userName)] = h
-		}
-	}
+	byExternal, byUserName := indexTargetUsers(held)
 
 	plan, matched := planArrivalsAndChanges(local, byExternal, byUserName)
 	plan.depart, plan.unchanged = planDepartures(departureInput{
@@ -243,7 +241,11 @@ func planArrivalsAndChanges(
 	for _, u := range local {
 		existing, found := matchTarget(u, byExternal, byUserName)
 		if !found {
-			plan.create = append(plan.create, u)
+			if u.Active {
+				plan.create = append(plan.create, u)
+			} else {
+				plan.unchanged++
+			}
 			continue
 		}
 		matched[existing.id] = true
@@ -422,48 +424,4 @@ func applyPlan(ctx context.Context, client *http.Client, w syncWrite) writeTally
 	wg.Wait()
 	sort.Strings(tally.failures)
 	return tally
-}
-
-// syncGroupWrite is one group pass.
-type syncGroupWrite struct {
-	base   string
-	token  string
-	tenant *Tenant
-	opts   SyncOptions
-}
-
-/**
- * syncGroups replaces the target's groups with the tenant's.
- *
- * Membership is sent by USER NAME rather than by the target's ids, because
- * resolving five thousand ids would be a second full read and the receiving
- * side already knows its own people by the address it was given. A target that
- * insists on ids will refuse these, which is itself worth seeing — the refusal
- * names the group.
- */
-func syncGroups(ctx context.Context, client *http.Client, w syncGroupWrite) int {
-	written := 0
-	for _, g := range w.tenant.Groups() {
-		members := make([]map[string]any, 0, len(g.MemberIDs))
-		for _, id := range g.MemberIDs {
-			if u, ok := w.tenant.UserByID(id); ok {
-				members = append(members, map[string]any{
-					"value": u.ExternalID, "display": u.DisplayName(),
-				})
-			}
-		}
-		_, err := scimCreate(ctx, client, scimPost{
-			URL: w.base + "/Groups", Token: w.token,
-			Resource: map[string]any{
-				"schemas":     []string{scimGroupSchema},
-				"displayName": g.Name,
-				"externalId":  g.ID,
-				"members":     members,
-			},
-		})
-		if err == nil {
-			written++
-		}
-	}
-	return written
 }

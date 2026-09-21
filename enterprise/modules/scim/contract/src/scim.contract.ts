@@ -53,6 +53,8 @@ export const scimErrorSchema = z.object({
   schemas: z.tuple([z.literal("urn:ietf:params:scim:api:messages:2.0:Error")]),
   status: z.string(),
   detail: z.string(),
+  /** RFC 7644 §3.12's error type, when the refusal has one. */
+  scimType: z.string().optional(),
 });
 export type ScimError = z.infer<typeof scimErrorSchema>;
 
