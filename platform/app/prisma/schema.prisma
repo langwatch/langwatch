@@ -1357,7 +1357,7 @@ model ScimUserResource {
   updatedAt      DateTime @default(now()) @updatedAt
 
   @@id([organizationId, userId])
-  /// Live nonblank names have a normalized partial unique index in 20260918171000_scim_user_resources.
+  /// Live nonblank names have a normalized partial unique index in 20260918171008_scim_user_resources.
   @@index([organizationId, userName])
   @@index([userId])
 }
@@ -3679,7 +3679,7 @@ model Group {
 
   @@unique([organizationId, slug])
   /// Legacy null-connection external IDs are unique per organization through
-  /// the partial index in 20260918170000_scim_group_external_id_namespaces.
+  /// the partial index in 20260918171007_scim_group_external_id_namespaces.
   /// Concrete connections each own their external-ID namespace.
   @@unique([scimConnectionId, externalId])
   @@index([organizationId])

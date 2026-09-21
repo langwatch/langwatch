@@ -15,7 +15,7 @@ import {
 const client = new Client({ connectionString: process.env.DATABASE_URL });
 const migration = readFileSync(
   new URL(
-    "../../../prisma/migrations/20260918160000_sso_scim_ownership_backfill/migration.sql",
+    "../../../prisma/migrations/20260918171006_sso_scim_ownership_backfill/migration.sql",
     import.meta.url,
   ),
   "utf8",
@@ -93,12 +93,13 @@ describe("SSO and SCIM ownership upgrade", () => {
     });
   });
 
-  it("refuses to guess the tenant of an orphaned directory identity", async () => {
+  it("refuses to guess the tenant of an orphaned directory identity, naming its connection", async () => {
     await client.query(
       `INSERT INTO "ScimExternalId" VALUES ('missing', 'orphan', 'person')`,
     );
     await expect(client.query(migration)).rejects.toMatchObject({
-      code: "23502",
+      code: "P0001",
+      message: expect.stringContaining("First 20: missing"),
     });
   });
 });
