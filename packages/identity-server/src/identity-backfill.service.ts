@@ -1,9 +1,11 @@
 import {
   type BackfillDiff,
+  type BackfillIdentifierRow,
   backfillParityDiffs,
   IdentityCommandRefusedError,
   isLiveIdentifierState,
   orphanedIdentifierRows,
+  type SubjectHolder,
 } from "@langwatch/identity";
 import { mintUserHashKey } from "./crypto/user-hash-key";
 import {
@@ -310,7 +312,15 @@ export class IdentityBackfillService {
     planned: PlannedIdentifier[];
   }): Promise<IdentityBackfillOutcome> {
     const rows = await this.reads.findIdentifierRows({ userId });
-    const diffs = backfillParityDiffs({ rows, expected: planned });
+    const subjectHolders = await this.holdersOfMissingSubjects({
+      rows,
+      planned,
+    });
+    const diffs = backfillParityDiffs({
+      rows,
+      expected: planned,
+      subjectHolders,
+    });
     if (diffs.length > 0) {
       return {
         status: "migrated",
@@ -321,6 +331,43 @@ export class IdentityBackfillService {
       status: "finalized",
       report: { kind: "adopted", identifiers: planned.length },
     };
+  }
+
+  /**
+   * Who already holds the provider subjects this user's plan expected and
+   * the projection does not carry.
+   *
+   * The difference an operator needs: an identifier that is merely not
+   * folded yet heals on the next pass, while one whose subject another live
+   * row holds never does — the fold parked it against the live unique index,
+   * and only a person merging the two accounts moves the subject. Without
+   * this read both read as `identifier_missing`, and the report tells them
+   * to wait for something that will not happen.
+   *
+   * Scoped to the gap: a pass that proves cleanly asks nothing.
+   */
+  private async holdersOfMissingSubjects({
+    rows,
+    planned,
+  }: {
+    rows: BackfillIdentifierRow[];
+    planned: PlannedIdentifier[];
+  }): Promise<SubjectHolder[]> {
+    const present = new Set(rows.map((row) => row.id));
+    const subjects = planned.flatMap((plan) =>
+      present.has(plan.identifierId) ||
+      plan.providerId === null ||
+      plan.providerAccountId === null
+        ? []
+        : [
+            {
+              providerId: plan.providerId,
+              providerAccountId: plan.providerAccountId,
+            },
+          ],
+    );
+    if (subjects.length === 0) return [];
+    return this.reads.findSubjectHolders({ subjects });
   }
 }
 

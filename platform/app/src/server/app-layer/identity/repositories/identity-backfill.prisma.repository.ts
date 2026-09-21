@@ -1,4 +1,5 @@
-import type { BackfillIdentifierRow } from "@langwatch/identity";
+import type { BackfillIdentifierRow, SubjectHolder } from "@langwatch/identity";
+import { LIVE_IDENTIFIER_STATES } from "@langwatch/identity";
 import type {
   BackfillAccountRow,
   BackfillUserRow,
@@ -85,5 +86,42 @@ export class PrismaIdentityBackfillRepository
         state: true,
       },
     });
+  }
+
+  /**
+   * The live rows holding these subjects, whoever they belong to — the one
+   * cross-user read the backfill makes, and only for subjects an expectation
+   * is missing. LIVE states only: a tombstone releases the subject, so a
+   * DETACHED row holding one explains nothing.
+   */
+  async findSubjectHolders({
+    subjects,
+  }: {
+    subjects: { providerId: string; providerAccountId: string }[];
+  }): Promise<SubjectHolder[]> {
+    if (subjects.length === 0) return [];
+    const rows = await this.prisma.identifier.findMany({
+      where: {
+        state: { in: [...LIVE_IDENTIFIER_STATES] },
+        OR: subjects.map(({ providerId, providerAccountId }) => ({
+          providerId,
+          providerAccountId,
+        })),
+      },
+      select: { id: true, providerId: true, providerAccountId: true },
+    });
+    return rows.flatMap((row) =>
+      // Narrowing, not filtering: the columns are nullable on the table and
+      // the query already excluded nulls, so this only tells the compiler.
+      row.providerId === null || row.providerAccountId === null
+        ? []
+        : [
+            {
+              identifierId: row.id,
+              providerId: row.providerId,
+              providerAccountId: row.providerAccountId,
+            },
+          ],
+    );
   }
 }
