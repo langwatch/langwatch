@@ -17,6 +17,7 @@ import {
   resourceSchema,
   spanSchema,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import { isStorableSpanTimeMs } from "../../event-sourcing/pipelines/trace-processing/utils/storableSpanTime";
 import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
 import {
   codexHelperThreadMarkersOf,
@@ -354,6 +355,26 @@ export class TraceRequestCollectionService {
       return {
         status: "dropped",
         error: "span start time is more than 31 days in the past",
+      };
+    }
+
+    // The future edge, which nothing bounded before: a start time past what span
+    // storage can represent cannot be written at all, and the record id minted
+    // from it throws once the span is already an appended event — permanently,
+    // on a retrying lane. Refuse it at the door instead. The end time is checked
+    // with it because it is written to the same kind of column.
+    const endTimeUnixMs = TraceRequestUtils.convertUnixNanoToUnixMs(
+      TraceRequestUtils.normalizeOtlpUnixNano(
+        spanParseResult.data.endTimeUnixNano,
+      ),
+    );
+    if (
+      !isStorableSpanTimeMs(startTimeUnixMs) ||
+      !isStorableSpanTimeMs(endTimeUnixMs)
+    ) {
+      return {
+        status: "dropped",
+        error: "span start time is not a valid timestamp",
       };
     }
 
