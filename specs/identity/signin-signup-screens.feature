@@ -536,6 +536,17 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     When I sign in with my password instead
     Then the password is badged, and stays badged once I am let in
 
+  # The hand-off nobody clicks. A typed address that routes to an organization's
+  # identity provider is dialled for the person, with no button pressed, and
+  # that is the ordinary way in for everybody whose organization owns their
+  # domain. It has to earn the badge the same way a pressed button does, or
+  # the people who sign in this way every day are the ones never badged.
+  @integration
+  Scenario: A provider my address was routed to is badged once it lets me in
+    Given my address routes to my organization's identity provider
+    When I am taken there without pressing anything, and it lets me in
+    Then that provider is badged
+
   # Every button on the rail is live, or it is not there. A screen that drew a
   # provider the deployment never mounted would be offering a door that opens
   # onto an error, and the person pressing it has no way to know that before

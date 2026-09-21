@@ -662,6 +662,10 @@ export function RoutedToConnection({
   useEffect(() => {
     if (!autoStart || !method || dialed.current) return;
     dialed.current = true;
+    // Parked here as well as on the button, because this is the dial nobody
+    // presses: without it the people routed by their address, who sign in
+    // this way every day, are the ones the landing never badges.
+    rememberPendingMethod(method);
     void signIn(method.id, { callbackUrl, loginHint });
   }, [autoStart, method, callbackUrl, loginHint]);
 
