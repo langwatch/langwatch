@@ -718,10 +718,10 @@ const presentations = {
     },
   },
   agent_owner_only: {
-    title: "This development agent belongs to someone else",
+    title: "This development agent belongs to one person",
     describe: (error) => {
       const owner = str(error, "ownerName", "its owner");
-      return `Only ${owner} can run simulations against it. Connect your own copy of the agent, or ask them to run it.`;
+      return `Only ${owner}'s own key can run simulations against it, so a project or service key is refused even when it belongs to the same person. Run it with the key that connected the agent, connect your own copy, or give the agent a shared environment name.`;
     },
   },
   agent_call_timeout: {

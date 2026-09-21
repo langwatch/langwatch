@@ -546,6 +546,7 @@ const registry = {
   },
   agent_owner_only: {
     tips: [
+      "Run it with the same key that connected the agent; a project or service key names no person, so it never reaches a personal agent, even the caller's own",
       "A development agent registered with a personal key belongs to that person; connect your own process to get your own copy",
       "To share one development agent with the team, register it with a project key or name its environment, for example dev-shared",
     ],

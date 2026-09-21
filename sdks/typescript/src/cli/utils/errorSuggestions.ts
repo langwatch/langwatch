@@ -106,6 +106,7 @@ const FALLBACK_BY_CODE: Record<string, ErrorExplanation> = {
   // service key meets when it targets such an agent by name.
   agent_owner_only: {
     suggestions: [
+      "Run it with the same key that registered the agent; a project or service key names no person, so it never reaches a personal agent, even one you registered yourself",
       "This development agent belongs to the owner of the key that registered it; connect your own process to get your own copy",
       "To share one agent with the team, start it with LANGWATCH_AGENT_ENVIRONMENT set to a shared name such as dev-shared, and target connected:<name>@dev-shared",
     ],
