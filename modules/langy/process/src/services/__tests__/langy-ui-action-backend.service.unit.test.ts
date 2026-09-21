@@ -85,7 +85,7 @@ const definition = (overrides: Partial<LangyUiActionDefinition>): LangyUiActionD
   ...overrides,
 });
 
-const CALLER = { projectId: "project-1", userId: "user-1" };
+const CALLER = { projectId: "project-1", projectSlug: "acme", userId: "user-1" };
 
 let backend: FakeBackend;
 

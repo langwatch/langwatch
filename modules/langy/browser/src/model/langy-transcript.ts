@@ -3,11 +3,16 @@
  */
 import { LANGY_CARD_FAILED_PART_TYPE, LANGY_CARD_PART_TYPE } from "@langwatch/langy-contract";
 
+import { isQuestionToolPart } from "./langy-question-tool.ts";
+import { isSayToolPart } from "./langy-say-tool.ts";
+
 export type LangyTranscriptRun =
   /** Prose, and the card blocks stamped into the reply's own flow. */
   | { kind: "answer"; parts: readonly unknown[] }
   /** Tool calls, rendered as the activity cards for the work they did. */
-  | { kind: "activity"; parts: readonly unknown[] };
+  | { kind: "activity"; parts: readonly unknown[] }
+  /** Lines said with the `say` tool, drawn as prose where they were said. */
+  | { kind: "say"; parts: readonly unknown[] };
 
 /** Parts that are the reply itself rather than the work behind it. */
 const ANSWER_PART_TYPES = new Set<string>([
@@ -29,20 +34,37 @@ function partType(part: unknown): string | undefined {
   return typeof type === "string" ? type : undefined;
 }
 
+/** Does this part render nowhere in the transcript, so it splits no run? */
+function isInertPart(part: unknown): boolean {
+  const type = partType(part);
+  return type !== undefined && INERT_PART_TYPES.has(type);
+}
+
+/** Which run a part belongs to: a said line, the reply, or the work behind it. */
+function runKindOf(part: unknown): LangyTranscriptRun["kind"] {
+  if (isSayToolPart(part)) return "say";
+  const type = partType(part);
+  return type !== undefined && ANSWER_PART_TYPES.has(type) ? "answer" : "activity";
+}
+
 /** The turn's parts, grouped into the runs they are read in. */
 export function langyTranscriptRuns(parts: readonly unknown[]): LangyTranscriptRun[] {
   const runs: LangyTranscriptRun[] = [];
+  // A question's card is drawn after the run that holds the call, so the run
+  // ends on the question: the calls that follow the answer start a new run and
+  // their rows sit under the card, not between the question and it.
+  let closed = false;
 
   for (const part of parts) {
-    const type = partType(part);
-    if (type !== undefined && INERT_PART_TYPES.has(type)) continue;
-    const kind = type !== undefined && ANSWER_PART_TYPES.has(type) ? "answer" : "activity";
+    if (isInertPart(part)) continue;
+    const kind = runKindOf(part);
     const open = runs.at(-1);
-    if (open?.kind === kind) {
+    if (open?.kind === kind && !closed) {
       open.parts = [...open.parts, part];
-      continue;
+    } else {
+      runs.push({ kind, parts: [part] });
     }
-    runs.push({ kind, parts: [part] });
+    closed = kind === "activity" && isQuestionToolPart(part);
   }
 
   return runs;

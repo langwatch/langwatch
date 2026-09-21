@@ -14,6 +14,10 @@ import { escapeValue } from "@langwatch/trace-contract";
 export interface TraceSearchQuery {
   /** Free-text query (`-q` / `--query`). */
   query?: string;
+  /** `--filter`, in the trace filter language the Explorer itself reads. */
+  filter?: string;
+  /** `--errors-only`: only traces with a failed span. */
+  errorsOnly?: boolean;
   /** `--origin`, split on commas. A trace matches if it came from ANY of them. */
   origins?: string[];
   /** Epoch ms. */
@@ -45,6 +49,8 @@ export function readTraceSearchQuery(input: unknown): TraceSearchQuery {
 
   return {
     ...pick(readText(record.query ?? record.q), (query) => ({ query })),
+    ...pick(readText(record.filter), (filter) => ({ filter })),
+    ...(record.errorsOnly === true || record.errors_only === true ? { errorsOnly: true } : {}),
     ...pick(readOrigins(record.origins ?? record.origin), (origins) => ({
       origins,
     })),
@@ -58,48 +64,53 @@ export function readTraceSearchQuery(input: unknown): TraceSearchQuery {
   };
 }
 
+/** A flag that takes a value, and where that value lands on the search. */
+const VALUE_FLAGS: Record<string, (search: TraceSearchQuery, value: string) => void> = {
+  "-q": setQuery,
+  "--query": setQuery,
+  "--filter": (search, value) => {
+    const filter = readText(value);
+    if (filter !== undefined) search.filter = filter;
+  },
+  "--origin": (search, value) => {
+    const origins = readOrigins(value);
+    if (origins !== undefined) search.origins = origins;
+  },
+  "--start-date": (search, value) => {
+    const at = readEpochMs(value);
+    if (at !== undefined) search.startDate = at;
+  },
+  "--end-date": (search, value) => {
+    const at = readEpochMs(value);
+    if (at !== undefined) search.endDate = at;
+  },
+  "--limit": (search, value) => {
+    const n = readInt(value);
+    if (n !== undefined) search.limit = n;
+  },
+};
+
+function setQuery(search: TraceSearchQuery, value: string): void {
+  const text = readText(value);
+  if (text !== undefined) search.query = text;
+}
+
 /** Pull `trace search`'s flags out of the shell command the agent ran. */
 export function parseTraceSearchCommand(command: string): TraceSearchQuery {
   const tokens = tokenize(command);
   const search: TraceSearchQuery = {};
 
   for (let i = 0; i < tokens.length; i++) {
-    const token = tokens[i]!;
-    const [flag, inlineValue] = splitFlag(token);
+    const [flag, inlineValue] = splitFlag(tokens[i]!);
+    // A switch carries no value, so it must not read the next token as one.
+    if (flag === "--errors-only") {
+      if (inlineValue !== "false") search.errorsOnly = true;
+      continue;
+    }
     // `--flag=value` carries its own value; `--flag value` takes the next token.
     const value = inlineValue ?? tokens[i + 1];
     if (value === undefined) continue;
-
-    switch (flag) {
-      case "-q":
-      case "--query": {
-        const text = readText(value);
-        if (text !== undefined) search.query = text;
-        break;
-      }
-      case "--origin": {
-        const origins = readOrigins(value);
-        if (origins !== undefined) search.origins = origins;
-        break;
-      }
-      case "--start-date": {
-        const at = readEpochMs(value);
-        if (at !== undefined) search.startDate = at;
-        break;
-      }
-      case "--end-date": {
-        const at = readEpochMs(value);
-        if (at !== undefined) search.endDate = at;
-        break;
-      }
-      case "--limit": {
-        const n = readInt(value);
-        if (n !== undefined) search.limit = n;
-        break;
-      }
-      default:
-        break;
-    }
+    VALUE_FLAGS[flag]?.(search, value);
   }
 
   return search;
@@ -122,6 +133,15 @@ export function buildExplorerQuery(search: TraceSearchQuery): string | null {
     clauses.push(origins.length > 1 ? `(${group})` : group);
   }
 
+  // Already the Explorer's language, so it goes in as itself. Parenthesised
+  // because it may hold an OR, and an OR left bare would swallow the clauses
+  // joined to it.
+  const filter = search.filter?.trim();
+  const isFilterAlone = clauses.length === 0 && !search.errorsOnly;
+  if (filter) clauses.push(isFilterAlone ? filter : `(${filter})`);
+
+  if (search.errorsOnly) clauses.push("status:error");
+
   if (clauses.length === 0) return null;
   // AND is explicit: liqe's implicit combinator is configurable, and a link is
   // read by a parser we don't control the settings of at the far end.
@@ -138,7 +158,11 @@ export type UnstatedWindow = "cli-last-24h" | "unknown";
  * The Explorer's fragment for this search: the default lens, plus whatever survived of
  * the query and the window.
  */
-function explorerFragment(search: TraceSearchQuery, unstatedWindow: UnstatedWindow): string {
+function explorerFragment(
+  search: TraceSearchQuery,
+  unstatedWindow: UnstatedWindow,
+  lensId: string = TRACE_EXPLORER_LENS,
+): string {
   const fragmentParams = new URLSearchParams();
   const query = buildExplorerQuery(search);
   if (query) fragmentParams.set("q", query);
@@ -159,7 +183,8 @@ function explorerFragment(search: TraceSearchQuery, unstatedWindow: UnstatedWind
   }
   // Exactly ONE bound named falls through deliberately, carrying no window at all.
   const fragmentQuery = fragmentParams.toString();
-  return fragmentQuery ? `${TRACE_EXPLORER_LENS}?${fragmentQuery}` : TRACE_EXPLORER_LENS;
+  const lens = encodeURIComponent(lensId);
+  return fragmentQuery ? `${lens}?${fragmentQuery}` : lens;
 }
 
 /**
@@ -171,6 +196,7 @@ export function buildTraceExplorerHref({
   traceId,
   traceTimestamp,
   unstatedWindow = "unknown",
+  lensId,
 }: {
   projectSlug?: string | null;
   search: TraceSearchQuery;
@@ -178,10 +204,15 @@ export function buildTraceExplorerHref({
   traceTimestamp?: number | null;
   /** What an absent window means here — see {@link UnstatedWindow}. */
   unstatedWindow?: UnstatedWindow;
+  /**
+   * The lens to open: the one the user is on, when it shows the same result
+   * set. Omitted, the link opens the default lens.
+   */
+  lensId?: string | null;
 }): string | null {
   if (!projectSlug) return null;
 
-  const fragment = explorerFragment(search, unstatedWindow);
+  const fragment = explorerFragment(search, unstatedWindow, lensId ?? TRACE_EXPLORER_LENS);
 
   const drawerParams = new URLSearchParams();
   if (traceId) {

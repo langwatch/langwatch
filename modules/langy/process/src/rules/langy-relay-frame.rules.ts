@@ -102,6 +102,7 @@ export const langyRelayToolCallSchema = z.object({
   output: z.string().optional(),
   isError: z.boolean().optional(),
   result: cliToolResultSchema.optional(),
+  local: z.boolean().optional(),
 });
 
 /**
@@ -160,7 +161,11 @@ const langyRelayFrameVariants = [
     detail: z.string().optional(),
     data: z.unknown().optional(),
   }),
-  /** Tool-call lifecycle — a live card AND a durable milestone event. */
+  /**
+   * Tool-call lifecycle: a live card and a durable milestone event. `local`
+   * means the call ran in the folder the developer shared (ADR-129), which the
+   * name cannot say — the shell that delegates there is registered as `bash`.
+   */
   z.object({
     type: z.literal("tool"),
     id: langyToolCallIdSchema,
@@ -173,6 +178,7 @@ const langyRelayFrameVariants = [
     isError: z.boolean().optional(),
     result: cliToolResultSchema.optional(),
     durationMs: z.number().optional(),
+    local: z.boolean().optional(),
   }),
   /** Terminal success — carries the durable final answer. */
   z.object({

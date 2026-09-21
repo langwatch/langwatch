@@ -473,3 +473,27 @@ export function escapeValue(value: string): string {
   }
   return value;
 }
+
+/**
+ * Whether joining this query with AND would rebind an OR it already holds.
+ * Read from the parsed top level: `(a) OR (b)` starts with `(` and ends with
+ * `)` without being one group. Unparseable text is grouped if it spells `OR`.
+ */
+function bindsAsOr(query: string): boolean {
+  try {
+    const ast = parse(query);
+    return ast.type === "LogicalExpression" && ast.operator.operator === "OR";
+  } catch {
+    return /\bOR\b/.test(query);
+  }
+}
+
+/** Join two queries with AND, grouping either side that binds as an OR. */
+export function combineQueries({ base, addition }: { base: string; addition: string }): string {
+  const left = base.trim();
+  const right = addition.trim();
+  if (!left) return right;
+  if (!right) return left;
+  const guard = (query: string): string => (bindsAsOr(query) ? `(${query})` : query);
+  return `${guard(left)} AND ${guard(right)}`;
+}

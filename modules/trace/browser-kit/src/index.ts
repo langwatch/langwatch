@@ -14,5 +14,15 @@ export * from "./suggestion-ui.ts";
 export * from "./trace-drawer-chip.tsx";
 export * from "./trace-query-config.ts";
 export * from "./trace-row-kind.ts";
-export * from "./url-state.ts";
+// The Explorer's fragment grammar moved to the contract, because the away
+// executor on the server builds the same link. Re-exported here so every
+// browser reading it through the kit keeps one import.
+export {
+  type BarStateOverrides,
+  buildFragment,
+  computeOverrides,
+  type FragmentState,
+  isOverridesEmpty,
+  parseFragment,
+} from "@langwatch/trace-contract";
 export * from "./view.store.ts";

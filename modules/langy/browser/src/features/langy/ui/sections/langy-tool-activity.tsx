@@ -26,6 +26,7 @@ import {
   isQuestionToolPart,
   questionToolCardParts,
 } from "../../../../model/langy-question-tool.ts";
+import { isSayToolPart } from "../../../../model/langy-say-tool.ts";
 import { langyThinkingShimmerStyles } from "../../../../model/values/langy-shimmer.ts";
 import { LangyInterruptedNote } from "../../../../ui/elements/langy-interrupted-note.tsx";
 import {
@@ -399,6 +400,10 @@ function readActivityGroups(message: PartsView): ActivityGroup[] {
     // the checklist itself (LangyPlanCard), so it must not also collapse into a
     // shimmering "Planning…" row.
     if (isPlanToolPart(part)) return;
+    // The `say` tool is a line of Langy's own words, drawn as reply prose where
+    // the call happened (message-content); an activity row for it would only
+    // say a line was said.
+    if (isSayToolPart(part)) return;
     // The `question` tool is the interactive choices card (ADR-060 §6, rendered
     // by MessageContent), never a raw activity card. It waits on the USER, so as
     // an activity it read as a dead "Question…" stuck in-flight forever. Only a

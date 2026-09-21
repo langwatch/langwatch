@@ -80,6 +80,11 @@ export type LangyFinalToolCall = {
   isError?: boolean;
   digest?: CliResultDigest;
   result?: CliToolResult;
+  /**
+   * The call ran in the folder the developer shared from their own machine
+   * (ADR-129) rather than in the sandbox. Absent means the sandbox.
+   */
+  local?: boolean;
 };
 
 export type LangyConversationTurnCapability = {

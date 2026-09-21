@@ -10,6 +10,7 @@ import {
   type LangyUiActionBackend,
 } from "../app/langy.members.ts";
 import { tryReadTransformRefusalCode } from "../rules/langy-ui-action-refusal.rules.ts";
+import { LangyExplorerActionService } from "./langy-explorer-action.service.ts";
 
 /**
  * The away-fallback half of the UI-action channel: the same action kinds the
@@ -30,6 +31,8 @@ const LANGY_ACTOR_LABEL = "langy";
 
 export type LangyUiActionBackendServiceDependencies = {
   backend: LangyUiActionBackend;
+  /** The Trace Explorer's away form, which writes no document. */
+  explorer?: LangyExplorerActionService;
 };
 
 export class LangyUiActionBackendService {
@@ -38,14 +41,17 @@ export class LangyUiActionBackendService {
   }
 
   private readonly backend: LangyUiActionBackend;
+  private readonly explorer: LangyExplorerActionService;
 
   private constructor(deps: LangyUiActionBackendServiceDependencies) {
     this.backend = deps.backend;
+    this.explorer = deps.explorer ?? LangyExplorerActionService.create();
   }
 
   /** Runs one dispatched action against the saved document. */
   async run({
     projectId,
+    projectSlug,
     userId,
     kind,
     definition,
@@ -53,12 +59,20 @@ export class LangyUiActionBackendService {
     experimentSlug,
   }: {
     projectId: string;
+    /** The tenant's address, which is what an away link is built from. */
+    projectSlug: string;
     userId: string;
     kind: string;
     definition: LangyUiActionDefinition;
     payload: unknown;
     experimentSlug?: string;
   }): Promise<unknown> {
+    // The Explorer has no saved document to edit, so its away form is a link
+    // rather than a write, and it needs no experiment named.
+    if (this.explorer.isExplorerKind(kind)) {
+      return this.explorer.run({ projectSlug, kind, payload });
+    }
+
     if (!experimentSlug) {
       throw new LangyUiExperimentRequiredError(kind);
     }

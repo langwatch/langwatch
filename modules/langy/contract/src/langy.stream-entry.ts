@@ -44,6 +44,12 @@ export const langyStreamEntrySchema = z.discriminatedUnion("type", [
     isError: z.boolean().optional(),
     digest: cliResultDigestSchema.optional(),
     result: cliToolResultSchema.optional(),
+    /**
+     * The call ran in the folder the developer shared from their own machine
+     * (ADR-129), not in the sandbox. The shell that delegates there is
+     * registered as `bash`, so the name alone cannot say where it ran.
+     */
+    local: z.boolean().optional(),
   }),
   /**
    * The agent navigating the browser. `href` is ALWAYS platform-computed,

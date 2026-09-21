@@ -1,122 +1,26 @@
-import { nowInstant, Temporal } from "@langwatch/time";
+import {
+  ALL_PRESETS,
+  PRESET_MATCH_TOLERANCE_MS,
+  PRESETS_BY_ID,
+  type TimeRangePreset,
+} from "@langwatch/trace-contract";
 
-export interface TimeRangePreset {
-  id: string;
-  label: string;
-  shortLabel: string;
-  compute: () => { from: number; to: number };
-}
+// The preset table is contract data (the away executor resolves the same ids
+// server-side); the two nullable lookups over it stay on the browser side.
+export {
+  ALL_PRESETS,
+  CALENDAR_PRESETS,
+  PRESET_GROUPS,
+  ROLLING_PRESETS,
+  type TimeRangePreset,
+} from "@langwatch/trace-contract";
 
-const MS_PER_MINUTE = 60_000;
-const MS_PER_HOUR = 60 * MS_PER_MINUTE;
-const MS_PER_DAY = 24 * MS_PER_HOUR;
-
-function rolling(windowMs: number): () => { from: number; to: number } {
-  return () => {
-    const now = nowInstant().epochMilliseconds;
-    return { from: now - windowMs, to: now };
-  };
-}
-
-export const ROLLING_PRESETS: readonly TimeRangePreset[] = [
-  {
-    id: "15m",
-    label: "Last 15 minutes",
-    shortLabel: "15m",
-    compute: rolling(15 * MS_PER_MINUTE),
-  },
-  {
-    id: "1h",
-    label: "Last 1 hour",
-    shortLabel: "1h",
-    compute: rolling(MS_PER_HOUR),
-  },
-  {
-    id: "4h",
-    label: "Last 4 hours",
-    shortLabel: "4h",
-    compute: rolling(4 * MS_PER_HOUR),
-  },
-  {
-    id: "24h",
-    label: "Last 24 hours",
-    shortLabel: "24h",
-    compute: rolling(MS_PER_DAY),
-  },
-  {
-    id: "7d",
-    label: "Last 7 days",
-    shortLabel: "7d",
-    compute: rolling(7 * MS_PER_DAY),
-  },
-  {
-    id: "30d",
-    label: "Last 30 days",
-    shortLabel: "30d",
-    compute: rolling(30 * MS_PER_DAY),
-  },
-  {
-    id: "60d",
-    label: "Last 60 days",
-    shortLabel: "60d",
-    compute: rolling(60 * MS_PER_DAY),
-  },
-];
-
-export const CALENDAR_PRESETS: readonly TimeRangePreset[] = [
-  {
-    id: "wtd",
-    label: "This week",
-    shortLabel: "WTD",
-    compute: () => {
-      const now = Temporal.Now.zonedDateTimeISO();
-      const start = now.subtract({ days: now.dayOfWeek - 1 }).startOfDay();
-      return { from: start.epochMilliseconds, to: now.epochMilliseconds };
-    },
-  },
-  {
-    id: "mtd",
-    label: "This month",
-    shortLabel: "MTD",
-    compute: () => {
-      const now = Temporal.Now.zonedDateTimeISO();
-      return {
-        from: now.with({ day: 1 }).startOfDay().epochMilliseconds,
-        to: now.epochMilliseconds,
-      };
-    },
-  },
-  {
-    id: "qtd",
-    label: "This quarter",
-    shortLabel: "QTD",
-    compute: () => {
-      const now = Temporal.Now.zonedDateTimeISO();
-      const quarterStartMonth = now.month - ((now.month - 1) % 3);
-      return {
-        from: now.with({ day: 1, month: quarterStartMonth }).startOfDay().epochMilliseconds,
-        to: now.epochMilliseconds,
-      };
-    },
-  },
-];
-
-export const ALL_PRESETS: readonly TimeRangePreset[] = [...ROLLING_PRESETS, ...CALENDAR_PRESETS];
-
-export const PRESET_GROUPS: readonly {
-  label: string;
-  presets: readonly TimeRangePreset[];
-}[] = [
-  { label: "Rolling", presets: ROLLING_PRESETS },
-  { label: "Period to date", presets: CALENDAR_PRESETS },
-];
-
+/** The preset the picker offers under this id, or nothing if it offers none. */
 export function getPresetById(id: string): TimeRangePreset | undefined {
-  return ALL_PRESETS.find((p) => p.id === id);
+  return PRESETS_BY_ID[id];
 }
 
-const PRESET_MATCH_TOLERANCE_MS = MS_PER_MINUTE;
-
+/** The preset a window came from, when a preset computes the same window now. */
 export function matchPreset(range: { from: number; to: number }): TimeRangePreset | null {
   for (const preset of ALL_PRESETS) {
     const computed = preset.compute();

@@ -22,6 +22,7 @@
   "dependencies": {
     "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",

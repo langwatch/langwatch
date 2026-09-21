@@ -8,6 +8,7 @@ import type { CliResultDigest, CliToolResult, LangyStreamEntry } from "@langwatc
 import { nowInstant } from "@langwatch/time";
 
 import { langyEmptyTurnLine } from "../../rules/langy-empty-turn.rules.ts";
+import { sayEntryText } from "../../rules/langy-say-tool.rules.ts";
 import {
   LANGY_LIVENESS,
   LANGY_STREAM,
@@ -421,6 +422,7 @@ export class LangyTokenBufferRedisRepository extends LangyTokenBuffer {
     isError,
     digest,
     result,
+    local,
   }: {
     conversationId: string;
     turnId: string;
@@ -433,8 +435,14 @@ export class LangyTokenBufferRedisRepository extends LangyTokenBuffer {
     isError?: boolean;
     digest?: CliResultDigest;
     result?: CliToolResult;
+    local?: boolean;
   }): Promise<void> {
     await this.flush({ conversationId, turnId });
+    // A line said through the `say` tool is words the reader sees, so the turn
+    // is not silent once one has been said.
+    if (sayEntryText({ type: "tool", id, name, phase, input }) !== "") {
+      this.sawVisibleText.add(this.pendingKey(conversationId, turnId));
+    }
     await this.append(conversationId, turnId, {
       type: "tool",
       id,
@@ -446,6 +454,7 @@ export class LangyTokenBufferRedisRepository extends LangyTokenBuffer {
       ...(isError !== undefined ? { isError } : {}),
       ...(digest !== undefined ? { digest } : {}),
       ...(result !== undefined ? { result } : {}),
+      ...(local !== undefined ? { local } : {}),
     });
   }
 
@@ -473,7 +482,10 @@ export class LangyTokenBufferRedisRepository extends LangyTokenBuffer {
     if (backstopSilentTurn && !this.sawVisibleText.has(this.pendingKey(conversationId, turnId))) {
       const { reads } = await this.readTail({ conversationId, turnId });
       const entries = reads.map((read) => read.entry);
-      const visible = entries.some((entry) => entry.type === "delta" && entry.text.trim() !== "");
+      const visible = entries.some(
+        (entry) =>
+          (entry.type === "delta" && entry.text.trim() !== "") || sayEntryText(entry) !== "",
+      );
       if (!visible) {
         backstopped = true;
         text = langyEmptyTurnLine(entries);
@@ -503,7 +515,10 @@ export class LangyTokenBufferRedisRepository extends LangyTokenBuffer {
     await this.append(conversationId, turnId, { type: "error", error });
   }
 
-  /** Refresh the per-turn liveness key. TTL = 2× the heartbeat interval. */
+  /**
+   * Refresh the liveness key (2x the heartbeat interval) AND the stream's TTL,
+   * so a turn spending longer than the TTL in one silent call keeps its buffer.
+   */
   async heartbeat({
     conversationId,
     turnId,
@@ -518,6 +533,10 @@ export class LangyTokenBufferRedisRepository extends LangyTokenBuffer {
       String(now),
       "EX",
       LANGY_LIVENESS.heartbeatTtlSeconds(),
+    );
+    await this.redis.expire(
+      this.streamKey(conversationId, turnId),
+      LANGY_STREAMING.STREAM_TTL_SECONDS,
     );
   }
 

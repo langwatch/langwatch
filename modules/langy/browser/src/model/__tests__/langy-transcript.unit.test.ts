@@ -73,6 +73,25 @@ describe("langyTranscriptRuns", () => {
   });
 });
 
+describe("langyTranscriptRuns, given a line said with the `say` tool", () => {
+  const say = (value: string) => ({
+    type: "tool-say",
+    toolCallId: "s1",
+    state: "output-available",
+    input: { text: value },
+  });
+
+  it("gives it a run of its own, not the activity run beside it", () => {
+    const runs = langyTranscriptRuns([tool("t1"), say("Looking now."), tool("t2")]);
+    expect(runs.map((run) => run.kind)).toEqual(["activity", "say", "activity"]);
+  });
+
+  it("keeps it out of the reply run, so the prose is still only prose", () => {
+    const runs = langyTranscriptRuns([say("Looking now."), text("Here is what I found.")]);
+    expect(runs.map((run) => run.kind)).toEqual(["say", "answer"]);
+  });
+});
+
 describe("langyRunText", () => {
   describe("given parts that are not text", () => {
     it("reads only the prose", () => {

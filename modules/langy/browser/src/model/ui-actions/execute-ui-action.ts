@@ -3,8 +3,17 @@ import type { LangyUiActionHandlers } from "./langy-ui-action-types.ts";
 
 /**
  * The panel-side orchestration for one `ui` stream entry
- * (specs/langy/langy-ui-actions.feature).
+ * (specs/langy/langy-ui-actions.feature). A page still mounting is claimed for
+ * at once and the action held until its handler registers.
  */
+
+/** How long a claimed action waits for its page to register the handler. */
+export const UI_ACTION_HANDLER_HOLD_MS = 4_000;
+const UI_ACTION_HANDLER_POLL_MS = 50;
+
+/** What the page reports when it held an action and never finished mounting. */
+export const UI_ACTION_PAGE_NOT_READY = "langy_ui_page_not_ready";
+
 export type UiActionExecution =
   | "duplicate"
   | "no-handler"
@@ -67,11 +76,36 @@ async function reportOutcome({
   }
 }
 
+/** The handler for `kind` once the page registers it, or null at the deadline. */
+async function waitForHandler({
+  kind,
+  getHandlers,
+  holdMs,
+  sleep,
+}: {
+  kind: string;
+  getHandlers: () => LangyUiActionHandlers;
+  holdMs: number;
+  sleep: (ms: number) => Promise<void>;
+}): Promise<LangyUiActionHandlers[string] | null> {
+  for (let waited = 0; waited < holdMs; waited += UI_ACTION_HANDLER_POLL_MS) {
+    const handler = getHandlers()[kind];
+    if (handler) return handler;
+    await sleep(UI_ACTION_HANDLER_POLL_MS);
+  }
+  return getHandlers()[kind] ?? null;
+}
+
+const realSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
 export async function executeUiAction({
   entry,
   turnId,
   seen,
-  handlers,
+  getHandlers,
+  isPageArriving = () => false,
+  holdMs = UI_ACTION_HANDLER_HOLD_MS,
+  sleep = realSleep,
   claim,
   complete,
   onHandlerError,
@@ -79,7 +113,12 @@ export async function executeUiAction({
   entry: { actionId: string; kind: string; payload: unknown };
   turnId: string | null;
   seen: Set<string>;
-  handlers: LangyUiActionHandlers;
+  /** The handlers registered right now, read again while an action is held. */
+  getHandlers: () => LangyUiActionHandlers;
+  /** Whether the browser is on the page that owns `kind`, mounted or not. */
+  isPageArriving?: (kind: string) => boolean;
+  holdMs?: number;
+  sleep?: (ms: number) => Promise<void>;
   claim: (args: { actionId: string }) => Promise<{ isClaimed: boolean }>;
   complete: CompleteUiAction;
   /**
@@ -90,11 +129,25 @@ export async function executeUiAction({
   const key = uiActionDedupKey({ turnId, actionId: entry.actionId });
   if (!reserveNavigate({ seen, key })) return "duplicate";
 
-  const handler = handlers[entry.kind];
-  if (!handler) return "no-handler";
+  const registered = getHandlers()[entry.kind];
+  if (!registered && !isPageArriving(entry.kind)) return "no-handler";
 
   const { isClaimed } = await claim({ actionId: entry.actionId });
   if (!isClaimed) return "not-claimed";
+
+  const handler =
+    registered ?? (await waitForHandler({ kind: entry.kind, getHandlers, holdMs, sleep }));
+  if (!handler) {
+    await reportOutcome({
+      complete,
+      outcome: {
+        actionId: entry.actionId,
+        ok: false,
+        errorCode: UI_ACTION_PAGE_NOT_READY,
+      },
+    });
+    return "handler-failed";
+  }
 
   const parsed = handler.payloadSchema.safeParse(entry.payload);
   if (!parsed.success) {

@@ -9,8 +9,8 @@ import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "@langwatch/design-system/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
-import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
+import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import {
   mergeContextChips,
   removeContextChip,
@@ -134,6 +134,7 @@ import { isLangyTranscriptMessage } from "../../../../model/langy-transcript.ts"
 import { deriveWaveActivity } from "../../../../model/langy-wave-motion.ts";
 import { executeUiAction } from "../../../../model/ui-actions/execute-ui-action.ts";
 import { type LangyUiActionHandlers } from "../../../../model/ui-actions/langy-ui-action-types.ts";
+import { isOnPageOwningAction } from "../../../../model/ui-actions/manifest-routes.ts";
 import { LangyCardBoundary } from "../../../../ui/elements/langy-card-boundary.tsx";
 import { LangyWave } from "../../../../ui/elements/langy-wave.tsx";
 import { LANGY_CODE_ACCESS_ASK_AGAIN } from "../../../../ui/sections/derived-cards/langy-code-access-card.tsx";
@@ -310,12 +311,12 @@ function dispatchUiActionToPage({
   entry,
   projectId,
   seen,
-  handlers,
+  getHandlers,
 }: {
   entry: { actionId: string; kind: string; payload: unknown };
   projectId: string | undefined;
   seen: Set<string>;
-  handlers: LangyUiActionHandlers;
+  getHandlers: () => LangyUiActionHandlers;
 }): void {
   const store = useLangyStore.getState();
   const conversationId = store.activeConversationId;
@@ -329,7 +330,8 @@ function dispatchUiActionToPage({
     entry,
     turnId,
     seen,
-    handlers,
+    getHandlers,
+    isPageArriving: (kind) => isOnPageOwningAction({ kind, pathname: window.location.pathname }),
     claim: ({ actionId }) =>
       trpcClient.langy.claimUiAction.mutate({
         projectId,
@@ -828,7 +830,7 @@ function LangyPanel({
             entry,
             projectId: turnContextRef.current?.projectId,
             seen: uiActionSeenRef.current,
-            handlers: actionHandlersRef?.current ?? {},
+            getHandlers: () => actionHandlersRef?.current ?? {},
           });
         },
         // ADR-129. A card the turn is waiting on. The durable event is the

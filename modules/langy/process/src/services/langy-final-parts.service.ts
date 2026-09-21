@@ -4,6 +4,7 @@ import {
   type LangyMessagePart,
   type LangyFinalToolCall,
   langyMessagePartSchema,
+  partsShownOnce,
   salvageLangyDerivedCard,
   splitLangyCardFences,
 } from "@langwatch/langy-contract";
@@ -50,14 +51,17 @@ export class LangyFinalPartsService {
     order?: readonly LangyTurnSegment[];
     countBlock?: LangyBlockCounter;
   }): LangyMessagePart[] {
+    // A line is shown once: the rule is applied here, on the record both
+    // finalize paths write, so every reader of the turn agrees about what the
+    // turn said rather than each renderer deduplicating on its own.
     if (!order?.length) {
-      return [
+      return partsShownOnce([
         ...toolCalls.map((call) => this.toolPart(call)),
         ...this.assistantTextParts(text, countBlock),
-      ];
+      ]);
     }
 
-    return this.orderedParts({ text, toolCalls, order, countBlock });
+    return partsShownOnce(this.orderedParts({ text, toolCalls, order, countBlock }));
   }
 
   private toolPart(rawCall: LangyFinalToolCall): LangyMessagePart {
@@ -72,6 +76,7 @@ export class LangyFinalPartsService {
       ...(call.input !== undefined ? { input: call.input } : {}),
       ...(call.digest !== undefined ? { digest: call.digest } : {}),
       ...(call.result !== undefined ? { result: call.result } : {}),
+      ...(call.local === true ? { local: true } : {}),
       ...(call.isError
         ? { errorText: call.output ?? "Tool call failed" }
         : { output: call.output ?? "" }),

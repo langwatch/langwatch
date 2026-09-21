@@ -16,20 +16,17 @@ export interface FragmentState {
   overrides: BarStateOverrides;
 }
 
-function safeDecode(value: string): string | null {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return null;
-  }
-}
-
 export function parseFragment(fragment: string): FragmentState | null {
   const trimmed = fragment.replace(/^#/, "");
   if (!trimmed) return null;
 
   const [lensIdRaw, paramString] = trimmed.split("?", 2);
-  const lensId = safeDecode(lensIdRaw ?? "");
+  let lensId: string;
+  try {
+    lensId = decodeURIComponent(lensIdRaw ?? "");
+  } catch {
+    return null;
+  }
   if (!lensId) return null;
 
   return { lensId, overrides: paramString ? parseOverrides(paramString) : {} };

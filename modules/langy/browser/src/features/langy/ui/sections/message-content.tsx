@@ -45,8 +45,13 @@ import {
   foldReasoningTitles,
   stripReasoningTitles,
 } from "../../../../model/langy-reasoning-titles.ts";
+import { sayToolText } from "../../../../model/langy-say-tool.ts";
 import { stripToolNarration } from "../../../../model/langy-tool-narration.ts";
-import { langyRunText, langyTranscriptRuns } from "../../../../model/langy-transcript.ts";
+import {
+  langyRunText,
+  type LangyTranscriptRun,
+  langyTranscriptRuns,
+} from "../../../../model/langy-transcript.ts";
 import { githubPrsFromToolParts } from "../../../../model/shared/langy/github-pr-card.ts";
 import { LangyFailedCard } from "../../../../ui/elements/derived-cards/langy-failed-card.tsx";
 import { LangyGitHubProgressCard } from "../../../../ui/elements/github/langy-github-progress-card.tsx";
@@ -220,7 +225,8 @@ function MessageContentImpl({
   // the turn went on to answer after, which is what makes a failure in it a
   // step the turn RECOVERED from rather than the story of the turn.
   const lastAnswerRunIndex = runs.findLastIndex(
-    (run) => run.kind === "answer" && langyRunText(run.parts).trim().length > 0,
+    (run) =>
+      run.kind === "say" || (run.kind === "answer" && langyRunText(run.parts).trim().length > 0),
   );
 
   // The agent's `question` TOOL call, mapped onto the choices contract
@@ -265,6 +271,7 @@ function MessageContentImpl({
   // still gives the blur-reveal while `isStreaming`.
 
   const proposals = extractProposals(message);
+
   // The PR cards, read off the message's tool parts, not scraped from the model's text: the tool
   // part is written by the control plane from `gh pr create`'s own stdout, persisted with the
   // message, and skips a `gh pr create` that failed.
@@ -401,6 +408,21 @@ function MessageContentImpl({
     );
   }
 
+  /** Everything `renderRun` needs that belongs to the turn, not to one run. */
+  const view: RunView = {
+    isStreaming,
+    isRecorded,
+    hasActivity: hasActivityRecord,
+    projectSlug: project?.slug ?? null,
+    pullRequestLinks,
+    choicesTimeline,
+    onChoiceSelect,
+    onVerifyDerivedCard,
+    reasoningTitles: reasoningFold.titles,
+    lastActivityRunIndex,
+    lastAnswerRunIndex,
+  };
+
   return (
     // No avatar. Langy's mark lives on the launcher and above the empty state's
     // display line — nowhere else in the panel. A 24px logo tile repeated down
@@ -421,38 +443,7 @@ function MessageContentImpl({
             in-progress shell while it runs and its bespoke card once it
             settles, a generic activity card for everything else — and every
             mapping still lives in LangyToolActivity. */}
-        {runs.map((run, index) =>
-          run.kind === "activity" ? (
-            <LangyCardBoundary key={`activity-${index}`} scope="the tool activity">
-              <LangyActivityParts
-                parts={run.parts}
-                // The receipt's thinking headlines belong to the turn, not to
-                // one run of it, so they ride the last activity run.
-                reasoningTitles={index === lastActivityRunIndex ? reasoningFold.titles : []}
-                // A call is only ever closed by its own output, so a stopped or
-                // dead turn leaves its open calls looking like they still run.
-                // Off the streaming turn, an open call is an interrupted one.
-                live={isStreaming}
-                // The turn answered after this run, so a failure inside it is
-                // one the turn recovered from.
-                answeredAfter={index < lastAnswerRunIndex}
-              />
-            </LangyCardBoundary>
-          ) : (
-            <AnswerRun
-              key={`answer-${index}`}
-              parts={run.parts}
-              isStreaming={isStreaming}
-              isRecorded={isRecorded}
-              hasActivity={hasActivityRecord}
-              projectSlug={project?.slug ?? null}
-              pullRequestLinks={pullRequestLinks}
-              choicesTimeline={choicesTimeline}
-              onChoiceSelect={onChoiceSelect}
-              onVerifyDerivedCard={onVerifyDerivedCard}
-            />
-          ),
-        )}
+        {runs.map((run, index) => renderRun({ run, index, view }))}
         {progressEvents.length > 0 && (
           <LangyCardBoundary scope="the progress card">
             <LangyGitHubProgressCard events={progressEvents} live={isStreaming} />
@@ -982,4 +973,98 @@ function questionWaitLockState({
     options: card.options,
   });
   return answered ? { status: "answered", ...answered } : { status: "superseded" };
+}
+
+/**
+ * Lines said with the `say` tool, drawn where they were said, in the reply's
+ * own prose style. No frame, no activity row and never folded into the
+ * receipt: the line was for the reader at that moment and stays there.
+ */
+function SayRun({ parts }: { parts: readonly unknown[] }) {
+  const lines = parts
+    .map((part) => sayToolText(part))
+    .filter((line): line is string => line !== null);
+  if (lines.length === 0) return null;
+  return (
+    <Box
+      data-langy-say
+      paddingX="2px"
+      display="flex"
+      flexDirection="column"
+      gap={2}
+      css={{
+        "& > div > :first-child": { marginTop: 0 },
+        "& > div > :last-child": { marginBottom: 0 },
+        "& table": { display: "block", overflowX: "auto" },
+      }}
+    >
+      {lines.map((line, index) => (
+        <Markdown
+          // A said line has no id of its own; its place in the run is stable.
+          key={`${index}-${line.length}`}
+          fontSize="langyAnswer"
+          linkVariant="langy"
+          color="langy.answerFg"
+        >
+          {line}
+        </Markdown>
+      ))}
+    </Box>
+  );
+}
+
+/** What a run is drawn against: the turn's own facts, shared by every run. */
+type RunView = Omit<Parameters<typeof AnswerRun>[0], "parts" | "isStreaming" | "isRecorded"> & {
+  isStreaming: boolean;
+  isRecorded: boolean;
+  reasoningTitles: Parameters<typeof LangyActivityParts>[0]["reasoningTitles"];
+  lastActivityRunIndex: number;
+  lastAnswerRunIndex: number;
+};
+
+/** One transcript run, drawn as what it is: the work, a said line, or the reply. */
+function renderRun({
+  run,
+  index,
+  view,
+}: {
+  run: LangyTranscriptRun;
+  index: number;
+  view: RunView;
+}) {
+  if (run.kind === "activity") {
+    return (
+      <LangyCardBoundary key={`activity-${index}`} scope="the tool activity">
+        <LangyActivityParts
+          parts={run.parts}
+          // The receipt's thinking headlines belong to the turn, not to one run
+          // of it, so they ride the last activity run.
+          reasoningTitles={index === view.lastActivityRunIndex ? view.reasoningTitles : []}
+          // A call is only ever closed by its own output, so off the streaming
+          // turn an open call is an interrupted one.
+          live={view.isStreaming}
+          // The turn answered after this run, so a failure inside it is one the
+          // turn recovered from.
+          answeredAfter={index < view.lastAnswerRunIndex}
+        />
+      </LangyCardBoundary>
+    );
+  }
+  if (run.kind === "say") {
+    return <SayRun key={`say-${index}`} parts={run.parts} />;
+  }
+  return (
+    <AnswerRun
+      key={`answer-${index}`}
+      parts={run.parts}
+      isStreaming={view.isStreaming}
+      isRecorded={view.isRecorded}
+      hasActivity={view.hasActivity}
+      projectSlug={view.projectSlug}
+      pullRequestLinks={view.pullRequestLinks}
+      choicesTimeline={view.choicesTimeline}
+      onChoiceSelect={view.onChoiceSelect}
+      onVerifyDerivedCard={view.onVerifyDerivedCard}
+    />
+  );
 }

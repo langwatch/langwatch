@@ -14,11 +14,11 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { format, Temporal, toEpochMs } from "@langwatch/time";
 import type { TimeRange } from "@langwatch/trace-browser-kit";
+import type { TimeRangePreset } from "@langwatch/trace-contract";
 import { Check, Clock, Copy } from "lucide-react";
 import type React from "react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 
-import type { TimeRangePreset } from "../../../../behavior/time-range-presets.ts";
 import {
   getPresetById,
   matchPreset,

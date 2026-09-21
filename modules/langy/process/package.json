@@ -89,6 +89,7 @@
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/secrets": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
     "@opentelemetry/api": "catalog:",
     "@trpc/server": "catalog:",
     "ai": "catalog:",

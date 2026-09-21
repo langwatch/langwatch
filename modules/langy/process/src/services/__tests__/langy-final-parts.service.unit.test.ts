@@ -125,6 +125,24 @@ describe("buildFinalAssistantParts", () => {
   // The relay stamp — ```langy-card fences become typed parts (ADR-060 §1)
   // =========================================================================
 
+  describe("given a call that ran in the developer's shared folder (ADR-129)", () => {
+    it("records the marker on the durable part", () => {
+      const parts = buildFinalAssistantParts({
+        text: "done",
+        toolCalls: [{ id: "t1", name: "bash", output: "ok", local: true }],
+      });
+      expect(parts[0]).toMatchObject({ type: "tool-bash", local: true });
+    });
+
+    it("leaves a sandbox call unmarked, so absent means the sandbox", () => {
+      const parts = buildFinalAssistantParts({
+        text: "done",
+        toolCalls: [{ id: "t1", name: "bash", output: "ok" }],
+      });
+      expect(parts[0]).not.toHaveProperty("local");
+    });
+  });
+
   describe("given a well-formed block between prose", () => {
     it("stamps a typed langy-card part in place, prose kept on either side", () => {
       const parts = buildFinalAssistantParts({
