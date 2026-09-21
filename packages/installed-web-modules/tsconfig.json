@@ -60,6 +60,9 @@
       "path": "../../enterprise/modules/scim/browser/tsconfig.build.json"
     },
     {
+      "path": "../../enterprise/modules/sso/browser/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/feature-flag/browser/tsconfig.build.json"
     },
     {

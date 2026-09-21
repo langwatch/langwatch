@@ -1,0 +1,51 @@
+{
+  "name": "@langwatch/enterprise-sso-browser",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe Enterprise single sign-on administration: an organization brings its own identity provider, claims and proves its domains, and keeps a break-glass path.",
+  "license": "SEE LICENSE IN ../../../LICENSE.md",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/sso.web.ts",
+      "types": "./dist/sso.web.d.ts",
+      "default": "./src/sso.web.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
+    "lucide-react": "catalog:"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@emotion/react": "catalog:",
+    "@langwatch/vitest-config": "workspace:*",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

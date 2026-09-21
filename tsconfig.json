@@ -249,6 +249,9 @@
       "path": "enterprise/modules/scim/process/tsconfig.json"
     },
     {
+      "path": "enterprise/modules/sso/browser/tsconfig.json"
+    },
+    {
       "path": "enterprise/modules/sso/contract/tsconfig.json"
     },
     {

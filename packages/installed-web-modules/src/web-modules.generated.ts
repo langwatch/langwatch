@@ -35,6 +35,7 @@ import { scenarioWeb } from "@langwatch/scenario-browser/declaration";
 import { scimWeb } from "@langwatch/enterprise-scim-browser/declaration";
 import { secretWeb } from "@langwatch/secret-browser/declaration";
 import { shareWeb } from "@langwatch/share-browser/declaration";
+import { ssoWeb } from "@langwatch/enterprise-sso-browser/declaration";
 import { suiteWeb } from "@langwatch/suite-browser/declaration";
 import { topicWeb } from "@langwatch/topic-browser/declaration";
 import { traceWeb } from "@langwatch/trace-browser/declaration";
@@ -77,13 +78,14 @@ export const webModules = [
   scimWeb satisfies { readonly name: "scim" },
   secretWeb satisfies { readonly name: "secret" },
   shareWeb satisfies { readonly name: "share" },
+  ssoWeb satisfies { readonly name: "sso" },
   suiteWeb satisfies { readonly name: "suite" },
   topicWeb satisfies { readonly name: "topic" },
   traceWeb satisfies { readonly name: "trace" },
   userWeb satisfies { readonly name: "user" },
   workflowWeb satisfies { readonly name: "workflow" },
 ] as const;
-type PairedOnDisk = "agent" | "analytics" | "annotation" | "api-key" | "auth" | "authz" | "automation" | "coding-agent" | "data-privacy" | "data-retention" | "dataset" | "evaluator" | "experiment" | "feature-flag" | "gateway" | "github" | "langy" | "model-provider" | "monitor" | "notification" | "onboarding" | "ops" | "organization" | "presence" | "project" | "prompt" | "scenario" | "secret" | "share" | "suite" | "topic" | "trace" | "user" | "workflow" | "billing" | "governance" | "licensing" | "scim";
+type PairedOnDisk = "agent" | "analytics" | "annotation" | "api-key" | "auth" | "authz" | "automation" | "coding-agent" | "data-privacy" | "data-retention" | "dataset" | "evaluator" | "experiment" | "feature-flag" | "gateway" | "github" | "langy" | "model-provider" | "monitor" | "notification" | "onboarding" | "ops" | "organization" | "presence" | "project" | "prompt" | "scenario" | "secret" | "share" | "suite" | "topic" | "trace" | "user" | "workflow" | "billing" | "governance" | "licensing" | "scim" | "sso";
 type ServerHalfOnDisk = "agent" | "analytics" | "annotation" | "api-key" | "auth" | "authz" | "automation" | "coding-agent" | "dashboard" | "data-privacy" | "data-retention" | "dataset" | "entitlement" | "evaluation" | "evaluator" | "experiment" | "feature-flag" | "gateway" | "github" | "governance" | "hosted-mcp" | "identity" | "instant-eval" | "langy" | "licensing" | "log" | "managed-provider" | "metric" | "model-provider" | "monitor" | "notification" | "onboarding" | "ops" | "organization" | "platform-health" | "presence" | "project" | "prompt" | "role" | "scenario" | "scim" | "secret" | "share" | "sso" | "stored-object" | "suite" | "topic" | "trace" | "user" | "webhook" | "workflow";
 type MissingWeb = Exclude<PairedOnDisk, (typeof webModules)[number]["name"]>;
 type MissingServer = Exclude<PairedOnDisk, ServerHalfOnDisk>;

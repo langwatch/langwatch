@@ -31,6 +31,7 @@
     "@langwatch/enterprise-governance-browser": "workspace:*",
     "@langwatch/enterprise-licensing-browser": "workspace:*",
     "@langwatch/enterprise-scim-browser": "workspace:*",
+    "@langwatch/enterprise-sso-browser": "workspace:*",
     "@langwatch/evaluator-browser": "workspace:*",
     "@langwatch/experiment-browser": "workspace:*",
     "@langwatch/feature-flag-browser": "workspace:*",
