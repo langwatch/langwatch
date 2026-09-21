@@ -32,17 +32,19 @@ export function instantEvalRefusalCopy(refusal: InstantEvalRefusal): {
   body: string;
   action: { label: string; href: string };
 } {
-  const meanwhile = "Searching the words for now.";
+  const what =
+    "An Instant Eval reads every result in this view and keeps the ones that answer your question, which no filter can do.";
+  const meanwhile = "The words are searched as a phrase in the meantime.";
   if (refusal.kind === "budget") {
     return {
-      title: "Free Instant Evals used up",
-      body: `Upgrade to find what filters can't, like frustrated users. ${meanwhile}`,
+      title: "Your free Instant Evals quota is used up",
+      body: `${what} Upgrade to keep judging. ${meanwhile}`,
       action: { label: "Upgrade", href: UPGRADE_HREF },
     };
   }
   return {
     title: "Configure a model to judge results",
-    body: `Instant Evals need a model to find what filters can't. ${meanwhile}`,
+    body: `${what} Configure a model to run it. ${meanwhile}`,
     action: { label: "Configure a model", href: MODEL_PROVIDERS_HREF },
   };
 }

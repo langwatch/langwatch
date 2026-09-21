@@ -1,4 +1,23 @@
 import type { SystemStyleObject } from "@chakra-ui/react";
+import { keyframes } from "@emotion/react";
+
+// Emitted through emotion's helper rather than an `"@keyframes …"` key:
+// `SystemStyleObject` has no such key, and a plain object never reaches the
+// document head, so the animation would name a rule that does not exist.
+const instantEvalGlow = keyframes`
+  0%, 100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--chakra-colors-green-solid) 28%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 12px 2px color-mix(in srgb, var(--chakra-colors-green-solid) 55%, transparent);
+  }
+`;
+
+/** Both halves of an `eval` chip: the token and the remove button beside it. */
+const INSTANT_EVAL_CHIP =
+  "& .filter-token-eval, & .filter-token-delete[data-filter-chip-field='eval'], & .filter-token-delete[data-filter-chip-field^='eval.']";
+const BUSY_INSTANT_EVAL_CHIP =
+  "&[data-instant-eval-busy] .filter-token-eval, &[data-instant-eval-busy] .filter-token-delete[data-filter-chip-field='eval'], &[data-instant-eval-busy] .filter-token-delete[data-filter-chip-field^='eval.']";
 
 export const editorStyles: SystemStyleObject = {
   "& .tiptap": {
@@ -101,29 +120,26 @@ export const editorStyles: SystemStyleObject = {
     borderColor: "green.muted",
   },
   // An Instant Eval chip carries a judgement rather than a field match, so
-  // it wears a fuller green than the blue field chips around it.
-  "& .filter-token-eval": {
+  // it wears a fuller green than the blue field chips around it. The remove
+  // button is matched by its own field attribute rather than as a sibling:
+  // in the live editor it is a ProseMirror widget, and the sibling selector
+  // left it blue beside a green chip.
+  [INSTANT_EVAL_CHIP]: {
     background: "green.muted",
     borderColor: "green.solid",
   },
   "& .filter-token-eval[data-filter-chip-label]::after": {
     color: "green.fg",
   },
-  // While its run is estimated, started or judging, the chip sweeps a band
-  // of light left to right, so the search bar says work is under way.
-  "&[data-instant-eval-busy] .filter-token-eval": {
-    backgroundImage:
-      "linear-gradient(90deg, transparent 15%, color-mix(in srgb, var(--chakra-colors-green-solid) 38%, transparent) 50%, transparent 85%)",
-    backgroundSize: "220% 100%",
-    backgroundRepeat: "no-repeat",
-    animation: "filter-token-eval-sweep 1.3s linear infinite",
-  },
-  "@keyframes filter-token-eval-sweep": {
-    from: { backgroundPosition: "160% 0" },
-    to: { backgroundPosition: "-60% 0" },
+  // While its run is estimated, started or judging, the chip breathes a
+  // green halo, the same affordance the ask button wears, at a quicker pace
+  // because this one ends. The ask button drops its own halo meanwhile, so
+  // the bar never has two things pulsing at once.
+  [BUSY_INSTANT_EVAL_CHIP]: {
+    animation: `${instantEvalGlow} 1.2s ease-in-out infinite`,
   },
   "@media (prefers-reduced-motion: reduce)": {
-    "&[data-instant-eval-busy] .filter-token-eval": { animation: "none" },
+    [BUSY_INSTANT_EVAL_CHIP]: { animation: "none" },
   },
   "& .filter-keyword": {
     color: "fg.muted",
@@ -203,10 +219,6 @@ export const editorStyles: SystemStyleObject = {
   "& .filter-token-numeric + .filter-token-delete": {
     background: "green.subtle",
     borderColor: "green.muted",
-  },
-  "& .filter-token-eval + .filter-token-delete": {
-    background: "green.muted",
-    borderColor: "green.solid",
   },
   "& .filter-token-unknown-field + .filter-token-delete": {
     background: "yellow.subtle",

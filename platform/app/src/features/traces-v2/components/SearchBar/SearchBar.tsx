@@ -491,6 +491,7 @@ export const SearchBar: React.FC = () => {
               zIndex={1}
             >
               <AskAiButton
+                quiet={instantEvalBusy}
                 label={askLabel}
                 ariaLabel={langyRoutesAsk ? "Ask Langy" : undefined}
                 tooltip={

@@ -61,6 +61,12 @@ interface AskAiButtonProps {
    * knows it'll be available on their real data.
    */
   disabledReason?: string;
+  /**
+   * Drops the halo while another affordance on the same row is animating,
+   * so the search bar never pulses in two places at once. The button stays
+   * fully usable; only the animation stands down.
+   */
+  quiet?: boolean;
 }
 
 /**
@@ -78,6 +84,7 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
   label = "Ask AI",
   needsProviderPrimer = false,
   disabledReason,
+  quiet = false,
 }) => {
   const reduceMotion = useReducedMotion();
   const isGated = needsProviderPrimer || !!disabledReason;
@@ -110,7 +117,7 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
       // primer mode still pulses so the affordance pulls the eye to
       // "set me up to use AI."
       animation={
-        reduceMotion || disabledReason
+        reduceMotion || disabledReason || quiet
           ? undefined
           : `${glowPulse} 6s ease-in-out infinite`
       }

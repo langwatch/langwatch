@@ -36,11 +36,11 @@ describe("given the organization has spent its free Instant Evals budget", () =>
         { wrapper },
       );
       expect(
-        screen.getByText("Free Instant Evals used up"),
+        screen.getByText("Your free Instant Evals quota is used up"),
       ).toBeInTheDocument();
       expect(
         screen.getByText(
-          "Upgrade to find what filters can't, like frustrated users. Searching the words for now.",
+          "An Instant Eval reads every result in this view and keeps the ones that answer your question, which no filter can do. Upgrade to keep judging. The words are searched as a phrase in the meantime.",
         ),
       ).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "Upgrade" })).toHaveAttribute(
@@ -60,7 +60,7 @@ describe("given the deployment has no classifier", () => {
       const copy = instantEvalRefusalCopy({ kind: "model" });
       expect(copy.title).toBe("Configure a model to judge results");
       expect(copy.body).toBe(
-        "Instant Evals need a model to find what filters can't. Searching the words for now.",
+        "An Instant Eval reads every result in this view and keeps the ones that answer your question, which no filter can do. Configure a model to run it. The words are searched as a phrase in the meantime.",
       );
       expect(copy.action).toEqual({
         label: "Configure a model",
