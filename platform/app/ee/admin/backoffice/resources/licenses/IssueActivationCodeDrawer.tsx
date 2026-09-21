@@ -93,6 +93,54 @@ export function IssueActivationCodeDrawer({
   );
 }
 
+/** What the form holds while it is being filled in, all of it as typed. */
+interface Draft {
+  organizationId: string;
+  organizationName: string;
+  email: string;
+  planType: Plan;
+  maxMembers: string;
+  licenseTermDays: string;
+  expiresOn: string;
+  reusable: boolean;
+}
+
+const EMPTY_DRAFT: Draft = {
+  organizationId: "",
+  organizationName: "",
+  email: "",
+  planType: "ENTERPRISE",
+  maxMembers: "25",
+  licenseTermDays: String(DEFAULT_TERM_DAYS),
+  expiresOn: isoDaysFromNow(DEFAULT_CODE_DAYS),
+  reusable: false,
+};
+
+type SetField = <K extends keyof Draft>(key: K, value: Draft[K]) => void;
+
+function namesTheCustomer(draft: Draft): boolean {
+  return Boolean(
+    draft.organizationId.trim() &&
+      draft.organizationName.trim() &&
+      draft.email.trim(),
+  );
+}
+
+function issuedFrom(draft: Draft): CodeToIssue | null {
+  const expiresAt = dateInputToISO(draft.expiresOn);
+  if (!expiresAt) return null;
+  return {
+    organizationId: draft.organizationId.trim(),
+    organizationName: draft.organizationName.trim(),
+    email: draft.email.trim(),
+    planType: draft.planType,
+    maxMembers: Number(draft.maxMembers),
+    licenseTermDays: Number(draft.licenseTermDays),
+    expiresAt: new Date(expiresAt),
+    reusable: draft.reusable,
+  };
+}
+
 function IssueForm({
   error,
   pending,
@@ -102,30 +150,13 @@ function IssueForm({
   pending: boolean;
   onSubmit: (values: CodeToIssue) => void;
 }) {
-  const [organizationId, setOrganizationId] = useState("");
-  const [organizationName, setOrganizationName] = useState("");
-  const [email, setEmail] = useState("");
-  const [planType, setPlanType] = useState<Plan>("ENTERPRISE");
-  const [maxMembers, setMaxMembers] = useState("25");
-  const [licenseTermDays, setLicenseTermDays] = useState(
-    String(DEFAULT_TERM_DAYS),
-  );
-  const [expiresOn, setExpiresOn] = useState(isoDaysFromNow(DEFAULT_CODE_DAYS));
-  const [reusable, setReusable] = useState(false);
+  const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
+  const set: SetField = (key, value) =>
+    setDraft((current) => ({ ...current, [key]: value }));
 
   const submit = () => {
-    const expiresAt = dateInputToISO(expiresOn);
-    if (!expiresAt) return;
-    onSubmit({
-      organizationId: organizationId.trim(),
-      organizationName: organizationName.trim(),
-      email: email.trim(),
-      planType,
-      maxMembers: Number(maxMembers),
-      licenseTermDays: Number(licenseTermDays),
-      expiresAt: new Date(expiresAt),
-      reusable,
-    });
+    const values = issuedFrom(draft);
+    if (values) onSubmit(values);
   };
 
   return (
@@ -136,36 +167,66 @@ function IssueForm({
           fallbackTitle="Couldn't issue the activation code"
         />
       ) : null}
+      <CustomerFields draft={draft} set={set} />
+      <TermsFields draft={draft} set={set} />
+      <Checkbox
+        checked={draft.reusable}
+        onCheckedChange={({ checked }) => set("reusable", checked === true)}
+      >
+        Reusable, for a customer rolling out several installs
+      </Checkbox>
+      <Button
+        colorPalette="blue"
+        onClick={submit}
+        loading={pending}
+        disabled={!namesTheCustomer(draft)}
+      >
+        Issue code
+      </Button>
+    </VStack>
+  );
+}
+
+function CustomerFields({ draft, set }: { draft: Draft; set: SetField }) {
+  return (
+    <>
       <Field.Root>
         <Field.Label>Customer organization id</Field.Label>
         <Input
-          value={organizationId}
-          onChange={(e) => setOrganizationId(e.target.value)}
+          value={draft.organizationId}
+          onChange={(e) => set("organizationId", e.target.value)}
           placeholder="organization_..."
         />
       </Field.Root>
       <Field.Root>
         <Field.Label>Customer name</Field.Label>
         <Input
-          value={organizationName}
-          onChange={(e) => setOrganizationName(e.target.value)}
+          value={draft.organizationName}
+          onChange={(e) => set("organizationName", e.target.value)}
           placeholder="ACME"
         />
       </Field.Root>
       <Field.Root>
         <Field.Label>Contact email</Field.Label>
         <Input
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          value={draft.email}
+          onChange={(e) => set("email", e.target.value)}
           placeholder="ops@acme.test"
         />
       </Field.Root>
+    </>
+  );
+}
+
+function TermsFields({ draft, set }: { draft: Draft; set: SetField }) {
+  return (
+    <>
       <Field.Root>
         <Field.Label>Plan</Field.Label>
         <NativeSelect.Root>
           <NativeSelect.Field
-            value={planType}
-            onChange={(e) => setPlanType(e.target.value as Plan)}
+            value={draft.planType}
+            onChange={(e) => set("planType", e.target.value as Plan)}
           >
             {PLANS.map((plan) => (
               <option key={plan} value={plan}>
@@ -180,16 +241,16 @@ function IssueForm({
           <Field.Label>Seats</Field.Label>
           <Input
             type="number"
-            value={maxMembers}
-            onChange={(e) => setMaxMembers(e.target.value)}
+            value={draft.maxMembers}
+            onChange={(e) => set("maxMembers", e.target.value)}
           />
         </Field.Root>
         <Field.Root>
           <Field.Label>License term, in days</Field.Label>
           <Input
             type="number"
-            value={licenseTermDays}
-            onChange={(e) => setLicenseTermDays(e.target.value)}
+            value={draft.licenseTermDays}
+            onChange={(e) => set("licenseTermDays", e.target.value)}
           />
           <Field.HelperText>
             Counted from the day the code is redeemed.
@@ -200,27 +261,11 @@ function IssueForm({
         <Field.Label>Code expires on</Field.Label>
         <Input
           type="date"
-          value={expiresOn}
-          onChange={(e) => setExpiresOn(e.target.value)}
+          value={draft.expiresOn}
+          onChange={(e) => set("expiresOn", e.target.value)}
         />
       </Field.Root>
-      <Checkbox
-        checked={reusable}
-        onCheckedChange={({ checked }) => setReusable(checked === true)}
-      >
-        Reusable, for a customer rolling out several installs
-      </Checkbox>
-      <Button
-        colorPalette="blue"
-        onClick={submit}
-        loading={pending}
-        disabled={
-          !organizationId.trim() || !organizationName.trim() || !email.trim()
-        }
-      >
-        Issue code
-      </Button>
-    </VStack>
+    </>
   );
 }
 

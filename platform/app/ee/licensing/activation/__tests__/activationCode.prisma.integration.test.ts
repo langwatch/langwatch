@@ -28,7 +28,6 @@ import { PrismaActivationCodes } from "../activationCode.prisma";
 const RUN = `act-${Date.now()}`;
 const NEXT_YEAR = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
 
-
 function codeOf(): { code: string; hash: string; hint: string } {
   const code = mintActivationCode();
   const normalised = normaliseActivationCode(code);

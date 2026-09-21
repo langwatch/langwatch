@@ -32,42 +32,51 @@ vi.mock("../../../../../ee/billing/connected/connectedBillingOverview", () => ({
   readConnectedBillingOverview: mockOverview,
 }));
 
-vi.mock("~/server/app-layer/identity/runtime", () => ({
-  ssoConnections: vi.fn(),
-  addressRoutesToConnection: async () => false,
-  BACKUP_CODE_COUNT: 10,
-  betterAuthInstance: () => ({ provide: () => undefined }),
-  deploymentIsFederationCapable: () => false,
-  deploymentOffersPasskeys: () => true,
-  identityBridgeCeremonies: () => ({}),
-  identityCeremonies: () => ({}),
-  // `betterAuth()` builds its adapter eagerly at module load, and this suite's
-  // import graph reaches it through the tRPC module.
-  identityStorageAdapter: () => memoryAdapter({}),
-  lastWayInGuard: () => ({
-    refuseIfItClosesTheLastDoor: async () => undefined,
-  }),
-  mfaCeremonies: () => ({}),
-  organizationMfa: () => ({
-    standingForSession: async () => ({ satisfaction: { satisfied: true } }),
-  }),
-  PASSWORD_HASH_ROUNDS: 10,
-  passkeySignUp: () => ({}),
-  passwordResetSessionBridge: () => ({
-    recordPasswordReset: () => undefined,
-    signInAfterPasswordReset: async () => undefined,
-  }),
-  resolveSignInMethodPolicy: async () => ({}),
-  secondaryStorage: () => ({ configured: false, connection: () => null }),
-  sessionCallbackEvidence: () => ({}),
-  sessionClaims: () => ({}),
-  sessionRevocation: () => ({ revokeAll: async () => undefined }),
-  ssoAssertion: () => ({}),
-  signUpConfirmationEndpoint: () => ({
-    confirmSignUpAddress: async () => undefined,
-  }),
-  twoStepAccount: () => ({ requiringOrganizations: async () => false }),
-}));
+// Every export of the runtime is stubbed, read from its source rather than
+// listed here, so a new export in the runtime does not fail this suite on a
+// name it never uses. Only what this suite's import graph actually calls is
+// named below.
+vi.mock("~/server/app-layer/identity/runtime", async () => {
+  const { identityRuntimeStub } = await import(
+    "~/server/app-layer/identity/__tests__/runtimeStub"
+  );
+  return identityRuntimeStub({
+    ssoConnections: vi.fn(),
+    addressRoutesToConnection: async () => false,
+    BACKUP_CODE_COUNT: 10,
+    betterAuthInstance: () => ({ provide: () => undefined }),
+    deploymentIsFederationCapable: () => false,
+    deploymentOffersPasskeys: () => true,
+    identityBridgeCeremonies: () => ({}),
+    identityCeremonies: () => ({}),
+    // `betterAuth()` builds its adapter eagerly at module load, and this suite's
+    // import graph reaches it through the tRPC module.
+    identityStorageAdapter: () => memoryAdapter({}),
+    lastWayInGuard: () => ({
+      refuseIfItClosesTheLastDoor: async () => undefined,
+    }),
+    mfaCeremonies: () => ({}),
+    organizationMfa: () => ({
+      standingForSession: async () => ({ satisfaction: { satisfied: true } }),
+    }),
+    PASSWORD_HASH_ROUNDS: 10,
+    passkeySignUp: () => ({}),
+    passwordResetSessionBridge: () => ({
+      recordPasswordReset: () => undefined,
+      signInAfterPasswordReset: async () => undefined,
+    }),
+    resolveSignInMethodPolicy: async () => ({}),
+    secondaryStorage: () => ({ configured: false, connection: () => null }),
+    sessionCallbackEvidence: () => ({}),
+    sessionClaims: () => ({}),
+    sessionRevocation: () => ({ revokeAll: async () => undefined }),
+    ssoAssertion: () => ({}),
+    signUpConfirmationEndpoint: () => ({
+      confirmSignUpAddress: async () => undefined,
+    }),
+    twoStepAccount: () => ({ requiringOrganizations: async () => false }),
+  });
+});
 
 vi.mock("~/server/db", () => ({ prisma: {} }));
 
