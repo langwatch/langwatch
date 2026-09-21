@@ -127,7 +127,7 @@ Feature: Running system migrations across organizations
     When those events and application events are queued concurrently
     Then the preflight uses the canonical queue and its aggregate locks
     And it dispatches only groups registered by that preflight
-    And pending, delayed, blocked, or failed work the preflight itself caused in those groups prevents startup
+    And blocked or failed work the preflight itself caused in those groups prevents startup
     And worker-scoped durable subscribers run for the preflight events
     And schedulers, process-manager consumers, and general workers do not start
 
@@ -145,6 +145,32 @@ Feature: Running system migrations across organizations
     And it stays blocked, reported for operator triage
     But a failure produced by the preflight's own work still prevents startup
     And the refusal names the groups it refuses for, not a count of them
+
+  # The barrier's deadline is the one refusal a booting fleet cannot answer.
+  # Every replica runs this preflight BEFORE it starts consuming, so work the
+  # preflight queues drains only if some other process is already serving that
+  # queue. On a fleet booting together there is none, and a claim whose worker
+  # a previous crash-loop killed outlives it and blocks its group's head. Each
+  # boot then queues more behind that head and refuses over it, which is what
+  # keeps the consumer that would drain it from ever starting. Observed on the
+  # identity backfill: one group, `active: 1` with no owner alive, `pending`
+  # climbing 32 → 50 across boots, every replica crash-looping.
+  #
+  # Work that has not drained leaves its tenant HELD, and a held tenant already
+  # starts on the legacy path with its migration gate closed. Waiting for the
+  # drain is how a pass finalizes that tenant sooner, never how it stays safe —
+  # so giving up on the wait costs a later pass, not correctness. Work that
+  # actually FAILED is a different thing and still refuses: that is a fault a
+  # later pass will not clear, and it is the half of this barrier worth keeping.
+  @integration
+  Scenario: Work that never drains leaves its tenants held rather than refusing startup
+    Given the preflight's own work has not drained when the barrier's deadline passes
+    And none of that work has failed or blocked
+    When the barrier gives up waiting
+    Then startup continues rather than refusing
+    And the groups it stopped waiting for are named for operator triage
+    And their tenants stay held, to be re-proved by a later pass
+    But work that failed or blocked by the deadline still prevents startup
 
   @unit
   Scenario: A recurring reconciliation does not loop forever
