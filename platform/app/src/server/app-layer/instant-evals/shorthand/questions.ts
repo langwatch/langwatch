@@ -125,6 +125,12 @@ export class InstantEvalShorthandError extends Error {
   constructor(
     message: string,
     readonly fields: readonly string[] = [],
+    /**
+     * What kind of refusal this is, where a caller can act on the kind.
+     * `filter_field_unsupported` is the one the run service answers itself,
+     * by resolving the filter through the explorer's compiler instead.
+     */
+    readonly code?: "filter_field_unsupported",
   ) {
     super(message);
     this.name = "InstantEvalShorthandError";

@@ -30,13 +30,12 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
-vi.mock("../../stores/filterStore", () => ({
-  useFilterStore: (selector: (s: unknown) => unknown) =>
-    selector({ debouncedTimeRange: { from: 1_000, to: 2_000 } }),
-}));
-
-vi.mock("../../stores/viewStore", () => ({
-  useViewStore: (selector: (s: unknown) => unknown) => selector(harness.view),
+vi.mock("../../stores/explorerStore", () => ({
+  useExplorerStore: (selector: (s: unknown) => unknown) =>
+    selector({
+      debouncedTimeRange: { from: 1_000, to: 2_000 },
+      ...harness.view,
+    }),
 }));
 
 import type { TraceListItem } from "../../types/trace";

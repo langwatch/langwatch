@@ -8,6 +8,7 @@ import {
   evaluationContextChip,
   experimentContextChip,
   mergeContextChips,
+  namedPageChips,
   promptContextChip,
   scenarioContextChip,
   shortenChipId,
@@ -353,6 +354,36 @@ describe("shortenChipId", () => {
       it("leaves it whole", () => {
         expect(shortenChipId("abc123")).toBe("abc123");
       });
+    });
+  });
+});
+
+describe("namedPageChips", () => {
+  describe("when the dataset page registers its dataset by name", () => {
+    /** @scenario "The dataset page offers its dataset by name" */
+    it("goes ahead of the route's chip, so the merged chip carries the name and the same ref", () => {
+      const routed = datasetContextChip({ datasetId: "dataset_3f9a01c2" });
+      const named = datasetContextChip({
+        datasetId: "dataset_3f9a01c2",
+        name: "Refund conversations",
+      });
+      const merged = mergeContextChips([...namedPageChips([named]), routed]);
+      expect(merged).toEqual([
+        {
+          id: "dataset:dataset_3f9a01c2",
+          kind: "dataset",
+          label: "dataset: Refund conversations",
+          ref: "dataset_3f9a01c2",
+        },
+      ]);
+    });
+
+    it("leaves every other registered chip where it was", () => {
+      expect(
+        namedPageChips([
+          { id: "prompt:p1", kind: "prompt", label: "prompt: p1", ref: "p1" },
+        ]),
+      ).toEqual([]);
     });
   });
 });

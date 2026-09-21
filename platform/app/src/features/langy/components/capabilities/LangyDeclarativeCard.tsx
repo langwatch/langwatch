@@ -18,7 +18,7 @@
  */
 import { Box, Grid, Text, VStack } from "@chakra-ui/react";
 import { type CliResultDigest, parseCardResult } from "@langwatch/langy";
-import { extractPlatformUrl } from "~/utils/platformHref";
+import { extractPlatformUrl, isAppPath } from "~/utils/platformHref";
 import {
   type CapabilityData,
   useCapabilityData,
@@ -597,6 +597,7 @@ export function LangyDeclarativeCard({
       projectSlug={projectSlug}
       resourceId={tone === "removed" ? null : id}
       platformUrl={tone === "removed" ? null : extractPlatformUrl(output)}
+      {...dispatchedActionLink(document)}
       icon={descriptor.icon}
     >
       {parsed.ok ? (
@@ -845,4 +846,28 @@ function dispatchedActionTitle(document: unknown): string | null {
   if (typeof kind !== "string" || kind.trim() === "") return null;
   const action = kind.slice(kind.lastIndexOf(".") + 1);
   return action === "" ? null : capitalize(labelize(action));
+}
+
+/**
+ * The link a page action answered with. An action that ran with no page open
+ * cannot change a screen, so it answers where its effect can be seen
+ * (`explorer.setFilter` answers the Trace Explorer on that filter). The card
+ * links there instead of to the surface the action family belongs to. A link
+ * that leaves the app is dropped together with its label.
+ */
+function dispatchedActionLink(document: unknown): {
+  deepLinkHref?: string;
+  deepLinkLabel?: string;
+} {
+  if (!document || typeof document !== "object") return {};
+  const record = document as Record<string, unknown>;
+  if (typeof record.executedVia !== "string") return {};
+  const result = record.result;
+  if (!result || typeof result !== "object") return {};
+  const { href, label } = result as Record<string, unknown>;
+  if (!isAppPath(href)) return {};
+  return {
+    deepLinkHref: href,
+    deepLinkLabel: typeof label === "string" ? label : undefined,
+  };
 }

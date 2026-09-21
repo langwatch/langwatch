@@ -88,14 +88,41 @@ export class InstantEvalsApiService {
     throw new InstantEvalsApiError(message, operation, error, status);
   }
 
+  /**
+   * The body of a successful answer. A failed response can arrive with no body
+   * at all (a proxy answering 502 while the platform restarts), which leaves
+   * `error` empty, so the response status decides and not the error alone.
+   */
+  private unwrap<T>({
+    operation,
+    data,
+    error,
+    response,
+  }: {
+    operation: string;
+    data: unknown;
+    error: unknown;
+    response?: Response;
+  }): T {
+    const failed = response !== undefined && !response.ok;
+    if (error || failed || data === undefined) {
+      this.handleApiError(operation, error ?? undefined, response);
+    }
+    return data as T;
+  }
+
   /** Starts a run. The judging happens on the queue. */
   async create(body: InstantEvalRunBody): Promise<InstantEvalRun> {
     const { data, error, response } = await this.apiClient.POST(
       "/api/v1/instant-evals",
       { body },
     );
-    if (error) this.handleApiError("start an instant eval run", error, response);
-    return data as unknown as InstantEvalRun;
+    return this.unwrap<InstantEvalRun>({
+      operation: "start an instant eval run",
+      data,
+      error,
+      response,
+    });
   }
 
   /** Prices a run without starting it. Nothing is judged and nothing is charged. */
@@ -104,10 +131,12 @@ export class InstantEvalsApiService {
       "/api/v1/instant-evals/estimate",
       { body },
     );
-    if (error) {
-      this.handleApiError("estimate an instant eval run", error, response);
-    }
-    return data as unknown as InstantEvalEstimate;
+    return this.unwrap<InstantEvalEstimate>({
+      operation: "estimate an instant eval run",
+      data,
+      error,
+      response,
+    });
   }
 
   /** The project's runs, newest first. */
@@ -127,8 +156,12 @@ export class InstantEvalsApiService {
       "/api/v1/instant-evals",
       { params: { query } as never },
     );
-    if (error) this.handleApiError("list instant eval runs", error, response);
-    return (data as unknown as { runs: InstantEvalRun[] }).runs;
+    return this.unwrap<{ runs: InstantEvalRun[] }>({
+      operation: "list instant eval runs",
+      data,
+      error,
+      response,
+    }).runs;
   }
 
   async get(id: string): Promise<InstantEvalRun> {
@@ -136,10 +169,12 @@ export class InstantEvalsApiService {
       "/api/v1/instant-evals/{id}",
       { params: { path: { id } } },
     );
-    if (error) {
-      this.handleApiError(`get instant eval run "${id}"`, error, response);
-    }
-    return data as unknown as InstantEvalRun;
+    return this.unwrap<InstantEvalRun>({
+      operation: `get instant eval run "${id}"`,
+      data,
+      error,
+      response,
+    });
   }
 
   /** Asks a run to stop. It stops before its next page. */
@@ -148,10 +183,12 @@ export class InstantEvalsApiService {
       "/api/v1/instant-evals/{id}/cancel",
       { params: { path: { id } } },
     );
-    if (error) {
-      this.handleApiError(`cancel instant eval run "${id}"`, error, response);
-    }
-    return data as unknown as InstantEvalRun;
+    return this.unwrap<InstantEvalRun>({
+      operation: `cancel instant eval run "${id}"`,
+      data,
+      error,
+      response,
+    });
   }
 
   /**
@@ -187,14 +224,12 @@ export class InstantEvalsApiService {
       "/api/v1/instant-evals/{id}/results",
       { params: { path: { id }, query } as never },
     );
-    if (error) {
-      this.handleApiError(
-        `read instant eval run "${id}" results`,
-        error,
-        response,
-      );
-    }
-    return data as unknown as InstantEvalResultsPage;
+    return this.unwrap<InstantEvalResultsPage>({
+      operation: `read instant eval run "${id}" results`,
+      data,
+      error,
+      response,
+    });
   }
 
   /** A few of the run's rows, with the judged text beside the verdict. */
@@ -204,9 +239,11 @@ export class InstantEvalsApiService {
       "/api/v1/instant-evals/{id}/sample",
       { params: { path: { id }, query } as never },
     );
-    if (error) {
-      this.handleApiError(`sample instant eval run "${id}"`, error, response);
-    }
-    return data as unknown as InstantEvalSample;
+    return this.unwrap<InstantEvalSample>({
+      operation: `sample instant eval run "${id}"`,
+      data,
+      error,
+      response,
+    });
   }
 }

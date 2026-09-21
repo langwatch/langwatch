@@ -4,7 +4,7 @@ import type React from "react";
 import { useState } from "react";
 import { explainAnyError } from "~/features/errors";
 import type { AiActionError } from "~/server/app-layer/traces/ai-query";
-import { useFilterStore } from "../../stores/filterStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 import { AiErrorDetails, hasAiErrorDetails } from "./ErrorBannerDetail";
 
 /**
@@ -36,7 +36,7 @@ export const FloatingAiErrorRow: React.FC<{ error: AiActionError }> = ({
 }) => {
   const [expanded, setExpanded] = useState(false);
   const expandable = hasAiErrorDetails(error);
-  const setAiError = useFilterStore((s) => s.setAiError);
+  const setAiError = useExplorerStore((s) => s.setAiError);
   const { title, description } = explainAnyError(error.cause);
   const text = description ? `${title}. ${description}` : title;
 

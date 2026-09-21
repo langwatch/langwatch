@@ -19,8 +19,11 @@
  */
 
 import { getLangWatchQLService } from "~/server/analytics/lwql";
+import { lwqlConnectionFromEnv } from "~/server/analytics/lwql/executor";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { getApp, tryGetApp } from "~/server/app-layer/app";
+import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
+import { explorerHiddenOrigins } from "~/server/app-layer/traces/hidden-origins";
 import { prisma } from "~/server/db";
 import { instantEvalsEnabled } from "../access";
 import { getInstantEvalClassifier } from "../classifier";
@@ -37,6 +40,7 @@ import {
   type InstantEvalRunCommands,
   InstantEvalRunService,
 } from "./instant-eval-run.service";
+import { queryCapabilityOf } from "./query-capability";
 import { createInstantEvalRowSource } from "./row-source";
 
 /**
@@ -50,13 +54,15 @@ import { createInstantEvalRowSource } from "./row-source";
  */
 const INSTANT_EVAL_PAGE_CONCURRENCY = 128;
 
-/** The project's own query capability, or null when it has none. */
 async function callerFor(projectId: string) {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     select: { id: true, lwqlKey: true },
   });
-  return project?.lwqlKey ? { id: project.id, lwqlKey: project.lwqlKey } : null;
+  return queryCapabilityOf({
+    project,
+    hasDeploymentIdentity: lwqlConnectionFromEnv() !== null,
+  });
 }
 
 /** The plan that caps this project's runs. */
@@ -139,8 +145,35 @@ export function getInstantEvalRunService(): InstantEvalRunService {
     caller: callerFor,
     plan: planFor,
     budget: createInstantEvalFreeBudgetFromEnv(),
+    selectTraceIds: selectExplorerTraceIds,
   });
   return cached;
+}
+
+/**
+ * The trace ids a filter selects, through the Explorer's own compiler: the
+ * same predicate the table shows, hidden origins left out, newest first and
+ * capped at the run's row limit.
+ */
+async function selectExplorerTraceIds({
+  projectId,
+  filter,
+  window,
+  limit,
+}: {
+  projectId: string;
+  filter: string;
+  window: { from: number; to: number };
+  limit: number;
+}): Promise<readonly string[]> {
+  return await getApp().traces.list.getTraceIds({
+    tenantId: projectId,
+    timeRange: window,
+    filterWhere:
+      translateFilterToClickHouse(filter, projectId, window) ?? undefined,
+    hiddenOrigins: explorerHiddenOrigins(filter),
+    limit,
+  });
 }
 
 /**
@@ -162,6 +195,13 @@ export {
   INSTANT_EVAL_SAMPLE_CEILING,
 } from "./caps";
 export type { InstantEvalEstimate } from "./instant-eval-estimate";
+export {
+  INSTANT_EVAL_EXPLORER_STATUSES,
+  type InstantEvalExplorerRun,
+  type InstantEvalExplorerStatus,
+  isInstantEvalRunActive,
+  toInstantEvalExplorerRun,
+} from "./instant-eval-explorer";
 export type {
   InstantEvalJudgment,
   InstantEvalJudgmentPage,

@@ -82,6 +82,21 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     When I click into the field or start typing my address
     Then the passkey offer starts, once, and never again for this visit
 
+  # Focus has not moved yet when a pointer goes down, so it still names what
+  # somebody is clicking AWAY from, which on a screen that autofocuses the
+  # address field is the address field. Reading focus there armed the offer
+  # from a click on any control on the card, "Continue" included — and
+  # Continue runs a passkey ceremony of its own. Two ceremonies share one
+  # server-side challenge: the second overwrites the first, and both
+  # assertions are then turned down, so a passkey that was fine reads as one
+  # the account does not hold.
+  @integration
+  Scenario: Clicking a button on the card is not reaching for the address field
+    Given this deployment offers passkeys
+    And the entrance focuses the address field for me
+    When I click a button on the card without touching the field
+    Then no passkey request has started
+
   # ── The device is being asked, and the card says so ────────────────────
   #
   # A WebAuthn ceremony hands the screen to the browser and the operating

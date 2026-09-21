@@ -232,6 +232,26 @@ Feature: Langy renders domain-capability cards for tool calls
     And it does not claim that zero traces matched
     And the card still offers the way into Traces
 
+  # An oversized result is reduced before it is recorded: arrays keep a head and
+  # wide objects keep a few keys. Keys were kept in alphabetical order, so a
+  # trace row kept "error" to "metrics" and lost "trace_id". The card then read
+  # a total of 13 and no row it could name, and said "13 traces, showing 0. No
+  # traces matched."
+  @unit
+  Scenario: A reduced result keeps the id of every row it keeps
+    Given a trace search result too large to record whole
+    When the result is reduced to fit
+    Then every row that is kept still carries its trace id
+    And the total the search reported is kept
+
+  @integration
+  Scenario: Rows the card cannot identify render as unreadable, never as an empty result
+    When Langy runs the trace-search capability and the recorded rows carry no trace id
+    And the result still reports 13 matches
+    Then the card says it could not read the result
+    And it does not claim that no traces matched
+    And the card still offers the way into Traces
+
   @integration
   Scenario: A genuinely empty result still reads as a real answer
     When Langy runs the trace-search capability and it returns zero traces

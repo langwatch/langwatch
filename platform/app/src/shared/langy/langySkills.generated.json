@@ -99,6 +99,13 @@
 		"userPrompt": "Set up experiments for my agent"
 	},
 	{
+		"id": "find-traces",
+		"label": "Find traces",
+		"description": "Find the traces that match what the user describes, such as thumbs down, a user, an error, an evaluator label or a phrase. Drives the Trace Explorer when finding traces is the ask, and answers with result cards and a link when traces are a step in another task. Searches every form a concept can take before reporting that nothing matches. Use when asked to find, show, filter or count traces.",
+		"category": "recipe",
+		"userPrompt": "Find the traces where users gave a thumbs down"
+	},
+	{
 		"id": "generate-rag-dataset",
 		"label": "Generate RAG dataset",
 		"description": "Generate a synthetic evaluation dataset from your RAG knowledge base. Creates diverse Q&A pairs with expected answers and relevant context, ready for LangWatch experiments and platform import. Use when you need test data for your RAG pipeline.",

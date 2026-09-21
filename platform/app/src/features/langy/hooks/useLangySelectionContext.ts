@@ -1,9 +1,6 @@
 import { useMemo } from "react";
-import { useFilterStore } from "../../traces-v2/stores/filterStore";
-import {
-  SELECT_ALL_MATCHING_CAP,
-  useSelectionStore,
-} from "../../traces-v2/stores/selectionStore";
+import { useExplorerStore } from "../../traces-v2/stores/explorerStore";
+import { SELECT_ALL_MATCHING_CAP } from "../../traces-v2/stores/selectionSlice";
 import { ALL_MATCHING_PREFIX } from "../logic/langyChipContext";
 import type { LangyContextChip } from "../stores/langyStore";
 
@@ -20,11 +17,11 @@ import type { LangyContextChip } from "../stores/langyStore";
  * onto unrelated pages.
  */
 export function useLangySelectionContext(): LangyContextChip | null {
-  const mode = useSelectionStore((s) => s.mode);
-  const traceIds = useSelectionStore((s) => s.traceIds);
+  const mode = useExplorerStore((s) => s.selection.mode);
+  const traceIds = useExplorerStore((s) => s.selection.traceIds);
   // "Select all matching" is defined BY the search it matched, so the chip has
   // to carry that search or it carries nothing usable (see below).
-  const queryText = useFilterStore((s) => s.queryText);
+  const queryText = useExplorerStore((s) => s.queryText);
 
   return useMemo(
     () => selectionContextChip({ mode, traceIds, queryText }),
