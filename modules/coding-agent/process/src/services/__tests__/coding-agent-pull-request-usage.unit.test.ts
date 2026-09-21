@@ -1,4 +1,11 @@
-import { GithubPullRequestNotMappedError } from "@langwatch/github-contract";
+import type {
+  CodingAgentSessionBranchRecord,
+  CodingAgentSessionContextUsage,
+} from "@langwatch/coding-agent-contract";
+import {
+  GithubPullRequestNotMappedError,
+  type GithubPullRequest,
+} from "@langwatch/github-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -14,6 +21,7 @@ import {
   branchSession,
   pullRequest,
 } from "../../__tests__/fixtures/coding-agent.fixture.ts";
+import { MAX_USAGE_CONTEXTS } from "../../eventing/coding-agent-session-state.projection.ts";
 import { USAGE_SESSION_WINDOW_MS } from "../coding-agent-pull-request-read.service.ts";
 import { CodingAgentFeatureService } from "../coding-agent.service.ts";
 
@@ -319,6 +327,347 @@ describe("Coding Agent pull-request usage", () => {
 
     await expect(service.getPullRequestUsage(query)).rejects.toBeInstanceOf(
       GithubPullRequestNotMappedError,
+    );
+  });
+});
+
+/**
+ * The session row's per-context record as the split's first source — it
+ * covers the span-only agents the fact table never sees.
+ * @see specs/coding-agent/pull-request-linkage.feature
+ */
+describe("Coding Agent pull-request usage from the session's per-context record", () => {
+  const LINKAGE_PR = 7;
+  const NEXT_PR = 8;
+
+  function twoPullRequests(): GithubPullRequest[] {
+    return [
+      pullRequest({
+        repositoryFullName: query.repositoryFullName,
+        headBranch: "feat/linkage",
+        prNumber: LINKAGE_PR,
+        prCreatedAt: new Date(TEST_NOW_MS - 12 * 60 * 60 * 1000),
+      }),
+      pullRequest({
+        repositoryFullName: query.repositoryFullName,
+        headBranch: "feat/next",
+        prNumber: NEXT_PR,
+        prCreatedAt: new Date(TEST_NOW_MS - 8 * 60 * 60 * 1000),
+      }),
+    ];
+  }
+
+  /** One recorded context on the mapping's own repository. */
+  function recorded(
+    branch: string,
+    over: Partial<CodingAgentSessionContextUsage> = {},
+  ): CodingAgentSessionContextUsage {
+    return {
+      repositoryHost: "github.com",
+      repositoryOwner: "acme",
+      repositoryName: "widgets",
+      branch,
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheReadTokens: 0,
+      cacheCreationTokens: 0,
+      costUsd: 0,
+      ...over,
+    };
+  }
+
+  function serviceFor(session: CodingAgentSessionBranchRecord, events?: TestEvents) {
+    const github = new TestGithubService();
+    github.pullRequests = twoPullRequests();
+    const sessions = new TestSessions();
+    sessions.branchRows = [session];
+    return { service: serviceWith({ sessions, github, events }), github };
+  }
+
+  function longLivedSession(
+    over: Partial<CodingAgentSessionBranchRecord> = {},
+  ): CodingAgentSessionBranchRecord {
+    return branchSession({
+      sessionId: "span-only",
+      tenantId: "project-1",
+      agent: "codex",
+      gitBranch: "feat/next",
+      gitBranches: ["feat/linkage", "feat/next"],
+      startedAtMs: TEST_NOW_MS - 6 * 60 * 60 * 1000,
+      inputTokens: 1_000,
+      outputTokens: 0,
+      cacheReadTokens: 0,
+      cacheCreationTokens: 0,
+      costUsd: 10,
+      ...over,
+    });
+  }
+
+  /** @scenario "A session's usage recorded per declared context splits by that record" */
+  it("prices each pull request by what the row recorded under its branch", async () => {
+    const session = longLivedSession({
+      inputTokens: 100,
+      outputTokens: 40,
+      cacheReadTokens: 20,
+      cacheCreationTokens: 8,
+      costUsd: 2,
+      usageByContext: [
+        recorded("feat/linkage", {
+          inputTokens: 25,
+          outputTokens: 10,
+          cacheReadTokens: 5,
+          cacheCreationTokens: 2,
+          costUsd: 0.5,
+        }),
+        recorded("feat/next", {
+          inputTokens: 75,
+          outputTokens: 30,
+          cacheReadTokens: 15,
+          cacheCreationTokens: 6,
+          costUsd: 1.5,
+        }),
+      ],
+    });
+
+    const first = await serviceFor(session).service.getPullRequestUsage({
+      ...query,
+      prNumber: LINKAGE_PR,
+    });
+    const second = await serviceFor(session).service.getPullRequestUsage(query);
+
+    expect(first.totals.inputTokens).toBe(25);
+    expect(first.totals.outputTokens).toBe(10);
+    expect(first.totals.cacheReadTokens).toBe(5);
+    expect(first.totals.cacheCreationTokens).toBe(2);
+    expect(first.totals.costUsd).toBeCloseTo(0.5, 10);
+    expect(second.totals.inputTokens).toBe(75);
+    expect(second.totals.costUsd).toBeCloseTo(1.5, 10);
+  });
+
+  /** @scenario "Usage from before the session declared anything follows its first declared branch" */
+  it("charges each pull request its own declaration, and the rest to the first branch", async () => {
+    const session = longLivedSession({
+      usageByContext: [
+        recorded("feat/linkage", { inputTokens: 10, costUsd: 0.1 }),
+        recorded("feat/next", { inputTokens: 30, costUsd: 0.3 }),
+      ],
+    });
+
+    const first = await serviceFor(session).service.getPullRequestUsage({
+      ...query,
+      prNumber: LINKAGE_PR,
+    });
+    const second = await serviceFor(session).service.getPullRequestUsage(query);
+
+    expect(second.totals.inputTokens).toBe(30);
+    expect(second.totals.costUsd).toBeCloseTo(0.3, 10);
+    expect(first.totals.inputTokens).toBe(970);
+    expect(first.totals.costUsd).toBeCloseTo(9.7, 10);
+  });
+
+  /** @scenario "Undeclared usage of a session that started on a branch with no pull request is priced nowhere" */
+  it("reports only what was spent under the pull request's own declaration", async () => {
+    const session = longLivedSession({
+      gitBranches: ["main", "feat/next"],
+      usageByContext: [recorded("feat/next", { inputTokens: 30, costUsd: 0.3 })],
+    });
+
+    const usage = await serviceFor(session).service.getPullRequestUsage(query);
+
+    expect(usage.totals.sessionsCount).toBe(1);
+    expect(usage.totals.inputTokens).toBe(30);
+    expect(usage.totals.costUsd).toBeCloseTo(0.3, 10);
+  });
+
+  /** @scenario "Undeclared usage of a session that began in another repository is priced nowhere here" */
+  it("leaves undeclared usage of a session that began elsewhere unowned here", async () => {
+    // The row keeps one repository beside a branch set that is never reset, so
+    // the branch names alone cannot say that feat/linkage was another
+    // repository's branch — and it is this repository's pull request 7's head.
+    const session = longLivedSession({
+      usageByContext: [
+        {
+          ...recorded("feat/linkage", { inputTokens: 10, costUsd: 0.1 }),
+          repositoryOwner: "other",
+          repositoryName: "tools",
+        },
+        recorded("feat/next", { inputTokens: 30, costUsd: 0.3 }),
+      ],
+    });
+
+    const first = await serviceFor(session).service.getPullRequestUsage({
+      ...query,
+      prNumber: LINKAGE_PR,
+    });
+    const second = await serviceFor(session).service.getPullRequestUsage(query);
+
+    expect(first.totals.sessionsCount).toBe(0);
+    expect(first.totals.inputTokens).toBe(0);
+    expect(second.totals.inputTokens).toBe(30);
+    expect(second.totals.costUsd).toBeCloseTo(0.3, 10);
+  });
+
+  /** @scenario "A branch name worked in two repositories follows whichever declared it first" */
+  it("keeps the undeclared usage behind the repository that declared the name first", async () => {
+    const session = longLivedSession({
+      usageByContext: [
+        {
+          ...recorded("feat/linkage", { inputTokens: 10, costUsd: 0.1 }),
+          repositoryOwner: "other",
+          repositoryName: "tools",
+        },
+        recorded("feat/linkage", { inputTokens: 20, costUsd: 0.2 }),
+        recorded("feat/next", { inputTokens: 30, costUsd: 0.3 }),
+      ],
+    });
+
+    const first = await serviceFor(session).service.getPullRequestUsage({
+      ...query,
+      prNumber: LINKAGE_PR,
+    });
+    const second = await serviceFor(session).service.getPullRequestUsage(query);
+
+    // Pull request 7 still earns what was spent on ITS feat/linkage, and
+    // nothing of what the session spent before declaring anything.
+    expect(first.totals.inputTokens).toBe(20);
+    expect(first.totals.costUsd).toBeCloseTo(0.2, 10);
+    expect(second.totals.inputTokens).toBe(30);
+    expect(second.totals.costUsd).toBeCloseTo(0.3, 10);
+  });
+
+  /** @scenario "Usage a saturated record could not place is charged to no pull request" */
+  it("charges each pull request its own branch and the unplaceable usage to neither", async () => {
+    const session = longLivedSession({
+      usageByContext: [
+        recorded("feat/linkage", { inputTokens: 10, costUsd: 0.1 }),
+        recorded("feat/next", { inputTokens: 30, costUsd: 0.3 }),
+        ...Array.from({ length: MAX_USAGE_CONTEXTS - 2 }, (_unused, index) =>
+          recorded(`feat/filler-${index}`, { inputTokens: 1, costUsd: 0.01 }),
+        ),
+      ],
+    });
+
+    const first = await serviceFor(session).service.getPullRequestUsage({
+      ...query,
+      prNumber: LINKAGE_PR,
+    });
+    const second = await serviceFor(session).service.getPullRequestUsage(query);
+
+    expect(first.totals.inputTokens).toBe(10);
+    expect(first.totals.costUsd).toBeCloseTo(0.1, 10);
+    expect(second.totals.inputTokens).toBe(30);
+    expect(second.totals.costUsd).toBeCloseTo(0.3, 10);
+  });
+
+  /** @scenario "A session that declared one branch for its whole life keeps its whole total" */
+  it("reports the session's whole totals", async () => {
+    const session = longLivedSession({
+      gitBranch: "feat/linkage",
+      gitBranches: ["feat/linkage"],
+      inputTokens: 100,
+      outputTokens: 50,
+      cacheReadTokens: 20,
+      cacheCreationTokens: 10,
+      costUsd: 1.5,
+      // The hook fired a moment after the first call, so a little of the
+      // session came before its declaration.
+      usageByContext: [
+        recorded("feat/linkage", {
+          inputTokens: 40,
+          outputTokens: 50,
+          cacheReadTokens: 20,
+          cacheCreationTokens: 10,
+          costUsd: 1,
+        }),
+      ],
+    });
+
+    const usage = await serviceFor(session).service.getPullRequestUsage({
+      ...query,
+      prNumber: LINKAGE_PR,
+    });
+
+    expect(usage.totals.inputTokens).toBe(100);
+    expect(usage.totals.outputTokens).toBe(50);
+    expect(usage.totals.cacheReadTokens).toBe(20);
+    expect(usage.totals.cacheCreationTokens).toBe(10);
+    expect(usage.totals.costUsd).toBeCloseTo(1.5, 10);
+  });
+
+  it("splits by the row's record and keeps the model breakdown to the pull request's own calls", async () => {
+    const session = longLivedSession({
+      agent: "claude_code",
+      inputTokens: 100,
+      costUsd: 1,
+      usageByContext: [
+        recorded("feat/linkage", { inputTokens: 20, costUsd: 0.2 }),
+        recorded("feat/next", { inputTokens: 80, costUsd: 0.8 }),
+      ],
+    });
+    const modelTotals = [
+      {
+        tenantId: "project-1",
+        sessionId: session.sessionId,
+        model: "claude-fable-5",
+        repositoryHost: "github.com",
+        repositoryOwner: "acme",
+        repositoryName: "widgets",
+        branch: "feat/linkage",
+        inputTokens: 20,
+        outputTokens: 0,
+        cacheReadTokens: 0,
+        cacheCreationTokens: 0,
+        costUsd: 0.2,
+      },
+      {
+        tenantId: "project-1",
+        sessionId: session.sessionId,
+        model: "claude-opus-5",
+        repositoryHost: "github.com",
+        repositoryOwner: "acme",
+        repositoryName: "widgets",
+        branch: "feat/next",
+        inputTokens: 80,
+        outputTokens: 0,
+        cacheReadTokens: 0,
+        cacheCreationTokens: 0,
+        costUsd: 0.8,
+      },
+    ];
+    const eventsFor = () => {
+      const events = new TestEvents();
+      events.modelTotals = modelTotals;
+      return events;
+    };
+
+    const first = await serviceFor(session, eventsFor()).service.getPullRequestUsage({
+      ...query,
+      prNumber: LINKAGE_PR,
+    });
+    const second = await serviceFor(session, eventsFor()).service.getPullRequestUsage(query);
+
+    expect(first.totals.inputTokens).toBe(20);
+    expect(first.modelBreakdown.map((model) => model.model)).toEqual(["claude-fable-5"]);
+    expect(second.totals.inputTokens).toBe(80);
+    expect(second.modelBreakdown.map((model) => model.model)).toEqual(["claude-opus-5"]);
+  });
+
+  /** @scenario "The pull request detail and the personal page attribute a session the same way" */
+  it("asks about every branch the candidate sessions drove, not just the one queried", async () => {
+    // A dormant session: no record, no fact rows, so the legacy rule reads its
+    // whole branch history and lands it on the pull request it opened first.
+    const session = longLivedSession({
+      inputTokens: 180,
+      costUsd: 0,
+      usageByContext: [],
+    });
+    const { service, github } = serviceFor(session);
+
+    const detailOfLater = await service.getPullRequestUsage(query);
+
+    expect(detailOfLater.totals.sessionsCount).toBe(0);
+    expect(github.branchQueries.some((call) => call.headBranches.includes("feat/linkage"))).toBe(
+      true,
     );
   });
 });

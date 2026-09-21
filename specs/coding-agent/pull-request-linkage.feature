@@ -410,6 +410,71 @@ Rule: A session's cost splits across the pull requests it drove, by the work sta
     When one pull request's usage is read
     Then its model breakdown reports only the model stamped on it
 
+  # The session row itself carries what was spent under each declared
+  # context (see session-git-context.feature, "Tokens are charged to the
+  # context declared before them"). That record covers every agent, including
+  # the ones whose tokens ride spans and so never reach the per-call fact
+  # table, and it is what the split reads first. A long-lived session that
+  # declares a new branch per pull request then contributes to each one only
+  # what it spent there.
+
+  @unit
+  Scenario: A session's usage recorded per declared context splits by that record
+    Given a session whose row records its usage under two declared branches, each with a live pull request
+    And no per-call fact rows for it
+    When each pull request's usage is read
+    Then each reports the share the row recorded under its branch
+
+  @unit
+  Scenario: Usage from before the session declared anything follows its first declared branch
+    Given a session that spent most of its tokens before its first declaration
+    And later declared two branches, each with a live pull request, and spent a little on each
+    When each pull request's usage is read
+    Then each reports only what was spent under its own declaration
+    And the undeclared usage lands on the first declared branch's pull request alone
+
+  @unit
+  Scenario: Undeclared usage of a session that started on a branch with no pull request is priced nowhere
+    Given a session that spent most of its tokens before its first declaration, and first declared the default branch
+    And later declared a pull request's branch and spent a little there
+    When that pull request's usage is read
+    Then it reports only what was spent under its own declaration
+
+  @unit
+  Scenario: Undeclared usage of a session that began in another repository is priced nowhere here
+    Given a session that spent most of its tokens before its first declaration
+    And it first declared a branch of a DIFFERENT repository, whose name this repository also uses
+    And it later declared this repository's pull request branch and spent a little there
+    When that pull request's usage is read
+    Then it reports only what was spent under its own declaration
+
+  @unit
+  Scenario: A branch name worked in two repositories follows whichever declared it first
+    Given a session that spent most of its tokens before its first declaration
+    And it declared that branch name under another repository first, and under this one later
+    When this repository's pull request for that branch is read
+    Then it reports only what was spent under its own declaration
+
+  @unit
+  Scenario: Usage a saturated record could not place is charged to no pull request
+    Given a session whose usage record is full, so later contexts went unrecorded
+    And two of its declared branches have a live pull request
+    When each pull request's usage is read
+    Then each reports only what the record places under its own branch
+    And the unplaceable usage lands on neither
+
+  @unit
+  Scenario: A session that declared one branch for its whole life keeps its whole total
+    Given a session whose row records usage under one declared branch, and some from before the declaration
+    When its pull request's usage is read
+    Then it reports the session's whole totals
+
+  @unit
+  Scenario: The pull request detail and the personal page attribute a session the same way
+    Given a session that drove two branches, whose pull requests are both known
+    When the pull request detail is read for the later one
+    Then it asks about both branches, so it prices the session exactly as the personal page does
+
   @unit
   Scenario: A viewer without a GitHub connection sees the connect invitation
     Given an organization with no GitHub connection

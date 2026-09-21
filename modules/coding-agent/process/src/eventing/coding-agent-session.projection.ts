@@ -1,6 +1,8 @@
 import {
   type LogFactsContributedEvent,
   logFactsContributedEventSchema,
+  type CodingAgentSessionContextUsage,
+  stampedContextOf,
   type MetricFactsContributedEvent,
   metricFactsContributedEventSchema,
   type SpanFactsContributedEvent,
@@ -20,6 +22,7 @@ import { CodingAgentSessionMetricProjection } from "./coding-agent-session-metri
 import { CodingAgentSessionSpanProjection } from "./coding-agent-session-span.projection.ts";
 import {
   type CodingAgentSessionData,
+  contextUsageKey,
   type MetricSeriesFact,
   type SessionTitleSource,
   CodingAgentSessionStateProjection,
@@ -191,6 +194,9 @@ export class CodingAgentSessionFoldProjection
       // The contribution's own label, not the folded (first-writer-wins)
       // state's — same reasoning as the log handler below.
       agent: data.agent,
+      // The stamp the contribute service put on the event, so the call's
+      // tokens are charged to the context declared before it.
+      context: stampedContextOf(data),
     });
 
     const withIdentity = this.withContributionIdentity(
@@ -212,6 +218,7 @@ export class CodingAgentSessionFoldProjection
       // state's — the logs-only gate must reflect what THIS record is.
       agent: data.agent,
       occurredAtMs: data.timeUnixMs,
+      context: stampedContextOf(data),
     });
 
     return this.withContributionIdentity(
@@ -319,6 +326,13 @@ export interface CodingAgentSessionRow {
   cacheCreationTokens: number;
   costUsd: number;
   agentReportedCostUsd: number;
+  /**
+   * What the session spent under each declared working context (migration
+   * 00099), first seen first. The counters above are the amount; this says
+   * where it went. Empty on a row folded before the column, whose whole usage
+   * then reads as spent before any declaration.
+   */
+  usageByContext: CodingAgentSessionContextUsage[];
 
   modelCallMs: number;
   toolMs: number;
@@ -449,6 +463,7 @@ export class CodingAgentSessionRowMapper {
       cacheCreationTokens: state.cacheCreationTokens,
       costUsd: state.costUsd,
       agentReportedCostUsd: state.agentReportedCostUsd,
+      usageByContext: Object.values(state.usageByContext),
 
       modelCallMs: state.modelCallMs,
       toolMs: state.toolMs,
@@ -623,6 +638,9 @@ export class CodingAgentSessionStateMapper {
       cacheCreationTokens: row.cacheCreationTokens,
       costUsd: row.costUsd,
       agentReportedCostUsd: row.agentReportedCostUsd,
+      usageByContext: Object.fromEntries(
+        row.usageByContext.map((usage) => [contextUsageKey(usage), usage]),
+      ),
 
       modelCallMs: row.modelCallMs,
       toolMs: row.toolMs,

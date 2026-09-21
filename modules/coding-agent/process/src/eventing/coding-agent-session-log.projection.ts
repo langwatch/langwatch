@@ -8,6 +8,7 @@ import {
   SESSION_NAME_FACT_KEY,
   SESSION_TITLE_FACT_KEY,
   SESSION_TITLE_FALLBACK_FACT_KEY,
+  type SessionWorkingContext,
 } from "@langwatch/coding-agent-contract";
 
 import {
@@ -54,6 +55,12 @@ export interface CodingAgentSessionLogProjectionInput {
   attributes: Record<string, unknown>;
   agent?: string;
   occurredAtMs?: number;
+  /**
+   * The working context the contribution was stamped with, or null. A
+   * logs-only agent's `api_request` IS its model call, so that is where its
+   * tokens and cost are charged; no other record charges anything.
+   */
+  context?: SessionWorkingContext | null;
 }
 
 /** Deterministically projects one normalized log contribution into session state. */
@@ -71,6 +78,7 @@ export class CodingAgentSessionLogProjection {
     attributes,
     agent,
     occurredAtMs,
+    context = null,
   }: CodingAgentSessionLogProjectionInput): CodingAgentSessionData {
     const attrs = attributes;
     // Membership rides the registry (`logsOnly` on the definition), so adding
@@ -130,11 +138,15 @@ export class CodingAgentSessionLogProjection {
         // and with no token-bearing span to compute from, the reported figure
         // is also the session's cost.
         return isLogsOnly
-          ? this.stateProjection.foldModelCall(
-              { ...withReported, costUsd: withReported.costUsd + reported },
-              attrs,
-              0,
-            )
+          ? this.stateProjection.chargeContextUsage({
+              before: withReported,
+              after: this.stateProjection.foldModelCall(
+                { ...withReported, costUsd: withReported.costUsd + reported },
+                attrs,
+                0,
+              ),
+              context,
+            })
           : withReported;
       }
 

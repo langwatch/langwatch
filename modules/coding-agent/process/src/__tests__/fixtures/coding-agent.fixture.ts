@@ -158,6 +158,7 @@ export function branchSession(
     userId: "user-1",
     gitBranch: "main",
     gitBranches: [],
+    usageByContext: [],
     title: "",
     ...overrides,
   };
@@ -511,6 +512,7 @@ export class TestBillingPolicy implements CodingAgentBillingPolicy {
 }
 
 export class TestGithubService implements GithubApi {
+  branchQueries: { headBranches: readonly string[] }[] = [];
   readonly configured = true;
   pullRequests: GithubPullRequest[] = [];
   mappingRequests: {
@@ -665,12 +667,13 @@ export class TestGithubService implements GithubApi {
   // Declares the input the contract passes, so a test that replaces this with
   // a mock and then asserts the lookup key is asserting against the real
   // signature rather than a zero-argument stand-in.
-  async findAllByBranches(_input: {
+  async findAllByBranches(input: {
     organizationId: string;
     repositoryHost: string;
     repositoryFullName: string;
     headBranches: readonly string[];
   }): Promise<readonly GithubPullRequest[]> {
+    this.branchQueries.push(input);
     return this.pullRequests;
   }
 

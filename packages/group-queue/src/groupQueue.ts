@@ -8,6 +8,7 @@ import { performance } from "node:perf_hooks";
 // runs inside that same scope — so a bare `process.pid` here resolves to the
 // handler's binding and dies in its temporal dead zone.
 import { pid } from "node:process";
+
 import { createLogger } from "@langwatch/observability";
 import {
   type Attributes,
@@ -20,15 +21,7 @@ import {
 } from "@opentelemetry/api";
 import fastq from "fastq";
 import { Cluster, Redis as IORedis } from "ioredis";
-import {
-  LATENCY_HOUR_BUCKET_TTL_SECONDS,
-  LATENCY_MINUTE_BUCKET_TTL_SECONDS,
-  LATENCY_SAMPLE_SIZE,
-  latencyAllTimeKey,
-  latencyBucketField,
-  latencyHourBucketKey,
-  latencyMinuteBucketKey,
-} from "./latency.ts";
+
 import type {
   DeduplicationConfig,
   GroupQueueActivity,
@@ -41,16 +34,9 @@ import type {
   QueueAuditAdapter,
   QueueSendOptions,
 } from "./contracts.ts";
-import { defaultFailureDecision, GroupQueueConfigurationError, GroupQueueError } from "./errors.ts";
-import { getBackoffMs, JOB_RETRY_CONFIG } from "./retry.ts";
-import {
-  type ProjectStorageDestination,
-  redactStorageUrisInText,
-  tenantIdFromGroupId,
-} from "./storage.ts";
-
 import { GroupQueueDispatcher } from "./dispatcher.ts";
 import { EnvelopeBlobLifecycle } from "./envelopeBlobLifecycle.ts";
+import { defaultFailureDecision, GroupQueueConfigurationError, GroupQueueError } from "./errors.ts";
 import {
   DecodeFailureError,
   type DecodeFailureReason,
@@ -61,6 +47,15 @@ import {
   readJobRoutingMeta,
   withJobAttempt,
 } from "./jobEnvelope.ts";
+import {
+  LATENCY_HOUR_BUCKET_TTL_SECONDS,
+  LATENCY_MINUTE_BUCKET_TTL_SECONDS,
+  LATENCY_SAMPLE_SIZE,
+  latencyAllTimeKey,
+  latencyBucketField,
+  latencyHourBucketKey,
+  latencyMinuteBucketKey,
+} from "./latency.ts";
 import {
   gqBatchBisectionsTotal,
   gqForeignSiblingsRestagedTotal,
@@ -83,6 +78,12 @@ import {
   recordDroppedJob,
 } from "./metrics.ts";
 import { GroupQueueMetricsCollector } from "./metricsCollector.ts";
+import { getBackoffMs, JOB_RETRY_CONFIG } from "./retry.ts";
+import {
+  type ProjectStorageDestination,
+  redactStorageUrisInText,
+  tenantIdFromGroupId,
+} from "./storage.ts";
 
 function createBlockingConnection({
   consumerEnabled,
@@ -100,6 +101,8 @@ function createBlockingConnection({
   }
   return redisConnection;
 }
+import { nowInstant, Temporal } from "@langwatch/time";
+
 import { fallbackReadyScore, isPlausibleReadyScore, resolveReadyScore } from "./readyScore.ts";
 import {
   DEFAULT_BISECTION_SPLITS_PER_DISPATCH,
@@ -111,7 +114,6 @@ import {
   WORKER_LIVENESS_REFRESH_MS,
 } from "./scripts.ts";
 import { type ObjectStore, TransientBlobStoreError } from "./tieredBlobStore.ts";
-import { nowInstant, Temporal } from "@langwatch/time";
 
 /** Mutable state shared across one dispatch's bisection descent. */
 interface BisectionDispatchState {
@@ -270,6 +272,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
   private readonly globalConcurrency: number;
   private readonly consumerEnabled: boolean;
   private readonly dispatchGroupAllowListKey?: string;
+  private readonly preflightDrainTimeoutMs: number;
   private readonly dispatcher: GroupQueueDispatcher | null;
   private readonly metricsCollector: GroupQueueMetricsCollector | null;
   /**
@@ -330,6 +333,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
     options?: {
       consumerEnabled?: boolean;
       dispatchGroupAllowListKey?: string;
+      preflightDrainTimeoutMs?: number;
       objectStoreFor?: (projectId: string) => ObjectStore;
       resolveStorageDestination?: (projectId: string) => Promise<ProjectStorageDestination>;
       activity?: GroupQueueActivity<Payload>;
@@ -373,6 +377,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
     this.redisConnection = effectiveConnection;
     this.consumerEnabled = options?.consumerEnabled ?? true;
     this.dispatchGroupAllowListKey = options?.dispatchGroupAllowListKey;
+    this.preflightDrainTimeoutMs = options?.preflightDrainTimeoutMs ?? 60_000;
     // Dedicated connection for BRPOP to avoid blocking the shared connection.
     // Only needed when the dispatcher loop runs (consumer mode).
     // IORedis.duplicate() takes an options override; Cluster.duplicate() takes no
@@ -2398,21 +2403,40 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
         "Queue has no preflight allow-list",
       );
     }
-    const deadline = nowInstant().epochMilliseconds + 60_000;
+    const deadline = nowInstant().epochMilliseconds + this.preflightDrainTimeoutMs;
     while (true) {
       const state = await this.scripts.inspectPreflightTargets(key);
       const settled = state.pending === 0 && state.active === 0;
       if (settled) this.assertPreflightTargetsSucceeded(state);
       if (settled && this.processingQueue.idle()) return;
-      if (nowInstant().epochMilliseconds >= deadline) {
-        throw new GroupQueueError(
-          this.queueName,
-          "waitUntilPreflightIdle",
-          "Preflight groups did not drain within 60000ms",
-        );
-      }
+      if (nowInstant().epochMilliseconds >= deadline) return this.settlePastDrainTimeout(state);
       await new Promise<void>((resolve) => setTimeout(resolve, 100));
     }
+  }
+
+  /**
+   * Work that never drained leaves its tenants held for a later pass, so the
+   * barrier starts past it; work that FAILED still refuses, because no later
+   * pass clears a fault. specs/migration/system-migrations-runner.feature.
+   */
+  private settlePastDrainTimeout(state: {
+    pending: number;
+    active: number;
+    failed: number;
+    blocked: number;
+    groups: number;
+  }): void {
+    this.assertPreflightTargetsSucceeded(state);
+    this.logger.warn(
+      {
+        queueName: this.queueName,
+        pending: state.pending,
+        active: state.active,
+        groups: state.groups,
+        timeoutMs: this.preflightDrainTimeoutMs,
+      },
+      "Migration preflight stopped waiting for work that had not drained and is starting anyway; the tenants it covers stay held for a later pass, and these counts are for operator triage",
+    );
   }
 
   private assertPreflightTargetsSucceeded(state: { failed: number; blocked: number }): void {

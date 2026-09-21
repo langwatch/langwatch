@@ -1,4 +1,8 @@
-import { parseMcpToolName } from "@langwatch/coding-agent-contract";
+import {
+  type CodingAgentSessionContextUsage,
+  parseMcpToolName,
+  type SessionWorkingContext,
+} from "@langwatch/coding-agent-contract";
 import { z } from "zod";
 
 /** One thing the agent did, in the order it did it. */
@@ -87,6 +91,15 @@ export interface CodingAgentSessionData {
   /** Registry-computed cost; reported agent cost remains separate. */
   costUsd: number;
   agentReportedCostUsd: number;
+  /**
+   * What the session spent under each working context it declared, keyed by
+   * `contextUsageKey`. The counters above stay the amount; this says WHERE it
+   * went, which is what splits one session's cost across the pull requests it
+   * drove (specs/coding-agent/pull-request-linkage.feature). A call with no
+   * stamp charges no context, so the difference between the counters and this
+   * record's sum is what the session spent before it declared anything.
+   */
+  usageByContext: Record<string, CodingAgentSessionContextUsage>;
   modelCallMs: number;
   toolMs: number;
   ttftMsTotal: number;
@@ -145,6 +158,33 @@ export interface CodingAgentSessionData {
 /** Ordered steps retained in a bounded session summary. */
 const MAX_STEPS = 100;
 export const MAX_SET = 50;
+/**
+ * How many working contexts one session's usage record holds. Wider than
+ * `MAX_SET` because a long-lived agent declaring a branch per pull request
+ * reaches fifty in weeks. Both sides need it: the fold stops opening contexts
+ * here, and the read recognises a record of exactly this size as saturated.
+ */
+export const MAX_USAGE_CONTEXTS = 200;
+
+/**
+ * The key one context's usage is kept under. Repository fields are compared
+ * case-folded everywhere the usage is read, so they are folded here too and a
+ * remote spelled two ways stays one context; a branch name is case sensitive
+ * and kept verbatim.
+ */
+export function contextUsageKey(context: {
+  repositoryHost: string;
+  repositoryOwner: string;
+  repositoryName: string;
+  branch: string;
+}): string {
+  return [
+    context.repositoryHost.toLowerCase(),
+    context.repositoryOwner.toLowerCase(),
+    context.repositoryName.toLowerCase(),
+    context.branch,
+  ].join("\0");
+}
 const TITLE_RANK: Record<SessionTitleSource, number> = {
   prompt: 1,
   generated: 2,
@@ -210,6 +250,7 @@ export class CodingAgentSessionStateProjection {
       cacheCreationTokens: 0,
       costUsd: 0,
       agentReportedCostUsd: 0,
+      usageByContext: {},
 
       modelCallMs: 0,
       toolMs: 0,
@@ -277,6 +318,54 @@ export class CodingAgentSessionStateProjection {
   addToBoundedSet(set: string[], value: string): string[] {
     if (set.includes(value) || set.length >= MAX_SET) return set;
     return [...set, value];
+  }
+
+  /**
+   * Charge what one model call added to the counters to the context it was
+   * stamped with, read as the delta across the fold so the record can never
+   * drift from the totals it partitions. Keyed on the event's own stamp, so a
+   * late event folded in place still commutes. Unstamped charges nothing; a
+   * context past `MAX_USAGE_CONTEXTS` is not opened (ADR-056 bounds).
+   */
+  chargeContextUsage({
+    before,
+    after,
+    context,
+  }: {
+    before: CodingAgentSessionData;
+    after: CodingAgentSessionData;
+    context: SessionWorkingContext | null;
+  }): CodingAgentSessionData {
+    if (context === null) return after;
+    const key = contextUsageKey(context);
+    const existing = after.usageByContext[key];
+    if (existing === undefined && Object.keys(after.usageByContext).length >= MAX_USAGE_CONTEXTS) {
+      return after;
+    }
+    const charged = existing ?? {
+      ...context,
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheReadTokens: 0,
+      cacheCreationTokens: 0,
+      costUsd: 0,
+    };
+    return {
+      ...after,
+      usageByContext: {
+        ...after.usageByContext,
+        [key]: {
+          ...charged,
+          inputTokens: charged.inputTokens + (after.inputTokens - before.inputTokens),
+          outputTokens: charged.outputTokens + (after.outputTokens - before.outputTokens),
+          cacheReadTokens:
+            charged.cacheReadTokens + (after.cacheReadTokens - before.cacheReadTokens),
+          cacheCreationTokens:
+            charged.cacheCreationTokens + (after.cacheCreationTokens - before.cacheCreationTokens),
+          costUsd: charged.costUsd + (after.costUsd - before.costUsd),
+        },
+      },
+    };
   }
 
   string(value: unknown): string | null {

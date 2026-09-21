@@ -3,6 +3,7 @@ import {
   EVENTS_FOLD_TOOL_RUNS_AGENT_IDS,
   LOGS_ONLY_AGENT_IDS,
   detectCodingAgent,
+  type SessionWorkingContext,
 } from "@langwatch/coding-agent-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 
@@ -43,6 +44,17 @@ const DECLARED_SPAN_NAMES: ReadonlySet<string> = new Set(
   CODING_AGENT_REGISTRY.flatMap((agent) => agent.sessionSpanNames ?? []),
 );
 
+/**
+ * The spans whose tokens the fold counts as a model call, across every
+ * span-bearing agent. The contribute service stamps exactly these with the
+ * session's declared working context, so the fold can charge their tokens to
+ * it; every other span charges nothing anywhere and rides unstamped.
+ */
+export const MODEL_CALL_SPAN_NAMES: ReadonlySet<string> = new Set([
+  CLAUDE.SPAN.LLM_REQUEST,
+  CODEX.SPAN.TURN,
+]);
+
 export interface CodingAgentSessionSpanCandidate {
   name: string;
   scopeName?: string | null;
@@ -60,6 +72,13 @@ export interface CodingAgentSessionSpanProjectionInput {
   state: CodingAgentSessionData;
   span: SpanFactsView;
   agent?: string;
+  /**
+   * The working context the contribution was stamped with, or null when it
+   * carries none. Only a model call reads it: its tokens and cost are charged
+   * to that context, which is how a span-only agent's session says what it
+   * spent where.
+   */
+  context?: SessionWorkingContext | null;
 }
 
 /** Deterministically projects one admitted span contribution into session state. */
@@ -92,6 +111,7 @@ export class CodingAgentSessionSpanProjection {
     state,
     span,
     agent,
+    context = null,
   }: CodingAgentSessionSpanProjectionInput): CodingAgentSessionData {
     const attrs = span.attrs;
     const durationMs = Math.max(0, span.endTimeUnixMs - span.startTimeUnixMs);
@@ -100,24 +120,25 @@ export class CodingAgentSessionSpanProjection {
     if (span.name === CLAUDE.SPAN.LLM_REQUEST) {
       // Identity still rides the span; only the counted facts are the log's.
       if (isLogsOnly) return this.stateProjection.withIdentity(state, attrs);
-      const folded = this.stateProjection.foldModelCall(
-        this.stateProjection.withIdentity(state, attrs),
-        attrs,
-        durationMs,
-      );
+      const before = this.stateProjection.withIdentity(state, attrs);
+      const folded = this.stateProjection.foldModelCall(before, attrs, durationMs);
       // Priced from the span's tokens with the same formula and the same
       // cache-write lifetime the trace pipeline applies to the identical span,
       // so the session and its traces state one figure. The cost the agent
       // reports about itself lands on agentReportedCostUsd instead.
-      return {
-        ...folded,
-        costUsd:
-          folded.costUsd +
-          this.pricedFromTokens(
-            this.claudeCallTokenFacts(attrs, this.traceCanonicalisation),
-            this.modelProviders,
-          ),
-      };
+      return this.stateProjection.chargeContextUsage({
+        before,
+        after: {
+          ...folded,
+          costUsd:
+            folded.costUsd +
+            this.pricedFromTokens(
+              this.claudeCallTokenFacts(attrs, this.traceCanonicalisation),
+              this.modelProviders,
+            ),
+        },
+        context,
+      });
     }
 
     if (span.name === CODEX.SPAN.TURN) {
@@ -128,15 +149,16 @@ export class CodingAgentSessionSpanProjection {
       const facts = this.codexTurnTokenFacts(attrs);
       // Fallback duration 0, not the span's: the turn's wall time includes the
       // tools that ran inside it, and zero reads honestly as "not measured".
-      const folded = this.stateProjection.foldModelCall(
-        this.stateProjection.withIdentity(state, attrs),
-        facts,
-        0,
-      );
-      return {
-        ...folded,
-        costUsd: folded.costUsd + this.pricedFromTokens(facts, this.modelProviders),
-      };
+      const before = this.stateProjection.withIdentity(state, attrs);
+      const folded = this.stateProjection.foldModelCall(before, facts, 0);
+      return this.stateProjection.chargeContextUsage({
+        before,
+        after: {
+          ...folded,
+          costUsd: folded.costUsd + this.pricedFromTokens(facts, this.modelProviders),
+        },
+        context,
+      });
     }
 
     if (span.name === CLAUDE.SPAN.SUBAGENT_SPAWN) {

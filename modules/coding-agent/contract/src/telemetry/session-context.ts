@@ -54,6 +54,27 @@ export function isStampableContext(context: SessionWorkingContext): boolean {
   );
 }
 
+/**
+ * The context a stamped contribution carries, or null when it carries none.
+ * Stamps are written all-or-nothing, so any missing field means the whole
+ * stamp is absent; checking each keeps a partial stamp from ever reading as
+ * a context.
+ */
+export function stampedContextOf(stamp: {
+  repositoryHost?: string;
+  repositoryOwner?: string;
+  repositoryName?: string;
+  branch?: string;
+}): SessionWorkingContext | null {
+  const context = {
+    repositoryHost: stamp.repositoryHost ?? "",
+    repositoryOwner: stamp.repositoryOwner ?? "",
+    repositoryName: stamp.repositoryName ?? "",
+    branch: stamp.branch ?? "",
+  };
+  return isStampableContext(context) ? context : null;
+}
+
 function str(value: string | number | boolean | undefined): string {
   if (value === undefined) return "";
   return String(value);

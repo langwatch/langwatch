@@ -401,6 +401,79 @@ describe.skipIf(clickHouseUrl === null)("coding_agent_sessions git context round
     // The scalar keeps saying which branch the session ended on.
     expect(read!.gitBranch).toBe("feat/session-git-context");
   });
+  /** @scenario "The per-context usage round-trips through the session row" */
+  it("writes what the session spent under each context and reads it back", async () => {
+    const usageByContext = [
+      {
+        repositoryHost: "github.com",
+        repositoryOwner: "acme",
+        repositoryName: "widgets",
+        branch: "main",
+        inputTokens: 40,
+        outputTokens: 20,
+        cacheReadTokens: 4_000_000_000,
+        cacheCreationTokens: 4,
+        costUsd: 0.5,
+      },
+      {
+        repositoryHost: "github.com",
+        repositoryOwner: "acme",
+        repositoryName: "widgets",
+        branch: "feat/session-git-context",
+        inputTokens: 60,
+        outputTokens: 30,
+        cacheReadTokens: 5_000_000_000,
+        cacheCreationTokens: 6,
+        costUsd: 0.75,
+      },
+    ];
+    const row = session({
+      tenantId,
+      sessionId: `${tag}-usage-by-context`,
+      startedAtMs: baseMs,
+      usageByContext,
+    });
+    await sessions.upsert(row, 30, []);
+
+    const read = await sessions.findBySessionId({
+      tenantId,
+      sessionId: `${tag}-usage-by-context`,
+      window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
+    });
+
+    expect(read).not.toBeNull();
+    expect(read!.usageByContext).toEqual(usageByContext);
+  });
+
+  /** @scenario "A session row from before the per-context usage column decodes with none" */
+  it("decodes a row written before the per-context usage column with no record", async () => {
+    const sessionId = `${tag}-pre-usage-by-context`;
+    // A writer from before migration 00099 emits a JSONEachRow body with no
+    // UsageByContext field, so ClickHouse supplies the column's DEFAULT [].
+    await ch.insert({
+      table: "coding_agent_sessions",
+      values: [
+        {
+          TenantId: tenantId,
+          SessionId: sessionId,
+          StartedAt: new Date(baseMs),
+          Version: "2026-07-21",
+          InputTokens: "100",
+        },
+      ],
+      format: "JSONEachRow",
+    });
+
+    const read = await sessions.findBySessionId({
+      tenantId,
+      sessionId,
+      window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
+    });
+
+    expect(read).not.toBeNull();
+    expect(read!.usageByContext).toEqual([]);
+    expect(read!.inputTokens).toBe(100);
+  });
 });
 
 describe.skipIf(clickHouseUrl === null)("coding_agent_sessions by repository branch", () => {

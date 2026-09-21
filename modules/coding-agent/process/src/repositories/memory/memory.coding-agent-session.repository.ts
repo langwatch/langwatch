@@ -132,6 +132,7 @@ function branchRecord(row: CodingAgentSession): CodingAgentSessionBranchRecord {
     userId: row.userId,
     gitBranch: row.gitBranch,
     gitBranches: [...row.gitBranches],
+    usageByContext: row.usageByContext,
     title: row.title,
   };
 }

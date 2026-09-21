@@ -24,6 +24,27 @@ export const codingAgentMetricSeriesRowSchema = z
   })
   .strict();
 
+/**
+ * What a session spent under one declared working context: the repository and
+ * branch a model call was stamped with, and the tokens and computed cost of
+ * every call stamped the same way. Never a share: the amounts are the calls'
+ * own, and the pull-request split divides them (migration 00099).
+ */
+export const codingAgentSessionContextUsageSchema = z
+  .object({
+    repositoryHost: z.string(),
+    repositoryOwner: z.string(),
+    repositoryName: z.string(),
+    branch: z.string(),
+    inputTokens: z.number(),
+    outputTokens: z.number(),
+    cacheReadTokens: z.number(),
+    cacheCreationTokens: z.number(),
+    costUsd: z.number(),
+  })
+  .strict();
+export type CodingAgentSessionContextUsage = z.infer<typeof codingAgentSessionContextUsageSchema>;
+
 /** The complete durable `coding_agent_sessions` read row. */
 export const codingAgentSessionSchema = z
   .object({
@@ -46,6 +67,8 @@ export const codingAgentSessionSchema = z
     repositoryName: z.string(),
     gitBranch: z.string(),
     gitBranches: z.array(z.string()),
+    /** Where the session's usage went; empty on a row folded before 00099. */
+    usageByContext: z.array(codingAgentSessionContextUsageSchema).default([]),
     gitWorktree: z.string(),
     title: z.string(),
     titleSource: z.string(),
@@ -227,6 +250,8 @@ export const codingAgentSessionBranchRecordSchema = z
     userId: z.string(),
     gitBranch: z.string(),
     gitBranches: z.array(z.string()),
+    /** The split's ledger; empty on a row folded before 00099. */
+    usageByContext: z.array(codingAgentSessionContextUsageSchema).default([]),
     title: z.string(),
   })
   .strict();

@@ -40,6 +40,19 @@ const contributionBaseSchema = z.object({
 });
 
 /**
+ * The working context active when a record happened, stamped onto the event
+ * from the session's last `session_context` declaration. Absent on pre-stamp
+ * events: a log's fact table stores '' and prices under the legacy
+ * whole-session rule, and an unstamped model-call span charges no context.
+ */
+const workingContextStampSchema = {
+  repositoryHost: z.string().optional(),
+  repositoryOwner: z.string().optional(),
+  repositoryName: z.string().optional(),
+  branch: z.string().optional(),
+};
+
+/**
  * Facts off one coding-agent SPAN: structure, timing, tokens, finish reason.
  * The span itself stays in span storage — `traceId`/`spanId` reach it.
  */
@@ -59,6 +72,7 @@ export const spanFactsContributionSchema = contributionBaseSchema.extend({
   /** Lifted scalar span attributes (raw wire keys). */
   facts: contributionFactsSchema,
   scopeName: z.string().nullable(),
+  ...workingContextStampSchema,
 });
 export type SpanFactsContribution = z.infer<typeof spanFactsContributionSchema>;
 
@@ -78,15 +92,7 @@ export const logFactsContributionSchema = contributionBaseSchema.extend({
   scopeName: z.string().nullable(),
   /** The lifted scalar vocabulary (`CODING_AGENT_CONTRIBUTION_KEYS`). */
   facts: contributionFactsSchema,
-  /**
-   * The working context active when the record happened, stamped from the
-   * session's last `session_context` declaration. Absent on pre-stamp events,
-   * where the fact table stores '' and prices under the legacy whole-session rule.
-   */
-  repositoryHost: z.string().optional(),
-  repositoryOwner: z.string().optional(),
-  repositoryName: z.string().optional(),
-  branch: z.string().optional(),
+  ...workingContextStampSchema,
 });
 export type LogFactsContribution = z.infer<typeof logFactsContributionSchema>;
 

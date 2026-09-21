@@ -1,10 +1,27 @@
 import type { CodingAgentSessionBranchRecord } from "@langwatch/coding-agent-contract";
 
+import { MAX_USAGE_CONTEXTS } from "../eventing/coding-agent-session-state.projection.ts";
 import type { SessionModelTotalsRow } from "../repositories/coding-agent-session-event.repository.ts";
 import type {
   AssignablePullRequest,
   CodingAgentPullRequestAssignmentService,
 } from "./coding-agent-pull-request-assignment.service.ts";
+
+/**
+ * One stamped amount, from either record: where it was spent, and how much.
+ * `SessionModelTotalsRow` and the row's own per-context usage share this shape.
+ */
+interface StampedUsage {
+  repositoryHost: string;
+  repositoryOwner: string;
+  repositoryName: string;
+  branch: string;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  costUsd: number;
+}
 
 export interface PullRequestAttribution {
   /**
@@ -125,17 +142,19 @@ export class CodingAgentPullRequestShareService {
     session: CodingAgentSessionBranchRecord;
     prRows: SessionModelTotalsRow[];
   } | null {
-    const { weightOf, totalWeight } = CodingAgentPullRequestShareService.weighing(rows);
+    const ledger = CodingAgentPullRequestShareService.ledgerOf({ session, rows });
+    const { weightOf, totalWeight } = CodingAgentPullRequestShareService.weighing(ledger);
 
-    const { perBranch, legacyWinner } = this.branchTenure({
+    const { perBranch, legacyWinner, declaredBranches } = this.branchTenure({
       session,
+      ledger,
       rows,
       pullRequests,
       repositoryHost,
       repositoryFullName,
     });
 
-    // No event rows, or rows that report neither tokens nor cost: nothing to
+    // No record, or one that reports neither tokens nor cost: nothing to
     // divide by, so the legacy whole-session rule stands — and only where the
     // session's own row lives, like always.
     if (totalWeight === 0) {
@@ -146,16 +165,27 @@ export class CodingAgentPullRequestShareService {
       return { session, prRows: [] };
     }
 
-    // Bucket the rows by a key that depends on the SESSION alone, never on
+    // Bucket the record by a key that depends on the SESSION alone, never on
     // which pull request is being asked about. That is what makes the integer
     // allocation below the same answer in every read: each pull request takes a
     // disjoint set of whole buckets, so their counters cannot sum past the
     // session's own however many reads ask.
-    const { buckets, bucketOf } = CodingAgentPullRequestShareService.bucketWeights({
-      rows,
+    const buckets = CodingAgentPullRequestShareService.bucketWeights({
+      ledger,
       weightOf,
       repositoryHost,
       repositoryFullName,
+    });
+
+    const unstampedWinner = CodingAgentPullRequestShareService.unstampedWinnerOf({
+      ledger,
+      weightOf,
+      declaredBranches,
+      perBranch,
+      legacyWinner,
+      repositoryHost,
+      repositoryFullName,
+      saturated: session.usageByContext.length >= MAX_USAGE_CONTEXTS,
     });
 
     const ownsBucket = (key: string): boolean => {
@@ -164,7 +194,7 @@ export class CodingAgentPullRequestShareService {
       }
 
       if (key === UNSTAMPED_BUCKET) {
-        return rowMatched && legacyWinner === prNumber;
+        return rowMatched && unstampedWinner === prNumber;
       }
 
       return perBranch.get(key.slice(BRANCH_BUCKET_PREFIX.length)) === prNumber;
@@ -176,7 +206,17 @@ export class CodingAgentPullRequestShareService {
       return null;
     }
 
-    const prRows = rows.filter((row) => ownsBucket(bucketOf.get(row)!));
+    // The model breakdown follows the same ownership, whichever record set the
+    // weights: a fact row lands on the pull request that owns its bucket.
+    const prRows = rows.filter((row) =>
+      ownsBucket(
+        CodingAgentPullRequestShareService.bucketKeyOf({
+          usage: row,
+          repositoryHost,
+          repositoryFullName,
+        }),
+      ),
+    );
     const allocated = CodingAgentPullRequestShareService.allocateCounters({
       session,
       buckets,
@@ -203,34 +243,40 @@ export class CodingAgentPullRequestShareService {
    */
   private branchTenure({
     session,
+    ledger,
     rows,
     pullRequests,
     repositoryHost,
     repositoryFullName,
   }: {
     session: CodingAgentSessionBranchRecord;
+    ledger: readonly StampedUsage[];
     rows: readonly SessionModelTotalsRow[];
     pullRequests: readonly AssignablePullRequest[];
     repositoryHost: string;
     repositoryFullName: string;
-  }): { perBranch: ReadonlyMap<string, number>; legacyWinner: number | undefined } {
-    const stampedBranches = rows
-      .filter((row) =>
+  }): {
+    perBranch: ReadonlyMap<string, number>;
+    legacyWinner: number | undefined;
+    declaredBranches: readonly string[];
+  } {
+    const stampedBranches = [...ledger, ...rows]
+      .filter((usage) =>
         CodingAgentPullRequestShareService.isStampedOnRepository({
-          row,
+          usage,
           repositoryHost,
           repositoryFullName,
         }),
       )
-      .map((row) => row.branch);
-    const headBranches = [
-      ...new Set([...this.dependencies.assignments.branchesOf(session), ...stampedBranches]),
-    ];
+      .map((usage) => usage.branch);
+    const declaredBranches = this.dependencies.assignments.branchesOf(session);
+    const headBranches = [...new Set([...declaredBranches, ...stampedBranches])];
     const assignable = [
       { sessionId: session.sessionId, startedAtMs: session.startedAtMs, headBranches },
     ];
 
     return {
+      declaredBranches,
       perBranch:
         this.dependencies.assignments
           .assignDrivingSessionsPerBranch({ sessions: assignable, pullRequests })
@@ -242,52 +288,146 @@ export class CodingAgentPullRequestShareService {
   }
 
   /**
+   * What the split weighs a session by: its row's per-context usage where it
+   * carries any, the per-call fact rows otherwise, plus the counters' excess
+   * over the record as one unstamped entry — never negative.
+   */
+  private static ledgerOf({
+    session,
+    rows,
+  }: {
+    session: CodingAgentSessionBranchRecord;
+    rows: readonly SessionModelTotalsRow[];
+  }): readonly StampedUsage[] {
+    const recorded = session.usageByContext.filter(
+      (usage) =>
+        CodingAgentPullRequestShareService.tokensOf(usage) > 0 ||
+        CodingAgentPullRequestShareService.costOf(usage) > 0,
+    );
+    if (recorded.length === 0) {
+      return rows;
+    }
+
+    const remainder = (field: keyof StampedUsage & keyof CodingAgentSessionBranchRecord): number =>
+      Math.max(0, session[field] - recorded.reduce((total, usage) => total + usage[field], 0));
+
+    return [
+      ...recorded,
+      {
+        repositoryHost: "",
+        repositoryOwner: "",
+        repositoryName: "",
+        branch: "",
+        inputTokens: remainder("inputTokens"),
+        outputTokens: remainder("outputTokens"),
+        cacheReadTokens: remainder("cacheReadTokens"),
+        cacheCreationTokens: remainder("cacheCreationTokens"),
+        costUsd: remainder("costUsd"),
+      },
+    ];
+  }
+
+  /**
+   * Which pull request the session's undeclared usage follows: its FIRST
+   * declared branch, and only where the ledger's first entry of that name was
+   * declared on THIS repository; nobody, where the record saturated.
+   * @see specs/coding-agent/pull-request-linkage.feature
+   */
+  private static unstampedWinnerOf({
+    ledger,
+    weightOf,
+    declaredBranches,
+    perBranch,
+    legacyWinner,
+    repositoryHost,
+    repositoryFullName,
+    saturated,
+  }: {
+    ledger: readonly StampedUsage[];
+    weightOf: (usage: StampedUsage) => number;
+    declaredBranches: readonly string[];
+    perBranch: ReadonlyMap<string, number>;
+    legacyWinner: number | undefined;
+    repositoryHost: string;
+    repositoryFullName: string;
+    saturated: boolean;
+  }): number | undefined {
+    const declared = ledger.filter(
+      (usage) => !CodingAgentPullRequestShareService.isUnstamped(usage) && weightOf(usage) > 0,
+    );
+    if (declared.length === 0) {
+      return legacyWinner;
+    }
+
+    if (saturated) {
+      return undefined;
+    }
+
+    const firstBranch = declaredBranches[0];
+    if (firstBranch === undefined) {
+      return undefined;
+    }
+
+    const firstNamed = declared.find((usage) => usage.branch === firstBranch);
+    if (
+      firstNamed !== undefined &&
+      !CodingAgentPullRequestShareService.isStampedOnRepository({
+        usage: firstNamed,
+        repositoryHost,
+        repositoryFullName,
+      })
+    ) {
+      return undefined;
+    }
+
+    return perBranch.get(firstBranch);
+  }
+
+  /**
    * Buckets rows by a key depending on the SESSION alone, never the pull
    * request asked about — each pull request takes a disjoint set of whole
    * buckets, so counters can't sum past the session's own reads.
    */
   private static bucketWeights({
-    rows,
+    ledger,
     weightOf,
     repositoryHost,
     repositoryFullName,
   }: {
-    rows: readonly SessionModelTotalsRow[];
-    weightOf: (row: SessionModelTotalsRow) => number;
+    ledger: readonly StampedUsage[];
+    weightOf: (usage: StampedUsage) => number;
     repositoryHost: string;
     repositoryFullName: string;
-  }): { buckets: Map<string, number>; bucketOf: Map<SessionModelTotalsRow, string> } {
+  }): Map<string, number> {
     const buckets = new Map<string, number>();
-    const bucketOf = new Map<SessionModelTotalsRow, string>();
-    for (const row of rows) {
+    for (const usage of ledger) {
       const key = CodingAgentPullRequestShareService.bucketKeyOf({
-        row,
+        usage,
         repositoryHost,
         repositoryFullName,
       });
-      bucketOf.set(row, key);
-      buckets.set(key, (buckets.get(key) ?? 0) + weightOf(row));
+      buckets.set(key, (buckets.get(key) ?? 0) + weightOf(usage));
     }
 
-    return { buckets, bucketOf };
+    return buckets;
   }
 
   private static bucketKeyOf({
-    row,
+    usage,
     repositoryHost,
     repositoryFullName,
   }: {
-    row: SessionModelTotalsRow;
+    usage: StampedUsage;
     repositoryHost: string;
     repositoryFullName: string;
   }): string {
-    if (CodingAgentPullRequestShareService.isUnstamped(row)) {
+    if (CodingAgentPullRequestShareService.isUnstamped(usage)) {
       return UNSTAMPED_BUCKET;
     }
 
     if (
       !CodingAgentPullRequestShareService.isStampedOnRepository({
-        row,
+        usage,
         repositoryHost,
         repositoryFullName,
       })
@@ -295,7 +435,7 @@ export class CodingAgentPullRequestShareService {
       return ELSEWHERE_BUCKET;
     }
 
-    return `${BRANCH_BUCKET_PREFIX}${row.branch}`;
+    return `${BRANCH_BUCKET_PREFIX}${usage.branch}`;
   }
 
   /**
@@ -347,10 +487,12 @@ export class CodingAgentPullRequestShareService {
   }
 
   /**
-   * A row written before its session declared a working context.
+   * An amount from before its session declared a working context. Stamps are
+   * written all-or-nothing, so any missing field means the whole stamp is
+   * absent.
    */
-  private static isUnstamped(row: SessionModelTotalsRow): boolean {
-    return row.repositoryOwner === "" || row.repositoryName === "" || row.branch === "";
+  private static isUnstamped(usage: StampedUsage): boolean {
+    return usage.repositoryOwner === "" || usage.repositoryName === "" || usage.branch === "";
   }
 
   /**
@@ -359,59 +501,61 @@ export class CodingAgentPullRequestShareService {
    * stay case sensitive and are compared by the caller.
    */
   private static isStampedOnRepository({
-    row,
+    usage,
     repositoryHost,
     repositoryFullName,
   }: {
-    row: SessionModelTotalsRow;
+    usage: StampedUsage;
     repositoryHost: string;
     repositoryFullName: string;
   }): boolean {
-    if (CodingAgentPullRequestShareService.isUnstamped(row)) {
+    if (CodingAgentPullRequestShareService.isUnstamped(usage)) {
       return false;
     }
 
     return (
-      row.repositoryHost.toLowerCase() === repositoryHost.toLowerCase() &&
-      `${row.repositoryOwner}/${row.repositoryName}`.toLowerCase() ===
+      usage.repositoryHost.toLowerCase() === repositoryHost.toLowerCase() &&
+      `${usage.repositoryOwner}/${usage.repositoryName}`.toLowerCase() ===
         repositoryFullName.toLowerCase()
     );
   }
 
   /**
-   * The unit one session's rows are weighed in, and their total in that unit.
+   * The unit one session's record is weighed in, and its total in that unit.
    */
-  private static weighing(rows: readonly SessionModelTotalsRow[]): {
-    weightOf: (row: SessionModelTotalsRow) => number;
+  private static weighing(entries: readonly StampedUsage[]): {
+    weightOf: (usage: StampedUsage) => number;
     totalWeight: number;
   } {
     const tokensOf = CodingAgentPullRequestShareService.tokensOf;
     const costOf = CodingAgentPullRequestShareService.costOf;
-    const tokenWeight = CodingAgentPullRequestShareService.sum(rows, tokensOf);
+    const tokenWeight = CodingAgentPullRequestShareService.sum(entries, tokensOf);
     if (tokenWeight > 0) {
       return { weightOf: tokensOf, totalWeight: tokenWeight };
     }
 
     return {
       weightOf: costOf,
-      totalWeight: CodingAgentPullRequestShareService.sum(rows, costOf),
+      totalWeight: CodingAgentPullRequestShareService.sum(entries, costOf),
     };
   }
 
-  private static tokensOf(row: SessionModelTotalsRow): number {
-    return row.inputTokens + row.outputTokens + row.cacheReadTokens + row.cacheCreationTokens;
+  private static tokensOf(usage: StampedUsage): number {
+    return (
+      usage.inputTokens + usage.outputTokens + usage.cacheReadTokens + usage.cacheCreationTokens
+    );
   }
 
-  /** Never negative: a stray negative cost would eat another row's share. */
-  private static costOf(row: SessionModelTotalsRow): number {
-    return row.costUsd > 0 ? row.costUsd : 0;
+  /** Never negative: a stray negative cost would eat another entry's share. */
+  private static costOf(usage: StampedUsage): number {
+    return usage.costUsd > 0 ? usage.costUsd : 0;
   }
 
   private static sum(
-    rows: readonly SessionModelTotalsRow[],
-    of: (row: SessionModelTotalsRow) => number,
+    entries: readonly StampedUsage[],
+    of: (usage: StampedUsage) => number,
   ): number {
-    return rows.reduce((total, row) => total + of(row), 0);
+    return entries.reduce((total, usage) => total + of(usage), 0);
   }
 
   private static groupBySession(
