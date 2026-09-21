@@ -50,6 +50,8 @@ async function updateIsWaitingOnALock({
     SELECT count(*) AS waiting
       FROM pg_stat_activity
      WHERE wait_event_type = 'Lock'
+       AND datname = current_database()
+       AND pid <> pg_backend_pid()
        AND query ILIKE '%UPDATE%'
        AND query ILIKE ${`%${table}%`}
   `;
