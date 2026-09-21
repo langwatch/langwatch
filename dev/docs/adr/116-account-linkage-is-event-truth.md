@@ -421,42 +421,17 @@ collapse onto the same provider id.
 The fold stays total if the constraint is ever violated anyway: the incumbent
 keeps the subject and the newcomer is parked with a WARN naming both
 identifier ids and both users, rather than the projection stopping for
-everybody.
-
-**Both projections park, because both arbitrate the same pair.** `Account`
-has always been unique on `(provider, providerAccountId)` across every user,
-so when the two claimants are two different users the losing user's bridge
-row cannot be written either — the insert is refused by the same subject,
-one table over. It is parked the same way, with its own WARN naming the two
-accounts and the two users. The incumbent's row is never rewritten: demoting
-it would take a working sign-in method off somebody who has it to give it to
-somebody the database just refused. So the losing user simply has no
-`Account` row for that subject, and the fold carries on with the rest of
-their identifiers. (Within ONE user the constraint does not fire at all —
-one user's two identifiers naming one subject share a row — which is the
-case this paragraph used to describe as the general one.)
-
-What that costs the losing user depends on where they are, and only one case
-is contained. A user still being backfilled is revisited every pass, and the
-missing identifier shows up as a parity diff — `subject_collision`, naming
-the identifier that holds the subject, rather than the plain
-`identifier_missing` that means "the fold has not caught up yet". The
-distinction is the whole point: one heals on the next pass, the other never
-does, and only a person merging the two accounts clears it. They stay HELD
-with that report — the system saying "not right yet". A user who has already
+everybody. What that costs the losing user depends on where they are, and
+only one case is contained. A user still being backfilled is revisited every
+pass, the missing identifier shows up as a parity diff, and they stay HELD
+with a report — the system saying "not right yet". A user who has already
 `finalized` is NOT revisited: `finalized` is terminal and the runner
 short-circuits on it, so a latched user linking a new enterprise account whose
 subject collides ends up with that identifier permanently absent from the
-projection and nothing scheduled that would notice. Nor does the legacy
-fallback cover them, for the reason above — there is no bridge row to fall
-back to — so the WARN is the only signal. (An unlatched user cannot reach
+projection and nothing scheduled that would notice. Their `Account` bridge row
+is still written, so what covers them is the legacy fallback this ADR exists
+to retire, and the WARN is the only signal. (An unlatched user cannot reach
 this at all — their ceremonies state no facts.)
-
-**Amendment, 2026-09-21.** This section previously said the losing user's
-`Account` bridge row "is still written". It is not, and cannot be, whenever
-the two claimants are different users; the fold now parks that write
-explicitly instead of letting a P2002 fail the apply, and the parity report
-names the collision.
 
 Closing that second case means refusing the collision at COMMAND time instead
 of parking it at fold time: a subject lock mirroring `IdentifierReservation`'s

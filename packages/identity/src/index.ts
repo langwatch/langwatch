@@ -26,7 +26,6 @@ export {
   type ExpectedIdentifier,
   identifierStateSatisfies,
   orphanedIdentifierRows,
-  type SubjectHolder,
 } from "./backfill";
 export {
   CONNECTION_ACTIVATED_EVENT_TYPE,

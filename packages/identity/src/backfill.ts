@@ -24,36 +24,11 @@ export interface ExpectedIdentifier {
   value: string;
   /** VERIFIED-or-better; ATTACHED means any live state is acceptable. */
   expectedState: IdentifierArrivalState;
-  /**
-   * better-auth's own provider id and the subject asserted under it — the
-   * pair the projection's live unique index arbitrates, and therefore the
-   * only pair a collision can be named by. Absent on an expectation no
-   * protocol row backs (the email adopted from `User.email`), which is why
-   * they are optional rather than nullable-and-required: an expectation that
-   * names no subject can never lose one.
-   */
-  providerId?: string | null;
-  providerAccountId?: string | null;
-}
-
-/**
- * A live identifier row holding a provider subject, WHOEVER it belongs to.
- *
- * Supplied rather than read out of `rows`, because the row that beat this
- * user to a subject is almost always another user's, and `rows` is one
- * user's projection. `IdentityBackfillRepository.findSubjectHolders` is the
- * read; this module stays pure.
- */
-export interface SubjectHolder {
-  identifierId: string;
-  providerId: string;
-  providerAccountId: string;
 }
 
 export type BackfillDiff = {
   kind:
     | "identifier_missing"
-    | "subject_collision"
     | "state_mismatch"
     | "value_mismatch"
     | "surplus_row";
@@ -61,10 +36,6 @@ export type BackfillDiff = {
   provider: string;
   expectedState?: string;
   actualState?: string;
-  /** On `subject_collision` only: the live identifier that already holds the
-   *  provider subject this one expected. Named because the remediation is a
-   *  human merging two accounts, and neither id alone says which two. */
-  holdingIdentifierId?: string;
 };
 
 /** ATTACHED is satisfied by any live state; VERIFIED by VERIFIED-or-PRIMARY. */
@@ -86,36 +57,24 @@ export function identifierStateSatisfies(
  * since changed — accountId null, so never orphan-detachable) is a
  * `surplus_row` diff, because such a row keeps blocking its value for every
  * other user; DETACHED and DEAD_END surpluses are inert tombstones and fine.
- *
- * An absent identifier is reported as one of TWO things, because they ask
- * different things of the reader. `identifier_missing` heals by itself — the
- * fold has not caught up, and the next pass proves it. `subject_collision`
- * never does: another live identifier holds the provider subject, the fold
- * parked this one against the live unique index, and no number of passes
- * moves a subject off the incumbent. Only a person merging the two accounts
- * clears it, so the report has to say which one it is.
  */
 export function backfillParityDiffs({
   rows,
   expected,
-  subjectHolders = [],
 }: {
   rows: BackfillIdentifierRow[];
   expected: ExpectedIdentifier[];
-  subjectHolders?: SubjectHolder[];
 }): BackfillDiff[] {
   const byId = new Map(rows.map((row) => [row.id, row]));
   const diffs: BackfillDiff[] = [];
   for (const expectation of expected) {
     const row = byId.get(expectation.identifierId);
     if (!row) {
-      const holding = holderOfExpectedSubject({ expectation, subjectHolders });
       diffs.push({
-        kind: holding === null ? "identifier_missing" : "subject_collision",
+        kind: "identifier_missing",
         identifierId: expectation.identifierId,
         provider: expectation.provider,
         expectedState: expectation.expectedState,
-        ...(holding === null ? {} : { holdingIdentifierId: holding }),
       });
       continue;
     }
@@ -149,40 +108,6 @@ export function backfillParityDiffs({
     });
   }
   return diffs;
-}
-
-/**
- * The live identifier already holding the subject this expectation wants, or
- * null where nothing does.
- *
- * A holder under the expectation's OWN id is not a collision — it is a read
- * that raced the fold, the row landing between the projection read and the
- * holder read. Reporting it would send an operator to merge an account with
- * itself.
- */
-function holderOfExpectedSubject({
-  expectation,
-  subjectHolders,
-}: {
-  expectation: ExpectedIdentifier;
-  subjectHolders: SubjectHolder[];
-}): string | null {
-  const { providerId, providerAccountId } = expectation;
-  if (
-    providerId === null ||
-    providerId === undefined ||
-    providerAccountId === null ||
-    providerAccountId === undefined
-  ) {
-    return null;
-  }
-  const holder = subjectHolders.find(
-    (candidate) =>
-      candidate.providerId === providerId &&
-      candidate.providerAccountId === providerAccountId &&
-      candidate.identifierId !== expectation.identifierId,
-  );
-  return holder?.identifierId ?? null;
 }
 
 /**

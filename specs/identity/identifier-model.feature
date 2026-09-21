@@ -462,30 +462,6 @@ Feature: The identifier model - identity as an event-sourced pipeline
     Then the projection rows are written, so it stays complete
     And the anomaly is reported, rather than being a branch nobody can see
 
-  # A provider subject belongs to one account, fleet-wide. When two users
-  # claim the same one the first to arrive keeps it - but the second user's
-  # fold must still finish, and they must be told why their sign-in method
-  # did not arrive, because no amount of waiting will bring it.
-
-  @integration
-  Scenario: Two users' identifiers claim one provider subject: the incumbent keeps it and the fold stays total
-    Given "jordan" already signs in with a provider subject
-    And "sam" holds a live identifier claiming that same subject
-    When the identity fold stores "sam"'s projection
-    Then "jordan" keeps the subject, with their account untouched
-    And "sam" gets no account for that subject
-    And the rest of "sam"'s identity still projects, so their fold completes
-    And the clash is reported once, however many times the fold runs
-
-  @unit
-  Scenario: The losing user is held with the collision named in the report
-    Given "sam"'s backfill expects an identifier for a provider subject
-    And the projection does not carry it because another account holds it
-    When the backfill proves "sam" against their sign-in methods
-    Then "sam" is held rather than finished
-    And the report names the account holding the subject
-    And it reads as a clash needing an account merge, not as work still in flight
-
   @unit
   Scenario: The gate costs nothing before anyone is enrolled
     Given no user has finalized the identifier backfill

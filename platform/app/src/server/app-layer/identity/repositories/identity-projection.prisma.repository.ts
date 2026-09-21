@@ -47,31 +47,6 @@ function linkedIdentifiers(state: IdentityFoldState): LinkedIdentifier[] {
 }
 
 /**
- * The provider subject a refused write was about, or null where the failure
- * cannot be a subject collision at all.
- *
- * Both projections — `Identifier` and `Account` — arbitrate the same pair
- * with their own unique constraint, so both meet the same P2002 and ask the
- * same question of the error. A fact naming no subject cannot have lost one,
- * whatever the error says.
- */
-function collidingSubject({
-  fact,
-  error,
-}: {
-  fact: IdentifierFact;
-  error: unknown;
-}): string | null {
-  if (
-    !(error instanceof Prisma.PrismaClientKnownRequestError) ||
-    error.code !== "P2002"
-  ) {
-    return null;
-  }
-  return fact.providerAccountId;
-}
-
-/**
  * The identity pipeline's projection store (ADR-101 §3, ADR-116): the
  * Postgres `Identifier` head, the linkage columns of `Account`, and the
  * cursor — all written under the queue's per-user lock.
@@ -88,20 +63,6 @@ function collidingSubject({
 export class PrismaIdentityProjectionRepository
   implements StateProjectionStore<IdentityFoldState>
 {
-  /**
-   * The colliding pairs this process has already spoken about, keyed by the
-   * loser and the holder together.
-   *
-   * Parking writes NOTHING, so there is no state change a later pass could
-   * key on: without this, every replay and every pass over the same pair
-   * warns again, and a permanent condition reads as a storm of new
-   * incidents. First sighting is the incident; the rest are debug, which is
-   * still there when somebody asks "is it still happening?". In memory on
-   * purpose — a pod restart earning one more line is the right price for a
-   * signal that costs no schema.
-   */
-  private readonly reportedSubjectCollisions = new Set<string>();
-
   constructor(
     private readonly prisma: PrismaClient,
     private readonly reservations: IdentityReservationRepository,
@@ -242,23 +203,20 @@ export class PrismaIdentityProjectionRepository
    *
    *   still being backfilled (no record, or `migrated`) — contained. The
    *     next pass re-reads their legacy rows, `prove` diffs them against the
-   *     projection, and the missing identifier shows up as a parity diff —
-   *     as `subject_collision` rather than `identifier_missing`, because the
-   *     holder is named, and the two ask different things of the operator:
-   *     one heals itself, this one needs an account merge. The user is HELD
-   *     with that report, which is the system saying "not right yet", and it
-   *     is a far better outcome than a projection that stops folding for
-   *     everybody.
+   *     projection, the missing identifier shows up as a parity diff and the
+   *     user is HELD with a report. That is the system saying "not right
+   *     yet", and it is a far better outcome than a projection that stops
+   *     folding for everybody.
    *
    *   already `finalized` — NOT contained. `finalized` is terminal, so the
    *     runner short-circuits on it (`isTerminalTenantStatus`) and no later
    *     pass ever revisits them. A latched user linking a new enterprise
    *     account whose subject collides therefore ends up with the identifier
    *     permanently absent from the projection, the cursor committed, and
-   *     nothing scheduled that would notice. Nor does the legacy fallback
-   *     cover them: `Account` is unique on the same subject across all
-   *     users, so the bridge row cannot be written either
-   *     (`parkedAccountOnSubjectCollision`). This WARN is the only signal.
+   *     nothing scheduled that would notice. Their `Account` bridge row is
+   *     still written — `projectAccounts` reads the fold STATE, not the rows
+   *     this method wrote — so what actually covers them is the legacy
+   *     fallback ADR-116 exists to retire. This WARN is the only signal.
    *
    * (An unlatched user cannot reach here at all: their ceremonies state no
    * facts, so nothing of theirs is ever folded.)
@@ -281,12 +239,17 @@ export class PrismaIdentityProjectionRepository
     fact: IdentifierFact;
     error: unknown;
   }): Promise<boolean> {
-    const subject = collidingSubject({ fact, error });
-    if (subject === null) return false;
+    if (
+      !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+      error.code !== "P2002" ||
+      fact.providerAccountId === null
+    ) {
+      return false;
+    }
     const incumbent = await this.prisma.identifier.findFirst({
       where: {
         providerId: fact.providerId,
-        providerAccountId: subject,
+        providerAccountId: fact.providerAccountId,
         state: { in: [...LIVE_IDENTIFIER_STATES] },
         id: { not: fact.identifierId },
       },
@@ -294,104 +257,17 @@ export class PrismaIdentityProjectionRepository
     });
     // No incumbent means P2002 came from somewhere else entirely.
     if (incumbent === null) return false;
-    this.reportSubjectCollision({
-      losingId: fact.identifierId,
-      holdingId: incumbent.id,
-      fields: {
+    logger.warn(
+      {
         providerId: fact.providerId,
         parkedIdentifierId: fact.identifierId,
         parkedUserId: fact.userId,
         holdingIdentifierId: incumbent.id,
         holdingUserId: incumbent.userId,
       },
-      message:
-        "two live identifiers claim one provider subject; the incumbent keeps it and this one is parked, so its user stays held rather than the fold stopping",
-    });
+      "two live identifiers claim one provider subject; the incumbent keeps it and this one is parked, so its user stays held rather than the fold stopping",
+    );
     return true;
-  }
-
-  /**
-   * The same collision one table over: another user's `Account` row already
-   * owns this provider subject, so the bridge row this fact implies cannot
-   * be written at all.
-   *
-   * `Account` is unique on `(provider, providerAccountId)` across ALL users,
-   * and the create branch of `upsertLiveAccount` keys on the row id, so a
-   * fact whose subject someone else's row holds raises P2002 from a
-   * constraint the id-keyed upsert can never resolve. Uncaught it is not a
-   * skipped row — it fails the apply, the group queue retries, exhausts, and
-   * the losing user's identity fold stops for good. Parked instead: the
-   * incumbent keeps the subject, this fact projects no bridge row, and the
-   * fold finishes the user's other identifiers.
-   *
-   * The incumbent's row is never touched. Demoting it would reach across and
-   * take a working sign-in method off somebody who has it, to give it to
-   * somebody whose claim the database just refused.
-   *
-   * So the losing user has no `Account` row for that subject and the legacy
-   * fallback covers nothing for them (ADR-116 §6b); the parity report naming
-   * the collision (`subject_collision`) is what covers them instead.
-   */
-  private async parkedAccountOnSubjectCollision({
-    fact,
-    error,
-  }: {
-    fact: LinkedIdentifier;
-    error: unknown;
-  }): Promise<boolean> {
-    const subject = collidingSubject({ fact, error });
-    if (subject === null) return false;
-    // The value the create branch would have written, not the folded
-    // vocabulary: `Account`'s uniqueness is keyed by better-auth's own
-    // provider id, so probing with anything else asks about a row that
-    // could not have collided.
-    const provider = fact.providerId ?? fact.provider;
-    const incumbent = await this.prisma.account.findFirst({
-      where: {
-        provider,
-        providerAccountId: subject,
-        id: { not: fact.accountId },
-      },
-      select: { id: true, userId: true },
-    });
-    // No incumbent means P2002 came from somewhere else entirely, and an
-    // unexplained failure must still stop the apply.
-    if (incumbent === null) return false;
-    this.reportSubjectCollision({
-      losingId: fact.accountId,
-      holdingId: incumbent.id,
-      fields: {
-        provider,
-        parkedAccountId: fact.accountId,
-        parkedUserId: fact.userId,
-        holdingAccountId: incumbent.id,
-        holdingUserId: incumbent.userId,
-      },
-      message:
-        "two accounts claim one provider subject; the incumbent keeps it and no bridge row is written for this one, so its user stays held rather than the fold stopping",
-    });
-    return true;
-  }
-
-  /** One line the first time a pair is seen, debug every time after. */
-  private reportSubjectCollision({
-    losingId,
-    holdingId,
-    fields,
-    message,
-  }: {
-    losingId: string;
-    holdingId: string;
-    fields: Record<string, string | null>;
-    message: string;
-  }): void {
-    const key = `${losingId}\u0000${holdingId}`;
-    if (this.reportedSubjectCollisions.has(key)) {
-      logger.debug(fields, message);
-      return;
-    }
-    this.reportedSubjectCollisions.add(key);
-    logger.warn(fields, message);
   }
 
   /**
@@ -516,30 +392,21 @@ export class PrismaIdentityProjectionRepository
       ...(fact.issuer === null ? {} : { issuer: fact.issuer }),
       providerAccountId: fact.providerAccountId,
     };
-    try {
-      await this.prisma.account.upsert({
-        where: { id: fact.accountId },
-        create: {
-          id: fact.accountId,
-          ...columns,
-          provider: fact.providerId ?? fact.provider,
-          // A row created without one is a row better-auth cannot find, so
-          // the create floors it at the synthetic issuer 1.7 would have
-          // minted itself. Only reachable for a fact stated before the issuer
-          // was carried; a fact that names one always wins, because a real
-          // OIDC issuer is never what this derivation would produce.
-          issuer:
-            fact.issuer ??
-            issuerForProviderId(fact.providerId ?? fact.provider),
-        },
-        update: columns,
-      });
-    } catch (error) {
-      // Caught per fact, so one parked bridge row never costs the user the
-      // rest of theirs: `projectAccounts` keeps iterating every fact.
-      if (!(await this.parkedAccountOnSubjectCollision({ fact, error }))) {
-        throw error;
-      }
-    }
+    await this.prisma.account.upsert({
+      where: { id: fact.accountId },
+      create: {
+        id: fact.accountId,
+        ...columns,
+        provider: fact.providerId ?? fact.provider,
+        // A row created without one is a row better-auth cannot find, so the
+        // create floors it at the synthetic issuer 1.7 would have minted
+        // itself. Only reachable for a fact stated before the issuer was
+        // carried; a fact that names one always wins, because a real OIDC
+        // issuer is never what this derivation would produce.
+        issuer:
+          fact.issuer ?? issuerForProviderId(fact.providerId ?? fact.provider),
+      },
+      update: columns,
+    });
   }
 }
