@@ -1,5 +1,5 @@
 /**
- * The five things a self-hosted install can do that somebody should hear
+ * The six things a self-hosted install can do that somebody should hear
  * about, and the rule that keeps them from becoming a daily digest.
  *
  * @see ../selfHostedSignals.ts
@@ -121,6 +121,44 @@ describe("given users on a domain that already has a LangWatch Cloud account", (
     it("raises the domain signal", () => {
       const raised = signalsRaisedBy(inputOf({ domainHasCloudAccount: true }));
       expect(raised).toContain("domain_has_cloud_account");
+    });
+  });
+});
+
+describe("given a connected install whose license stopped syncing", () => {
+  describe("when the report arrives", () => {
+    /** @scenario "A licensed install that stopped syncing is raised" */
+    it("raises the stale sync signal after a week of silence and not after a day", () => {
+      const expiresAt = new Date(NOW.getTime() + 300 * DAY_MS);
+
+      const stale = signalsRaisedBy(
+        inputOf({
+          license: {
+            expiresAt,
+            lastSyncAt: new Date(NOW.getTime() - 8 * DAY_MS),
+          },
+        }),
+      );
+      expect(stale).toContain("license_sync_stale");
+
+      const fresh = signalsRaisedBy(
+        inputOf({
+          license: { expiresAt, lastSyncAt: new Date(NOW.getTime() - DAY_MS) },
+        }),
+      );
+      expect(fresh).not.toContain("license_sync_stale");
+    });
+
+    it("says nothing about a license that never synced, which was never connected", () => {
+      const raised = signalsRaisedBy(
+        inputOf({
+          license: {
+            expiresAt: new Date(NOW.getTime() + 300 * DAY_MS),
+            lastSyncAt: null,
+          },
+        }),
+      );
+      expect(raised).not.toContain("license_sync_stale");
     });
   });
 });

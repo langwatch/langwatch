@@ -50,6 +50,14 @@ Feature: Lead signals from a self-hosted install
     When its report arrives
     Then the domain signal is raised
 
+  @unit
+  Scenario: A licensed install that stopped syncing is raised
+    Given a connected install whose license last synced eight days ago
+    When its report arrives
+    Then the stale sync signal is raised
+    And an install that synced yesterday raises nothing
+    And a license that never synced raises nothing
+
   # ============================================================================
   # Not a firehose
   # ============================================================================

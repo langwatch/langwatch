@@ -155,7 +155,8 @@ export type CioEventName =
   | "self_hosted_sustained_ingestion"
   | "self_hosted_licensed_feature_without_license"
   | "self_hosted_license_expiring"
-  | "self_hosted_domain_has_cloud_account";
+  | "self_hosted_domain_has_cloud_account"
+  | "self_hosted_license_sync_stale";
 
 // ---------------------------------------------------------------------------
 // Batch call discriminated union

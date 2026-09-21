@@ -207,7 +207,9 @@ export class SelfHostedInstanceService {
       properties,
       firstSeenAt: previous?.firstSeenAt ?? null,
       alreadyRaised,
-      license: owner ? { expiresAt: owner.expiresAt } : null,
+      license: owner
+        ? { expiresAt: owner.expiresAt, lastSyncAt: owner.lastSyncAt ?? null }
+        : null,
       domainHasCloudAccount: await this.cloudAccountOnDomain({
         leadingDomain,
         alreadyRaised,

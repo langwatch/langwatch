@@ -6,8 +6,9 @@
  * one message a day per install stops reading them. So this is deliberately
  * short, and every signal here answers "would somebody pick up the phone": a
  * deployment that grew past a team, one that has been ingesting for a month, one
- * running a licensed feature without a license, a licence about to lapse, and a
- * company that already has an account with us.
+ * running a licensed feature without a license, a licence about to lapse, a
+ * company that already has an account with us, and a licensed install that
+ * has stopped syncing.
  *
  * Each signal fires once per install. The install's row records which have been
  * raised, and a signal already on that list is not raised again, so an install
@@ -27,6 +28,7 @@ export const SELF_HOSTED_SIGNALS = [
   "licensed_feature_without_license",
   "license_expiring",
   "domain_has_cloud_account",
+  "license_sync_stale",
 ] as const;
 
 export type SelfHostedSignal = (typeof SELF_HOSTED_SIGNALS)[number];
@@ -40,6 +42,8 @@ export const SIGNAL_HEADLINES: Record<SelfHostedSignal, string> = {
   license_expiring: "A self-hosted license is about to lapse",
   domain_has_cloud_account:
     "A self-hosted install is run by a company we already know",
+  license_sync_stale:
+    "A connected self-hosted install has not synced its license for a week",
 };
 
 /**
@@ -58,6 +62,12 @@ export const SIGNAL_THRESHOLDS = {
   establishedDays: 28,
   /** Long enough before a term ends to renew it without a scramble. */
   licenseExpiringDays: 45,
+  /**
+   * The sync runs daily, so a week of silence is an outbound rule or a
+   * stopped install, and a seat change waiting on the registry is not
+   * reaching the customer.
+   */
+  licenseSyncStaleDays: 7,
 } as const;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -70,8 +80,12 @@ export interface SignalInput {
   firstSeenAt: Date | null;
   /** Signals already raised for this install. */
   alreadyRaised: readonly string[];
-  /** The license bound to this instance, when there is one. */
-  license: { expiresAt: Date | null } | null;
+  /**
+   * The license bound to this instance, when there is one, and when its
+   * install last synced it. A license that never synced is not stale: the
+   * install was never connected.
+   */
+  license: { expiresAt: Date | null; lastSyncAt?: Date | null } | null;
   /**
    * Whether one of the reported domains already has an account on LangWatch
    * Cloud. Resolved by the caller, because it is a query rather than a rule.
@@ -145,6 +159,15 @@ export function signalsRaisedBy(input: SignalInput): SelfHostedSignal[] {
   );
 
   raise("domain_has_cloud_account", input.domainHasCloudAccount);
+
+  const lastSyncAt = input.license?.lastSyncAt ?? null;
+  const silentDays = lastSyncAt
+    ? (input.now.getTime() - lastSyncAt.getTime()) / DAY_MS
+    : null;
+  raise(
+    "license_sync_stale",
+    silentDays !== null && silentDays >= SIGNAL_THRESHOLDS.licenseSyncStaleDays,
+  );
 
   return raised;
 }

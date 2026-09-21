@@ -33,6 +33,7 @@ const SIGNAL_EVENTS: Record<SelfHostedSignal, CioEventName> = {
     "self_hosted_licensed_feature_without_license",
   license_expiring: "self_hosted_license_expiring",
   domain_has_cloud_account: "self_hosted_domain_has_cloud_account",
+  license_sync_stale: "self_hosted_license_sync_stale",
 };
 
 /** What the nurturing client has to offer. This service needs two of its calls. */

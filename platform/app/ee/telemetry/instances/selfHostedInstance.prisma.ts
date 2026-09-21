@@ -200,13 +200,19 @@ export class PrismaInstanceOwners implements InstanceOwnerLookup {
     const license = await this.prisma.issuedLicense.findFirst({
       where: { instanceId, revokedAt: null },
       orderBy: { instanceBoundAt: "desc" },
-      select: { id: true, organizationId: true, expiresAt: true },
+      select: {
+        id: true,
+        organizationId: true,
+        expiresAt: true,
+        lastSyncAt: true,
+      },
     });
     if (!license) return null;
     return {
       organizationId: license.organizationId,
       issuedLicenseId: license.id,
       expiresAt: license.expiresAt,
+      lastSyncAt: license.lastSyncAt,
     };
   }
 }

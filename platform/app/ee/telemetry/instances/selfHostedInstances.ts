@@ -22,6 +22,8 @@ export interface InstanceOwner {
   issuedLicenseId: string | null;
   /** When the term ends, which is what the expiring signal reads. */
   expiresAt: Date | null;
+  /** When the install last synced the license, which is what the stale signal reads. */
+  lastSyncAt?: Date | null;
 }
 
 /** What one report writes onto an install's row. */
