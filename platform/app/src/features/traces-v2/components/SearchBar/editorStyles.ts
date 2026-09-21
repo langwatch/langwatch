@@ -100,6 +100,31 @@ export const editorStyles: SystemStyleObject = {
     background: "green.subtle",
     borderColor: "green.muted",
   },
+  // An Instant Eval chip carries a judgement rather than a field match, so
+  // it wears a fuller green than the blue field chips around it.
+  "& .filter-token-eval": {
+    background: "green.muted",
+    borderColor: "green.solid",
+  },
+  "& .filter-token-eval[data-filter-chip-label]::after": {
+    color: "green.fg",
+  },
+  // While its run is estimated, started or judging, the chip sweeps a band
+  // of light left to right, so the search bar says work is under way.
+  "&[data-instant-eval-busy] .filter-token-eval": {
+    backgroundImage:
+      "linear-gradient(90deg, transparent 15%, color-mix(in srgb, var(--chakra-colors-green-solid) 38%, transparent) 50%, transparent 85%)",
+    backgroundSize: "220% 100%",
+    backgroundRepeat: "no-repeat",
+    animation: "filter-token-eval-sweep 1.3s linear infinite",
+  },
+  "@keyframes filter-token-eval-sweep": {
+    from: { backgroundPosition: "160% 0" },
+    to: { backgroundPosition: "-60% 0" },
+  },
+  "@media (prefers-reduced-motion: reduce)": {
+    "&[data-instant-eval-busy] .filter-token-eval": { animation: "none" },
+  },
   "& .filter-keyword": {
     color: "fg.muted",
     fontWeight: "semibold",
@@ -178,6 +203,10 @@ export const editorStyles: SystemStyleObject = {
   "& .filter-token-numeric + .filter-token-delete": {
     background: "green.subtle",
     borderColor: "green.muted",
+  },
+  "& .filter-token-eval + .filter-token-delete": {
+    background: "green.muted",
+    borderColor: "green.solid",
   },
   "& .filter-token-unknown-field + .filter-token-delete": {
     background: "yellow.subtle",

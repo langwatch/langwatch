@@ -61,6 +61,7 @@ import { instantEvalRunKey } from "~/server/app-layer/traces/query-language/inst
 import {
   instantEvalChipLabel,
   instantEvalChipMark,
+  isInstantEvalBusy,
 } from "../../components/SearchBar/SearchBar";
 import { instantEvalProgressCopy } from "../../components/TracesPage/InstantEvalProgressBar";
 import { useExplorerStore } from "../../stores/explorerStore";
@@ -396,6 +397,42 @@ describe("given a running run that was asked to stop", () => {
       expect(useInstantEvalRunStore.getState().settled["run-1"]).toBe(true);
       const { result } = renderHook(() => useExplorerCounts());
       expect(result.current.instantEval).toBeNull();
+    });
+  });
+});
+
+describe("given an eval chip in the search bar", () => {
+  const chips = [{ runId: "run-1" }];
+  const idle = { isEstimating: false, isStarting: false };
+
+  describe("when its run is estimated, started, queued, planned or judged", () => {
+    /** @scenario "An eval chip sweeps while its run is under way" */
+    it("reports the chip busy", () => {
+      expect(
+        isInstantEvalBusy({ ...idle, isEstimating: true, chips: [], runs: {} }),
+      ).toBe(true);
+      expect(
+        isInstantEvalBusy({ ...idle, isStarting: true, chips: [], runs: {} }),
+      ).toBe(true);
+      for (const status of ["queued", "planning", "running"] as const) {
+        expect(
+          isInstantEvalBusy({ ...idle, chips, runs: { "run-1": { status } } }),
+        ).toBe(true);
+      }
+    });
+  });
+
+  describe("when its run has finished, stopped or failed", () => {
+    /** @scenario "An eval chip sweeps while its run is under way" */
+    it("lets the chip rest", () => {
+      for (const status of ["finished", "cancelled", "failed"] as const) {
+        expect(
+          isInstantEvalBusy({ ...idle, chips, runs: { "run-1": { status } } }),
+        ).toBe(false);
+      }
+      expect(
+        isInstantEvalBusy({ ...idle, chips: [{ runId: null }], runs: {} }),
+      ).toBe(false);
     });
   });
 });

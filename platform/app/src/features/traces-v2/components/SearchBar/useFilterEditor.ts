@@ -3,7 +3,7 @@ import History from "@tiptap/extension-history";
 import Paragraph from "@tiptap/extension-paragraph";
 import Placeholder from "@tiptap/extension-placeholder";
 import { Text as TiptapText } from "@tiptap/extension-text";
-import { TextSelection } from "@tiptap/pm/state";
+import { TextSelection, type Transaction } from "@tiptap/pm/state";
 import { type Editor, useEditor } from "@tiptap/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -17,7 +17,7 @@ import {
   PARAGRAPH_OFFSET,
   readEditorContext,
 } from "./editorDocument";
-import { FilterHighlight } from "./filterHighlight";
+import { FilterHighlight, LABEL_REFRESH_META } from "./filterHighlight";
 import { getSuggestionState, type SuggestionState } from "./getSuggestionState";
 import { handleKey } from "./handleKey";
 import { SEARCH_BAR_PLACEHOLDER } from "./PlaceholderEditor";
@@ -287,7 +287,14 @@ export function useFilterEditor({
       const view = editor.view;
       const editorRect = view.dom.getBoundingClientRect();
       const coords = view.coordsAtPos(PARAGRAPH_OFFSET + text.length);
-      const next = Math.round(coords.left - editorRect.left);
+      // A chip with an overlay label paints the label after its text, and
+      // its remove button follows it, so the end of the text is not the end
+      // of what is drawn. Take whichever reaches further right.
+      const lastDrawn = view.dom.firstElementChild?.lastElementChild;
+      const drawnRight = lastDrawn?.getBoundingClientRect().right ?? 0;
+      const next = Math.round(
+        Math.max(coords.left, drawnRight) - editorRect.left,
+      );
       setEndAnchorX((prev) => (prev === next ? prev : next));
     } catch {
       // coordsAtPos throws on cold mount; the next refresh will recover.
@@ -798,6 +805,21 @@ export function useFilterEditor({
     setDropdownDismissed(false);
     triggerPosRef.current = null;
   }, [editor, onHasContentChangeRef]);
+
+  // A label arriving for a chip (a facet name, an eval chip's "(pending)")
+  // widens it without changing the text, so no update event measures it.
+  useEffect(() => {
+    if (!editor) return;
+    const onTransaction = ({ transaction }: { transaction: Transaction }) => {
+      if (transaction.getMeta(LABEL_REFRESH_META)) {
+        measureEndAnchor(editor, editor.getText());
+      }
+    };
+    editor.on("transaction", onTransaction);
+    return () => {
+      editor.off("transaction", onTransaction);
+    };
+  }, [editor, measureEndAnchor]);
 
   return {
     editor,

@@ -167,6 +167,19 @@ Feature: Instant Evals inside the Trace Explorer
       When the router receives it
       Then the classifier is not asked and that route is built
 
+    @unit
+    Scenario: An eval chip is green, whatever its target
+      Given the search bar holds `eval:"the user is annoyed"`, `eval.trace:"a"`, `eval.conversation:"b"` and `eval.llm:"c"`
+      When the chips are drawn
+      Then each is drawn as an eval chip, apart from the blue filter chips
+
+    @integration
+    Scenario: An eval chip sweeps while its run is under way
+      Given an eval chip in the search bar
+      When its run is being estimated, started, queued, planned or judged
+      Then a band of light sweeps across the chip from left to right
+      And once the run has finished, stopped or failed the chip rests
+
     @integration
     Scenario: A chip with no registered run is pending
       Given a chip `eval:"the user is annoyed"` and no run under its key
@@ -335,9 +348,9 @@ Feature: Instant Evals inside the Trace Explorer
     Scenario: A spent free budget opens the budget popover and the phrase search runs
       Given the organization has spent its free Instant Evals budget
       When the Explorer receives an Instant Eval payload
-      Then a closable popover anchored under the search bar says what an Instant Eval does, in plain sentences
+      Then a closable popover anchored under the search bar says in one line what Instant Evals find
       And the text the user typed stays visible above it
-      And it shows the spend against the 1 USD budget with an Upgrade link
+      And it offers an Upgrade link, without the spend or budget figures
       And "Skip" and closing both apply the phrase search
 
     @integration

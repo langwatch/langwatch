@@ -378,6 +378,15 @@ export const SearchBar: React.FC = () => {
     [evalChips, evalRuns, settledEvalRuns],
   );
 
+  // Spec: specs/traces-v2/instant-eval-search.feature ("An eval chip sweeps
+  // while its run is under way").
+  const instantEvalBusy = isInstantEvalBusy({
+    isEstimating: instantEval.isEstimating,
+    isStarting: instantEval.isStarting,
+    chips: evalChips,
+    runs: evalRuns,
+  });
+
   // Publish the (field → value → label) lookup the chip overlay reads
   // from. The editor's FilterHighlight plugin watches this via a
   // module-level ref; we ping it with a LABEL_REFRESH meta so chips
@@ -502,7 +511,13 @@ export const SearchBar: React.FC = () => {
                 </Icon>
               )}
 
-              <Box flex={1} minWidth={0} position="relative" css={editorStyles}>
+              <Box
+                flex={1}
+                minWidth={0}
+                position="relative"
+                css={editorStyles}
+                data-instant-eval-busy={instantEvalBusy ? "" : undefined}
+              >
                 {editorMounted ? (
                   <ActiveSearchEditor
                     queryText={queryText}
@@ -598,6 +613,25 @@ export const SearchBar: React.FC = () => {
     </Box>
   );
 };
+
+/** Whether an `eval` chip's run is being estimated, started or judged. */
+export function isInstantEvalBusy({
+  isEstimating,
+  isStarting,
+  chips,
+  runs,
+}: {
+  isEstimating: boolean;
+  isStarting: boolean;
+  chips: readonly { runId: string | null }[];
+  runs: Readonly<Record<string, { status: InstantEvalExplorerStatus }>>;
+}): boolean {
+  if (isEstimating || isStarting) return true;
+  return chips.some((chip) => {
+    const run = chip.runId === null ? undefined : runs[chip.runId];
+    return run !== undefined && isInstantEvalRunActive(run.status);
+  });
+}
 
 /** The overlay labels of the marked `eval` chips: field, then question. */
 export function instantEvalChipMarks({
