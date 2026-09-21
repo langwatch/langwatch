@@ -508,6 +508,45 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     Then nothing is promoted and nothing is badged
     And the methods stay in the order the decision named
 
+  # The dial cannot write the badge — a consent screen somebody backs out of
+  # would wear it forever — so the method is parked and only a session may
+  # promote it. Nothing on the sign-in screen can be what notices: a federated
+  # callback returns the browser to wherever the sign-in was heading, and that
+  # screen is never mounted again. The session fetch is the one thing every
+  # landing passes through, so it is where the promotion belongs.
+  @unit
+  Scenario: A social provider that got me in is badged, wherever the callback lands
+    Given I dialled a social provider and it signed me in
+    When the browser lands anywhere in the app holding a session
+    Then that provider is badged the next time the door is drawn
+
+  @unit
+  Scenario: A social provider I backed out of is never badged
+    Given I dialled a social provider and abandoned it before it signed me in
+    When the browser comes back with no session
+    Then nothing is badged
+
+  # The parked method has to be retired by whatever gets the person in next,
+  # or an abandoned dial outlives its own flow: back out of the consent
+  # screen, sign in with a password, and the first session fetch after that
+  # promotes the provider straight over the badge the password just earned.
+  @unit
+  Scenario: A method I abandoned cannot take the badge from the one that got me in
+    Given I dialled a social provider and abandoned it
+    When I sign in with my password instead
+    Then the password is badged, and stays badged once I am let in
+
+  # The hand-off nobody clicks. A typed address that routes to an organization's
+  # identity provider is dialled for the person, with no button pressed, and
+  # that is the ordinary way in for everybody whose organization owns their
+  # domain. It has to earn the badge the same way a pressed button does, or
+  # the people who sign in this way every day are the ones never badged.
+  @integration
+  Scenario: A provider my address was routed to is badged once it lets me in
+    Given my address routes to my organization's identity provider
+    When I am taken there without pressing anything, and it lets me in
+    Then that provider is badged
+
   # Every button on the rail is live, or it is not there. A screen that drew a
   # provider the deployment never mounted would be offering a door that opens
   # onto an error, and the person pressing it has no way to know that before

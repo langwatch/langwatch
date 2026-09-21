@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const stubs = vi.hoisted(() => ({
   runPass: vi.fn(),
+  warn: vi.fn(),
   error: vi.fn(),
 }));
 
@@ -13,7 +14,7 @@ vi.mock("../runtime", () => ({
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
-    warn: vi.fn(),
+    warn: stubs.warn,
     error: stubs.error,
     debug: vi.fn(),
     trace: vi.fn(),
@@ -105,6 +106,47 @@ describe("runSystemMigrationsToQuiescence", () => {
 
     await expect(run).resolves.toMatchObject({ tenantsSeen: 0 });
     expect(stubs.runPass).toHaveBeenCalledTimes(3);
+  });
+
+  /** @scenario A peer's claims do not keep this process from starting */
+  it("starts once it has nothing of its own left, however long a peer holds the rest", async () => {
+    // Every replica runs this preflight, so on a rolling deploy each reads
+    // the others' leases as claims. Waiting on them would mean waiting on
+    // peers who are waiting on us, and the whole fleet crash-loops.
+    stubs.runPass.mockResolvedValue({
+      ...summaryOf({ advanced: 0 }),
+      tenantsSeen: 7469,
+      claimed: 1243,
+    });
+
+    const run = runSystemMigrationsToQuiescence();
+    await vi.runAllTimersAsync();
+
+    await expect(run).resolves.toMatchObject({ claimed: 1243 });
+    expect(stubs.runPass).toHaveBeenCalledTimes(3);
+    expect(stubs.error).not.toHaveBeenCalled();
+    expect(stubs.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ passes: 3 }),
+      expect.stringContaining("a peer still holds claims"),
+    );
+  });
+
+  /** @scenario A momentary overlap with a peer is still waited out */
+  it("waits out a peer that clears before the third pass", async () => {
+    stubs.runPass
+      .mockResolvedValueOnce({
+        ...summaryOf({ advanced: 0 }),
+        tenantsSeen: 7469,
+        claimed: 1243,
+      })
+      .mockResolvedValue({ ...summaryOf({ advanced: 0 }), tenantsSeen: 7469 });
+
+    const run = runSystemMigrationsToQuiescence();
+    await vi.runAllTimersAsync();
+
+    await expect(run).resolves.toMatchObject({ claimed: 0 });
+    expect(stubs.runPass).toHaveBeenCalledTimes(2);
+    expect(stubs.warn).not.toHaveBeenCalled();
   });
 
   it("retries when even one tenant outcome is hidden by a concurrent claim", async () => {

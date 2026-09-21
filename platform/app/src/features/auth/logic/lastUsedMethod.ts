@@ -62,9 +62,23 @@ export function readLastUsedMethodId(): string | null {
  * Remembers a method that actually got somebody in — a password sign-in that
  * came back without a failure, or a federated one promoted from the pending
  * slot once a session exists.
+ *
+ * Retires anything parked, because a method that just got somebody in settles
+ * the question the parked one was waiting to answer. Without that, a dial
+ * somebody abandoned outlives its own flow: they back out of the consent
+ * screen, sign in with their password instead, and the first session fetch
+ * after that promotes the abandoned provider straight over the badge the
+ * password just earned — "last clicked" beating "last used" again, by a
+ * longer route.
+ *
+ * A dial still in flight in another tab is retired too, so a provider that
+ * does come back signed in goes unbadged that once. That is the right way
+ * round: a missing badge costs a glance, a wrong one sends somebody to a
+ * button that will not let them in.
  */
 export function rememberLastUsedMethod(method: Pick<SignInMethod, "id">): void {
   try {
+    window.localStorage.removeItem(PENDING_KEY);
     window.localStorage.setItem(STORAGE_KEY, method.id);
   } catch {
     // A browser that will not store it simply does not get the badge.

@@ -10,7 +10,9 @@ const stubs = vi.hoisted(() => {
   const userFindUnique = vi.fn().mockResolvedValue(null);
   const userFindMany = vi.fn().mockResolvedValue([]);
   const organizationFindMany = vi.fn().mockResolvedValue([]);
+  const secretHealQueryRaw = vi.fn().mockResolvedValue([]);
   return {
+    secretHealQueryRaw,
     enrollmentFindMany,
     enrollmentFindUnique,
     organizationUserFindMany,
@@ -39,6 +41,12 @@ const stubs = vi.hoisted(() => {
         findMany: organizationUserFindMany,
         findFirst: organizationUserFindFirst,
       },
+      // The secret heal declares its own candidate tenants — the users whose
+      // legacy secrets could have drifted — and asks for them in raw SQL,
+      // because the predicate compares a column against a column on a
+      // related row. None drifted here; this suite is about which cohort a
+      // tenant lands in, not about what the heal then finds.
+      $queryRaw: secretHealQueryRaw,
     },
   };
 });
@@ -114,6 +122,9 @@ import {
 // OrganizationUser by userId alone — a shape the guard rejects — and this
 // suite could not see that while the stubs bypassed the guard.
 for (const [delegateName, delegate] of Object.entries(stubs.prisma)) {
+  // `$queryRaw` and friends are client methods, not model delegates — the
+  // guard keys off a model name and there is none to give it.
+  if (delegateName.startsWith("$")) continue;
   const model = delegateName.charAt(0).toUpperCase() + delegateName.slice(1);
   for (const [action, fn] of Object.entries(delegate)) {
     (delegate as Record<string, unknown>)[action] = (args: unknown) =>

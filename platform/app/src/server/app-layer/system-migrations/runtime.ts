@@ -9,6 +9,7 @@
 import { auditLog } from "@ee/audit-log/auditLog";
 import { createLogger } from "@langwatch/observability";
 import {
+  groupByTenantSource,
   type MigrationPassSummary,
   type SystemMigration,
   SystemMigrationRunnerService,
@@ -532,17 +533,29 @@ export async function runSystemMigrationPass(args?: {
     await reapOrphanedAddressLocks();
     return organizationSummary;
   }
-  const userRunner = new SystemMigrationRunnerService({
-    state: systemMigrationState,
-    lease: new RedisMigrationLeaseRepository(redis),
-    tenants: new PrismaUserTenantSource(prisma),
-    cohort: userCohort,
+  // One runner per distinct tenant source. A migration that declares its own
+  // candidates is driven over those alone; every other user migration shares
+  // the walk over the whole `User` table. They cannot share one source: the
+  // narrowed set would silently become the others' cohort too, and a backfill
+  // that must reach every user would stop reaching most of them.
+  let summary = organizationSummary;
+  const userBuckets = groupByTenantSource({
     migrations: userMigrations,
+    everyTenant: new PrismaUserTenantSource(prisma),
   });
-  const summary = mergeSummaries(
-    organizationSummary,
-    await userRunner.runPass({ signal: args?.signal }),
-  );
+  for (const { tenants, migrations } of userBuckets) {
+    const userRunner = new SystemMigrationRunnerService({
+      state: systemMigrationState,
+      lease: new RedisMigrationLeaseRepository(redis),
+      tenants,
+      cohort: userCohort,
+      migrations,
+    });
+    summary = mergeSummaries(
+      summary,
+      await userRunner.runPass({ signal: args?.signal }),
+    );
+  }
   await reapOrphanedAddressLocks();
   return summary;
 }
