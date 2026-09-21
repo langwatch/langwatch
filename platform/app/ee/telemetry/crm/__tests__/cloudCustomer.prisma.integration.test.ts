@@ -37,9 +37,9 @@ describe("given a person on a company domain with a LangWatch Cloud account", ()
       ).resolves.toBe(true);
     });
 
-    it("says no for a domain nobody is on", async () => {
+    it("says no for a domain with no account behind it", async () => {
       await expect(
-        customers.hasAccountOnDomain(`nobody-${RUN}.test`),
+        customers.hasAccountOnDomain(`unknown-${RUN}.test`),
       ).resolves.toBe(false);
     });
 

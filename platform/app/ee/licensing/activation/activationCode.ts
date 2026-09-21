@@ -20,8 +20,8 @@ import { createHash, randomInt } from "node:crypto";
  * The alphabet a person can read off a screen and type back.
  *
  * Crockford's base32 without I, L, O and U: the first three are read as 1 and
- * 0, and the fourth is dropped so no code spells a word somebody has to say
- * out loud.
+ * 0, and the fourth is dropped so no code spells a word a customer would rather
+ * not read back over the phone.
  */
 const ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
