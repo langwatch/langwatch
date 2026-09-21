@@ -21,6 +21,7 @@ import {
   namedTopicCountsSchema,
   tracesForProjectResultSchema,
 } from "./trace-read.contract.ts";
+import { routeSearchInputSchema, routeSearchResultSchema } from "./trace-search-route.ts";
 import {
   spanDetailSchema,
   traceHeaderSchema,
@@ -376,6 +377,15 @@ export const tracesTrpc = defineTrpcContract("traces")
     }),
   )
   .withOutput(aiActionResultSchema)
+
+  /**
+   * Enter on a sentence. The client calls this only when the submitted text
+   * has bare words; a pure `field:value` query is applied without a call.
+   * `service_unavailable` until a model-invocation capability is wired.
+   */
+  .mutation("routeSearch")
+  .withInput(routeSearchInputSchema)
+  .withOutput(routeSearchResultSchema)
 
   .query("header")
   .withInput(

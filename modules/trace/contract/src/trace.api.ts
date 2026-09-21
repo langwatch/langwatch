@@ -74,6 +74,13 @@ export interface TraceApi extends TraceOtlpIngestApi {
   }): Promise<{ rewrittenEvent: unknown; refs: readonly { id: string }[] }>;
   downloadTraceExport(input: TraceExportDownloadInput): Promise<TraceExportDownload>;
   formatSpansDigest(input: { spans: Span[] }): Promise<string>;
+  /**
+   * The trace as the LLM-readable span digest, under a token budget. What a
+   * reader that is a model gets, where `formatSpansDigest` is unbounded.
+   */
+  renderReadableTrace(input: { trace: Trace; maxTokens: number }): Promise<string>;
+  /** The whole trace as one JSON object, spans included. */
+  renderTraceJson(input: { trace: Trace }): Promise<string>;
   recordCapturedSpan(input: RecordCapturedSpanInput): Promise<void>;
   resolveIngestWaitTimeout(input: TraceIngestWaitInput): Promise<number>;
   getEvaluationSpans(input: EvaluationTraceReadInput): Promise<EvaluationTraceSpan[]>;

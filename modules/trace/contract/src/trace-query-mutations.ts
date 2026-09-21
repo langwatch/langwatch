@@ -497,3 +497,111 @@ export function combineQueries({ base, addition }: { base: string; addition: str
   const guard = (query: string): string => (bindsAsOr(query) ? `(${query})` : query);
   return `${guard(left)} AND ${guard(right)}`;
 }
+
+/**
+ * A sentence as one free-text clause. Several words become one quoted phrase
+ * (substring semantics, one AST node), a single safe word stays bare. Empty
+ * input yields an empty clause so the caller can append it without a check.
+ */
+export function quoteAsPhrase(sentence: string): string {
+  const collapsed = sentence.replace(/\s+/g, " ").trim();
+  if (!collapsed) return "";
+  return escapeValue(collapsed);
+}
+
+/** A tag the sentence may take: bare, unquoted, un-negated, outside any `OR`. */
+type BareWordTag = Extract<LiqeQuery, { type: "Tag" }> & {
+  expression: Extract<
+    Extract<LiqeQuery, { type: "Tag" }>["expression"],
+    { type: "LiteralExpression" }
+  >;
+};
+
+/**
+ * Whether the node contributes a word to the sentence. Everything else was
+ * written the way the writer meant it, and stays in the explicit query.
+ */
+function isBareWord(node: LiqeQuery, keepExplicit: ReadonlySet<LiqeQuery>): node is BareWordTag {
+  return (
+    node.type === "Tag" &&
+    !keepExplicit.has(node) &&
+    node.field.type === "ImplicitField" &&
+    node.expression.type === "LiteralExpression" &&
+    !node.expression.quoted
+  );
+}
+
+/**
+ * Every tag with an `OR` above it, at any depth. Such a tag cannot be taken
+ * out on its own: what is left behind rebinds, and the caller rejoins the two
+ * halves with AND.
+ */
+function tagsUnderOr(
+  ast: LiqeQuery,
+  inOr = false,
+  found: Set<LiqeQuery> = new Set(),
+): Set<LiqeQuery> {
+  if (ast.type === "Tag") {
+    if (inOr) found.add(ast);
+    return found;
+  }
+  if (ast.type === "UnaryOperator") {
+    return tagsUnderOr(ast.operand, inOr, found);
+  }
+  if (ast.type === "ParenthesizedExpression") {
+    return tagsUnderOr(ast.expression, inOr, found);
+  }
+  if (ast.type === "LogicalExpression") {
+    const underOr = inOr || ast.operator.operator === "OR";
+    tagsUnderOr(ast.left, underOr, found);
+    tagsUnderOr(ast.right, underOr, found);
+  }
+  return found;
+}
+
+/**
+ * The two halves of a typed search: the bare words as one sentence, and the
+ * explicit query left when they are taken out. A quoted phrase, a negated
+ * word and a word under an `OR` stay explicit. @see ADR-144
+ */
+export function splitBareWords(currentQuery: string): {
+  sentence: string;
+  explicitQuery: string;
+} {
+  const trimmed = currentQuery.trim();
+  if (!trimmed) return { sentence: "", explicitQuery: "" };
+  try {
+    const ast = parse(trimmed);
+    // `filterAST` hands the predicate a negated word's operand with no sign of
+    // the negation, so the negated tags are marked first.
+    const negatedTags = new Set<LiqeQuery>();
+    walkAST(ast, (node, negated) => {
+      if (negated) negatedTags.add(node);
+    });
+    const keepExplicit = new Set<LiqeQuery>([...negatedTags, ...tagsUnderOr(ast)]);
+    const bare: string[] = [];
+    const explicit = filterAST(ast, (node) => {
+      if (!isBareWord(node, keepExplicit)) return true;
+      bare.push(String(node.expression.value));
+      return false;
+    });
+    if (bare.length === 0) return { sentence: "", explicitQuery: trimmed };
+    return {
+      sentence: bare.join(" "),
+      explicitQuery: isEmptyAST(explicit) ? "" : serialize(explicit),
+    };
+  } catch {
+    return { sentence: "", explicitQuery: trimmed };
+  }
+}
+
+/**
+ * The same query with its bare words collapsed into one quoted phrase, the
+ * explicit `field:value` terms kept as typed: what "search it as one phrase"
+ * applies, and what an undo restores after the router wrote a filter.
+ */
+export function requoteBareTerms(currentQuery: string): string {
+  const { sentence, explicitQuery } = splitBareWords(currentQuery);
+  if (!sentence) return currentQuery;
+  return combineQueries({ base: explicitQuery, addition: quoteAsPhrase(sentence) });
+}

@@ -46,6 +46,10 @@ export class TestModelProviderService implements ModelProviderApi {
     throw new Error("Not used by Trace tests.");
   }
 
+  generateStructured(): Promise<never> {
+    throw new Error("Not used by Trace tests.");
+  }
+
   upsert(): Promise<never> {
     throw new Error("Not used by Trace tests.");
   }

@@ -566,6 +566,16 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
     throw new TraceAiQueryUnavailableError();
   })
 
+  /**
+   * Enter on a sentence, routed. Refuses for the same reason `aiQuery` does:
+   * every route but the phrase needs a model this transport cannot call yet.
+   */
+  .procedure("routeSearch")
+  .withPermission("traces:view")
+  .handle(() => {
+    throw new TraceAiQueryUnavailableError();
+  })
+
   .procedure("header")
   .withPermission("traces:view")
   .handle(async ({ app, input, actor }) => {
@@ -654,7 +664,7 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
       gateTraceLogVisibility(
         row,
         protections,
-        protections.visibilityCutoffMs,
+        protections.visibilityCutoffMs ?? null,
         {
           logContentKeys: (eventName) =>
             app.codingAgentLogContentKeys(eventName).map((entry) => ({

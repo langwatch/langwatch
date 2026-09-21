@@ -40,6 +40,7 @@ import { Toolbar } from "../toolbar/toolbar.tsx";
 import { TraceV2DrawerShell } from "../trace-drawer/index.ts";
 import { TraceTable } from "../trace-table/trace-table.tsx";
 import { EmptyResultsPane } from "./empty-results-pane.tsx";
+import { ExplorerLangyActions } from "./explorer-langy-actions.tsx";
 import { IntegratePane } from "./integrate-pane.tsx";
 import { PageKeyboardShortcuts } from "./page-keyboard-shortcuts.tsx";
 import { useDebouncedFilterCommit } from "./use-debounced-filter-commit.ts";
@@ -212,6 +213,7 @@ export const TracesPage: React.FC = () => {
               )}
             </AnimatePresence>
           </HStack>
+          <ExplorerLangyActions />
           <PageKeyboardShortcuts />
           <TraceDrawerMount />
         </VStack>

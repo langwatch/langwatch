@@ -102,6 +102,15 @@ class CapabilityTraceHost extends TraceHostApi {
   failed(failure: TraceFailureNotice): void {
     this.actions.failed(failure);
   }
+
+  /**
+   * No `@langwatch/browser-host` capability carries the agent's page
+   * registry, so the port is told absence rather than a guess: a composition
+   * that installs Langy answers this from Langy's published capability.
+   */
+  registerLangyActions(): () => void {
+    return () => void 0;
+  }
 }
 
 /**

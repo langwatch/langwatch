@@ -22,7 +22,34 @@ function missingValueMessage(ast: Extract<LiqeQuery, { type: "Tag" }>): string |
   return fieldName ? `Missing value after \`${fieldName}:\`` : "Missing value after `:`";
 }
 
+/** The ceiling the ClickHouse translator holds: one node per node visited. */
+export const MAX_FILTER_NODE_COUNT = 20;
+
+/**
+ * What a filter past the ceiling says. The server answers the same refusal
+ * with `filter_too_complex`; this is the client's copy, shown before sending.
+ */
+export const FILTER_TOO_COMPLEX_MESSAGE =
+  "Too many separate terms. Put the sentence in quotes to search it as one phrase.";
+
+/** Counts nodes the way the ClickHouse translator does: one per node visited. */
+export function countFilterNodes(ast: LiqeQuery): number {
+  switch (ast.type) {
+    case "LogicalExpression":
+      return 1 + countFilterNodes(ast.left) + countFilterNodes(ast.right);
+    case "UnaryOperator":
+      return 1 + countFilterNodes(ast.operand);
+    case "ParenthesizedExpression":
+      return 1 + countFilterNodes(ast.expression);
+    default:
+      return 1;
+  }
+}
+
 export function validateAst(ast: LiqeQuery): string | null {
+  if (countFilterNodes(ast) > MAX_FILTER_NODE_COUNT) {
+    return FILTER_TOO_COMPLEX_MESSAGE;
+  }
   switch (ast.type) {
     case "Tag":
       return missingValueMessage(ast);

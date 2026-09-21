@@ -9,6 +9,7 @@ import {
 } from "@langwatch/browser-host/use-organization-team-project";
 import { createContext, createElement, useContext, useMemo } from "react";
 import type { ReactNode } from "react";
+import type { z } from "zod";
 
 /** The project every trace read is scoped to. */
 export type TraceHostProject = {
@@ -94,6 +95,18 @@ export type TraceFailureNotice = {
   id?: string;
 };
 
+/**
+ * One thing the agent may do on the screen that is open, with the schema its
+ * payload is checked against first.
+ */
+export type TraceLangyActionHandler = {
+  payloadSchema: z.ZodTypeAny;
+  run: (payload: never) => unknown;
+};
+
+/** Every such action, by the kind the agent dispatches. */
+export type TraceLangyActionHandlers = Readonly<Record<string, TraceLangyActionHandler>>;
+
 export abstract class TraceHostApi {
   /** The project in scope, or undefined before one resolves. */
   abstract project(): TraceHostProject | undefined;
@@ -129,6 +142,13 @@ export abstract class TraceHostApi {
   abstract succeeded(notice: TraceSuccessNotice): void;
 
   abstract failed(failure: TraceFailureNotice): void;
+
+  /**
+   * Publishes what the agent may do on the open screen and hands back the way
+   * to withdraw it. An application with no agent answers with a no-op, which
+   * is why a screen never reaches the agent's browser half itself.
+   */
+  abstract registerLangyActions(handlers: TraceLangyActionHandlers): () => void;
 }
 
 const TraceHostContext = createContext<TraceHostApi | undefined>(void 0);

@@ -2140,3 +2140,233 @@ Rule: Editing an existing token reopens the dropdown
     Given the search bar contains "@trace.attribute.langwatch.origin:application" with the dropdown open
     When the user presses the right arrow until the cursor sits past the token
     Then the dropdown closes
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ENTER ROUTES A SENTENCE
+# ─────────────────────────────────────────────────────────────────────────────
+
+Rule: Enter routes a sentence
+  Enter is the only way a typed text leaves the search bar. A text made of
+  `field:value` terms is applied as typed, with no request. A text with bare
+  words is a sentence, and `tracesV2.routeSearch` decides what it is: a
+  filter the query language can express, a judgement each trace needs (an
+  Instant Eval), a literal phrase, or a question for Langy. The classifier
+  makes the call in one category question over the sentence and a line of
+  context (lens, window, the filter fields, the evaluators and events the
+  project has); a deployment without the classifier asks the FAST model to
+  decide and build in one call; a deployment with neither searches the
+  phrase and says why. Routing is counted on a metric and never metered.
+  A failure on the way is a phrase search, never an error state in the bar.
+  See dev/docs/adr/139-trace-search-routes-on-enter.md.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the project has traces
+
+  @integration
+  Scenario: Enter on a sentence asks the router
+    Given the search bar contains the applied query "model:gpt-4o"
+    When the user types "annoyed users" and presses Enter
+    Then `tracesV2.routeSearch` is called with the text, the visible time range, the applied query and the active lens
+    And nothing changes on screen until it answers
+    And a second Enter before the answer supersedes it
+
+  @unit
+  Scenario: A sentence the filter language can express becomes chips
+    Given the classifier answers "filter" for "errors from gpt-4 service:checkout"
+    When the router runs
+    Then the FAST model builds the filter for "errors from gpt-4" with the live field catalogue
+    And the result is merged with the explicit term: "service:checkout AND status:error"
+    And the bar shows the query as chips
+    And a strip under the bar reads "Searched as: <query>" with "Search the words instead"
+    And "Search the words instead" applies the sentence as one quoted phrase
+
+  @integration
+  Scenario: The routed query replaces the sentence in the bar while the bar keeps focus
+    Given the user typed "annoyed users" and pressed Enter
+    And the bar still has focus
+    When the query the router produced is applied
+    Then the bar shows the applied query as chips, with the caret at its end
+    And a bar the user kept typing in after Enter keeps what they typed
+    And the Enter hint sits after the applied query, not where the sentence ended
+
+  @unit
+  Scenario: Explicit terms typed next to a sentence are kept
+    When the user types "annoyed users status:error asking refunds"
+    Then the sentence is "annoyed users asking refunds"
+    And the explicit query is "status:error"
+    And a quoted phrase or a negated word counts as explicit, not as part of the sentence
+
+  # The two halves are rejoined with AND, so a word the writer put under an OR
+  # would come back meaning something else than they typed.
+  @unit
+  Scenario: A word under an OR stays in the explicit query
+    When the user types "status:error OR refund"
+    Then the sentence is empty
+    And the explicit query is "status:error OR refund"
+    And the query is applied as typed rather than routed
+
+  @unit
+  Scenario: Joining a query that holds a top-level OR groups it first
+    Given a query "(a) OR (b)" and an addition "c"
+    Then the joined query reads "((a) OR (b)) AND c"
+    And a query already wrapped in one pair of parentheses is not wrapped again
+
+  # A rejected key makes the provider's own response body the credential, so
+  # the log line gets the same curation the customer-facing disclosure gets.
+  @unit
+  Scenario: A provider failure is logged curated, never raw
+    Given a provider call fails with its own message
+    When the failure is logged
+    Then the line carries the provider, the model and the status code
+    And none of the provider's own text is in it
+
+  @unit
+  Scenario: A filter the model could not write becomes a phrase search
+    Given the classifier answers "filter"
+    And the FAST model answers an empty query
+    When the router runs
+    Then the sentence is searched as one quoted phrase
+    And the result says it fell back from the filter route
+
+  @unit
+  Scenario: A sentence that needs a judgement becomes an Instant Eval question
+    Given the classifier answers "instant_eval" for "annoyed users status:error" on the Conversations lens
+    When the router runs
+    Then the FAST model rewrites the sentence into a judge question with a yes and a no criterion
+    And the target is "threads" on the Conversations lens and "traces" on every other lens
+    And the result carries the explicit terms as `otherQuery` and the phrase search as `fallbackQuery`
+
+  @unit
+  Scenario: An existing evaluator answers the judgement as a filter
+    Given the classifier answers "instant_eval" for "hallucinated answers"
+    And the project has results from the evaluator "ragas/faithfulness"
+    When the FAST model prefers the evaluator
+    Then the result is the filter "evaluator:ragas/faithfulness AND evaluatorVerdict:fail"
+    And it carries the reason the evaluator was chosen
+
+  @integration
+  Scenario: An Instant Eval route starts a run
+    Given the router answered "instant_eval"
+    When the Explorer receives the payload through `useInstantEvalRoute`
+    Then an `eval:"<question>"` chip is applied and a run starts under the cost rule
+    # The cost rule, the progress bar and the refusals are specified in
+    # specs/traces-v2/instant-eval-search.feature.
+
+  @unit
+  Scenario: A literal phrase is searched as one phrase
+    Given the classifier answers "free_text" for "cannot connect to database service:api"
+    When the router runs
+    Then the query is `service:api AND "cannot connect to database"`
+    And no model is called
+
+  @unit
+  Scenario: A question for the assistant goes to Langy with the view attached
+    Given the classifier answers "langy" for "why did errors spike this morning"
+    When the router runs
+    Then the whole typed text is handed to Langy as the question
+    And the view and the applied search are attached, as the Ask Langy button attaches them
+    And the option is not offered to the classifier when Langy is not available to the user
+
+  @unit
+  Scenario: Without the classifier the model decides and builds in one call
+    Given the deployment has no classifier configured
+    When the user submits "failing calls model:gpt-4o"
+    Then the FAST model answers a route and, for a filter, the query in the same call
+    And a filter answer is merged with the explicit terms: "model:gpt-4o AND (status:error OR status:warning)"
+
+  @unit
+  Scenario: Without a classifier or a model the words are searched as a phrase
+    Given the deployment has no classifier configured
+    And the project has no FAST model configured
+    When the user submits "annoyed users"
+    Then the query `"annoyed users"` is applied
+    And the result says a model is unavailable
+    And the bar shows the "Connect a model for smarter search" popover once per session, closable
+    And the popover links to the model provider settings in a new tab
+
+  @integration
+  Scenario: Back returns to the search before
+    Given the user submitted "status:error" and then "model:gpt-5-mini"
+    When the user presses the browser's Back button
+    Then the Explorer stays open on "status:error", with its window, lens and run keys
+    And Forward returns to "model:gpt-5-mini"
+    # A submitted search (Enter, a facet click, a range or lens pick, a Langy
+    # action) is a history entry. Restoring one is not a new search.
+
+  @integration
+  Scenario: Run progress and run keys never add history entries
+    Given a search whose Instant Eval run is registered a moment after the submit
+    When the run key reaches the URL
+    Then it is written into the entry the submit made
+
+  @unit
+  Scenario: With Instant Evals not released for the project the router does not offer the judgement route
+    Given Instant Evals are not released for the project
+    When the user submits "annoyed users"
+    Then the classifier is asked without the instant_eval option
+    And the model is told the instant_eval route is not available
+    And a judgement answer from either is searched as a filter or as the phrase
+    And no Instant Eval popover or dialog is shown
+
+  @integration
+  Scenario: A model whose provider is disabled counts as no model
+    Given the deployment has no classifier configured
+    And the project's FAST model belongs to a provider that is disabled
+    When the user submits "annoyed users"
+    Then the query `"annoyed users"` is applied
+    And the result says a model is unavailable
+
+  @unit
+  Scenario: A classified route that finds the provider disabled says a model is unavailable
+    Given the classifier answers "filter"
+    And the project's FAST model belongs to a provider that is disabled
+    When the user submits "failing calls"
+    Then the query `"failing calls"` is applied
+    And the result says a model is unavailable
+
+  @unit
+  Scenario: A model failure is a phrase search, not an error
+    Given the FAST model fails on every attempt
+    When the user submits "annoyed users"
+    Then the query `"annoyed users"` is applied
+    And no error banner is shown
+    And the result does not say a model is unavailable
+
+  @unit
+  Scenario: The client refuses a sentence past the term ceiling before sending it
+    Given the user applies eleven bare words as a filter
+    Then the client's validation refuses it with "Too many separate terms. Put the sentence in quotes to search it as one phrase."
+    And ten bare words pass
+    And the same eleven words in quotes pass as one node
+    # Eleven bare words are twenty-one nodes: the translator's ceiling is twenty.
+
+  @unit
+  Scenario: The server refuses a sentence past the term ceiling with its own code
+    Given a filter with more than twenty nodes reaches the server
+    Then it is refused with the code `filter_too_complex`, a 422 and customer fault
+    And `meta.maxNodes` carries the ceiling
+    And the customer copy reads "Too many separate terms" and "Put the sentence in quotes to search it as one phrase."
+
+  @integration
+  Scenario: A sentence past the term ceiling offers to search it as one phrase
+    Given the table failed with `filter_too_complex`
+    Then the error state offers "Search it as one phrase"
+    And clicking it applies the query with its bare words as one quoted phrase and the explicit terms kept
+
+  @unit
+  Scenario: The fix quotes the sentence as one phrase
+    Given the query "status:error one two three four five six seven eight nine ten eleven"
+    When it is requoted
+    Then it reads `status:error AND "one two three four five six seven eight nine ten eleven"`
+    And a query with no bare words is returned untouched
+
+  # The Explorer re-runs a search it already routed (an eval chip re-judged),
+  # and the answer must not land on a different route the second time.
+  @unit
+  Scenario: A search the page routed once is not classified again
+    Given the caller names the route the search took before
+    When the router runs
+    Then that route is built without asking the classifier or the model
+    And the answer says the caller decided it

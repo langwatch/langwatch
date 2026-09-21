@@ -617,6 +617,17 @@ export class TraceApp implements TraceApi, CollectorApp {
     return TraceReadableSpanService.formatSpansDigest(input.spans);
   }
 
+  async renderReadableTrace(input: { trace: Trace; maxTokens: number }): Promise<string> {
+    return TraceReadableSpanService.formatSpansDigestBounded({
+      spans: input.trace.spans,
+      maxTokens: input.maxTokens,
+    }).text;
+  }
+
+  async renderTraceJson(input: { trace: Trace }): Promise<string> {
+    return JSON.stringify(input.trace);
+  }
+
   async recordCapturedSpan(input: RecordCapturedSpanInput): Promise<void> {
     const parsed = recordCapturedSpanInputSchema.parse(input);
     const ingest = this.#dependencies.spanIngest;
