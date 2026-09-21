@@ -72,6 +72,28 @@ describe("given a social provider was dialled on this browser", () => {
     });
   });
 
+  describe("when another method gets the person in first", () => {
+    /** @scenario "A method I abandoned cannot take the badge from the one that got me in" */
+    it("leaves the badge with the method that actually let them in", async () => {
+      mockFetch.mockResolvedValue({ ok: true, json: async () => signedIn });
+
+      const { useSession } = await import("../auth-client");
+      const { readLastUsedMethodId, rememberLastUsedMethod } = await import(
+        "~/features/auth/logic/lastUsedMethod"
+      );
+
+      // Backed out of the consent screen, signed in with a password instead.
+      rememberLastUsedMethod({ id: "password" });
+
+      const { result } = renderHook(() => useSession());
+      await waitFor(() => {
+        expect(result.current.status).toBe("authenticated");
+      });
+
+      expect(readLastUsedMethodId()).toBe("password");
+    });
+  });
+
   describe("when the browser comes back with no session", () => {
     /** @scenario "A social provider I backed out of is never badged" */
     it("badges nothing", async () => {

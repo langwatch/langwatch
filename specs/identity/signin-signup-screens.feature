@@ -526,6 +526,16 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     When the browser comes back with no session
     Then nothing is badged
 
+  # The parked method has to be retired by whatever gets the person in next,
+  # or an abandoned dial outlives its own flow: back out of the consent
+  # screen, sign in with a password, and the first session fetch after that
+  # promotes the provider straight over the badge the password just earned.
+  @unit
+  Scenario: A method I abandoned cannot take the badge from the one that got me in
+    Given I dialled a social provider and abandoned it
+    When I sign in with my password instead
+    Then the password is badged, and stays badged once I am let in
+
   # Every button on the rail is live, or it is not there. A screen that drew a
   # provider the deployment never mounted would be offering a door that opens
   # onto an error, and the person pressing it has no way to know that before
