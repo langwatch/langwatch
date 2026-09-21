@@ -46,6 +46,17 @@ export interface LangWatchQLPolicy {
    */
   readonly gatedColumns: readonly string[];
   /**
+   * Content permissions the caller holds, which is what admits an app function
+   * whose value reads a gated field. Absent means none are held.
+   */
+  readonly heldPermissions?: readonly string[];
+  /**
+   * Whether this caller may call an eval function. Not a permission: a
+   * judgement is charged to one project, so it is a deployment-and-project
+   * decision the caller's surface answers. Absent means no.
+   */
+  readonly isInstantEvalsEnabled?: boolean;
+  /**
    * Database an unqualified table name resolves to — the same one the executor
    * connects with. Omit it and unqualified names are matched as written.
    */
@@ -58,6 +69,8 @@ export interface LangWatchQLPolicy {
 export interface ResolvedLangWatchQLPolicy {
   readonly allowedTables: ReadonlySet<string>;
   readonly gatedColumns: ReadonlySet<string>;
+  readonly heldPermissions: ReadonlySet<string>;
+  readonly isInstantEvalsEnabled: boolean;
   readonly reservedDatabases: ReadonlySet<string>;
   readonly defaultDatabase: string;
   readonly limits: LangWatchQLLimits;

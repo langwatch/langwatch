@@ -154,7 +154,7 @@ export class RedisInstantEvalRateLimiterChannel implements InstantEvalRateLimite
     const { redis } = this.options;
     if (!redis) return this.drawLocally(wanted);
     try {
-      return this.takeFromBuckets({ redis, wanted, tenantId });
+      return await this.takeFromBuckets({ redis, wanted, tenantId });
     } catch (error) {
       logger.warn(
         { error },

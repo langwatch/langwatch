@@ -1,0 +1,224 @@
+/**
+ * The shared token buckets, driven against a fake Redis that runs the real
+ * script's arithmetic: the Lua itself needs a server, so the fake keeps the
+ * same state and applies the same refill rule to both buckets.
+ * @see specs/instant-evals/classifier.feature
+ */
+
+import { Temporal } from "@langwatch/time";
+import { describe, expect, it } from "vitest";
+
+import {
+  type InstantEvalRateLimiterRedis,
+  LOCAL_FALLBACK_TOKENS_PER_SECOND,
+  RedisInstantEvalRateLimiterChannel,
+} from "../redis/redis.instant-eval-rate-limiter.channel.ts";
+
+const GLOBAL_REFILL = 300_000;
+const GLOBAL_CAPACITY = 600_000;
+const TENANT_REFILL = 150_000;
+const TENANT_CAPACITY = 300_000;
+
+interface Bucket {
+  tokens: number;
+  at: number | null;
+}
+
+interface BucketRedis extends InstantEvalRateLimiterRedis {
+  readonly buckets: Map<string, Bucket>;
+  evals: number;
+}
+
+/** A Redis that keeps the buckets the script keeps, and counts what it was asked. */
+function bucketRedis(): BucketRedis {
+  const buckets = new Map<string, Bucket>();
+  const bucket = (key: string, capacity: number): Bucket => {
+    const state = buckets.get(key) ?? { tokens: capacity, at: null };
+    buckets.set(key, state);
+    return state;
+  };
+  const refilled = (state: Bucket, now: number, capacity: number, refill: number) => {
+    state.at ??= now;
+    state.tokens = Math.min(capacity, state.tokens + ((now - state.at) / 1000) * refill);
+    state.at = now;
+    return state.tokens;
+  };
+  const fake: BucketRedis = {
+    evals: 0,
+    buckets,
+    async eval(_script: string, _keyCount: number, ...args: string[]) {
+      fake.evals += 1;
+      const [globalKey = "", tenantKey = ""] = args;
+      const [
+        now = 0,
+        wanted = 0,
+        ,
+        globalCapacity = 0,
+        globalRefill = 0,
+        tenantCapacity = 0,
+        tenantRefill = 0,
+      ] = args.slice(2).map(Number);
+      const global = bucket(globalKey, globalCapacity);
+      const tenant = bucket(tenantKey, tenantCapacity);
+      const globalTokens = refilled(global, now, globalCapacity, globalRefill);
+      const tenantTokens = refilled(tenant, now, tenantCapacity, tenantRefill);
+      const waitFor = (tokens: number, refill: number) =>
+        tokens >= wanted ? 0 : Math.ceil(((wanted - tokens) / refill) * 1000);
+      const wait = Math.max(
+        waitFor(globalTokens, globalRefill),
+        waitFor(tenantTokens, tenantRefill),
+      );
+      if (wait > 0) return [0, wait];
+      global.tokens -= wanted;
+      tenant.tokens -= wanted;
+      return [wanted, 0];
+    },
+  };
+  return fake;
+}
+
+function limiterOn({
+  redis,
+  clock,
+}: {
+  redis: InstantEvalRateLimiterRedis | null;
+  clock: { now: number };
+}) {
+  return RedisInstantEvalRateLimiterChannel.create({
+    redis,
+    tokensPerSecond: GLOBAL_REFILL,
+    capacity: GLOBAL_CAPACITY,
+    tenantTokensPerSecond: TENANT_REFILL,
+    tenantCapacity: TENANT_CAPACITY,
+    now: () => Temporal.Instant.fromEpochMilliseconds(clock.now),
+    sleep: async (ms: number) => {
+      clock.now += ms;
+    },
+  });
+}
+
+const globalBucket = (redis: BucketRedis) =>
+  [...redis.buckets.entries()].find(([key]) => !key.includes(":tenant:"))?.[1];
+const tenantBucket = (redis: BucketRedis, tenant: string) =>
+  [...redis.buckets.entries()].find(([key]) => key.endsWith(`:tenant:${tenant}`))?.[1];
+
+/** The `{...}` segment Redis Cluster hashes a key's slot from, if it has one. */
+const hashTagOf = (key: string): string | undefined => /\{[^}]+\}/.exec(key)?.[0];
+
+describe("given the shared buckets", () => {
+  describe("when the two buckets are keyed", () => {
+    /** @scenario "Both buckets share one Redis Cluster hash tag" */
+    it("puts both keys under one hash tag, so one EVAL may take from both", async () => {
+      const redis = bucketRedis();
+      const limiter = limiterOn({ redis, clock: { now: 1_000 } });
+
+      await limiter.acquire({ tokens: 100, tenantId: "project-a" });
+
+      const keys = [...redis.buckets.keys()];
+
+      expect(keys).toHaveLength(2);
+      expect(hashTagOf(keys[0] ?? "")).toBeDefined();
+      expect(hashTagOf(keys[1] ?? "")).toBe(hashTagOf(keys[0] ?? ""));
+    });
+  });
+
+  describe("when a classification takes its tokens", () => {
+    /** @scenario "A classification takes its estimated tokens from one bucket shared by every pod" */
+    it("debits the global bucket and the tenant's by exactly what it asked", async () => {
+      const redis = bucketRedis();
+      const limiter = limiterOn({ redis, clock: { now: 1_000 } });
+
+      await limiter.acquire({ tokens: 4_200, tenantId: "project-a" });
+      await limiter.acquire({ tokens: 800, tenantId: "project-b" });
+
+      expect(redis.evals).toBe(2);
+      expect(globalBucket(redis)?.tokens).toBe(GLOBAL_CAPACITY - 5_000);
+      expect(tenantBucket(redis, "project-a")?.tokens).toBe(TENANT_CAPACITY - 4_200);
+      expect(tenantBucket(redis, "project-b")?.tokens).toBe(TENANT_CAPACITY - 800);
+    });
+  });
+
+  describe("when the global bucket is empty", () => {
+    /** @scenario "An empty bucket refills at the configured token rate" */
+    it("waits, and the wait is what makes the next tokens available", async () => {
+      const redis = bucketRedis();
+      const clock = { now: 1_000 };
+      const limiter = limiterOn({ redis, clock });
+
+      await limiter.acquire({ tokens: TENANT_CAPACITY, tenantId: "a" });
+      await limiter.acquire({ tokens: TENANT_CAPACITY, tenantId: "b" });
+      const startedAt = clock.now;
+      await limiter.acquire({ tokens: 30_000, tenantId: "c" });
+
+      expect(clock.now - startedAt).toBeGreaterThanOrEqual(100);
+      expect(clock.now - startedAt).toBeLessThanOrEqual(250);
+    });
+  });
+
+  describe("when one tenant has spent its share", () => {
+    /** @scenario "A tenant that has spent its share waits while another tenant does not" */
+    it("makes that tenant wait and lets another through", async () => {
+      const redis = bucketRedis();
+      const clock = { now: 1_000 };
+      const limiter = limiterOn({ redis, clock });
+
+      await limiter.acquire({ tokens: TENANT_CAPACITY, tenantId: "busy" });
+      const before = clock.now;
+      await limiter.acquire({ tokens: 1_000, tenantId: "quiet" });
+
+      expect(clock.now).toBe(before);
+
+      await limiter.acquire({ tokens: 1_000, tenantId: "busy" });
+
+      expect(clock.now).toBeGreaterThan(before);
+    });
+  });
+
+  describe("when the bucket has been idle", () => {
+    /** @scenario "The bucket never fills past its capacity" */
+    it("never holds more than its capacity", async () => {
+      const redis = bucketRedis();
+      const clock = { now: 1_000 };
+      const limiter = limiterOn({ redis, clock });
+
+      clock.now += 3_600_000;
+      await limiter.acquire({ tokens: 1, tenantId: "a" });
+
+      expect(globalBucket(redis)?.tokens).toBe(GLOBAL_CAPACITY - 1);
+      expect(tenantBucket(redis, "a")?.tokens).toBe(TENANT_CAPACITY - 1);
+    });
+  });
+
+  describe("when a request asks for more than a bucket can ever hold", () => {
+    it("is let through at the capacity rather than waiting forever", async () => {
+      const redis = bucketRedis();
+      const clock = { now: 1_000 };
+      const limiter = limiterOn({ redis, clock });
+
+      await limiter.acquire({ tokens: TENANT_CAPACITY * 3, tenantId: "a" });
+
+      expect(tenantBucket(redis, "a")?.tokens).toBe(0);
+    });
+  });
+});
+
+describe("given a Redis that cannot be reached", () => {
+  describe("when tokens are asked for", () => {
+    /** @scenario "A Redis that cannot be reached falls back to a local token rate" */
+    it("grants them locally rather than failing the query", async () => {
+      const failing: InstantEvalRateLimiterRedis = {
+        async eval() {
+          throw new Error("connection refused");
+        },
+      };
+      const clock = { now: 1_000 };
+      const limiter = limiterOn({ redis: failing, clock });
+
+      for (let taken = 0; taken < 20; taken++) {
+        await limiter.acquire({ tokens: LOCAL_FALLBACK_TOKENS_PER_SECOND / 10, tenantId: "a" });
+      }
+
+      expect(clock.now - 1_000).toBeGreaterThanOrEqual(900);
+    });
+  });
+});

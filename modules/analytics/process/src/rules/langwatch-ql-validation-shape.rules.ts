@@ -1,4 +1,5 @@
 import type {
+  LangWatchQLAppFunctionCall,
   LangWatchQLClause,
   LangWatchQLViolation,
   LangWatchQLViolationCode,
@@ -85,6 +86,12 @@ export interface AcceptedLangWatchQL {
    * outermost query first, then what it contains.
    */
   readonly blocks: readonly LangWatchQLQueryBlock[];
+  /**
+   * The app-function calls the projection made, in projection order — the
+   * hydration plan. Empty for a statement that called none, which leaves the
+   * hydration stage free for every query that existed before app functions.
+   */
+  readonly appFunctions: readonly LangWatchQLAppFunctionCall[];
 }
 
 /** A query that was refused, and every reason found before the walk stopped. */
@@ -146,6 +153,17 @@ export interface Frame {
   readonly ctes: readonly string[];
   /** The `SELECT` block this node sits in. Absent above the outermost one. */
   readonly block?: BlockAccumulator;
+  /**
+   * Set on the children of the root `SelectWithUnionQuery` holding exactly one
+   * `SELECT`, cleared below. A `UNION` clears it: two branches would put two
+   * meanings in one column, and hydration works per column.
+   */
+  readonly isRootSelect?: boolean;
+  /**
+   * Set on the frame of the one `SELECT` whose projection may call an app
+   * function. Read by the projection walk and by nothing else.
+   */
+  readonly isOutermostSelect?: boolean;
 }
 
 /** Everything the walk accumulates. */
@@ -155,6 +173,8 @@ export interface WalkContext {
   readonly tables: string[];
   readonly parameters: LangWatchQLParameter[];
   readonly blocks: BlockAccumulator[];
+  /** The hydration plan, in projection order. Only admitted calls are here. */
+  readonly appFunctions: LangWatchQLAppFunctionCall[];
 }
 
 export interface NodeArgs {

@@ -82,7 +82,14 @@ export interface AnalyticsApi {
     input: AnalyticsEvaluationRollupAppendBatchInput,
   ): Promise<void>;
   isLangWatchQLAvailable(): boolean;
-  describeLangWatchQLSchema(input: { protections: LangWatchQLProtections }): LangWatchQLSchema;
+  /**
+   * `isInstantEvalsEnabled` decides whether the eval functions are published
+   * as available. The caller answers it; absent means no.
+   */
+  describeLangWatchQLSchema(input: {
+    protections: LangWatchQLProtections;
+    isInstantEvalsEnabled?: boolean;
+  }): LangWatchQLSchema;
   validateLangWatchQL(input: LangWatchQLValidationInput): unknown;
   executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
   /** Whether this project's rollout admits it to the Workbench at all. */

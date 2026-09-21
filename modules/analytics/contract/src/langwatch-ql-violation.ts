@@ -44,6 +44,26 @@ export const LWQL_VIOLATION_CODES = [
   "NESTING_TOO_DEEP",
   /** The default-deny fallthrough: syntax the validator does not recognise. */
   "UNSUPPORTED_SYNTAX",
+  /**
+   * An app function was called somewhere other than the top-level SELECT list.
+   * The database holds each one as a projection UDF over its key, so a call in
+   * a WHERE compares the raw key and answers the wrong rows with no error.
+   */
+  "APP_FUNCTION_POSITION",
+  /**
+   * An app function was called without an alias. Required so hydration can
+   * find the call by its output column name.
+   */
+  "APP_FUNCTION_ALIAS_REQUIRED",
+  /** An app function's arguments do not match its one signature. */
+  "APP_FUNCTION_ARGUMENT",
+  /** An app function was called without the permissions it requires. */
+  "APP_FUNCTION_GATED",
+  /**
+   * An app function was called with a spelling other than the catalogued one.
+   * The statement runs verbatim and ClickHouse resolves a UDF by exact name.
+   */
+  "APP_FUNCTION_NAME_CASE",
 ] as const;
 
 export type LangWatchQLViolationCode = (typeof LWQL_VIOLATION_CODES)[number];

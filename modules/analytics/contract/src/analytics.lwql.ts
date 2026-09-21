@@ -189,6 +189,8 @@ export type LangWatchQLExecuteInput = LangWatchQLRunContext &
   Readonly<{
     sql: string;
     parameters?: Readonly<Record<string, unknown>>;
+    /** Whether this caller may call an eval function. Absent means no. */
+    isInstantEvalsEnabled?: boolean;
   }>;
 
 /** Input used to admit a statement before it is stored as a reusable artifact. */
@@ -198,6 +200,8 @@ export type LangWatchQLValidationInput = Readonly<{
   sql: string;
   parameters?: Readonly<Record<string, unknown>>;
   timeWindow?: LangWatchQLTimeWindow;
+  /** Whether this caller may call an eval function. Absent means no. */
+  isInstantEvalsEnabled?: boolean;
 }>;
 
 /**

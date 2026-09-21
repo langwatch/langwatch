@@ -146,6 +146,8 @@ export interface LangWatchQLExecuteInput {
    * ceiling. Defaults to `"refuse"`.
    */
   readonly onBudgetOverflow?: LangWatchQLBudgetOverflowMode;
+  /** Whether this caller may call an eval function. Absent means no. */
+  readonly isInstantEvalsEnabled?: boolean;
 }
 
 /**
@@ -206,11 +208,19 @@ export class LangWatchQLService {
   }
 
   /** The LangWatchQL schema this caller's permissions unlock. */
-  describeSchema({ protections }: { protections: LangWatchQLProtections }): LangWatchQLSchema {
+  describeSchema({
+    protections,
+    isInstantEvalsEnabled,
+  }: {
+    protections: LangWatchQLProtections;
+    /** Whether the eval functions are published as available. */
+    isInstantEvalsEnabled?: boolean;
+  }): LangWatchQLSchema {
     return lwqlSchema.describe({
       database: this.deps.database,
       protections,
       views: this.views,
+      isInstantEvalsEnabled: isInstantEvalsEnabled === true,
     });
   }
 
@@ -224,6 +234,7 @@ export class LangWatchQLService {
     sql,
     parameters,
     timeWindow,
+    isInstantEvalsEnabled,
   }: {
     /** Logged with a refusal. The database, not this, decides the tenant. */
     readonly projectId: string;
@@ -232,6 +243,11 @@ export class LangWatchQLService {
     readonly parameters?: Readonly<Record<string, unknown>>;
     /** The period the surface is showing, when one is asking. */
     readonly timeWindow?: LangWatchQLTimeWindow;
+    /**
+     * Whether this caller may call an eval function. The surface answers it —
+     * the flag for this project, in this caller's scope. Absent means no.
+     */
+    readonly isInstantEvalsEnabled?: boolean;
   }): ValidatedLangWatchQL {
     const validation = this.validation.validate({
       sql,
@@ -248,6 +264,10 @@ export class LangWatchQLService {
       // dataset must stay gated so that naming it unqualified — where no table
       // reference reveals which dataset it came from — is refused too.
       gatedColumns: catalogShapes.gatedColumns({ protections, views: this.views }),
+      // An app function returning captured content is as restricted as a
+      // column holding it, so the gate reads the same permissions.
+      heldPermissions: [...catalogShapes.heldPermissions(protections)],
+      isInstantEvalsEnabled: isInstantEvalsEnabled === true,
       defaultDatabase: this.deps.database,
     });
 
@@ -314,6 +334,7 @@ export class LangWatchQLService {
     timeWindow,
     granularitySeconds,
     onBudgetOverflow,
+    isInstantEvalsEnabled,
   }: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
     const validation = this.validate({
       projectId: project.id,
@@ -321,6 +342,7 @@ export class LangWatchQLService {
       sql,
       ...(parameters ? { parameters } : {}),
       ...(timeWindow ? { timeWindow } : {}),
+      isInstantEvalsEnabled: isInstantEvalsEnabled === true,
     });
     const granularity = resolveRunGranularityOrRefuseUnfilled({
       declared: validation.parameters,

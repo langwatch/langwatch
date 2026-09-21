@@ -66,6 +66,7 @@ export class LangWatchQLValidationService {
     return {
       ok: true,
       tables: [...ctx.tables],
+      appFunctions: [...ctx.appFunctions],
       parameters: ctx.parameters.map(({ name, type }) => ({ name, type })),
       blocks: ctx.blocks.map((block) => ({
         tables: [...block.tables],
@@ -87,6 +88,8 @@ export class LangWatchQLValidationService {
         policy.allowedTables.map((entry) => qualifyTableName({ table: entry, defaultDatabase })),
       ),
       gatedColumns: new Set(policy.gatedColumns.map((column) => column.trim().toLowerCase())),
+      heldPermissions: new Set(policy.heldPermissions ?? []),
+      isInstantEvalsEnabled: policy.isInstantEvalsEnabled === true,
       reservedDatabases: new Set(RESERVED_DATABASES),
       defaultDatabase,
       limits: policy.limits ?? DEFAULT_LWQL_LIMITS,
@@ -100,6 +103,7 @@ export class LangWatchQLValidationService {
       tables: [],
       parameters: [],
       blocks: [],
+      appFunctions: [],
     };
   }
 

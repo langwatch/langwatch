@@ -311,7 +311,7 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
 
   /** The datasets and columns one member's protections unlock. */
   describeLangWatchQLSchema(
-    input: Readonly<{ protections: LangWatchQLProtections }>,
+    input: Readonly<{ protections: LangWatchQLProtections; isInstantEvalsEnabled?: boolean }>,
   ): LangWatchQLSchema {
     return this.#dependencies.langWatchQL.describeSchema(input);
   }

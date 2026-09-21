@@ -1,5 +1,8 @@
 import {
   type SqlSourcePosition,
+  type LangWatchQLAppFunctionCall,
+  type LangWatchQLAppFunctionOption,
+  type LangWatchQLAppFunctionSource,
   type LangWatchQLClause,
   type LangWatchQLViolationCode,
 } from "@langwatch/analytics-contract";
@@ -12,6 +15,13 @@ import {
  * @see dev/docs/adr/081-lwql-table-function-and-ssrf-policy.md
  * @see ../services/langwatch-ql-access-model.service.ts — the database isolation this backs up
  */
+import { readAppFunctionArguments } from "./langwatch-ql-app-function-arguments.rules.ts";
+import {
+  findLangWatchQLAppFunctions,
+  lwqlAppFunctionSignature,
+} from "./langwatch-ql-app-function-catalog.rules.ts";
+import type { LangWatchQLAppFunctionDefinition } from "./langwatch-ql-app-function-shapes.rules.ts";
+import { isEvalFunctionName } from "./langwatch-ql-eval-function-catalog.rules.ts";
 import {
   isAllowedLangWatchQLFunction,
   isLangWatchQLAggregateFunction,
@@ -277,6 +287,11 @@ function walkProjection({ value, node, frame, ctx }: FieldArgs): void {
       refuseUnrecognised({ node, frame: projection, ctx });
       continue;
     }
+    const [definition] = directAppFunctionCalls(element);
+    if (definition) {
+      walkAppFunctionCall({ node: element, definition, frame: projection, ctx });
+      continue;
+    }
     const isUngatableWildcard =
       ctx.policy.gatedColumns.size > 0 && UNRESOLVABLE_COLUMN_SETS.includes(element.type);
     if (isUngatableWildcard) {
@@ -292,6 +307,360 @@ function walkProjection({ value, node, frame, ctx }: FieldArgs): void {
     }
     walkNode(element, projection, ctx);
   }
+}
+
+// App functions: the one rule here is correctness, not policy. ClickHouse
+// holds each as a projection UDF over its key, so a call in a WHERE compares
+// the raw key and answers wrong rows with no error. @see specs/lwql/app-functions.feature
+
+/** The catalogue entries a direct projection element calls. One or none. */
+function directAppFunctionCalls(element: SqlAstNode): readonly LangWatchQLAppFunctionDefinition[] {
+  if (element.type !== "Function") return [];
+  if (typeof element.name !== "string") return [];
+  return findLangWatchQLAppFunctions(element.name);
+}
+
+const APP_FUNCTION_POSITION_PLACE =
+  "can only be used in the top-level SELECT list of a single SELECT statement, with an alias.";
+
+/** An extraction function's value is a column, so it can be filtered on. */
+const APP_FUNCTION_POSITION_EXTRACTION_ADVICE =
+  "Project it there and filter, group or sort on a plain column instead.";
+
+/** An eval function's answer arrives after the query, so there is no column. */
+const APP_FUNCTION_POSITION_EVAL_ADVICE =
+  "Its answer is decided after the query runs, so there is no column in this statement to filter on. " +
+  "To keep only the matches, filter the rows it returns, " +
+  "or run the statement as an Instant Eval and read `instant-eval results <run-id> --matched`.";
+
+function appFunctionPositionMessage(name: string): string {
+  const advice = isEvalFunctionName(name)
+    ? APP_FUNCTION_POSITION_EVAL_ADVICE
+    : APP_FUNCTION_POSITION_EXTRACTION_ADVICE;
+  return `The function "${echoIdentifier(name)}" ${APP_FUNCTION_POSITION_PLACE} ${advice}`;
+}
+
+function reportAppFunctionPosition({
+  name,
+  node,
+  frame,
+  ctx,
+}: {
+  name: string;
+  node: SqlAstNode;
+  frame: Frame;
+  ctx: WalkContext;
+}): void {
+  report({
+    ctx,
+    frame,
+    code: "APP_FUNCTION_POSITION",
+    message: appFunctionPositionMessage(name),
+    node,
+  });
+}
+
+/**
+ * Whether the call was written in ClickHouse's parametric form,
+ * `f(params)(args)`: the parser keeps the first list under `parameters`.
+ */
+function isParametricCall(node: SqlAstNode): boolean {
+  return Array.isArray(node.parameters);
+}
+
+/**
+ * An app function is a lambda with one argument list. The parametric form
+ * would pass on its `arguments` alone and then reach ClickHouse, which has no
+ * parametric UDF of that name, so it is refused where the refusal can name it.
+ */
+function reportParametricAppFunctionCall({
+  name,
+  node,
+  frame,
+  ctx,
+}: {
+  name: string;
+  node: SqlAstNode;
+  frame: Frame;
+  ctx: WalkContext;
+}): void {
+  report({
+    ctx,
+    frame,
+    code: "APP_FUNCTION_ARGUMENT",
+    message: `The function "${echoIdentifier(name)}" takes one list of arguments, not a parameter list followed by one: write it as ${name}(...) rather than ${name}(...)(...).`,
+    node,
+  });
+}
+
+/** What reading a nested key found: nothing of ours, a refusal, or a source. */
+type NestedSourceRead =
+  | { readonly kind: "not_an_app_function" }
+  | { readonly kind: "refused" }
+  | { readonly kind: "source"; readonly source: LangWatchQLAppFunctionSource };
+
+/**
+ * One call in the projection: every rule, then the plan entry. Keeps going
+ * where it can, so two mistakes are reported at once; a refused query has no
+ * plan, because half a plan is a plan for a query that never runs.
+ */
+function walkAppFunctionCall({
+  node,
+  definition,
+  frame,
+  ctx,
+}: {
+  node: SqlAstNode;
+  definition: LangWatchQLAppFunctionDefinition;
+  frame: Frame;
+  ctx: WalkContext;
+}): void {
+  if (isParametricCall(node)) {
+    reportParametricAppFunctionCall({ name: definition.name, node, frame, ctx });
+    return;
+  }
+
+  const args = Array.isArray(node.arguments) ? node.arguments : [];
+  const nested = walkAppFunctionArguments({ node, definition, args, frame, ctx });
+
+  if (frame.isOutermostSelect !== true) {
+    reportAppFunctionPosition({ name: definition.name, node, frame, ctx });
+    return;
+  }
+
+  const [column] = admitAppFunctionCall({ node, definition, frame, ctx });
+  if (column === undefined) return;
+
+  const options = readAppFunctionOptions({ definition, args, node, frame, ctx });
+  if (!options.ok) return;
+
+  // A nested call that was itself refused leaves no plan: the statement is
+  // already rejected, and half a plan is a plan for a query that never runs.
+  if (nested.kind === "refused") return;
+
+  const call: LangWatchQLAppFunctionCall = {
+    column,
+    function: definition.name,
+    options: options.options,
+    ...(nested.kind === "source" ? { source: nested.source } : {}),
+  };
+  ctx.appFunctions.push(call);
+}
+
+/**
+ * The arguments, plus the nested extraction in the first one where there is
+ * one. The frame drops `isOutermostSelect`, which refuses nesting everywhere
+ * except the one place it is allowed: the key of an eval function.
+ */
+function walkAppFunctionArguments({
+  node,
+  definition,
+  args,
+  frame,
+  ctx,
+}: {
+  node: SqlAstNode;
+  definition: LangWatchQLAppFunctionDefinition;
+  args: readonly unknown[];
+  frame: Frame;
+  ctx: WalkContext;
+}): NestedSourceRead {
+  const inside: Frame = { ...frame, isOutermostSelect: false };
+  const nested: NestedSourceRead =
+    definition.kind === "eval"
+      ? readNestedSource({ key: args[0], frame: inside, ctx })
+      : { kind: "not_an_app_function" };
+  for (const [index, argument] of args.entries()) {
+    if (nested.kind !== "not_an_app_function" && index === 0) continue;
+    walkChildNode({ value: argument, node, frame: inside, ctx });
+  }
+  return nested;
+}
+
+/**
+ * Whether a nested call has the shape a source may take at all: one argument
+ * list, and an extraction rather than another eval.
+ */
+function isNestedCallAdmitted({
+  nested,
+  key,
+  frame,
+  ctx,
+}: {
+  nested: LangWatchQLAppFunctionDefinition;
+  key: SqlAstNode;
+  frame: Frame;
+  ctx: WalkContext;
+}): boolean {
+  if (isParametricCall(key)) {
+    reportParametricAppFunctionCall({ name: nested.name, node: key, frame, ctx });
+    return false;
+  }
+  if (nested.kind !== "extraction") {
+    reportAppFunctionPosition({ name: nested.name, node: key, frame, ctx });
+    return false;
+  }
+  return true;
+}
+
+/**
+ * The extraction an eval reads its text from. One level, and an extraction
+ * only: a second one would have no key of its own, and an eval inside an eval
+ * would ask the classifier about a probability.
+ */
+function readNestedSource({
+  key,
+  frame,
+  ctx,
+}: {
+  key: unknown;
+  frame: Frame;
+  ctx: WalkContext;
+}): NestedSourceRead {
+  if (!isNode(key) || key.type !== "Function") return { kind: "not_an_app_function" };
+  if (typeof key.name !== "string") return { kind: "not_an_app_function" };
+  const [nested] = findLangWatchQLAppFunctions(key.name);
+  if (!nested) return { kind: "not_an_app_function" };
+  if (!isNestedCallAdmitted({ nested, key, frame, ctx })) return { kind: "refused" };
+
+  // Its own arguments, under a frame that is still not the outermost select,
+  // so anything nested inside IT is refused by the ordinary function walk.
+  const args = Array.isArray(key.arguments) ? key.arguments : [];
+  for (const argument of args) {
+    walkChildNode({ value: argument, node: key, frame, ctx });
+  }
+
+  if (key.name.trim() !== nested.name) {
+    report({
+      ctx,
+      frame,
+      code: "APP_FUNCTION_NAME_CASE",
+      message: nameCaseMessage({ written: key.name.trim(), definition: nested }),
+      node: key,
+    });
+    return { kind: "refused" };
+  }
+
+  if (!holdsAppFunctionGates({ definition: nested, ctx })) {
+    report({
+      ctx,
+      frame,
+      code: "APP_FUNCTION_GATED",
+      message: gatedMessage(nested),
+      node: key,
+    });
+    return { kind: "refused" };
+  }
+
+  const options = readAppFunctionOptions({ definition: nested, args, node: key, frame, ctx });
+  if (!options.ok) return { kind: "refused" };
+  return { kind: "source", source: { function: nested.name, options: options.options } };
+}
+
+function nameCaseMessage({
+  written,
+  definition,
+}: {
+  written: string;
+  definition: LangWatchQLAppFunctionDefinition;
+}): string {
+  return `Write "${echoIdentifier(written)}" as "${definition.name}": the query runs exactly as written, and the database matches this function's name letter for letter.`;
+}
+
+function gatedMessage(definition: LangWatchQLAppFunctionDefinition): string {
+  return `The function "${echoIdentifier(definition.name)}" is not available to you. It needs the ${definition.gates.join(" and ")} permission; ask an administrator for it, or remove the call.`;
+}
+
+/**
+ * The rules a call in the right place still has to pass, and the column it
+ * earns. Empty means one failed and was reported. Spelling comes first: a
+ * mis-cased call would plan a statement the database cannot run.
+ */
+function admitAppFunctionCall({
+  node,
+  definition,
+  frame,
+  ctx,
+}: {
+  node: SqlAstNode;
+  definition: LangWatchQLAppFunctionDefinition;
+  frame: Frame;
+  ctx: WalkContext;
+}): readonly string[] {
+  const refuse = (code: LangWatchQLViolationCode, message: string): readonly string[] => {
+    report({ ctx, frame, code, message, node });
+    return [];
+  };
+
+  const written = typeof node.name === "string" ? node.name.trim() : "";
+  if (written !== definition.name) {
+    return refuse("APP_FUNCTION_NAME_CASE", nameCaseMessage({ written, definition }));
+  }
+
+  const [column] = aliasOf(node);
+  if (column === undefined) {
+    return refuse(
+      "APP_FUNCTION_ALIAS_REQUIRED",
+      `The function "${echoIdentifier(definition.name)}" needs an alias: write it as "${lwqlAppFunctionSignature(definition)} AS my_column".`,
+    );
+  }
+
+  if (!holdsAppFunctionGates({ definition, ctx })) {
+    return refuse("APP_FUNCTION_GATED", gatedMessage(definition));
+  }
+
+  if (definition.kind === "eval" && !ctx.policy.isInstantEvalsEnabled) {
+    return refuse(
+      "APP_FUNCTION_GATED",
+      `The function "${echoIdentifier(definition.name)}" is not available to you. A judgement is charged to one project, so it needs Instant Evals switched on for a key that reads a single project; ask an administrator to enable them, use a project key, or remove the call.`,
+    );
+  }
+
+  return [column];
+}
+
+/** The alias a projection element was written with. Empty when it has none. */
+function aliasOf(node: SqlAstNode): readonly string[] {
+  const { alias } = node;
+  if (typeof alias !== "string") return [];
+  const trimmed = alias.trim();
+  return trimmed === "" ? [] : [trimmed];
+}
+
+/** Whether the caller holds every permission this function requires. */
+function holdsAppFunctionGates({
+  definition,
+  ctx,
+}: {
+  definition: LangWatchQLAppFunctionDefinition;
+  ctx: WalkContext;
+}): boolean {
+  return definition.gates.every((gate) => ctx.policy.heldPermissions.has(gate));
+}
+
+/**
+ * The literal option values, or the refusal that was reported. The rules
+ * themselves are pure and live next door; this is the half that reports one.
+ */
+function readAppFunctionOptions({
+  definition,
+  args,
+  node,
+  frame,
+  ctx,
+}: {
+  definition: LangWatchQLAppFunctionDefinition;
+  args: readonly unknown[];
+  node: SqlAstNode;
+  frame: Frame;
+  ctx: WalkContext;
+}):
+  | { readonly ok: true; readonly options: readonly LangWatchQLAppFunctionOption[] }
+  | { readonly ok: false } {
+  const outcome = readAppFunctionArguments({ definition, args });
+  if (outcome.ok) return { ok: true, options: outcome.options };
+  report({ ctx, frame, code: "APP_FUNCTION_ARGUMENT", message: outcome.message, node });
+  return { ok: false };
 }
 
 /**
@@ -338,10 +707,22 @@ function walkInterpolatedColumn({ value, node, frame, ctx }: FieldArgs): void {
 // ---------------------------------------------------------------------------
 
 /**
+ * Marks the one `SELECT` whose projection may call an app function: only when
+ * the root union holds exactly one, and cleared below it.
+ */
+function enterSelectWithUnionQuery({ node, frame }: NodeArgs): Frame {
+  const isRoot =
+    frame.clause === "statement" && frame.subqueryDepth === 0 && frame.block === undefined;
+  const isSingle = Array.isArray(node.selects) && node.selects.length === 1;
+  return { ...frame, isRootSelect: isRoot && isSingle };
+}
+
+/**
  * Opens this SELECT's block and brings its CTE names into scope, before
  * anything else is walked.
  */
 function enterSelectQuery({ node, frame, ctx }: NodeArgs): Frame {
+  const isOutermostSelect = frame.isRootSelect === true;
   const block: BlockAccumulator = {
     tables: [],
     joins: [],
@@ -353,14 +734,17 @@ function enterSelectQuery({ node, frame, ctx }: NodeArgs): Frame {
   };
   ctx.blocks.push(block);
 
-  if (!Array.isArray(node.with)) return { ...frame, block };
+  // `isRootSelect` is spent here: it marked this SELECT as the outermost one,
+  // and clearing it stops a subquery or a CTE body claiming the same standing.
+  const here: Frame = { ...frame, block, isOutermostSelect, isRootSelect: false };
+  if (!Array.isArray(node.with)) return here;
   const ctes = [...frame.ctes];
   for (const item of node.with) {
     if (isNode(item) && item.type === "WithElement" && typeof item.name === "string") {
       addOnce(ctes, item.name.trim().toLowerCase());
     }
   }
-  return { ...frame, ctes, block };
+  return { ...here, ctes };
 }
 
 /** Descends one query level, or refuses when that would pass the ceiling. */
@@ -557,6 +941,16 @@ function enterFunction({ node, frame, ctx }: NodeArgs): Frame | null {
     refuseUnrecognised({ node, frame, ctx });
     return null;
   }
+  // Reaching here at all means this call is not a direct element of the
+  // outermost projection: the projection walk intercepts those. So an
+  // app-function name here is always a position violation, and saying so keeps
+  // the refusal actionable — the allowlist below would report a catalogued
+  // function as "not allowed", sending the caller after a name the schema lists.
+  const [appFunction] = findLangWatchQLAppFunctions(name);
+  if (appFunction) {
+    reportAppFunctionPosition({ name: appFunction.name, node, frame, ctx });
+    return frame;
+  }
   if (!isAllowedLangWatchQLFunction(name)) {
     reportRefusedFunction({ name, node, frame, ctx });
     return frame;
@@ -606,6 +1000,11 @@ function reportRefusedFunction({
 function walkApplyFunctionName({ value, node, frame, ctx }: FieldArgs): void {
   if (typeof value !== "string") {
     refuseUnrecognised({ node, frame, ctx });
+    return;
+  }
+  const [appFunction] = findLangWatchQLAppFunctions(value);
+  if (appFunction) {
+    reportAppFunctionPosition({ name: appFunction.name, node, frame, ctx });
     return;
   }
   if (isAllowedLangWatchQLFunction(value)) return;
@@ -712,6 +1111,7 @@ const REFUSE_OUTPUT: FieldRule = {
 const NODE_RULES: Readonly<Record<string, NodeRule>> = {
   // ---- query structure ----
   SelectWithUnionQuery: {
+    enter: enterSelectWithUnionQuery,
     fields: {
       selects: { kind: "nodes" },
       // Both modes are read-only set operations, and the row policy applies to
