@@ -1,5 +1,5 @@
 /**
- * What an activation code row is, and how the registry reaches it (ADR-139,
+ * What an activation code row is, and how the registry reaches it (ADR-141,
  * section 5).
  */
 

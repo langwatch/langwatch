@@ -80,7 +80,7 @@ export interface OrganizationWithAdmins {
  *
  * `cloud` is a SEAT_EVENT organization with an active GROWTH subscription, and
  * is invoiced monthly. `connected` is a self-hosted customer with a
- * `ConnectedBillingAccount` (ADR-139, section 7): it buys no Cloud plan, so it
+ * `ConnectedBillingAccount` (ADR-141, section 7): it buys no Cloud plan, so it
  * is not on SEAT_EVENT pricing at all, and its usage rides the quarterly
  * subscription that account names.
  */

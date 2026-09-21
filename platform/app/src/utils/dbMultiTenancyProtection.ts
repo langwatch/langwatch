@@ -108,11 +108,11 @@ const RELATIONAL_PARENT_SCOPED = [
   // Annotation-queue join tables, written through the parent queue.
   "AnnotationQueueMembers",
   "AnnotationQueueScores",
-  // The install's own identity (ADR-139, section 10): one row, at the fixed id
+  // The install's own identity (ADR-141, section 10): one row, at the fixed id
   // "self", naming the deployment rather than anything inside it. It has no
   // tenant to constrain on, because it is what the whole install is.
   "InstanceIdentity",
-  // The history of usage reports received from self-hosted installs (ADR-139,
+  // The history of usage reports received from self-hosted installs (ADR-141,
   // section 10). Written by a public route that holds no tenant at all, and
   // read by the backoffice for one instance id at a time. Its sibling
   // `SelfHostedInstance` carries an organizationId and so is classified by the
@@ -318,7 +318,7 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       return null;
     },
   },
-  // The seats one license reported in one quarter (ADR-139). It carries no
+  // The seats one license reported in one quarter (ADR-141). It carries no
   // organizationId: its parent `IssuedLicense` row names the customer, and the
   // sync that writes it has only just resolved that row from a token. Every
   // query names the license, which is what keeps a bare findMany from walking
@@ -352,7 +352,7 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
     },
   },
   // What the quarterly seat true-up decided for one license quarter
-  // (ADR-139). Scoped like `LicenseSeatReport` above and for the same reason:
+  // (ADR-141). Scoped like `LicenseSeatReport` above and for the same reason:
   // the parent `IssuedLicense` row names the customer. The backoffice reads it
   // for the licenses it already listed, so it passes `licenseId: { in: [...] }`
   // rather than filtering on `state` alone.
@@ -384,7 +384,7 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       return null;
     },
   },
-  // A paid credit at the payment provider (ADR-139). Its parent
+  // A paid credit at the payment provider (ADR-141). Its parent
   // `ConnectedBillingAccount` row carries the organizationId; a grant is
   // otherwise addressed by the provider's own id, which names one customer.
   ConnectedCreditGrant: {
@@ -415,7 +415,7 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       return null;
     },
   },
-  // An invoice raised for a connected customer (ADR-139). Scoped like the
+  // An invoice raised for a connected customer (ADR-141). Scoped like the
   // grants above; the provider's invoice id is the other bounded way in,
   // which is how a webhook finds the row for the invoice it was told about.
   ConnectedInvoice: {
@@ -446,7 +446,7 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
       return null;
     },
   },
-  // The monthly statement one connected customer was sent (ADR-139). Its
+  // The monthly statement one connected customer was sent (ADR-141). Its
   // parent `ConnectedBillingAccount` row carries the organizationId, so every
   // query here names the account.
   ConnectedStatement: {

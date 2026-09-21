@@ -1,5 +1,5 @@
 /**
- * Prisma bindings for connected billing (ADR-139, section 7), and the one
+ * Prisma bindings for connected billing (ADR-141, section 7), and the one
  * place that builds the service as the app uses it.
  *
  * The commercial terms live on the license, not here: `terms` below reads the

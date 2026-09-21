@@ -1,5 +1,5 @@
 /**
- * Seats filled over what the license covers (ADR-139, section 6).
+ * Seats filled over what the license covers (ADR-141, section 6).
  *
  * A connected install may go over its licensed seats by the allowance
  * LangWatch signed, and those seats are invoiced at the next quarterly seat

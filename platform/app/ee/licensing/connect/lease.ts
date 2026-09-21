@@ -1,5 +1,5 @@
 /**
- * The lease a license sync answers with (ADR-139, section 6).
+ * The lease a license sync answers with (ADR-141, section 6).
  *
  * A lease is what lets a connected install go over its licensed seats by the
  * agreed allowance, and it expires: when sync stops, the allowance goes with

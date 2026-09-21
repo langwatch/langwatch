@@ -1,5 +1,5 @@
 /**
- * Activation codes over Prisma (ADR-139, section 5).
+ * Activation codes over Prisma (ADR-141, section 5).
  *
  * The two claim methods are the point of this file. Both push the state the
  * caller resolved against into the WHERE clause of the write, so the database

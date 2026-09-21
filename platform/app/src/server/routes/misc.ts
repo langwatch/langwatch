@@ -1178,7 +1178,7 @@ secured.access(tracesCreateAuth).post(
 // =============================================
 // The handler, the schema and the limits live in `_lib/track-usage.ts`,
 // because `POST /api/connect/v1/stats` is the same report arriving at the
-// connect host and has to be handled identically (ADR-139, section 6).
+// connect host and has to be handled identically (ADR-141, section 6).
 secured
   .access(publicEndpoint("anonymous product telemetry, no credential"))
   .post(

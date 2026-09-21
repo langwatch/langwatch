@@ -676,7 +676,7 @@ const CREDENTIAL_OBJECT_FIELDS = ["customKeys", "providerConfig"] as const;
  * String fields whose value is a credential on every action that carries them.
  *
  * A license key is one: a connected install derives the token it presents to
- * LangWatch-hosted services from it (ADR-139), so an audit row holding the key
+ * LangWatch-hosted services from it (ADR-141), so an audit row holding the key
  * would hold the means to mint that token. Unlike `parameters`, the name means
  * one thing everywhere, so the rule is bound to the name.
  */

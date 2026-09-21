@@ -8,7 +8,7 @@ import { InstancesTable } from "./instances/InstancesTable";
 const PAGE_SIZE = 25;
 
 /**
- * Every self-hosted install that has reported (ADR-139, section 10), newest
+ * Every self-hosted install that has reported (ADR-141, section 10), newest
  * activity first.
  *
  * LangWatch shipped self-hosted for three years with no record of who ran it.

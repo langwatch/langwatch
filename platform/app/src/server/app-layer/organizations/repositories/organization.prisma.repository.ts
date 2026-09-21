@@ -600,7 +600,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     if (organization.pricingModel !== PricingModel.SEAT_EVENT) {
       // A connected self-hosted customer buys no Cloud plan, so it never
       // reaches SEAT_EVENT pricing. Its hosted usage is still invoiced, on the
-      // quarterly subscription its billing account names (ADR-139, section 7).
+      // quarterly subscription its billing account names (ADR-141, section 7).
       // The second read runs only for an organization an operator marked as a
       // self-hosted customer, which is a handful of rows.
       if (organization.selfHostedCustomer) {

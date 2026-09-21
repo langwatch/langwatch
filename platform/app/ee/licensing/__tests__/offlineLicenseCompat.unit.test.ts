@@ -1,5 +1,5 @@
 /**
- * Existing offline licenses do not break (ADR-139, "Existing offline licenses").
+ * Existing offline licenses do not break (ADR-141, "Existing offline licenses").
  *
  * The fixture was minted with the licensing code of origin/main before this
  * change, with the arguments scripts/generate-license.ts passes. Everything

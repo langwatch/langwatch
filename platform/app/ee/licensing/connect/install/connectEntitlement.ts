@@ -1,5 +1,5 @@
 /**
- * What this install's license says it may call (ADR-139, section 2).
+ * What this install's license says it may call (ADR-141, section 2).
  *
  * Every hosted-service path asks here before it builds a client. The answer
  * comes from the signed license, so an install that holds an offline license,

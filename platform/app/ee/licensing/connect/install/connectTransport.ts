@@ -1,5 +1,5 @@
 /**
- * One outbound request from a self-hosted install to LangWatch (ADR-139).
+ * One outbound request from a self-hosted install to LangWatch (ADR-141).
  *
  * Two hosts answer an install: the gateway, which runs the hosted services,
  * and the connect host, which the license syncs against. They take the same

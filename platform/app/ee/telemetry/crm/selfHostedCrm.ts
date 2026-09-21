@@ -1,6 +1,6 @@
 /**
  * What the CRM side of the self-hosted registry needs from the rest of the
- * application (ADR-139, section 10).
+ * application (ADR-141, section 10).
  *
  * No new vendor: Customer.io carries the traits and the events, and the
  * existing Slack notifications carry the signal a person reads.

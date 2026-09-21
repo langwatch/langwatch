@@ -7,7 +7,7 @@ import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
- * The backoffice's registry of self-hosted installs (ADR-139, section 10).
+ * The backoffice's registry of self-hosted installs (ADR-141, section 10).
  *
  * Gated like the license registry beside it: the `ADMIN_EMAILS` staff list
  * checked in the handler, never an RBAC permission, and denial is the shared

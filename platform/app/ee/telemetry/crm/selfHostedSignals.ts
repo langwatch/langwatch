@@ -1,6 +1,6 @@
 /**
  * The handful of things a self-hosted install can do that a person should hear
- * about (ADR-139, section 10).
+ * about (ADR-141, section 10).
  *
  * A daily report from every install is a firehose, and a sales team that gets
  * one message a day per install stops reading them. So this is deliberately

@@ -793,7 +793,7 @@ export function initializeDefaultApp(options?: {
       // so the App singleton isn't available yet.
       inviteApprover: InviteService.create(prisma, { planProvider }),
       // A purchased license is recorded in the license registry, unlinked: a
-      // checkout names no customer organization on LangWatch Cloud (ADR-139).
+      // checkout names no customer organization on LangWatch Cloud (ADR-141).
       licensePurchaseHandler: {
         handle: (params) =>
           handleLicensePurchase({
@@ -809,7 +809,7 @@ export function initializeDefaultApp(options?: {
       licensePaymentLinkId: env.STRIPE_LICENSE_PAYMENT_LINK_ID,
       licensePrivateKey: env.LANGWATCH_LICENSE_PRIVATE_KEY,
       getPostHog: () => getPostHogInstance(),
-      // A finalized invoice of a connected self-hosted customer (ADR-139):
+      // A finalized invoice of a connected self-hosted customer (ADR-141):
       // small usage invoices roll forward and a waiting renewal completes.
       connectedBilling: {
         accountFor: (stripeCustomerId) =>

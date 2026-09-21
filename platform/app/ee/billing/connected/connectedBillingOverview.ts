@@ -1,6 +1,6 @@
 /**
  * What the backoffice shows about a connected customer's commercial state
- * (ADR-139, section 7).
+ * (ADR-141, section 7).
  *
  * The amount drawn down comes from LangWatch's own budget ledger, never from
  * the payment provider's credit balance, which only settles when an invoice is

@@ -1,5 +1,5 @@
 /**
- * The counts behind the usage report's optional block (ADR-139, section 10).
+ * The counts behind the usage report's optional block (ADR-141, section 10).
  *
  * Every one of these is a `count` or a `min` over a column the install already
  * holds. None of them reads a name, a body or an address: what comes back is a

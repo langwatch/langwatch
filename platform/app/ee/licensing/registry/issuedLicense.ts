@@ -1,5 +1,5 @@
 /**
- * The registry row and the vocabulary around it (ADR-139): what a license looks
+ * The registry row and the vocabulary around it (ADR-141): what a license looks
  * like as stored, how the backoffice reads it, the ports the service writes
  * through, and the two rules that are derived from the row alone.
  *

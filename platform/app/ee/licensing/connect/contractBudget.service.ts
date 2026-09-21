@@ -1,5 +1,5 @@
 /**
- * The contract budget of a connected customer (ADR-139): one blocking
+ * The contract budget of a connected customer (ADR-141): one blocking
  * organization budget that starts equal to the prepaid commit and is the hard
  * stop for hosted usage.
  *

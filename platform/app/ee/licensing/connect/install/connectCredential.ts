@@ -1,6 +1,6 @@
 /**
  * The credential one organization presents to LangWatch-hosted services
- * (ADR-139).
+ * (ADR-141).
  *
  * There is no new secret to distribute: the token is derived from the license
  * the organization already holds, or from the instance-wide license where the

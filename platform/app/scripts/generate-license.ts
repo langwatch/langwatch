@@ -105,7 +105,7 @@ export async function applyLicenseToOrg(
   // One transaction, so the registry row and the license on the organization
   // are both there or neither is. Either write failing alone would leave an
   // active license in the registry that the organization never got, and the
-  // retry would mint a second one beside it (ADR-139).
+  // retry would mint a second one beside it (ADR-141).
   await input.prisma.$transaction(async (tx) => {
     await createLicenseRecorderService(tx).record({
       licenseKey,

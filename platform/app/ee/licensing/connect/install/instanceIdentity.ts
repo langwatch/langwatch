@@ -1,5 +1,5 @@
 /**
- * The identity this install presents to LangWatch (ADR-139, section 2).
+ * The identity this install presents to LangWatch (ADR-141, section 2).
  *
  * One UUID, minted the first time anything asks for it and kept in this
  * install's own database. It carries nothing about the customer, names one

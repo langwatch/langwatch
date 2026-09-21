@@ -282,7 +282,7 @@ export async function handleTrackUsage(c: Context) {
 }
 
 /**
- * The report's own row, and one row of history (ADR-139, section 10).
+ * The report's own row, and one row of history (ADR-141, section 10).
  *
  * A failure here is swallowed, exactly as the PostHog capture's is, and for
  * the same reason: refusing a report takes the install with it. An install

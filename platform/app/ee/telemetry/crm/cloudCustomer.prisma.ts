@@ -1,5 +1,5 @@
 /**
- * The two Cloud lookups the self-hosted lead signals need (ADR-139, section
+ * The two Cloud lookups the self-hosted lead signals need (ADR-141, section
  * 10): who to write a customer's Customer.io traits through, and whether a
  * company already has an account with us.
  */

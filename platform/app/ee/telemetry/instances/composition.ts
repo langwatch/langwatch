@@ -1,7 +1,7 @@
 /**
  * The one place that builds the self-hosted instance registry as the app uses
  * it: Prisma for the rows, the license registry for the customer behind an
- * install (ADR-139, section 10).
+ * install (ADR-141, section 10).
  */
 
 import type { PrismaClient } from "~/generated/prisma/client";

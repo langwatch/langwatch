@@ -1,5 +1,5 @@
 /**
- * The control plane end of a hosted-service call (ADR-139).
+ * The control plane end of a hosted-service call (ADR-141).
  *
  * The gateway has authenticated the caller and applied the budget stop; it
  * sends who the caller resolved to beside the caller's own JSON, which stays

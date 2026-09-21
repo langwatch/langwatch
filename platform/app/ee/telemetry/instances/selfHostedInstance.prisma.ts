@@ -1,5 +1,5 @@
 /**
- * The registry of self-hosted installs, over Prisma (ADR-139, section 10).
+ * The registry of self-hosted installs, over Prisma (ADR-141, section 10).
  *
  * @see ./selfHostedInstance.service.ts
  */

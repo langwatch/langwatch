@@ -17,7 +17,7 @@
  * The receiver is `/api/track_usage` on app.langwatch.ai, and it stays that
  * for every install whose license names no hosted service. A connected install
  * posts the same body to the connect host instead, so one host answers
- * everything it sends (ADR-139, section 6). These statistics are separate from
+ * everything it sends (ADR-141, section 6). These statistics are separate from
  * the license sync in both directions: DISABLE_USAGE_STATS stops these and
  * nothing else, and the sync runs whether or not they are switched off.
  */

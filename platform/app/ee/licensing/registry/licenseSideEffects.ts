@@ -1,6 +1,6 @@
 /**
  * The two writes that follow a change to a license row but are not part of it
- * (ADR-139): ending the managed gateway key it resolved to, and bringing the
+ * (ADR-141): ending the managed gateway key it resolved to, and bringing the
  * customer's contract budget back in line with its licenses.
  *
  * Both are skipped for a license that names no customer, because neither a key

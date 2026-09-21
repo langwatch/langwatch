@@ -1,5 +1,5 @@
 /**
- * The customer a license is issued to (ADR-139): an organization that already
+ * The customer a license is issued to (ADR-141): an organization that already
  * exists on LangWatch Cloud, or a bare one created for a customer who has none.
  */
 

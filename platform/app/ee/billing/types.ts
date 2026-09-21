@@ -105,7 +105,7 @@ export type LicensePurchaseNotificationPayload = {
 
 /**
  * One thing a self-hosted install did that somebody should hear about
- * (ADR-139, section 10). Raised once per install, never once per report.
+ * (ADR-141, section 10). Raised once per install, never once per report.
  */
 export type SelfHostedSignalNotificationPayload = {
   /** The sentence at the top of the message. */

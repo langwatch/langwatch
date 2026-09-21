@@ -1,5 +1,5 @@
 /**
- * Every field a self-hosted install reports, declared once (ADR-139, section
+ * Every field a self-hosted install reports, declared once (ADR-141, section
  * 10).
  *
  * One list, read by two callers that used to drift: the report the sender

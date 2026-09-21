@@ -1,6 +1,6 @@
 /**
  * Prisma and app bindings for the hosted services of a self-hosted license
- * (ADR-139), and the one place that builds them.
+ * (ADR-141), and the one place that builds them.
  */
 
 import { SYSTEM_ACTORS } from "@langwatch/actor";

@@ -1,6 +1,6 @@
 /**
  * What a license reported about its seats, kept per quarter of its own term
- * (ADR-139, section 6).
+ * (ADR-141, section 6).
  *
  * The quarterly seat true-up invoices the peak, not the last figure, so a
  * customer that runs 53 seats for a week and drops back to 51 is still

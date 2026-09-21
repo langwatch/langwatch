@@ -36,7 +36,7 @@ export type GatewayJwtClaims = {
    *  the control plane is unreachable. */
   vk_expires_at: number | null;
   /** The hosted services the license behind this credential is entitled to
-   *  (ADR-139). Present only when a license token was resolved, which is what
+   *  (ADR-141). Present only when a license token was resolved, which is what
    *  lets the gateway tell a connected install's traffic from an ordinary
    *  key's: a license entitled to nothing sends an empty array, a virtual key
    *  sends the claim not at all. Omitted rather than null, because null would

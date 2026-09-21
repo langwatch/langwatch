@@ -83,7 +83,7 @@ export const UNPUBLISHED = [
   {
     match: "/api/connect/v1",
     category: "internal",
-    why: "the connect host a self-hosted install syncs its license and its anonymous statistics to; the caller is the install's own worker and the contract is ADR-139, not something a customer writes by hand",
+    why: "the connect host a self-hosted install syncs its license and its anonymous statistics to; the caller is the install's own worker and the contract is ADR-141, not something a customer writes by hand",
   },
   {
     match: "/api/admin",

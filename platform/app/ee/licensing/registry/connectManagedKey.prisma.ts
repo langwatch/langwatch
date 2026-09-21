@@ -1,5 +1,5 @@
 /**
- * The managed gateway key of a license, on Prisma (ADR-139).
+ * The managed gateway key of a license, on Prisma (ADR-141).
  *
  * The key is an ordinary VirtualKey with `purpose: CONNECT`, so budgets, spend
  * rows, the change feed and revocation work as they do for any gateway key. Its

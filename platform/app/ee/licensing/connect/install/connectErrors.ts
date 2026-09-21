@@ -1,5 +1,5 @@
 /**
- * Refusals the install side of Connect raises itself (ADR-139).
+ * Refusals the install side of Connect raises itself (ADR-141).
  *
  * The host names most of its own refusals, and those cross the wire as their
  * own codes with copy already written for them. These three are what only the

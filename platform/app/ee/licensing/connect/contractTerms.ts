@@ -1,5 +1,5 @@
 /**
- * What a customer's licenses add up to commercially (ADR-139).
+ * What a customer's licenses add up to commercially (ADR-141).
  *
  * The budget spans licenses, so the terms do too: the commit is the sum of the
  * commits, and the most a customer may raise its own cap to is that sum plus

@@ -1,5 +1,5 @@
 /**
- * What an organization's Connect settings read and write (ADR-139).
+ * What an organization's Connect settings read and write (ADR-141).
  *
  * Reading never throws on a refusal from the host. An administrator opening
  * these settings to find out why hosted judging stopped is the reader who most
@@ -48,7 +48,7 @@ export interface ConnectLeaseView {
   readonly state: LeaseState;
 }
 
-/** Where the daily license sync stands (ADR-139, section 6). */
+/** Where the daily license sync stands (ADR-141, section 6). */
 export interface ConnectSyncView {
   readonly lastSyncAt: string | null;
   readonly lastError: { readonly code: string } | null;

@@ -178,7 +178,7 @@ export class LicenseHandler {
 
   /**
    * The plan a current lease widens, and the plain licensed plan otherwise
-   * (ADR-139, section 6).
+   * (ADR-141, section 6).
    *
    * `maxMembers` carries the widened count because that is what every caller
    * of the seat guard already enforces, and the licensed count travels beside

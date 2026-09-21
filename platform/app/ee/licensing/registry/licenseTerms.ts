@@ -1,6 +1,6 @@
 /**
  * The commercial terms of a license, checked as they will stand after a change
- * rather than as they arrived (ADR-139).
+ * rather than as they arrived (ADR-141).
  */
 
 import { LicenseOverageMaxRequiresOverageError } from "./errors";

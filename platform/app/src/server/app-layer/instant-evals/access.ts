@@ -9,7 +9,7 @@
  *    would put a caller in front of a query that always comes back null;
  *  - that classifier can judge for the project's organization. A connected
  *    self-hosted install judges on LangWatch, and an organization admin
- *    switches that on per organization (ADR-139), so one that has not
+ *    switches that on per organization (ADR-141), so one that has not
  *    switched it on is in the same position as a deployment with nothing
  *    configured.
  *

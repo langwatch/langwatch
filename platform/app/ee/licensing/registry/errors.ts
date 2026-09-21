@@ -1,5 +1,5 @@
 /**
- * Handled errors for the license registry (ADR-139).
+ * Handled errors for the license registry (ADR-141).
  *
  * The callers are LangWatch operators in the backoffice, so each one names a
  * cause an operator can act on. Customer copy is keyed off the code in

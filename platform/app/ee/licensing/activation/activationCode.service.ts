@@ -1,5 +1,5 @@
 /**
- * Issuing and redeeming activation codes (ADR-139, section 5).
+ * Issuing and redeeming activation codes (ADR-141, section 5).
  *
  * Redemption is the part that has to be exactly right. It is a public,
  * unauthenticated route, and a single-use code has to be redeemable exactly

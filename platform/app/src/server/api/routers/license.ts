@@ -16,7 +16,7 @@ import { licenseValidationError } from "../../../../ee/licensing/errors";
  * activate one, remove it.
  *
  * Issuing a license is not here. It is a LangWatch operator action in the
- * backoffice, signed with a server secret (`licenseRegistry` router, ADR-139).
+ * backoffice, signed with a server secret (`licenseRegistry` router, ADR-141).
  */
 export const licenseRouter = createTRPCRouter({
   /**

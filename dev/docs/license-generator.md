@@ -136,7 +136,7 @@ generator. `getActivePlan()` returns the unlicensed baseline when
   Cloud. A self-hosted install must not have it set.
 - Every license the script mints is recorded in the license registry before
   it is applied, so none exists that the registry does not know about. The
-  registry keeps a hash of the license token, never the license (ADR-139).
+  registry keeps a hash of the license token, never the license (ADR-141).
 
 ## What was removed
 

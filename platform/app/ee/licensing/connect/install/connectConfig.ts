@@ -1,6 +1,6 @@
 /**
  * What the install side of Connect reads from its deployment configuration
- * (ADR-139).
+ * (ADR-141).
  *
  * There is no switch that turns Connect on. What a deployment may call is
  * decided by the license it holds: a license that names a hosted service can

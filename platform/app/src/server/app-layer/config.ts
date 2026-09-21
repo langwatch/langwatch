@@ -63,7 +63,7 @@ export interface AppConfig {
   slackPlanLimitChannel?: string;
   slackSignupsChannel?: string;
   slackSubscriptionsChannel?: string;
-  /** Self-hosted lead signals (ADR-139). Falls back to the signups channel. */
+  /** Self-hosted lead signals (ADR-141). Falls back to the signups channel. */
   slackSelfHostedChannel?: string;
   hubspotPortalId?: string;
   hubspotReachedLimitFormId?: string;

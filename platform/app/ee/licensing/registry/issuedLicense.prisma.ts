@@ -1,5 +1,5 @@
 /**
- * Prisma bindings for the license registry (ADR-139). The services are built
+ * Prisma bindings for the license registry (ADR-141). The services are built
  * in `./composition.ts`.
  */
 

@@ -1,5 +1,5 @@
 /**
- * Where a self-hosted lead signal goes (ADR-139, section 10).
+ * Where a self-hosted lead signal goes (ADR-141, section 10).
  *
  * Two places, both of which already existed. Customer.io gets the install's
  * traits on the customer's organization object and one event per signal, so a

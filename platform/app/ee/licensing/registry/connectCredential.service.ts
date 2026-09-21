@@ -1,5 +1,5 @@
 /**
- * Resolves a license token to the managed gateway key it runs under (ADR-139).
+ * Resolves a license token to the managed gateway key it runs under (ADR-141).
  *
  * This is the only reader of the registry on the credential path. It runs on
  * LangWatch Cloud when the gateway asks who a `lwl_` bearer is. It is never on

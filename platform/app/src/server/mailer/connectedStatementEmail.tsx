@@ -1,6 +1,6 @@
 /**
  * The monthly usage statement a connected self-hosted customer's billing
- * contact receives (ADR-139, section 7).
+ * contact receives (ADR-141, section 7).
  *
  * It is a statement, not an invoice: a connected customer is invoiced
  * quarterly, and this is what tells them where the prepaid commit stands

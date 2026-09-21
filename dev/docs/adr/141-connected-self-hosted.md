@@ -1,4 +1,4 @@
-# ADR-139: Connected self-hosted, hosted services metered against the license
+# ADR-141: Connected self-hosted, hosted services metered against the license
 
 **Date:** 2026-09-19
 

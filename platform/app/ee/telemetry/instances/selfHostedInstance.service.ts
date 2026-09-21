@@ -1,6 +1,6 @@
 /**
  * What happens to a usage report once the receiver has accepted it, and how an
- * operator reads it back (ADR-139, section 10).
+ * operator reads it back (ADR-141, section 10).
  *
  * The report presents no credential. That is deliberate, and it is what bounds
  * this service: a report identifies an install and never a customer. The

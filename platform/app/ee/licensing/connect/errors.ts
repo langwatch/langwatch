@@ -1,5 +1,5 @@
 /**
- * Refusals of a hosted-service call (ADR-139). Each one names something the
+ * Refusals of a hosted-service call (ADR-141). Each one names something the
  * administrator of the calling install can act on. Customer copy is keyed off
  * the code in `src/features/errors/logic/presentation.ts`.
  */

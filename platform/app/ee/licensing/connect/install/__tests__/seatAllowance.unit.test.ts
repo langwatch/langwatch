@@ -1,5 +1,5 @@
 /**
- * The seats a connected install may fill (ADR-139, section 6).
+ * The seats a connected install may fill (ADR-141, section 6).
  *
  * The lease is the only thing that widens the licensed count, and it is read
  * where plan limits are resolved, so every caller of the seat guard sees the

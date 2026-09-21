@@ -1,6 +1,6 @@
 /**
  * The connect host: what a self-hosted install calls on LangWatch Cloud
- * (ADR-139, section 6).
+ * (ADR-141, section 6).
  *
  * `connect.langwatch.ai/v1/*` maps onto this basePath, so an install posting to
  * `https://connect.langwatch.ai/v1/license/sync` lands on

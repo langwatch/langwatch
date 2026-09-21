@@ -1,5 +1,5 @@
 /**
- * The control plane end of a license sync (ADR-139, section 6).
+ * The control plane end of a license sync (ADR-141, section 6).
  *
  * A connected install posts its version and its two seat counts once a day and
  * gets a signed lease back. The lease is what lets it go over its licensed

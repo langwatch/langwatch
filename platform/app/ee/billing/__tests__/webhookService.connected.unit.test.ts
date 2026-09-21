@@ -18,7 +18,7 @@ import {
 
 /**
  * The `invoice.finalized` branch for a connected self-hosted customer
- * (ADR-139, section 7). The service behind it has its own suite; what is
+ * (ADR-141, section 7). The service behind it has its own suite; what is
  * proven here is the routing: whose invoices it acts on, and whose it leaves.
  */
 

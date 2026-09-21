@@ -403,7 +403,7 @@ function virtualKeyStatusRejection({
 }
 
 /**
- * Resolve a license token (ADR-139) to the managed key it runs under. The
+ * Resolve a license token (ADR-141) to the managed key it runs under. The
  * registry decides; from there the key is checked and signed for exactly like
  * a presented virtual key, so budgets, spend and the change feed need no second
  * path. The token ends with the license term when that comes first.
@@ -455,7 +455,7 @@ async function resolveLicenseToken(
   }
   // The license's services travel on the signed token, so the gateway can
   // refuse a hosted service outside the contract before it resolves anything
-  // else about the request (ADR-139 section 8).
+  // else about the request (ADR-141 section 8).
   return keyResolutionResponse(c, {
     service,
     vk,

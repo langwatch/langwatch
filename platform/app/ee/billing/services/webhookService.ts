@@ -62,7 +62,7 @@ export interface LicensePurchaseHandler {
 
 /**
  * What a finalized invoice means for a connected self-hosted customer
- * (ADR-139, section 7): a small quarterly usage invoice is rolled into the
+ * (ADR-141, section 7): a small quarterly usage invoice is rolled into the
  * next one, and a renewal that was waiting for the old term's last invoice can
  * now have its credit. Absent on a deployment that is not LangWatch Cloud.
  */

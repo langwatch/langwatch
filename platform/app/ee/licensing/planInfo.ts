@@ -22,7 +22,7 @@ export type PlanInfo = {
   maxMembers: number;
   /**
    * The full member seats the license itself covers, present only while a
-   * signed lease lets this install go over them (ADR-139, section 6). Then
+   * signed lease lets this install go over them (ADR-141, section 6). Then
    * `maxMembers` is this plus {@link PlanInfo.seatOverageAllowance}, which is
    * what every caller of the seat guard enforces, and the difference between
    * the two is what gets invoiced at the next quarterly seat true-up.

@@ -1,5 +1,5 @@
 /**
- * The monthly usage statement of a connected self-hosted customer (ADR-139,
+ * The monthly usage statement of a connected self-hosted customer (ADR-141,
  * section 7).
  *
  * A connected customer is invoiced quarterly, so a month can pass with nothing

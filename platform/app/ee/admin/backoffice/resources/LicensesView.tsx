@@ -12,7 +12,7 @@ import type { License } from "./licenses/types";
 const PAGE_SIZE = 25;
 
 /**
- * The backoffice's license registry (ADR-139): every license LangWatch issued,
+ * The backoffice's license registry (ADR-141): every license LangWatch issued,
  * with its customer, term, status, entitlements and commercial terms.
  *
  * Every write here is a verb with the operator recorded on it: issue, register

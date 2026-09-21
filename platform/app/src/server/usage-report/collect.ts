@@ -1,5 +1,5 @@
 /**
- * The report one install sends, built from the dictionary (ADR-139, section
+ * The report one install sends, built from the dictionary (ADR-141, section
  * 10).
  *
  * The dictionary says what may be in a report; this says what is in this one.

@@ -145,7 +145,7 @@ function billingMonthEndMs(billingMonth: string): number {
  * A Cloud customer is invoiced monthly, so dating an event inside a month
  * whose invoice may already be finalized would put the amount behind a closed
  * period. Its events therefore stay at the time of reporting, which is what
- * they have always done. A connected customer is invoiced quarterly (ADR-139,
+ * they have always done. A connected customer is invoiced quarterly (ADR-141,
  * section 7), so the month it belongs to is still open and the event is dated
  * there, subject to the meter's own 35-day floor.
  */

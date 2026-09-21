@@ -1,6 +1,6 @@
 /**
  * Writing a registry row: what the signed license itself dictates, and the
- * duplicate rules the table enforces (ADR-139).
+ * duplicate rules the table enforces (ADR-141).
  */
 
 import { LicenseKeyInvalidError } from "../errors";

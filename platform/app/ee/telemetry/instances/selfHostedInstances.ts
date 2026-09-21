@@ -1,6 +1,6 @@
 /**
  * The registry of self-hosted installs: what a report says, what a stored row
- * holds, and what the store has to offer (ADR-139, section 10).
+ * holds, and what the store has to offer (ADR-141, section 10).
  *
  * @see specs/self-hosting/connected-services/instance-registry.feature
  */

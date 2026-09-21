@@ -8,7 +8,7 @@ import { readConnectedBillingOverview } from "../../../../ee/billing/connected/c
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
- * Invoice billing for connected self-hosted customers (ADR-139, section 7).
+ * Invoice billing for connected self-hosted customers (ADR-141, section 7).
  *
  * Gated like the license registry: the `ADMIN_EMAILS` staff list checked in
  * the handler, never an RBAC permission, and a denial is the shared 404 that

@@ -107,7 +107,7 @@ export interface CioOrgTraits {
   onboarding_primary_path?: string;
   guided_onboarding_completed_paths?: string;
 
-  // Self-hosted (ADR-139, section 10). Set from the daily usage report of an
+  // Self-hosted (ADR-141, section 10). Set from the daily usage report of an
   // install whose license binds it to this organization, so a customer running
   // LangWatch on their own infrastructure is segmented on what that install
   // actually does rather than on their Cloud account, which may be empty.
@@ -149,7 +149,7 @@ export type CioEventName =
   | "onboarding_path_gateway"
   | "onboarding_path_governance"
   | "guided_onboarding_path_completed"
-  // Self-hosted lead signals (ADR-139, section 10). One per install, not one
+  // Self-hosted lead signals (ADR-141, section 10). One per install, not one
   // per report: a campaign keyed on these fires when something changed.
   | "self_hosted_seats_crossed_threshold"
   | "self_hosted_sustained_ingestion"

@@ -1,6 +1,6 @@
 /**
  * The credential a connected install presents to LangWatch-hosted services,
- * derived from the license it already holds (ADR-139).
+ * derived from the license it already holds (ADR-141).
  *
  * Pure: no environment, no database. The install derives the token to send it,
  * and LangWatch Cloud derives it to record and look up a license, so both sides

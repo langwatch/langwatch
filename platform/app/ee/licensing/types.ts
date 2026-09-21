@@ -62,7 +62,7 @@ export const LicenseDataSchema = z.object({
   expiresAt: z.string(), // ISO 8601 date string
   plan: LicensePlanLimitsSchema,
   /**
-   * The LangWatch-hosted services this license may call (ADR-139, section 2).
+   * The LangWatch-hosted services this license may call (ADR-141, section 2).
    *
    * Last in the schema and optional, so a license signed before it existed
    * parses and re-serializes byte-identically: `z.object` drops the key when

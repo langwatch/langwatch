@@ -1,5 +1,5 @@
 /**
- * The daily billing tick of a connected self-hosted customer (ADR-139,
+ * The daily billing tick of a connected self-hosted customer (ADR-141,
  * section 7).
  *
  * Three things run on it, in order and independently: the quarterly seat

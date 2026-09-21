@@ -1,7 +1,7 @@
 /**
  * How a registry row reads once it leaves the service: the derived status and
  * allowance, the held license dropped, and for a browsing caller the seats the
- * install reported in the term quarter now running (ADR-139).
+ * install reported in the term quarter now running (ADR-141).
  */
 
 import {

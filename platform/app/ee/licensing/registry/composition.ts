@@ -1,7 +1,7 @@
 /**
  * The one place that builds the license registry, the credential service and
  * the license sync as the app uses them: Prisma, the server's signing key, real
- * encryption, and the customer's contract budget (ADR-139).
+ * encryption, and the customer's contract budget (ADR-141).
  */
 
 import { SYSTEM_ACTORS } from "@langwatch/actor";

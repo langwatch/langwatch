@@ -11,7 +11,7 @@ import {
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
- * The backoffice's license registry surface (ADR-139).
+ * The backoffice's license registry surface (ADR-141).
  *
  * tRPC rather than the flat REST admin API because every change here is a verb
  * (issue, revoke, reissue, reset the instance binding) and that surface can only

@@ -1,6 +1,6 @@
 /**
  * Prisma, ledger and budget bindings for the monthly statement of a connected
- * self-hosted customer (ADR-139, section 7), and the one place that builds the
+ * self-hosted customer (ADR-141, section 7), and the one place that builds the
  * service.
  *
  * The walk starts at the organizations an operator marked as self-hosted

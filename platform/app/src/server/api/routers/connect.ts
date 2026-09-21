@@ -7,7 +7,7 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 /**
  * What an organization does with LangWatch-hosted services on a self-hosted
  * install: read the state, switch a service on or off, set its own cap
- * (ADR-139).
+ * (ADR-141).
  *
  * Every decision is the service's; this names the permission each one needs.
  * Reading is any member's, because the page explains why hosted judging is or

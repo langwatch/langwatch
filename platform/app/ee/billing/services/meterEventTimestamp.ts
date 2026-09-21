@@ -1,5 +1,5 @@
 /**
- * The timestamp a meter event may carry (ADR-139, section 7).
+ * The timestamp a meter event may carry (ADR-141, section 7).
  *
  * Stripe accepts a meter event only when its timestamp falls inside the last
  * 35 days, and rejects anything older. A month that was never reported can be

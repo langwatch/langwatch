@@ -1,6 +1,6 @@
 /**
  * The install's client for the connect host, where its license syncs
- * (ADR-139, section 6).
+ * (ADR-141, section 6).
  *
  * One route. The install reports the version it runs and the two seat counts
  * in use, and LangWatch answers with a signed lease, plus a reissued license

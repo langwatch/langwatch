@@ -1,5 +1,5 @@
 /**
- * The quarterly seat true-up of a connected self-hosted customer (ADR-139,
+ * The quarterly seat true-up of a connected self-hosted customer (ADR-141,
  * section 7).
  *
  * A connected install reports its seats once a day and the registry keeps the

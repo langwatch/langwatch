@@ -1,6 +1,6 @@
 /**
  * Prisma and payment provider bindings for the quarterly seat true-up
- * (ADR-139, section 7), and the one place that builds the service.
+ * (ADR-141, section 7), and the one place that builds the service.
  *
  * The walk starts at the license registry rather than at the billing accounts:
  * a license names its customer, and the account is read one organization at a

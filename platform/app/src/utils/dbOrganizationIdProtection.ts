@@ -440,7 +440,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
       (action === "findMany" && isCliLoginKeySweep(clause)),
   },
   RoutingPolicy: {},
-  // How a connected self-hosted customer is invoiced (ADR-139, section 7).
+  // How a connected self-hosted customer is invoiced (ADR-141, section 7).
   // One row per organization, so organizationId or the row id covers the
   // operator surfaces. The two provider ids are the other way in: the webhook
   // knows the customer an event names, and roll-forward knows the subscription
@@ -670,21 +670,21 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   // ownership rule is made of. It holds no customer content: ids, domains,
   // enums and credential references.
   "SsoConnection",
-  // The license registry (ADR-139). Org-bearing, and deliberately not
+  // The license registry (ADR-141). Org-bearing, and deliberately not
   // org-CONSTRAINED: a presented license token is resolved by `tokenHash`
   // before any organization is known, which is what identifies the customer in
   // the first place, and LangWatch operators list it across customers in the
   // backoffice. A guard demanding organizationId would refuse both. It holds
   // no customer content: ids, a token hash, seat counts, terms and amounts.
   "IssuedLicense",
-  // Activation codes (ADR-139, section 5). Org-bearing, and deliberately not
+  // Activation codes (ADR-141, section 5). Org-bearing, and deliberately not
   // org-CONSTRAINED for the same reason `IssuedLicense` is not: a presented
   // code is resolved by `codeHash` before any organization is known, which is
   // what identifies the customer, and LangWatch operators list codes across
   // customers in the backoffice. It holds no customer content: a hash, the
   // last four characters of a code, seat counts and dates.
   "ActivationCode",
-  // The registry of self-hosted installs (ADR-139, section 10). Org-bearing,
+  // The registry of self-hosted installs (ADR-141, section 10). Org-bearing,
   // and deliberately not org-CONSTRAINED: a report is addressed by the
   // instance id the install minted, before any organization is known, and the
   // organization on the row is filled in afterwards from the license bound to

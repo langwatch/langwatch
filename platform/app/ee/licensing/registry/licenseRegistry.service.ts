@@ -1,5 +1,5 @@
 /**
- * The license registry (ADR-139): the record of every license LangWatch issued.
+ * The license registry (ADR-141): the record of every license LangWatch issued.
  *
  * Every issue path goes through here, so a license never exists without its
  * row: the backoffice (`issue`, `reissue`), the purchase flow and the mint

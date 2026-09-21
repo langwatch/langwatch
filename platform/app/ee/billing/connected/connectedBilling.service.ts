@@ -1,5 +1,5 @@
 /**
- * Invoice billing for a connected self-hosted customer (ADR-139, section 7).
+ * Invoice billing for a connected self-hosted customer (ADR-141, section 7).
  *
  * The customer pays by invoice. Hosted usage draws down a prepaid commit at
  * list rates through the payment provider's meter; the commit itself is a

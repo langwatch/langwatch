@@ -15,7 +15,7 @@ interface HandleLicensePurchaseParams {
   stripe: Stripe;
   privateKey: string;
   /**
-   * Writes the minted license to the license registry (ADR-139). Required, so
+   * Writes the minted license to the license registry (ADR-141). Required, so
    * no caller can mint a license that the registry never hears about.
    */
   recordLicense: (params: { licenseKey: string }) => Promise<void>;

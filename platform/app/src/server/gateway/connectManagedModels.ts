@@ -1,5 +1,5 @@
 /**
- * Managed models, the two sides of it (ADR-139 section 8).
+ * Managed models, the two sides of it (ADR-141 section 8).
  *
  * On a connected self-hosted install: the extra provider slot that puts the
  * LangWatch gateway in front of every virtual key of an organization that

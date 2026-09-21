@@ -1,5 +1,5 @@
 /**
- * The payment provider behind connected billing (ADR-139, section 7).
+ * The payment provider behind connected billing (ADR-141, section 7).
  *
  * Everything here is invoiced, never charged: `send_invoice` with thirty days
  * to pay on the subscription and on every one-off invoice. A customer that can

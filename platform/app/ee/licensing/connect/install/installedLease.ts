@@ -1,5 +1,5 @@
 /**
- * The lease this install may act on (ADR-139, section 6).
+ * The lease this install may act on (ADR-141, section 6).
  *
  * A lease is only ever the one LangWatch signed for this license and this
  * install: a payload edited after signing, a lease naming another license, and

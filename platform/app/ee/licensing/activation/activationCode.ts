@@ -1,5 +1,5 @@
 /**
- * The short code a fresh install pastes instead of a license blob (ADR-139,
+ * The short code a fresh install pastes instead of a license blob (ADR-141,
  * section 5).
  *
  * Pure: no environment, no database. The backoffice mints a code here and the

@@ -1,5 +1,5 @@
 /**
- * Billing credit grants (ADR-139, section 7).
+ * Billing credit grants (ADR-141, section 7).
  *
  * The prepaid commit of a connected customer is a paid credit grant that
  * applies to metered usage only, so a seat invoice can never draw it down.

@@ -1,5 +1,5 @@
 /**
- * The daily license sync of a connected install (ADR-139, section 6).
+ * The daily license sync of a connected install (ADR-141, section 6).
  *
  * One outbound call per organization holding a license: the token, the
  * instance id, the version this install runs and the two seat counts in use.
