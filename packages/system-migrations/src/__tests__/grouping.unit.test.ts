@@ -33,6 +33,13 @@ function migration({
   };
 }
 
+/** The order a pass would actually drive them in. */
+function driveOrder(buckets: ReturnType<typeof groupByTenantSource>): string[] {
+  return buckets.flatMap((bucket) =>
+    bucket.migrations.map((migration) => migration.name),
+  );
+}
+
 describe("groupByTenantSource", () => {
   describe("given one migration declares its own candidates and another does not", () => {
     const drifted = source(["user-drifted"]);
@@ -47,7 +54,10 @@ describe("groupByTenantSource", () => {
         everyTenant,
       });
 
-      expect(grouped.get(drifted)).toEqual([heal]);
+      expect(grouped).toContainEqual({
+        tenants: drifted,
+        migrations: [heal],
+      });
     });
 
     /** @scenario "A migration's own candidate tenants do not narrow the others in the pass" */
@@ -57,7 +67,10 @@ describe("groupByTenantSource", () => {
         everyTenant,
       });
 
-      expect(grouped.get(everyTenant)).toEqual([backfill]);
+      expect(grouped).toContainEqual({
+        tenants: everyTenant,
+        migrations: [backfill],
+      });
     });
 
     it("keeps the two on separate runners", () => {
@@ -66,7 +79,7 @@ describe("groupByTenantSource", () => {
         everyTenant,
       });
 
-      expect(grouped.size).toBe(2);
+      expect(grouped).toHaveLength(2);
     });
   });
 
@@ -81,8 +94,9 @@ describe("groupByTenantSource", () => {
         everyTenant,
       });
 
-      expect([...grouped.keys()]).toEqual([everyTenant]);
-      expect(grouped.get(everyTenant)).toEqual([first, second]);
+      expect(grouped).toEqual([
+        { tenants: everyTenant, migrations: [first, second] },
+      ]);
     });
   });
 
@@ -98,8 +112,39 @@ describe("groupByTenantSource", () => {
         everyTenant,
       });
 
-      expect(grouped.size).toBe(1);
-      expect(grouped.get(shared)).toEqual([one, two]);
+      expect(grouped).toEqual([{ tenants: shared, migrations: [one, two] }]);
+    });
+  });
+
+  describe("when a source is registered again after a different one", () => {
+    const shared = source(["user-drifted"]);
+    const everyTenant = source(["user-a"]);
+    const first = migration({ name: "first", candidateTenants: shared });
+    const second = migration({ name: "second" });
+    const third = migration({ name: "third", candidateTenants: shared });
+
+    it("keeps registration order rather than merging the two runs", () => {
+      const grouped = groupByTenantSource({
+        migrations: [first, second, third],
+        everyTenant,
+      });
+
+      // Merged into one bucket per source this would read first, third,
+      // second — third overtaking a migration it was registered after.
+      expect(driveOrder(grouped)).toEqual(["first", "second", "third"]);
+    });
+
+    it("pages the repeated source once per run", () => {
+      const grouped = groupByTenantSource({
+        migrations: [first, second, third],
+        everyTenant,
+      });
+
+      expect(grouped.map((bucket) => bucket.tenants)).toEqual([
+        shared,
+        everyTenant,
+        shared,
+      ]);
     });
   });
 });

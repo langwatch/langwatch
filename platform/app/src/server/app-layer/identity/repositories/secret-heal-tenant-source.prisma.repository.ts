@@ -41,7 +41,16 @@ export class PrismaSecretHealTenantSource implements TenantSource {
   }): Promise<string[]> {
     // DISTINCT because a user with several drifted accounts is still one
     // tenant, and the runner claims per tenant.
+    //
+    // The `@tenancy` opt-out is required and correct: this asks "which users
+    // does the heal have work for?" across the whole installation, which is
+    // what a tenant source is for — the answer IS the tenant list, so it
+    // cannot be scoped by one. `Account` and `AccountCredential` are identity
+    // tables with no `projectId` or `organizationId` to scope it by in any
+    // case, which is why both sit under the multitenancy exemption.
     const rows = await this.prisma.$queryRaw<{ userId: string }[]>`
+      -- @tenancy: the tenant source itself; an installation-wide scan of two
+      -- identity tables that carry no project or organization of their own
       SELECT DISTINCT a."userId"
       FROM "Account" a
       LEFT JOIN "AccountCredential" c ON c."id" = a."id"

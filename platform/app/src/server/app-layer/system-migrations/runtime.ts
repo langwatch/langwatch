@@ -543,7 +543,7 @@ export async function runSystemMigrationPass(args?: {
     migrations: userMigrations,
     everyTenant: new PrismaUserTenantSource(prisma),
   });
-  for (const [tenants, migrations] of userBuckets) {
+  for (const { tenants, migrations } of userBuckets) {
     const userRunner = new SystemMigrationRunnerService({
       state: systemMigrationState,
       lease: new RedisMigrationLeaseRepository(redis),

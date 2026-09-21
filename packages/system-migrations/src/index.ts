@@ -1,4 +1,4 @@
-export { groupByTenantSource } from "./grouping";
+export { groupByTenantSource, type TenantSourceBucket } from "./grouping";
 export type { MigrationLeaseRepository } from "./lease.repository";
 export {
   type MigrationCohort,

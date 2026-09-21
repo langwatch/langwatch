@@ -135,6 +135,30 @@ Feature: Running system migrations across organizations
     Then the run continues rather than stopping
     But an installation with no organizations at all is converged
 
+  # Every replica runs this preflight, so a rolling deploy has a dozen of them
+  # sweeping the same tenants at once and each reads the others' leases as
+  # claims. If a claim a peer holds prevented convergence, none of them could
+  # ever start: each would be waiting on peers who are waiting on it. So a
+  # process that has finished its OWN work starts, and leaves what it could
+  # not claim to the peer already driving it — the same bargain a held or
+  # parked tenant gets, and the re-drive cadence covers a peer that dies.
+  #
+  # Only PARTIAL contention counts. Being shut out of the whole fleet is what
+  # an unreachable Redis looks like too, and a process that learned nothing
+  # about any tenant has no grounds to call anything settled.
+  @unit
+  Scenario: A peer's claims do not keep this process from starting
+    Given passes that advance nothing while a peer holds some of the fleet
+    When the same shape repeats pass after pass
+    Then the run ends and runtime processes start
+    And it says it is starting rather than waiting on a peer
+
+  @unit
+  Scenario: A momentary overlap with a peer is still waited out
+    Given one pass that advances nothing while a peer holds part of the fleet
+    When the next pass reads every tenant and still advances nothing
+    Then that pass is what ends the run
+
   @unit
   Scenario: A loop that never converges prevents startup
     Given passes that report progress every time
