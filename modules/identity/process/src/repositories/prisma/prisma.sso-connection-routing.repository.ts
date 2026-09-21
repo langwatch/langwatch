@@ -72,7 +72,9 @@ export class SsoConnectionDomainRoutingRepository implements SignInDomainRouting
       method,
       state: routingStateOf(row.state as Parameters<typeof routingStateOf>[0]),
       configured: await this.isMethodConfigured(providerId),
-      allowsJit: row.allowsJit,
+      // Derived from the policy, never from the column beside it: one field
+      // cannot disagree with itself, and `request` is not an admission.
+      allowsJit: row.arrivalPolicy === "admit",
     };
   }
 }

@@ -48,6 +48,24 @@ export const SSO_VERIFICATION_METHODS = [
 export const ssoVerificationMethodSchema = z.enum(SSO_VERIFICATION_METHODS);
 export type SsoVerificationMethod = z.infer<typeof ssoVerificationMethodSchema>;
 
+/**
+ * What a connection does with somebody who signs in through it and is not a
+ * member yet (ADR-117 §3). ONE field: a boolean beside it disagreed about
+ * the middle answer, and "they ask, you approve" provisioned nobody.
+ */
+export const SSO_ARRIVAL_POLICIES = ["admit", "request", "refuse"] as const;
+export const ssoArrivalPolicySchema = z.enum(SSO_ARRIVAL_POLICIES);
+export type SsoArrivalPolicy = z.infer<typeof ssoArrivalPolicySchema>;
+
+/** What a connection admits before anybody has chosen: the only answer that
+ *  cannot surprise anybody. */
+export const DEFAULT_SSO_ARRIVAL_POLICY: SsoArrivalPolicy = "refuse";
+
+/** Whether a stored string is one of the three answers. */
+export function isSsoArrivalPolicy(value: string): value is SsoArrivalPolicy {
+  return SSO_ARRIVAL_POLICIES.some((policy) => policy === value);
+}
+
 export const SSO_VERIFICATION_CEREMONY_METHODS = ["dns-txt", "license-token"] as const;
 export const ssoVerificationCeremonyMethodSchema = z.enum(SSO_VERIFICATION_CEREMONY_METHODS);
 export type SsoVerificationCeremonyMethod = z.infer<typeof ssoVerificationCeremonyMethodSchema>;
@@ -60,6 +78,11 @@ export type SsoVerificationCeremonyMethod = z.infer<typeof ssoVerificationCeremo
 export const SSO_PUBLISHED_PROOF_CHANNELS = ["dns-txt", "https-file"] as const;
 export const ssoPublishedProofChannelSchema = z.enum(SSO_PUBLISHED_PROOF_CHANNELS);
 export type SsoPublishedProofChannel = z.infer<typeof ssoPublishedProofChannelSchema>;
+
+/** Whether a method published something a re-read can go and look for. */
+export function isSsoPublishedProofChannel(method: string): method is SsoPublishedProofChannel {
+  return SSO_PUBLISHED_PROOF_CHANNELS.some((channel) => channel === method);
+}
 
 /**
  * Whether the evidence behind a proved domain is still there (ADR-123).
@@ -112,6 +135,9 @@ export const CONNECTION_SUSPENDED_EVENT_TYPE = "lw.identity.connection_suspended
 export const CONNECTION_RESUMED_EVENT_TYPE = "lw.identity.connection_resumed" as const;
 export const TEARDOWN_REQUESTED_EVENT_TYPE = "lw.identity.teardown_requested" as const;
 export const CONNECTION_TORN_DOWN_EVENT_TYPE = "lw.identity.connection_torn_down" as const;
+/** Who this connection admits, changed after registration stated it. */
+export const CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE =
+  "lw.identity.connection_arrival_policy_set" as const;
 
 export const SSO_CONNECTION_EVENT_TYPES = [
   CONNECTION_REGISTERED_EVENT_TYPE,
@@ -130,6 +156,7 @@ export const SSO_CONNECTION_EVENT_TYPES = [
   CONNECTION_RESUMED_EVENT_TYPE,
   TEARDOWN_REQUESTED_EVENT_TYPE,
   CONNECTION_TORN_DOWN_EVENT_TYPE,
+  CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE,
 ] as const;
 export type SsoConnectionEventType = (typeof SSO_CONNECTION_EVENT_TYPES)[number];
 
@@ -144,8 +171,8 @@ export const connectionRegisteredPayloadSchema = z.object({
   organizationId: z.string().min(1),
   type: ssoConnectionTypeSchema,
   idp: ssoIdpMetadataSchema,
-  /** Whether an unmatched callback subject may provision a user. */
-  allowsJit: z.boolean(),
+  /** What this connection does with somebody it has never seen. */
+  arrivalPolicy: ssoArrivalPolicySchema,
   actor: identityActorSchema,
   ...sourced,
 });
@@ -302,7 +329,18 @@ export const connectionTornDownPayloadSchema = z.object({
  * (aggregate, tenant, ids, idempotency key) and `occurredAt` are stamped by
  * whoever appends.
  */
+export const connectionArrivalPolicySetPayloadSchema = z.object({
+  connectionId: z.string().min(1),
+  policy: ssoArrivalPolicySchema,
+  actor: identityActorSchema,
+  ...sourced,
+});
+
 export const ssoConnectionFactInputSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal(CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE),
+    data: connectionArrivalPolicySetPayloadSchema,
+  }),
   z.object({
     type: z.literal(CONNECTION_REGISTERED_EVENT_TYPE),
     data: connectionRegisteredPayloadSchema,
@@ -395,6 +433,12 @@ export interface SsoDomainVerification {
    *  lapse. Both null while the proof is VERIFIED. */
   firstAbsentAtMs: number | null;
   graceEndsAtMs: number | null;
+  /** `sha256:…` of the token the ceremony published, so a re-read is
+   *  verification rather than "is anything at all published at our name".
+   *  Null for a proof that published nothing — an attestation, a licence,
+   *  the grandfather migration — which is also what makes them never
+   *  re-read. */
+  tokenHash: string | null;
 }
 
 /**
@@ -421,7 +465,14 @@ export interface SsoConnectionState {
     tokenHash: string;
   } | null;
   idpMetadata: SsoIdpMetadata;
-  allowsJit: boolean;
+  /** Who this connection admits (ADR-117 §3). Stated at registration and
+   *  changed by the setup journey; never absent, so no reader has to decide
+   *  what absence means. */
+  arrivalPolicy: SsoArrivalPolicy;
+  /** When somebody CHOSE it, or null while the registration default stands.
+   *  A different fact from the policy: going live waits for the deciding,
+   *  and "turn everybody away" is a decision too. */
+  arrivalPolicyDecidedAtMs: number | null;
   source: SsoConnectionSource;
   testLoginAccountId: string | null;
   /** Why ops last rejected a claim, with the domain it was about. Kept so a
@@ -454,7 +505,8 @@ export function emptySsoConnection({ connectionId }: { connectionId: string }): 
     domainVerifications: [],
     pendingVerification: null,
     idpMetadata: EMPTY_IDP,
-    allowsJit: false,
+    arrivalPolicy: DEFAULT_SSO_ARRIVAL_POLICY,
+    arrivalPolicyDecidedAtMs: null,
     source: "self-serve",
     testLoginAccountId: null,
     rejection: null,
@@ -529,7 +581,7 @@ export function reduceSsoConnection({
         type: fact.data.type,
         state: "DRAFT",
         idpMetadata: fact.data.idp,
-        allowsJit: fact.data.allowsJit,
+        arrivalPolicy: fact.data.arrivalPolicy,
         source: fact.data.source,
         createdBy: fact.data.actor.id,
         createdAtMs: fact.occurredAt,
@@ -557,6 +609,14 @@ export function reduceSsoConnection({
       };
     case CONNECTION_DISCARDED_EVENT_TYPE:
       return { ...touched, state: "DISCARDED" };
+    // Deciding is its own fact: a connection always has a behaviour, and
+    // separately somebody has or has not chosen it.
+    case CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE:
+      return {
+        ...touched,
+        arrivalPolicy: fact.data.policy,
+        arrivalPolicyDecidedAtMs: fact.occurredAt,
+      };
     case VERIFICATION_REQUESTED_EVENT_TYPE:
       return {
         ...touched,
@@ -584,6 +644,9 @@ export function reduceSsoConnection({
           proofState: "VERIFIED",
           firstAbsentAtMs: null,
           graceEndsAtMs: null,
+          // An attestation publishes nothing, so there is no record to read
+          // again and nothing to read it against.
+          tokenHash: null,
         }),
         pendingVerification: null,
       };
@@ -601,6 +664,14 @@ export function reduceSsoConnection({
           proofState: "VERIFIED",
           firstAbsentAtMs: null,
           graceEndsAtMs: null,
+          // Carried from the ceremony this fact closes, the one moment the
+          // hash is in hand. Derived from folded state rather than the
+          // payload, so a replay reconstructs it identically.
+          tokenHash:
+            state.pendingVerification?.domain === fact.data.domain &&
+            isSsoPublishedProofChannel(state.pendingVerification.method)
+              ? state.pendingVerification.tokenHash
+              : null,
         }),
         pendingVerification: null,
       };

@@ -1,4 +1,4 @@
-import type { SsoConnectionLifecycleState } from "./connection.ts";
+import type { SsoConnectionLifecycleState, SsoConnectionType } from "./connection.ts";
 
 /**
  * What happened to one connection, as a reader reads it (ADR-117 §5, D05).
@@ -34,5 +34,8 @@ export interface OrganizationSsoConnection {
    * name of its own, that is the provider id registration collected.
    */
   displayName: string;
+  /** Which protocol this connection speaks, as identity recorded it at
+   *  registration: the word a card shows beside the name. */
+  type: SsoConnectionType;
   state: SsoConnectionLifecycleState;
 }

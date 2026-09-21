@@ -27,7 +27,7 @@ export function grandfatheredConnectionFacts(
         organizationId: data.organizationId,
         type: data.type,
         idp: data.idp,
-        allowsJit: data.allowsJit,
+        arrivalPolicy: data.arrivalPolicy,
         actor,
         source,
       },

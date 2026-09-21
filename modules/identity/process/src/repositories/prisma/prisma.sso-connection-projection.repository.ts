@@ -3,6 +3,7 @@ import type {
   StateProjectionStore,
   StoredProjection,
 } from "@langwatch/eventing";
+import { DEFAULT_SSO_ARRIVAL_POLICY, isSsoArrivalPolicy } from "@langwatch/identity-contract";
 import type {
   SsoConnectionLifecycleState,
   SsoConnectionSource,
@@ -28,6 +29,7 @@ function provedCondition(entry: SsoDomainVerification): SsoDomainVerification {
     proofState: entry.proofState ?? "VERIFIED",
     firstAbsentAtMs: entry.firstAbsentAtMs ?? null,
     graceEndsAtMs: entry.graceEndsAtMs ?? null,
+    tokenHash: entry.tokenHash ?? null,
   };
 }
 
@@ -91,7 +93,12 @@ export class PrismaSsoConnectionProjectionRepository implements StateProjectionS
       domainVerifications: state.domainVerifications as unknown as Prisma.InputJsonValue,
       pendingVerification: state.pendingVerification ?? undefined,
       idpMetadata: state.idpMetadata,
-      allowsJit: state.allowsJit,
+      arrivalPolicy: state.arrivalPolicy,
+      arrivalPolicyDecidedAt:
+        state.arrivalPolicyDecidedAtMs === null ? null : new Date(state.arrivalPolicyDecidedAtMs),
+      // The dead column, kept in step for one release: the previous release's
+      // pods still select it by name on every connection read.
+      allowsJit: state.arrivalPolicy === "admit",
       source: state.source,
       testLoginAccountId: state.testLoginAccountId,
       rejection: state.rejection ?? undefined,
@@ -139,7 +146,10 @@ export class PrismaSsoConnectionProjectionRepository implements StateProjectionS
           })
         : null,
       idpMetadata: row.idpMetadata as unknown as SsoIdpMetadata,
-      allowsJit: row.allowsJit,
+      arrivalPolicy: isSsoArrivalPolicy(row.arrivalPolicy)
+        ? row.arrivalPolicy
+        : DEFAULT_SSO_ARRIVAL_POLICY,
+      arrivalPolicyDecidedAtMs: row.arrivalPolicyDecidedAt?.getTime() ?? null,
       source: row.source as SsoConnectionSource,
       testLoginAccountId: row.testLoginAccountId,
       rejection: row.rejection

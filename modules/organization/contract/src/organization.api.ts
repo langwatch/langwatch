@@ -175,6 +175,14 @@ export interface OrganizationApi {
     input: Readonly<{ organizationId: string; userId: string; disabled: boolean }>,
     by: OrganizationCaller | null,
   ): Promise<void>;
+  /**
+   * Refuses when taking this member out would leave the organization with no
+   * administrator who can sign in. Asked by a caller that writes the
+   * membership row itself — a directory deprovision — before it does.
+   */
+  assertRemovalKeepsAnAdministrator(
+    input: Readonly<{ organizationId: string; userId: string }>,
+  ): Promise<void>;
   getAllForUser(
     input: Readonly<{ isDemo: boolean; demoProjectUserId: string; demoProjectId: string }>,
     by: OrganizationCaller,

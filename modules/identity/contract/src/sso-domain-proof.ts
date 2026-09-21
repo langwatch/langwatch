@@ -43,3 +43,20 @@ export const SSO_VERIFICATION_FILE_PATH = "/.well-known/langwatch-verification.t
 export function ssoVerificationFileUrl({ domain }: { domain: string }): string {
   return `https://${domain}${SSO_VERIFICATION_FILE_PATH}`;
 }
+
+/**
+ * What one re-proof sweep did (ADR-123), for the worker's log line and for a
+ * test to assert on without reading a ledger.
+ */
+export interface SsoDomainReproofOutcome {
+  /** Whether the batch filled, so more domains wait for the next cycle. */
+  truncated: boolean;
+  checked: number;
+  wavered: number;
+  lapsed: number;
+  recovered: number;
+  /** Lookups that could not be answered. Counted rather than acted on. */
+  unreachable: number;
+  /** Domains whose re-read threw, carried out so the worker says it once. */
+  failed: { domain: string; error: unknown }[];
+}

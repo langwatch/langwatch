@@ -67,7 +67,7 @@ async function run(
 
 async function reachVerified(): Promise<void> {
   await run(() =>
-    guards.registerConnection({ ...identity, type: "oidc", idp: IDP, allowsJit: true }),
+    guards.registerConnection({ ...identity, type: "oidc", idp: IDP, arrivalPolicy: "admit" }),
   );
   await run(() => guards.claimDomain({ ...identity, domain: "acme.com" }));
   await run(() => guards.approveDomainClaim({ ...identity, actor: OPS, domain: "acme.com" }));
@@ -108,7 +108,7 @@ describe("sso connection guards", () => {
           ...identity,
           type: "oidc",
           idp: IDP,
-          allowsJit: true,
+          arrivalPolicy: "admit",
         }),
       );
 
@@ -136,7 +136,7 @@ describe("sso connection guards", () => {
           ...identity,
           type: "oidc",
           idp: IDP,
-          allowsJit: true,
+          arrivalPolicy: "admit",
         }),
       );
     });
@@ -168,7 +168,7 @@ describe("sso connection guards", () => {
           ...identity,
           type: "oidc",
           idp: IDP,
-          allowsJit: true,
+          arrivalPolicy: "admit",
         }),
       );
       await run(() => guards.claimDomain({ ...identity, domain: "acme.com" }));
@@ -221,7 +221,7 @@ describe("sso connection guards", () => {
           ...identity,
           type: "oidc",
           idp: IDP,
-          allowsJit: true,
+          arrivalPolicy: "admit",
         }),
       );
       await run(() => guards.claimDomain({ ...identity, domain: "acme.com" }));
@@ -281,7 +281,7 @@ describe("sso connection guards", () => {
           ...identity,
           type: "oidc",
           idp: IDP,
-          allowsJit: true,
+          arrivalPolicy: "admit",
         }),
       );
       await run(() => guards.claimDomain({ ...identity, domain: "acme.com" }));
@@ -437,7 +437,7 @@ describe("sso connection guards", () => {
           source: "legacy-grandfathered",
           type: "oidc",
           idp: IDP,
-          allowsJit: true,
+          arrivalPolicy: "admit",
           domains: ["acme.com"],
         }),
       );
@@ -498,7 +498,7 @@ describe("sso connection guards", () => {
           source: "legacy-grandfathered" as const,
           type: "oidc" as const,
           idp: IDP,
-          allowsJit: true,
+          arrivalPolicy: "admit",
           domains: ["acme.com"],
         });
 

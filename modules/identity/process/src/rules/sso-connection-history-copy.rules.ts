@@ -1,5 +1,6 @@
 import {
   CONNECTION_ACTIVATED_EVENT_TYPE,
+  CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE,
   CONNECTION_DISCARDED_EVENT_TYPE,
   CONNECTION_REGISTERED_EVENT_TYPE,
   CONNECTION_RESUMED_EVENT_TYPE,
@@ -54,6 +55,14 @@ function forDomain(domain: string | null): string {
   return domain ? ` for ${domain}` : "";
 }
 
+/** The three answers, as an administrator reads them back. */
+function arrivalWords(policy: string | null): string {
+  if (policy === "admit") return "is given an account";
+  if (policy === "request") return "asks to join, for somebody here to approve";
+
+  return "is turned away";
+}
+
 function withNote(note: string | null): string {
   return note ? `: ${note}` : "";
 }
@@ -68,6 +77,8 @@ const HISTORY_COPY_BY_EVENT_TYPE: Record<
   (fields: HistoryCopyFields) => string
 > = {
   [CONNECTION_REGISTERED_EVENT_TYPE]: () => "The connection was registered",
+  [CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE]: ({ policy }) =>
+    `Somebody new signing in through this connection ${arrivalWords(policy)}`,
   [DOMAIN_CLAIMED_EVENT_TYPE]: ({ domain }) => `${domain ?? "A domain"} was claimed`,
   [DOMAIN_CLAIM_APPROVED_EVENT_TYPE]: ({ domain }) => `The claim${forDomain(domain)} was approved`,
   [DOMAIN_CLAIM_REJECTED_EVENT_TYPE]: ({ domain, note }) =>

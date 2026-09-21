@@ -68,7 +68,7 @@ describe("given a peer module asking which connections an organization holds", (
       ]);
 
       await expect(service.findForOrganization({ organizationId: ACME })).resolves.toEqual([
-        { connectionId: "ssoc_acme", displayName: "okta", state: "ACTIVE" },
+        { connectionId: "ssoc_acme", displayName: "okta", type: "oidc", state: "ACTIVE" },
       ]);
     });
 

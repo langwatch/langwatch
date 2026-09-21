@@ -4,6 +4,7 @@ import {
   APPROVE_DOMAIN_CLAIM_COMMAND_TYPE,
   type ApproveDomainClaimCommandData,
   ATTEST_DOMAIN_COMMAND_TYPE,
+  CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE,
   type AttestDomainCommandData,
   CLAIM_DOMAIN_COMMAND_TYPE,
   type ClaimDomainCommandData,
@@ -35,10 +36,12 @@ import {
   REQUEST_TEARDOWN_COMMAND_TYPE,
   REQUEST_VERIFICATION_COMMAND_TYPE,
   RESUME_CONNECTION_COMMAND_TYPE,
+  SET_ARRIVAL_POLICY_COMMAND_TYPE,
   type RegisterConnectionCommandData,
   type RejectDomainClaimCommandData,
   type RequestTeardownCommandData,
   type RequestVerificationCommandData,
+  type SetArrivalPolicyCommandData,
   type ResumeConnectionCommandData,
   SUSPEND_CONNECTION_COMMAND_TYPE,
   type SsoConnectionFactInput,
@@ -92,7 +95,7 @@ export class SsoConnectionGuardsService {
           organizationId: data.organizationId,
           type: data.type,
           idp: data.idp,
-          allowsJit: data.allowsJit,
+          arrivalPolicy: data.arrivalPolicy,
           actor: data.actor,
           source: data.source,
         },
@@ -317,6 +320,30 @@ export class SsoConnectionGuardsService {
           method: pending.method,
           actor: data.actor,
           source: data.source,
+        },
+      },
+    ];
+  }
+
+  /**
+   * Somebody decided who this connection admits (ADR-117 §3). Idempotent by
+   * state: re-stating the policy the connection already has says nothing,
+   * so a screen that saves twice does not claim two decisions.
+   */
+  async setArrivalPolicy(data: SetArrivalPolicyCommandData): Promise<SsoConnectionFactInput[]> {
+    const state = await this.checks.require(data, SET_ARRIVAL_POLICY_COMMAND_TYPE);
+    if (state.arrivalPolicy === data.policy && state.arrivalPolicyDecidedAtMs !== null) {
+      return [];
+    }
+
+    return [
+      {
+        type: CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE,
+        data: {
+          connectionId: data.connectionId,
+          policy: data.policy,
+          actor: data.actor,
+          source: "self-serve",
         },
       },
     ];

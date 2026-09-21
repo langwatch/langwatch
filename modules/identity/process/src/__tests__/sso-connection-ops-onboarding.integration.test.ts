@@ -85,7 +85,7 @@ async function onboard(): Promise<void> {
     ...commandFor("ssocmd_1"),
     type: "oidc",
     idp: IDP,
-    allowsJit: true,
+    arrivalPolicy: "admit",
   });
   await service.claimDomain({ ...commandFor("ssocmd_2"), domain: "acme.com" });
   await service.approveDomainClaim({
@@ -178,6 +178,7 @@ describe("ops-assisted onboarding", () => {
           proofState: "VERIFIED",
           firstAbsentAtMs: null,
           graceEndsAtMs: null,
+          tokenHash: null,
         },
       ]);
       // And it never reads as a domain the customer proved: the method is a

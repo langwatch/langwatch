@@ -20,6 +20,7 @@ import {
   RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE,
   REQUEST_VERIFICATION_COMMAND_TYPE,
   RESUME_CONNECTION_COMMAND_TYPE,
+  SET_ARRIVAL_POLICY_COMMAND_TYPE,
   SUSPEND_CONNECTION_COMMAND_TYPE,
   VERIFY_DOMAIN_COMMAND_TYPE,
 } from "@langwatch/identity-contract";
@@ -62,6 +63,18 @@ const ALLOWED_FROM: Record<SsoConnectionCommandType, readonly SsoConnectionLifec
   [RESUME_CONNECTION_COMMAND_TYPE]: ["SUSPENDED"],
   [REQUEST_TEARDOWN_COMMAND_TYPE]: ["ACTIVE", "SUSPENDED"],
   [COMPLETE_TEARDOWN_COMMAND_TYPE]: ["TEARDOWN_PENDING"],
+  // Decidable for as long as the connection can still admit anybody: before
+  // it goes live, and after, because changing your mind is not a rebuild.
+  [SET_ARRIVAL_POLICY_COMMAND_TYPE]: [
+    "DRAFT",
+    "CLAIMED",
+    "APPROVED",
+    "REJECTED",
+    "VERIFICATION_PENDING",
+    "VERIFIED",
+    "ACTIVE",
+    "SUSPENDED",
+  ],
 };
 
 export interface SsoConnectionGuardsDeps {

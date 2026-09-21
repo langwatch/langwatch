@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  ssoArrivalPolicySchema,
   ssoConnectionSourceSchema,
   ssoConnectionTypeSchema,
   ssoIdpMetadataSchema,
@@ -41,6 +42,8 @@ export const RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE =
   "lw.identity.record_domain_proof_present" as const;
 export const RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE =
   "lw.identity.record_domain_proof_absent" as const;
+/** Somebody decided who this connection admits (ADR-117 §3). */
+export const SET_ARRIVAL_POLICY_COMMAND_TYPE = "lw.identity.set_arrival_policy" as const;
 
 export const SSO_CONNECTION_COMMAND_TYPES = [
   REGISTER_CONNECTION_COMMAND_TYPE,
@@ -59,6 +62,7 @@ export const SSO_CONNECTION_COMMAND_TYPES = [
   GRANDFATHER_CONNECTION_COMMAND_TYPE,
   RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE,
   RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE,
+  SET_ARRIVAL_POLICY_COMMAND_TYPE,
 ] as const;
 export type SsoConnectionCommandType = (typeof SSO_CONNECTION_COMMAND_TYPES)[number];
 
@@ -104,7 +108,7 @@ function commandDataSchema<Shape extends z.ZodRawShape>(
 export const registerConnectionCommandDataSchema = commandDataSchema({
   type: ssoConnectionTypeSchema,
   idp: ssoIdpMetadataSchema,
-  allowsJit: z.boolean(),
+  arrivalPolicy: ssoArrivalPolicySchema,
 });
 export type RegisterConnectionCommandData = z.infer<typeof registerConnectionCommandDataSchema>;
 
@@ -193,7 +197,7 @@ export type CompleteTeardownCommandData = z.infer<typeof completeTeardownCommand
 export const grandfatherConnectionCommandDataSchema = commandDataSchema({
   type: ssoConnectionTypeSchema,
   idp: ssoIdpMetadataSchema,
-  allowsJit: z.boolean(),
+  arrivalPolicy: ssoArrivalPolicySchema,
   /** The domains `Organization.ssoDomain` carries, already normalized. */
   domains: z.array(z.string().min(1)).min(1),
   source: z.literal("legacy-grandfathered"),
@@ -201,6 +205,11 @@ export const grandfatherConnectionCommandDataSchema = commandDataSchema({
 export type GrandfatherConnectionCommandData = z.infer<
   typeof grandfatherConnectionCommandDataSchema
 >;
+
+export const setArrivalPolicyCommandDataSchema = commandDataSchema({
+  policy: ssoArrivalPolicySchema,
+});
+export type SetArrivalPolicyCommandData = z.infer<typeof setArrivalPolicyCommandDataSchema>;
 
 /** One connection command, typed on its verb — what the ledger stages. */
 export type SsoConnectionCommand =
@@ -254,6 +263,10 @@ export type SsoConnectionCommand =
   | {
       type: typeof COMPLETE_TEARDOWN_COMMAND_TYPE;
       data: CompleteTeardownCommandData;
+    }
+  | {
+      type: typeof SET_ARRIVAL_POLICY_COMMAND_TYPE;
+      data: SetArrivalPolicyCommandData;
     }
   | {
       type: typeof GRANDFATHER_CONNECTION_COMMAND_TYPE;

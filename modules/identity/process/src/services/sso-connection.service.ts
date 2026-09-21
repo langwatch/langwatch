@@ -31,6 +31,7 @@ import {
   REQUEST_TEARDOWN_COMMAND_TYPE,
   REQUEST_VERIFICATION_COMMAND_TYPE,
   RESUME_CONNECTION_COMMAND_TYPE,
+  SET_ARRIVAL_POLICY_COMMAND_TYPE,
   type RegisterConnectionCommandData,
   registerConnectionCommandDataSchema,
   type RejectDomainClaimCommandData,
@@ -38,6 +39,8 @@ import {
   type RequestTeardownCommandData,
   requestTeardownCommandDataSchema,
   type RequestVerificationCommandData,
+  type SetArrivalPolicyCommandData,
+  setArrivalPolicyCommandDataSchema,
   requestVerificationCommandDataSchema,
   type ResumeConnectionCommandData,
   resumeConnectionCommandDataSchema,
@@ -154,6 +157,15 @@ export class SsoConnectionService {
   }
 
   /** What a re-read of a published proof found (ADR-123). */
+  async setArrivalPolicy(input: SetArrivalPolicyCommandData): Promise<SsoConnectionFact[]> {
+    const data = setArrivalPolicyCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: SET_ARRIVAL_POLICY_COMMAND_TYPE, data },
+      await this.guards.setArrivalPolicy(data),
+    );
+  }
+
   async recordDomainProofAbsent(
     input: RecordDomainProofAbsentCommandData,
   ): Promise<SsoConnectionFact[]> {

@@ -54,6 +54,7 @@ function seed(proof: Partial<SsoDomainVerification> & { method: SsoDomainVerific
         proofState: "VERIFIED",
         firstAbsentAtMs: null,
         graceEndsAtMs: null,
+        tokenHash: null,
         ...proof,
       },
     ],

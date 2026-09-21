@@ -1,3 +1,4 @@
+import type { GuidedOnboardingRecord } from "@langwatch/onboarding-contract";
 import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -37,7 +38,7 @@ function seedOrganization(signupData?: Record<string, unknown>): void {
 }
 
 beforeEach(() => {
-  database = new MemoryOrganizationDatabase();
+  database = MemoryOrganizationDatabase.create();
   repository = MemoryOrganizationRepository.create({ memory: database });
 });
 
@@ -86,9 +87,9 @@ describe("given an organization whose sign-up answers are already stored", () =>
 
     it("reads back exactly what was written", async () => {
       seedOrganization({ usage: "production" });
-      const record = {
+      const record: GuidedOnboardingRecord = {
         state: { paths: ["coding"], donePaths: [], conversationId: "conv_1" },
-        variant: "guided" as const,
+        variant: "guided",
       };
 
       await repository.saveGuidedOnboarding({ organizationId: ORGANIZATION_ID, record });

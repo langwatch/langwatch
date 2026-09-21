@@ -14,6 +14,7 @@ export {
 export {
   CONNECTION_ACTIVATED_EVENT_TYPE,
   CONNECTION_DISCARDED_EVENT_TYPE,
+  CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE,
   CONNECTION_REGISTERED_EVENT_TYPE,
   CONNECTION_RESUMED_EVENT_TYPE,
   CONNECTION_SUSPENDED_EVENT_TYPE,
@@ -44,9 +45,13 @@ export {
   domainProofWaveredPayloadSchema,
   domainVerifiedPayloadSchema,
   emptySsoConnection,
+  isSsoArrivalPolicy,
+  isSsoPublishedProofChannel,
   reduceSsoConnection,
   routingFactsOf,
   routingStateOf,
+  DEFAULT_SSO_ARRIVAL_POLICY,
+  SSO_ARRIVAL_POLICIES,
   SSO_CONNECTION_EVENT_TYPES,
   SSO_CONNECTION_EVENT_VERSION_LATEST,
   SSO_CONNECTION_SOURCES,
@@ -56,6 +61,7 @@ export {
   SSO_PUBLISHED_PROOF_CHANNELS,
   SSO_VERIFICATION_CEREMONY_METHODS,
   SSO_VERIFICATION_METHODS,
+  type SsoArrivalPolicy,
   type SsoConnectionEventType,
   type SsoConnectionFact,
   type SsoConnectionFactInput,
@@ -69,6 +75,8 @@ export {
   type SsoPublishedProofChannel,
   type SsoVerificationCeremonyMethod,
   type SsoVerificationMethod,
+  connectionArrivalPolicySetPayloadSchema,
+  ssoArrivalPolicySchema,
   ssoConnectionFactInputSchema,
   ssoConnectionSourceSchema,
   ssoConnectionStateSchema,
@@ -89,6 +97,7 @@ export {
   SSO_DNS_RECORD_TYPE,
   SSO_DNS_REPROOF_GRACE_MS,
   SSO_VERIFICATION_FILE_PATH,
+  type SsoDomainReproofOutcome,
   ssoDnsRecordName,
   ssoVerificationFileUrl,
 } from "./sso-domain-proof.ts";
@@ -135,8 +144,11 @@ export {
   requestVerificationCommandDataSchema,
   type ResumeConnectionCommandData,
   resumeConnectionCommandDataSchema,
+  SET_ARRIVAL_POLICY_COMMAND_TYPE,
   SSO_CONNECTION_COMMAND_TYPES,
   SUSPEND_CONNECTION_COMMAND_TYPE,
+  type SetArrivalPolicyCommandData,
+  setArrivalPolicyCommandDataSchema,
   type SsoConnectionCommand,
   type SsoConnectionCommandType,
   type SuspendConnectionCommandData,
@@ -570,3 +582,4 @@ export {
 export * from "./signin-callback.errors.ts";
 export * from "./identity.api.ts";
 export * from "./identity-lookup.ts";
+export * from "./identity.config.ts";

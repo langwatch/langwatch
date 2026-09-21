@@ -105,7 +105,7 @@ export class SsoConnectionGrandfatherService {
       // Today's behavior, kept: an OAuth callback for an unknown person on a
       // routed domain creates them. Changing that at grandfathering would be
       // a behavior change wearing a migration's clothes.
-      allowsJit: true,
+      arrivalPolicy: "admit",
       domains,
     });
 

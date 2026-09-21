@@ -336,6 +336,17 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     return this.memberSummary(row);
   }
 
+  async findActiveAdministratorIds(params: { organizationId: string }): Promise<string[]> {
+    return this.memory.organizationUsers
+      .filter(
+        (row) =>
+          row.organizationId === params.organizationId &&
+          row.role === OrganizationUserRole.ADMIN &&
+          row.disabledAt === null,
+      )
+      .map((row) => row.userId);
+  }
+
   async findAllMembers(params: {
     organizationId: string;
     includeDisabled: boolean;

@@ -21,6 +21,7 @@ import {
   MemorySsoConnectionReadRepository,
   MemorySsoConnectionStrandingRepository,
 } from "./memory.sso-connection.repositories.ts";
+import { MemorySsoDomainReproofTargetRepository } from "./memory.sso-domain-reproof.repository.ts";
 
 /**
  * The "memory" tier: every identity repository the app is tested without a
@@ -51,6 +52,7 @@ export class MemoryIdentityRepositories {
       ssoConnections: MemorySsoConnectionReadRepository.create(store),
       ssoStranding: MemorySsoConnectionStrandingRepository.create(store),
       ssoBackoffice: MemorySsoConnectionBackofficeRepository.create(store),
+      ssoReproofTargets: MemorySsoDomainReproofTargetRepository.create(store),
       ssoBreakGlass: MemorySsoBreakGlassRepository.create(store),
     };
   }

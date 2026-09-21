@@ -27,6 +27,7 @@ describe("OrganizationMembershipService", () => {
     tryGetUserOrgRole: vi.fn(),
     findUserOrgRoleByTeamId: vi.fn(),
     tryFindPrimaryIntentById: vi.fn(),
+    findActiveAdministratorIds: vi.fn(),
     createAndAssign: vi.fn(),
     createForProvisioning: vi.fn(),
     findAllProvisioningSummaries: vi.fn(),

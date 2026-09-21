@@ -6,12 +6,14 @@ import {
 } from "@langwatch/eventing";
 import {
   CONNECTION_ACTIVATED_EVENT_TYPE,
+  CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE,
   CONNECTION_DISCARDED_EVENT_TYPE,
   CONNECTION_REGISTERED_EVENT_TYPE,
   CONNECTION_RESUMED_EVENT_TYPE,
   CONNECTION_SUSPENDED_EVENT_TYPE,
   CONNECTION_TORN_DOWN_EVENT_TYPE,
   connectionActivatedPayloadSchema,
+  connectionArrivalPolicySetPayloadSchema,
   connectionDiscardedPayloadSchema,
   connectionRegisteredPayloadSchema,
   connectionResumedPayloadSchema,
@@ -144,7 +146,14 @@ export const connectionTornDownEventSchema = EventSchema.extend({
 });
 export type ConnectionTornDownEvent = z.infer<typeof connectionTornDownEventSchema>;
 
+export const connectionArrivalPolicySetEventSchema = EventSchema.safeExtend({
+  type: z.literal(CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE),
+  data: connectionArrivalPolicySetPayloadSchema,
+});
+export type ConnectionArrivalPolicySetEvent = z.infer<typeof connectionArrivalPolicySetEventSchema>;
+
 export const ssoConnectionEventSchema = z.discriminatedUnion("type", [
+  connectionArrivalPolicySetEventSchema,
   connectionRegisteredEventSchema,
   domainClaimedEventSchema,
   domainClaimApprovedEventSchema,
@@ -169,6 +178,7 @@ const SSO_CONNECTION_PROJECTION_VERSION = "2026-08-24";
 export const SSO_CONNECTION_PROJECTION_NAME = "ssoConnectionState" as const;
 
 const ssoConnectionEvents = [
+  connectionArrivalPolicySetEventSchema,
   connectionRegisteredEventSchema,
   domainClaimedEventSchema,
   domainClaimApprovedEventSchema,
@@ -248,6 +258,13 @@ export class SsoConnectionStateFoldProjection
 
   handleIdentityConnectionRegistered(
     event: ConnectionRegisteredEvent,
+    state: SsoConnectionFoldState,
+  ): SsoConnectionFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityConnectionArrivalPolicySet(
+    event: ConnectionArrivalPolicySetEvent,
     state: SsoConnectionFoldState,
   ): SsoConnectionFoldState {
     return this.fold(event, state);

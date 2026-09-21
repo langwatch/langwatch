@@ -7,11 +7,12 @@ import { generate } from "@langwatch/ksuid";
 import {
   type OrganizationIntent,
   type OrganizationUser,
-  type OrganizationUserRole,
+  OrganizationUserRole,
   PricingModel,
   RoleBindingScopeType,
   type TeamUserRole,
   type User,
+  CannotRemoveLastAdminError,
   CannotRemoveSelfError,
   MemberNotFoundError,
 } from "@langwatch/organization-contract";
@@ -391,6 +392,30 @@ export class OrganizationMembershipService {
       userId: params.userId,
       actingUserId: params.actingUserId ?? null,
     });
+  }
+
+  /**
+   * Refuses when taking this member out would leave the organization with no
+   * administrator who can sign in — the one lockout nothing inside the
+   * product can undo. Asked by a caller whose own path writes the membership
+   * row (a directory deprovision), so the rule is stated once, here.
+   */
+  async assertRemovalKeepsAnAdministrator(params: {
+    organizationId: string;
+    userId: string;
+  }): Promise<void> {
+    const membership = await this.repo.tryFindMembership(params);
+    // Not a member, or not an administrator who can sign in: there is no
+    // administrator to lose, so there is nothing to refuse.
+    if (!membership) return;
+    if (membership.role !== OrganizationUserRole.ADMIN || membership.disabledAt !== null) return;
+
+    const administrators = await this.repo.findActiveAdministratorIds({
+      organizationId: params.organizationId,
+    });
+    if (administrators.some((administrator) => administrator !== params.userId)) return;
+
+    throw new CannotRemoveLastAdminError();
   }
 
   /**

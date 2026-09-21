@@ -19,3 +19,14 @@ export type SsoDomainFileFetch =
 export interface SsoDomainProofFileChannel {
   fetchVerificationFile(args: { domain: string; url: string }): Promise<SsoDomainFileFetch>;
 }
+
+/**
+ * A proof file is fetched off the PUBLIC internet, always: a token answered
+ * from private space proves nothing, and one read over an unverified
+ * certificate could have been answered by anybody in between.
+ */
+export const SSO_DOMAIN_PROOF_PUBLIC_EGRESS = {
+  blockLocal: true,
+  allowedHosts: [],
+  verifyTls: true,
+} as const;

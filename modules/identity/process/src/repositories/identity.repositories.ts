@@ -18,6 +18,7 @@ import type {
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
 } from "./sso-connection.repository.ts";
+import type { SsoDomainReproofTargetRepository } from "./sso-domain-reproof.repository.ts";
 
 /**
  * The rows the identity module owns, chosen once at boot. One tier over
@@ -40,6 +41,8 @@ export interface IdentityRepositories {
   readonly ssoConnections: SsoConnectionReadRepository;
   readonly ssoStranding: SsoConnectionStrandingRepository;
   readonly ssoBackoffice: SsoConnectionBackofficeRepository;
+  /** Which proved domains are due a re-read, and the look itself (ADR-123). */
+  readonly ssoReproofTargets: SsoDomainReproofTargetRepository;
   /** The ways back in a connection's activation depends on (D05). */
   readonly ssoBreakGlass: SsoBreakGlassRepository;
   /**

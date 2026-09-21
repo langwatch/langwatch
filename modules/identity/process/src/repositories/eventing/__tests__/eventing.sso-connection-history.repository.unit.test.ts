@@ -44,7 +44,7 @@ function registered(at: FactEnvelope): SsoConnectionEvent {
       organizationId: ACME,
       type: "oidc",
       idp: { issuer: null, providerId: "okta", clientIdRef: null, secretRef: null, certRefs: [] },
-      allowsJit: false,
+      arrivalPolicy: "refuse",
       actor: SYSTEM_ACTOR,
       source: "self-serve",
     },

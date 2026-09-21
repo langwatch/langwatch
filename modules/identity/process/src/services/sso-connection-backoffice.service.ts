@@ -1,4 +1,5 @@
 import {
+  type SsoArrivalPolicy,
   type SsoConnectionHistoryEntryView,
   type SsoConnectionLifecycleState,
   type SsoConnectionState,
@@ -39,6 +40,9 @@ export interface BackofficeSsoConnection {
   >[];
   providerId: string;
   issuer: string | null;
+  /** DERIVED from the connection's arrival policy: `admit` and nothing else.
+   *  The policy itself joins this row when the enterprise output schema that
+   *  parses it is widened — it is `.strict()` (see the handoff §10). */
   allowsJit: boolean;
   source: string;
   testLoginAccountId: string | null;
@@ -153,13 +157,16 @@ export class SsoConnectionBackofficeService {
     providerId,
     issuer,
     allowsJit,
+    arrivalPolicy,
     operator,
   }: {
     organizationId: string;
     type: string;
     providerId: string;
     issuer: string | null;
+    /** The legacy boolean, read only when no policy was stated. */
     allowsJit: boolean;
+    arrivalPolicy?: SsoArrivalPolicy;
     operator: OperatorActor;
   }): Promise<{ connectionId: string }> {
     if (type !== "oidc") {
@@ -179,7 +186,7 @@ export class SsoConnectionBackofficeService {
         secretRef: null,
         certRefs: [],
       },
-      allowsJit,
+      arrivalPolicy: arrivalPolicy ?? (allowsJit ? "admit" : "refuse"),
     });
 
     return { connectionId };
@@ -291,7 +298,7 @@ export class SsoConnectionBackofficeService {
       ),
       providerId: state.idpMetadata.providerId,
       issuer: state.idpMetadata.issuer,
-      allowsJit: state.allowsJit,
+      allowsJit: state.arrivalPolicy === "admit",
       source: state.source,
       testLoginAccountId: state.testLoginAccountId,
       rejection: state.rejection,

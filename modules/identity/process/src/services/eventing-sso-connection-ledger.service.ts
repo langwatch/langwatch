@@ -24,6 +24,7 @@ import {
   RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE,
   REQUEST_VERIFICATION_COMMAND_TYPE,
   RESUME_CONNECTION_COMMAND_TYPE,
+  SET_ARRIVAL_POLICY_COMMAND_TYPE,
   type SsoConnectionCommand,
   type SsoConnectionCommandType,
   type SsoConnectionFact,
@@ -69,6 +70,7 @@ const SENDER_NAME_BY_COMMAND: Record<SsoConnectionCommandType, string> = {
   [REQUEST_TEARDOWN_COMMAND_TYPE]: "requestTeardown",
   [COMPLETE_TEARDOWN_COMMAND_TYPE]: "completeTeardown",
   [GRANDFATHER_CONNECTION_COMMAND_TYPE]: "grandfatherConnection",
+  [SET_ARRIVAL_POLICY_COMMAND_TYPE]: "setArrivalPolicy",
 };
 
 export interface SsoConnectionLedgerWriterDeps {

@@ -713,6 +713,19 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     });
   }
 
+  async findActiveAdministratorIds(params: { organizationId: string }): Promise<string[]> {
+    const rows = await this.prisma.organizationUser.findMany({
+      where: {
+        organizationId: params.organizationId,
+        role: OrganizationUserRole.ADMIN,
+        disabledAt: null,
+      },
+      select: { userId: true },
+    });
+
+    return rows.map((row) => row.userId);
+  }
+
   async findAllMembers(params: {
     organizationId: string;
     includeDisabled: boolean;

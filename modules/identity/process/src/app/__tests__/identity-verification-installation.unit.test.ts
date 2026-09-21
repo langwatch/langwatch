@@ -11,6 +11,7 @@ describe("identity verification installation", () => {
     const runtime = await createApp({ role: "api" })
       .withModules([withMemoryRepositories(identityServer)])
       .withMembers({ producesPipelines: false, adminEmails: [] })
+      .withConfig({ identity: { ssoDomainProofDnsServers: [] } })
       .withRelational(createApiFixture<PrismaClient>())
       .withEventing(new EventSourcing({ enabled: false }))
       .boot();

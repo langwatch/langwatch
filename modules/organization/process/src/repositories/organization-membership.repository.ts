@@ -330,6 +330,13 @@ export abstract class OrganizationMembershipRepository {
   // function-typed properties, not method shorthand, so test mocks can be
   // asserted on directly without tripping `unbound-method`.
 
+  /**
+   * Every administrator who can still sign in. A list rather than a count:
+   * the last-administrator rule is the service's, and "is this person the
+   * only one left" is a question a count cannot answer on its own.
+   */
+  abstract findActiveAdministratorIds: (params: { organizationId: string }) => Promise<string[]>;
+
   /** Paginated membership list for the management surface. */
   abstract findAllMembers: (params: {
     organizationId: string;

@@ -18,9 +18,10 @@ import type {
   VerifyDomainCommandData,
 } from "./connection-commands.ts";
 import type {
+  SsoArrivalPolicy,
   SsoConnectionFactInput,
-  SsoDomainVerification,
   SsoConnectionLifecycleState,
+  SsoDomainVerification,
 } from "./connection.ts";
 import type {
   AttachIdentifierCommandData,
@@ -63,6 +64,7 @@ import type {
   OrganizationSsoConnection,
   SsoConnectionHistoryEntryView,
 } from "./sso-connection-history.ts";
+import type { SsoDomainReproofOutcome } from "./sso-domain-proof.ts";
 
 /** One abandoned-newborn sweep pass (ADR-116 §3). */
 export interface IdentityNewbornSweepSummary {
@@ -95,6 +97,9 @@ export interface IdentityBackofficeSsoConnection {
   >[];
   providerId: string;
   issuer: string | null;
+  /** DERIVED from the connection's arrival policy: `admit` and nothing else.
+   *  The policy itself joins this row when the enterprise output schema that
+   *  parses it is widened (the handoff §10). */
   allowsJit: boolean;
   source: string;
   testLoginAccountId: string | null;
@@ -240,7 +245,9 @@ export interface SsoConnectionBackofficeApi {
     type: string;
     providerId: string;
     issuer: string | null;
+    /** The legacy boolean, read only when no policy was stated. */
     allowsJit: boolean;
+    arrivalPolicy?: SsoArrivalPolicy;
     operator: IdentityOperatorActor;
   }): Promise<{ connectionId: string }>;
   claimDomain(args: {
@@ -292,6 +299,14 @@ export interface SsoConnectionBackofficeApi {
     reason: string | null;
     graceMs: number;
   }): Promise<void>;
+}
+
+/**
+ * The re-proof sweep (ADR-123): one pass over the domains proved by a
+ * published record or file, re-read where that evidence lives.
+ */
+export interface SsoDomainReproofApi {
+  sweep(): Promise<SsoDomainReproofOutcome>;
 }
 
 /** The directory-sync guards. */
@@ -350,6 +365,7 @@ export interface IdentityApi {
   ssoBackoffice(): SsoConnectionBackofficeApi;
   ssoConnectionHistory(): SsoConnectionHistoryApi;
   ssoConnectionReads(): SsoConnectionReadsApi;
+  ssoDomainReproof(): SsoDomainReproofApi;
   scimSyncGuards(): ScimSyncGuardsApi;
 }
 

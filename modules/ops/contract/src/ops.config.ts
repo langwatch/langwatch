@@ -13,7 +13,6 @@ export const opsConfig = Config.define((c) => ({
   metricsApiKey: c.env("METRICS_API_KEY", z.string().optional()),
   /** A third ClickHouse identity; never falls back to the tenant-keyed client. */
   clickhouseOpsUrl: c.env("CLICKHOUSE_OPS_URL", z.string().optional()),
-  /** The platform-operator allow-list; `AdminAccessService` splits and trims it. */
   /**
    * ADR-117 §5: once the connection projection decides sign-in, legacy
    * string writes are refused.

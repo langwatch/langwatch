@@ -538,6 +538,15 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     });
   }
 
+  /** Refuses when this removal would leave the organization without an
+   *  administrator who can sign in. */
+  assertRemovalKeepsAnAdministrator(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<void> {
+    return this.#dependencies.membership.assertRemovalKeepsAnAdministrator(input);
+  }
+
   /** Every organization the caller can reach, fully loaded. */
   getAllForUser(
     input: Omit<Parameters<OrganizationMembershipService["getAllForUser"]>[0], "userId">,

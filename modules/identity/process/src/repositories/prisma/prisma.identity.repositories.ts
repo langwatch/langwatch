@@ -20,6 +20,7 @@ import {
   PrismaSsoConnectionReadRepository,
   PrismaSsoConnectionStrandingRepository,
 } from "./prisma.sso-connection-reads.repository.ts";
+import { PrismaSsoDomainReproofTargetRepository } from "./prisma.sso-domain-reproof.repository.ts";
 
 /** The live tier: every identity row over the one Prisma client. */
 export class PostgresIdentityRepositories {
@@ -44,6 +45,7 @@ export class PostgresIdentityRepositories {
       ssoConnections: PrismaSsoConnectionReadRepository.create(database),
       ssoStranding: PrismaSsoConnectionStrandingRepository.create(database),
       ssoBackoffice: PrismaSsoConnectionBackofficeRepository.create(database),
+      ssoReproofTargets: PrismaSsoDomainReproofTargetRepository.create(database),
     };
   }
 }

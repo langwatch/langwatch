@@ -69,7 +69,7 @@ async function reachClaimed(): Promise<void> {
       ...identity,
       type: "oidc",
       idp: IDP,
-      allowsJit: true,
+      arrivalPolicy: "admit",
     }),
   );
   await run(() => guards.claimDomain({ ...identity, domain: "acme.com" }));
@@ -132,6 +132,7 @@ describe("operator attestation", () => {
           proofState: "VERIFIED",
           firstAbsentAtMs: null,
           graceEndsAtMs: null,
+          tokenHash: null,
         },
       ]);
     });
@@ -183,7 +184,7 @@ describe("operator attestation", () => {
             ...second,
             type: "oidc",
             idp: IDP,
-            allowsJit: true,
+            arrivalPolicy: "admit",
           }),
         { connectionId: "ssoc_2" },
       );
@@ -245,6 +246,7 @@ describe("operator attestation", () => {
           proofState: "VERIFIED",
           firstAbsentAtMs: null,
           graceEndsAtMs: null,
+          tokenHash: null,
         },
       ]);
 
@@ -310,6 +312,7 @@ describe("operator attestation", () => {
           proofState: "VERIFIED",
           firstAbsentAtMs: null,
           graceEndsAtMs: null,
+          tokenHash: null,
         },
       ]);
     });
@@ -365,6 +368,7 @@ describe("operator attestation", () => {
             proofState: "VERIFIED",
             firstAbsentAtMs: null,
             graceEndsAtMs: null,
+            tokenHash: null,
           },
         ],
       });
@@ -415,7 +419,7 @@ describe("operator attestation", () => {
             ...proved,
             type: "oidc",
             idp: IDP,
-            allowsJit: true,
+            arrivalPolicy: "admit",
           }),
         { connectionId: "ssoc_2" },
       );
@@ -453,7 +457,7 @@ describe("operator attestation", () => {
             ...licensed,
             type: "oidc",
             idp: IDP,
-            allowsJit: true,
+            arrivalPolicy: "admit",
           }),
         { connectionId: "ssoc_3" },
       );
@@ -504,6 +508,7 @@ describe("operator attestation", () => {
           proofState: "VERIFIED",
           firstAbsentAtMs: null,
           graceEndsAtMs: null,
+          tokenHash: null,
         },
       ]);
       expect(published?.domainVerifications).toEqual([
@@ -515,6 +520,9 @@ describe("operator attestation", () => {
           proofState: "VERIFIED",
           firstAbsentAtMs: null,
           graceEndsAtMs: null,
+          // Carried from the ceremony this verification closed: what a
+          // re-read will hold the published record against.
+          tokenHash: "sha256:proof",
         },
       ]);
       expect(byLicence?.domainVerifications).toEqual([
@@ -526,6 +534,7 @@ describe("operator attestation", () => {
           proofState: "VERIFIED",
           firstAbsentAtMs: null,
           graceEndsAtMs: null,
+          tokenHash: null,
         },
       ]);
 
@@ -544,7 +553,7 @@ describe("operator attestation", () => {
           actor: OLIVE,
           type: "oidc",
           idp: IDP,
-          allowsJit: true,
+          arrivalPolicy: "admit",
         }),
       );
       const claimed = await run(() =>

@@ -3,11 +3,21 @@
  * newborn sweep, join-request/SSO-connection/directory-sync guards — every
  * capability crossing a package boundary today (ADR-101, 115, 116, 117).
  */
-import { IdentityApi, IdentityCapabilityUnavailableError } from "@langwatch/identity-contract";
+import {
+  IdentityApi,
+  IdentityCapabilityUnavailableError,
+  identityConfig,
+  type IdentityServerConfig,
+} from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { Temporal, nowInstant } from "@langwatch/time";
 
+import {
+  ssoDomainProofChannels,
+  ssoDomainProofFileChannels,
+} from "../channels/sso-domain-proof-channels.registry.ts";
+import { SSO_DOMAIN_PROOF_PUBLIC_EGRESS } from "../channels/sso-domain-proof-file.channel.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
 import { CryptoIdentifierIdentityAdapter } from "../services/crypto-identifier-identity.service.ts";
 import { IdentityBackfillPlanService } from "../services/identity-backfill-plan.service.ts";
@@ -31,6 +41,7 @@ import { SsoConnectionBackofficeService } from "../services/sso-connection-backo
 import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
 import { SsoConnectionHistoryService } from "../services/sso-connection-history.service.ts";
 import { SsoConnectionService } from "../services/sso-connection.service.ts";
+import { SsoDomainReproofService } from "../services/sso-domain-reproof.service.ts";
 import { IdentityIdentifierBackfillMigrationAdapter } from "../services/system-migration-identity-identifier-backfill.service.ts";
 import { IdentitySecretHealMigrationAdapter } from "../services/system-migration-identity-secret-heal.service.ts";
 import { VerificationCeremonyService } from "../services/verification-ceremony.service.ts";
@@ -49,7 +60,7 @@ const RESERVATIONS_REAP_LIMIT_PER_PASS = 200;
 type IdentityMembers = MembersRead<readonly ["prisma", "eventing"]> &
   Readonly<{ producesPipelines: boolean; adminEmails: readonly string[] }>;
 
-type IdentitySetup = FeatureSetup<Record<string, never>, IdentityMembers, undefined> &
+type IdentitySetup = FeatureSetup<Record<string, never>, IdentityMembers, IdentityServerConfig> &
   Readonly<{ repositories: IdentityRepositories }>;
 
 type IdentityAppParts = {
@@ -69,11 +80,13 @@ type IdentityAppParts = {
   ssoBackoffice: SsoConnectionBackofficeService | null;
   ssoConnectionHistory: SsoConnectionHistoryService | null;
   ssoConnectionReads: OrganizationSsoConnectionsService;
+  ssoDomainReproof: SsoDomainReproofService | null;
   scimSyncGuards: ScimSyncGuardsService;
 };
 
 export class IdentityApp implements IdentityApi {
   static readonly contract = IdentityApi;
+  static readonly config = identityConfig;
   static readonly dependencies = {};
   /** `registersPipelines` is named raw so the process can answer it through
    * `withMember`/`withMembers` (see {@link IdentityMembers}). */
@@ -160,6 +173,20 @@ export class IdentityApp implements IdentityApi {
     const ssoConnectionReads = OrganizationSsoConnectionsService.create({
       connections: setup.repositories.ssoConnections,
     });
+    // The sweep re-reads published evidence where it lives, so both channels
+    // are the live ones; only the worker's schedule ever calls it.
+    const ssoDomainReproof = ssoConnections
+      ? SsoDomainReproofService.create({
+          connections: () => ssoConnections,
+          targets: setup.repositories.ssoReproofTargets,
+          proofs: ssoDomainProofChannels.live.create({
+            nameservers: setup.config.ssoDomainProofDnsServers,
+          }),
+          files: ssoDomainProofFileChannels.live.create({
+            policy: SSO_DOMAIN_PROOF_PUBLIC_EGRESS,
+          }),
+        })
+      : null;
     const scimSyncGuards = ScimSyncGuardsService.create({ syncs: infrastructure.scimSyncs });
 
     return new IdentityApp({
@@ -179,6 +206,7 @@ export class IdentityApp implements IdentityApi {
       ssoBackoffice,
       ssoConnectionHistory,
       ssoConnectionReads,
+      ssoDomainReproof,
       scimSyncGuards,
     });
   }
@@ -289,6 +317,14 @@ export class IdentityApp implements IdentityApi {
 
   ssoConnectionReads(): OrganizationSsoConnectionsService {
     return this.#parts.ssoConnectionReads;
+  }
+
+  ssoDomainReproof(): SsoDomainReproofService {
+    if (!this.#parts.ssoDomainReproof) {
+      throw new IdentityCapabilityUnavailableError("SSO domain re-proof sweep");
+    }
+
+    return this.#parts.ssoDomainReproof;
   }
 
   scimSyncGuards(): ScimSyncGuardsService {

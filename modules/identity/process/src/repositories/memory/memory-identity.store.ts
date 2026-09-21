@@ -50,6 +50,8 @@ export class MemoryIdentityStore {
   readonly joinRejections = new Map<string, Instant>();
   readonly joinCandidates = new Map<string, JoinCandidateOrganization[]>();
   readonly ssoConnections = new Map<string, SsoConnectionState>();
+  /** When the re-proof sweep last LOOKED at a connection, by its id. */
+  readonly ssoReproofCursors = new Map<string, number>();
   readonly organizationNames = new Map<string, string>();
   readonly finalizedUsers = new Set<string>();
   /** Keyed by the lowercased address, the way the legacy read matches it. */
