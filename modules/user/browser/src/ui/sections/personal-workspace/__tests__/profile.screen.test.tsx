@@ -16,7 +16,12 @@ import ProfileScreen from "../profile.screen.tsx";
 vi.mock("../../../../behavior/personal-workspace-api.ts", () => ({
   personalWorkspaceApi: {},
   api: {
+    useUtils: () => ({ user: { browserSessions: { invalidate: () => Promise.resolve() } } }),
     user: {
+      browserSessions: { useQuery: () => ({ data: [], isLoading: false }) },
+      endBrowserSession: {
+        useMutation: () => ({ mutateAsync: () => Promise.resolve({ ended: 0 }), isPending: false }),
+      },
       getLinkedAccounts: { useQuery: () => ({ data: [] }) },
       hasPassword: { useQuery: () => ({ data: { hasPassword: true } }) },
       setAvatar: { useMutation: () => ({ mutate: () => {}, isPending: false }) },

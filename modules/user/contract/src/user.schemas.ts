@@ -23,6 +23,11 @@ export const userApiRegisterInputSchema = z.object({
 
 export const userApiUnlinkAccountInputSchema = z.object({ accountId: z.string() });
 
+/** Which of the caller's own browser sessions to end. */
+export const userApiEndBrowserSessionInputSchema = z
+  .object({ sessionId: z.string().min(1) })
+  .strict();
+
 export const userApiSetPasswordInputSchema = z.object({ password: z.string().min(1) });
 
 export const userApiChangePasswordInputSchema = z.object({

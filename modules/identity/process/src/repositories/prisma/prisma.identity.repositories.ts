@@ -6,6 +6,7 @@ import { PrismaIdentityHeadsRepository } from "./prisma.identity-heads.repositor
 import { PrismaIdentityLatchRepository } from "./prisma.identity-latch.repository.ts";
 import { PrismaIdentityNewbornRepository } from "./prisma.identity-newborn.repository.ts";
 import { PrismaIdentityReservationRepository } from "./prisma.identity-reservations.repository.ts";
+import { PrismaIdentitySignInAccountsRepository } from "./prisma.identity-signin-accounts.repository.ts";
 import { PrismaIdentityUsersRepository } from "./prisma.identity-users.repository.ts";
 import { PrismaIdentityVerificationRepository } from "./prisma.identity-verification.repository.ts";
 import {
@@ -13,6 +14,7 @@ import {
   PrismaJoinRequestReadRepository,
 } from "./prisma.join-request.repository.ts";
 import { PrismaMfaEnrollmentRepository } from "./prisma.mfa-enrollment.repository.ts";
+import { PrismaSsoBreakGlassRepository } from "./prisma.sso-break-glass.repository.ts";
 import { PrismaSsoConnectionBackofficeRepository } from "./prisma.sso-connection-backoffice.repository.ts";
 import {
   PrismaSsoConnectionReadRepository,
@@ -30,6 +32,8 @@ export class PostgresIdentityRepositories {
       heads: PrismaIdentityHeadsRepository.create(database),
       latch: PrismaIdentityLatchRepository.create(database),
       users: PrismaIdentityUsersRepository.create(database),
+      signInAccounts: PrismaIdentitySignInAccountsRepository.create(database),
+      ssoBreakGlass: PrismaSsoBreakGlassRepository.create(database),
       newborn: PrismaIdentityNewbornRepository.create(database),
       reservations: PrismaIdentityReservationRepository.create(database),
       verification: PrismaIdentityVerificationRepository.create(database),

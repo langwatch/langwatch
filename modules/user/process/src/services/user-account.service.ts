@@ -12,6 +12,8 @@ import {
   PersonalUsageKeyMismatchError,
   PersonalUsageServiceKeyUnsupportedError,
   type MePersonalCredential,
+  type UserBrowserSession,
+  type UserBrowserSessionEnded,
 } from "@langwatch/user-contract";
 
 export class UserAccountService {
@@ -73,6 +75,39 @@ export class UserAccountService {
   /** The organization a personal workspace's team belongs to. */
   findOrganizationIdByTeamId(input: { teamId: string }): Promise<string | null> {
     return this.organizations.tryGetOrganizationIdByTeamId(input);
+  }
+
+  /**
+   * Auth owns the session rows; this surface owns the words a `/me` reader
+   * sees. The field-by-field copy is what makes that a typechecked agreement
+   * rather than an assumption that the two shapes stay identical.
+   */
+  async listBrowserSessions(input: {
+    userId: string;
+    currentSessionId?: string | undefined;
+  }): Promise<UserBrowserSession[]> {
+    const sessions = await this.auth.listBrowserSessions(input);
+
+    return sessions.map((session) => ({
+      sessionId: session.sessionId,
+      identifierId: session.identifierId,
+      method: session.method,
+      secondFactorProven: session.secondFactorProven,
+      ipAddress: session.ipAddress,
+      userAgent: session.userAgent,
+      signedInAt: session.signedInAt,
+      lastActiveAt: session.lastActiveAt,
+      expiresAt: session.expiresAt,
+      current: session.current,
+    }));
+  }
+
+  endBrowserSession(input: {
+    userId: string;
+    sessionId: string;
+    currentSessionId?: string | undefined;
+  }): Promise<UserBrowserSessionEnded> {
+    return this.auth.endBrowserSession(input);
   }
 
   revokeOtherBrowserSessions(input: { userId: string; keepSessionId: string }): Promise<void> {

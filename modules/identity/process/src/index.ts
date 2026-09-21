@@ -77,6 +77,24 @@ export type { IdentityUserGate } from "./rules/identity-user-gate.rules.ts";
 export type { IdentityUsersRepository } from "./repositories/identity-users.repository.ts";
 export type { IdentityVerificationRecord } from "./repositories/identity-verification.repository.ts";
 export type { MfaEnrollmentRepository } from "./repositories/mfa-enrollment.repository.ts";
+export {
+  SsoBreakGlassRepository,
+  SsoBreakGlassWarningChannel,
+} from "./repositories/sso-break-glass.repository.ts";
+export { breakGlassHolderEligibility } from "./rules/break-glass-eligibility.rules.ts";
+export {
+  RequiresLocalDoorAndBinding,
+  SsoBreakGlassService,
+  type SsoBreakGlassServiceDeps,
+} from "./services/sso-break-glass.service.ts";
+export type {
+  IdentitySignInAccountsRepository,
+  LegacySignInAccount,
+} from "./repositories/identity-signin-accounts.repository.ts";
+export {
+  SignInAccountLookupService,
+  type SignInAccountLookupServiceDeps,
+} from "./services/signin-account-lookup.service.ts";
 export type {
   SignInAccountLookup,
   SignInBreakGlassLimiter,

@@ -26,6 +26,12 @@ const updateProfileFake = (email = user.email) =>
   vi.fn(async (): Promise<UserProfile> => ({ ...user, email }));
 
 class AuthFake implements BrowserSessionApi {
+  async listBrowserSessions(): Promise<never[]> {
+    return [];
+  }
+  async endBrowserSession(): Promise<{ ended: number }> {
+    return { ended: 0 };
+  }
   async isWithinBudget(): Promise<boolean> {
     return false;
   }

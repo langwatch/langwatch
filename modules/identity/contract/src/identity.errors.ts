@@ -539,3 +539,51 @@ export class IdentityUnsupportedStorageQueryError extends HandledError {
     this.name = "IdentityUnsupportedStorageQueryError";
   }
 }
+
+/**
+ * A grant naming somebody who could not use the way in satisfies the
+ * activation precondition and satisfies nothing real: the connection goes
+ * live, the provider misbehaves, and the promised door opens for nobody.
+ */
+export class SsoBreakGlassHolderIneligibleError extends SsoConnectionCommandRefusedError {
+  constructor(userId: string) {
+    super("sso_break_glass_holder_ineligible", "sso_break_glass_holder_ineligible", {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { userId },
+    });
+    this.name = "SsoBreakGlassHolderIneligibleError";
+  }
+}
+
+/**
+ * An expiry in the past, or further out than a way in may be granted for. The
+ * expiry is the whole of what stops a named local door becoming a permanent
+ * second one, and the warning sweep only looks fourteen days ahead.
+ */
+export class SsoBreakGlassExpiryOutOfRangeError extends SsoConnectionCommandRefusedError {
+  constructor(maxWindowDays: number) {
+    super("sso_break_glass_expiry_out_of_range", "sso_break_glass_expiry_out_of_range", {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { maxWindowDays },
+    });
+    this.name = "SsoBreakGlassExpiryOutOfRangeError";
+  }
+}
+
+/**
+ * Revoking this grant would leave a live connection with no way back in — the
+ * one lever for the identity provider failing, removed while the identity
+ * provider is what decides sign-in. Grant somebody else first.
+ */
+export class SsoBreakGlassLastWayInError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_break_glass_last_way_in", "sso_break_glass_last_way_in", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoBreakGlassLastWayInError";
+  }
+}

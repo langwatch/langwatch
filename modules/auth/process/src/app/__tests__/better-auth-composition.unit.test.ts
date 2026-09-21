@@ -58,7 +58,6 @@ async function appFor(named = false): Promise<AuthApp> {
       },
       publicBaseUrl: undefined,
       identityEmails: undefined as never,
-      rateLimit: undefined as never,
       route: undefined as never,
       signUp: null,
       invites: null,

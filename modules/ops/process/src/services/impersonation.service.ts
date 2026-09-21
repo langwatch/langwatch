@@ -2,12 +2,13 @@ import {
   CannotImpersonateAdminError,
   CannotImpersonateDeactivatedUserError,
   CannotImpersonateWithoutSecondFactorError,
+  CannotReimpersonateWhileImpersonatingError,
   type StartImpersonationInput,
   type StopImpersonationInput,
   UserToImpersonateNotFoundError,
   type AdminAuditRequest,
 } from "@langwatch/ops-contract";
-import { type Instant, nowInstant } from "@langwatch/time";
+import { type Instant, nowInstant, Temporal } from "@langwatch/time";
 
 import type { AdminAccess } from "./admin-access.service.ts";
 
@@ -39,6 +40,8 @@ export abstract class ImpersonationRepository {
   abstract tryFindTarget(userId: string): Promise<ImpersonationTarget | null>;
   /** Whether this person can prove a second factor on their own account. */
   abstract hasSecondFactor(userId: string): Promise<boolean>;
+  /** The window this session carries, expired or not — the service decides. */
+  abstract findWindow(sessionId: string): Promise<ImpersonationWindow | null>;
   abstract setWindow(sessionId: string, window: ImpersonationWindow): Promise<void>;
   abstract clearWindow(sessionId: string): Promise<void>;
 }
@@ -77,6 +80,8 @@ export class ImpersonationService {
   }
 
   async start(input: StartImpersonationInput): Promise<void> {
+    await this.assertSessionIsNotAlreadyImpersonating(input);
+
     const target = await this.repository.tryFindTarget(input.userIdToImpersonate);
     if (!target) {
       throw new UserToImpersonateNotFoundError(input.userIdToImpersonate);
@@ -109,6 +114,22 @@ export class ImpersonationService {
       image: target.image,
       expires: this.now().add({ milliseconds: IMPERSONATION_TTL_MS }),
     });
+  }
+
+  /**
+   * Read FIRST, so a refused hop writes no audit entry and touches no session
+   * row. A lapsed window reads as an ordinary session, and so does one naming
+   * the operator: neither is an impersonation to stop.
+   */
+  private async assertSessionIsNotAlreadyImpersonating(
+    input: StartImpersonationInput,
+  ): Promise<void> {
+    const window = await this.repository.findWindow(input.sessionId);
+    if (!window) return;
+    if (window.id === input.impersonatorUserId) return;
+    if (Temporal.Instant.compare(window.expires, this.now()) <= 0) return;
+
+    throw new CannotReimpersonateWhileImpersonatingError();
   }
 
   /**

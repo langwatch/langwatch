@@ -1,7 +1,11 @@
 import type { RoutingDecision } from "@langwatch/identity-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 
-import type { BrowserSession, VerifiedBrowserSession } from "./browser-session.ts";
+import type {
+  BrowserSession,
+  BrowserSessionInventoryEntry,
+  VerifiedBrowserSession,
+} from "./browser-session.ts";
 import type { InviteLanding, SignUpVerificationResult } from "./front-door.responses.ts";
 
 /**
@@ -47,6 +51,25 @@ export interface AuthApi {
     authorization: string | null | undefined;
     userId: string;
   }): Promise<void>;
+  /**
+   * What this person is signed in on, newest first, and how each signed in.
+   * The reading half of ending a session: a list with no action on it leaves
+   * somebody who lost a laptop with nothing to do.
+   */
+  listBrowserSessions(input: {
+    userId: string;
+    currentSessionId?: string | undefined;
+  }): Promise<readonly BrowserSessionInventoryEntry[]>;
+  /**
+   * End ONE of this person's sessions, found in their OWN list rather than
+   * deleted by id, so naming somebody else's session ends nothing. Ending the
+   * session doing the reading raises `session_is_current`.
+   */
+  endBrowserSession(input: {
+    userId: string;
+    sessionId: string;
+    currentSessionId?: string | undefined;
+  }): Promise<{ ended: number }>;
   revokeAllBrowserSessions(input: { userId: string }): Promise<void>;
   revokeBrowserSession(input: { sessionId: string }): Promise<void>;
   revokeOtherBrowserSessions(input: { userId: string; keepSessionId: string }): Promise<void>;
@@ -94,6 +117,8 @@ export type BrowserSessionApi = Pick<
   AuthApi,
   | "tryVerifyBrowserSession"
   | "tryResolveBrowserSession"
+  | "listBrowserSessions"
+  | "endBrowserSession"
   | "revokeAllBrowserSessions"
   | "revokeBrowserSession"
   | "revokeOtherBrowserSessions"

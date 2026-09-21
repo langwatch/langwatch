@@ -14,6 +14,8 @@ import {
   userApiOkSchema,
   userApiPasskeyNudgeSchema,
   userApiPersonalBudgetSchema,
+  userApiBrowserSessionEndedSchema,
+  userApiBrowserSessionSchema,
   userApiPersonalContextSchema,
   userApiSuccessSchema,
 } from "./user.responses.ts";
@@ -21,6 +23,7 @@ import {
   userApiChangePasswordInputSchema,
   userApiCompleteVerificationInputSchema,
   userApiEmptyInputSchema,
+  userApiEndBrowserSessionInputSchema,
   userApiOrganizationInputSchema,
   userApiRegisterInputSchema,
   userApiRequestBudgetIncreaseInputSchema,
@@ -86,6 +89,17 @@ export const userTrpc = defineTrpcContract("user")
   .mutation("dismissPasskeyNudge")
   .withInput(userApiEmptyInputSchema)
   .withOutput(userApiSuccessSchema)
+
+  // Reading the browsers somebody is signed in on, and ending one of them.
+  // Both answer about the CALLER's own account: the session id never names
+  // whose it is, so nothing here can reach somebody else's list.
+  .query("browserSessions")
+  .withInput(userApiEmptyInputSchema)
+  .withOutput(userApiBrowserSessionSchema.array())
+
+  .mutation("endBrowserSession")
+  .withInput(userApiEndBrowserSessionInputSchema)
+  .withOutput(userApiBrowserSessionEndedSchema)
 
   .query("hasPassword")
   .withInput(userApiEmptyInputSchema)

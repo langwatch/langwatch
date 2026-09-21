@@ -1,13 +1,20 @@
 import {
   browserSessionImpersonationSchema,
+  browserSessionInventoryEntrySchema,
   browserSessionSchema,
+  SessionIsCurrentError,
   verifiedBrowserSessionSchema,
   type BrowserSession,
+  type BrowserSessionInventoryEntry,
   type VerifiedBrowserSession,
 } from "@langwatch/auth-contract";
-import type { IdentityEmailService } from "@langwatch/identity-contract";
+import {
+  signInMethodLabelFor,
+  signInProvedSecondFactor,
+  type IdentityEmailService,
+} from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
-import { Temporal, fromDate, type Instant } from "@langwatch/time";
+import { Temporal, fromDate, toDate, type Instant } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 
 import type { AuthSessionCacheRepository } from "../repositories/auth-session-cache.repository.ts";
@@ -104,6 +111,63 @@ export class BrowserSessionService {
         },
       },
     });
+  }
+
+  /**
+   * What this person is signed in on, newest first. Nothing here reads a
+   * token: the list is evidence about sign-ins, and a token on it would be a
+   * credential on a screen.
+   */
+  async listBrowserSessions({
+    userId,
+    currentSessionId,
+  }: {
+    userId: string;
+    currentSessionId?: string | undefined;
+  }): Promise<readonly BrowserSessionInventoryEntry[]> {
+    const records = await this.deps.sessions.findForUser({ userId });
+
+    return records.map((record) =>
+      browserSessionInventoryEntrySchema.parse({
+        sessionId: record.id,
+        identifierId: record.identifierId,
+        method: signInMethodLabelFor({ amr: record.amr }),
+        secondFactorProven: signInProvedSecondFactor(record.amr),
+        ipAddress: record.ipAddress,
+        userAgent: record.userAgent,
+        signedInAt: toDate(record.createdAt).toISOString(),
+        lastActiveAt: toDate(record.updatedAt).toISOString(),
+        expiresAt: toDate(record.expires).toISOString(),
+        current: record.id === currentSessionId,
+      }),
+    );
+  }
+
+  /**
+   * The session is found in the caller's OWN list rather than deleted by id,
+   * so naming somebody else's session ends nothing rather than ending theirs.
+   */
+  async endBrowserSession({
+    userId,
+    sessionId,
+    currentSessionId,
+  }: {
+    userId: string;
+    sessionId: string;
+    currentSessionId?: string | undefined;
+  }): Promise<{ ended: number }> {
+    if (currentSessionId && sessionId === currentSessionId) {
+      throw new SessionIsCurrentError();
+    }
+
+    const records = await this.deps.sessions.findForUser({ userId });
+    if (!records.some((record) => record.id === sessionId)) return { ended: 0 };
+
+    await this.clearCachedSessions({ userId });
+    const ended = await this.deps.sessions.deleteById({ id: sessionId });
+    logger.info({ ended, sessionId, userId }, "Ended one of a person's own browser sessions");
+
+    return { ended };
   }
 
   async revokeAllBrowserSessions({ userId }: { userId: string }): Promise<void> {

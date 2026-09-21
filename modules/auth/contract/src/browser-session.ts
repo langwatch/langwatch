@@ -50,3 +50,32 @@ export const browserSessionImpersonationSchema = browserSessionActorSchema
   .safeExtend({ expires: z.coerce.date() })
   .strict();
 export type BrowserSessionImpersonation = z.infer<typeof browserSessionImpersonationSchema>;
+
+/**
+ * One session as its owner reads it on their devices list. Carries how it
+ * signed in and what that proved, never a token: the list is a reading of
+ * live sessions, and nothing on it can be replayed.
+ */
+export const browserSessionInventoryEntrySchema = z
+  .object({
+    sessionId: z.string().min(1),
+    /** Which sign-in method minted it; null on every session predating it. */
+    identifierId: z.string().nullable(),
+    /** How it signed in, in words — never `pwd` or `phw`. */
+    method: z.string().min(1),
+    secondFactorProven: z.boolean(),
+    ipAddress: z.string().nullable(),
+    userAgent: z.string().nullable(),
+    signedInAt: z.string().datetime(),
+    /**
+     * Activity to the nearest day: better-auth rolls a live session's expiry
+     * once per `updateAge`, so this tells a browser used this morning from one
+     * untouched since February, which is the only question asked of it.
+     */
+    lastActiveAt: z.string().datetime(),
+    expiresAt: z.string().datetime(),
+    /** Whether this is the session doing the reading. */
+    current: z.boolean(),
+  })
+  .strict();
+export type BrowserSessionInventoryEntry = z.infer<typeof browserSessionInventoryEntrySchema>;

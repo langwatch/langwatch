@@ -2478,6 +2478,11 @@ const presentations = {
     describe: () =>
       "The service behind this action isn't part of this deployment. Ask whoever runs it whether it can be enabled.",
   },
+  session_is_current: {
+    title: "That is the browser you are using",
+    describe: () =>
+      "Signing out of this one is a different action. Use the sign-out control instead.",
+  },
 
   session_read_failed: {
     // Read by somebody who has just been shown a sign-in screen they did not
@@ -2622,6 +2627,11 @@ const presentations = {
     title: "Set up two-step verification first",
     describe: () =>
       "This organization requires two-step verification, so viewing it as another person requires it on your own account too.",
+  },
+  cannot_reimpersonate_while_impersonating: {
+    title: "Stop the current impersonation first",
+    describe: () =>
+      "You are already viewing the product as somebody else. Return to your own account, then start the new one.",
   },
   sso_connection_invalid_transition: {
     title: "This single sign-on connection has moved on",
@@ -4187,6 +4197,21 @@ const presentations = {
     // and callers already branch on it.
     title: "Spend isn't available for this key",
     describe: () => "This deployment doesn't record spend per key, so there's no figure to show.",
+  },
+  sso_break_glass_expiry_out_of_range: {
+    title: "Pick an end date within ninety days",
+    describe: () =>
+      "A way back in always ends. Choose a date in the future and no more than ninety days out, then renew it if it is still needed.",
+  },
+  sso_break_glass_holder_ineligible: {
+    title: "That person cannot use this way back in",
+    describe: () =>
+      "A way back in has to name an administrator of this organization who can also sign in with a password. Pick somebody from the list.",
+  },
+  sso_break_glass_last_way_in: {
+    title: "This is the only way back in",
+    describe: () =>
+      "Single sign-on is live, so removing the last way back in would lock everyone out. Grant somebody else one first.",
   },
   webhook_endpoint_not_found: {
     // An archived endpoint reads the same as one that never existed, so the

@@ -54,3 +54,21 @@ export class FrontDoorRateLimitedError extends HandledError {
     this.name = "FrontDoorRateLimitedError";
   }
 }
+
+/**
+ * Named rather than silently refused: "nothing happened" and "that one is
+ * yours" look identical on a list, and the second has an action attached to
+ * it — sign out — that the first does not.
+ */
+export class SessionIsCurrentError extends HandledError {
+  declare readonly code: "session_is_current";
+
+  constructor() {
+    super(
+      "session_is_current",
+      "Signing out of the browser you are reading this in is a different act; use the sign-out control.",
+      { httpStatus: 400, fault: "customer" },
+    );
+    this.name = "SessionIsCurrentError";
+  }
+}

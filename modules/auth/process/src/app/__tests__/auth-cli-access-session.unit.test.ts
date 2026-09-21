@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { cliAccessTokenKey } from "@langwatch/auth-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -6,7 +7,6 @@ import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RateLimiter, SecretResolver } from "@langwatch/process-stores/members";
 import { ScopedSecrets } from "@langwatch/secrets";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
@@ -45,7 +45,6 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
       secrets,
       publicBaseUrl: void 0,
       identityEmails: void 0,
-      rateLimit: void 0,
       route: void 0,
       signUp: null,
       invites: null,

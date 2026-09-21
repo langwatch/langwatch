@@ -66,7 +66,6 @@ async function appFor(
       },
       publicBaseUrl: undefined,
       identityEmails: undefined as never,
-      rateLimit: undefined as never,
       route: undefined as never,
       signUp: null,
       invites: null,

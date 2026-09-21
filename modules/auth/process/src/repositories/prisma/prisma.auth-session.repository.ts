@@ -1,6 +1,11 @@
 import { PrismaRepository } from "@langwatch/prisma-client";
+import { fromDate } from "@langwatch/time";
 
-import type { AuthSessionRepository, StoredBrowserSession } from "../auth-session.repository.ts";
+import type {
+  AuthSessionRepository,
+  BrowserSessionRecord,
+  StoredBrowserSession,
+} from "../auth-session.repository.ts";
 
 const sessionSelect = {
   id: true,
@@ -22,6 +27,34 @@ export class PrismaAuthSessionRepository
 
   async findById({ id }: { id: string }): Promise<StoredBrowserSession | null> {
     return this.prisma.session.findUnique({ where: { id }, select: sessionSelect });
+  }
+
+  async findForUser({ userId }: { userId: string }): Promise<readonly BrowserSessionRecord[]> {
+    const rows = await this.prisma.session.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        identifierId: true,
+        amr: true,
+        ipAddress: true,
+        userAgent: true,
+        createdAt: true,
+        updatedAt: true,
+        expires: true,
+      },
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      identifierId: row.identifierId,
+      amr: row.amr,
+      ipAddress: row.ipAddress,
+      userAgent: row.userAgent,
+      createdAt: fromDate(row.createdAt),
+      updatedAt: fromDate(row.updatedAt),
+      expires: fromDate(row.expires),
+    }));
   }
 
   async listTokensForUser({ userId }: { userId: string }): Promise<string[]> {

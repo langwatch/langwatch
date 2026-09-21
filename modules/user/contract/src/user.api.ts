@@ -13,6 +13,8 @@ import type {
   UserAvatarCaller,
 } from "./user-rest.schemas.ts";
 import type {
+  UserBrowserSession,
+  UserBrowserSessionEnded,
   UserBudgetIncreaseRequested,
   UserHomePagePickerState,
   UserPersonalBudget,
@@ -105,6 +107,17 @@ export interface UserApi {
   unlinkAccount(input: UnlinkUserAccountInput): Promise<UnlinkUserAccountOutcome>;
   /** Removes one of the caller's own sign-in methods, refusing the last one. */
   unlinkOwnAccount(input: UnlinkUserAccountInput): Promise<void>;
+  /** What this person is signed in on, and how each session signed in. */
+  listBrowserSessions(input: {
+    userId: string;
+    currentSessionId?: string | undefined;
+  }): Promise<UserBrowserSession[]>;
+  /** Ends ONE of this person's own sessions; the current one is refused. */
+  endBrowserSession(input: {
+    userId: string;
+    sessionId: string;
+    currentSessionId?: string | undefined;
+  }): Promise<UserBrowserSessionEnded>;
   revokeOtherBrowserSessions(input: { userId: string; keepSessionId: string }): Promise<void>;
   revokeAllBrowserSessions(input: { userId: string }): Promise<void>;
   deactivate(input: UserIdInput): Promise<UserProfile>;

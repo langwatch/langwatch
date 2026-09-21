@@ -18,10 +18,12 @@ describe("the user tRPC surface", () => {
 
     it("declares every procedure the account and /me screens call", () => {
       expect(Object.keys(userTrpc.members).toSorted()).toEqual([
+        "browserSessions",
         "changePassword",
         "deactivate",
         "dismissPasskeyNudge",
         "dismissTraceExplorerTour",
+        "endBrowserSession",
         "getAccountInfo",
         "getLinkedAccounts",
         "getSsoStatus",
@@ -50,6 +52,8 @@ describe("the user tRPC surface", () => {
       );
 
       expect(kinds).toMatchObject({
+        browserSessions: "query",
+        endBrowserSession: "mutation",
         getAccountInfo: "query",
         getLinkedAccounts: "query",
         getSsoStatus: "query",

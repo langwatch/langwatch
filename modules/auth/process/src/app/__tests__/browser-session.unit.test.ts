@@ -1,3 +1,4 @@
+import { SessionIsCurrentError } from "@langwatch/auth-contract";
 import { IdentityEmailService } from "@langwatch/identity-contract";
 import { Temporal, type Instant } from "@langwatch/time";
 import type { UserProfile } from "@langwatch/user-contract";
@@ -6,6 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { AuthSessionCacheRepository } from "../../repositories/auth-session-cache.repository.ts";
 import type {
   AuthSessionRepository,
+  BrowserSessionRecord,
   StoredBrowserSession,
 } from "../../repositories/auth-session.repository.ts";
 import { BrowserSessionService } from "../../services/browser-session.service.ts";
@@ -49,12 +51,17 @@ const LIVE_SESSION: StoredBrowserSession = {
 
 class Sessions implements AuthSessionRepository {
   stored: StoredBrowserSession | null = LIVE_SESSION;
+  records: readonly BrowserSessionRecord[] = [];
   readonly deletedAll = vi.fn().mockResolvedValue(2);
   readonly deletedById = vi.fn().mockResolvedValue(1);
   readonly deletedOthers = vi.fn().mockResolvedValue(1);
 
   async findById(): Promise<StoredBrowserSession | null> {
     return this.stored;
+  }
+
+  async findForUser(): Promise<readonly BrowserSessionRecord[]> {
+    return this.records;
   }
 
   async listTokensForUser(): Promise<string[]> {
@@ -277,6 +284,79 @@ describe("BrowserSessionService", () => {
       });
 
       expect(sessions.deletedAll).toHaveBeenCalledWith({ userId: "user-1" });
+    });
+  });
+
+  describe("when somebody reads the browsers they are signed in on", () => {
+    const record = (overrides: Partial<BrowserSessionRecord> = {}): BrowserSessionRecord => ({
+      id: "session-1",
+      identifierId: "identifier-1",
+      amr: ["pwd"],
+      ipAddress: "203.0.113.4",
+      userAgent: "Mozilla/5.0",
+      createdAt: Temporal.Instant.from("2026-01-01T00:00:00Z"),
+      updatedAt: Temporal.Instant.from("2026-01-02T00:00:00Z"),
+      expires: Temporal.Instant.from("2026-02-01T00:00:00Z"),
+      ...overrides,
+    });
+
+    /** @scenario "A person reads the browsers they are signed in on" */
+    it("names the method in words, what it proved, and which one is theirs", async () => {
+      const sessions = new Sessions();
+      sessions.records = [
+        record(),
+        record({ id: "session-2", amr: ["phw"], identifierId: null }),
+        record({ id: "session-3", amr: [] }),
+      ];
+
+      const listed = await service({ sessions }).service.listBrowserSessions({
+        userId: "user-1",
+        currentSessionId: "session-2",
+      });
+
+      expect(listed.map((entry) => entry.method)).toEqual([
+        "Email and password",
+        "Passkey",
+        "Signed in",
+      ]);
+      expect(listed.map((entry) => entry.current)).toEqual([false, true, false]);
+      expect(listed.map((entry) => entry.secondFactorProven)).toEqual([false, true, false]);
+      expect(listed[1]?.identifierId).toBeNull();
+      expect(Object.keys(listed[0] ?? {})).not.toContain("sessionToken");
+    });
+
+    /** @scenario "A person ends one of the browsers they are signed in on" */
+    it("ends one they own, refuses the one they are reading from, and ignores a stranger's", async () => {
+      const sessions = new Sessions();
+      sessions.records = [record(), record({ id: "session-2" })];
+      const { service: subject } = service({ sessions });
+
+      await expect(
+        subject.endBrowserSession({
+          userId: "user-1",
+          sessionId: "session-2",
+          currentSessionId: "session-2",
+        }),
+      ).rejects.toBeInstanceOf(SessionIsCurrentError);
+      expect(sessions.deletedById).not.toHaveBeenCalled();
+
+      await expect(
+        subject.endBrowserSession({
+          userId: "user-1",
+          sessionId: "somebody-elses",
+          currentSessionId: "session-2",
+        }),
+      ).resolves.toEqual({ ended: 0 });
+      expect(sessions.deletedById).not.toHaveBeenCalled();
+
+      await expect(
+        subject.endBrowserSession({
+          userId: "user-1",
+          sessionId: "session-1",
+          currentSessionId: "session-2",
+        }),
+      ).resolves.toEqual({ ended: 1 });
+      expect(sessions.deletedById).toHaveBeenCalledWith({ id: "session-1" });
     });
   });
 

@@ -12,6 +12,7 @@ import {
   type AuthApi as AuthApiContract,
   type AuthServerConfig,
   type BrowserSession,
+  type BrowserSessionInventoryEntry,
   type CliAccessSession,
   type InviteLanding,
   type SignUpVerificationResult,
@@ -376,6 +377,21 @@ export class AuthApp implements AuthApiContract {
       authHeader: input.authorization,
       userId: input.userId,
     });
+  }
+
+  listBrowserSessions(input: {
+    userId: string;
+    currentSessionId?: string | undefined;
+  }): Promise<readonly BrowserSessionInventoryEntry[]> {
+    return this.#sessions.listBrowserSessions(input);
+  }
+
+  endBrowserSession(input: {
+    userId: string;
+    sessionId: string;
+    currentSessionId?: string | undefined;
+  }): Promise<{ ended: number }> {
+    return this.#sessions.endBrowserSession(input);
   }
 
   revokeAllBrowserSessions(input: { userId: string }): Promise<void> {

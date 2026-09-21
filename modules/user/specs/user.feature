@@ -46,3 +46,21 @@ Feature: Canonical user lifecycle
     And the stored hash is read and written by the User feature's own persistence
     And the process composing the request never reads the account rows itself
     And what the operation answers with is the outcome, never the stored hash
+
+  # There was no way to end a session anywhere in the product: somebody who
+  # signed in on a shared machine, lost a laptop or suspected a stolen cookie
+  # had no action available, and the account surface offered none.
+
+  @unit
+  Scenario: The account surface serves the browsers somebody is signed in on
+    Given a signed-in person holding several browser sessions
+    When they open their account's devices list
+    Then the browsers are served under the user namespace with their sign-in method and last activity
+    And the browser making the request is marked as the current one
+
+  @unit
+  Scenario: Ending one browser session is a mutation on the caller's own account
+    Given a signed-in person reading their devices list
+    When they end one of the other browsers
+    Then that session alone is ended
+    And the request names no account, so nobody else's session is reachable

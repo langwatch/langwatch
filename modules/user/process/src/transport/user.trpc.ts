@@ -102,6 +102,29 @@ export const userTrpcTransport = defineTrpcRouter(UserApi, userTrpc)
     return { success: true as const };
   })
 
+  // The session row travels as a fact so the list can say which entry is the
+  // browser doing the reading, and so ending that one is refused by name.
+  .procedure("browserSessions")
+  .withFacts(browserSessionFact)
+  .noPermission({ reason: OWN_ACCOUNT })
+  .handle(({ app, actor }, browserSession) =>
+    app.listBrowserSessions({
+      userId: actor.id,
+      currentSessionId: browserSession ?? undefined,
+    }),
+  )
+
+  .procedure("endBrowserSession")
+  .withFacts(browserSessionFact)
+  .noPermission({ reason: OWN_ACCOUNT })
+  .handle(({ app, actor, input }, browserSession) =>
+    app.endBrowserSession({
+      userId: actor.id,
+      sessionId: input.sessionId,
+      currentSessionId: browserSession ?? undefined,
+    }),
+  )
+
   .procedure("hasPassword")
   .noPermission({ reason: OWN_ACCOUNT })
   .handle(async ({ app, actor }) => ({ hasPassword: await app.hasPassword({ id: actor.id }) }))

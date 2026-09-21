@@ -152,6 +152,9 @@ export {
   JoinRequestThrottledError,
   MfaCommandRefusedError,
   PasskeyCommandRefusedError,
+  SsoBreakGlassExpiryOutOfRangeError,
+  SsoBreakGlassHolderIneligibleError,
+  SsoBreakGlassLastWayInError,
   SsoConnectionActivationBlockedError,
   SsoConnectionCommandRefusedError,
   SsoConnectionDomainTakenError,
@@ -161,6 +164,17 @@ export {
   SsoConnectionTeardownStrandsUsersError,
   SsoSamlNotSelfServeError,
 } from "./identity.errors.ts";
+export {
+  BREAK_GLASS_MAX_WINDOW_DAYS,
+  BREAK_GLASS_MAX_WINDOW_MS,
+  BREAK_GLASS_WARNING_DAYS,
+  type BreakGlassBinding,
+  breakGlassDaysRemaining,
+  breakGlassExpiryIsAllowed,
+  breakGlassIsLive,
+  type BreakGlassWarningDay,
+  breakGlassWarningsDue,
+} from "./break-glass.ts";
 export { IdentityEmailService } from "./identity-email.service.ts";
 export {
   coarseColleagueCount,
@@ -381,6 +395,7 @@ export {
   signInProvedSecondFactor,
   TOTP_AMR,
 } from "./mfa-condition.ts";
+export { signedInWithFor, signInMethodLabelFor, type SignedInWith } from "./session-claims.ts";
 export {
   PASSWORD_MAXIMUM_BYTES,
   PASSWORD_MINIMUM_LENGTH,

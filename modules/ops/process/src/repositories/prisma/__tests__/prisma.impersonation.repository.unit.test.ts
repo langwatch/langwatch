@@ -9,8 +9,9 @@ import { PrismaImpersonationRepository } from "../prisma.admin.repository.ts";
  * organizations require a second factor" carries no single-organization
  * predicate; the real guard below refuses it, so that failure lands here.
  */
-function stubDatabase({ row }: { row: unknown }) {
+function stubDatabase({ row, session }: { row: unknown; session?: unknown }) {
   const userFindUnique = vi.fn().mockResolvedValue(row);
+  const sessionFindUnique = vi.fn().mockResolvedValue(session ?? null);
   const organizationUserFindMany = vi.fn(async (args: unknown) =>
     guardOrganizationId({ model: "OrganizationUser", action: "findMany", args }, async () => []),
   );
@@ -19,6 +20,7 @@ function stubDatabase({ row }: { row: unknown }) {
     organizationUserFindMany,
     database: {
       user: { findUnique: userFindUnique },
+      session: { findUnique: sessionFindUnique },
       organizationUser: { findMany: organizationUserFindMany },
     } as unknown as PrismaClient,
   };
@@ -53,6 +55,39 @@ describe("PrismaImpersonationRepository", () => {
 
       await expect(
         PrismaImpersonationRepository.create(database).tryFindTarget("user_missing"),
+      ).resolves.toBeNull();
+    });
+  });
+
+  describe("when it reads the window a session already carries", () => {
+    /** @scenario "An operator cannot hop from one impersonation straight into another" */
+    it("reads the stored claims back as a window", async () => {
+      const { database } = stubDatabase({
+        row: null,
+        session: {
+          impersonating: {
+            id: "user_subject",
+            name: "Subject",
+            email: "subject@example.com",
+            image: null,
+            expires: "2026-01-01T01:00:00.000Z",
+          },
+        },
+      });
+
+      const window = await PrismaImpersonationRepository.create(database).findWindow("session_1");
+
+      expect(window?.id).toBe("user_subject");
+      expect(window?.expires.toString({ fractionalSecondDigits: 3 })).toBe(
+        "2026-01-01T01:00:00.000Z",
+      );
+    });
+
+    it("answers null for a session carrying no claims at all", async () => {
+      const { database } = stubDatabase({ row: null, session: { impersonating: null } });
+
+      await expect(
+        PrismaImpersonationRepository.create(database).findWindow("session_1"),
       ).resolves.toBeNull();
     });
   });

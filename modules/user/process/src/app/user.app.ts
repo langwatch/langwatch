@@ -47,6 +47,8 @@ import type {
   UserAvatarObjectRead,
   UserAvatarReadAllowance,
   UserAvatarResult,
+  UserBrowserSession,
+  UserBrowserSessionEnded,
   UserBudgetIncreaseRequested,
   UserCaller,
   UserFullProfile,
@@ -515,6 +517,26 @@ export class UserApp implements UserApi {
   /** "Not now" on the passkey offer, dated rather than flagged. */
   dismissPasskeyNudge(input: UserIdInput): Promise<void> {
     return this.#users.dismissPasskeyNudge(input);
+  }
+
+  /**
+   * What this person is signed in on. The reading half of ending a session:
+   * a person who lost a laptop needs the list before the action.
+   */
+  listBrowserSessions(input: {
+    userId: string;
+    currentSessionId?: string | undefined;
+  }): Promise<UserBrowserSession[]> {
+    return this.#account.listBrowserSessions(input);
+  }
+
+  /** Ends ONE of this person's own browser sessions, never the current one. */
+  endBrowserSession(input: {
+    userId: string;
+    sessionId: string;
+    currentSessionId?: string | undefined;
+  }): Promise<UserBrowserSessionEnded> {
+    return this.#account.endBrowserSession(input);
   }
 
   /**

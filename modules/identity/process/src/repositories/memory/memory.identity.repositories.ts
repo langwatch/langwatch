@@ -1,6 +1,7 @@
 import type { IdentityRepositories } from "../identity.repositories.ts";
 import { MemoryIdentityStore } from "./memory-identity.store.ts";
 import { MemoryIdentityLatchRepository } from "./memory.identity-latch.repository.ts";
+import { MemoryIdentitySignInAccountsRepository } from "./memory.identity-signin-accounts.repository.ts";
 import {
   MemoryIdentityBackfillRepository,
   MemoryIdentityHeadsRepository,
@@ -14,6 +15,7 @@ import {
   MemoryJoinRequestReadRepository,
 } from "./memory.join-request.repositories.ts";
 import { MemoryMfaEnrollmentRepository } from "./memory.mfa-enrollment.repository.ts";
+import { MemorySsoBreakGlassRepository } from "./memory.sso-break-glass.repository.ts";
 import {
   MemorySsoConnectionBackofficeRepository,
   MemorySsoConnectionReadRepository,
@@ -38,6 +40,7 @@ export class MemoryIdentityRepositories {
       heads: MemoryIdentityHeadsRepository.create(store),
       latch: MemoryIdentityLatchRepository.create(store),
       users: MemoryIdentityUsersRepository.create(store),
+      signInAccounts: MemoryIdentitySignInAccountsRepository.create(store),
       newborn: MemoryIdentityNewbornRepository.create(store),
       reservations: MemoryIdentityReservationRepository.create(store),
       verification: MemoryIdentityVerificationRepository.create(store),
@@ -48,6 +51,7 @@ export class MemoryIdentityRepositories {
       ssoConnections: MemorySsoConnectionReadRepository.create(store),
       ssoStranding: MemorySsoConnectionStrandingRepository.create(store),
       ssoBackoffice: MemorySsoConnectionBackofficeRepository.create(store),
+      ssoBreakGlass: MemorySsoBreakGlassRepository.create(store),
     };
   }
 }

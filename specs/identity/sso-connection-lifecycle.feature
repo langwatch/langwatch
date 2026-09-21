@@ -292,3 +292,53 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     And they are told to give the issuer URL their provider publishes
     And nothing in the answer describes our network back to them
 
+
+  # D05: the way back in, and its expiry. Activation's precondition stops
+  # being "this deployment still has a local door somewhere" and becomes "a
+  # named person can get in on Monday" — the only failure that cannot be
+  # recovered from inside the product.
+
+  @unit
+  Scenario: A way back in is granted to a named person with an end date
+    Given an organization whose sign-in is about to belong to an identity provider
+    When an administrator grants somebody a way back in
+    Then the grant records who holds it apart from who granted it
+    And the organization satisfies activation's break-glass precondition
+
+  @unit
+  Scenario: A way back in is never open-ended
+    Given an administrator granting a way back in
+    When the end date is in the past or further out than ninety days
+    Then the grant is refused with sso_break_glass_expiry_out_of_range
+    And nothing is written
+    And the same refusal applies to a renewal that would reach past the window
+
+  @unit
+  Scenario: A way back in names somebody who could actually use it
+    Given a person who is not an administrator, or who holds no password
+    When they are named as the holder of a way back in
+    Then the grant is refused with sso_break_glass_holder_ineligible
+    And standing is asked before the key, so the second question is skipped
+
+  @unit
+  Scenario: Renewing a way back in leaves the date it previously ended readable
+    Given a live way back in
+    When an administrator renews it to a later date
+    Then a new binding is written naming the one it replaced
+    And the replaced binding keeps its own end date and is marked superseded
+    And only one of them is live
+
+  @unit
+  Scenario: The last way back in cannot be revoked while a connection is live
+    Given an organization with an ACTIVE connection and one live way back in
+    When an administrator revokes it
+    Then the revocation is refused with sso_break_glass_last_way_in
+    But once somebody else holds one the revocation succeeds
+    And the revoked row survives with its end written on it
+
+  @unit
+  Scenario: A way back in that is ending is warned about once per mark
+    Given a way back in that ends in five days
+    When the expiry sweep runs
+    Then the warning names the days actually left rather than the mark that tripped
+    And a second sweep the same day says nothing

@@ -25,6 +25,12 @@ export const backofficeOperator: UserProfile = {
 };
 
 export class AuthStub implements BrowserSessionApi {
+  async listBrowserSessions(): Promise<never[]> {
+    return [];
+  }
+  async endBrowserSession(): Promise<{ ended: number }> {
+    return { ended: 0 };
+  }
   async isWithinBudget(): Promise<boolean> {
     return false;
   }

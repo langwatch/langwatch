@@ -1,3 +1,4 @@
+import { browserSessionImpersonationSchema } from "@langwatch/auth-contract";
 import { Prisma } from "@langwatch/prisma-client/generated";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate, toDate } from "@langwatch/time";
@@ -57,6 +58,23 @@ export class PrismaImpersonationRepository extends ImpersonationRepository {
       select: { twoFactorEnabled: true },
     });
     return operator?.twoFactorEnabled === true;
+  }
+
+  async findWindow(sessionId: string): Promise<ImpersonationWindow | null> {
+    const row = await this.database.session.findUnique({
+      where: { id: sessionId },
+      select: { impersonating: true },
+    });
+    const stored = browserSessionImpersonationSchema.safeParse(row?.impersonating);
+    if (!stored.success) return null;
+
+    return {
+      id: stored.data.id,
+      name: stored.data.name ?? null,
+      email: stored.data.email ?? null,
+      image: stored.data.image ?? null,
+      expires: fromDate(stored.data.expires),
+    };
   }
 
   async setWindow(sessionId: string, window: ImpersonationWindow): Promise<void> {

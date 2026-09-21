@@ -14,6 +14,13 @@ Feature: Platform administration package boundary
     Then the service reports cannot_impersonate_admin without changing session state
 
   @unit
+  Scenario: An operator cannot hop from one impersonation straight into another
+    Given the acting session already carries an unexpired impersonation window
+    When an admin starts impersonation of somebody else
+    Then the service reports cannot_reimpersonate_while_impersonating
+    And no target is looked up and nothing is audited
+
+  @unit
   Scenario: A healthy target receives a bounded session window
     Given a healthy non-admin target
     When an admin starts impersonation with a reason

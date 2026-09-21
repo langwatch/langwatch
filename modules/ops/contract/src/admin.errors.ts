@@ -36,6 +36,22 @@ export class CannotImpersonateWithoutSecondFactorError extends HandledError {
   }
 }
 
+/**
+ * Hopping subject to subject leaves the audit trail without the operator ever
+ * returning to themselves — the washing-out {@link CannotImpersonateAdminError}
+ * prevents, reached another way. Stop the current window to start another.
+ */
+export class CannotReimpersonateWhileImpersonatingError extends HandledError {
+  constructor() {
+    super(
+      "cannot_reimpersonate_while_impersonating",
+      "Stop the current impersonation before starting another",
+      { httpStatus: 403, fault: "customer" },
+    );
+    this.name = "CannotReimpersonateWhileImpersonatingError";
+  }
+}
+
 export class UserToImpersonateNotFoundError extends NotFoundError {
   constructor(userId: string) {
     super("user_to_impersonate_not_found", "User to impersonate", userId);

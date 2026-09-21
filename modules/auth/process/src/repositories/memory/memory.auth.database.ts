@@ -1,6 +1,13 @@
 import type { Instant } from "@langwatch/time";
 
-import type { StoredBrowserSession } from "../auth-session.repository.ts";
+import type { BrowserSessionRecord, StoredBrowserSession } from "../auth-session.repository.ts";
+
+/**
+ * A session in memory. The inventory columns are optional because the rows a
+ * test mints to exercise revocation carry none, and a devices list that reads
+ * them absent answers exactly what a session minted before the columns does.
+ */
+export type MemoryStoredSession = StoredBrowserSession & Partial<Omit<BrowserSessionRecord, "id">>;
 
 /** One confirmation token, exactly as the row holds it. */
 export type StoredVerificationToken = {
@@ -15,7 +22,7 @@ export type StoredVerificationToken = {
  * must see one set of rows, not state hidden behind a second database.
  */
 export class MemoryAuthDatabase {
-  readonly sessions = new Map<string, StoredBrowserSession>();
+  readonly sessions = new Map<string, MemoryStoredSession>();
   readonly verificationTokens = new Map<string, StoredVerificationToken>();
 
   private constructor() {}

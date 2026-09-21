@@ -1,5 +1,6 @@
 import type {
   BackfillIdentifierRow,
+  BreakGlassBinding,
   IdentifierFact,
   JoinCandidateOrganization,
   JoinRequestAggregateState,
@@ -10,6 +11,7 @@ import type { Instant } from "@langwatch/time";
 
 import type { BackfillAccountRow } from "../identity-backfill.repository.ts";
 import type { IdentifierReservationHolder } from "../identity-reservations.repository.ts";
+import type { LegacySignInAccount } from "../identity-signin-accounts.repository.ts";
 import type { IdentityVerificationRecord } from "../identity-verification.repository.ts";
 
 /** The `User` row as the memory tier keeps it, plus the opaque payload a
@@ -50,6 +52,14 @@ export class MemoryIdentityStore {
   readonly ssoConnections = new Map<string, SsoConnectionState>();
   readonly organizationNames = new Map<string, string>();
   readonly finalizedUsers = new Set<string>();
+  /** Keyed by the lowercased address, the way the legacy read matches it. */
+  readonly legacySignInAccounts = new Map<string, LegacySignInAccount>();
+  readonly breakGlassBindings = new Map<string, BreakGlassBinding>();
+  /** Activation reservations, keyed by the command that took them. */
+  readonly breakGlassReservations = new Map<
+    string,
+    { commandId: string; organizationId: string; connectionId: string }
+  >();
 
   findUserRow(args: { userId: string }): MemoryUserRow | null {
     return this.users.get(args.userId) ?? null;
