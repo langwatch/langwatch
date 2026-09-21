@@ -77,6 +77,7 @@ import {
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
 
@@ -282,7 +283,9 @@ describe("given the /api/v1/query REST family", () => {
     );
 
     await resetApp();
+    const eventSourcing = createAuthzTestEventSourcing(prisma);
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: eventSourcing,
       planProvider: PlanProviderService.create({
         getActivePlan: vi
           .fn()

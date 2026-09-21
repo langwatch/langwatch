@@ -62,6 +62,8 @@ function mockPrisma(name: string): PrismaClient {
         revokedAt: new Date(),
       }),
     },
+    grant: { findMany: vi.fn().mockResolvedValue([]) },
+    role: { findMany: vi.fn().mockResolvedValue([]) },
     // The personal-workspace guard reads the scopes a binding names.
     team: { findFirst: vi.fn().mockResolvedValue(null) },
     project: { findFirst: vi.fn().mockResolvedValue(null) },

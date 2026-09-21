@@ -9,7 +9,8 @@
  *
  * Spec: specs/lwql/workbench.feature
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { appPermissionsService } from "~/test-utils/appPermissionsMock";
 
 const { mockFeatureFlagIsEnabled, mockExecute, deployment } = vi.hoisted(
   () => ({
@@ -49,15 +50,21 @@ vi.mock("~/server/analytics/lwql", async (importOriginal) => {
   };
 });
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    resolveProjectPermission: vi
-      .fn()
-      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      resolveProjectPermission: vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+    };
+  },
+);
 
 vi.mock("../../utils", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../utils")>();
@@ -67,10 +74,18 @@ vi.mock("../../utils", async (importOriginal) => {
   };
 });
 
+import { globalForApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { lwqlRouter } from "../analytics/lwql";
 
 wireDefaultTestApp();
+
+beforeAll(() => {
+  globalForApp.__langwatch_app = createTestApp({
+    permissions: appPermissionsService(),
+  });
+});
 
 const mockPrismaClient = {
   project: {

@@ -110,6 +110,8 @@ export interface GrantFact {
    */
   legacyRole?: LegacyBindingRole;
   source: GrantEventSource;
+  /** Current USER membership lifetime; absent for non-user/resource facts. */
+  membershipStamp?: string;
   /** Business time (backfilled facts carry the legacy row's createdAt). */
   occurredAtMs: number;
 }

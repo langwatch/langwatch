@@ -27,6 +27,7 @@ import {
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { ENTERPRISE_TEST_PLAN } from "~/test-utils/managementApiOrg";
 import { app } from "../[[...route]]/app";
@@ -43,6 +44,7 @@ describe("Feature: Organization provisioning REST API for self-hosted deployment
 
   let previousInstanceKey: string | undefined;
   let mockGetActivePlan: ReturnType<typeof vi.fn>;
+  let eventSourcing: ReturnType<typeof createAuthzTestEventSourcing>;
 
   const instanceHeaders = () => ({
     Authorization: `Bearer ${instanceKey}`,
@@ -64,6 +66,7 @@ describe("Feature: Organization provisioning REST API for self-hosted deployment
 
   const installSelfHostedApp = () => {
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: eventSourcing,
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
       }),
@@ -75,6 +78,7 @@ describe("Feature: Organization provisioning REST API for self-hosted deployment
     process.env.LANGWATCH_INSTANCE_ADMIN_API_KEY = instanceKey;
 
     await resetApp();
+    eventSourcing = createAuthzTestEventSourcing(prisma);
     mockGetActivePlan = vi.fn().mockResolvedValue(ENTERPRISE_TEST_PLAN);
     installSelfHostedApp();
   });
@@ -96,6 +100,7 @@ describe("Feature: Organization provisioning REST API for self-hosted deployment
     try {
       for (const organizationId of createdOrganizationIds) {
         await cleanupTestRows(prisma, [
+          ["grant", { organizationId }],
           ["roleBinding", { organizationId }],
           ["apiKey", { organizationId }],
           ["customRole", { organizationId }],

@@ -1,6 +1,8 @@
 /**
  * Where a new account goes before it makes an organization: the
- * join-before-create step (D12 fills it; today it passes straight through).
+ * join-before-create step, which D12 has filled: the page offers the
+ * organizations already on the account's verified domain, and creating one of
+ * your own is the explicit secondary choice.
  *
  * Held here rather than on either screen because BOTH doors create accounts
  * now — the log-in door converts an address nobody holds into a sign-up, and

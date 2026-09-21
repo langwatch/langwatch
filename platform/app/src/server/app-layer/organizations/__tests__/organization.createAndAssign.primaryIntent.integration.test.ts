@@ -1,6 +1,17 @@
 import { nanoid } from "nanoid";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { GrantPrincipalType, GrantScopeType } from "~/generated/prisma/client";
+import { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
+import { PrismaAuthzAuditTrailRepository } from "~/server/app-layer/authz/repositories/authz-audit-trail.prisma.repository";
+import { PrismaAuthzGrantsWriteRepository } from "~/server/app-layer/authz/repositories/authz-grants-write.prisma.repository";
 import { prisma } from "~/server/db";
+import {
+  cleanupTestData,
+  startTestContainers,
+  stopTestContainers,
+} from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { EventSourcing } from "~/server/event-sourcing/eventSourcing";
+import { createAuthzGrantsPipeline } from "~/server/event-sourcing/pipelines/authz-grants/pipeline";
 import { PrismaOrganizationRepository } from "../repositories/organization.prisma.repository";
 
 /**
@@ -10,14 +21,14 @@ import { PrismaOrganizationRepository } from "../repositories/organization.prism
  * shape regardless of intent, and persists NULL when no intent is given
  * (legacy default).
  *
- * Exercised at the repository layer because the tRPC-level
- * initializeOrganization integration tests are env-gated (App singleton
- * requires IS_SAAS + Stripe config) and permanently skipped.
+ * The repository assertion is paired with the router-level onboarding
+ * integration, which exercises the same writer through initializeOrganization.
  *
  * Pairs with: specs/features/onboarding/intent-fork.feature
  */
 describe("PrismaOrganizationRepository.createAndAssign — primaryIntent", () => {
-  const repository = new PrismaOrganizationRepository(prisma);
+  let repository: PrismaOrganizationRepository;
+  let eventSourcing: EventSourcing;
   const testNamespace = `intent-${nanoid(8)}`;
   const createdOrgIds: string[] = [];
   const createdUserIds: string[] = [];
@@ -52,6 +63,15 @@ describe("PrismaOrganizationRepository.createAndAssign — primaryIntent", () =>
   }
 
   afterAll(async () => {
+    await prisma.grantUsage.deleteMany({
+      where: { organizationId: { in: createdOrgIds } },
+    });
+    await prisma.grant.deleteMany({
+      where: { organizationId: { in: createdOrgIds } },
+    });
+    await prisma.role.deleteMany({
+      where: { organizationId: { in: createdOrgIds } },
+    });
     await prisma.teamUser.deleteMany({
       where: { team: { organizationId: { in: createdOrgIds } } },
     });
@@ -65,6 +85,33 @@ describe("PrismaOrganizationRepository.createAndAssign — primaryIntent", () =>
       where: { id: { in: createdOrgIds } },
     });
     await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
+    await eventSourcing.close();
+    for (const organizationId of createdOrgIds) {
+      await cleanupTestData(organizationId);
+    }
+    await stopTestContainers();
+  });
+
+  beforeAll(async () => {
+    const { clickHouseClient, redisConnection } = await startTestContainers();
+    eventSourcing = new EventSourcing({
+      clickhouse: async () => clickHouseClient,
+      redis: redisConnection,
+      enabled: true,
+      processRole: "all",
+    });
+    const pipeline = eventSourcing.register(
+      createAuthzGrantsPipeline({
+        authzGrantsWriteStore: new PrismaAuthzGrantsWriteRepository(prisma),
+        authzAuditTrailStore: new PrismaAuthzAuditTrailRepository(prisma),
+      }),
+    );
+    repository = new PrismaOrganizationRepository(
+      prisma,
+      new GrantsLedgerWriter(prisma, {
+        commands: async () => ({ commands: pipeline.commands }),
+      }),
+    );
   });
 
   describe("when the governance intent is declared", () => {
@@ -89,6 +136,52 @@ describe("PrismaOrganizationRepository.createAndAssign — primaryIntent", () =>
         select: { primaryIntent: true },
       });
       expect(organization?.primaryIntent).toBeNull();
+    });
+  });
+
+  describe("when a new organization is assigned to its creator", () => {
+    it("waits for the canonical organization and team ADMIN grants", async () => {
+      const result = await createOrg({ primaryIntent: "LLM_OPS" });
+      const userId = createdUserIds.at(-1);
+
+      expect(userId).toBeDefined();
+      const grants = await prisma.grant.findMany({
+        where: {
+          organizationId: result.organization.id,
+          principalType: GrantPrincipalType.USER,
+          principalId: userId,
+          roleKey: "admin",
+          revokedAt: null,
+        },
+        orderBy: { scopeType: "asc" },
+        select: {
+          organizationId: true,
+          principalId: true,
+          roleKey: true,
+          scopeType: true,
+          scopeId: true,
+          source: true,
+        },
+      });
+
+      expect(grants).toEqual([
+        {
+          organizationId: result.organization.id,
+          principalId: userId,
+          roleKey: "admin",
+          scopeType: GrantScopeType.ORGANIZATION,
+          scopeId: result.organization.id,
+          source: "grants-service",
+        },
+        {
+          organizationId: result.organization.id,
+          principalId: userId,
+          roleKey: "admin",
+          scopeType: GrantScopeType.TEAM,
+          scopeId: result.team.id,
+          source: "grants-service",
+        },
+      ]);
     });
   });
 

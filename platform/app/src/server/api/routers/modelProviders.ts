@@ -2,6 +2,10 @@ import { auditLog } from "@ee/audit-log/auditLog";
 import { declareAuthzMiddleware } from "@langwatch/authz";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import {
+  checkOrganizationPermission,
+  checkProjectPermission,
+} from "~/server/app-layer/authz/permission-adapters";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import {
   SCOPE_TIERS,
@@ -43,7 +47,6 @@ import {
   ROUTING_HANDLE_MAX_LENGTH,
   ROUTING_HANDLE_RULE,
 } from "../../modelProviders/routingHandle";
-import { checkOrganizationPermission, checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   getProjectModelProviders,

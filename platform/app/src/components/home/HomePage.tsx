@@ -31,6 +31,7 @@ import { HomePageBanners } from "./HomePageBanners";
 import { LangyHomeHero } from "./LangyHomeHero";
 import { LearningResources } from "./LearningResources";
 import { OnboardingProgress } from "./OnboardingProgress";
+import { PendingJoinRequests } from "./PendingJoinRequests";
 import { RecentItemsSection } from "./RecentItemsSection";
 import { TracesOverview } from "./TracesOverview";
 import { useHomeComposition } from "./useHomeComposition";
@@ -103,6 +104,10 @@ export function HomePage() {
                   leave a bare "Request a demo" with nothing explaining it. */}
               <ConsideringLangWatch />
             </HStack>
+
+            {/* Above every composition on purpose: whoever can answer a join
+                request sees the wait wherever the home happens to open. */}
+            <PendingJoinRequests />
 
             {/* The Langy home carries the offer inside its hero, under the
                 ask field; the other homes carry it here, under the header. */}

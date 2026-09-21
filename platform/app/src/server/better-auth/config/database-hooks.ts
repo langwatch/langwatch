@@ -1,45 +1,42 @@
 import type { BetterAuthOptions } from "better-auth";
 import { z } from "zod";
+import type { CredentialSessionGuard } from "../credential-session-guard";
+import type { BetterAuthDatabaseHooks } from "../hooks";
 import type { SessionClaimsPort } from "../session-claims-hook";
 import { sessionClaimsData } from "../session-claims-hook";
 
-const hookContextSchema = z.object({ path: z.string().optional() });
+const hookContextSchema = z.object({
+  path: z.string().optional(),
+  params: z.record(z.string(), z.unknown()).optional(),
+});
+const callbackParameterSchema = z
+  .string()
+  .min(1)
+  .regex(/^[^/?#]+$/);
+const callbackTemplates = new Map([
+  ["/callback/:id", "id"],
+  ["/oauth2/callback/:providerId", "providerId"],
+  ["/sso/callback/:providerId", "providerId"],
+  ["/sso/saml2/sp/acs/:providerId", "providerId"],
+]);
 
-function hookPath(context: unknown): string | null {
+const hookPath = (context: unknown): string | undefined => {
   const parsed = hookContextSchema.safeParse(context);
-  return parsed.success ? (parsed.data.path ?? null) : null;
-}
-
-export interface LegacyDatabaseHooksPort {
-  beforeUserCreate(args: {
-    user: { email: string; deactivatedAt?: Date | null } & Record<
-      string,
-      unknown
-    >;
-  }): Promise<boolean | void>;
-  afterUserCreate(args: {
-    user: { id: string; email: string; name: string };
-  }): Promise<void>;
-  beforeAccountCreate(args: {
-    account: {
-      userId: string;
-      providerId: string;
-      accountId: string;
-      /** The callback's own ID token, for the rule that weighs its claims. */
-      idToken?: string;
-    };
-  }): Promise<void>;
-  afterAccountCreate(args: {
-    account: { userId: string; providerId: string; accountId: string };
-  }): Promise<void>;
-  afterAccountUpdate(args: {
-    account: { userId: string; providerId: string; accountId: string };
-  }): Promise<void>;
-  beforeSessionCreate(args: {
-    session: { userId: string };
-  }): Promise<boolean | void>;
-  afterSessionCreate(args: { userId: string }): Promise<void>;
-}
+  if (!parsed.success || !parsed.data.path) {
+    return void 0;
+  }
+  const { path, params } = parsed.data;
+  const parameter = callbackTemplates.get(path);
+  if (!parameter) {
+    return path;
+  }
+  // Database hooks receive the endpoint template, with router-matched params.
+  // Body/query values cannot supply a provider or earn callback evidence.
+  const provider = callbackParameterSchema.safeParse(params?.[parameter]);
+  return provider.success
+    ? path.slice(0, path.lastIndexOf(":")) + provider.data
+    : void 0;
+};
 
 /** ADR-101 §2's erasure, taken before the user row goes. */
 export interface UserErasureCeremonyPort {
@@ -90,7 +87,7 @@ export interface DatabaseHooksDeps {
    * pipeline handle when they run, and better-auth builds its options at
    * module load, before any App exists.
    */
-  hooks: () => LegacyDatabaseHooksPort;
+  hooks: () => BetterAuthDatabaseHooks;
   /** The erasure a user delete is (ADR-101 §2). */
   userErasure: () => UserErasureCeremonyPort;
   /**
@@ -104,6 +101,7 @@ export interface DatabaseHooksDeps {
   sessionClaims: () => SessionClaimsPort;
   /** The verified current callback token whose claims the session may carry. */
   providerAssertions: () => VerifiedProviderAssertionsPort;
+  credentialSessions: () => CredentialSessionGuard;
 }
 
 type ConfiguredDatabaseHooks = NonNullable<BetterAuthOptions["databaseHooks"]>;
@@ -163,6 +161,11 @@ function accountCreateHooks({
         verifiedIdToken:
           typeof account.idToken === "string" ? account.idToken : undefined,
       });
+      providerAssertions().recordAuthenticatedCallbackAccount({
+        providerId: account.providerId,
+        providerAccountId: account.accountId,
+        path: hookPath(context),
+      });
       return accountCeremonies().beforeAccountCreate(account);
     },
     after: async (account, context) => {
@@ -198,6 +201,13 @@ function accountUpdateHooks({
         verifiedIdToken:
           typeof account.idToken === "string" ? account.idToken : undefined,
       });
+      if (typeof account.accountId === "string") {
+        providerAssertions().recordAuthenticatedCallbackAccount({
+          providerId: account.providerId,
+          providerAccountId: account.accountId,
+          path: hookPath(context),
+        });
+      }
     },
     after: async (account, context) => {
       if (
@@ -238,14 +248,21 @@ function accountDatabaseHooks(deps: DatabaseHooksDeps): AccountDatabaseHookSet {
 function sessionDatabaseHooks({
   hooks,
   sessionClaims,
+  credentialSessions,
 }: DatabaseHooksDeps): NonNullable<ConfiguredDatabaseHooks["session"]> {
   return {
     create: {
       before: async (session, context) => {
         const refusal = await hooks().beforeSessionCreate({
           session: { userId: session.userId },
+          path: hookPath(context),
         });
         if (refusal === false) return false;
+
+        await credentialSessions().beforeSessionCreate({
+          userId: session.userId,
+          context,
+        });
 
         return sessionClaimsData({
           userId: session.userId,
@@ -274,6 +291,7 @@ export function databaseHooks({
   accountCeremonies,
   sessionClaims,
   providerAssertions,
+  credentialSessions,
 }: DatabaseHooksDeps): BetterAuthOptions["databaseHooks"] {
   const deps = {
     hooks,
@@ -281,10 +299,21 @@ export function databaseHooks({
     accountCeremonies,
     sessionClaims,
     providerAssertions,
+    credentialSessions,
   };
   return {
     user: userDatabaseHooks(deps),
     account: accountDatabaseHooks(deps),
+    verification: {
+      create: {
+        before: async (verification, context) => {
+          await credentialSessions().beforeVerificationCreate({
+            verification,
+            context,
+          });
+        },
+      },
+    },
     session: sessionDatabaseHooks(deps),
   };
 }

@@ -226,6 +226,17 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     Then it offers to set a first password
     And it offers nothing to remove, because there is nothing there to give up
 
+  # A self-hosted install issues its own passwords even behind an enterprise
+  # identity provider, so an administrator who only holds a passkey must still
+  # be able to set one — it is the fallback way in single sign-on go-live asks
+  # for. Keying the offer off the configured provider alone hid it (ADR-027).
+  @integration
+  Scenario: A self-hosted passkey-only administrator can still set a password
+    Given a self-hosted deployment configured with an enterprise identity provider
+    And "sam" signs in with a passkey and holds no password
+    When the password section is shown
+    Then it offers to set a first password
+
   @integration
   Scenario: Removing the password is refused before it is clicked where it is the last way in
     Given the password is the only confirmed way in "sam" holds

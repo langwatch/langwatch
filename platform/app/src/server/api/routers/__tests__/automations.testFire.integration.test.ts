@@ -9,6 +9,7 @@
  * handed to the (mocked) mailer boundary.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { appPermissionsService } from "~/test-utils/appPermissionsMock";
 import { globalForApp } from "../../../app-layer/app";
 import { createTestApp } from "../../../app-layer/presets";
 
@@ -17,15 +18,21 @@ const { mockTestFire, mockProjectGetById } = vi.hoisted(() => ({
   mockProjectGetById: vi.fn(),
 }));
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    resolveProjectPermission: vi
-      .fn()
-      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      resolveProjectPermission: vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+    };
+  },
+);
 
 // The session user IS the only legitimate recipient. Pin the rate-limit gate
 // open so the recipient-forcing behaviour (not throttling) is what's under test.
@@ -86,6 +93,7 @@ describe("automationRouter.testFireTemplate", () => {
     });
     previousApp = globalForApp.__langwatch_app;
     globalForApp.__langwatch_app = createTestApp({
+      permissions: appPermissionsService(),
       triggerTemplates: { testFire: mockTestFire } as any,
       projects: { getById: mockProjectGetById } as any,
     });

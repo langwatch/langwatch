@@ -60,7 +60,13 @@ export function EnterpriseLockedSurface({
             {description ??
               `${featureName} is available on Enterprise plans. Upgrade to unlock this surface for your organization.`}
           </Text>
-          <Button asChild size="sm" colorPalette="orange">
+          <Button
+            asChild
+            size="sm"
+            colorPalette="orange"
+            color="white"
+            _hover={{ color: "white" }}
+          >
             <a href="/settings/subscription">Upgrade →</a>
           </Button>
         </VStack>

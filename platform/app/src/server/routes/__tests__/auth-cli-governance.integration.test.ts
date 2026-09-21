@@ -32,6 +32,8 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { FREE_PLAN } from "../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../ee/licensing/planInfo";
 import { app } from "../auth-cli";
@@ -87,6 +89,7 @@ describe("GET /api/auth/cli/governance/*", () => {
     await resetApp();
     globalForApp.__langwatch_app = createTestApp({
       redis: redisConnection,
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
       planProvider: PlanProviderService.create({
         getActivePlan: async ({ organizationId }) =>
           organizationId === ORG_C ? freePlan : enterprisePlan,
@@ -140,14 +143,12 @@ describe("GET /api/auth/cli/governance/*", () => {
       [ORG_B, USER_B],
       [ORG_C, USER_C],
     ] as const) {
-      await prisma.roleBinding.create({
-        data: {
-          organizationId: orgId,
-          userId,
-          role: "ADMIN",
-          scopeType: "ORGANIZATION",
-          scopeId: orgId,
-        },
+      await seedRoleBinding(prisma, {
+        organizationId: orgId,
+        userId,
+        role: "ADMIN",
+        scopeType: "ORGANIZATION",
+        scopeId: orgId,
       });
     }
 
@@ -223,6 +224,9 @@ describe("GET /api/auth/cli/governance/*", () => {
       where: { organizationId: { in: [ORG_A, ORG_B, ORG_C] } },
     });
     await prisma.roleBinding.deleteMany({
+      where: { organizationId: { in: [ORG_A, ORG_B, ORG_C] } },
+    });
+    await prisma.grant.deleteMany({
       where: { organizationId: { in: [ORG_A, ORG_B, ORG_C] } },
     });
     await prisma.user.deleteMany({
@@ -456,14 +460,12 @@ describe("GET /api/auth/cli/governance/*", () => {
           role: "ADMIN",
         },
       });
-      await prisma.roleBinding.create({
-        data: {
-          organizationId: INGEST_KEY_ORG,
-          userId: INGEST_KEY_USER,
-          role: "ADMIN",
-          scopeType: "ORGANIZATION",
-          scopeId: INGEST_KEY_ORG,
-        },
+      await seedRoleBinding(prisma, {
+        organizationId: INGEST_KEY_ORG,
+        userId: INGEST_KEY_USER,
+        role: "ADMIN",
+        scopeType: "ORGANIZATION",
+        scopeId: INGEST_KEY_ORG,
       });
 
       if (!redisConnection) throw new Error("Redis unavailable");
@@ -520,6 +522,9 @@ describe("GET /api/auth/cli/governance/*", () => {
       }
       // RoleBindings reference ApiKeys (required relation), so they go first.
       await prisma.roleBinding.deleteMany({
+        where: { organizationId: INGEST_KEY_ORG },
+      });
+      await prisma.grant.deleteMany({
         where: { organizationId: INGEST_KEY_ORG },
       });
       await prisma.apiKey.deleteMany({

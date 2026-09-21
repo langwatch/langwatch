@@ -325,6 +325,15 @@ any address, and password reset keeps its uniform response.
 
 ### Revision (2026-08-25) — the router-level no-oracle is retired too
 
+**SSO-domain exception.** An address governed by an active or suspended
+organization SSO connection must not reveal whether an account exists. Public
+sign-in and sign-up requests use the domain's routing policy before account
+lookup. Requests for sign-up verification return the same
+`auth_direct_registration_unavailable` response for registered, unconfirmed,
+and unknown addresses on those domains, without sending verification mail.
+The existing-account guidance below remains for addresses outside those SSO
+domains. This contract is bound in `specs/identity/signin-router.feature`.
+
 The 2026-08-24 revision retired the no-oracle at the SCREEN and explicitly
 kept it at the router: "the router's decision object stays
 existence-independent". That half-measure is now retired as well, at the

@@ -1,11 +1,7 @@
 import { createLogger } from "@langwatch/observability";
-import {
-  OrganizationUserRole,
-  type PrismaClient,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "~/generated/prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
+import { isDemoProject } from "~/server/app-layer/authz/permission-adapters";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { VisibilityWindowService } from "~/server/app-layer/traces/visibility-window.service";
 import type { Session } from "~/server/auth";
@@ -13,7 +9,6 @@ import {
   describeAudience,
   isContentVisible,
   isContentVisibleToPublic,
-  needsAudienceFacts,
   type ViewerFacts,
 } from "~/server/data-privacy/contentVisibility";
 import {
@@ -29,7 +24,6 @@ import { resolveOrganizationId } from "~/server/organizations/resolveOrganizatio
 import { TtlCache } from "~/server/utils/ttlCache";
 import { FREE_VISIBILITY_DAYS } from "../../../ee/licensing/constants";
 import type { CategoryVisibility, Protections } from "../traces/protections";
-import { isDemoProject } from "./rbac";
 
 const logger = createLogger("langwatch:api:protections");
 
@@ -236,6 +230,7 @@ export async function getUserProtectionsForProject(
     select: {
       teamId: true,
       ownerUserId: true,
+      team: { select: { organizationId: true } },
     },
   });
 
@@ -323,61 +318,37 @@ export async function getUserProtectionsForProject(
   }
 
   const userId = ctx.session.user.id;
-  const teamBindings = await ctx.prisma.roleBinding.findMany({
-    where: {
-      userId,
-      scopeType: RoleBindingScopeType.TEAM,
-      scopeId: project.teamId,
-    },
-    select: { role: true },
+  const organizationId = project.team.organizationId;
+  const memberships = await ctx.prisma.groupMembership.findMany({
+    where: { userId, group: { organizationId } },
+    select: { groupId: true },
   });
-
-  let isAdmin = teamBindings.some((b) => b.role === TeamUserRole.ADMIN);
-  let isMember = teamBindings.length > 0;
-  let isMemberRole = teamBindings.some((b) => b.role === TeamUserRole.MEMBER);
-  const isViewer = teamBindings.some((b) => b.role === TeamUserRole.VIEWER);
+  const groupIds = memberships.map((membership) => membership.groupId);
+  const groupIdSet = new Set(groupIds);
+  const teamGrants = await ctx.prisma.grant.findMany({
+    where: {
+      organizationId,
+      scopeType: "TEAM",
+      scopeId: project.teamId,
+      revokedAt: null,
+      principalType: { in: ["USER", "GROUP"] },
+    },
+    select: { roleKey: true, principalType: true, principalId: true },
+  });
+  const heldTeamGrants = teamGrants.filter(
+    (grant) =>
+      (grant.principalType === "USER" && grant.principalId === userId) ||
+      (grant.principalType === "GROUP" &&
+        grant.principalId !== null &&
+        groupIdSet.has(grant.principalId)),
+  );
+  const roleKeys = new Set(heldTeamGrants.map((grant) => grant.roleKey));
+  const isAdmin = roleKeys.has("admin");
+  const isMemberRole = roleKeys.has("member");
+  const isViewer = roleKeys.has("viewer");
+  const isMember = heldTeamGrants.length > 0;
   const isProjectOwner =
     project.ownerUserId != null && project.ownerUserId === userId;
-  if (!isMember) {
-    const orgRole = await getApp().organizations.getUserOrgRoleByTeamId({
-      userId,
-      teamId: project.teamId,
-    });
-    if (orgRole === OrganizationUserRole.ADMIN) {
-      isMember = true;
-      isAdmin = true;
-    } else if (orgRole === OrganizationUserRole.MEMBER) {
-      isMember = true;
-      isMemberRole = true;
-    }
-  }
-
-  // Group membership is only needed when a restrict audience names groups; the
-  // role-group and owner audiences decide from facts already in hand, keeping
-  // the common read path free of the extra queries.
-  let organizationId: string | null = null;
-  let groupIds: string[] = [];
-  const needsFacts =
-    CONTENT_CATEGORIES.some((category) =>
-      needsAudienceFacts(policy.categories[category]),
-    ) ||
-    restrictedAttributeRules.some((rule) =>
-      needsAudienceFacts({ disposition: "restrict", audience: rule.audience }),
-    );
-  if (isMember && needsFacts) {
-    const team = await ctx.prisma.team.findUnique({
-      where: { id: project.teamId },
-      select: { organizationId: true },
-    });
-    organizationId = team?.organizationId ?? null;
-    if (organizationId) {
-      const memberships = await ctx.prisma.groupMembership.findMany({
-        where: { userId, group: { organizationId } },
-        select: { groupId: true },
-      });
-      groupIds = memberships.map((m) => m.groupId);
-    }
-  }
 
   const viewer: ViewerFacts = {
     isAdmin,

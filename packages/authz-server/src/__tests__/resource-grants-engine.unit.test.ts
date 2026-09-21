@@ -147,29 +147,17 @@ describe("resource-tier grants (ADR-092 §8)", () => {
       expect(checkWith({ audience, grants: other }).allowed).toBe(false);
     });
 
-    it("team: matches a member of that team, via binding or legacy row", () => {
+    it("team: matches a member of that team through a grant", () => {
       const audience = { kind: "team", id: TEAM } as const;
       const viaBinding = makeGrants({
         principal: { type: "user", id: "user-1" },
         bindings: [binding({ scopeType: "TEAM", scopeId: TEAM })],
-      });
-      const viaLegacy = makeGrants({
-        principal: { type: "user", id: "user-1" },
-        legacyTeamMemberships: [
-          {
-            teamId: TEAM,
-            role: "VIEWER",
-            customRoleId: null,
-            isPersonal: false,
-          },
-        ],
       });
       const otherTeam = makeGrants({
         principal: { type: "user", id: "user-2" },
         bindings: [binding({ scopeType: "TEAM", scopeId: "team-other" })],
       });
       expect(checkWith({ audience, grants: viaBinding }).allowed).toBe(true);
-      expect(checkWith({ audience, grants: viaLegacy }).allowed).toBe(true);
       expect(checkWith({ audience, grants: otherTeam }).allowed).toBe(false);
     });
 

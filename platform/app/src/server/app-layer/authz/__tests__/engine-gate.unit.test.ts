@@ -96,7 +96,6 @@ describe("the authz engine gate", () => {
     // in the server composition and reaches the gate as an installed reporter.
     // What the gate owes is the CALL — that a failed read is reported at all,
     // with the organization and the window it reopened.
-    /** @scenario "A failed migration-state read is reported" */
     it("reports the failure so a reopened legacy-fallback window is observable", async () => {
       const findUnique = vi.fn().mockRejectedValue(new Error("pg is down"));
       const prisma = {
@@ -169,7 +168,6 @@ describe("the authz engine gate", () => {
   });
 
   describe("when the operator flips the row after it was cached", () => {
-    /** @scenario "Rolling back returns an organization to the legacy path within the gate's cache window" */
     it("returns to the legacy path once the cached answer expires, with no restart", async () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date("2026-08-18T09:00:00.000Z"));
