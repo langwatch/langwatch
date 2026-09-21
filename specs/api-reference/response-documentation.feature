@@ -47,3 +47,14 @@ Feature: A route's published answers come from its declaration
     Given a route declared public
     When the document is written
     Then the operation publishes the empty requirement
+
+  # A create whose body the reference cannot demonstrate is a create nothing
+  # can be generated for. Measured 2026-09-21: 11 of the API-diff harness's
+  # create probes were refused as invalid and one more by an unexpressed
+  # domain rule, and every `{id}` route behind those creates went unprobed as
+  # a result — 84 operations both sides serve were never compared.
+  @unit
+  Scenario: A create whose body a shape alone cannot describe publishes an example
+    Given a create whose required combination is a domain rule, not a shape
+    When the document is written
+    Then the request schema publishes a complete worked example

@@ -14,22 +14,34 @@ import {
 } from "./prompt.field-schemas.ts";
 import { getLatestConfigVersionSchema } from "./prompt.version-schema.ts";
 
-export const createPromptInputSchema = z.strictObject({
-  handle: handleSchema,
-  scope: scopeSchema.optional().default("PROJECT"),
-  model: modelNameSchema.optional(),
-  temperature: z.number().optional(),
-  maxTokens: z.number().optional(),
-  commitMessage: commitMessageSchema.optional(),
-  authorId: z.string().optional(),
-  prompt: z.string().optional(),
-  messages: z.array(messageSchema).optional(),
-  inputs: z.array(inputsSchema).optional(),
-  outputs: z.array(outputsSchema).optional(),
-  schemaVersion: schemaVersionSchema.optional(),
-  tags: z.array(z.string().min(1)).optional(),
-  parameters: runtimeParametersSchema.optional(),
-});
+export const createPromptInputSchema = z
+  .strictObject({
+    handle: handleSchema,
+    scope: scopeSchema.optional().default("PROJECT"),
+    model: modelNameSchema.optional(),
+    temperature: z.number().optional(),
+    maxTokens: z.number().optional(),
+    commitMessage: commitMessageSchema.optional(),
+    authorId: z.string().optional(),
+    prompt: z.string().optional(),
+    messages: z.array(messageSchema).optional(),
+    inputs: z.array(inputsSchema).optional(),
+    outputs: z.array(outputsSchema).optional(),
+    schemaVersion: schemaVersionSchema.optional(),
+    tags: z.array(z.string().min(1)).optional(),
+    parameters: runtimeParametersSchema.optional(),
+  })
+  // `prompt` and `messages` are each optional but the handler needs one of
+  // them, which a shape alone cannot say. The example is where a reader — and
+  // any client generated from this document — learns what a working body is.
+  .meta({
+    examples: [
+      {
+        handle: "support/tone-check",
+        prompt: "You are a helpful assistant. Answer in one short paragraph.",
+      },
+    ],
+  });
 
 export const updatePromptInputSchema = z.strictObject({
   ...createPromptInputSchema.omit({ scope: true, handle: true }).shape,
