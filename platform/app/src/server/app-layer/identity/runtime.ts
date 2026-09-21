@@ -228,6 +228,7 @@ import {
   PrismaSignUpAccountDirectory,
   PrismaSignUpVerificationTokenStore,
 } from "./repositories/signup-verification.prisma.repository";
+import { PrismaSecretHealTenantSource } from "./repositories/secret-heal-tenant-source.prisma.repository";
 import { IdentitySecretHealMigration } from "./secret-heal.migration";
 import {
   PrismaSessionIdentifiers,
@@ -453,7 +454,10 @@ export function identifierBackfillMigration(): IdentityIdentifierBackfillMigrati
 /** The reverse mirror's heal leg, as its own never-terminal pass — see the
  *  migration's own docblock for why it cannot be a step in the backfill. */
 export function identitySecretHealMigration(): IdentitySecretHealMigration {
-  return new IdentitySecretHealMigration(identitySecretCarryService);
+  return new IdentitySecretHealMigration({
+    secrets: identitySecretCarryService,
+    candidateTenants: new PrismaSecretHealTenantSource(prisma),
+  });
 }
 
 /**
