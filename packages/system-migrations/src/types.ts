@@ -3,7 +3,14 @@
  * key legacy-path removal on. Blanking a finalized row does NOT roll it
  * back — re-proving just re-finalizes it; only `rolled_back` pins it on legacy.
  */
-export type TenantMigrationStatus = "migrated" | "finalized" | "parked" | "rolled_back";
+export const TENANT_MIGRATION_STATUSES = [
+  "migrated",
+  "finalized",
+  "parked",
+  "rolled_back",
+] as const;
+
+export type TenantMigrationStatus = (typeof TENANT_MIGRATION_STATUSES)[number];
 
 /**
  * The two terminal states the runner never re-runs: `finalized`, the one-way
@@ -13,6 +20,13 @@ export type TenantMigrationStatus = "migrated" | "finalized" | "parked" | "rolle
 export function isTerminalTenantStatus(status: TenantMigrationStatus | undefined): boolean {
   return status === "finalized" || status === "rolled_back";
 }
+
+/**
+ * The same two statuses as a LIST, for a `status = ANY(...)` SQL narrowing.
+ * Derived from `isTerminalTenantStatus`, not written out again.
+ */
+export const TERMINAL_TENANT_STATUSES: readonly TenantMigrationStatus[] =
+  TENANT_MIGRATION_STATUSES.filter(isTerminalTenantStatus);
 
 export type TenantMigrationRecord = {
   migrationName: string;

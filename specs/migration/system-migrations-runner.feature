@@ -88,9 +88,26 @@ Feature: Running system migrations across organizations
     When those events and application events are queued concurrently
     Then the preflight uses the canonical queue and its aggregate locks
     And it dispatches only groups registered by that preflight
-    And pending, delayed, blocked, or failed work in those groups prevents startup
+    And blocked or failed work in those groups prevents startup
     And worker-scoped durable subscribers run for the preflight events
     And schedulers, process-manager consumers, and general workers do not start
+
+  # The barrier's deadline is the one refusal a booting fleet cannot answer:
+  # every replica runs this preflight before it starts consuming, so work it
+  # queues drains only if some other process already serves that queue, and a
+  # fleet booting together has none. Held work is not unsafe — a held tenant
+  # already starts on the legacy path with its migration gate closed — so
+  # giving up on the wait costs a later pass, never correctness; a failure is
+  # a fault a later pass will not clear, and that half still refuses.
+  @integration
+  Scenario: Work that never drains leaves its tenants held rather than refusing startup
+    Given the preflight's own work has not drained when the barrier's deadline passes
+    And none of that work has failed or blocked
+    When the barrier gives up waiting
+    Then startup continues rather than refusing
+    And the groups it stopped waiting for are named for operator triage
+    And their tenants stay held, to be re-proved by a later pass
+    But work that failed or blocked by the deadline still prevents startup
 
   @unit
   Scenario: A recurring reconciliation does not loop forever

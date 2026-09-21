@@ -188,9 +188,25 @@ Feature: Online-evaluator infinite-loop prevention
     Given the parent trace has a legacy trace_<nanoid> trace_id
     When extractParentTraceForNlpgo runs
     Then it returns undefined
-    # nlpgo falls back to body-supplied trace_id when no traceparent header
-    # arrives — better than synthesizing a parent_span_id that would
-    # render under a non-existent span in Studio's waterfall.
+    # The dispatchers then ask nlpgo not to emit spans (see the next two
+    # scenarios) — better than synthesizing a parent_span_id that would
+    # render under a non-existent span in Studio's waterfall, and better
+    # than nlpgo minting a fresh trace id for a separate orphan trace.
+
+  @unit @loop-prevention @traceparent
+  Scenario: A code evaluator emits no spans when the target trace has no parent link
+    Given the target trace has no usable parent link
+    When the code evaluator is dispatched to nlpgo
+    Then the request asks nlpgo not to emit spans
+    # Without a parent link nlpgo cannot join the target trace: it would mint
+    # a fresh trace id and the evaluator's spans would form a separate
+    # evaluation-origin trace that flows back through the trace pipeline.
+
+  @unit @loop-prevention @traceparent
+  Scenario: An evaluator workflow emits no spans when the target trace has no parent link
+    Given the target trace has no usable parent link
+    When the evaluator workflow is dispatched to nlpgo
+    Then the request asks nlpgo not to emit spans
 
   # ============================================================================
   # nlpgo-side guarantees (Go tests live in services/nlpgo/...)
@@ -202,6 +218,26 @@ Feature: Online-evaluator infinite-loop prevention
     When nlpgo creates its root studio span
     Then the studio span shares trace_id with the parent
     And the studio span's parent_span_id equals the header's span_id
+
+  @go @nlpgo @propagation
+  Scenario: nlpgo suppresses every span of a request marked do_not_trace
+    Given a request marked do_not_trace
+    When nlpgo starts its studio span and the engine starts a node span from that context
+    Then no span is exported, with or without an inbound traceparent
+    # Two layers of defense: (1) a context suppression marker
+    # (WithTraceSuppressed) checked by SuppressAwareSampler — works
+    # regardless of the configured sampler; (2) an unsampled parent
+    # context for defense-in-depth under parent-based samplers.
+
+  @go @nlpgo @propagation
+  Scenario: nlpgo suppresses spans under non-parent-based samplers
+    Given a request marked do_not_trace
+    And the tracer provider uses a non-parent-based sampler (always_on or traceidratio)
+    When nlpgo starts its studio span and the engine starts a node span from that context
+    Then no span is exported
+    # The context suppression marker (SuppressAwareSampler) takes
+    # precedence over the configured sampler, so suppression holds even
+    # when always_on or bare traceidratio would otherwise sample.
 
   @go @nlpgo @depth-increment
   Scenario: nlpgo handler increments causality_depth on its root span

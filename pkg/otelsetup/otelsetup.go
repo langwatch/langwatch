@@ -441,6 +441,11 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 	if opts.Sampler.ParentBased {
 		sampler = sdktrace.ParentBased(rootSampler)
 	}
+	// Wrap the configured sampler so context-level trace suppression
+	// (WithTraceSuppressed) takes precedence over any sampling decision.
+	// Without this, non-parent-based samplers (always_on, traceidratio)
+	// ignore the unsampled parent flag and export suppressed spans.
+	sampler = NewSuppressAwareSampler(sampler)
 
 	tpOpts := []sdktrace.TracerProviderOption{
 		sdktrace.WithResource(res),

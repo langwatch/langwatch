@@ -33,7 +33,11 @@ export class WorkflowEvaluationAdapter {
         projectId: input.projectId,
         inputs: input.inputs,
         versionId: input.versionId,
-        doNotTrace: false,
+        // Without a parent link the engine cannot join the caller's trace: it
+        // mints a fresh trace id and the evaluator's spans become a separate
+        // evaluation-origin trace that flows back through the trace pipeline.
+        // Emit spans only when they can land under the target trace.
+        doNotTrace: input.parentTrace === undefined,
         runEvaluations: false,
         origin: "evaluation",
         causalityDepth: input.causalityDepth ?? 0,

@@ -1,3 +1,4 @@
+import type { TenantSource } from "./tenant-source.ts";
 import type { TenantMigrationOutcome, TenantMigrationRecord } from "./types.ts";
 
 /**
@@ -10,6 +11,13 @@ export interface SystemMigration {
   readonly executionMode?: "background" | "startup";
   /** Whether a held outcome must prevent startup. Defaults to finite. */
   readonly startupSettlement?: "finite" | "recurring";
+
+  /**
+   * The tenants this migration could possibly concern, narrower than the
+   * pass's own source; omitted, the pass drives it over every tenant it
+   * enumerates. Keeps a `recurring` migration's per-pass cost bounded.
+   */
+  readonly candidateTenants?: TenantSource;
   /**
    * Stable identifier - the state table's key. Renaming it orphans every
    * stored record, so never do that; what operators read is `title`.
