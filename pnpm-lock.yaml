@@ -3007,6 +3007,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../../packages/design-system
+      '@langwatch/identity-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/identity/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time
@@ -7677,6 +7680,9 @@ importers:
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../packages/time
       zod:
         specifier: 'catalog:'
         version: 4.4.3
