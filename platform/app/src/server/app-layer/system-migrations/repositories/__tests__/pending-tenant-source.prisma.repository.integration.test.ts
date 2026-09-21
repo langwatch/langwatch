@@ -101,9 +101,13 @@ describe("given tenants at every stage of a two-migration pass", () => {
   });
 
   afterAll(async () => {
-    await prisma.systemMigrationTenantState.deleteMany({
-      where: { migrationName: { in: BOTH } },
-    });
+    // A bulk write on this table must name one tenant: the guard refuses a
+    // migration-wide delete, since it would drop every installation's latches.
+    for (const tenantId of EVERY_TENANT) {
+      await prisma.systemMigrationTenantState.deleteMany({
+        where: { tenantId, migrationName: { in: BOTH } },
+      });
+    }
     await prisma.organization.deleteMany({
       where: { id: { in: EVERY_TENANT } },
     });
