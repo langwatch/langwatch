@@ -11,12 +11,13 @@ import { useOnboardingHost } from "../../../../model/onboarding-host.ts";
 import { greetingName, setupTarget } from "../../model/copy.ts";
 import type { TakeoverPhase } from "../../model/resume.ts";
 import { HelloScreen } from "./hello-screen.tsx";
+import { ProviderScreen } from "./provider-screen.tsx";
 import { TAKEOVER_FADE_MS, TakeoverStage } from "./takeover-stage.tsx";
 import { ValueScreen } from "./value-screen.tsx";
 
 /**
- * The provider phase (ProviderScreen) is not ported yet — see the handoff.
- * `returnTo` and the land-on-completion navigation return with it.
+ * What follows the provider phase (the tour) is not ported yet — see the
+ * handoff. `returnTo` and the land-on-completion navigation return with it.
  */
 export function GuidedTakeover({
   organizationId,
@@ -34,6 +35,7 @@ export function GuidedTakeover({
   initialPaths?: GuidedPath[];
 }) {
   const host = useOnboardingHost();
+  const { project } = host.scope();
   const [phase, setPhase] = useState<TakeoverPhase>(initialPhase);
   const [fading, setFading] = useState(false);
   const [paths, setPaths] = useState<GuidedPath[]>(initialPaths);
@@ -84,7 +86,17 @@ export function GuidedTakeover({
             }}
           />
         )}
-        {/* phase === "provider" renders ProviderScreen once it is ported; see the handoff. */}
+        {phase === "provider" && (
+          <ProviderScreen
+            picksCount={paths.length}
+            organizationId={organizationId}
+            projectId={project?.id}
+            fading={fading}
+            onConnected={() => undefined}
+            onSkip={() => undefined}
+          />
+        )}
+        {/* What phase follows "provider" (the tour) is not ported yet; see the handoff. */}
       </TakeoverStage>
     </AnalyticsBoundary>
   );
