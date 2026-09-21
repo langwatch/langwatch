@@ -1,4 +1,6 @@
+import type { OnboardingVariant } from "@langwatch/onboarding-contract";
 import type { Project, Team } from "@langwatch/project-contract";
+import type { Instant } from "@langwatch/time";
 
 /**
  * The organization columns the project reads reach through a team: the two
@@ -11,6 +13,9 @@ export type MemoryOrganizationRow = Readonly<{
   traceSharingEnabled: boolean;
   /** Admin members oldest first, which is the order the Prisma read takes one in. */
   adminUserIds: readonly string[];
+  /** Which onboarding the organization went through; null before the experiment. */
+  onboardingVariant: OnboardingVariant | null;
+  createdAt: Instant;
 }>;
 
 /**

@@ -47,6 +47,16 @@ export const EMPTY_GUIDED_ONBOARDING_STATE: GuidedOnboardingState = {
   donePaths: [],
 };
 
+/**
+ * The record the process's own repository stores per organization: state and
+ * variant together, since a Redis read has no schema to join them back with.
+ */
+export const guidedOnboardingRecordSchema = z.object({
+  state: guidedOnboardingStateSchema,
+  variant: onboardingVariantSchema.nullable(),
+});
+export type GuidedOnboardingRecord = z.infer<typeof guidedOnboardingRecordSchema>;
+
 const attributionShape = ATTRIBUTION_FIELDS.reduce(
   (acc, field) => {
     acc[field] = z.string().optional().nullable();

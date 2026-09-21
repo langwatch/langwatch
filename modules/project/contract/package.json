@@ -23,6 +23,7 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/kernel": "workspace:*",
+    "@langwatch/onboarding-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "zod": "catalog:"
   },

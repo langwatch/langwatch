@@ -1,0 +1,90 @@
+/**
+ * The organization admin resolution reads the onboarding variant next to the
+ * admin, so a milestone tracked against the admin can be split by variant.
+ *
+ * @see specs/analytics/posthog-guided-onboarding.feature
+ */
+import { fromDate } from "@langwatch/time";
+import { describe, expect, it, vi } from "vitest";
+
+import { PrismaProjectRepository } from "../prisma.project.repository.ts";
+
+type ProjectDatabase = Parameters<typeof PrismaProjectRepository.create>[0]["prisma"];
+
+function repositoryWith(project: unknown) {
+  const findUnique = vi.fn().mockResolvedValue(project);
+  const database = { project: { findUnique }, team: {} } as unknown as ProjectDatabase;
+  return {
+    repository: PrismaProjectRepository.create({ prisma: database }),
+    findUnique,
+  };
+}
+
+describe("PrismaProjectRepository.findWithOrgAdmin()", () => {
+  describe("when the organization recorded the classic variant", () => {
+    /** @scenario "the organization admin resolution reads the onboarding variant next to the admin" */
+    it("carries onboardingVariant classic next to the admin", async () => {
+      const { repository, findUnique } = repositoryWith({
+        firstMessage: false,
+        team: {
+          organization: {
+            id: "org_1",
+            createdAt: new Date("2026-09-01T00:00:00Z"),
+            signupData: {
+              companyType: "company",
+              onboardingVariant: "classic",
+            },
+            members: [{ userId: "admin_1" }],
+          },
+        },
+      });
+
+      const result = await repository.findWithOrgAdmin("project_1");
+
+      expect(result).toEqual({
+        firstMessage: false,
+        organizationId: "org_1",
+        adminUserId: "admin_1",
+        onboardingVariant: "classic",
+        organizationCreatedAt: fromDate(new Date("2026-09-01T00:00:00Z")),
+      });
+      expect(findUnique.mock.calls[0]![0].select.team.select.organization.select).toMatchObject({
+        signupData: true,
+      });
+    });
+  });
+
+  describe("when the organization predates the experiment", () => {
+    it("carries a null onboardingVariant", async () => {
+      const { repository } = repositoryWith({
+        firstMessage: true,
+        team: {
+          organization: {
+            id: "org_1",
+            createdAt: new Date("2026-01-01T00:00:00Z"),
+            signupData: { companyType: "company" },
+            members: [],
+          },
+        },
+      });
+
+      const result = await repository.findWithOrgAdmin("project_1");
+
+      expect(result).toEqual({
+        firstMessage: true,
+        organizationId: "org_1",
+        adminUserId: null,
+        onboardingVariant: null,
+        organizationCreatedAt: fromDate(new Date("2026-01-01T00:00:00Z")),
+      });
+    });
+  });
+
+  describe("when the project does not exist", () => {
+    it("answers null", async () => {
+      const { repository } = repositoryWith(null);
+
+      await expect(repository.findWithOrgAdmin("missing")).resolves.toBeNull();
+    });
+  });
+});

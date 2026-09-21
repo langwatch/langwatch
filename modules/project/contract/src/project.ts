@@ -1,3 +1,5 @@
+import type { OnboardingVariant } from "@langwatch/onboarding-contract";
+import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
 export const PROJECT_FEATURE_ID = "project" as const;
@@ -241,6 +243,10 @@ export interface OrgAdminResolution {
   userId: string | null;
   organizationId: string | null;
   firstMessage: boolean;
+  /** Which onboarding the organization went through; null before the experiment. */
+  onboardingVariant: OnboardingVariant | null;
+  /** When the organization was created, for milestones measured in days since signup. */
+  organizationCreatedAt: Instant | null;
 }
 
 export interface UpdateProjectMetadataInput {

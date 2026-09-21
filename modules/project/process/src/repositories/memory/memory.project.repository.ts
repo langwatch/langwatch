@@ -160,6 +160,8 @@ export class MemoryProjectRepository implements ProjectRepository {
       firstMessage: project.firstMessage,
       organizationId: organization?.id ?? null,
       adminUserId: organization?.adminUserIds[0] ?? null,
+      onboardingVariant: organization?.onboardingVariant ?? null,
+      organizationCreatedAt: organization?.createdAt ?? null,
     };
   }
 

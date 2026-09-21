@@ -51,13 +51,21 @@ export class ProjectMetadataService {
     try {
       const result = await this.repository.findWithOrgAdmin(projectId);
       if (!result) {
-        return { userId: null, organizationId: null, firstMessage: false };
+        return {
+          userId: null,
+          organizationId: null,
+          firstMessage: false,
+          onboardingVariant: null,
+          organizationCreatedAt: null,
+        };
       }
 
       return {
         userId: result.adminUserId,
         organizationId: result.organizationId,
         firstMessage: result.firstMessage,
+        onboardingVariant: result.onboardingVariant,
+        organizationCreatedAt: result.organizationCreatedAt,
       };
     } catch (error) {
       const resolution = {
@@ -70,7 +78,13 @@ export class ProjectMetadataService {
       );
       this.diagnostics?.capture(new Error("Failed to resolve org admin"), resolution);
 
-      return { userId: null, organizationId: null, firstMessage: false };
+      return {
+        userId: null,
+        organizationId: null,
+        firstMessage: false,
+        onboardingVariant: null,
+        organizationCreatedAt: null,
+      };
     }
   }
 }

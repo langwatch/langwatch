@@ -21,7 +21,8 @@
   },
   "dependencies": {
     "@langwatch/kernel": "workspace:*",
-    "@langwatch/onboarding-contract": "workspace:*"
+    "@langwatch/onboarding-contract": "workspace:*",
+    "@langwatch/redis-client": "workspace:*"
   },
   "devDependencies": {
     "@langwatch/vitest-config": "workspace:*",

@@ -256,3 +256,20 @@ Feature: Guided onboarding variant
   Scenario: the CLI boot graph does not change for the onboarding commands
     When the CLI starts
     Then the onboarding command modules are not loaded until the command runs
+
+  # ============================================================================
+  # Persisting the guided state
+  # ============================================================================
+
+  @unit
+  Scenario: the memory and Redis guided onboarding repositories answer alike
+    Given a guided onboarding repository, over memory or over Redis
+    When no record has been written for an organization
+    Then a read answers absence with null
+    And a written record reads back exactly as written, independent of every other organization's
+
+  @unit
+  Scenario: a corrupted stored blob reads as absent rather than a crash
+    Given a value in Redis for an organization's key that is not a guided onboarding record
+    When the repository reads that organization's state
+    Then the read answers null instead of throwing

@@ -1,3 +1,4 @@
+import { parseOnboardingVariant } from "@langwatch/onboarding-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
 import {
   Prisma,
@@ -25,7 +26,7 @@ import {
   type UpdateProjectInput,
   type UpdateProjectMetadataInput,
 } from "@langwatch/project-contract";
-import { toDate } from "@langwatch/time";
+import { fromDate, toDate } from "@langwatch/time";
 
 import type {
   ProjectRepository,
@@ -187,6 +188,8 @@ export class PrismaProjectRepository
             organization: {
               select: {
                 id: true,
+                createdAt: true,
+                signupData: true,
                 members: {
                   where: { role: "ADMIN" },
                   select: { userId: true },
@@ -203,6 +206,10 @@ export class PrismaProjectRepository
     return {
       firstMessage: project.firstMessage,
       organizationId: project.team?.organization?.id ?? null,
+      onboardingVariant: parseOnboardingVariant(project.team?.organization?.signupData),
+      organizationCreatedAt: project.team?.organization?.createdAt
+        ? fromDate(project.team.organization.createdAt)
+        : null,
       adminUserId: project.team?.organization?.members?.[0]?.userId ?? null,
     };
   }

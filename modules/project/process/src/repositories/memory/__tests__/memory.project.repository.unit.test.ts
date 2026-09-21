@@ -32,6 +32,8 @@ function seeded() {
     presenceEnabled: true,
     traceSharingEnabled: true,
     adminUserIds: ["user_admin", "user_second"],
+    onboardingVariant: null,
+    createdAt: fromDate(new Date("2026-01-01T00:00:00.000Z")),
   });
   database.putTeam(team());
 
@@ -78,6 +80,8 @@ describe("MemoryProjectRepository", () => {
         presenceEnabled: false,
         traceSharingEnabled: true,
         adminUserIds: [],
+        onboardingVariant: null,
+        createdAt: fromDate(new Date("2026-01-01T00:00:00.000Z")),
       });
       expect(await repository.isPresenceEnabled("project_1")).toBe(false);
     });
@@ -90,6 +94,8 @@ describe("MemoryProjectRepository", () => {
         firstMessage: false,
         organizationId: ORGANIZATION_ID,
         adminUserId: "user_admin",
+        onboardingVariant: null,
+        organizationCreatedAt: fromDate(new Date("2026-01-01T00:00:00.000Z")),
       });
     });
   });

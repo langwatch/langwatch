@@ -1,3 +1,4 @@
+import type { OnboardingVariant } from "@langwatch/onboarding-contract";
 import type {
   ActiveProjectsByScopesInput,
   CreateProjectInput,
@@ -25,6 +26,10 @@ export interface ProjectWithOrgAdmin {
   firstMessage: boolean;
   organizationId: string | null;
   adminUserId: string | null;
+  /** Which onboarding the organization went through; null before the experiment. */
+  onboardingVariant: OnboardingVariant | null;
+  /** When the organization was created, for milestones measured in days since signup. */
+  organizationCreatedAt: Instant | null;
 }
 
 /** Persistence owned by the Project module. It never crosses into a caller. */
