@@ -339,7 +339,9 @@ describe("organization-owned SCIM user state", () => {
     if (isScimError(first) || isScimError(second))
       throw new Error("Expected pages");
     expect(
-      [...first.Resources, ...second.Resources].map((resource) => resource.id),
+      [...first.Resources, ...second.Resources]
+        .map((resource) => resource.id)
+        .sort(),
     ).toEqual([userId, created.id].sort());
     expect(first.totalResults).toBe(2);
     const alias = `renamed-${email}`;
