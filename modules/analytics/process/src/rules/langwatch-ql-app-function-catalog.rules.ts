@@ -4,8 +4,11 @@
  * public API from the first deploy. @see specs/lwql/app-functions.feature
  */
 
+import type { LangWatchQLAppFunctionCall } from "@langwatch/analytics-contract";
+
 import {
   LWQL_APP_FUNCTION_KEY_CAPS,
+  LWQL_WIDEST_APP_FUNCTION_KEY_CAP,
   LWQL_DEFAULT_BUDGET_TOKENS,
   LWQL_THREAD_KEY_PARAMETER,
   LWQL_TRACE_KEY_PARAMETER,
@@ -249,4 +252,21 @@ export function lwqlAppFunctionCap(definition: LangWatchQLAppFunctionDefinition)
 export function lwqlAppFunctionSignature(definition: LangWatchQLAppFunctionDefinition): string {
   const parameters = definition.parameters.map((parameter) => parameter.name).join(", ");
   return `${definition.name}(${parameters})`;
+}
+
+/**
+ * The keys one execution of these calls may hydrate: every call's cap holds at
+ * once, so the lowest wins. A plan naming no catalogued function is bound only
+ * by the widest published cap, which is what a caller sizing a page reads.
+ */
+export function lwqlHydrationKeyCap(
+  calls: readonly LangWatchQLAppFunctionCall[],
+  functions: readonly LangWatchQLAppFunctionDefinition[] = LWQL_APP_FUNCTION_CATALOG,
+): number {
+  const caps = calls
+    .flatMap((call) => [call.function, call.source?.function])
+    .filter((name): name is string => typeof name === "string")
+    .flatMap((name) => findLangWatchQLAppFunctions(name, functions).map(lwqlAppFunctionCap));
+
+  return caps.length === 0 ? LWQL_WIDEST_APP_FUNCTION_KEY_CAP : Math.min(...caps);
 }

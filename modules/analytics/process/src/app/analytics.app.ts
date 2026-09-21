@@ -48,6 +48,7 @@ import { createLangWatchQLService } from "../app/langwatch-ql-composition.build.
 import type { EvaluationAnalyticsClickHouseClient } from "../repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
 import type { LangWatchQLConnection } from "../repositories/langwatch-ql-executor.repository.ts";
 import { savedWorkbenchChartPlatformUrl as savedWorkbenchChartPlatformUrl_ } from "../rules/analytics-platform-url.rules.ts";
+import { lwqlHydrationKeyCap } from "../rules/langwatch-ql-app-function-catalog.rules.ts";
 import { statementMightCallEvalFunction } from "../rules/langwatch-ql-eval-function-catalog.rules.ts";
 import { langWatchQLJudgementCalls } from "../rules/langwatch-ql-judgement-questions.rules.ts";
 import { instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
@@ -390,6 +391,11 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
     appFunctions: readonly LangWatchQLAppFunctionCall[];
   }): readonly LangWatchQLJudgementCall[] {
     return langWatchQLJudgementCalls(input.appFunctions);
+  }
+
+  /** The keys one execution of this plan may hydrate, the lowest cap winning. */
+  langWatchQLKeyCapFor(input: { appFunctions: readonly LangWatchQLAppFunctionCall[] }): number {
+    return lwqlHydrationKeyCap(input.appFunctions);
   }
 
   /** Whether this project's rollout admits it to the Workbench at all. */

@@ -16,6 +16,7 @@ import {
   lwqlAppFunctionKeyParameters,
   lwqlAppFunctionNames,
   lwqlAppFunctionSignature,
+  lwqlHydrationKeyCap,
 } from "../langwatch-ql-app-function-catalog.rules.ts";
 import {
   LWQL_APP_FUNCTION_ENCODINGS,
@@ -250,6 +251,45 @@ describe("given the schema endpoint's app functions section", () => {
       expect(byName.get("llm_input_messages")).toBe(true);
       expect(byName.get("llm_output_messages")).toBe(false);
       expect(byName.get("conversation")).toBe(false);
+    });
+  });
+});
+
+describe("given the app functions a hydration plan calls", () => {
+  describe("when the keys one execution may hydrate are counted", () => {
+    /** @scenario "A page never exceeds the key cap of the statement's own functions" */
+    it("takes the lowest cap, which a conversation statement carries", () => {
+      expect(
+        lwqlHydrationKeyCap([
+          {
+            column: "q1",
+            function: "eval",
+            options: [],
+            source: { function: "conversation_bounded", options: [] },
+          },
+        ]),
+      ).toBe(200);
+    });
+
+    /** @scenario "A statement over traces keeps the full page" */
+    it("leaves a trace statement at the trace cap", () => {
+      expect(
+        lwqlHydrationKeyCap([
+          {
+            column: "q1",
+            function: "eval",
+            options: [],
+            source: { function: "llm_readable_trace", options: [] },
+          },
+        ]),
+      ).toBe(1_000);
+    });
+
+    it("bounds a plan naming no catalogued function by the widest cap", () => {
+      expect(lwqlHydrationKeyCap([])).toBe(1_000);
+      expect(lwqlHydrationKeyCap([{ column: "q1", function: "not_a_function", options: [] }])).toBe(
+        1_000,
+      );
     });
   });
 });

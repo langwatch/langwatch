@@ -102,6 +102,11 @@ export const LWQL_APP_FUNCTION_KEY_CAPS: Readonly<Record<LangWatchQLAppFunctionK
   text: 1_000,
 };
 
+/** The widest cap any kind of key carries, which bounds nothing in practice. */
+export const LWQL_WIDEST_APP_FUNCTION_KEY_CAP = Math.max(
+  ...Object.values(LWQL_APP_FUNCTION_KEY_CAPS),
+);
+
 /** The default token budget the bounded functions document. */
 export const LWQL_DEFAULT_BUDGET_TOKENS = 8_000;
 

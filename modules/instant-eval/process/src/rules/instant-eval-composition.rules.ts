@@ -5,6 +5,8 @@
  * @see dev/docs/adr/153-instant-eval-run-is-a-judgment-job.md
  */
 
+import type { LangWatchQLColumn } from "@langwatch/analytics-contract";
+
 /** The bound parameter a page pass carries its own trace ids in. */
 export const INSTANT_EVAL_PAGE_PARAMETER = "instant_eval_page_ids";
 
@@ -44,6 +46,13 @@ export const INSTANT_EVAL_OPTIONAL_KEY_COLUMNS = [
   INSTANT_EVAL_SPAN_COLUMN,
   "OccurredAt",
 ] as const;
+
+/** The optional key columns a probe's column list actually offers. */
+export function instantEvalKeyColumns(columns: readonly LangWatchQLColumn[]): readonly string[] {
+  const present = new Set(columns.map((column) => column.name));
+
+  return INSTANT_EVAL_OPTIONAL_KEY_COLUMNS.filter((column) => present.has(column));
+}
 
 /**
  * Whether this statement's rows are addressed by the trace and span pair. A

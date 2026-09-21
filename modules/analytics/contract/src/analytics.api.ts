@@ -109,6 +109,12 @@ export interface AnalyticsApi {
   describeLangWatchQLJudgements(input: {
     appFunctions: readonly LangWatchQLAppFunctionCall[];
   }): readonly LangWatchQLJudgementCall[];
+  /**
+   * The keys one execution of a hydration plan may hydrate, the lowest cap
+   * winning. Answered here because the caps are the catalogue's: a statement
+   * over conversations is bound far below one over traces.
+   */
+  langWatchQLKeyCapFor(input: { appFunctions: readonly LangWatchQLAppFunctionCall[] }): number;
   executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
   /** Whether this project's rollout admits it to the Workbench at all. */
   isWorkbenchEnabled(input: { projectId: string }): Promise<boolean>;
