@@ -293,6 +293,13 @@ Feature: Enterprise SCIM package boundary
       Then no token is minted and the page says a connection has to come first
 
     @integration
+    Scenario: Two connections at the same provider are told apart by their protocol
+      Given two connections that route, both named for the same identity provider
+      When the generate dialog offers them
+      Then each is named with the protocol identity recorded for it
+      And a connection whose protocol is unrecorded is offered under its name alone
+
+    @integration
     Scenario: A token issued against a connection since retired still names it
       Given a token issued against a connection that has been torn down
       When the provisioning tokens are read

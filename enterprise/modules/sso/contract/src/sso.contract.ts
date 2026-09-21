@@ -31,6 +31,9 @@ export const backofficeSsoConnectionSchema = z
     providerId: z.string(),
     issuer: z.string().nullable(),
     allowsJit: z.boolean(),
+    /** Optional only until identity's backoffice row carries it: a strict
+     *  schema that required it would refuse every row identity sends today. */
+    arrivalPolicy: z.enum(["admit", "request", "refuse"]).optional(),
     source: z.string(),
     testLoginAccountId: z.string().nullable(),
     rejection: z.object({ domain: z.string(), note: z.string() }).strict().nullable(),
@@ -95,6 +98,9 @@ export const registerSsoConnectionInputSchema = z.object({
   providerId: z.string().min(1).max(100),
   issuer: z.string().max(2048).nullable().default(null),
   allowsJit: z.boolean().default(false),
+  /** Stated policy wins over `allowsJit`, which identity reads only when the
+   *  caller states none. */
+  arrivalPolicy: z.enum(["admit", "request", "refuse"]).optional(),
 });
 export type RegisterSsoConnectionInput = z.infer<typeof registerSsoConnectionInputSchema>;
 

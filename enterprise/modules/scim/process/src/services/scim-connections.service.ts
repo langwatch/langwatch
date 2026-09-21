@@ -25,6 +25,7 @@ export class ScimConnectionsService {
     return connections.map((connection) => ({
       connectionId: connection.connectionId,
       displayName: connection.displayName,
+      type: connection.type,
       state: connection.state,
     }));
   }

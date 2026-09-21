@@ -146,3 +146,15 @@ Feature: Enterprise governance package boundary
     When a request arrives on the project-scoped family, the CLI governance plane or a push-mode ingestion receiver
     Then each family is served by the same installed governance application
     And no family answers an unknown error because the capability its routes name was declared but never provided
+
+  # The guided tour turns the sample panels on while it runs and puts them
+  # back when it ends. Reaching into governance for the writer made one
+  # module's state another module's import; the declaration publishes it.
+
+  @unit
+  Scenario: The sample-data choice is offered as a capability, not an import
+    Given the guided tour needs governance's sample panels shown and then put back
+    When it sets the sample choice through the capability governance declares
+    Then the panels follow the choice, and forgetting it returns them to their default
+    And everything already rendering a sample affordance hears about the change
+    And no peer imports governance's own state to do it

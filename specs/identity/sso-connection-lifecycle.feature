@@ -342,3 +342,55 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     When the expiry sweep runs
     Then the warning names the days actually left rather than the mark that tripped
     And a second sweep the same day says nothing
+
+  # ── Who a connection admits, in three answers ──────────────────────────
+  #
+  # The question used to be a boolean, and its default forbade provisioning,
+  # so a person signing in through their own organization's identity provider
+  # was authenticated and then handed a brand new workspace of their own.
+  # Nobody chose that: it was a default nobody surfaced. The answer is now one
+  # of three — the arrivals join, they wait for approval, or they are turned
+  # away — and which one it is is recorded as itself.
+
+  @unit
+  Scenario: A registered connection carries the arrival answer registration stated
+    Given a connection registered with an answer for who it admits
+    When the connection is read back
+    Then it carries the answer registration stated
+    And nobody has decided it yet, because registering is not deciding
+
+  @unit
+  Scenario: A connection nobody has answered for turns arrivals away
+    Given a connection whose history carries no answer
+    When anything asks who it admits
+    Then arrivals are turned away
+    And that is the default, so nobody is admitted by an answer nobody gave
+
+  @unit
+  Scenario: The middle answer is recorded as itself, not as a boolean either side of it
+    Given a verified connection nobody has answered for
+    When an administrator says arrivals wait for approval
+    Then the recorded answer is that they wait
+    And the moment it was decided is recorded with it
+
+  @unit
+  Scenario: Confirming the same arrival answer twice records nothing, and changing it records a decision
+    Given a connection whose administrator has said arrivals join
+    When they say so again
+    Then nothing is recorded, because nothing changed
+    But when they say arrivals are turned away instead
+    Then that answer is recorded with the moment it was decided
+
+  @unit
+  Scenario: Saying it out loud is a fact even where the behaviour is the same
+    Given a connection nobody has answered for, which turns arrivals away
+    When the administrator chooses to turn arrivals away
+    Then the decision is recorded
+    And it is no longer waiting to be decided
+
+  @unit
+  Scenario: A torn-down connection refuses an arrival decision by name
+    Given a connection that has been torn down
+    When an administrator says who it admits
+    Then it is refused with sso_connection_invalid_transition
+    And nothing about the dead connection changed

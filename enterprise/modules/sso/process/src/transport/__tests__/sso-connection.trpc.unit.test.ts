@@ -227,10 +227,9 @@ describe("the back-office single sign-on surface", () => {
 
       // The note is an operator's prose about a customer, and audit rows outlive
       // the decision. The command carries it; the audit row does not.
-      const [[audited]] = context.record.mock.calls as unknown as [
-        [{ args: Record<string, unknown> }],
-      ];
-      expect(audited.args.note).toBeUndefined();
+      const audited = context.record.mock.calls[0]?.[0];
+      expect(audited?.args).toBeDefined();
+      expect(audited?.args).not.toHaveProperty("note");
       expect(context.connections.rejectDomainClaim).toHaveBeenCalledWith(
         expect.objectContaining({
           note: "the requester could not be reached at that domain",
@@ -254,6 +253,22 @@ describe("the back-office single sign-on surface", () => {
 
       expect(context.connections.registerConnection).toHaveBeenCalledWith(
         expect.objectContaining({ type: "saml" }),
+      );
+    });
+
+    it("carries the stated arrival answer, so it is not decided by the legacy boolean", async () => {
+      const caller = context.callerFor({ id: STAFF_ID });
+      await caller.register({
+        organizationId: "org_acme",
+        type: "oidc",
+        providerId: "okta",
+        issuer: null,
+        allowsJit: false,
+        arrivalPolicy: "request",
+      });
+
+      expect(context.connections.registerConnection).toHaveBeenCalledWith(
+        expect.objectContaining({ arrivalPolicy: "request", allowsJit: false }),
       );
     });
 

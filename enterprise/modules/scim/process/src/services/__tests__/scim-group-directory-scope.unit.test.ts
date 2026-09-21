@@ -368,7 +368,10 @@ describe("a group belongs to the connection that pushed it", () => {
 });
 
 /** Which member operation each patch verb stands for. */
-const PATCH_OPS: Record<string, string> = { "patch-remove": "remove", "patch-replace": "replace" };
+const PATCH_OPS: Record<string, "remove" | "replace"> = {
+  "patch-remove": "remove",
+  "patch-replace": "replace",
+};
 
 /** The same foreign member, named through each write the protocol offers. */
 function foreignMemberWrite({

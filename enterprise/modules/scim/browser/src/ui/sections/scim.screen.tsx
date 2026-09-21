@@ -22,7 +22,7 @@ import { useState } from "react";
 
 import { scimApi } from "../../behavior/scim-api.ts";
 import { chosenConnectionOf, isActiveConnection } from "../../model/connection-lifecycle.ts";
-import { readableDate } from "../../model/display-formatters.ts";
+import { connectionLabel, readableDate } from "../../model/display-formatters.ts";
 import { useScimHost } from "../../model/scim-host.ts";
 import { CopyInput } from "../../ui/elements/copy-input.tsx";
 
@@ -238,7 +238,10 @@ function ScimSettingsContent({ organizationId }: { organizationId: string }) {
                       <option value="">Choose a connection</option>
                       {issuableConnections.map((option) => (
                         <option key={option.connectionId} value={option.connectionId}>
-                          {option.displayName}
+                          {connectionLabel({
+                            displayName: option.displayName,
+                            connectionType: option.type,
+                          })}
                         </option>
                       ))}
                     </NativeSelect.Field>

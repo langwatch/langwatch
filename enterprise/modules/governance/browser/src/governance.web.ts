@@ -6,7 +6,20 @@
 
 import { defineWebModule } from "@langwatch/ui-kernel";
 
+import type { GovernanceSampleCapability, SampleChoice } from "./model/sample-choice.ts";
+import { writeSampleChoice } from "./ui/elements/governance-sample-mode.ts";
+
 export const governanceWeb = defineWebModule("governance")
+  /**
+   * The one thing a peer may do to governance's own state: the guided tour
+   * shows the sample panels while it runs and puts them back afterwards. It
+   * reads this through its own host api, never by importing governance.
+   */
+  .withCapabilities({
+    setSampleChoice: (choice: SampleChoice): void => {
+      writeSampleChoice(choice);
+    },
+  } satisfies GovernanceSampleCapability)
   .withHosts({
     requires: ["GovernanceHostApi"],
     mounts: {

@@ -11,7 +11,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const { state, calls } = vi.hoisted(() => ({
   state: {
     rows: [] as Record<string, unknown>[],
-    connections: [] as { connectionId: string; displayName: string; state: string }[],
+    connections: [] as {
+      connectionId: string;
+      displayName: string;
+      type: string;
+      state: string;
+    }[],
     minted: { token: "scim_live_secret_value" },
   },
   calls: { generate: vi.fn(), revoke: vi.fn(), invalidate: vi.fn() },
@@ -61,10 +66,16 @@ const token = (overrides: Record<string, unknown> = {}) => ({
 });
 
 const connection = (
-  overrides: Partial<{ connectionId: string; displayName: string; state: string }> = {},
+  overrides: Partial<{
+    connectionId: string;
+    displayName: string;
+    type: string;
+    state: string;
+  }> = {},
 ) => ({
   connectionId: "ssoconn_1",
   displayName: "Okta",
+  type: "saml",
   state: "ACTIVE",
   ...overrides,
 });
@@ -201,7 +212,26 @@ describe("given a connection that was never turned on", () => {
     const options = Array.from(screen.getByLabelText("Connection").querySelectorAll("option")).map(
       (option) => option.textContent,
     );
-    expect(options).toEqual(["Choose a connection", "Okta"]);
+    expect(options).toEqual(["Choose a connection", "Okta (SAML)"]);
+  });
+});
+
+describe("given two connections at the same identity provider", () => {
+  /** @scenario "Two connections at the same provider are told apart by their protocol" */
+  it("names each by the protocol identity recorded, and leaves an unrecorded one alone", async () => {
+    state.connections = [
+      connection(),
+      connection({ connectionId: "ssoconn_2", displayName: "Okta", type: "oidc" }),
+      connection({ connectionId: "ssoconn_3", displayName: "Entra ID", type: "" }),
+    ];
+
+    renderWithScimHost(<ScimScreen />);
+    await openGenerateDialog();
+
+    const options = Array.from(screen.getByLabelText("Connection").querySelectorAll("option")).map(
+      (option) => option.textContent,
+    );
+    expect(options).toEqual(["Choose a connection", "Okta (SAML)", "Okta (OIDC)", "Entra ID"]);
   });
 });
 

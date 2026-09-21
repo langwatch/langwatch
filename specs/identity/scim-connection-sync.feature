@@ -254,6 +254,40 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     And access an administrator had given them by hand before they left stays gone
       until an administrator gives it again
 
+  # ── The organization's own way in is not the directory's to close ──────
+  #
+  # A full sync asserts the set it knows about and deactivates the rest, and
+  # the administrator somebody invited by hand is in nobody's directory. On a
+  # real stack the first sync reported "1 created and 4 deactivated" and one
+  # of the four was the organization's only administrator: their session died
+  # mid-page, their password was then refused, and no screen undoes it.
+  #
+  # What is refused is narrower than adoption, and is about the organization
+  # rather than the person: the one act that leaves nobody able to administer
+  # it. It is the refusal `setMemberDisabled` already makes by hand.
+
+  @unit
+  Scenario: A directory cannot deactivate the last administrator who can still sign in
+    Given "acme" whose only administrator was invited by hand
+    When the directory pushes that administrator as inactive
+    Then the push is refused
+    And the administrator is left exactly as they were
+
+  @unit
+  Scenario: A directory may deactivate an administrator while another can still get in
+    Given "acme" with a second administrator who can sign in
+    When the directory pushes the first administrator as inactive
+    Then the deprovision goes through
+
+  @unit
+  Scenario: An administrator who is already deactivated does not count as a way in
+    Given "acme" whose other administrators have all been deactivated
+    When the directory pushes the remaining administrator as inactive
+    Then the push is refused
+    # Counting memberships alone would let one sync deactivate two
+    # administrators in turn, each passing because the other's membership had
+    # not been marked yet.
+
   @unit
   Scenario: A removal that cannot prove itself empty fails loudly
     Given a removal whose proof still finds something resolving for the person

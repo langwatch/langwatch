@@ -47,6 +47,9 @@ export const scimDirectoryConnectionSchema = z
   .object({
     connectionId: z.string(),
     displayName: z.string(),
+    /** The protocol identity recorded at registration, so the picker can call
+     *  a connection SAML or OIDC rather than leaving it unnamed. */
+    type: z.string(),
     state: z.string(),
   })
   .strict();

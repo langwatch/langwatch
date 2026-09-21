@@ -129,14 +129,14 @@ describe("the scimToken tRPC namespace", () => {
       it("answers the connections identity holds, lifecycle state and all", async () => {
         const { caller } = mount({
           connections: [
-            { connectionId: "ssoconn_1", displayName: "Okta", state: "ACTIVE" },
-            { connectionId: "ssoconn_2", displayName: "Entra ID", state: "DRAFT" },
+            { connectionId: "ssoconn_1", displayName: "Okta", type: "oidc", state: "ACTIVE" },
+            { connectionId: "ssoconn_2", displayName: "Entra ID", type: "oidc", state: "DRAFT" },
           ],
         });
 
         await expect(caller.connections({ organizationId: "org_1" })).resolves.toEqual([
-          { connectionId: "ssoconn_1", displayName: "Okta", state: "ACTIVE" },
-          { connectionId: "ssoconn_2", displayName: "Entra ID", state: "DRAFT" },
+          { connectionId: "ssoconn_1", displayName: "Okta", type: "oidc", state: "ACTIVE" },
+          { connectionId: "ssoconn_2", displayName: "Entra ID", type: "oidc", state: "DRAFT" },
         ]);
       });
     });
@@ -147,7 +147,9 @@ describe("the scimToken tRPC namespace", () => {
       it("refuses, because reading them takes seeing single sign-on", async () => {
         const { caller } = mount({
           permits: (permission) => permission === "organization:view",
-          connections: [{ connectionId: "ssoconn_1", displayName: "Okta", state: "ACTIVE" }],
+          connections: [
+            { connectionId: "ssoconn_1", displayName: "Okta", type: "oidc", state: "ACTIVE" },
+          ],
         });
 
         await expect(caller.connections({ organizationId: "org_1" })).rejects.toMatchObject({
@@ -182,11 +184,13 @@ describe("the scimToken tRPC namespace", () => {
     it("reads the connections a token could be minted against", async () => {
       const { caller } = mount({
         ...seeing,
-        connections: [{ connectionId: "ssoconn_1", displayName: "Okta", state: "ACTIVE" }],
+        connections: [
+          { connectionId: "ssoconn_1", displayName: "Okta", type: "oidc", state: "ACTIVE" },
+        ],
       });
 
       await expect(caller.connections({ organizationId: "org_1" })).resolves.toEqual([
-        { connectionId: "ssoconn_1", displayName: "Okta", state: "ACTIVE" },
+        { connectionId: "ssoconn_1", displayName: "Okta", type: "oidc", state: "ACTIVE" },
       ]);
     });
 
