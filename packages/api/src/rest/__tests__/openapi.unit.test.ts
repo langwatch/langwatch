@@ -322,3 +322,42 @@ describe("hoistStraySchemaDefs", () => {
     });
   });
 });
+
+describe("the security requirement an operation publishes", () => {
+  function route(overrides: Partial<RestTransportRoute<unknown>> = {}) {
+    return { ...rawBodyRoute(), method: "get", ...overrides } as RestTransportRoute<unknown>;
+  }
+
+  describe("given a route behind an organization door", () => {
+    /** @scenario "An operation publishes the scheme its own credential presents" */
+    it("publishes the organization scheme rather than inheriting the document default", () => {
+      const published = restRouteDocumentation({ route: route(), credential: "organization" });
+
+      expect(published.security).toEqual([{ admin_api_key: [] }]);
+    });
+  });
+
+  describe("given a route that raises its own credential inside another family", () => {
+    /** @scenario "A route's own credential wins over its family's door" */
+    it("publishes the route's scheme, not the family's", () => {
+      const published = restRouteDocumentation({
+        route: route({ credential: "scimToken" }),
+        credential: "project",
+      });
+
+      expect(published.security).toEqual([{ scim_bearer: [] }]);
+    });
+  });
+
+  describe("given a public route", () => {
+    /** @scenario "A public operation publishes no requirement at all" */
+    it("publishes the empty requirement", () => {
+      const published = restRouteDocumentation({
+        route: route({ access: { kind: "public", reason: "discovery" } as never }),
+        credential: "organization",
+      });
+
+      expect(published.security).toEqual([]);
+    });
+  });
+});

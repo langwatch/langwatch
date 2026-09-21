@@ -21,12 +21,9 @@ import {
 } from "../../access/access.ts";
 import { createErrorHandler, PayloadTooLargeError } from "../../errors.ts";
 import { defineRestRouter, projectRestFacts } from "../declaration.ts";
-import {
-  documentedResponses,
-  securityForCredentialClass,
-} from "../openapi.ts";
-import { declined } from "../response.ts";
+import { documentedResponses, securityForCredentialClass } from "../openapi.ts";
 import { bindRestHeader, bindRestMiddleware, defineRestMiddleware } from "../request.ts";
+import { declined } from "../response.ts";
 import { createRestRuntime, type RestDeprecationLog } from "../runtime.ts";
 import { getRoutePolicy } from "../security.ts";
 
@@ -638,7 +635,9 @@ describe("a route declared public", () => {
       | undefined;
 
     expect(publicItem?.get?.security).toEqual([]);
-    expect(scopedItem?.get?.security).toBeUndefined();
+    // Its scoped sibling states its own scheme rather than inheriting the
+    // document default, which is one scheme for the whole surface.
+    expect(scopedItem?.get?.security).toEqual([{ project_api_key: [] }]);
   });
 
   /** @scenario "A route that answers without a credential resolves none" */
@@ -1001,7 +1000,7 @@ describe("a route the family's own door alone gates", () => {
       | { get?: { security?: unknown[] } }
       | undefined;
 
-    expect(item?.get?.security).toBeUndefined();
+    expect(item?.get?.security).toEqual([{ admin_api_key: [] }]);
   });
 });
 

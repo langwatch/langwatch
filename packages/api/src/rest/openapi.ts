@@ -99,17 +99,28 @@ export function restRouteDocumentation({
 
   if (requestBody) options.requestBody = requestBody;
 
+  // The credential this route actually reaches by: its own where it raised
+  // one, else the family door's. Never the document's default, which is one
+  // scheme and would describe every organization route as a project one.
+  const reaches = route.credential ?? credential;
+
   // An empty requirement list is the document's way of saying "no credential",
   // which is exactly what a public route is; it also overrides the document's
-  // own default requirement, which every other operation inherits. A route the
-  // door still authenticates keeps its family's scheme.
+  // own default requirement.
   if (route.access?.kind === "public") options.security = [];
-
   // An optional credential publishes both alternatives: the empty requirement
-  // for the caller who presents none, and the family's own scheme beside it.
-  if (route.access?.kind === "optional" && credential) {
-    options.security = [{}, ...securityRequirement(credential)];
+  // for the caller who presents none, and the route's own scheme beside it.
+  else if (route.access?.kind === "optional" && reaches) {
+    options.security = [{}, ...securityRequirement(reaches)];
   }
+  // Every other documented operation states its own scheme. Inheriting the
+  // document default silently advertised `project_api_key` on the whole
+  // surface, so a generated client sent the wrong credential to every
+  // organization, SCIM and instance-admin route (measured 2026-09-21: 626 of
+  // 659 operations). `browser` has no scheme a client can present, and the
+  // family-wide case is already undocumented; a route that raises it inside an
+  // API family keeps the family's own rather than crashing the document.
+  else if (reaches && reaches !== "browser") options.security = [...securityRequirement(reaches)];
 
   if (deprecated) {
     options.deprecated = true;

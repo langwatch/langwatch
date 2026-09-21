@@ -20,3 +20,30 @@ Feature: A route's published answers come from its declaration
     And its docs restate the success status with their own content
     When the route's reference documentation is published
     Then the docs' content is what the reference publishes
+
+  # Measured 2026-09-21: 626 of the 659 published operations declared no
+  # security of their own and inherited the document's single default,
+  # `project_api_key` — so the reference told a client to send a project key
+  # to every organization, SCIM and instance-admin route. It also left the
+  # API-diff harness no operation an organization key could authenticate,
+  # which is why three consecutive runs could not prove that credential
+  # survived. The machinery to publish the right scheme already existed;
+  # only public and optional routes were reaching it.
+  @unit
+  Scenario: An operation publishes the scheme its own credential presents
+    Given a route behind an organization door
+    When the document is written
+    Then the operation publishes the organization scheme
+    And it does not fall back to the document's default requirement
+
+  @unit
+  Scenario: A route's own credential wins over its family's door
+    Given a route that raises its own credential inside another family
+    When the document is written
+    Then the operation publishes the route's scheme, not the family's
+
+  @unit
+  Scenario: A public operation publishes no requirement at all
+    Given a route declared public
+    When the document is written
+    Then the operation publishes the empty requirement
