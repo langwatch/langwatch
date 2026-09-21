@@ -33,7 +33,6 @@ function migration({
   };
 }
 
-/** The order a pass would actually drive them in. */
 function driveOrder(buckets: ReturnType<typeof groupByTenantSource>): string[] {
   return buckets.flatMap((bucket) =>
     bucket.migrations.map((migration) => migration.name),
