@@ -5,7 +5,8 @@ import { resolveCredentials } from "../utils/apiKey";
 import {
   createLangWatchApiClient,
 } from "@/internal/api/client";
-import { buildAuthHeaders, isPersonalAccessToken } from "@/internal/api/auth";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
+import { isPersonalAccessToken } from "@/internal/api/auth";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import { printResult, type RawOutputFlags } from "../utils/output";
@@ -166,7 +167,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
 
   async function fetchCount(url: string): Promise<{ data: unknown; error?: unknown; status?: number }> {
     const response = await langwatchFetch(`${endpoint}${url}`, {
-      headers: buildAuthHeaders({ apiKey }),
+      headers: buildRequestHeaders({ apiKey }),
     });
     if (!response.ok) {
       let body: unknown;

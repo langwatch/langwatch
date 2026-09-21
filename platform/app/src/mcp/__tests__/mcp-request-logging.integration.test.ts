@@ -19,51 +19,70 @@ import {
 
 const VALID_API_KEY = "lw_logging_key";
 
-const { mockPrisma, logLines, loggerStub } = vi.hoisted(() => {
-  const lines: { fields: Record<string, unknown>; message: string }[] = [];
-  const record = () => (fields: unknown, message?: unknown) => {
-    if (typeof fields === "object" && fields !== null) {
-      lines.push({
-        fields: fields as Record<string, unknown>,
-        message: String(message ?? ""),
-      });
-    }
-  };
-  const stub: Record<string, unknown> = {
-    info: record(),
-    debug: record(),
-    warn: record(),
-    error: record(),
-    fatal: record(),
-    trace: record(),
-  };
-  stub.child = () => stub;
-  return {
-    logLines: lines,
-    loggerStub: stub,
-    mockPrisma: {
-      project: {
-        findUnique: vi.fn(({ where }: { where: { apiKey: string } }) =>
-          Promise.resolve(
-            where.apiKey === "lw_logging_key"
-              ? {
-                  id: "logging-project",
-                  apiKey: where.apiKey,
-                  teamId: "team-1",
-                  archivedAt: null,
-                }
-              : null,
-          ),
-        ),
+const { mockPrisma, logLines, loggerStub, redisRecords, mockRedis } =
+  vi.hoisted(() => {
+    const lines: { fields: Record<string, unknown>; message: string }[] = [];
+    const record = () => (fields: unknown, message?: unknown) => {
+      if (typeof fields === "object" && fields !== null) {
+        lines.push({
+          fields: fields as Record<string, unknown>,
+          message: String(message ?? ""),
+        });
+      }
+    };
+    const stub: Record<string, unknown> = {
+      info: record(),
+      debug: record(),
+      warn: record(),
+      error: record(),
+      fatal: record(),
+      trace: record(),
+    };
+    stub.child = () => stub;
+    const records = new Map<string, string>();
+    return {
+      redisRecords: records,
+      mockRedis: {
+        get: vi.fn(async (key: string) => records.get(key) ?? null),
+        set: vi.fn(async (key: string, value: string) => {
+          records.set(key, value);
+        }),
+        del: vi.fn(async (key: string) => records.delete(key)),
+        sadd: vi.fn(async () => 1),
+        srem: vi.fn(async () => 1),
+        smembers: vi.fn(async () => []),
+        expire: vi.fn(async () => 1),
+        publish: vi.fn(async () => 1),
       },
-    },
-  };
-});
+      logLines: lines,
+      loggerStub: stub,
+      mockPrisma: {
+        project: {
+          findUnique: vi.fn(({ where }: { where: { apiKey: string } }) =>
+            Promise.resolve(
+              where.apiKey === "lw_logging_key"
+                ? {
+                    id: "logging-project",
+                    apiKey: where.apiKey,
+                    teamId: "team-1",
+                    archivedAt: null,
+                  }
+                : null,
+            ),
+          ),
+        },
+      },
+    };
+  });
 
 vi.mock("@langwatch/observability", async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   return { ...actual, createLogger: () => loggerStub };
 });
+
+vi.mock("~/server/app-layer/app", () => ({
+  tryGetApp: () => ({ redis: mockRedis }),
+}));
 
 vi.mock("~/server/db", () => ({ prisma: mockPrisma }));
 vi.mock("~/utils/encryption", () => ({
@@ -72,6 +91,42 @@ vi.mock("~/utils/encryption", () => ({
 }));
 
 import { createMcpHandler, type McpHandler } from "../handler";
+
+function initializeBody({ id }: { id: number }) {
+  return {
+    jsonrpc: "2.0",
+    id,
+    method: "initialize",
+    params: {
+      protocolVersion: "2025-03-26",
+      capabilities: {},
+      clientInfo: { name: "logging-test", version: "1.0.0" },
+    },
+  };
+}
+
+async function postMessage({
+  baseUrl,
+  path,
+  apiKey,
+  body,
+}: {
+  baseUrl: string;
+  path: string;
+  apiKey: string;
+  body: unknown;
+}) {
+  const response = await fetch(`${baseUrl}${path}`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  await response.text();
+  return response;
+}
 
 describe("Feature: MCP request logging", () => {
   let server: Server;
@@ -110,6 +165,205 @@ describe("Feature: MCP request logging", () => {
     throw new Error(`no access log line was written for ${path}`);
   }
 
+  const requestHeaders = {
+    authorization: `Bearer ${VALID_API_KEY}`,
+    "content-type": "application/json",
+    accept: "application/json, text/event-stream",
+  };
+
+  async function initializeSession() {
+    const response = await fetch(`${baseUrl}/mcp`, {
+      method: "POST",
+      headers: requestHeaders,
+      body: JSON.stringify(initializeBody({ id: 1 })),
+    });
+    await response.text();
+    const sessionId = response.headers.get("mcp-session-id");
+    if (!sessionId) throw new Error("Initialize did not create a session");
+    await accessLogFor("/mcp");
+    logLines.length = 0;
+    mockPrisma.project.findUnique.mockClear();
+    return sessionId;
+  }
+
+  it("stores the authenticated project with the session for other replicas", async () => {
+    const sessionId = await initializeSession();
+    const stored = redisRecords.get(`mcp:session:${sessionId}`);
+    expect(stored).toBeDefined();
+    expect(JSON.parse(stored ?? "null")).toMatchObject({
+      projectId: "logging-project",
+    });
+  });
+
+  describe("given an established streamable session", () => {
+    describe("when the client makes another session request", () => {
+      it.each([
+        "POST",
+        "GET",
+        "DELETE",
+      ])("attributes its %s without another project lookup", async (method) => {
+        const sessionId = await initializeSession();
+        const abort = new AbortController();
+        try {
+          const response = await fetch(`${baseUrl}/mcp`, {
+            method,
+            headers: { ...requestHeaders, "mcp-session-id": sessionId },
+            signal: abort.signal,
+            ...(method === "POST"
+              ? {
+                  body: JSON.stringify({
+                    jsonrpc: "2.0",
+                    id: 2,
+                    method: "tools/list",
+                    params: {},
+                  }),
+                }
+              : {}),
+          });
+          expect(response.status).toBe(200);
+          if (method !== "GET") await response.text();
+        } finally {
+          abort.abort();
+        }
+        const line = await accessLogFor("/mcp");
+        expect(line.fields.projectId).toBe("logging-project");
+        expect(line.fields.sessionId).toBe(sessionId);
+        expect(mockPrisma.project.findUnique).not.toHaveBeenCalled();
+        expect(JSON.stringify(line)).not.toContain(VALID_API_KEY);
+      });
+    });
+  });
+
+  it("does not attribute another project's session on a bearer mismatch", async () => {
+    const sessionId = await initializeSession();
+    const response = await fetch(`${baseUrl}/mcp`, {
+      method: "DELETE",
+      headers: {
+        authorization: "Bearer lw_other_project",
+        "mcp-session-id": sessionId,
+      },
+    });
+    expect(response.status).toBe(401);
+    expect((await accessLogFor("/mcp")).fields).not.toHaveProperty("projectId");
+  });
+
+  describe("given a streamable session stored by another replica", () => {
+    describe("when the client resumes it on this replica", () => {
+      it.each([
+        true,
+        false,
+      ])("attributes the recovered session (legacy: %s)", async (legacy) => {
+        const sessionId = `recovered-logging-${legacy}`;
+        redisRecords.set(
+          `mcp:session:${sessionId}`,
+          JSON.stringify({
+            encryptedApiKey: VALID_API_KEY,
+            ...(legacy ? {} : { projectId: "logging-project" }),
+          }),
+        );
+        mockPrisma.project.findUnique.mockClear();
+        for (let id = 2; id < 4; id++) {
+          logLines.length = 0;
+          const response = await fetch(`${baseUrl}/mcp`, {
+            method: "POST",
+            headers: { ...requestHeaders, "mcp-session-id": sessionId },
+            body: JSON.stringify({
+              jsonrpc: "2.0",
+              id,
+              method: "tools/list",
+              params: {},
+            }),
+          });
+          expect(response.status).toBe(200);
+          await response.text();
+          expect((await accessLogFor("/mcp")).fields.projectId).toBe(
+            "logging-project",
+          );
+          if (legacy && id === 2) {
+            expect(
+              JSON.parse(
+                redisRecords.get(`mcp:session:${sessionId}`) ?? "null",
+              ),
+            ).toMatchObject({ projectId: "logging-project" });
+          }
+        }
+        expect(mockPrisma.project.findUnique).toHaveBeenCalledTimes(
+          legacy ? 1 : 0,
+        );
+      });
+    });
+  });
+
+  it("attributes local SSE messages", async () => {
+    const abort = new AbortController();
+    try {
+      const response = await fetch(`${baseUrl}/sse`, {
+        headers: requestHeaders,
+        signal: abort.signal,
+      });
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("SSE response has no body");
+      const event = await reader.read();
+      const endpoint = new TextDecoder()
+        .decode(event.value)
+        .match(/data: (.+)/)?.[1];
+      if (!endpoint) throw new Error("SSE stream has no message endpoint");
+      mockPrisma.project.findUnique.mockClear();
+      const posted = await postMessage({
+        baseUrl,
+        path: endpoint,
+        apiKey: VALID_API_KEY,
+        body: initializeBody({ id: 1 }),
+      });
+      expect(posted.status).toBe(202);
+      expect((await accessLogFor("/messages")).fields.projectId).toBe(
+        "logging-project",
+      );
+      expect(mockPrisma.project.findUnique).not.toHaveBeenCalled();
+    } finally {
+      abort.abort();
+    }
+  });
+
+  describe("given an SSE session stored by another replica", () => {
+    describe("when this replica relays a message", () => {
+      it.each([
+        true,
+        false,
+      ])("attributes the relayed message (legacy: %s)", async (legacy) => {
+        const sessionId = `remote-sse-${legacy}`;
+        redisRecords.set(
+          `mcp:sse:session:${sessionId}`,
+          JSON.stringify({
+            encryptedApiKey: VALID_API_KEY,
+            ...(legacy ? {} : { projectId: "logging-project" }),
+          }),
+        );
+        mockPrisma.project.findUnique.mockClear();
+        for (let id = 1; id < 3; id++) {
+          logLines.length = 0;
+          const response = await postMessage({
+            baseUrl,
+            path: `/messages?sessionId=${sessionId}`,
+            apiKey: VALID_API_KEY,
+            body: initializeBody({ id }),
+          });
+          expect(response.status).toBe(202);
+          expect((await accessLogFor("/messages")).fields.projectId).toBe(
+            "logging-project",
+          );
+        }
+        expect(mockPrisma.project.findUnique).toHaveBeenCalledTimes(
+          legacy ? 1 : 0,
+        );
+        expect(mockRedis.publish).toHaveBeenCalledWith(
+          `mcp:sse:relay:${sessionId}`,
+          JSON.stringify(initializeBody({ id: 2 })),
+        );
+      });
+    });
+  });
+
   describe("given a client sends a request to an MCP route", () => {
     describe("when the response completes", () => {
       /** @scenario Every MCP request is logged with its outcome */
@@ -137,6 +391,38 @@ describe("Feature: MCP request logging", () => {
         const line = await accessLogFor("/sse");
 
         expect(line.fields.status).toBe(401);
+      });
+    });
+
+    describe("when an authenticated request completes", () => {
+      /** @scenario MCP request logs carry the tenant and the client */
+      it("records the project the credential resolved to and the client attribution", async () => {
+        await fetch(`${baseUrl}/mcp`, {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${VALID_API_KEY}`,
+            "content-type": "application/json",
+            accept: "application/json, text/event-stream",
+            "user-agent": "langwatch-mcp/1.4.0",
+          },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "initialize",
+            params: {
+              protocolVersion: "2025-03-26",
+              capabilities: {},
+              clientInfo: { name: "attribution-test", version: "1.0.0" },
+            },
+          }),
+        });
+
+        const line = await accessLogFor("/mcp");
+
+        expect(line.fields.projectId).toBe("logging-project");
+        expect(line.fields.endpointClass).toBe("mcp");
+        expect(line.fields.clientSource).toBe("mcp");
+        expect(line.fields.userAgent).toBe("langwatch-mcp/1.4.0");
       });
     });
   });

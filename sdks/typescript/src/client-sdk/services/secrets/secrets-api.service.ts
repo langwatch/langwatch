@@ -1,6 +1,6 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveEndpoint } from "@/internal/endpoint";
-import { buildAuthHeaders } from "@/internal/api/auth";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
@@ -42,7 +42,7 @@ export class SecretsApiService {
     const response = await langwatchFetch(`${this.endpoint}${path}`, {
       ...options,
       headers: {
-        ...buildAuthHeaders({ apiKey: this.apiKey }),
+        ...buildRequestHeaders({ apiKey: this.apiKey }),
         "Content-Type": "application/json",
         ...options?.headers,
       },

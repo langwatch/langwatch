@@ -43,6 +43,7 @@ from langwatch.__version__ import __version__
 from langwatch.http_client import create_async_client
 from langwatch.state import get_api_key, get_endpoint, get_instance
 from langwatch.utils.initialization import ensure_setup
+from langwatch.utils.sdk_identity import build_sdk_identity_headers
 
 from .identity import InstanceIdentity, resolve_enabled, resolve_instance_label
 from .protocol import (
@@ -244,7 +245,11 @@ def socket_url(endpoint: str) -> str:
 
 
 def connection_headers(*, api_key: str, project_id: str | None) -> dict[str, str]:
-    headers = {"Authorization": f"Bearer {api_key}", "User-Agent": USER_AGENT}
+    headers = {
+        **build_sdk_identity_headers(str(__version__)),
+        "Authorization": f"Bearer {api_key}",
+        "User-Agent": USER_AGENT,
+    }
     if project_id:
         headers["X-Project-Id"] = project_id
     return headers
