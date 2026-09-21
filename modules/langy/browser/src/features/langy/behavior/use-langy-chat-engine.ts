@@ -33,11 +33,9 @@ export function useLangyChatEngine({
       },
     });
 
-  // Langy can mutate server-side state (e.g. dashboard widgets) mid-turn.
-  // Nothing else observes a turn's completion, so invalidate here, once,
-  // on the submitted/streaming -> ready/error transition — a ref (not
-  // state) tracks the previous status so this doesn't re-fire every render.
-  // Invalidating on a page with no dashboard mounted is a harmless no-op.
+  // Langy can mutate dashboard widgets mid-turn, read via dashboardWidgets.list
+  // and graphs.getAll, so invalidate both once on the in-flight -> settled
+  // transition (a ref, not state, tracks prior status to avoid re-firing).
   const utils = api.useUtils();
   const previousStatusRef = useRef(status);
   useEffect(() => {
@@ -46,6 +44,7 @@ export function useLangyChatEngine({
     const isSettled = status === "ready" || status === "error";
     if (wasInFlight && isSettled) {
       void utils.dashboardWidgets.list.invalidate();
+      void utils.graphs.getAll.invalidate();
     }
     previousStatusRef.current = status;
   }, [status, utils]);

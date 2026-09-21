@@ -22,7 +22,9 @@
   "dependencies": {
     "@langwatch/api": "workspace:*",
     "@langwatch/config": "workspace:*",
-    "@langwatch/kernel": "workspace:*"
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@langwatch/vitest-config": "workspace:*",
