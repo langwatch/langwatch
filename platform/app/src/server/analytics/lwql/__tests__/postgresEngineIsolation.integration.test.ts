@@ -26,19 +26,19 @@
  * the load property — the first holds on either object, the second only on the
  * view.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
 import { lwqlPostgresViews } from "../catalog/types";
-import { DEFAULT_POSTGRES_ENGINE_POOL_SIZE } from "../postgresMapping";
 import {
   lwqlPostgresReaderConnectionLimit,
   lwqlViewSetupStatements,
   SHIPPED_LWQL_DEDUP,
-} from "../views";
+} from "../provisioning/catalogStatements";
+import { DEFAULT_POSTGRES_ENGINE_POOL_SIZE } from "../provisioning/postgresMapping";
 import {
   CLICKHOUSE_ERROR_CODE,
   expectClickHouseError,
@@ -140,7 +140,7 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
      * it would assert the two layers together and prove neither. The engine
      * table has only the policy, which is the layer this case is about.
      */
-    /** @scenario "Every PostgreSQL-resident dataset in the catalog is tenant-scoped" */
+    /** @scenario "Every PostgreSQL-resident view in the catalog is tenant-scoped" */
     it("scopes every PostgreSQL-resident dataset to the caller's tenant", async () => {
       expect(
         POSTGRES_VIEWS.length,
@@ -682,7 +682,7 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
      * The bug this pins: the key map is `ORDER BY KeyHash` with no uniqueness
      * enforced, so a retried provisioning step or a re-issued key can leave two
      * rows the key map's own self-policy admits for the same hash. The LangWatchQL
-     * view's tenant predicate (`postgresTenantPredicate` in `../views.ts`) is a
+     * view's tenant predicate (`postgresTenantPredicate` in `../provisioning/catalogStatements.ts`) is a
      * scalar subquery over exactly that self-policed read — before its
      * `LIMIT 1`, two admitted rows made the subquery return two rows and
      * ClickHouse rejected the whole read with

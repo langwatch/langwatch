@@ -22,6 +22,7 @@ import {
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { ENTERPRISE_TEST_PLAN } from "~/test-utils/managementApiOrg";
+import { seedSsoConnection } from "~/test-utils/ssoConnection";
 import { FREE_PLAN } from "../../licensing/constants";
 import { app } from "../routes";
 import { ScimTokenService } from "../scim-token.service";
@@ -50,10 +51,19 @@ describe("Feature: SCIM entitlement is checked on every call", () => {
     });
     organizationId = organization.id;
 
+    // A token names the connection it was issued for (D08), so the directory
+    // the identity provider is pushing through has to exist before it can be
+    // minted. Which connection is not what this suite is about — the plan is.
+    const { connectionId } = await seedSsoConnection({
+      prisma,
+      organizationId,
+    });
+
     // Minted while the organization is on Enterprise: the credential itself
     // is legitimate for the whole test.
     const minted = await ScimTokenService.create(prisma).generate({
       organizationId,
+      connectionId,
       description: "lapse test",
     });
     bearerToken = minted.token;
@@ -63,6 +73,7 @@ describe("Feature: SCIM entitlement is checked on every call", () => {
     try {
       await cleanupTestRows(prisma, [
         ["scimToken", { organizationId }],
+        ["ssoConnection", { organizationId }],
         ["organizationUser", { organizationId }],
         ["user", { email: { contains: ns } }],
         ["organization", { id: organizationId }],

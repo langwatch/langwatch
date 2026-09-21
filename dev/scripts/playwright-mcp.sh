@@ -21,6 +21,12 @@ if [ "$1" = "--headed" ]; then
   shift
 fi
 
+# A hard-killed session cannot signal this MCP, and the Chrome it launches
+# outlives even the MCP. The hook makes the MCP notice it was orphaned and
+# shut its browser down (specs/setup/mcp-browser-lifecycle.feature).
+ORPHAN_HOOK="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/die-with-parent.cjs"
+export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--require \"$ORPHAN_HOOK\""
+
 # `npx @playwright/mcp@latest` does a registry lookup on every cold start (~55s
 # observed on this machine — well over Claude Code's 30s MCP-connect timeout).
 # Resolve to the already-installed CLI directly. Fall back to npx only if the

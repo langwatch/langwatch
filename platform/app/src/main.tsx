@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router/dom";
 import { OuterProviders } from "./AppProviders";
+import { applyFeatureFlagOverridesFromSearch } from "./hooks/useFeatureFlagOverrides";
 import { router } from "./routes";
 import { registerChunkReloadListener } from "./utils/chunkReload";
 import { setRouterInstance } from "./utils/compat/next-router";
@@ -10,6 +11,10 @@ import "./styles/globals.scss";
 
 // Enable imperative navigation from outside React (e.g. navigateToDrawer)
 setRouterInstance(router);
+
+// `?ff_<flag>=on` lands before the first render, so a link opens straight onto
+// the screen it names instead of painting the other one and swapping.
+applyFeatureFlagOverridesFromSearch(window.location.search);
 
 // Recover from stale content-hashed chunks after a deploy: when a lazy import()
 // 404s (e.g. the trace-drawer JSON viewer), reload once to fetch the new hashes

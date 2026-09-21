@@ -46,6 +46,8 @@ langwatch.dspy.init(experiment="my-awesome-experiment", optimizer=optimizer)
 compiled_rag = optimizer.compile(RAG(), trainset=trainset)
 ```
 
+`init` tracks `BootstrapFewShot`, `BootstrapFewShotWithRandomSearch`, `COPRO`, `MIPROv2` and `GEPA`, and a `dspy.Evaluate` through the `evaluator` parameter. A GEPA run gets one step for the seed program and one for every candidate evaluated on the validation set, with the candidate's instructions and the score of each validation example. For any other optimizer, see [Custom optimizer tracking](/dspy-visualization/custom-optimizer).
+
 ## Follow your experiment
 
 Open the link provided when the compilation starts or go to your [LangWatch dashboard](https://app.langwatch.ai) to follow the progress of your experiments:

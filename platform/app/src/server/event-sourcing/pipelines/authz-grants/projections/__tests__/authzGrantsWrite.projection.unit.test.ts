@@ -58,7 +58,10 @@ describe("AuthzGrantsWriteProjection", () => {
      * legacy resolver's empty-permission-list fallback then answered "admin"
      * where the legacy row said "viewer".
      *
-     * @scenario "Reassigning a grant's role clears the role it was imported with"
+     * No feature scenario names this behavior yet — the annotation here used
+     * to claim "Reassigning a grant's role clears the role it was imported
+     * with", which exists in no .feature file. Removed rather than bound to
+     * the wrong title.
      */
     it("does not carry the imported role onto the reassignment", () => {
       const imported = projection.mapAuthzGrantAttached(

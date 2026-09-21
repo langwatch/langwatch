@@ -16,7 +16,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import { BlockStack } from "~/features/traces-v2/components/TraceDrawer/transcript/BlockStack";
-import { parseContentBlocks } from "~/features/traces-v2/components/TraceDrawer/transcript/parsing";
+import { parseContentBlocks } from "~/shared/traces/transcript/parsing";
 import { RenderInputOutput } from "../RenderInputOutput";
 
 // TraceMediaPart resolves the owning project from context; MediaPart needs a

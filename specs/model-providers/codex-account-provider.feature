@@ -151,6 +151,70 @@ Feature: Codex, the sign-in-with-OpenAI model provider
     Then the gateway drops the sampling options the codex backend refuses
     And the assist gets its title back instead of a failed request
 
+  # The codex backend keeps its own allowlist and answers 400 "Unsupported
+  # parameter" on anything outside it, before a token is generated. So the
+  # gateway keeps the body to what that backend accepts, rather than removing
+  # refused fields one at a time: a removal list costs one production outage
+  # per field, and it took two to learn it. Langy's worker sends both
+  # prompt_cache_retention and its own default max output tokens, so removing
+  # the first only uncovered the second, with the same dead card for the user.
+  #
+  # The codex lane follows the parameter policy the translated chat lanes
+  # follow (adapters/providers/param_policy.go): the gateway authors the
+  # outgoing body, so every field the caller sends gets an explicit
+  # disposition. A tuning option the backend refuses is dropped and the drop
+  # is signaled; an option whose silent absence would change what the caller
+  # observably gets is refused by name before a provider round trip is paid.
+  @unit
+  Scenario: A codex request carries only what its backend accepts
+    Given a caller sends a Responses body with options the codex backend refuses
+    When the gateway forwards the call to the codex backend
+    Then the backend accepts the call and the user gets their answer
+    And what the user asked for is unchanged: the question, the tools and the reasoning all arrive
+    And an option we have not named is left out, so a caller adding one cannot fail their own call
+
+  # The codex response is provider-shaped SSE streamed through untouched, so
+  # the drop is not injected into the response body the way the chat lanes
+  # inject params_dropped; the header and the gateway span carry it.
+  @unit
+  Scenario: A tuning option the codex backend refuses is dropped with a signal
+    Given a caller sends a Responses body with an output cap and a temperature
+    When the gateway forwards the call to the codex backend
+    Then the call proceeds without those options
+    And the X-LangWatch-Params-Dropped response header names them
+    And the gateway span records the drop
+
+  # These four are functional, not tuning: the gateway pins store false, so a
+  # previous_response_id chain cannot continue; background promises an id to
+  # poll; top_logprobs promises data in the answer; max_tool_calls is a cap
+  # the model would exceed. Dropping any of them returns an answer that is
+  # not what was asked for, so the gateway refuses before dialing.
+  @unit
+  Scenario: An option a codex answer would silently betray is refused by name
+    Given a caller sends a Responses body with previous_response_id
+    When the gateway builds the codex request
+    Then the gateway responds 400 unsupported_parameter naming the field
+    And no provider round trip is paid for an answer that could not be what was asked
+
+  @unit
+  Scenario: Strict mode refuses codex tuning options instead of dropping them
+    Given a caller sends a Responses body with a temperature and drop_tuning_params false
+    When the gateway builds the codex request
+    Then the gateway responds 400 unsupported_parameter
+    And the message names the option and how to proceed
+
+  # The backend's allowlist is theirs and can move. The table's claim about
+  # each field is checked against the real backend by an on-demand probe
+  # (codex_live_conformance_test.go, gated on a real ChatGPT sign-in): every
+  # mapped field must be accepted and every dropped or refused field must be
+  # rejected upstream. Run it before changing the codex lane; it is the check
+  # that would have caught both production outages before they shipped.
+  @live
+  Scenario: The codex disposition table agrees with the live backend
+    When each field the table names is probed against the real codex backend
+    Then every mapped field is accepted
+    And every dropped or refused field is rejected upstream
+
   Scenario: Langy resolves its own feature key without breaking older setups
     Given Langy resolves its model through the langy.chat feature key
     When a project configured Langy before that key existed

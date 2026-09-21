@@ -156,7 +156,7 @@ describe("SCIM PATCH op casing", () => {
     describe("when the operation adds a group member", () => {
       it("adds the member to the group", async () => {
         await ScimGroupService.create({ prisma }).updateGroup({
-          externalScimId: "group-1",
+          scimResourceId: "group-1",
           organizationId: "org-1",
           patchRequest: parsePatch({
             schemas: [PATCH_SCHEMA],
@@ -177,7 +177,7 @@ describe("SCIM PATCH op casing", () => {
     describe("when the operation removes a group member", () => {
       it("removes the member from the group", async () => {
         await ScimGroupService.create({ prisma }).updateGroup({
-          externalScimId: "group-1",
+          scimResourceId: "group-1",
           organizationId: "org-1",
           patchRequest: parsePatch({
             schemas: [PATCH_SCHEMA],
@@ -194,7 +194,7 @@ describe("SCIM PATCH op casing", () => {
     describe("when the operation renames the group", () => {
       it("renames the group", async () => {
         await ScimGroupService.create({ prisma }).updateGroup({
-          externalScimId: "group-1",
+          scimResourceId: "group-1",
           organizationId: "org-1",
           patchRequest: parsePatch({
             schemas: [PATCH_SCHEMA],

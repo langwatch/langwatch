@@ -85,12 +85,67 @@ describe("ScenarioInputMappingSection", () => {
           screen.getByTestId("variable-name-threadId"),
         ).toBeInTheDocument();
       });
+
+      /** @scenario "The scenario mappings offer the session as a source" */
+      it("shows a row for the session", () => {
+        renderSection();
+
+        expect(screen.getByTestId("variable-name-session")).toBeInTheDocument();
+      });
     });
   });
 
   // ============================================================================
   // Scenario: Dropdown offers agent inputs as targets
   // ============================================================================
+
+  describe("given an agent declaring the output 'answer'", () => {
+    /**
+     * The stored value carries three states in one optional string, and these
+     * two are the pair that must not collapse: `undefined` means the user has
+     * not chosen and the first output is auto-populated, `""` means they
+     * cleared it on purpose. Reading `""` as "not chosen" would silently
+     * re-map the output the user just unmapped. See #3119.
+     */
+    describe("when the output field has not been chosen yet", () => {
+      it("maps the agent's first output automatically", () => {
+        renderSection({
+          outputs: [{ identifier: "answer", type: "str" }],
+          outputField: undefined,
+          onOutputFieldChange: vi.fn(),
+        });
+
+        expect(screen.getAllByText(/answer/i)).toHaveLength(1);
+      });
+    });
+
+    describe("when the user has cleared the output field", () => {
+      it("maps nothing, rather than falling back to the first output", () => {
+        renderSection({
+          outputs: [{ identifier: "answer", type: "str" }],
+          outputField: "",
+          onOutputFieldChange: vi.fn(),
+        });
+
+        expect(screen.queryByText(/answer/i)).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when the user has chosen a specific output", () => {
+      it("maps that one rather than the first", () => {
+        renderSection({
+          outputs: [
+            { identifier: "answer", type: "str" },
+            { identifier: "reply", type: "str" },
+          ],
+          outputField: "reply",
+          onOutputFieldChange: vi.fn(),
+        });
+
+        expect(screen.getAllByText(/reply/i)).toHaveLength(1);
+      });
+    });
+  });
 
   describe("given the mapping UI with agent inputs 'query' and 'context'", () => {
     describe("when the user opens the input mapping dropdown", () => {

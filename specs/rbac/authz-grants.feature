@@ -303,6 +303,46 @@ Feature: Authorization grants
     Then the orphaned binding's revocation is issued before the edit commits
     And a failure to revoke fails the edit
 
+
+  # ═══ Read-your-writes ═════════════════════════════════════════════════
+
+  # An attach and a role definition hold, bounded, for the projection to make
+  # their rows readable. Timing out is normally not a failure: the append is
+  # durable and the fold converges. It IS a failure for a caller whose next
+  # step hands out access these rows decide, which is what `requireProjection`
+  # states.
+
+  @unit
+  Scenario: A write that nobody reads next passes when the projection lags
+    Given an attach whose caller does not require the projection
+    When the read-your-writes window passes with the rows not readable
+    Then the write is reported as done
+    And the lag is logged
+
+  @unit
+  Scenario: A write whose caller requires the projection fails when it lags
+    Given an attach whose caller requires the projection
+    When the read-your-writes window passes with the rows not readable
+    Then the write fails with "authz_grant_not_confirmed"
+
+  @unit
+  Scenario: A role definition whose caller requires the projection fails when it lags
+    Given a role definition whose caller requires the projection
+    When the read-your-writes window passes with the row not readable
+    Then the write fails with "authz_grant_not_confirmed"
+
+  @unit
+  Scenario: A required write that lands inside the window passes
+    Given an attach whose caller requires the projection
+    When the rows become readable inside the window
+    Then the write is reported as done
+
+  @unit
+  Scenario: Requiring the projection waits for it even when the wait is switched off
+    Given an attach whose caller requires the projection and asks not to wait
+    When the read-your-writes window passes with the rows not readable
+    Then the write fails with "authz_grant_not_confirmed"
+
   # ═══ The projection ═══════════════════════════════════════════════════
 
   @unit @unimplemented
@@ -519,6 +559,51 @@ Feature: Authorization grants
     Then the actor names the code path that decided to act
     And the platform is never an anonymous actor
 
+  # ═══ Provenance ═══════════════════════════════════════════════════════
+  # Two facts, not one. The SOURCE is which surface authored the grant, which
+  # the actor cannot say: a directory sync and an approved request to join
+  # both act as the platform. The ACTOR is who caused it, and for those same
+  # two surfaces that is nobody — a system principal, named from the closed
+  # registry. Both vocabularies are shared, so a surface states which entry
+  # it is rather than inventing a label.
+
+  @unit
+  Scenario: A grant states which surface authored it
+    Given a surface that grants access on a customer's behalf
+    When it states the grant
+    Then the fact carries that surface as its source
+
+  @unit
+  Scenario: A grant nobody attributed is the grants service's own
+    Given a grant made through the ordinary access surfaces
+    When no source is stated
+    Then the fact is attributed to the grants service
+
+  @unit
+  Scenario: The wire accepts every source the vocabulary names
+    Given a source is added to the shared vocabulary
+    When a grant arrives naming it
+    Then the wire accepts it with no second list to edit
+    And a source the vocabulary does not name is refused
+
+  @unit
+  Scenario: A write with no person behind it names the surface that made it
+    Given a grant write with no person or credential behind it
+    When the surface states the write
+    Then the fact names the surface from the closed registry
+    And a write made by a person still names that person
+
+  # A revocation carries no source of its own, and does not need one: the
+  # actor already names the surface and the reason carries the rest, so
+  # attributing an automated removal needs no new field on the fact.
+
+  @unit
+  Scenario: A revocation names the surface that made it without a source of its own
+    Given a surface removes access it granted earlier
+    When the revocation is stated
+    Then the fact names the surface as its actor
+    And the audit trail records it rather than treating it as backdated history
+
   # ═══ Audit ════════════════════════════════════════════════════════════
 
   @integration
@@ -530,6 +615,13 @@ Feature: Authorization grants
   Scenario: Facts stated by the platform itself never reach the audit trail
     When the platform states grants on its own behalf
     Then no audit row is written for them
+
+  @unit
+  Scenario: A grant an automated surface made still reaches the audit trail
+    Given a surface grants access on a customer's behalf
+    When the grant is stated
+    Then an audit row records it and names the surface
+    And only backdated history is left out
 
   @unit
   Scenario: A write on the legacy path still records its audit row

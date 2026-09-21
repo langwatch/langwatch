@@ -53,7 +53,7 @@ Feature: Langy runs the prompt improvement loop on the workbench
   Scenario: Langy runs the loop without asking permission to continue
     Given a dataset the experiment already holds
     When the loop starts
-    Then Langy duplicates, edits, runs and compares without asking the user anything
+    Then Langy scores the baseline, duplicates, edits, runs and compares without asking permission to continue
     And it never asks whether it may run the next attempt
 
   @e2e
@@ -133,3 +133,47 @@ Feature: Langy runs the prompt improvement loop on the workbench
     When Langy runs the improvement loop
     Then every action executes against the saved state
     And the loop completes without a browser
+
+  # The other half of the loop: the same conversation with the workbench OPEN.
+  # A page changes what the agent should say, not what it should do, so the end
+  # state is asserted with the same helper the no-page suite uses and the words
+  # are graded separately. Covered by
+  # platform/app/e2e/langy/langy-workbench-live.scenario.test.ts, which attaches
+  # a headless stand-in for the page (see specs/langy/langy-ui-actions.feature,
+  # "The browser leg is proven end to end against a live stack").
+
+  @e2e
+  Scenario: The loop runs in the page the user has open
+    Given the user has the workbench open while Langy works
+    When Langy runs the improvement loop
+    Then the page carries the changes Langy asks for
+    And the workbench ends in the same state it reaches with no page attached
+
+  @e2e
+  Scenario: The user closes the page mid-loop and the loop carries on
+    Given Langy has already made changes through the open page
+    When the user walks away and the page closes
+    Then the rest of the loop executes against the saved state
+    And no later action claims to have run in a page that is gone
+
+  @e2e
+  Scenario: Langy never says the page shows something it does not
+    When Langy tells the user about a change it made
+    Then it does not say the open page is showing a change the page is not showing
+    And a place it names as where a change happened is where the change happened
+
+  # The other half of the same idea. The two are graded apart so a run that
+  # simply says nothing fails only this one, while a run that speaks and is
+  # wrong fails the stricter invariant above.
+  @e2e
+  Scenario: Langy says where each change happened
+    When a change ran in the page the user is watching
+    Then Langy phrases it as something the user can watch happen
+    And a change that ran that no page watched is described as one the page will pick up on reload
+
+  @e2e
+  Scenario: The recorded turn reads in the order it happened
+    Given a turn that wrote text between its tool calls
+    When the conversation is read back the way the panel reads it on reload
+    Then the recorded turn holds more than one passage of text
+    And text written before the last call is still in front of it

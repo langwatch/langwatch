@@ -121,7 +121,7 @@ The LLM model to use (e.g., "openai/gpt-5-mini"). Model names follow the litellm
 </ResponseField>
 
 <ResponseField name="temperature" type="float">
-Fine-tune creativity vs. consistency (0.0 = deterministic, 2.0 = very creative). Not every model accepts it — the GPT-5 family rejects a custom temperature, so leave it unset for those.
+Fine-tune creativity vs. consistency (0.0 = deterministic, 2.0 = very creative). Not every model accepts it: the GPT-5 family rejects a custom temperature, so leave it unset for those.
 </ResponseField>
 
 <ResponseField name="maxTokens" type="integer">
@@ -167,8 +167,7 @@ Please help them with: {{input}}
 ## Optimization Features
 
 <Note>
-**Studio Only**: These advanced optimization features require the optimization studio interface for proper experimentation, 
-performance measurement, and A/B testing. They cannot be configured via the API.
+**Workflows only**: You set these fields in the LLM node of a [workflow](/workflows/overview). They cannot be configured via the API.
 </Note>
 
 ### Input/Output Definitions

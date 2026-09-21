@@ -75,6 +75,7 @@ import { createLogger } from "@langwatch/observability";
 // Hono — unified API router
 import type { Hono } from "hono";
 import { register } from "prom-client";
+import { env } from "./env.mjs";
 import { createMcpHandler } from "./mcp/handler";
 import { createApiRouter } from "./server/api-router";
 import { getApp } from "./server/app-layer/app";
@@ -84,6 +85,24 @@ import {
 } from "./server/app-layer/presets";
 import { assertRedisReady } from "./server/app-layer/redis-readiness";
 import { assetBaseOrigin, getAssetBase } from "./server/asset-base";
+import {
+  buildChartFrameHeaders,
+  buildChartFrameHtml,
+  CHART_FRAME_PATH,
+  generateChartFrameNonce,
+} from "./server/chartSandboxFrame";
+import { ConnectGateway } from "./server/connected-agents/connect.gateway";
+import { closeLongPollTransport } from "./server/connected-agents/long-poll.process";
+import {
+  closeConnectedAgentRuntime,
+  getConnectedAgentRuntime,
+} from "./server/connected-agents/runtime";
+import { prisma } from "./server/db";
+import { LocalControlGateway } from "./server/langy-local-control/control.gateway";
+import {
+  closeLocalControlRuntime,
+  getLocalControlSessionCore,
+} from "./server/langy-local-control/runtime";
 import {
   getWorkerMetricsPort,
   isMetricsAuthorized,
@@ -98,6 +117,7 @@ import { createHttpServerClosePhase } from "./server/shutdown/httpServerClosePha
 import { installShutdownHandlers } from "./server/shutdown/runGracefulShutdown";
 import { serveStaticOrFallback } from "./server/static-handler";
 import { setupTRPCWebSocket } from "./server/websockets/trpc-ws";
+import { createUpgradeRouter } from "./server/websockets/upgrade-router";
 import { startWorkers, type WorkerHandle } from "./server/workers/startWorkers";
 
 const logger = createLogger("langwatch:start");
@@ -133,6 +153,33 @@ export const metricsMiddleware = promBundle({
     return normalizeMetricsPath(req.url?.split("?")[0] ?? "/");
   },
 });
+
+/**
+ * Serves the chart sandbox frame document with its own CSP (a fresh nonce per
+ * response). Replaces the app-wide policy and X-Frame-Options for this
+ * response only. See specs/analytics/custom-chart-sandbox-imports.feature.
+ */
+function serveChartFrame(req: IncomingMessage, res: ServerResponse): void {
+  // Drop the app-wide policy first so it cannot linger under a different
+  // header name. In dev the app emits Content-Security-Policy-Report-Only
+  // (a distinct header from Content-Security-Policy), which setHeader
+  // below would NOT overwrite — it would stay on the response and spew
+  // violation reports for exactly the CDN scripts this route allows.
+  res.removeHeader("Content-Security-Policy-Report-Only");
+  res.removeHeader("Content-Security-Policy");
+  const nonce = generateChartFrameNonce();
+  for (const [key, value] of Object.entries(
+    buildChartFrameHeaders({ nonce }),
+  )) {
+    res.setHeader(key, value);
+  }
+  res.statusCode = 200;
+  if (req.method === "HEAD") {
+    res.end();
+  } else {
+    res.end(buildChartFrameHtml({ nonce }));
+  }
+}
 
 export const startApp = async (dir = resolveAppPackageRoot()) => {
   const dev = process.env.NODE_ENV !== "production";
@@ -241,6 +288,11 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
     assetOrigin: assetBaseOrigin(getAssetBase()),
   });
 
+  // The chart sandbox frame document and its own headers carry a fresh nonce
+  // per request (so they can't be built once) — see
+  // server/chartSandboxFrame.ts and
+  // specs/analytics/custom-chart-sandbox-imports.feature.
+
   // Optional HTTPS + HTTP/2 path for local dev. Set
   // `LANGWATCH_DEV_HTTP2=1` and a self-signed cert is auto-generated on
   // first boot (cached in `.dev-certs/` so subsequent boots reuse).
@@ -266,6 +318,21 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
       // Apply security headers to all responses
       for (const [key, value] of Object.entries(securityHeaders)) {
         res.setHeader(key, value);
+      }
+
+      // Chart sandbox frame document: its own permissive CSP replaces the
+      // app-wide one (and X-Frame-Options) for this response, so a widget may
+      // import any https origin. Safe because the frame document always runs at
+      // an opaque origin — the embedding iframe is sandbox="allow-scripts" with
+      // no allow-same-origin, and the frame CSP carries `sandbox allow-scripts`
+      // so a direct top-level navigation is sandboxed too. See
+      // specs/analytics/custom-chart-sandbox-imports.feature.
+      if (
+        (req.method === "GET" || req.method === "HEAD") &&
+        pathname === CHART_FRAME_PATH
+      ) {
+        serveChartFrame(req, res);
+        return;
       }
 
       // MCP routes — intercept before everything
@@ -368,12 +435,32 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
     server = createServer(handler);
   }
 
+  // One upgrade listener, routed by path: the tRPC transport and the
+  // connected agent gateway share the HTTP server, and an unknown path is
+  // answered 404 instead of hanging.
+  const upgradeRouter = createUpgradeRouter(
+    server as ReturnType<typeof createServer>,
+  );
   // Bind the tRPC router to a WebSocket transport on the same HTTP server.
   // Lets high-frequency procedures (presence cursor today) escape the
   // browser's 6-connection HTTP cap by riding a single long-lived socket.
-  const wsHandle = setupTRPCWebSocket(
-    server as ReturnType<typeof createServer>,
-  );
+  const wsHandle = setupTRPCWebSocket(upgradeRouter);
+  // Connected agents (ADR-128): the SDK's outbound socket lands here.
+  const connectGateway = new ConnectGateway({
+    runtime: getConnectedAgentRuntime(),
+    prisma,
+    replicaCount: env.LANGWATCH_APP_REPLICAS,
+  });
+  connectGateway.mount(upgradeRouter);
+
+  // Langy local control (ADR-129): the outbound socket of
+  // `langwatch langy --share-control` lands here. Bearer session key, no
+  // Origin check, so the dev proxy and the ingress carry it with no per-path
+  // entry of their own.
+  const localControlGateway = new LocalControlGateway({
+    core: getLocalControlSessionCore(),
+  });
+  localControlGateway.mount(upgradeRouter);
 
   server.once("error", (err) => {
     // Write synchronously to stderr BEFORE the structured log: pino's
@@ -451,6 +538,21 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
         closeSessions: () => mcpHandler.closeAllSessions(),
         logger,
       }),
+      // Connected agent sockets close after the HTTP drain, with 1012 so the
+      // SDKs reconnect at once to the next pod. A call in flight outlives any
+      // drain budget, so this phase comes after the drain, not inside it.
+      {
+        name: "connected-agents",
+        run: async () => {
+          await connectGateway.close();
+          await closeLongPollTransport();
+          await closeConnectedAgentRuntime();
+          // The shared folders close the same way and for the same reason: a
+          // local command in flight outlives any drain budget.
+          await localControlGateway.close();
+          await closeLocalControlRuntime();
+        },
+      },
       // Drain in-process workers (if any) before closing the shared App below,
       // so jobs stop accepting/draining before ClickHouse / Redis / Prisma go
       // away.

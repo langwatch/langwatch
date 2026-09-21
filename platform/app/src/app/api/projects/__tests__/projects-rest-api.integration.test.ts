@@ -1,6 +1,6 @@
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   type Organization,
   OrganizationUserRole,
@@ -9,6 +9,7 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { ProjectService } from "~/server/app-layer/projects/project.service";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
@@ -471,8 +472,8 @@ describe("Feature: Projects REST API", () => {
   /**
    * @see specs/api-keys/project-key-read-access.feature
    *
-   * The base key is a project-level write credential, so reading it needs
-   * `project:update` on the project being asked for.
+   * This transport authenticates with organization API keys. A raw key never
+   * becomes an administrator session and cannot reveal or rotate a base key.
    */
   describe("GET /api/projects/:id/api-key", () => {
     const getAs = (path: string, token: string) =>
@@ -515,22 +516,25 @@ describe("Feature: Projects REST API", () => {
       projectId = await createProject();
     });
 
-    /** @scenario A caller who can change the project reads the base key */
-    it("returns the base key to a caller who can update the project", async () => {
+    /** @scenario An API key principal cannot read the base key */
+    it("refuses the organization API key before reading the stored key", async () => {
       const stored = await prisma.project.findUnique({
         where: { id: projectId },
         select: { apiKey: true },
       });
-
-      const res = await api.get(`/api/projects/${projectId}/api-key`);
-
-      expect(res.status).toBe(200);
-      expect((await res.json()).apiKey).toBe(stored!.apiKey);
+      const readSecret = vi.spyOn(ProjectService.prototype, "getWithTeam");
+      try {
+        const res = await api.get(`/api/projects/${projectId}/api-key`);
+        expect(res.status).toBe(403);
+        expect(await res.text()).not.toContain(stored!.apiKey);
+        expect(readSecret).not.toHaveBeenCalled();
+      } finally {
+        readSecret.mockRestore();
+      }
     });
 
-    /** @scenario A read-only credential cannot read the base key */
-    it("refuses a caller who can only view the project", async () => {
-      const token = await mintKey(["project:view"], testOrganization.id);
+    it("also refuses a narrowed owner key with project:manage", async () => {
+      const token = await mintKey(["project:manage"], projectId);
 
       const res = await getAs(`/api/projects/${projectId}/api-key`, token);
 
@@ -542,58 +546,44 @@ describe("Feature: Projects REST API", () => {
       expect(await res.text()).not.toContain(stored!.apiKey);
     });
 
-    /** @scenario Permission is checked against the requested project */
-    it("refuses a project-scoped caller asking about a sibling project", async () => {
-      const sibling = await createProject();
-      const token = await mintKey(["project:update"], projectId);
-
-      const own = await getAs(`/api/projects/${projectId}/api-key`, token);
-      expect(own.status).toBe(200);
-
-      const other = await getAs(`/api/projects/${sibling}/api-key`, token);
-      expect(other.status).toBe(403);
-
-      const stored = await prisma.project.findUnique({
-        where: { id: sibling },
-        select: { apiKey: true },
-      });
-      expect(await other.text()).not.toContain(stored!.apiKey);
+    /** @scenario API key refusal happens before the project is read */
+    it("refuses before revealing whether the target project exists", async () => {
+      const readSecret = vi.spyOn(ProjectService.prototype, "getWithTeam");
+      try {
+        const res = await api.get("/api/projects/project_nope/api-key");
+        expect(res.status).toBe(403);
+        expect(readSecret).not.toHaveBeenCalled();
+      } finally {
+        readSecret.mockRestore();
+      }
     });
 
-    /** @scenario A project in another organization is not disclosed */
-    it("reports a project in another organization as not found", async () => {
-      const otherOrg = await prisma.organization.create({
-        data: { name: "Other Org", slug: `--test-other-${nanoid(8)}` },
+    /** @scenario An API key principal cannot rotate the base key */
+    it("refuses rotation before reading or changing the stored key", async () => {
+      const before = await prisma.project.findUniqueOrThrow({
+        where: { id: projectId },
+        select: { apiKey: true },
       });
-      const otherTeam = await prisma.team.create({
-        data: {
-          name: "Other Team",
-          slug: `--test-other-team-${nanoid(8)}`,
-          organizationId: otherOrg.id,
-        },
-      });
-      const foreign = await prisma.project.create({
-        data: {
-          name: "Foreign",
-          slug: `--test-foreign-${nanoid(8)}`,
-          apiKey: `test-foreign-${nanoid(16)}`,
-          teamId: otherTeam.id,
-          language: "python",
-          framework: "langchain",
-        },
-      });
-
-      const res = await api.get(`/api/projects/${foreign.id}/api-key`);
-      expect(res.status).toBe(404);
-      expect(await res.text()).not.toContain(foreign.apiKey);
-
-      await prisma.project
-        .delete({ where: { id: foreign.id } })
-        .catch(() => {});
-      await prisma.team.delete({ where: { id: otherTeam.id } }).catch(() => {});
-      await prisma.organization
-        .delete({ where: { id: otherOrg.id } })
-        .catch(() => {});
+      const readSecret = vi.spyOn(ProjectService.prototype, "getWithTeam");
+      const writeSecret = vi.spyOn(prisma.project, "update");
+      try {
+        const res = await api.post(
+          `/api/projects/${projectId}/regenerate-api-key`,
+          {},
+        );
+        expect(res.status).toBe(403);
+        expect(readSecret).not.toHaveBeenCalled();
+        expect(writeSecret).not.toHaveBeenCalled();
+      } finally {
+        readSecret.mockRestore();
+        writeSecret.mockRestore();
+      }
+      await expect(
+        prisma.project.findUniqueOrThrow({
+          where: { id: projectId },
+          select: { apiKey: true },
+        }),
+      ).resolves.toEqual(before);
     });
   });
 });

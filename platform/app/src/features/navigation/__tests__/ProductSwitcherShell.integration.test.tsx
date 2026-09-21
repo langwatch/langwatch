@@ -270,6 +270,40 @@ vi.mock("~/utils/api", () => ({
     user: {
       getSsoStatus: { useQuery: () => ({ data: undefined }) },
       isAdmin: { useQuery: () => ({ data: { isAdmin: false } }) },
+      // The dashboard shell mounts the secure-account nudge and the
+      // organization's second-factor gate on every page, so a mock that
+      // names neither takes the whole shell down.
+      secureAccountNudge: { useQuery: () => ({ data: undefined }) },
+      dismissSecureAccountNudge: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+    },
+    twoStepVerification: {
+      standing: { useQuery: () => ({ data: undefined }) },
+    },
+    // The shell also mounts the join-your-team notice.
+    joinRequests: {
+      offer: { useQuery: () => ({ data: undefined }) },
+      mine: { useQuery: () => ({ data: undefined }) },
+      request: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+      dismissOffer: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+    },
+    useUtils: () => ({
+      user: { secureAccountNudge: { invalidate: vi.fn() } },
+      joinRequests: {
+        mine: { invalidate: vi.fn() },
+        offer: { invalidate: vi.fn() },
+      },
+    }),
+    auth: {
+      myAddressConfirmation: { useQuery: () => ({ data: undefined }) },
+      sendMyAddressConfirmation: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
     },
     governance: {
       recordWorkspaceView: {
@@ -379,6 +413,7 @@ beforeEach(() => {
   trackEventMock.mockReset();
   commandBarOpenMock.mockReset();
   localStorage.clear();
+  localStorage.setItem("langwatch:navigation-mode:v1", "product-switcher");
   useNavigationModeStore.setState({ storedMode: "product-switcher" });
 });
 
@@ -590,6 +625,31 @@ describe("the product-switcher top bar", () => {
       });
     });
 
+    /** @scenario Typing highlights the top result */
+    it("highlights the first result as I type, with no arrow key", async () => {
+      renderShell();
+      const user = await openProjectPicker();
+      const field = screen.getByPlaceholderText("Search projects");
+
+      searchFor("billing");
+      // Highlighted by the typing itself, before any arrow key. The field
+      // names the highlighted option, which is the machine's own state
+      // rather than a class the list happens to carry.
+      await waitFor(() => {
+        const [first] = screen.getAllByRole("option");
+        expect(first).toHaveAttribute("data-highlighted");
+        expect(field).toHaveAttribute("aria-activedescendant", first?.id);
+      });
+
+      // Enter alone opens it, which is the point of the highlight.
+      await user.keyboard("{Enter}");
+      await waitFor(() => {
+        expect(pushMock).toHaveBeenCalledWith(
+          expect.stringContaining("billing-sync"),
+        );
+      });
+    });
+
     /** @scenario Creating a project stays available while the list is unfiltered */
     it("keeps the per-team create entries while nothing is typed and drops them while searching", async () => {
       renderShell();
@@ -684,14 +744,42 @@ describe("the product-switcher top bar", () => {
 
   describe("when on a Gateway page", () => {
     /** @scenario Gateway and Governance carry no scope control */
-    it("shows no project chip and no personal badge", () => {
+    it("shows no project chip", () => {
+      // The ambient team from the outer beforeEach holds projects and renders
+      // the chip on `/[project]`, so the only thing withholding it here is the
+      // page. Without a team that has projects this would assert the absence
+      // of something nothing was going to draw.
       mockPathname = "/gateway/virtual-keys";
       renderShell();
 
       expect(
         screen.queryByRole("button", { name: "Switch project" }),
       ).not.toBeInTheDocument();
+    });
+
+    /** @scenario Gateway and Governance carry no scope control */
+    it("shows no personal badge even when the scope resolved is a personal workspace", () => {
+      // Both drivers of the badge are switched ON deliberately: the personal
+      // workspace is the ambient scope and `personalScope` is set. Rendered
+      // without them — as this case used to be — the badge could not appear
+      // whatever the code did, and deleting the suppression left it green.
+      // The control below is what proves these inputs draw a badge at all.
+      mockPathname = "/gateway/virtual-keys";
+      mockAmbientTeam = personalTeam;
+      renderShell();
+
       expect(screen.queryByText("Personal")).not.toBeInTheDocument();
+    });
+
+    it("draws that badge on a page that does carry a scope control, on the same inputs", () => {
+      // The positive control for the case above, and the only reason its
+      // `not.toBeInTheDocument()` means anything. If this one ever goes red,
+      // the guard beside it has stopped guarding rather than started passing.
+      mockPathname = "/[project]";
+      mockAmbientTeam = personalTeam;
+      renderShell();
+
+      expect(screen.getByText("Personal")).toBeInTheDocument();
     });
   });
 

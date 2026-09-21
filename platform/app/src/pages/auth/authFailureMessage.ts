@@ -7,8 +7,18 @@
  * failures worth naming onto wording that person can act on, and refuses to
  * put a raw code on screen.
  *
+ * TWO sources of copy, because two different things answer this endpoint.
+ * better-auth's own identifiers are its own vocabulary and have no
+ * handled-error registry entry, so their wording lives here. Everything the
+ * platform refuses with — the identity storage adapter translates a
+ * `HandledError` into an `APIError` carrying its stable `code` (ADR-116 §6) —
+ * reads from the client presentation registry, which is where every other
+ * surface gets the words for a code. Writing a second set here would mean the
+ * same failure reads differently depending on which screen a customer is on.
+ *
  * Shared by the sign-in and sign-up screens so the two cannot drift.
  */
+import { explainHandledError } from "~/features/errors/logic/presentation";
 
 const GENERIC = "Sign in did not go through. Please try again.";
 
@@ -34,6 +44,12 @@ const CREDENTIAL_REJECTION_KEYS = new Set([
   "invalid_email_or_password",
   "credentialssignin",
   "user_not_found",
+  // Our own code for the same refusal. The auth route re-answers
+  // `INVALID_EMAIL_OR_PASSWORD` in the handled-error contract
+  // (`server/better-auth/handled-errors.ts`), so both spellings reach here and
+  // both have to mean exactly one thing — otherwise the translation itself
+  // becomes the oracle this set exists to close.
+  "identity_sign_in_refused",
 ]);
 
 /**
@@ -65,6 +81,34 @@ const KEYED_MESSAGES: Record<string, string> = {
   user_already_exists:
     "An account with that email already exists. Try signing in instead.",
   email_not_verified: "Verify your email address before signing in.",
+};
+
+/**
+ * The registry's copy for a platform error code, as one sentence.
+ *
+ * `isRegistered` is the whole test: an entry exists for this code, so the
+ * words were written for this failure. Anything else — better-auth's own
+ * identifiers, a code nobody has given copy yet — answers null and falls
+ * through to the handling below, which is the ADR-045 degradation path.
+ */
+const registryMessage = (key: string): string | null => {
+  const explanation = explainHandledError({
+    code: key,
+    meta: {},
+    httpStatus: 500,
+    fault: "platform",
+    tips: [],
+    docsUrl: undefined,
+    traceId: undefined,
+    reasons: [],
+  });
+  if (!explanation.isRegistered) return null;
+  const title = explanation.title.endsWith(".")
+    ? explanation.title
+    : `${explanation.title}.`;
+  return explanation.description
+    ? `${title} ${explanation.description}`
+    : title;
 };
 
 /**
@@ -102,7 +146,14 @@ export const authFailureMessage = ({
   if (CREDENTIAL_REJECTION_KEYS.has(key)) {
     return "Invalid email or password.";
   }
-  const keyed = KEYED_MESSAGES[key] ?? statusClassMessage(status, key);
+  // better-auth's own vocabulary first: those identifiers are its, and the
+  // registry has no entry for them. The registry BEFORE the status class,
+  // because a platform refusal with named copy must not be flattened into
+  // "something went wrong on our side" by its own 5xx.
+  const keyed =
+    KEYED_MESSAGES[key] ??
+    registryMessage(key) ??
+    statusClassMessage(status, key);
   if (keyed) {
     return keyed;
   }

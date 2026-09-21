@@ -68,7 +68,7 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
     // Wire the App singleton — procedures that touch
     // `getApp().organizations.*` (getOrganizationWithMembersAndTheirTeams)
     // or `assertEnterprisePlan` (the group router) require a live App.
-    // Same pattern as organization.invites.integration.test.ts (#3240
+    // Same pattern as invite.integration.test.ts (#3240
     // workaround) — bypass initializeDefaultApp() which has a require()
     // chain that fails under vitest, and instead build a test App with
     // (a) a real Prisma org repo so picker procedures resolve fixtures,
@@ -346,9 +346,9 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
       ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
-    it("organization.getOrganizationPendingInvites → UNAUTHORIZED for member", async () => {
+    it("invite.getOrganizationPendingInvites → UNAUTHORIZED for member", async () => {
       await expect(
-        memberCaller.organization.getOrganizationPendingInvites({
+        memberCaller.invite.getOrganizationPendingInvites({
           organizationId: ORG_ID,
         }),
       ).rejects.toMatchObject({ code: "FORBIDDEN" });
@@ -383,7 +383,7 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
         }),
       ).resolves.toBeDefined();
       await expect(
-        adminCaller.organization.getOrganizationPendingInvites({
+        adminCaller.invite.getOrganizationPendingInvites({
           organizationId: ORG_ID,
         }),
       ).resolves.toBeDefined();

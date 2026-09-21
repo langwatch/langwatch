@@ -406,21 +406,41 @@ export const saveWorkbenchStateResponseSchema = z.object({
 });
 
 const workbenchVersionSchema = z.object({
-  version: z.number().int(),
+  version: z
+    .number()
+    .int()
+    .describe(
+      "Restore this version by this number. Named versions run 1, 2, 3 with no gaps. The autosave row also has a number, but it changes with every save, so read it as a handle and not as a place in the history.",
+    ),
+  counterVersion: z
+    .number()
+    .int()
+    .describe(
+      "The setup version this row was written at. It says how recent the row is, and it equals the experiment's current version on the row holding the live setup.",
+    ),
   autoSaved: z
     .boolean()
-    .describe("True for a version written by an ordinary save"),
+    .describe(
+      "True for the single autosave row, which every ordinary save rewrites in place",
+    ),
   commitMessage: z.string().nullable(),
   authorLabel: z
     .string()
     .describe("Who wrote it: user, langy or api")
     .openapi({ example: "user" }),
   authorId: z.string().nullable().describe("User id, when a person wrote it"),
-  createdAt: z.string().describe("ISO 8601 timestamp"),
+  createdAt: z.string().describe("ISO 8601 timestamp of the first write"),
+  updatedAt: z
+    .string()
+    .describe(
+      "ISO 8601 timestamp of the last write. The autosave row is rewritten in place, so this is what says how old its content is.",
+    ),
 });
 
 export const listWorkbenchVersionsResponseSchema = z.object({
-  versions: z.array(workbenchVersionSchema).describe("Newest first"),
+  versions: z
+    .array(workbenchVersionSchema)
+    .describe("Newest first, by `counterVersion`"),
   nextCursor: z
     .number()
     .int()

@@ -1,9 +1,11 @@
 import { Box } from "@chakra-ui/react";
 import { memo, type ReactNode, useEffect } from "react";
 import { Outlet } from "react-router";
+import { GuidedOnboardingHost } from "~/features/guided-onboarding/tour/GuidedOnboardingHost";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { LangySidecar } from "./components/LangyPanel";
+import { useLangyConversationDeepLink } from "./hooks/useLangyConversationDeepLink";
 import { useLangyScopeReset } from "./hooks/useLangyScopeReset";
 import { useShowLangy } from "./hooks/useShowLangy";
 import { LangyProvider, useLangy } from "./LangyContext";
@@ -43,6 +45,7 @@ export default function ProjectLangyLayout() {
     redirectToProjectOnboarding: false,
   });
   useLangyScopeReset();
+  useLangyConversationDeepLink();
 
   return (
     <ProjectLangySubtree
@@ -132,6 +135,9 @@ function LangyShiftedRoot({
         {children}
       </Box>
       {showLangy && <LangySidecarConnected />}
+      {/* The guided onboarding tour and its handoff to the panel live wherever
+          the panel does. Spec: specs/features/onboarding/guided-tour.feature */}
+      {showLangy && <GuidedOnboardingHost />}
     </>
   );
 }

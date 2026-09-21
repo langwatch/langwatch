@@ -18,8 +18,14 @@ import {
   spanSchema,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
+import {
+  codexHelperThreadMarkersOf,
+  type ScopedSpans,
+  stampCodexHelperThread,
+} from "./codex-auxiliary-thread";
 import { shouldFilterCodingAgentSpan } from "./coding-agent-span-filter";
 import type { SpanDedupService } from "./span-dedupe.service";
+import { SpanIngestionTally } from "./span-ingestion-tally";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 /**
@@ -45,26 +51,13 @@ export type SpanIngestionStatus =
  * criterion 5). Only meaningful for `dropped`/`failed` statuses; absent on
  * success/dedup/filtered paths.
  */
-export type SpanDropReason =
-  | "validation"
-  | "age"
-  | "queue";
+export type SpanDropReason = "validation" | "age" | "queue";
 
 export interface SpanIngestionResult {
   status: SpanIngestionStatus;
   error?: string;
   dropReason?: SpanDropReason;
 }
-
-/**
- * Cap the error message we surface in `partialSuccess.errorMessage` so a single
- * bad batch with hundreds of malformed spans cannot blow the response size or
- * swallow the actionable prefix in a wall of repeated text. The OTLP spec lets
- * receivers truncate `partialSuccess.errorMessage` arbitrarily; we keep the
- * first few distinct errors verbatim and append "+N more" if there are more.
- */
-const MAX_DISTINCT_ERRORS_IN_RESPONSE = 5;
-const MAX_SINGLE_ERROR_CHARS = 500;
 
 /**
  * Stable, public-safe messages surfaced in `partialSuccess.errorMessage` per
@@ -80,39 +73,6 @@ const PUBLIC_REJECTION_MESSAGE: Record<SpanDropReason, string> = {
   age: "span start time is more than 31 days in the past",
   queue: "ingestion queue error",
 };
-
-function truncateError(msg: string): string {
-  if (msg.length <= MAX_SINGLE_ERROR_CHARS) return msg;
-  return `${msg.slice(0, MAX_SINGLE_ERROR_CHARS - 3)}...`;
-}
-
-/**
- * Build a bounded error message from the per-span error list. De-duplicates
- * first because a misconfigured SDK will often produce the same parse error
- * for every span in a batch, then truncates each individual error and caps the
- * count. The result is what callers see in `partialSuccess.errorMessage`.
- *
- * Exported so the bounding contract can be unit-tested without a tRPC client.
- */
-export function buildBoundedErrorMessage(errors: string[]): string {
-  // Preserve insertion order while de-duplicating. A batch that fails the same
-  // way 200 times should still surface one entry, not 200.
-  const seen = new Set<string>();
-  const distinct: string[] = [];
-  for (const e of errors) {
-    if (!seen.has(e)) {
-      seen.add(e);
-      distinct.push(e);
-    }
-  }
-  if (distinct.length === 0) return "";
-  const shown = distinct.slice(0, MAX_DISTINCT_ERRORS_IN_RESPONSE).map(truncateError);
-  const remaining = distinct.length - shown.length;
-  if (remaining > 0) {
-    return `${shown.join("; ")}; +${remaining} more`;
-  }
-  return shown.join("; ");
-}
 
 /** An OtlpSpan whose ID fields have been normalized to hex strings. */
 type NormalizedIdSpan = OtlpSpan & { traceId: string; spanId: string };
@@ -189,91 +149,6 @@ export interface TraceRequestCollectionDeps {
 }
 
 /**
- * Per-request tally of span outcomes, and the one place that decides what each
- * outcome means to a caller.
- *
- * It exists as its own unit because two of those decisions are load-bearing and
- * were previously inline: filtered spans are NOT rejections, and drops and
- * dispatch failures are rejections with opposite retry answers (see
- * `TraceRequestCollectionResult`).
- */
-class SpanIngestionTally {
-  private collected = 0;
-  private dropped = 0;
-  private deduped = 0;
-  private filtered = 0;
-  private failed = 0;
-  // Per-reason breakdown of rejected spans (issue #5898 acceptance
-  // criterion 5). The set of keys is closed (validation/age/queue) so a
-  // numeric counter per key is enough — no need for a Map.
-  private rejectedByValidation = 0;
-  private rejectedByAge = 0;
-  private rejectedByQueue = 0;
-  private readonly errors: string[] = [];
-  private readonly failureErrors: string[] = [];
-
-  record(result: SpanIngestionResult): void {
-    switch (result.status) {
-      case "collected":
-        this.collected++;
-        break;
-      case "dropped":
-        this.dropped++;
-        if (result.dropReason === "validation") this.rejectedByValidation++;
-        else if (result.dropReason === "age") this.rejectedByAge++;
-        break;
-      case "deduped":
-        this.deduped++;
-        break;
-      case "filtered":
-        this.filtered++;
-        break;
-      case "failed":
-        this.failed++;
-        if (result.dropReason === "queue") this.rejectedByQueue++;
-        if (result.error) this.failureErrors.push(result.error);
-        break;
-    }
-    if (result.error) this.errors.push(result.error);
-  }
-
-  annotate(span: OtelSpan): void {
-    span.setAttribute("spans.ingestion.successes", this.collected);
-    span.setAttribute("spans.ingestion.failures", this.failed);
-    span.setAttribute("spans.ingestion.drops", this.dropped);
-    span.setAttribute("spans.ingestion.deduped", this.deduped);
-    span.setAttribute("spans.ingestion.filtered", this.filtered);
-    // Rejected-span breakdown by rejection reason. Emitted as separate
-    // attributes so dashboards can sum any slice without parsing a JSON
-    // blob, and so the existing `spans.ingestion.drops`/`failures`
-    // attributes stay back-compatible.
-    span.setAttribute(
-      "spans.ingestion.rejected.by_reason.validation",
-      this.rejectedByValidation,
-    );
-    span.setAttribute(
-      "spans.ingestion.rejected.by_reason.age",
-      this.rejectedByAge,
-    );
-    span.setAttribute(
-      "spans.ingestion.rejected.by_reason.queue",
-      this.rejectedByQueue,
-    );
-  }
-
-  toResult(): TraceRequestCollectionResult {
-    return {
-      // Filtered spans are intentionally not stored (coding-agent infra
-      // noise), so they are NOT rejections.
-      rejectedSpans: this.dropped + this.failed,
-      ingestionFailures: this.failed,
-      ingestionFailureMessage: this.failureErrors.join("; "),
-      errorMessage: this.errors.join("; "),
-    };
-  }
-}
-
-/**
  * Service for collecting trace requests into the trace processing pipeline.
  *
  * Normalizes OTLP trace requests and sends each span as a span-received event
@@ -309,7 +184,14 @@ export class TraceRequestCollectionService {
         },
       },
       async (span) => {
-        const tally = new SpanIngestionTally();
+        const tally = SpanIngestionTally.create();
+
+        // A codex helper thread's request span names its thread only through
+        // a child in the same export (see codex-auxiliary-thread.ts), so the
+        // join runs over the whole request before any span is processed.
+        const helperThreads = codexHelperThreadMarkersOf({
+          scopes: scopedSpansOf(traceRequest),
+        });
 
         for (const resourceSpan of traceRequest.resourceSpans ?? []) {
           const resource = resourceSpan?.resource;
@@ -340,6 +222,7 @@ export class TraceRequestCollectionService {
                 scope: scopeParseResult.data ?? null,
                 piiRedactionLevel,
                 otelSpanRef: span,
+                helperThreads,
               });
 
               tally.record(result);
@@ -456,6 +339,7 @@ export class TraceRequestCollectionService {
     scope,
     piiRedactionLevel,
     otelSpanRef,
+    helperThreads,
   }: {
     tenantId: string;
     otelSpan: unknown;
@@ -463,6 +347,12 @@ export class TraceRequestCollectionService {
     scope: OtlpInstrumentationScope | null;
     piiRedactionLevel: PIIRedactionLevel;
     otelSpanRef: OtelSpan;
+    /**
+     * The codex helper threads this batch's temporary structured request
+     * spans were issued for, by request span id. Absent for a caller that
+     * ingests one span at a time, which then stamps nothing.
+     */
+    helperThreads?: Map<string, string>;
   }): Promise<SpanIngestionResult> {
     const spanParseResult = spanSchema.safeParse(otelSpan);
     if (!spanParseResult.success) {
@@ -503,6 +393,19 @@ export class TraceRequestCollectionService {
       };
     }
 
+    // A codex helper thread's request span gets its thread id here, before
+    // the filter reads the span: the stamp is what admits it.
+    const helperThreadId = helperThreads?.get(
+      TraceRequestUtils.normalizeOtlpId(spanParseResult.data.spanId),
+    );
+    const span =
+      helperThreadId !== undefined
+        ? stampCodexHelperThread({
+            span: spanParseResult.data,
+            threadId: helperThreadId,
+          })
+        : spanParseResult.data;
+
     // Drop pure-infra spans from the noisy coding-agent tools (codex/opencode)
     // so their traces read like claude's and the infra-only fragment traces
     // never get created. Scoped to those two instrumentation scopes; all other
@@ -512,8 +415,8 @@ export class TraceRequestCollectionService {
       process.env.LANGWATCH_DISABLE_CODING_AGENT_SPAN_FILTER !== "true" &&
       shouldFilterCodingAgentSpan({
         scopeName: scope?.name,
-        spanName: spanParseResult.data.name,
-        attributeKeys: spanParseResult.data.attributes.map((a) => a.key),
+        spanName: span.name,
+        attributeKeys: span.attributes.map((a) => a.key),
       })
     ) {
       return { status: "filtered" };
@@ -521,11 +424,36 @@ export class TraceRequestCollectionService {
 
     return await this.ingestNormalizedSpan({
       tenantId,
-      span: normalizeSpanIds(spanParseResult.data),
+      span: normalizeSpanIds(span),
       resource,
       instrumentationScope: scope,
       piiRedactionLevel,
       otelSpanRef,
     });
   }
+}
+
+/** Every scope entry of the request with its parsed spans, for the helper-thread join. */
+function scopedSpansOf(
+  traceRequest: IExportTraceServiceRequest,
+): ScopedSpans[] {
+  const scopes: ScopedSpans[] = [];
+  for (const resourceSpan of traceRequest.resourceSpans ?? []) {
+    for (const scopeSpan of resourceSpan?.scopeSpans ?? []) {
+      scopes.push({
+        scopeName: scopeSpan?.scope?.name,
+        spans: parsedSpansOf(scopeSpan?.spans ?? []),
+      });
+    }
+  }
+  return scopes;
+}
+
+function parsedSpansOf(otelSpans: unknown[]): OtlpSpan[] {
+  const spans: OtlpSpan[] = [];
+  for (const otelSpan of otelSpans) {
+    const parsed = spanSchema.safeParse(otelSpan);
+    if (parsed.success) spans.push(parsed.data);
+  }
+  return spans;
 }

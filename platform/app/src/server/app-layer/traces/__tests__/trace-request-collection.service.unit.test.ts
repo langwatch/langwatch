@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
   PIIRedactionLevel,
@@ -7,10 +7,8 @@ import type {
 } from "../../../event-sourcing/pipelines/trace-processing/schemas/commands";
 import type { OtlpSpan } from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import type { SpanDedupService } from "../span-dedupe.service";
-import {
-  buildBoundedErrorMessage,
-  TraceRequestCollectionService,
-} from "../trace-request-collection.service";
+import { buildBoundedErrorMessage } from "../span-ingestion-tally";
+import { TraceRequestCollectionService } from "../trace-request-collection.service";
 
 // ─── Tracer / logger mocks ─────────────────────────────────────────────────
 // `handleOtlpTraceRequest` wraps iteration in `tracer.withActiveSpan` and
@@ -261,15 +259,13 @@ describe("TraceRequestCollectionService.handleOtlpTraceRequest", () => {
       const { service } = makeService({ dedupAcquire: true });
       const req = makeTraceRequest([{}, {}]);
 
-      await service.handleOtlpTraceRequest(
-        tenantId,
-        req,
-        piiRedactionLevel,
-      );
+      await service.handleOtlpTraceRequest(tenantId, req, piiRedactionLevel);
 
       const calls = setAttribute.mock.calls as unknown as [string, unknown][];
       const byReason = Object.fromEntries(
-        calls.filter(([k]) => k.startsWith("spans.ingestion.rejected.by_reason.")),
+        calls.filter(([k]) =>
+          k.startsWith("spans.ingestion.rejected.by_reason."),
+        ),
       );
       expect(byReason).toEqual({
         "spans.ingestion.rejected.by_reason.validation": 0,
@@ -329,11 +325,7 @@ describe("TraceRequestCollectionService.handleOtlpTraceRequest", () => {
         {},
       ]);
 
-      await service.handleOtlpTraceRequest(
-        tenantId,
-        req,
-        piiRedactionLevel,
-      );
+      await service.handleOtlpTraceRequest(tenantId, req, piiRedactionLevel);
 
       const calls = setAttribute.mock.calls as unknown as [string, unknown][];
       const validation = calls.find(
@@ -371,11 +363,7 @@ describe("TraceRequestCollectionService.handleOtlpTraceRequest", () => {
         {},
       ]);
 
-      await service.handleOtlpTraceRequest(
-        tenantId,
-        req,
-        piiRedactionLevel,
-      );
+      await service.handleOtlpTraceRequest(tenantId, req, piiRedactionLevel);
 
       const calls = setAttribute.mock.calls as unknown as [string, unknown][];
       const age = calls.find(
@@ -494,15 +482,13 @@ describe("buildBoundedErrorMessage", () => {
 
   describe("when there are several distinct errors", () => {
     it("joins them with '; ' in insertion order", () => {
-      expect(
-        buildBoundedErrorMessage(["a", "b", "c"]),
-      ).toBe("a; b; c");
+      expect(buildBoundedErrorMessage(["a", "b", "c"])).toBe("a; b; c");
     });
 
     it("de-duplicates while preserving first-seen order", () => {
-      expect(
-        buildBoundedErrorMessage(["a", "b", "a", "c", "b"]),
-      ).toBe("a; b; c");
+      expect(buildBoundedErrorMessage(["a", "b", "a", "c", "b"])).toBe(
+        "a; b; c",
+      );
     });
   });
 
@@ -535,7 +521,9 @@ describe("buildBoundedErrorMessage", () => {
       const long1 = "a".repeat(600);
       const long2 = "b".repeat(600);
       const result = buildBoundedErrorMessage([long1, long2]);
-      expect(result.length).toBe(/* "aaa..." */ 500 + /* "; " */ 2 + /* "bbb..." */ 500);
+      expect(result.length).toBe(
+        /* "aaa..." */ 500 + /* "; " */ 2 + /* "bbb..." */ 500,
+      );
       expect(result.endsWith("...")).toBe(true);
     });
   });

@@ -104,7 +104,7 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     cursor: str | Unset = UNSET,
     limit: int | Unset = 50,
     scope_type: str | Unset = UNSET,
@@ -126,18 +126,19 @@ def sync_detailed(
     member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many
     members the allowance currently covers. `attributed_user` rows are per-person templates: `limit_usd`
     is what EACH end user may spend, `end_users_seen` counts the end users with spend this period, and
-    `end_users_over` how many of them are at or over that limit. `spend_available: false` means spend
-    could not be totalled, and both `spent_usd` and `spent_nano_usd` are then null rather than a stale
-    figure a caller could read as real money. Every amount is published twice: `_usd` is the display
-    string, `_nano_usd` is the canonical integer in the same nano-USD unit the spend events carry, so a
-    budget and its spend reconcile without parsing decimals.
+    `end_users_over` how many of them are at or over that limit. A template's own `spent_usd` and
+    `spent_nano_usd` are null because one allowance per person has no single total to report; each
+    person's figure is in `GET /spend-summaries` and the seat buckets. `spend_available: false` means
+    spend could not be totalled at all, and both fields are null for that reason instead, rather than a
+    stale figure a caller could read as real money. Every amount is published twice: `_usd` is the
+    display string, `_nano_usd` is the canonical integer in the same nano-USD unit the spend events
+    carry, so a budget and its spend reconcile without parsing decimals.
 
     Args:
         cursor (str | Unset):
         limit (int | Unset):  Default: 50.
-        scope_type (str | Unset): Comma-separated subset of the scope types, lowercase, e.g.
-            `virtual_key,principal`.
-        external_id (str | Unset): Exact match on the resource's `external_id`.
+        scope_type (str | Unset):
+        external_id (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -163,7 +164,7 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     cursor: str | Unset = UNSET,
     limit: int | Unset = 50,
     scope_type: str | Unset = UNSET,
@@ -186,18 +187,19 @@ def sync(
     member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many
     members the allowance currently covers. `attributed_user` rows are per-person templates: `limit_usd`
     is what EACH end user may spend, `end_users_seen` counts the end users with spend this period, and
-    `end_users_over` how many of them are at or over that limit. `spend_available: false` means spend
-    could not be totalled, and both `spent_usd` and `spent_nano_usd` are then null rather than a stale
-    figure a caller could read as real money. Every amount is published twice: `_usd` is the display
-    string, `_nano_usd` is the canonical integer in the same nano-USD unit the spend events carry, so a
-    budget and its spend reconcile without parsing decimals.
+    `end_users_over` how many of them are at or over that limit. A template's own `spent_usd` and
+    `spent_nano_usd` are null because one allowance per person has no single total to report; each
+    person's figure is in `GET /spend-summaries` and the seat buckets. `spend_available: false` means
+    spend could not be totalled at all, and both fields are null for that reason instead, rather than a
+    stale figure a caller could read as real money. Every amount is published twice: `_usd` is the
+    display string, `_nano_usd` is the canonical integer in the same nano-USD unit the spend events
+    carry, so a budget and its spend reconcile without parsing decimals.
 
     Args:
         cursor (str | Unset):
         limit (int | Unset):  Default: 50.
-        scope_type (str | Unset): Comma-separated subset of the scope types, lowercase, e.g.
-            `virtual_key,principal`.
-        external_id (str | Unset): Exact match on the resource's `external_id`.
+        scope_type (str | Unset):
+        external_id (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -218,7 +220,7 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     cursor: str | Unset = UNSET,
     limit: int | Unset = 50,
     scope_type: str | Unset = UNSET,
@@ -240,18 +242,19 @@ async def asyncio_detailed(
     member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many
     members the allowance currently covers. `attributed_user` rows are per-person templates: `limit_usd`
     is what EACH end user may spend, `end_users_seen` counts the end users with spend this period, and
-    `end_users_over` how many of them are at or over that limit. `spend_available: false` means spend
-    could not be totalled, and both `spent_usd` and `spent_nano_usd` are then null rather than a stale
-    figure a caller could read as real money. Every amount is published twice: `_usd` is the display
-    string, `_nano_usd` is the canonical integer in the same nano-USD unit the spend events carry, so a
-    budget and its spend reconcile without parsing decimals.
+    `end_users_over` how many of them are at or over that limit. A template's own `spent_usd` and
+    `spent_nano_usd` are null because one allowance per person has no single total to report; each
+    person's figure is in `GET /spend-summaries` and the seat buckets. `spend_available: false` means
+    spend could not be totalled at all, and both fields are null for that reason instead, rather than a
+    stale figure a caller could read as real money. Every amount is published twice: `_usd` is the
+    display string, `_nano_usd` is the canonical integer in the same nano-USD unit the spend events
+    carry, so a budget and its spend reconcile without parsing decimals.
 
     Args:
         cursor (str | Unset):
         limit (int | Unset):  Default: 50.
-        scope_type (str | Unset): Comma-separated subset of the scope types, lowercase, e.g.
-            `virtual_key,principal`.
-        external_id (str | Unset): Exact match on the resource's `external_id`.
+        scope_type (str | Unset):
+        external_id (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -275,7 +278,7 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     cursor: str | Unset = UNSET,
     limit: int | Unset = 50,
     scope_type: str | Unset = UNSET,
@@ -298,18 +301,19 @@ async def asyncio(
     member may spend, while `spent_usd` is the group's summed spend, and `member_count` says how many
     members the allowance currently covers. `attributed_user` rows are per-person templates: `limit_usd`
     is what EACH end user may spend, `end_users_seen` counts the end users with spend this period, and
-    `end_users_over` how many of them are at or over that limit. `spend_available: false` means spend
-    could not be totalled, and both `spent_usd` and `spent_nano_usd` are then null rather than a stale
-    figure a caller could read as real money. Every amount is published twice: `_usd` is the display
-    string, `_nano_usd` is the canonical integer in the same nano-USD unit the spend events carry, so a
-    budget and its spend reconcile without parsing decimals.
+    `end_users_over` how many of them are at or over that limit. A template's own `spent_usd` and
+    `spent_nano_usd` are null because one allowance per person has no single total to report; each
+    person's figure is in `GET /spend-summaries` and the seat buckets. `spend_available: false` means
+    spend could not be totalled at all, and both fields are null for that reason instead, rather than a
+    stale figure a caller could read as real money. Every amount is published twice: `_usd` is the
+    display string, `_nano_usd` is the canonical integer in the same nano-USD unit the spend events
+    carry, so a budget and its spend reconcile without parsing decimals.
 
     Args:
         cursor (str | Unset):
         limit (int | Unset):  Default: 50.
-        scope_type (str | Unset): Comma-separated subset of the scope types, lowercase, e.g.
-            `virtual_key,principal`.
-        external_id (str | Unset): Exact match on the resource's `external_id`.
+        scope_type (str | Unset):
+        external_id (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

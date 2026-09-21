@@ -1,0 +1,69 @@
+-- An API-key permission check asks who else holds a key's private role:
+-- `(organizationId, roleKey)`, fenced on the row not being revoked. Every
+-- index on Grant led with organizationId and then went somewhere else
+-- (scopeType, principalType, projectId), so for an organization that holds
+-- more than a handful of grants the leading column selects everything and
+-- there is nothing left to descend. Postgres read every live grant the
+-- organization owned, on every check, to return a few rows.
+--
+-- The fence belongs in the index rather than as a filter over it, for the
+-- same reason it does on "Grant_organizationId_scopeType_scopeId_live_idx"
+-- (20260820180000_grants_revoke_marks_the_row): every read that decides
+-- access excludes marked rows, so an index that still carries them is an
+-- index the planner has to filter after descending.
+--
+-- IF NOT EXISTS is deliberate. A deployment with no CPU headroom can build
+-- this ahead of the release with CREATE INDEX CONCURRENTLY - which cannot
+-- run here, because Prisma wraps each migration in a transaction - and this
+-- statement then becomes the no-op that records the same intent.
+--
+-- That escape hatch has one trap, and it is the reason this comment is long:
+-- a CREATE INDEX CONCURRENTLY that FAILS leaves an invalid index behind
+-- under this exact name. IF NOT EXISTS would then match it and skip, and the
+-- planner never uses an invalid index - so the migration would report success
+-- while the read stayed broken, which is the worst of both. Anyone taking the
+-- concurrent path must check
+--   SELECT indisvalid FROM pg_index WHERE indexrelid =
+--     '"Grant_organizationId_roleKey_live_idx"'::regclass;
+-- and DROP INDEX before retrying.
+--
+-- LOCKING NOTE: left alone, the plain build takes a SHARE lock on "Grant".
+-- Reads keep working; writes wait. That matters more here than on an ordinary
+-- table, because "Grant" is the live authorization projection and a revoke is
+-- a write - so the length of the build is the length of the worst-case delay
+-- on a revoke landing.
+--
+-- Measured on a local Postgres 16 container on developer hardware, over a
+-- 600,000-row reproduction: 400-575 ms to build, 4 MB of index. Two
+-- distributions were tried, because a btree deduplicates repeated keys and a
+-- lopsided seed would flatter the result - one organization holding every row
+-- built in 524 ms, a 7,000-organization spread in 399 ms. The shape barely
+-- moves it, so the range above is the honest one.
+--
+-- Read that as an order of magnitude, not as a production figure: a smaller
+-- or already-saturated instance should expect single-digit seconds, the same
+-- extrapolation 20260804120000_dataset_record_project_dataset_index made from
+-- its own reproduction. Plan the deploy window for seconds.
+--
+-- That trade is the one this directory already takes - see that migration and
+-- 20260814120002_llm_prompt_config_org_scope_index - and for the same reason:
+-- CONCURRENTLY cannot run inside the transaction Prisma wraps a migration in.
+-- Making the concurrent prebuild mandatory instead would fail this migration
+-- on every fresh install, which is worse than a wait of that length.
+CREATE INDEX IF NOT EXISTS "Grant_organizationId_roleKey_live_idx"
+  ON "Grant" ("organizationId", "roleKey")
+  WHERE "revokedAt" IS NULL;
+
+-- Down (manual rollback; uncomment and run). The index carries no row data of
+-- its own, so dropping it loses nothing - the API-key permission check goes
+-- back to reading every live grant the organization owns on every call.
+--
+-- Note the lock is the other way round from the build above: a plain DROP
+-- INDEX takes ACCESS EXCLUSIVE and blocks reads as well as writes, where the
+-- build blocked only writes. On this index that is immaterial - dropping it
+-- took 0.458 ms on the same reproduction, because the work is unlinking a
+-- catalog entry rather than scanning a heap - but if it ever needs to happen
+-- on a running system, DROP INDEX CONCURRENTLY is the form that does not
+-- block, and it works here because a manual rollback is not inside Prisma's
+-- transaction:
+-- DROP INDEX IF EXISTS "Grant_organizationId_roleKey_live_idx";

@@ -1,9 +1,9 @@
 /**
  * @vitest-environment jsdom
  *
- * The "/" landing seam: in a new navigation mode the per-org product
- * memory decides ahead of the server resolver, and in legacy mode the
- * current resolveHomeDestination path runs unchanged.
+ * The "/" landing seam: the per-org product memory decides ahead of the
+ * server home resolver, and re-renders during the in-flight navigation
+ * never restart the same replace.
  *
  * Spec: specs/navigation/navigation-v2-landing.feature
  */
@@ -12,11 +12,11 @@ import { render, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const replaceMock = vi.fn().mockResolvedValue(true);
-let mockMode: "legacy" | "product-switcher" = "product-switcher";
 let mockResolveHome: {
   data?: { destination: string; isOverride: boolean } & Record<string, unknown>;
   isError: boolean;
 } = { isError: false };
+let mockWorkspace: Record<string, unknown> = {};
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
@@ -26,10 +26,6 @@ vi.mock("~/utils/compat/next-router", () => ({
     push: vi.fn(),
     replace: replaceMock,
   }),
-}));
-
-vi.mock("~/features/navigation/useNavigationMode", () => ({
-  useNavigationMode: () => ({ status: "ready", mode: mockMode }),
 }));
 
 vi.mock("~/features/navigation/useReachableProducts", () => ({
@@ -43,12 +39,14 @@ vi.mock("~/features/navigation/useReachableProducts", () => ({
 // project this fixture resolves is the organization's, so they answer with it.
 vi.mock("~/hooks/useOrganizationTeamProject", async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  useOrganizationTeamProject: () => ({
-    isLoading: false,
-    organization: { id: "org_1" },
-    organizations: [{ id: "org_1" }],
-    project: { id: "project_1", slug: "demo", isPersonal: false },
-  }),
+  useOrganizationTeamProject: () => mockWorkspace,
+}));
+
+// Stubbed to markers rather than rendered: what this file checks is WHICH of
+// the two surfaces "/" draws, not what either one says. The words on the
+// failure come from the code-keyed registry and are tested where it lives.
+vi.mock("~/features/errors", () => ({
+  HandledErrorState: () => <div data-testid="workspace-failed" />,
 }));
 
 vi.mock("~/utils/api", () => ({
@@ -60,7 +58,7 @@ vi.mock("~/utils/api", () => ({
 }));
 
 vi.mock("../../components/LoadingScreen", () => ({
-  LoadingScreen: () => null,
+  LoadingScreen: () => <div data-testid="loading-screen" />,
 }));
 
 import { writeLastVisitedProduct } from "~/features/navigation/logic/productMemory";
@@ -69,7 +67,13 @@ import Index from "../index";
 beforeEach(() => {
   localStorage.clear();
   replaceMock.mockClear();
-  mockMode = "product-switcher";
+  mockWorkspace = {
+    isLoading: false,
+    workspaceError: null,
+    organization: { id: "org_1" },
+    organizations: [{ id: "org_1" }],
+    project: { id: "project_1", slug: "demo", isPersonal: false },
+  };
   mockResolveHome = {
     data: {
       destination: "/demo",
@@ -82,8 +86,8 @@ beforeEach(() => {
 });
 
 describe("the root landing", () => {
-  describe("when a new mode remembers a product", () => {
-    /** @scenario The root address opens the remembered product in a new mode */
+  describe("when the device remembers a product", () => {
+    /** @scenario The root address opens the remembered product */
     it("opens the remembered product ahead of the server resolver", async () => {
       writeLastVisitedProduct({
         organizationId: "org_1",
@@ -121,7 +125,6 @@ describe("the root landing", () => {
   describe("when the landing page re-renders while the navigation is in flight", () => {
     /** @scenario The landing redirect navigates once per destination */
     it("navigates once per destination", async () => {
-      mockMode = "legacy";
       const { rerender } = render(<Index />);
 
       await waitFor(() => {
@@ -138,19 +141,28 @@ describe("the root landing", () => {
     });
   });
 
-  describe("when the device is in legacy mode", () => {
-    /** @scenario The root address keeps its current behavior in legacy mode */
-    it("resolves through the current home resolution, ignoring the memory", async () => {
-      mockMode = "legacy";
-      writeLastVisitedProduct({
-        organizationId: "org_1",
-        productId: "governance",
-      });
-      render(<Index />);
+  describe("when the organization graph refused the read", () => {
+    /** @scenario The landing address says a refused read failed rather than waiting on it */
+    it("says the workspace could not be opened instead of waiting on it", () => {
+      mockWorkspace = {
+        isLoading: false,
+        workspaceError: new Error("UNAUTHORIZED"),
+        organization: undefined,
+        organizations: undefined,
+        project: undefined,
+      };
+      // The home resolver is asked for an organization, so a refused graph
+      // leaves it switched off and answerless — there is no second source the
+      // page could have fallen back to.
+      mockResolveHome = { isError: false };
 
-      await waitFor(() => {
-        expect(replaceMock).toHaveBeenCalledWith("/demo");
-      });
+      const { queryByTestId } = render(<Index />);
+
+      // The redirect never comes for a graph that will not answer, so the
+      // loading screen this page shows while deciding would be permanent.
+      expect(queryByTestId("workspace-failed")).not.toBeNull();
+      expect(queryByTestId("loading-screen")).toBeNull();
+      expect(replaceMock).not.toHaveBeenCalled();
     });
   });
 });

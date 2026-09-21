@@ -83,6 +83,25 @@ describe("given the internal ops pages the route table registers", () => {
     });
   });
 
+  describe("when the single sign-on connections entry is resolved", () => {
+    const CONNECTIONS = "/ops/backoffice/sso-connections";
+
+    /** @scenario "The connections page is reachable from the operator menu" */
+    it("resolves to a route registered for that exact path", () => {
+      // The menu offers it...
+      const offered = backofficeGroup().items.find(
+        (item) => item.href === CONNECTIONS,
+      );
+      expect(offered).toBeDefined();
+
+      // ...and the route table registers that exact path, rather than the
+      // link falling through to `/:project` or the catch-all. Both halves,
+      // because the pair of hand-maintained tables is what drifts.
+      expect(addresses).toContain(CONNECTIONS);
+      expect(isClaimedBy({ address: CONNECTIONS, groups: menu })).toBe(true);
+    });
+  });
+
   describe("when the event-sourcing tools are looked for", () => {
     const TOOLS = ["/ops/projections", "/ops/blobs", "/ops/dejaview"];
 

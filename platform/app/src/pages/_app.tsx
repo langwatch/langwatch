@@ -12,7 +12,9 @@ import {
   mergeConfigs,
 } from "@chakra-ui/react";
 import { colorSystem } from "../components/ui/color-mode";
+import { authThemeConfig } from "../features/auth/authTheme";
 import { langyThemeConfig } from "../features/langy/langyTheme";
+import { drawerSlotRecipe } from "../theme/recipes/drawer";
 
 // Inter font loaded via CSS @import in globals.scss (no more next/font/google)
 const interFontFamily = "'Inter', sans-serif";
@@ -45,6 +47,29 @@ const toastPanel = {
 
 const appConfig = defineConfig({
   globalCss: {
+    /**
+     * What the BROWSER paints, as opposed to what we do.
+     *
+     * `color-scheme` was never declared, so every surface the browser draws
+     * itself stayed in light mode over a dark app: scrollbars above all — a
+     * pale grey trough and a chunky thumb, the single loudest thing on a dark
+     * page — but also the spinners, the autofill wash, the date and select
+     * popups, and the overscroll gutter.
+     *
+     * Declaring it is the whole fix, and it is a better one than styling
+     * `::-webkit-scrollbar` by hand: the browser draws its own dark scrollbar,
+     * which is the one the person already recognises from every other dark
+     * application, at the width their platform says and with the
+     * overlay/inset behaviour their platform says. A hand-drawn one is a
+     * scrollbar that looks like ours instead of like theirs, and it has to be
+     * re-tuned per platform forever.
+     *
+     * Keyed off the resolved theme rather than `prefers-color-scheme`, so it
+     * follows the toggle in the app and not the operating system — those
+     * disagree exactly when somebody has chosen.
+     */
+    ":root": { colorScheme: "light" },
+    ".dark, [data-theme='dark']": { colorScheme: "dark" },
     body: {
       background: { _light: "{colors.gray.100}", _dark: "{colors.zinc.900}" },
       fontSize: "14px",
@@ -747,7 +772,14 @@ const appConfig = defineConfig({
           variant: {
             outline: {
               root: {
-                boxShadow: "2xs",
+                // One soft contact shadow in light mode; in dark, shadows
+                // die on the ground, so the card's lift is a hairline inner
+                // top highlight instead — the modern dark-surface tell.
+                boxShadow: "0 1px 2px rgba(16, 16, 32, 0.05)",
+                _dark: {
+                  boxShadow:
+                    "inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 1px 2px rgba(0, 0, 0, 0.35)",
+                },
               },
             },
             elevated: {
@@ -1079,7 +1111,7 @@ const appConfig = defineConfig({
             borderColor: "border",
             borderRadius: "lg",
             boxShadow: "lg",
-            "& button:not([data-variant=ghost]):not([data-part])": {
+            "& button[data-variant=solid], & button[data-variant=outline]": {
               boxShadow: "md",
             },
             "& input, & textarea, & select": {
@@ -1181,35 +1213,7 @@ const appConfig = defineConfig({
           },
         },
       }),
-      drawer: defineSlotRecipe({
-        slots: ["content", "header"],
-        base: {
-          content: {
-            maxWidth: "70%",
-            background:
-              "color-mix(in srgb, var(--chakra-colors-bg-surface) var(--lw-panel-alpha, 80%), transparent)",
-            backdropFilter: "var(--lw-backdrop-blur, blur(25px))",
-            border: "1px solid",
-            borderColor: "border",
-            borderRadius: "lg",
-          },
-          header: {
-            paddingY: 4,
-            paddingRight: 12,
-          },
-        },
-        variants: {
-          size: {
-            span: { content: { maxWidth: "70%" } },
-            full: { content: { maxWidth: "100%" } },
-            eval: { content: { maxWidth: "1024px" } },
-            xl: { content: { maxWidth: "4xl" } },
-          },
-        },
-        defaultVariants: {
-          size: "xl",
-        },
-      }),
+      drawer: drawerSlotRecipe,
       /**
        * Light mode keeps Chakra's own filled toast: a solid status colour with
        * contrast text. On a light page a white card reads as dead, and the
@@ -1327,7 +1331,7 @@ const appConfig = defineConfig({
  */
 export const system = createSystem(
   defaultConfig,
-  mergeConfigs(appConfig, langyThemeConfig),
+  mergeConfigs(appConfig, langyThemeConfig, authThemeConfig),
 );
 
 // The LangWatch app shell (providers, routing, NProgress) has moved to:

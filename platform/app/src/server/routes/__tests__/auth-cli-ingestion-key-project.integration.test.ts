@@ -19,6 +19,7 @@ import type { Redis } from "ioredis";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { splitApiKeyToken } from "~/server/api-key/api-key-token.utils";
+import { CliLoginKeyService } from "~/server/api-key/cli-login-key.service";
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
@@ -181,10 +182,27 @@ describe("POST /api/auth/cli/governance/ingestion-key with a named project", () 
 
     if (!redisConnection) throw new Error("Redis unavailable in test env");
     const redis = redisConnection;
-    for (const [token, userId] of [
-      [ADMIN_TOKEN, ADMIN_ID],
-      [VIEWER_TOKEN, VIEWER_ID],
-      [LEAVER_TOKEN, LEAVER_ID],
+    // The admin's session carries the login key /exchange mints, because the
+    // personal branch parents its key to that one and answers a session
+    // without it as signed out. The other two never reach that branch.
+    const adminLoginKey = await CliLoginKeyService.create(
+      prisma,
+    ).mintForDeviceSession({
+      userId: ADMIN_ID,
+      organizationId: ORG_ID,
+      deviceLabel: `ikp-admin-${suffix}`,
+      selection: {
+        bindings: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+        permissions: ["traces:create"],
+      },
+      sessionStartedAtMs: Date.now(),
+      maxSessionDurationDays: 0,
+      refreshWindowMs: 90 * 24 * 60 * 60 * 1000,
+    });
+    for (const [token, userId, loginKeyId] of [
+      [ADMIN_TOKEN, ADMIN_ID, adminLoginKey.apiKeyId],
+      [VIEWER_TOKEN, VIEWER_ID, null],
+      [LEAVER_TOKEN, LEAVER_ID, null],
     ] as const) {
       await redis.set(
         `lwcli:access:${token}`,
@@ -193,6 +211,7 @@ describe("POST /api/auth/cli/governance/ingestion-key with a named project", () 
           organization_id: ORG_ID,
           issued_at: Date.now(),
           expires_at: Date.now() + 60 * 60 * 1000,
+          ...(loginKeyId ? { cli_api_key_id: loginKeyId } : {}),
         }),
         "EX",
         60 * 60,

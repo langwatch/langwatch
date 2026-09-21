@@ -17,10 +17,9 @@
  * it would refuse and teaching a caller the wrong rule.
  *
  * @see ~/server/analytics/lwql — the service and everything under it
- * @see specs/analytics/lwql-workbench.feature
+ * @see specs/lwql/workbench.feature
  */
 
-import { NotFoundError } from "@langwatch/handled-error";
 import { z } from "zod";
 
 import {
@@ -28,11 +27,14 @@ import {
   MAX_LWQL_LENGTH,
 } from "~/server/analytics/lwql";
 import { lwqlEnabled } from "~/server/analytics/lwql/access";
-import { lwqlTimeWindowSchema } from "~/server/analytics/lwql/timeWindowSchema";
+import {
+  lwqlGranularityStepSchema,
+  lwqlTimeWindowSchema,
+} from "~/server/analytics/lwql/timeWindowSchema";
 
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
-import { getUserProtectionsForProject } from "../../utils";
 
+import { resolveLangWatchQLCaller } from "./lwqlCaller";
 import { enforceWorkbenchEnabled } from "./workbenchAccessMiddleware";
 
 /**
@@ -69,9 +71,8 @@ export interface LangWatchQLAvailability {
 /**
  * Whether the LangWatchQL query path is switched on and provisioned.
  *
- * Separate from `schema` because the schema is answerable without an executor
- * (it is the catalog), so a deployment with no LangWatchQL identity would describe
- * a surface it cannot run. The navigation gates on this, never on the schema.
+ * The navigation this used to gate (the Custom query page) is gone, but other
+ * callers still read this to decide whether LangWatchQL is usable at all.
  *
  * The one procedure that reads the switch rather than being gated by it: its
  * whole job is to answer "off" out loud, so `enforceWorkbenchEnabled` — which
@@ -98,19 +99,6 @@ const availability = protectedProcedure
     return { available: true };
   });
 
-/** The LangWatchQL datasets and columns this member's permissions unlock. */
-const schema = protectedProcedure
-  .input(projectScopeSchema)
-  .permission("analytics:view")
-  .use(enforceWorkbenchEnabled)
-  .query(async ({ ctx, input }) => {
-    return getLangWatchQLService().describeSchema({
-      protections: await getUserProtectionsForProject(ctx, {
-        projectId: input.projectId,
-      }),
-    });
-  });
-
 /**
  * Runs one submitted statement, exactly as written.
  *
@@ -128,35 +116,38 @@ const query = protectedProcedure
       sql: z.string().min(1).max(MAX_LWQL_LENGTH),
       parameters: z.record(z.string(), parameterValueSchema).optional(),
       timeWindow: lwqlTimeWindowSchema.optional(),
+      /**
+       * The datapoint step for a statement that declares
+       * `{dashboard_context_granularity_seconds:UInt32}`, in seconds — restricted to the
+       * offered steps ({@link lwqlGranularityStepSchema}) so an off-list value
+       * is a schema rejection here rather than reaching the service's backstop.
+       * The bucket-budget arithmetic and its refusal are still the service's.
+       */
+      granularitySeconds: lwqlGranularityStepSchema.optional(),
     }),
   )
   .permission("analytics:view")
   .use(enforceWorkbenchEnabled)
   .mutation(async ({ ctx, input }) => {
-    // The project's LangWatchQL secret is hashed into the tenant capability
-    // the query runs under. It is read server-side and never leaves this
-    // function — no field of it appears in the response.
-    const project = await ctx.prisma.project.findUnique({
-      where: { id: input.projectId },
-      select: { id: true, lwqlKey: true },
+    const { project, protections } = await resolveLangWatchQLCaller({
+      ctx,
+      projectId: input.projectId,
     });
-    if (!project) {
-      throw new NotFoundError("project_not_found", "Project", input.projectId);
-    }
 
     return getLangWatchQLService().execute({
-      project,
-      protections: await getUserProtectionsForProject(ctx, {
-        projectId: project.id,
-      }),
+      // A workbench run is bound to the one project the surface is showing.
+      projects: [project],
+      protections,
       sql: input.sql,
       ...(input.parameters ? { parameters: input.parameters } : {}),
       ...(input.timeWindow ? { timeWindow: input.timeWindow } : {}),
+      ...(input.granularitySeconds === undefined
+        ? {}
+        : { granularitySeconds: input.granularitySeconds }),
     });
   });
 
 export const lwqlRouter = createTRPCRouter({
   availability,
-  schema,
   query,
 });

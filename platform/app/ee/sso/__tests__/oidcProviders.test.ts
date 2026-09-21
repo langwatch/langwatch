@@ -63,11 +63,35 @@ const configFor = (
         scopes?: string[];
         pkce?: boolean;
         redirectURI?: string;
+        requireIdTokenVerification?: boolean;
         mapProfileToUser?: (p: Record<string, any>) => { name?: string };
       }
     | undefined;
 
 describe("buildGenericOAuthConfigs", () => {
+  /** @scenario Supported enterprise providers require ID-token verification */
+  it.each([
+    "auth0",
+    "okta",
+  ])("requires cryptographic ID-token verification for %s", (provider) => {
+    const configs = buildGenericOAuthConfigs(
+      envWith({
+        NEXTAUTH_PROVIDER: provider,
+        AUTH0_CLIENT_ID: "auth0-client-id",
+        AUTH0_CLIENT_SECRET: "auth0-client-secret",
+        AUTH0_ISSUER: "https://tenant.eu.auth0.com",
+        OKTA_CLIENT_ID: "okta-client-id",
+        OKTA_CLIENT_SECRET: "okta-client-secret",
+        OKTA_ISSUER: "https://acme.okta.com",
+        OIDC_CLIENT_ID: "oidc-client-id",
+        OIDC_CLIENT_SECRET: "oidc-client-secret",
+        OIDC_ISSUER: "https://idp.acme.com",
+      }),
+    );
+
+    expect(configFor(configs, provider)?.requireIdTokenVerification).toBe(true);
+  });
+
   describe("when NEXTAUTH_PROVIDER is cognito", () => {
     /** @scenario Cognito mode */
     it("mounts a cognito provider that discovers its endpoints from the issuer", () => {
@@ -289,6 +313,52 @@ describe("discoveryUrlFor", () => {
       expect(() =>
         discoveryUrlFor("not a url at all !!!", "COGNITO_ISSUER"),
       ).toThrow(/Invalid COGNITO_ISSUER.*not a url at all/);
+    });
+  });
+});
+
+/**
+ * The namespacing the identity branch's provider-subject lookup depends on
+ * (ADR-116). `Identifier` is uniquely indexed on
+ * `(providerId, providerAccountId)`, and every lookup keys on it, because an
+ * OIDC subject is unique only WITHIN an issuer. `providerId` can only carry
+ * that if each configured connection has its own — the moment two
+ * connections share one, their subject spaces merge and one customer can be
+ * signed in as another.
+ *
+ * Today that holds by construction: one connection per configured provider.
+ * The Auth0 exit is what puts it under pressure — every enterprise customer
+ * connecting directly, rather than behind Auth0's own namespacing — so this
+ * is here to fail loudly if a change ever routes several connections through
+ * one provider id before connections become data (D04) and the index gains a
+ * `connectionId`.
+ */
+describe("provider ids namespace their subjects", () => {
+  describe("given every provider the environment can configure", () => {
+    /** @scenario "Two enterprise IdPs sharing a subject resolve to different users" */
+    it("gives each configured provider its own id, so no two share a subject space", () => {
+      const ids = ["cognito", "onelogin", "okta", "auth0", "oidc"].flatMap(
+        (provider) =>
+          providerIds(
+            buildGenericOAuthConfigs(
+              envWith({
+                NEXTAUTH_PROVIDER: provider,
+                AUTH0_CLIENT_ID: "auth0-client-id",
+                AUTH0_CLIENT_SECRET: "auth0-client-secret",
+                AUTH0_ISSUER: "https://tenant.eu.auth0.com",
+                OKTA_CLIENT_ID: "okta-client-id",
+                OKTA_CLIENT_SECRET: "okta-client-secret",
+                OKTA_ISSUER: "https://acme.okta.com",
+                OIDC_CLIENT_ID: "oidc-client-id",
+                OIDC_CLIENT_SECRET: "oidc-client-secret",
+                OIDC_ISSUER: "https://idp.acme.com",
+              }),
+            ),
+          ),
+      );
+
+      expect(ids.length).toBeGreaterThan(0);
+      expect(new Set(ids).size).toBe(ids.length);
     });
   });
 });

@@ -425,7 +425,10 @@ export class TeamService {
     const teams = await this.prisma.team.findMany({
       where: { organizationId, archivedAt: null },
       include: {
-        projects: { where: { archivedAt: null }, orderBy: { name: "asc" } },
+        projects: {
+          where: { archivedAt: null, kind: { not: "internal_governance" } },
+          orderBy: { name: "asc" },
+        },
       },
       orderBy: { name: "asc" },
     });

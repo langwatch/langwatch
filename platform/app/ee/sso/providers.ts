@@ -10,6 +10,7 @@
  * gate (`sso-gate.ts`) that decides whether a deployment may use it.
  */
 
+import { issuerForProviderId } from "@langwatch/identity-server/better-auth";
 import type { BetterAuthOptions } from "better-auth";
 import {
   auth0,
@@ -41,6 +42,21 @@ export const fallbackName = (profile: Record<string, any>): string => {
     "User"
   );
 };
+
+/**
+ * The avatar an identity provider claims, but only where it claimed a string.
+ *
+ * `picture` is whatever the provider chose to put in the token — some send an
+ * object, some send null, some omit it. It lands in a `String?` column either
+ * way, so anything else is a write that either throws or stores `"[object
+ * Object]"` as somebody's avatar URL. better-auth 1.7 types the mapped `image`
+ * as `string | undefined` and made that visible; the coercion is the fix, not
+ * the cast that would silence it.
+ *
+ * Exported for unit testing.
+ */
+export const profileImage = (value: unknown): string | undefined =>
+  typeof value === "string" && value.trim() ? value : void 0;
 
 /**
  * True when an Auth0 `sub` identifies a user who authenticated through a SAML
@@ -83,24 +99,40 @@ type SocialProviderEnv = Pick<
 
 /**
  * Builds BetterAuth's `socialProviders` map from environment configuration.
- * Mirrors the original NextAuth "exactly one provider" behavior: only the
- * provider named by `NEXTAUTH_PROVIDER` is configured, and only when its
- * client credentials are present.
+ * On a deployment that names ANY federated provider, a social provider
+ * mounts when its client credentials are present — the credentials ARE the
+ * operator's intent, since they exist for no other reason. The named
+ * provider still selects the generic-OAuth branch (auth0, okta, oidc) and
+ * still leads the sign-in rail, so a single-provider deployment reads
+ * exactly as it always did.
+ *
+ * This retired the NextAuth-era "exactly one provider" rule on purpose
+ * (D09): migrating off the Auth0 broker means the native providers mount
+ * BESIDE it during grace, and a rule that could mount only the broker made
+ * that impossible. `sso-gate.ts#authProviderIsMounted` answers for the named
+ * provider specifically, so the typo protection did not widen with this.
+ *
+ * EMAIL MODE STAYS AUTHORITATIVE. A deployment that chose email mode mounts
+ * no social provider whatever credentials linger in its environment: email
+ * mode is exactly what ADR-027 means by DENY, and the federation request
+ * hook stands down entirely in email mode
+ * (`deploymentIsFederationCapable`), so a provider mounted here would be a
+ * live, license-ungated sign-in endpoint nothing offered and nothing
+ * refuses.
  *
  * Exported for unit testing — lets us exercise google/github/gitlab/azure
  * selection directly, without re-initializing the module under a different
- * `NEXTAUTH_PROVIDER`.
+ * environment.
  */
 export const buildSocialProviders = (
   e: SocialProviderEnv,
 ): NonNullable<BetterAuthOptions["socialProviders"]> => {
   const socialProviders: NonNullable<BetterAuthOptions["socialProviders"]> = {};
+  if (!e.NEXTAUTH_PROVIDER || e.NEXTAUTH_PROVIDER === "email") {
+    return socialProviders;
+  }
 
-  if (
-    e.NEXTAUTH_PROVIDER === "google" &&
-    e.GOOGLE_CLIENT_ID &&
-    e.GOOGLE_CLIENT_SECRET
-  ) {
+  if (e.GOOGLE_CLIENT_ID && e.GOOGLE_CLIENT_SECRET) {
     socialProviders.google = {
       clientId: e.GOOGLE_CLIENT_ID,
       clientSecret: e.GOOGLE_CLIENT_SECRET,
@@ -112,11 +144,7 @@ export const buildSocialProviders = (
     };
   }
 
-  if (
-    e.NEXTAUTH_PROVIDER === "github" &&
-    e.GITHUB_CLIENT_ID &&
-    e.GITHUB_CLIENT_SECRET
-  ) {
+  if (e.GITHUB_CLIENT_ID && e.GITHUB_CLIENT_SECRET) {
     socialProviders.github = {
       clientId: e.GITHUB_CLIENT_ID,
       clientSecret: e.GITHUB_CLIENT_SECRET,
@@ -128,11 +156,7 @@ export const buildSocialProviders = (
     };
   }
 
-  if (
-    e.NEXTAUTH_PROVIDER === "gitlab" &&
-    e.GITLAB_CLIENT_ID &&
-    e.GITLAB_CLIENT_SECRET
-  ) {
+  if (e.GITLAB_CLIENT_ID && e.GITLAB_CLIENT_SECRET) {
     socialProviders.gitlab = {
       clientId: e.GITLAB_CLIENT_ID,
       clientSecret: e.GITLAB_CLIENT_SECRET,
@@ -145,7 +169,6 @@ export const buildSocialProviders = (
   }
 
   if (
-    e.NEXTAUTH_PROVIDER === "azure-ad" &&
     e.AZURE_AD_CLIENT_ID &&
     e.AZURE_AD_CLIENT_SECRET &&
     e.AZURE_AD_TENANT_ID
@@ -172,6 +195,69 @@ export const buildSocialProviders = (
 
   return socialProviders;
 };
+
+/**
+ * The social providers, in the order a sign-in rail draws them, as a map from
+ * the key BetterAuth mounts them under to the id the product dials.
+ *
+ * The two differ for exactly one provider: BetterAuth calls it `microsoft`,
+ * and everything outside better-auth — `NEXTAUTH_PROVIDER`, the `Account`
+ * rows, the callback path customers registered with Azure, the method labels
+ * — has always called it `azure-ad`. `auth-client` maps one to the other at
+ * the moment of the dial; this table is the same pairing, read the other way,
+ * so a method offered by the door carries the id the door knows how to dial.
+ */
+const SOCIAL_PROVIDER_METHOD_IDS: readonly (readonly [string, string])[] = [
+  ["google", "google"],
+  ["github", "github"],
+  ["gitlab", "gitlab"],
+  ["microsoft", "azure-ad"],
+];
+
+/**
+ * Whether better-auth mounts this provider id as a NATIVE social button - one
+ * this deployment dials itself, rather than the broker or a generic-OAuth id.
+ * Reads the same table the rail draws from, so a provider added there is
+ * covered here without a second edit.
+ */
+export const isNativeSocialProvider = (providerId: string): boolean =>
+  SOCIAL_PROVIDER_METHOD_IDS.some(
+    ([betterAuthKey]) => betterAuthKey === providerId,
+  );
+
+/**
+ * The social providers this deployment actually MOUNTED, by the id the
+ * product dials them under, in rail order.
+ *
+ * Derived from `buildSocialProviders` rather than restated beside it, and that
+ * is the whole point: a sign-in door reading this can never offer a button
+ * that dials a provider better-auth never registered. Whatever widens or
+ * narrows what gets mounted — a credential appearing, `NEXTAUTH_PROVIDER`
+ * changing, a provider being added to the builder — moves this answer with it,
+ * in one place.
+ *
+ * It reports what is MOUNTED, never what is LICENSED. ADR-027's gate is a
+ * separate question, asked by the method policy that consumes this.
+ */
+export const configuredSocialProviderIds = (
+  e: SocialProviderEnv,
+): readonly string[] => {
+  const mounted = buildSocialProviders(e);
+  return SOCIAL_PROVIDER_METHOD_IDS.filter(
+    ([betterAuthKey]) => betterAuthKey in mounted,
+  ).map(([, methodId]) => methodId);
+};
+
+/**
+ * The better-auth key a social method id mounts under, or null for an id
+ * that is not a social provider at all (a generic-OAuth id, `email`, a
+ * typo). What `authProviderIsMounted` needs now that the social map mounts
+ * on credentials rather than on `NEXTAUTH_PROVIDER`: "is anything mounted"
+ * no longer answers "is the NAMED provider mounted", and the named one is
+ * the only one the typo protection is about.
+ */
+export const socialProviderKeyFor = (methodId: string): string | null =>
+  SOCIAL_PROVIDER_METHOD_IDS.find(([, id]) => id === methodId)?.[0] ?? null;
 
 /**
  * Forgiving issuer URL parser. Accepts:
@@ -237,11 +323,12 @@ export const discoveryUrlFor = (issuer: string, envName: string): string => {
  * domain separately: Cognito publishes that domain as the
  * `authorization_endpoint` of the user pool's discovery document.
  *
- * `redirectURI` is pinned to `/api/auth/callback/<providerId>` rather than the
- * genericOAuth plugin's own `/api/auth/oauth2/callback/<providerId>` so that
- * every provider in the self-hosting docs registers the same shape of callback
- * URL. BetterAuth serves that path because the plugin registers each config in
- * `ctx.socialProviders`, which is what the core callback route resolves against.
+ * `redirectURI` is pinned to `/api/auth/callback/<providerId>` so that every
+ * provider in the self-hosting docs registers the same shape of callback URL.
+ * BetterAuth serves that path because the plugin registers each config in
+ * `ctx.socialProviders`, which is what the core callback route resolves
+ * against — and since better-auth 1.7 that core route is the only callback
+ * there is, the plugin having stopped mounting one of its own.
  *
  * Exported for unit testing.
  */
@@ -270,7 +357,7 @@ export const oidcProviderConfig = ({
   mapProfileToUser: (profile) => ({
     name: fallbackName(profile),
     email: profile.email,
-    image: profile.picture,
+    image: profileImage(profile.picture),
   }),
 });
 
@@ -354,15 +441,20 @@ export const PLAIN_OIDC_PROVIDERS = [
 ] as const;
 
 /**
- * Every generic-OAuth provider whose `redirectURI` is pinned to the legacy
- * `/api/auth/callback/<providerId>` path instead of the genericOAuth plugin's
- * own `/api/auth/oauth2/callback/<providerId>`.
+ * Every generic-OAuth provider whose `redirectURI` is pinned to
+ * `/api/auth/callback/<providerId>` — the path customer IdPs have registered
+ * as an allowed callback, and the one the self-hosting docs tell operators to
+ * register.
  *
- * `createApiRouter` registers its legacy-callback rewrites from this list, so
- * the two halves cannot drift: a provider that pins the legacy path without a
- * matching rewrite sends its IdP round-trip to better-auth's core social
- * callback instead of the plugin's, which is a second code path nobody chose
- * and which no test would notice, because sign-in still succeeds.
+ * It used to be the LEGACY path, opposite the genericOAuth plugin's own
+ * `/api/auth/oauth2/callback/<providerId>`, and `createApiRouter` rewrote one
+ * to the other from this list. better-auth 1.7 removed the plugin's endpoints
+ * — every config is a first-class social provider now — so the core callback
+ * answers this path directly and the rewrite is gone. The list stays because
+ * the PIN is still the thing that has to hold: `legacyCallbackParity.test.ts`
+ * checks every id here builds a config pinned to it, and that every row of the
+ * OIDC table appears here. A provider that drifts sends its IdP somewhere
+ * nobody registered, and only that provider's sign-in breaks.
  *
  * Derived from the table above rather than restated, so adding a row is enough.
  * Auth0 and Okta are listed by hand because they are hand-coded branches.
@@ -406,15 +498,16 @@ export const buildGenericOAuthConfigs = (
       // instead of silently using an existing session — matches the original
       // NextAuth Auth0Provider behavior (`authorization: { params: { prompt: "login" } }`).
       authorizationUrlParams: { prompt: "login" },
-      // Pin the OAuth `redirect_uri` to the LEGACY NextAuth callback path
-      // (`/api/auth/callback/auth0`). BetterAuth's genericOAuth plugin
-      // defaults to `/api/auth/oauth2/callback/auth0`, but existing customer
-      // Auth0 applications have only the legacy path registered as an
-      // allowed callback. Sending a different `redirect_uri` would cause
-      // Auth0 to reject the authorization request.
-      // BetterAuth serves that path because the genericOAuth plugin registers
-      // each config in `ctx.socialProviders`, which is what the core callback
-      // route resolves against.
+      // Pin the OAuth `redirect_uri` to the NextAuth-era callback path
+      // (`/api/auth/callback/auth0`): existing customer Auth0 applications
+      // have only that path registered as an allowed callback, and sending a
+      // different `redirect_uri` would cause Auth0 to reject the
+      // authorization request outright.
+      // BetterAuth serves it because the genericOAuth plugin registers each
+      // config in `ctx.socialProviders`, which is what the core callback route
+      // resolves against. Before 1.7 the plugin also mounted its own
+      // `/api/auth/oauth2/callback/auth0` and this pin was the thing steering
+      // round-trips away from it; that endpoint no longer exists.
       redirectURI: legacyCallbackUrl({
         baseUrl: e.NEXTAUTH_URL,
         providerId: "auth0",
@@ -422,7 +515,7 @@ export const buildGenericOAuthConfigs = (
       mapProfileToUser: (profile) => ({
         name: fallbackName(profile),
         email: profile.email,
-        image: profile.picture,
+        image: profileImage(profile.picture),
         // SAML sign-ins count as verified: the email was asserted by the
         // organization's own IdP, but Auth0 reports `email_verified: false`
         // for every SAML connection, which would stop BetterAuth from
@@ -459,7 +552,7 @@ export const buildGenericOAuthConfigs = (
       mapProfileToUser: (profile) => ({
         name: fallbackName(profile),
         email: profile.email,
-        image: profile.image ?? profile.picture,
+        image: profileImage(profile.image ?? profile.picture),
       }),
     });
   }
@@ -482,5 +575,34 @@ export const buildGenericOAuthConfigs = (
     );
   }
 
-  return genericOAuthConfigs;
+  // Every generic-OAuth account keeps the namespace it already has.
+  //
+  // better-auth 1.7 re-keys an account from `(providerId, accountId)` to
+  // `(issuer, accountId)`, and for a config carrying a `discoveryUrl` it
+  // would otherwise adopt the DISCOVERED issuer — `https://tenant.auth0.com/`
+  // rather than `auth0`. Every `Account` row we already hold is keyed by the
+  // provider id, and `Account` is unique on exactly that pair, so letting the
+  // key change under a library upgrade would leave every existing enterprise
+  // account unfindable: the callback would look up an issuer no stored row
+  // carries, miss, and try to link a second row over the unique index.
+  //
+  // Pinning is what the option is for — better-auth's own contract calls it
+  // the way to "establish a stable account namespace" — and this one is
+  // already stable, already unique, and already what our data means. Moving
+  // to real issuer URLs is a deliberate re-keying with a backfill of its own,
+  // not something that should ride along on a version bump.
+  //
+  // `accountIssuer` beats `discoveryUrl` in the plugin's own precedence
+  // (`accountIssuer ?? issuer`), so this holds for auth0, okta and every
+  // `PLAIN_OIDC_PROVIDERS` entry without touching their discovery.
+  return genericOAuthConfigs.map((config) => ({
+    ...config,
+    accountIssuer: issuerForProviderId(config.providerId),
+    // Auth0 and Okta session MFA evidence comes from their callback ID token.
+    // Refuse those providers at initialization when discovery cannot supply
+    // the issuer and JWKS needed for BetterAuth to verify that proof.
+    ...(config.providerId === "auth0" || config.providerId === "okta"
+      ? { requireIdTokenVerification: true }
+      : {}),
+  }));
 };

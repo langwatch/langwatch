@@ -1,17 +1,24 @@
 package domain
 
 import (
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 )
 
-// The tsgo governor (ADR-095). tsgo is the single largest transient memory
-// consumer on a dev machine, and admission controls only see the spawns they
-// wrap. This is the other half: policy over a sample of every live tsgo
-// process, wherever it came from. The decisions here are pure; the daemon
-// samples and enforces.
+// The TypeScript compiler governor (ADR-095). The compiler is the single
+// largest transient memory consumer on a dev machine, and admission controls
+// only see the spawns they wrap. This is the other half: policy over a sample
+// of every live compiler process, wherever it came from. The decisions here
+// are pure; the daemon samples and enforces.
+//
+// The types keep the Tsgo name the governor was born with, because the knobs
+// (HAVEN_TSGO_*), the metric attribute and the persisted reap Kind are all
+// spelled that way and are a contract with machines that already carry
+// history. What the governor SELECTS is name-neutral: see
+// typeScriptCompilerBinaries.
 
 // TsgoClass is the crude-on-purpose classification: an --lsp instance is a
 // language server, anything else is a run. Single-file checks are tiny and
@@ -38,15 +45,43 @@ type TsgoProcess struct {
 	IdleFor time.Duration
 }
 
-// IsTsgoCommand reports whether a process command line is a tsgo binary
-// invocation — the whole selection rule, so the governor can never touch
-// anything else. Matched on the binary path, not the args: an unrelated
-// process mentioning "tsgo" in an argument is not a candidate.
-func IsTsgoCommand(command string) bool {
-	return binaryBase(command) == "tsgo"
+// typeScriptCompilerBinaries are the names the native TypeScript compiler is
+// installed under. They are one binary under two package identities:
+// @typescript/native-preview published it as `tsgo`, and typescript@7 renamed
+// it to `tsc` — the package picks the name (`lib/getExePath.js`:
+// `baseName === "typescript" ? "tsc" : "tsgo"`), and a local repo build still
+// produces `tsgo`, so both names stay live on real machines. One compiler is
+// one class with one set of limits: two classes would split the machine budget
+// in half and govern neither half of it.
+var typeScriptCompilerBinaries = []string{"tsc", "tsgo"}
+
+// TypeScriptCompilerClass is the single process class both compiler binaries
+// land in. Deliberately still spelled "tsgo" after the rename: the string is
+// the `class` attribute on every haven_proc_* series, the Kind of a persisted
+// reap event, and the key the daemon selects the governed subset by — renaming
+// it would cut the recorded history in two at exactly the moment the point of
+// the change is to join the two binaries together.
+const TypeScriptCompilerClass = "tsgo"
+
+// IsTypeScriptCompilerCommand reports whether a process command line invokes
+// the native TypeScript compiler under either of its names — the whole
+// selection rule, so the governor can never touch anything else. Matched on
+// the binary path, not the args: an unrelated process mentioning "tsc" or
+// "tsgo" in an argument is not a candidate, and neither is the `tsc.real` /
+// `tsgo.real` launcher the check-queue shim runs, which is a shell and then a
+// node process — the compiler it finally becomes is the process governed.
+func IsTypeScriptCompilerCommand(command string) bool {
+	return isTypeScriptCompilerBinary(binaryBase(command))
 }
 
-// ClassifyTsgo reads the class off a tsgo command line.
+// isTypeScriptCompilerBinary reports whether a binary base name is the
+// compiler's, under either name.
+func isTypeScriptCompilerBinary(base string) bool {
+	return slices.Contains(typeScriptCompilerBinaries, base)
+}
+
+// ClassifyTsgo reads the class off a compiler command line. Arg-based, so it
+// reads the same under either binary name.
 func ClassifyTsgo(command string) TsgoClass {
 	if strings.Contains(command, "--lsp") {
 		return TsgoLSP
@@ -79,17 +114,21 @@ type WatchedProcess struct {
 // ClassifyWatchedProcess maps a command line to the process class haven
 // tracks, or ok=false for everything haven has no interest in. The class list
 // is deliberately the dev-tooling that shapes machine health: compilers and
-// checkers (tsgo, gopls, biome), test workers (vitest — matched on the worker
-// path, the same marker the orphan sweep uses), the JS runtimes every dev
-// server and script runs on (node, bun), and coding agents (claude). Only
-// tsgo carries kill limits (ADR-095); every other class is observe-only —
-// node and claude in particular are the user's own work and are never
-// touched.
+// checkers (the TypeScript compiler under either name, gopls, biome), test
+// workers (vitest — matched on the worker path, the same marker the orphan
+// sweep uses), the JS runtimes every dev server and script runs on (node,
+// bun), and coding agents (claude). Only the TypeScript compiler carries kill
+// limits (ADR-095); every other class is observe-only — node and claude in
+// particular are the user's own work and are never touched.
+//
+// `tsc` and `tsgo` return the SAME class, so limits, dashboards and reap
+// events aggregate the one compiler into one budget however it was installed.
 func ClassifyWatchedProcess(command string) (WatchedProcess, bool) {
 	base := binaryBase(command)
+	if isTypeScriptCompilerBinary(base) {
+		return WatchedProcess{Class: TypeScriptCompilerClass, Role: ClassifyTsgo(command)}, true
+	}
 	switch base {
-	case "tsgo":
-		return WatchedProcess{Class: "tsgo", Role: ClassifyTsgo(command)}, true
 	case "gopls":
 		return WatchedProcess{Class: "gopls", Role: TsgoLSP}, true
 	case "biome":

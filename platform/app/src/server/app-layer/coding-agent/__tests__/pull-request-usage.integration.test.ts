@@ -223,6 +223,10 @@ function modelCallEvent({
     toolResultBytes: 0,
     promptChars: 0,
     totalTokens: 0,
+    repositoryHost: "",
+    repositoryOwner: "",
+    repositoryName: "",
+    branch: "",
   };
 }
 

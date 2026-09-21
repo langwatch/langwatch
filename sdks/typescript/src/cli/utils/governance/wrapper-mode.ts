@@ -42,7 +42,9 @@ import { deviceLabelForThisMachine } from "./device-label";
 import { warnIfGeminiOAuthSelected } from "./gemini-settings-preflight";
 import { buildOtelEnvBlock, SOURCE_TYPE_BY_TOOL } from "./otel-env-block";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
+import { runningCodeRestartNotice } from "./running-code";
 import { SHELL_FUNCTION_TOOLS, assertCodexTurnHarvest } from "./shell-rc";
+import { assertCodexAgentGuidance } from "./codex-agents-md";
 import {
 	type ClaudeProjectPinResult,
 	ensureClaudeProjectTelemetryPin,
@@ -483,6 +485,12 @@ export async function resolveWrapperMode(
 			),
 		);
 	}
+	if (tool === "code" && refreshedWiring.length > 0) {
+		const restartNotice = runningCodeRestartNotice();
+		if (restartNotice) {
+			notice = notice ? `${notice}\n${restartNotice}` : restartNotice;
+		}
+	}
 
 	// VS Code hardening, coupled to the env INJECTION (not to the shell-rc
 	// persistence consent): every `code` ingestion run injects the bearer
@@ -543,6 +551,7 @@ export async function resolveWrapperMode(
 		// The exporters carry no conversation; the turn harvest is what
 		// recovers it, so the two are wired (and healed) together.
 		assertCodexTurnHarvest();
+		assertCodexAgentGuidance();
 	}
 
 	if (tool === "opencode") {

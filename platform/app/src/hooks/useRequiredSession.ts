@@ -7,6 +7,7 @@ export const publicRoutes = [
   "/auth/signup",
   "/auth/forgot-password",
   "/auth/reset-password",
+  "/auth/verify-email",
   "/auth/error",
 ];
 
@@ -29,6 +30,10 @@ export const publicRoutes = [
  */
 export const noOrgBouncerRoutes = [
   "/invite/accept",
+  // Join before create (ADR-117 §6). A brand-new account is signed in and has
+  // no organization by definition when it lands here, which is the state this
+  // step exists to resolve — the bouncer must not resolve it first.
+  "/auth/join",
   // The CLI device-login approval page. The global bouncer (e.g.
   // CommandBar's useOrganizationTeamProject) must never swallow
   // /cli/auth?user_code=… into onboarding — the page handles the no-org
@@ -48,6 +53,10 @@ export const noOrgBouncerRoutes = [
   "/governance/people",
   "/governance/costs",
   "/governance/billed",
+  "/governance/insights",
+  "/governance/analytics",
+  "/governance/signals",
+  "/governance/agents",
   // The retired addresses stay exempt so each redirect route renders
   // before the bouncer fires (cost-centers precedent below).
   "/governance/catalog",

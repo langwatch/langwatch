@@ -22,10 +22,16 @@ const checkRAMPerRun = 6 << 30
 // is worth starting.
 const checkCPUsPerRun = 4
 
-// CheckEnv carries the two environment values the limit is resolved from.
+// CheckEnv carries the environment the limit is resolved from.
 type CheckEnv struct {
 	CheckSlots string // CHECK_SLOTS
 	CI         string // CI
+	Claudecode string // CLAUDECODE, set in every shell an agent runs
+	// HeldByQueue reports that CHECK_QUEUE_HELD names a live ancestor of this
+	// process that is itself one of the queue's wrappers: the queue spawned the
+	// run and already counted it. The caller resolves it, because the domain
+	// does not inspect processes.
+	HeldByQueue bool
 }
 
 // CheckMachine carries the machine facts the limit is resolved from.
@@ -60,30 +66,35 @@ func ResolveCheckPressure(override string, measured Pressure, ci string) Pressur
 	case "red":
 		return Red
 	}
-	if isTruthyCI(ci) {
+	if isTruthyEnv(ci) {
 		return Green
 	}
 	return measured
 }
 
-// isTruthyCI reads the CI convention: the variable is set to something that is
-// not one of the values meaning "not CI". The slot limit and the pressure
-// policy both ask this, so they ask it in one place and cannot drift apart.
-func isTruthyCI(ci string) bool {
-	value := strings.ToLower(strings.TrimSpace(ci))
-	return value != "" && value != "0" && value != "false"
+// isTruthyEnv reads the CI convention: the variable is set to something that
+// is not one of the values meaning "no". CI and CLAUDECODE both follow it, so
+// the slot limit and the pressure policy read them by one rule that cannot
+// drift apart.
+func isTruthyEnv(value string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	return normalized != "" && normalized != "0" && normalized != "false"
 }
 
 // ResolveCheckSlots resolves how many whole-repo checks may run at once, and
-// names where the answer came from ("CHECK_SLOTS", "CI", "machine" or
+// names where the answer came from ("CHECK_SLOTS", "held", "CI", "machine" or
 // "pressure").
 //
 // An explicit CHECK_SLOTS always wins, including under CI — that is what lets
 // tests exercise the queue on a CI runner. "0" (or off/none/unlimited/false)
-// disables the gate. Unset, CI gets no queue at all (one job runs one check),
-// and a developer machine gets a limit bounded by both memory and cores —
-// tsgo is memory-hungry AND parallel, so the tighter bound is the honest one —
-// never below 1, or the queue would deadlock every run.
+// disables the gate — from a person's shell. From an agent shell (CLAUDECODE
+// set) a gate-off is ignored and the derived limit applies, unless the queue
+// itself spawned the run (HeldByQueue): the queue exists to serialize agents,
+// so a lever any agent may pull is not a limit. Unset, CI gets no queue at all
+// (one job runs one check), and a developer machine gets a limit bounded by
+// both memory and cores — tsgo is memory-hungry AND parallel, so the tighter
+// bound is the honest one — never below 1, or the queue would deadlock every
+// run.
 //
 // A machine already under memory pressure gets one slot, whatever the formula
 // says. The formula assumes an otherwise idle machine, and pressure is the
@@ -93,17 +104,22 @@ func isTruthyCI(ci string) bool {
 func ResolveCheckSlots(machine CheckMachine, env CheckEnv) (int, string) {
 	raw := strings.TrimSpace(env.CheckSlots)
 	if raw != "" {
-		switch strings.ToLower(raw) {
-		case "off", "none", "unlimited", "false":
-			return 0, "CHECK_SLOTS"
-		}
-		if parsed, err := strconv.Atoi(raw); err == nil && parsed >= 0 {
+		if gateOffRequested(raw) {
+			if !isTruthyEnv(env.Claudecode) {
+				return 0, "CHECK_SLOTS"
+			}
+			if env.HeldByQueue {
+				return 0, "held"
+			}
+			// An agent shell may not turn the queue off: fall through to the
+			// derived limit as if CHECK_SLOTS were unset.
+		} else if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
 			return parsed, "CHECK_SLOTS"
 		}
 		// An unparseable value falls through to the derived default, exactly
 		// like the JS wrapper: a typo must not turn the gate off.
 	}
-	if isTruthyCI(env.CI) {
+	if isTruthyEnv(env.CI) {
 		return 0, "CI"
 	}
 	if machine.Pressure > Green {
@@ -112,6 +128,25 @@ func ResolveCheckSlots(machine CheckMachine, env CheckEnv) (int, string) {
 	byMemory := int(machine.TotalRAMBytes / checkRAMPerRun)
 	byCPU := machine.NumCPU / checkCPUsPerRun
 	return max(1, min(byMemory, byCPU)), "machine"
+}
+
+// gateOffRequested reads the values that ask for the queue to be off entirely.
+func gateOffRequested(raw string) bool {
+	switch strings.ToLower(raw) {
+	case "off", "none", "unlimited", "false":
+		return true
+	}
+	parsed, err := strconv.Atoi(raw)
+	return err == nil && parsed == 0
+}
+
+// GateOffIgnored reports that this environment asked for the gate to be off
+// and was refused: the ask came from an agent shell and not from the queue
+// itself. ResolveCheckSlots stays silent about it, so callers use this to say
+// why the limit still applies.
+func GateOffIgnored(env CheckEnv) bool {
+	return gateOffRequested(strings.TrimSpace(env.CheckSlots)) &&
+		isTruthyEnv(env.Claudecode) && !env.HeldByQueue
 }
 
 // CheckGoMemLimit is the soft memory cap set on the Go-runtime tools the queue

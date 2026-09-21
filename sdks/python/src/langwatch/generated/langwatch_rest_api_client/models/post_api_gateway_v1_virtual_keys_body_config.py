@@ -22,6 +22,9 @@ if TYPE_CHECKING:
     from ..models.post_api_gateway_v1_virtual_keys_body_config_rate_limits import (
         PostApiGatewayV1VirtualKeysBodyConfigRateLimits,
     )
+    from ..models.post_api_gateway_v1_virtual_keys_body_config_realtime import (
+        PostApiGatewayV1VirtualKeysBodyConfigRealtime,
+    )
 
 
 T = TypeVar("T", bound="PostApiGatewayV1VirtualKeysBodyConfig")
@@ -37,6 +40,7 @@ class PostApiGatewayV1VirtualKeysBodyConfig:
         fallback (PostApiGatewayV1VirtualKeysBodyConfigFallback | Unset):
         guardrail_attachments (list[PostApiGatewayV1VirtualKeysBodyConfigGuardrailAttachmentsItem] | Unset):
         rate_limits (PostApiGatewayV1VirtualKeysBodyConfigRateLimits | Unset):
+        realtime (PostApiGatewayV1VirtualKeysBodyConfigRealtime | Unset):
         metadata (PostApiGatewayV1VirtualKeysBodyConfigMetadata | Unset):
     """
 
@@ -46,6 +50,7 @@ class PostApiGatewayV1VirtualKeysBodyConfig:
     fallback: PostApiGatewayV1VirtualKeysBodyConfigFallback | Unset = UNSET
     guardrail_attachments: list[PostApiGatewayV1VirtualKeysBodyConfigGuardrailAttachmentsItem] | Unset = UNSET
     rate_limits: PostApiGatewayV1VirtualKeysBodyConfigRateLimits | Unset = UNSET
+    realtime: PostApiGatewayV1VirtualKeysBodyConfigRealtime | Unset = UNSET
     metadata: PostApiGatewayV1VirtualKeysBodyConfigMetadata | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -87,6 +92,10 @@ class PostApiGatewayV1VirtualKeysBodyConfig:
         if not isinstance(self.rate_limits, Unset):
             rate_limits = self.rate_limits.to_dict()
 
+        realtime: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.realtime, Unset):
+            realtime = self.realtime.to_dict()
+
         metadata: dict[str, Any] | Unset = UNSET
         if not isinstance(self.metadata, Unset):
             metadata = self.metadata.to_dict()
@@ -106,6 +115,8 @@ class PostApiGatewayV1VirtualKeysBodyConfig:
             field_dict["guardrailAttachments"] = guardrail_attachments
         if rate_limits is not UNSET:
             field_dict["rateLimits"] = rate_limits
+        if realtime is not UNSET:
+            field_dict["realtime"] = realtime
         if metadata is not UNSET:
             field_dict["metadata"] = metadata
 
@@ -127,6 +138,9 @@ class PostApiGatewayV1VirtualKeysBodyConfig:
         )
         from ..models.post_api_gateway_v1_virtual_keys_body_config_rate_limits import (
             PostApiGatewayV1VirtualKeysBodyConfigRateLimits,
+        )
+        from ..models.post_api_gateway_v1_virtual_keys_body_config_realtime import (
+            PostApiGatewayV1VirtualKeysBodyConfigRealtime,
         )
 
         d = dict(src_dict)
@@ -197,6 +211,13 @@ class PostApiGatewayV1VirtualKeysBodyConfig:
         else:
             rate_limits = PostApiGatewayV1VirtualKeysBodyConfigRateLimits.from_dict(_rate_limits)
 
+        _realtime = d.pop("realtime", UNSET)
+        realtime: PostApiGatewayV1VirtualKeysBodyConfigRealtime | Unset
+        if isinstance(_realtime, Unset):
+            realtime = UNSET
+        else:
+            realtime = PostApiGatewayV1VirtualKeysBodyConfigRealtime.from_dict(_realtime)
+
         _metadata = d.pop("metadata", UNSET)
         metadata: PostApiGatewayV1VirtualKeysBodyConfigMetadata | Unset
         if isinstance(_metadata, Unset):
@@ -211,6 +232,7 @@ class PostApiGatewayV1VirtualKeysBodyConfig:
             fallback=fallback,
             guardrail_attachments=guardrail_attachments,
             rate_limits=rate_limits,
+            realtime=realtime,
             metadata=metadata,
         )
 

@@ -59,6 +59,9 @@ export function harness({
   const db = {
     roleBinding: {
       findFirst: vi.fn().mockResolvedValue(null),
+      // The tenancy pre-read `GrantsService` does before a revoke, when a
+      // test drives the writer through the service rather than directly.
+      findUnique: vi.fn().mockResolvedValue(null),
       findMany: vi.fn().mockResolvedValue([]),
       count: vi.fn().mockResolvedValue(0),
       create: vi.fn().mockResolvedValue(undefined),

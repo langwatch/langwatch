@@ -178,14 +178,35 @@ Feature: Langy consumes the event-sourced backend with optimized fetches and lig
     Given a turn is in flight by either the live stream or the durable state
     Then the feedback ask is not shown under the latest reply
 
-  @integration @unimplemented
+  @integration
   Scenario: A turn in flight resumes after a page refresh
-    # Depends on the PR3 Redis token-buffer transport; the UI reads turn state
-    # and replays the buffered tail.
     Given Langy is streaming a response
     When I refresh the page
-    Then Langy shows "Catching up…" while it reattaches to the in-flight turn
-    And it replays the buffered token tail and continues streaming
+    Then the durable record names the turn in flight and the panel adopts it
+    And the panel reattaches to that turn's stream once, which replays what the turn already wrote
+    And a turn this tab sent itself is never reattached, its stream came with the send
+
+  @integration
+  Scenario: A turn started by the shared folder connecting reaches the open tab
+    Given the guided path is waiting for my folder to connect
+    When the folder connects and the server starts the next turn
+    Then the panel adopts the turn from the durable record and reattaches to its stream
+    And a navigate instruction from that turn opens the page it names in place
+
+  # The fold and the transcript are different reads. The fold advances on the
+  # freshness signal, so a turn started elsewhere is adopted within a batch;
+  # the transcript is re-read on an explicit open, or on a poll armed by its
+  # own in-flight flag, which a snapshot taken before the turn existed does
+  # not carry. A tab that had already answered a turn therefore held the
+  # previous transcript for the whole of the next one, was never ready to
+  # resume, and never subscribed: every live-only entry that turn issued
+  # reached no reader.
+  @integration
+  Scenario: A folder-connected turn reaches a tab that already answered one
+    Given this tab answered a turn of its own, so the last thing on screen is that answer
+    When the folder connects and the server starts the next turn
+    Then the panel re-reads the transcript once, which lands the new turn's own message
+    And it then reattaches to that turn's stream and navigates where the turn says
 
   # ---------------------------------------------------------------------------
   # Domain-error rendering (ADR-045)
@@ -202,6 +223,20 @@ Feature: Langy consumes the event-sourced backend with optimized fetches and lig
     When Langy has no data source connected
     Then Langy shows the connect card or empty state
     And it does not show a red error
+
+  @unit
+  Scenario: A platform failure to read the conversation is never told as Langy being slow
+    Given the conversation record cannot be read because the platform is unavailable
+    Then the panel says the conversation could not be loaded, and offers to try again
+    And the words come from the shared error copy for that code
+    And nothing on screen says Langy is slow or stuck
+
+  @unit
+  Scenario: A conversation that was never created stops reading as one on its way
+    Given the history read answers not found for a conversation this tab just created
+    Then the read counts as the record lagging the create, for a short grace only
+    And after that grace the panel says the conversation is not available
+    And a conversation the record has confirmed never reads as lagging
 
   @integration
   Scenario: An unknown error stays calm and traceable
@@ -233,6 +268,84 @@ Feature: Langy consumes the event-sourced backend with optimized fetches and lig
     Given a turn is in flight and the reply's text is streaming on screen
     Then no thinking line renders under the answer
     And no status placeholder renders under the answer
+
+  # The row at the end of the transcript is the turn's activity row (card
+  # taxonomy: activity). It hides while text arrives and comes back once the
+  # text has been quiet for one second, a pinned constant, so a pause between
+  # two paragraphs reads as Langy working and two deltas never flicker it.
+  @unit
+  Scenario: The activity row returns once the text has been quiet for a second
+    Given a turn is in flight and the reply's text just arrived
+    Then no activity row renders under the answer
+    When no further text arrives for one second
+    Then the activity row renders with a spinner and a cycling verb
+
+  # Thinking is the default word and shows more often than the others. The
+  # verbs cycle only while the turn is provably working, never while waiting
+  # for a worker to start.
+  @unit
+  Scenario: The activity row cycles a verb while Langy works between steps
+    Given a turn is in flight with a tool call already settled
+    Then the activity row shows a spinner and one of the thinking verbs
+    And the verb changes every few seconds
+    And Thinking appears more often than any other verb
+
+  @unit
+  Scenario: The activity row names the running work in my words
+    Given a turn is in flight with a tool call running
+    Then the row says "Running the command in your terminal" for a command on my machine
+    And "Reading the code" for a read, search or listing
+    And "Editing the code" for a write or an edit
+    And "Writing your LangWatch credentials" for the credentials file
+    And "Loading a skill" for a skill
+    And the capability headline for a LangWatch CLI call
+
+  # The record is what a tab that adopted the turn holds before its stream is
+  # back, and where a command on the developer's machine is recorded.
+  @unit
+  Scenario: A turn adopted from the record still names its running tool
+    Given a turn whose message on screen carries nothing
+    When the turn's durable record holds a running tool call
+    Then the activity row names that tool's work
+
+  @unit
+  Scenario: A turn held by a card says it is waiting for me
+    Given a turn is in flight with a card waiting for my answer
+    Then the thinking line says it is waiting for my answer on the card above
+    And it never says the turn is taking longer than usual
+    And it never says Langy may be stuck
+
+  @unit
+  Scenario: A permission ask open in the terminal says the approval is waited for there
+    Given a turn is in flight with a permission card waiting for my answer
+    And a folder is shared from a terminal
+    Then the thinking line says it is waiting for my approval in the terminal
+
+  # The escalation used to measure the time since the line appeared, which is
+  # turn length, not silence. So a turn that had answered a permission card and
+  # was running a local command, with its output arriving in the terminal, was
+  # told "Langy still has not answered. It may be stuck." while nothing was
+  # wrong. A local command and a card the developer answered never reach the
+  # message on screen, so the line has to read the turn's own record too.
+  @unit
+  Scenario: The escalation measures silence, not how long the turn has run
+    Given a turn that has been running far longer than the stuck threshold
+    When it produced something more recently than that
+    Then the line does not say the turn is slow or that Langy may be stuck
+
+  @unit
+  Scenario: Work that never reaches the message still counts as progress
+    Given a turn whose message on screen carries nothing
+    Then a tool call in the turn's record counts as the turn making progress
+    And a card the developer answered counts
+    And a plan step changing counts
+    And reasoning or prose arriving counts
+
+  @unit
+  Scenario: A turn that really is silent still ends up looking stuck
+    Given a turn that has produced nothing at all
+    When the silence passes the stuck threshold
+    Then the line says Langy may be stuck
 
   @unit
   Scenario: Live reasoning reads as thinking, not as starting up

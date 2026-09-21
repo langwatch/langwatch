@@ -33,6 +33,7 @@ const metricNames = [
   "gq_retry_encode_failures_total",
   // #5538
   "gq_jobs_dropped_total",
+  "gq_jobs_last_dropped_timestamp_seconds",
   "gq_group_attempt_read_failures_total",
   // 2026-07-22 blob-retention fix
   "gq_blob_release_grace_total",
@@ -43,6 +44,9 @@ const metricNames = [
   "gq_batch_bisections_total",
   // Work-conserving override visibility
   "gq_jobs_dispatched_override_total",
+  // #4682 single-group staging accumulation
+  "gq_group_staging_depth_max",
+  "gq_groups_over_staging_depth",
 ] as const;
 
 for (const name of metricNames) {
@@ -229,6 +233,60 @@ export const gqOldestBacklogAgeMilliseconds = new Gauge({
 });
 
 /**
+ * Deepest single group's staging hash, in staged jobs.
+ *
+ * The aggregate gauges cannot see this. `gq_pending_groups` counts groups and
+ * `gq_oldest_backlog_age_milliseconds` clocks the head job's age, so one group
+ * holding hundreds of thousands of staged fields looks, to both of them, like
+ * a queue with one slightly old group in it. In the 2026-06 incident a single
+ * trace's `:data` hash reached ~290k fields and ~2.9 GB, and it grew for hours
+ * behind a coarse Redis-capacity alarm that only fired at 50% of the cluster.
+ *
+ * Per-key, because that is the shape of the failure. A per-group accumulation
+ * is caused by one producer or one hot key, and the aggregate is unremarkable
+ * the whole time it is happening.
+ *
+ * Published from a rotating sweep, so it means "the deepest group seen since
+ * this rotation began" rather than "the deepest group right now". See
+ * `sweepStagingDepth` in metricsCollector.ts for why a rotation rather than a
+ * sample, and what the lag costs.
+ */
+export const gqGroupStagingDepthMax = new Gauge({
+  name: "gq_group_staging_depth_max",
+  help: "Staged jobs in the deepest single group seen in the current sweep rotation (catches one hot group accumulating behind unremarkable aggregates)",
+  labelNames: ["queue_name"] as const,
+});
+
+/**
+ * How many groups are at or above {@link STAGING_DEPTH_REPORT_FLOOR}.
+ *
+ * Separate from the max because they answer different questions under alarm.
+ * One deep group is a hot key; a thousand is the drainer having stopped. The
+ * max alone cannot tell those apart, and they want different responses.
+ */
+export const gqGroupsOverStagingDepth = new Gauge({
+  name: "gq_groups_over_staging_depth",
+  help: "Groups whose staging hash is at or above the reporting floor, in the current sweep rotation",
+  labelNames: ["queue_name"] as const,
+});
+
+/**
+ * Depth at which a group starts being counted as accumulating.
+ *
+ * A floor, and inclusive: a group sitting at exactly this depth is counted.
+ * The alternative reads better in a sentence and worse in an incident, since
+ * the one depth that would slip through is the round number a person is most
+ * likely to have chosen deliberately.
+ *
+ * 10k staged jobs in one group is far outside anything the queue produces in
+ * normal operation and far below the ~290k the incident reached, so it leaves
+ * room to act. It is a reporting floor only: nothing in the queue changes
+ * behaviour when a group crosses it, and where the alarm sits is a dashboard
+ * decision, not this module's.
+ */
+export const STAGING_DEPTH_REPORT_FLOOR = 10_000;
+
+/**
  * Jobs whose producer supplied a ready score the queue refused.
  *
  * Raised at the staging fallback, once per job, the moment the value is
@@ -343,6 +401,29 @@ export const gqJobsDroppedTotal = new Counter({
     "reason",
   ] as const,
 });
+
+export const gqJobsLastDroppedTimestampSeconds = new Gauge({
+  name: "gq_jobs_last_dropped_timestamp_seconds",
+  help: "Unix timestamp of the latest discarded job in this process. Detects the first discard without a previous counter sample; not durable across an unscraped process exit.",
+  labelNames: [
+    "queue_name",
+    "pipeline_name",
+    "job_type",
+    "job_name",
+    "reason",
+  ] as const,
+});
+
+export function recordDroppedJob(labels: {
+  queue_name: string;
+  pipeline_name: string;
+  job_type: string;
+  job_name: string;
+  reason: string;
+}): void {
+  gqJobsDroppedTotal.inc(labels);
+  gqJobsLastDroppedTimestampSeconds.set(labels, Date.now() / 1000);
+}
 
 /**
  * A dispatched job whose routing metadata names a pipeline this worker does

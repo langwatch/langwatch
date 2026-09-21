@@ -11,12 +11,13 @@
  * force-enables the very flag under test — so consulting the real one would
  * make the switched-off case answer "on" and pass vacuously.
  *
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { nanoid } from "nanoid";
 import {
   afterAll,
+  afterEach,
   beforeAll,
   beforeEach,
   describe,
@@ -59,9 +60,13 @@ vi.mock("../../utils", async (importOriginal) => {
   };
 });
 
+import { lwqlResult } from "~/features/analytics-query/__tests__/lwqlFixtures";
 import { VEGA_LITE_SCHEMA_URL } from "~/features/analytics-query/visualization/vegaLiteSchema";
+import { getLangWatchQLService } from "~/server/analytics/lwql/lwql.service";
+import { SavedWorkbenchChartService } from "~/server/analytics/saved-workbench-charts/savedWorkbenchChart.service";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { prisma } from "../../../db";
+import type { Protections } from "../../../traces/protections";
 import type { Permission } from "../../rbac";
 import { createInnerTRPCContext } from "../../trpc";
 import { savedWorkbenchChartsRouter } from "../analytics/savedWorkbenchCharts";
@@ -96,12 +101,26 @@ const DEFINITION = {
   vegaLiteSpec: SPEC,
 };
 
-/** Loads its data over the network — the chart policy refuses it. */
-const NETWORK_SPEC = {
-  $schema: VEGA_LITE_SCHEMA_URL,
-  data: { url: "https://example.invalid/rows.json" },
-  mark: "bar",
+/** The author's content permissions, fully open — this suite is not about them. */
+const FULLY_PERMITTED: Protections = {
+  canSeeCapturedInput: true,
+  canSeeCapturedOutput: true,
+  canSeeCosts: true,
 };
+
+/**
+ * A statement declaring the granularity parameter alongside both period bounds
+ * — the shape a saved chart has to have for the surface to supply it a step.
+ *
+ * Module-scoped because two describe blocks assert about the same declaration:
+ * one that it saves, one that running it reaches the database with the step
+ * bound. Two copies could drift into agreeing with a bug in either.
+ */
+const GRANULARITY_WITH_BOUNDS_SQL =
+  "SELECT toStartOfInterval(OccurredAt, INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND) AS bucket, " +
+  "count() AS value FROM analytics.traces " +
+  "WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime} " +
+  "GROUP BY bucket ORDER BY bucket";
 
 const ALL_ANALYTICS: Permission[] = [
   "analytics:view",
@@ -255,99 +274,51 @@ describe("the saved workbench chart router", () => {
     });
   });
 
-  const saveChart = (name = "Traces per day") =>
-    author.create({ projectId: PROJECT, name, definition: DEFINITION });
+  /**
+   * Seeds a chart the way the application's only write path does — through the
+   * service, not this router. The router hasn't had a write procedure since the
+   * Custom query page (and its Save/Open UI) was removed; what remains is
+   * read-only (`getById`/`run`), so every test here needs a chart to already
+   * exist rather than creating one through the surface under test.
+   */
+  const saveChart = (name = "Traces per day", projectId = PROJECT) =>
+    SavedWorkbenchChartService.create(prisma).createChart({
+      projectId,
+      protections: FULLY_PERMITTED,
+      input: { name, definition: DEFINITION },
+    });
 
   describe("given the workbench switch is off for the project", () => {
-    describe("when the member reaches any of the procedures", () => {
-      /** @scenario "Saved charts stay unreachable while the workbench switch is off" */
-      it("refuses every one of them the same way", async () => {
+    describe("when the member reaches getById or run", () => {
+      /** @scenario "A saved chart stays unreachable while the workbench switch is off" */
+      /** @scenario "Running a saved chart carries the same permission and switch as every other chart procedure" */
+      it("refuses both the same way", async () => {
         const saved = await saveChart();
         isEnabled.mockResolvedValue(false);
 
-        expect(
-          await refusalOf(() => author.getAll({ projectId: PROJECT })),
-        ).toBe("lwql_not_enabled");
         expect(
           await refusalOf(() =>
             author.getById({ projectId: PROJECT, id: saved.id }),
           ),
         ).toBe("lwql_not_enabled");
-        expect(await refusalOf(() => saveChart("Another"))).toBe(
-          "lwql_not_enabled",
-        );
         expect(
           await refusalOf(() =>
-            author.update({
-              projectId: PROJECT,
-              id: saved.id,
-              name: "Renamed",
-            }),
+            author.run({ projectId: PROJECT, id: saved.id }),
           ),
         ).toBe("lwql_not_enabled");
-        expect(
-          await refusalOf(() =>
-            author.delete({ projectId: PROJECT, id: saved.id }),
-          ),
-        ).toBe("lwql_not_enabled");
-      });
-    });
-  });
-
-  describe("given a member who may view analytics but not change them", () => {
-    describe("when they list charts and then try to write", () => {
-      /** @scenario "Being allowed to read a chart is not being allowed to change one" */
-      it("lets the listing through and refuses each write for want of its own permission", async () => {
-        const saved = await saveChart();
-
-        // The read they are entitled to.
-        expect(
-          (await reader.getAll({ projectId: PROJECT })).map(({ id }) => id),
-        ).toEqual([saved.id]);
-
-        // Each write, refused on its own permission rather than on the read one.
-        expect(
-          await refusalOf(() =>
-            reader.create({
-              projectId: PROJECT,
-              name: "Theirs",
-              definition: DEFINITION,
-            }),
-          ),
-        ).toBe("permission_denied");
-        expect(
-          await refusalOf(() =>
-            reader.update({
-              projectId: PROJECT,
-              id: saved.id,
-              name: "Renamed",
-            }),
-          ),
-        ).toBe("permission_denied");
-        expect(
-          await refusalOf(() =>
-            reader.delete({ projectId: PROJECT, id: saved.id }),
-          ),
-        ).toBe("permission_denied");
-
-        // Nothing the refused writes attempted actually happened.
-        const after = await author.getById({
-          projectId: PROJECT,
-          id: saved.id,
-        });
-        expect(after.name).toBe("Traces per day");
-        expect((await author.getAll({ projectId: PROJECT })).length).toBe(1);
       });
     });
   });
 
   describe("given a member of another organization", () => {
-    describe("when they reach for this project's charts", () => {
-      /** @scenario "Reading saved charts requires the analytics permission" */
+    describe("when they reach for this project's chart", () => {
+      /** @scenario "Reading a saved chart requires the analytics permission" */
       it("is refused before any chart is read", async () => {
-        await saveChart();
+        const saved = await saveChart();
 
-        await expect(stranger.getAll({ projectId: PROJECT })).rejects.toThrow();
+        await expect(
+          stranger.getById({ projectId: PROJECT, id: saved.id }),
+        ).rejects.toThrow();
       });
     });
   });
@@ -356,11 +327,7 @@ describe("the saved workbench chart router", () => {
     describe("when the member names its id on their own project", () => {
       /** @scenario "Every procedure answers only for the project in the request" */
       it("answers not found, exactly as for an id that never existed", async () => {
-        const theirs = await stranger.create({
-          projectId: OTHER_PROJECT,
-          name: "Theirs",
-          definition: DEFINITION,
-        });
+        const theirs = await saveChart("Theirs", OTHER_PROJECT);
 
         expect(
           await refusalOf(() =>
@@ -374,16 +341,7 @@ describe("the saved workbench chart router", () => {
         ).toBe("saved_workbench_chart_not_found");
         expect(
           await refusalOf(() =>
-            author.update({
-              projectId: PROJECT,
-              id: theirs.id,
-              name: "Mine now",
-            }),
-          ),
-        ).toBe("saved_workbench_chart_not_found");
-        expect(
-          await refusalOf(() =>
-            author.delete({ projectId: PROJECT, id: theirs.id }),
+            author.run({ projectId: PROJECT, id: theirs.id }),
           ),
         ).toBe("saved_workbench_chart_not_found");
 
@@ -400,65 +358,230 @@ describe("the saved workbench chart router", () => {
     });
   });
 
-  describe("given a definition the governors refuse", () => {
-    describe("when the member saves it through the application", () => {
-      /** @scenario "A refusal from the write gate reaches the member with its code intact" */
-      it("delivers the service's own code rather than a generic failure", async () => {
+  describe("given a chart declaring the granularity parameter", () => {
+    // The granularity declaration is only meaningful when both period bounds
+    // are declared alongside — without them, the bucket budget no surface can
+    // compute is exactly the one the dashboard needs.
+    const GRANULARITY_WITHOUT_BOUNDS_SQL =
+      "SELECT toStartOfInterval(OccurredAt, INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND) AS bucket, " +
+      "count() AS value FROM analytics.traces " +
+      "WHERE OccurredAt >= {dashboard_context_period_start:DateTime} " +
+      "GROUP BY bucket ORDER BY bucket";
+
+    describe("when the member saves it without both period parameters", () => {
+      /** @scenario "A saved chart declaring granularity without both period parameters is refused at save" */
+      it("is refused at save with the requires-window code and nothing is written", async () => {
         expect(
           await refusalOf(() =>
-            author.create({
+            SavedWorkbenchChartService.create(prisma).createChart({
               projectId: PROJECT,
-              name: "Loads over the network",
-              definition: { ...DEFINITION, vegaLiteSpec: NETWORK_SPEC },
+              protections: FULLY_PERMITTED,
+              input: {
+                name: "Bucketed, half a window",
+                definition: {
+                  ...DEFINITION,
+                  sql: GRANULARITY_WITHOUT_BOUNDS_SQL,
+                  parameters: {},
+                },
+              },
             }),
           ),
-        ).toBe("saved_workbench_chart_specification_refused");
+        ).toBe("lwql_granularity_requires_window");
 
         expect(
-          await refusalOf(() =>
-            author.create({
+          (
+            await SavedWorkbenchChartService.create(prisma).getAll({
               projectId: PROJECT,
-              name: "A write dressed as a chart",
-              definition: { ...DEFINITION, sql: "DROP TABLE analytics.traces" },
-            }),
-          ),
-        ).toBe("lwql_not_permitted");
+            })
+          ).length,
+        ).toBe(0);
+      });
 
-        expect(
-          await refusalOf(() =>
-            author.create({
-              projectId: PROJECT,
-              name: "Shapeless",
-              definition: { sql: SQL },
-            }),
-          ),
-        ).toBe("validation_error");
-
-        expect((await author.getAll({ projectId: PROJECT })).length).toBe(0);
+      it("saves the same declaration once both period bounds stand beside it", async () => {
+        // The control behind the refusal: the declaration itself is fine — it
+        // is the missing bounds that refuse. This also proves a granularity
+        // chart is savable at all now that its surface-owned step is deferred
+        // to run instead of demanded of a save request that may never carry one.
+        const saved = await SavedWorkbenchChartService.create(
+          prisma,
+        ).createChart({
+          projectId: PROJECT,
+          protections: FULLY_PERMITTED,
+          input: {
+            name: "Bucketed, whole window",
+            definition: {
+              ...DEFINITION,
+              sql: GRANULARITY_WITH_BOUNDS_SQL,
+              parameters: {},
+            },
+          },
+        });
+        expect(saved.definition.sql).toBe(GRANULARITY_WITH_BOUNDS_SQL);
       });
     });
   });
 
-  describe("given a member saving and then editing a chart", () => {
-    describe("when they save, read, rename and delete it", () => {
-      /** @scenario "A saved chart can be renamed or deleted from the list" */
-      it("keeps the definition through a rename and removes it on delete", async () => {
-        const first = await saveChart("First");
-        const second = await saveChart("Second");
+  /**
+   * Running a saved chart, at the router rather than at the service.
+   *
+   * What the service suite already proves — that the stored statement executes
+   * with its saved values, that another project's id is not runnable, that a
+   * step past the bucket budget refuses — is not restated here. The claims this
+   * layer owns are the four the service never sees: that `run` carries the same
+   * permission and the same switch as `getById`, that the tenant key it runs
+   * under is read from the database for the project *named in the request*
+   * rather than accepted from the caller, and that the result reaches the
+   * caller with the reserved-parameter facts intact.
+   *
+   * Only the database call is stubbed, and it is stubbed on the real service
+   * instance. Replacing the whole service would also replace `validate`, which
+   * the save-gate tests above depend on being the genuine one.
+   */
+  describe("given a saved chart run through the router", () => {
+    const WEEK = {
+      start: new Date("2026-02-20T00:00:00Z"),
+      end: new Date("2026-02-27T00:00:00Z"),
+    };
 
-        const renamed = await author.update({
-          projectId: PROJECT,
-          id: first.id,
-          name: "First, renamed",
+    /** The stubbed database call, re-armed per test so the counts are per-test. */
+    const stubExecute = () =>
+      vi.spyOn(getLangWatchQLService(), "execute").mockResolvedValue(
+        lwqlResult({
+          columns: [
+            { name: "bucket", type: "DateTime" },
+            { name: "value", type: "UInt64" },
+          ],
+          rows: [{ bucket: "2026-02-20 00:00:00", value: 7 }],
+          followsTimeWindow: true,
+          followsGranularity: true,
+          granularitySeconds: 3600,
+        }),
+      );
+
+    let execute: ReturnType<typeof stubExecute>;
+
+    beforeEach(() => {
+      execute = stubExecute();
+    });
+
+    afterEach(() => {
+      execute.mockRestore();
+    });
+
+    const saveBucketed = () =>
+      SavedWorkbenchChartService.create(prisma).createChart({
+        projectId: PROJECT,
+        protections: FULLY_PERMITTED,
+        input: {
+          name: "Traces per hour",
+          definition: {
+            ...DEFINITION,
+            sql: GRANULARITY_WITH_BOUNDS_SQL,
+            parameters: {},
+          },
+        },
+      });
+
+    describe("given a chart saved in the member's own project", () => {
+      describe("when they run it with the surface's period and step", () => {
+        /** @scenario "A run names the tenant the database holds for the project in the request" */
+        it("returns the result with its reserved-parameter facts, run as the project's own tenant", async () => {
+          const saved = await saveBucketed();
+
+          const result = await author.run({
+            projectId: PROJECT,
+            id: saved.id,
+            timeWindow: WEEK,
+            granularitySeconds: 3600,
+          });
+
+          // The shape the workbench card reads to decide what it may claim.
+          expect(result.followsTimeWindow).toBe(true);
+          expect(result.followsGranularity).toBe(true);
+          expect(result.granularitySeconds).toBe(3600);
+          expect(result.rows).toEqual([
+            { bucket: "2026-02-20 00:00:00", value: 7 },
+          ]);
+
+          expect(execute).toHaveBeenCalledTimes(1);
+          const call = execute.mock.calls[0]![0];
+
+          // The stored statement, not one rebuilt from the request.
+          expect(call.sql).toBe(GRANULARITY_WITH_BOUNDS_SQL);
+
+          // The period and the step come from this request, which is the whole
+          // reserved-parameter contract: the surface owns them, the row does not.
+          expect(call.timeWindow).toEqual(WEEK);
+          expect(call.granularitySeconds).toBe(3600);
+
+          // The tenant identity is the one the database holds for the project
+          // named in the request — never anything the caller could supply.
+          const project = await prisma.project.findUniqueOrThrow({
+            where: { id: PROJECT },
+            select: { lwqlKey: true },
+          });
+          expect(call.projects).toHaveLength(1);
+          const first = call.projects[0];
+          expect(first).toBeDefined();
+          if (!first) throw new Error("call.projects[0] is undefined");
+          expect(first.id).toBe(PROJECT);
+          expect(first.lwqlKey).toBe(project.lwqlKey);
         });
-        expect(renamed.name).toBe("First, renamed");
-        expect(renamed.definition.sql).toBe(SQL);
-        expect(renamed.definition.vegaLiteSpec).toEqual(SPEC);
+      });
+    });
 
-        await author.delete({ projectId: PROJECT, id: second.id });
+    describe("given a member of another organization naming this project", () => {
+      describe("when they run one of its charts", () => {
+        it("is refused before the query reaches the database", async () => {
+          const saved = await saveBucketed();
 
-        const remaining = await author.getAll({ projectId: PROJECT });
-        expect(remaining.map(({ id }) => id)).toEqual([first.id]);
+          await expect(
+            stranger.run({ projectId: PROJECT, id: saved.id }),
+          ).rejects.toThrow();
+
+          expect(execute).not.toHaveBeenCalled();
+        });
+      });
+    });
+
+    describe("given a member with no analytics permission at all", () => {
+      describe("when they run a chart in their own project", () => {
+        /** @scenario "A run is refused for a member without the analytics view permission, and nothing is executed" */
+        it("is refused for want of the view permission, and nothing is executed", async () => {
+          const saved = await saveBucketed();
+          // A custom role with an EMPTY permission list falls back to the
+          // VIEWER defaults (which include analytics:view) — see rbac.ts. So a
+          // caller "without analytics" needs a non-empty grant that simply
+          // lacks it, or the fallback would hand the permission right back.
+          const outsider = await seedCaller(ORG, ["annotations:view"]);
+
+          expect(
+            await refusalOf(() =>
+              outsider.run({ projectId: PROJECT, id: saved.id }),
+            ),
+          ).toBe("permission_denied");
+
+          expect(execute).not.toHaveBeenCalled();
+        });
+      });
+    });
+
+    describe("given a member who may view analytics but not change them", () => {
+      describe("when they run a chart someone else saved", () => {
+        /** @scenario "Being allowed to read a chart is being allowed to run one" */
+        it("lets the run through, because running is reading with execution attached", async () => {
+          const saved = await saveBucketed();
+
+          const result = await reader.run({
+            projectId: PROJECT,
+            id: saved.id,
+            timeWindow: WEEK,
+            granularitySeconds: 3600,
+          });
+
+          expect(result.followsGranularity).toBe(true);
+          expect(execute).toHaveBeenCalledTimes(1);
+        });
       });
     });
   });

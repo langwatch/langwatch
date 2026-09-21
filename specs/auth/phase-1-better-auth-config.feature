@@ -8,12 +8,36 @@ Feature: BetterAuth config (unmounted)
   # instance with every provider we care about and every custom hook ported
   # from the NextAuth callbacks. BetterAuth is now the live auth handler,
   # mounted at `/api/auth/[...all]`.
+  #
+  # Three mechanisms here were superseded by the router (D03/D13, ADR-117).
+  # They are described as what they became rather than deleted, because the
+  # rows they wrote are still in the database:
+  #
+  #   - the `NEXTAUTH_PROVIDER` matrix below no longer decides WHERE anyone
+  #     signs in. Routing is the router's (specs/identity/signin-router.feature),
+  #     and what the env names is now the deployment's default METHOD SET
+  #     (ADR-117 §4). Which providers get mounted, and the email/password gate
+  #     that comes with them, are unchanged and stay here.
+  #   - `isSsoProviderMatch` is replaced by callback linking on the router
+  #     (ADR-117 §3: two-sided evidence, or a proposal a human resolves).
+  #   - `pendingSsoSetup` is reconciled once against identifier data and the
+  #     column then dropped (D03 plan item 5).
+  #
+  # What stays here is what is still live: which providers get mounted, and
+  # the email/password gate that comes with them.
 
   Background:
     Given the BetterAuth instance is exported from `~/server/better-auth`
 
   # ============================================================================
   # Provider selection via NEXTAUTH_PROVIDER env
+  #
+  # What these scenarios assert is MOUNTING: which providers the instance
+  # stands up, and whether email and password sign-in is enabled beside them.
+  # That survives the auth screens (ADR-117 §4) - the env's provider becomes the
+  # default method set, one element, offered automatically, which is what a
+  # single-provider deployment already does. Where a person is SENT is no
+  # longer decided here.
   # ============================================================================
 
   Scenario: Credentials-only on-prem mode
@@ -46,6 +70,11 @@ Feature: BetterAuth config (unmounted)
 
   # ============================================================================
   # SSO domain + provider matching (ported from NextAuth signIn callback)
+  #
+  # Retires at the flip: the router's callback linking replaces string
+  # matching with evidence (ADR-117 §3), and a match it cannot make
+  # unambiguously becomes a proposal for a human rather than a guess. Kept
+  # while the legacy callback is still the one that runs.
   # ============================================================================
 
   Scenario: isSsoProviderMatch — Auth0 prefix match
@@ -109,32 +138,79 @@ Feature: BetterAuth config (unmounted)
     Then the Account row is upserted
     And pendingSsoSetup remains false
 
-  Scenario: Existing user with wrong SSO provider gets pending flag
-    Given an organization with ssoDomain "acme.com" and ssoProvider "okta" exists
+  # `pendingSsoSetup` is the flag this sets; it is reconciled once against
+  # identifier data and dropped at bake end. Under the auth screens the same
+  # situation is a routing decision the screen explains instead (ADR-117 §6).
+  #
+  # Scoped to the BROKER now that native social buttons mount beside it. An
+  # existing member arriving through the broker on a connection the
+  # organization has since stopped pinning is mid-migration, and locking them
+  # out is the failure this soft flag exists to avoid.
+  Scenario: Existing user with wrong brokered SSO provider gets pending flag
+    Given an organization with ssoDomain "acme.com" and ssoProvider "waad|acme-conn" exists
     And a user exists with email "existing@acme.com" and pendingSsoSetup=false
-    When that user signs in via Google
+    When that user signs in through the broker on a different connection
     Then signin succeeds
     And pendingSsoSetup is set to true
 
-  # ============================================================================
-  # Admin impersonation via the legacy Session.impersonating JSON column
-  #
-  # We deliberately do NOT use BetterAuth's `admin()` plugin — it expects
-  # `User.role` / `User.banned` columns our schema doesn't have, and it
-  # would force an additional schema migration for no behavioral benefit.
-  # Impersonation is handled end-to-end by `src/pages/api/admin/impersonate.ts`
-  # writing to the existing `Session.impersonating` JSON column, and
-  # `src/server/auth.ts` reading it to rewrite `session.user` on each
-  # request. The compat layer also re-verifies the target user is still
-  # active on each request.
-  # ============================================================================
+  # A native provider is a button the deployment mounts itself, beside the
+  # broker. No existing way in runs through one, so refusing it locks nobody
+  # out - and admitting it would hand an organization that enforces single
+  # sign-on a second door it never agreed to. The refusal carries the code
+  # the error page already renders as "use your organization's sign-in".
+  Scenario: A native social sign-in at an SSO-enforced domain is refused
+    Given an organization with ssoDomain "acme.com" and ssoProvider "waad|acme-conn" exists
+    And a user exists with email "existing@acme.com" and pendingSsoSetup=false
+    When that user signs in via Google
+    Then the signin is rejected with an SSO_PROVIDER_NOT_ALLOWED error
+    And pendingSsoSetup is left alone
 
-  Scenario: The BetterAuth admin plugin is intentionally omitted
-    Given the BetterAuth instance is initialized
-    When I inspect the configured plugins
-    Then only genericOAuth is present in the plugins array
-    And impersonation is handled via the legacy Session.impersonating JSON column
-    And the compat layer re-verifies the impersonation target on every request
+  # A provider is linked ONCE: better-auth writes the Account row the first
+  # time and only updates it on every sign-in after. So the refusal has to sit
+  # on both paths, or it closes the door to new links while every link the old
+  # soft block already wrote keeps letting its holder in.
+  Scenario: A native social sign-in on an already-linked account is refused too
+    Given an organization with ssoDomain "acme.com" and ssoProvider "waad|acme-conn" exists
+    And a user exists with email "existing@acme.com" whose Google account is already linked
+    When that user signs in via Google again
+    Then the signin is rejected with an SSO_PROVIDER_NOT_ALLOWED error
+
+  # The refusal is about a provider the organization did NOT choose. One it did
+  # choose is its own front door, whatever kind of provider it happens to be -
+  # so an organization pinned to Google signs in with Google, and refusing
+  # native providers ahead of that match would lock it out of its own setting.
+  Scenario: An organization pinned to Google still signs in with Google
+    Given an organization with ssoDomain "acme.com" and ssoProvider "google" exists
+    And a user exists with email "existing@acme.com" and pendingSsoSetup=false
+    When that user signs in via Google
+    Then signin succeeds
+    And pendingSsoSetup is left alone
+
+  # ============================================================================
+  # RETIRED at D06 — the legacy impersonation pair, and the plugin allow-list
+  #
+  # This block described impersonation as the `Session.impersonating` JSON
+  # column, and asserted that generic OAuth was the ONLY registered plugin.
+  # Both statements are now false and neither is worth restating here.
+  #
+  # Impersonation rides the authorization principal, `{actor, subject}`, and
+  # what a session carries is described where the rest of the session shape
+  # is: specs/identity/mfa-and-session-shape.feature. The behaviour it used to
+  # protect survives untouched in specs/auth/impersonation-banner.feature,
+  # specs/ops/dejaview-impersonation-access.feature and
+  # specs/features/backoffice-user-impersonation-reason.feature — only the
+  # mechanism underneath swapped.
+  #
+  # The plugin allow-list moved too, and for a reason this block could not
+  # have carried: the passkey plugin is mounted on every deployment and the
+  # two-factor plugin joins generic OAuth when MFA_ENROLLMENT_OPEN is on, so
+  # "only genericOAuth" was never a statement about the product. What survives is the
+  # part that was ever load-bearing — BetterAuth's `admin()` plugin is
+  # deliberately NOT registered, because it expects `User.role` / `User.banned`
+  # columns our schema does not have and would take impersonation over — and
+  # that lives in specs/identity/mfa-and-session-shape.feature and
+  # specs/identity/passkeys.feature.
+  # ============================================================================
 
   # ============================================================================
   # bcrypt-compatible password verification

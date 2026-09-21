@@ -38,10 +38,16 @@ OUTPUT CONTRACT (every command)
   -o, --output <format>   table (human default) | json | agents | yaml
   --json <fields>         JSON with only the given fields: --json traceId,input
   --jq <expr>             project the result before it prints. Supported:
-                          dot paths, .items[], .items[].field, | length
+                          dot paths, .items[], .items[].field, .items[0]
+                          (negative counts from the end), and length, with
+                          or without a pipe in front
+  --limit <n>             keep at most n rows of the result. A command that
+                          pages with a --limit of its own keeps that one
 
   Examples:
     langwatch trace search --jq '.traces[].traceId'
+    langwatch prompt list --jq length
+    langwatch prompt list --limit 5 -o json
     langwatch monitor list -o json
     langwatch evaluator list --json id,name,slug
     langwatch commands --flat --jq '.commands[].path'

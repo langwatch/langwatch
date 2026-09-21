@@ -392,6 +392,135 @@ describe("Autosave evaluation state", () => {
       });
       expect(mockMutateAsync).not.toHaveBeenCalled();
     });
+
+    /** @scenario "A refused save names who holds the newer version" */
+    it("keeps who wrote the newer version, so the banner can name them", async () => {
+      mockMutateAsync.mockRejectedValue({
+        data: {
+          error: {
+            code: "experiment_stale_workbench_state",
+            httpStatus: 409,
+            message: "experiment_stale_workbench_state",
+            meta: { currentVersion: 9, actorLabel: "langy" },
+          },
+        },
+      });
+      useEvaluationsV3Store.getState().setWorkbenchVersion(4);
+
+      render(<TestAutosaveComponent />, { wrapper: Wrapper });
+      await act(async () => {
+        vi.advanceTimersByTime(50);
+      });
+
+      act(() => {
+        useEvaluationsV3Store
+          .getState()
+          .setCellValue("test-data", 0, "input", "an edit that will lose");
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
+      });
+
+      expect(useEvaluationsV3Store.getState().staleWorkbench).toEqual({
+        serverVersion: 9,
+        actorLabel: "langy",
+      });
+    });
+
+    /** @scenario "A refused save whose newer version came from this page's own run is sent again" */
+    it("takes the version its own run wrote and sends the edits again", async () => {
+      // The run wrote its cells into the saved state, and this page streamed
+      // every one of them. Standing down here would cost the reader the edits
+      // they made while the run was going, over a write they already hold.
+      mockMutateAsync
+        .mockRejectedValueOnce({
+          data: {
+            error: {
+              code: "experiment_stale_workbench_state",
+              httpStatus: 409,
+              message: "experiment_stale_workbench_state",
+              meta: {
+                currentVersion: 9,
+                actorLabel: "user",
+                runId: "bold-jolly-bee",
+              },
+            },
+          },
+        })
+        .mockResolvedValue({
+          id: "test-experiment-id",
+          slug: "test-slug",
+          name: "New Evaluation",
+          version: 10,
+        });
+      useEvaluationsV3Store.getState().setWorkbenchVersion(4);
+      useEvaluationsV3Store.getState().rememberRunStartedHere("bold-jolly-bee");
+
+      render(<TestAutosaveComponent />, { wrapper: Wrapper });
+      await act(async () => {
+        vi.advanceTimersByTime(50);
+      });
+
+      act(() => {
+        useEvaluationsV3Store
+          .getState()
+          .setCellValue("test-data", 0, "input", "an edit made during the run");
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
+      });
+
+      // Sent again at the version the run created, not at the one this page
+      // was holding.
+      expect(mockMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ expectedVersion: 9 }),
+      );
+      expect(useEvaluationsV3Store.getState().staleWorkbench).toBeUndefined();
+      expect(
+        useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation,
+      ).not.toBe("error");
+    });
+
+    /** @scenario "A page still stands down for a version somebody else wrote" */
+    it("still stands down when a run it did not start wrote the version", async () => {
+      mockMutateAsync.mockRejectedValue({
+        data: {
+          error: {
+            code: "experiment_stale_workbench_state",
+            httpStatus: 409,
+            message: "experiment_stale_workbench_state",
+            meta: {
+              currentVersion: 9,
+              actorLabel: "user",
+              runId: "some-other-run",
+            },
+          },
+        },
+      });
+      useEvaluationsV3Store.getState().setWorkbenchVersion(4);
+      useEvaluationsV3Store.getState().rememberRunStartedHere("bold-jolly-bee");
+
+      render(<TestAutosaveComponent />, { wrapper: Wrapper });
+      await act(async () => {
+        vi.advanceTimersByTime(50);
+      });
+
+      act(() => {
+        useEvaluationsV3Store
+          .getState()
+          .setCellValue("test-data", 0, "input", "an edit that will lose");
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
+      });
+
+      expect(useEvaluationsV3Store.getState().staleWorkbench).toMatchObject({
+        serverVersion: 9,
+      });
+      expect(
+        useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation,
+      ).toBe("error");
+    });
   });
 
   // The silent reconciliation path reloads a clean workbench, and the server

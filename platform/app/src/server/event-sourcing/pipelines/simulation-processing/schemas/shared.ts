@@ -1,13 +1,18 @@
 import { z } from "zod";
+import { scenarioEvaluationResultSchema } from "~/server/scenarios/schemas/event-schemas";
 
 /**
  * Status values stored in ClickHouse.
  * STALLED is never written: stalled runs finish ERROR via the process-manager
  * stall watchdog, and nothing derives STALLED at read time anymore.
+ * PENDING_EVALUATION is written by the fold when a run finishes owing its
+ * evaluator results, and replaced by the gated terminal status when they are
+ * recorded.
  */
 export const SIMULATION_RUN_STATUS = [
   "PENDING",
   "IN_PROGRESS",
+  "PENDING_EVALUATION",
   "SUCCESS",
   "FAILURE",
   "ERROR",
@@ -39,5 +44,11 @@ export const simulationResultsSchema = z.object({
   metCriteria: z.array(z.string()).default([]),
   unmetCriteria: z.array(z.string()).default([]),
   error: z.string().optional(),
+  /**
+   * The evaluator results a scenario run from code sends with its finished
+   * event. The platform stores them as sent and runs no evaluator of its own
+   * on that run.
+   */
+  evaluations: z.array(scenarioEvaluationResultSchema).optional(),
 });
 export type SimulationResults = z.infer<typeof simulationResultsSchema>;

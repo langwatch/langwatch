@@ -1,7 +1,5 @@
 import { useEffect, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
-import { isLegacyNavigationDevice } from "~/features/navigation/logic/resolveNavigationMode";
-import { useNavigationModeStore } from "~/features/navigation/navigationModeStore";
 import { OrganizationUserRole, type Project } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import {
@@ -22,11 +20,16 @@ import {
 /**
  * Whether a permission is org-scoped: it lives in ORGANIZATION_ROLE_PERMISSIONS
  * and must be resolved against the user's organization role, not any team-role
- * bag. Covers `organization:` itself plus the AI Governance resource family
- * (governance / ingestionSources / anomalyRules / complianceExport /
- * activityMonitor / aiTools). Team admins do NOT inherit these automatically;
- * delegation flows through the CustomRolePermissions JSON column at the team
- * level (matching the rest of the RBAC catalog).
+ * bag. Team admins do NOT inherit these automatically; delegation flows through
+ * the CustomRolePermissions JSON column at the team level (matching the rest of
+ * the RBAC catalog).
+ *
+ * The members are exactly the resources the authz registry declares grantable
+ * at the organization tier and no other — `ORG_EXCLUSIVE_RESOURCES` in rbac.ts,
+ * `permissionGrantTiers` in @langwatch/authz. Deliberately not enumerated here:
+ * this list has fallen behind the registry three times, and a docblock naming
+ * the members goes stale the same way. The unit test walks the registry and
+ * fails when the two disagree, so that check lives in CI rather than in prose.
  *
  * @internal Exported for testing only
  */
@@ -43,7 +46,17 @@ export function isOrgScopedPermission(permission: Permission): boolean {
     // (rbac.ts ADMIN defaults); resolving them against team roles denies
     // org admins client-side while the server correctly allows them.
     permission.startsWith("webhookEndpoints:") ||
-    permission.startsWith("gatewaySpend:")
+    permission.startsWith("gatewaySpend:") ||
+    // The cost screen is org-exclusive on the server (rbac.ts
+    // ORG_EXCLUSIVE_RESOURCES). Omitting it here sent the check down the
+    // team-role path, where no bag carries it, so the screen refused every
+    // org admin while the router allowed them.
+    permission.startsWith("governanceCost:") ||
+    // Single sign-on, and the directory sync it gates, are org-tier by
+    // declaration (registry scopes: ["organization"]); resolving them
+    // against team roles denies org admins client-side while the server
+    // allows them.
+    permission.startsWith("sso:")
   );
 }
 
@@ -266,10 +279,29 @@ export const useOrganizationTeamProject = (
       router.query.project === publicEnv.data.DEMO_PROJECT_SLUG,
   );
 
+  // Hoisted so the loading contract below can tell "switched off because the
+  // session has not resolved" from "switched off because nothing here is
+  // organization-scoped". The two look identical on the query itself.
+  const isOrganizationsQueryEnabled =
+    session.status !== "loading" && (!!session.data || !isPublicRoute);
+
   const organizations = api.organization.getAll.useQuery(
     { isDemo: isDemo },
     {
-      enabled: !!session.data || !isPublicRoute,
+      // Nothing is asked FOR a session that has not resolved yet. On a private
+      // route `!isPublicRoute` alone was true on the very first render, before
+      // `useSession` had finished its fetch, so the query went out with no
+      // cookie behind it and came back 401 — and 401 is one of the statuses
+      // `shouldRetryQuery` will never replay, deliberately, because a replay
+      // cannot change a rejected credential. The query then SAT in error until
+      // something remounted an observer: an empty organization list that never
+      // recovers, which the landing redirect reads as "this account has no
+      // organization" and answers with /onboarding/welcome.
+      //
+      // Waiting for RESOLUTION rather than for data is what makes it correct
+      // both ways: an unauthenticated visitor on a private route still asks,
+      // and is still refused, which is the answer that sends them to the door.
+      enabled: isOrganizationsQueryEnabled,
       // Small reference query that drives load-bearing client state (current
       // project incl. defaultModel). Cheap to refetch — prefer freshness over
       // a "cache forever" default. Background refetch on focus picks up edits
@@ -294,9 +326,6 @@ export const useOrganizationTeamProject = (
   );
   const [localStorageProjectSlug, setLocalStorageProjectSlug] =
     useLocalStorage<string>("selectedProjectSlug", "");
-  const [lastVisitedHomeKind, setLastVisitedHomeKind] = useLocalStorage<
-    "" | "project" | "personal"
-  >("lastVisitedHomeKind", "");
 
   const reservedProjectSlugs = useMemo(
     () => ["analytics", "datasets", "evaluations", "experiments", "messages"],
@@ -519,34 +548,11 @@ export const useOrganizationTeamProject = (
         setLocalStorageProjectSlug(project.slug);
       }
     }
-    // Visiting an actual /[project]/* page marks the implicit home preference
-    // as "project". Pairs with MyLayout's "personal" marker so the `/` index
-    // resolver can fall through to whichever home was visited last when the
-    // user has no explicit pin. Gate on the URL actually carrying a project
-    // slug: `project` also resolves from the persisted selectedProjectSlug on
-    // non-project routes (e.g. /me), and marking "project" there would clobber
-    // MyLayout's "personal" and wrongly bounce `/` back to the project.
-    // `projectSlugFromUrl` (not raw `router.query.project`) so reserved slugs
-    // like /messages or /datasets don't count as project visits either.
-    if (project && !!projectSlugFromUrl && lastVisitedHomeKind !== "project") {
-      // Guarded like the setters above: every unguarded write dispatches a
-      // storage event that setStates all mounted subscribers, which can cascade
-      // past React's nested-update limit during route transitions.
-      setLastVisitedHomeKind("project");
-    }
     // We want to update localstorage values only once, forward, doesn't matter if localstorage
     // itself changes. This is because the user might have two tabs open in different projects,
     // and we don't want them fighting each other on who keeps localstorage in sync.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDemo, organization, project, team, router.query.project]);
-
-  // Subscribed, not read once. The store holds the last flag answer this
-  // device saw, which is device-wide: a reader who leaves an organization
-  // with the new navigation on for one with it off starts as a v2 device
-  // and becomes a legacy one when the flag answers. The redirect effect
-  // below must run again on that answer, so it reads a subscribed value.
-  // Spec: specs/navigation/navigation-v2-landing.feature
-  const isLegacyNavigation = useNavigationModeStore(isLegacyNavigationDevice);
 
   useEffect(() => {
     if (
@@ -608,28 +614,10 @@ export const useOrganizationTeamProject = (
       return;
     }
 
-    const hasTeamsWithProjectsOnCurrentOrg = organization.teams.some(
-      (team) => team.projects.length > 0,
-    );
-    if (
-      !hasTeamsWithProjectsOnCurrentOrg &&
-      teamsWithProjectsOnAnyOrg.length > 0 &&
-      // In the navigation-v2 modes the org switch and the landing resolver
-      // own cross-organization destinations; this teleport to another
-      // org's project would fight them mid-navigation.
-      // Spec: specs/navigation/navigation-v2-landing.feature
-      isLegacyNavigation
-    ) {
-      // Personal workspaces are never a valid project-home target — only
-      // redirect when a shared team's project exists (ADR-038 v6).
-      const availableProjectSlug = teamsWithProjectsOnAnyOrg.find(
-        (team) => !team.isPersonal,
-      )?.projects[0]?.slug;
-      if (availableProjectSlug) {
-        void router.push(`/${availableProjectSlug}`);
-        return;
-      }
-    }
+    // The org switch and the landing resolver own cross-organization
+    // destinations; a teleport to another org's project would fight them
+    // mid-navigation, so a member kept in an organization without projects
+    // stays put. Spec: specs/navigation/navigation-v2-landing.feature
 
     if (redirectToProjectOnboarding && !teamsWithProjectsOnAnyOrg.length) {
       const firstTeamSlug = organizations.data.flatMap((org) => org.teams)[0]
@@ -656,7 +644,6 @@ export const useOrganizationTeamProject = (
     }
   }, [
     isDemo,
-    isLegacyNavigation,
     organization,
     organizations.data,
     finalProject,
@@ -668,9 +655,33 @@ export const useOrganizationTeamProject = (
     team,
   ]);
 
-  if (organizations.isLoading && !organizations.isFetched) {
+  // React Query derives `isLoading` as `isPending && isFetching`, so a query it
+  // was told not to run reports `isLoading: false` with no data — the same
+  // shape as one that answered with nothing. Asking `isLoading` alone
+  // therefore called the workspace RESOLVED for the whole width of the session
+  // fetch, and callers read the empty graph as fact: the project chrome drew
+  // its full-page not-found scene on every refresh of a project address, and
+  // the landing redirect sent a member who has organizations to
+  // /onboarding/welcome before correcting itself.
+  //
+  // So the question is "has this read answered", not "is it in flight" — with
+  // the wait for the session counted as part of the read, but only on an
+  // address that will need the graph whatever the session turns out to say.
+  // An address anybody can open needs none, so it resolves immediately rather
+  // than holding the share page and the sign-in screen behind a session fetch
+  // whose answer cannot change what they draw.
+  const isAwaitingOrganizations =
+    !organizations.isFetched &&
+    !organizations.isError &&
+    (isOrganizationsQueryEnabled ||
+      (session.status === "loading" && !isPublicRoute));
+
+  if (isAwaitingOrganizations) {
     return {
       isLoading: true,
+      // Nothing has failed yet — the read is still out. A caller that draws a
+      // failure must not draw one for a workspace that is merely on its way.
+      workspaceError: undefined,
       project: publicShareProjectData,
       hasPermission: () => false,
       hasOrgPermission: () => false,
@@ -719,7 +730,26 @@ export const useOrganizationTeamProject = (
 
     // Check if user has custom role assignment
     if (teamMember.assignedRole) {
-      // If user has custom role, ONLY use custom role permissions (no fallback)
+      // An org admin keeps admin access whatever team role they hold — both
+      // server paths answer this way (an ORGANIZATION-scoped ADMIN binding
+      // grants everything: checkPermissionFromBindings in rbac.ts, and the
+      // engine's bindingGrants), and the no-team-membership branch above
+      // already mirrors it. EXTERNAL users are never ADMIN, so their
+      // restriction below is unaffected.
+      //
+      // What the hook actually reads is the membership row's role, standing
+      // in for that binding — the same trust the branch above already
+      // places in it. The two are written together but not atomically, so
+      // they can diverge (binding deleted or edited on its own, or a crash
+      // between the membership and grant writes on invite acceptance).
+      // In that state this shows admin controls the server then refuses —
+      // a stale-UI failure, not an access grant.
+      if (organizationRole === OrganizationUserRole.ADMIN) {
+        return true;
+      }
+
+      // Otherwise ONLY the custom role's permissions apply (no fallback to
+      // the built-in team role it replaced)
       const rawPermissions = teamMember.assignedRole.permissions as
         | string[]
         | null
@@ -777,6 +807,14 @@ export const useOrganizationTeamProject = (
 
   return {
     isLoading: false,
+    // The third answer the graph can give, beside a list and an empty list: it
+    // refused. `organizations` is `undefined` for a refusal exactly as it is
+    // for a read still in flight, so a caller that has only those two cannot
+    // tell a workspace it may not read from one it does not have — and the one
+    // that sends people to onboarding must never confuse them. Carrying the
+    // error itself rather than a flag is what lets a screen resolve the
+    // customer-facing words from the code-keyed registry (ADR-045).
+    workspaceError: organizations.error,
     isRefetching: organizations.isRefetching,
     organizations: organizations.data,
     organization,

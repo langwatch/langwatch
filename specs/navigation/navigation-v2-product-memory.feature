@@ -3,7 +3,7 @@ Feature: The device remembers the last product per organization
   I want the app to reopen where I actually work
   So that I never re-navigate from a home that is not mine
 
-  In the new navigation modes the device keeps one value per organization:
+  The device keeps one value per organization:
   the last product visited (Me, LLM Ops, Gateway or Governance). It lives
   in localStorage, written only when the product actually changes, and is
   never synced to the account. Settings and app plumbing pages are not
@@ -42,20 +42,12 @@ Feature: The device remembers the last product per organization
 
   @integration
   Scenario: Navigating the app keeps the memory current
-    Given I am in a new navigation mode
-    When I go from a Gateway page to a Governance page
+        When I go from a Gateway page to a Governance page
     Then the device remembers "governance" for my organization
 
   @integration
-  Scenario: Legacy mode writes no product memory
-    Given I am in legacy mode
-    When I visit a Gateway page
-    Then the device remembers nothing
-
-  @integration
   Scenario: Entering Settings captures where I came from
-    Given I am in a new navigation mode
-    When I go from a Gateway page to a Settings page
+        When I go from a Gateway page to a Settings page
     Then the Settings back entry points at that Gateway page
 
   @integration

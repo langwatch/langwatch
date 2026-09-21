@@ -28,6 +28,23 @@ export const MAX_NODE_COUNT = 20;
 const MAX_PARAM_COUNT = 50;
 
 /**
+ * How one dialect compiles a single `field:value` tag.
+ *
+ * The boolean structure of the language (AND, OR, NOT, parentheses, the node
+ * ceiling) is the same whatever table the result runs against, so the walk
+ * below takes the per-tag compilation as an argument. `trace_summaries` is one
+ * dialect (the rest of this file); the LangWatchQL trace view is another, and
+ * it lives with the feature that needs it.
+ *
+ * @see ~/server/app-layer/instant-evals/shorthand/filter.ts
+ */
+export type FilterTagTranslator = (
+  tag: TagToken,
+  negated: boolean,
+  ctx: TranslationContext,
+) => string;
+
+/**
  * `liqe`'s serializer can emit `cost:[0.01 TO 1]AND foo:bar` (no space after
  * `]`/`)` before a boolean) which its own parser then rejects. Normalise the
  * incoming query so older saved URLs and external callers don't 422.
@@ -50,18 +67,6 @@ export function translateFilterToClickHouse(
   tenantId: string,
   timeRange: { from: number; to: number },
 ): { sql: string; params: Record<string, unknown> } | null {
-  const trimmed = normalizeQuery(queryText);
-  if (!trimmed) return null;
-
-  let ast: LiqeQuery;
-  try {
-    ast = parse(trimmed);
-  } catch {
-    throw new FilterParseError("Invalid filter syntax");
-  }
-
-  if (ast.type === "EmptyExpression") return null;
-
   const ctx: TranslationContext = {
     paramCounter: 0,
     nodeCount: 0,
@@ -74,13 +79,53 @@ export function translateFilterToClickHouse(
     timeRange,
   };
 
-  const sql = translateNode(ast, false, ctx);
+  const sql = translateFilterAst({ queryText, ctx, translateTag });
+  if (sql === null) return null;
+  return { sql, params: ctx.params };
+}
+
+/**
+ * The language's boolean structure, compiled with the tag translator given.
+ *
+ * Returns `null` for an empty query, which every caller reads as "no
+ * condition"; throws {@link FilterParseError} for syntax the language does not
+ * have and for a query past the node or parameter ceiling. The parameters land
+ * on `ctx.params`, so the caller owns both the names it seeded and the ones the
+ * walk added.
+ */
+export function translateFilterAst({
+  queryText,
+  ctx,
+  translateTag: translateTagWith,
+}: {
+  readonly queryText: string;
+  readonly ctx: TranslationContext;
+  readonly translateTag: FilterTagTranslator;
+}): string | null {
+  const trimmed = normalizeQuery(queryText);
+  if (!trimmed) return null;
+
+  let ast: LiqeQuery;
+  try {
+    ast = parse(trimmed);
+  } catch {
+    throw new FilterParseError("Invalid filter syntax");
+  }
+
+  if (ast.type === "EmptyExpression") return null;
+
+  const sql = translateNode({
+    node: ast,
+    negated: false,
+    ctx,
+    translateTag: translateTagWith,
+  });
 
   if (Object.keys(ctx.params).length > MAX_PARAM_COUNT) {
     throw new FilterParseError("Too many filter conditions");
   }
 
-  return { sql, params: ctx.params };
+  return sql;
 }
 
 /**
@@ -129,6 +174,50 @@ export function extractFreeTextTerms(queryText: string): string[] {
   if (terms.length > MAX_CONTENT_TERMS) return [];
   if (terms.some((term) => term.length > MAX_VALUE_LENGTH)) return [];
   return terms;
+}
+
+/**
+ * Whether the query names `fieldName` as a structured term anywhere, negated
+ * or not, at any depth. Empty and unparsable input names nothing (the
+ * translator rejects the latter first anyway).
+ */
+export function queryNamesField(queryText: string, fieldName: string): boolean {
+  const trimmed = normalizeQuery(queryText);
+  if (!trimmed) return false;
+
+  let ast: LiqeQuery;
+  try {
+    ast = parse(trimmed);
+  } catch {
+    return false;
+  }
+
+  return namesField(ast, fieldName);
+}
+
+function namesField(node: LiqeQuery, fieldName: string): boolean {
+  switch (node.type) {
+    case "Tag": {
+      const tag = node as TagToken;
+      return tag.field.type !== "ImplicitField" && tag.field.name === fieldName;
+    }
+    case "LogicalExpression": {
+      const logExpr = node as LogicalExpressionToken;
+      return (
+        namesField(logExpr.left, fieldName) ||
+        namesField(logExpr.right, fieldName)
+      );
+    }
+    case "UnaryOperator":
+      return namesField((node as UnaryOperatorToken).operand, fieldName);
+    case "ParenthesizedExpression":
+      return namesField(
+        (node as ParenthesizedExpressionToken).expression,
+        fieldName,
+      );
+    default:
+      return false;
+  }
 }
 
 /** Whether an OR joins any two branches of the query, at any depth. */
@@ -206,11 +295,24 @@ function freeTextTermOf(tag: TagToken, negated: boolean): string | null {
   return value.length > 0 ? value : null;
 }
 
-function translateNode(
-  node: LiqeQuery,
-  negated: boolean,
-  ctx: TranslationContext,
-): string {
+/**
+ * The walk, with the per-tag compilation it was given.
+ *
+ * Named parameters rather than positional, because the tag translator is the
+ * fourth thing the walk needs and a reader at the recursive call should not
+ * have to count arguments to see which of them is the dialect.
+ */
+function translateNode({
+  node,
+  negated,
+  ctx,
+  translateTag: translateTagWith,
+}: {
+  node: LiqeQuery;
+  negated: boolean;
+  ctx: TranslationContext;
+  translateTag: FilterTagTranslator;
+}): string {
   ctx.nodeCount++;
   if (ctx.nodeCount > MAX_NODE_COUNT) {
     throw new FilterParseError("Query too complex");
@@ -221,25 +323,40 @@ function translateNode(
       return "1 = 1";
 
     case "Tag":
-      return translateTag(node as TagToken, negated, ctx);
+      return translateTagWith(node as TagToken, negated, ctx);
 
     case "LogicalExpression": {
       const logExpr = node as LogicalExpressionToken;
-      const left = translateNode(logExpr.left, negated, ctx);
-      const right = translateNode(logExpr.right, negated, ctx);
+      const branch = (side: LiqeQuery): string =>
+        translateNode({
+          node: side,
+          negated,
+          ctx,
+          translateTag: translateTagWith,
+        });
       const op = logExpr.operator.operator === "OR" ? "OR" : "AND";
-      return `(${left} ${op} ${right})`;
+      return `(${branch(logExpr.left)} ${op} ${branch(logExpr.right)})`;
     }
 
     case "UnaryOperator": {
       const unary = node as UnaryOperatorToken;
       const isNeg = unary.operator === "NOT" || unary.operator === "-";
-      return translateNode(unary.operand, negated !== isNeg, ctx);
+      return translateNode({
+        node: unary.operand,
+        negated: negated !== isNeg,
+        ctx,
+        translateTag: translateTagWith,
+      });
     }
 
     case "ParenthesizedExpression": {
       const paren = node as ParenthesizedExpressionToken;
-      return `(${translateNode(paren.expression, negated, ctx)})`;
+      return `(${translateNode({
+        node: paren.expression,
+        negated,
+        ctx,
+        translateTag: translateTagWith,
+      })})`;
     }
 
     default:

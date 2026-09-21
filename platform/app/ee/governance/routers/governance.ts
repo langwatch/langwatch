@@ -38,6 +38,7 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 import { featureFlagService } from "~/server/featureFlag";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { UsageStatsService } from "~/server/license-enforcement/usage-stats.service";
 
 export const governanceRouter = createTRPCRouter({
@@ -137,6 +138,9 @@ export const governanceRouter = createTRPCRouter({
           .isEnabled("release_ui_ai_governance_enabled", {
             distinctId: userId,
             defaultValue: false,
+            // The landing destination is picked for an organization. No
+            // project takes part in it.
+            projectId: NOT_TARGETED,
             organizationId: input.organizationId,
           })
           .catch(() => false),

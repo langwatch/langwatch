@@ -143,6 +143,11 @@ function fixturePrisma(): PrismaClient {
 
 function callerForUser(userId: string) {
   const ctx = createInnerTRPCContext({
+    // Not a suite about the second-factor gate. Without this the gate runs
+    // inside the permission middleware, reads the scope's owner from a Prisma
+    // double that has only this router's models, and fails there instead of
+    // here — and only where the deployment switches it on.
+    mfaGate: { offered: () => false },
     session: { user: { id: userId }, expires: "1" },
     req: undefined,
     res: undefined,

@@ -3,6 +3,7 @@ import type {
   BatchRunDataResult,
   BatchSummary,
   ExternalSetSummary,
+  ScenarioLastResultSummary,
   ScenarioRunData,
   ScenarioSetData,
 } from "~/server/scenarios/scenario-event.types";
@@ -82,6 +83,12 @@ export interface SimulationRepository {
     cursor?: string;
     startDate?: number;
     endDate?: number;
+    /**
+     * Reads whole conversations instead of the trimmed list projection. The
+     * page size is capped lower when set, because the heavy message arrays
+     * are exactly what the trim protects against.
+     */
+    shouldIncludeMessages?: boolean;
   }): Promise<{
     runs: ScenarioRunData[];
     nextCursor?: string;
@@ -112,6 +119,17 @@ export interface SimulationRepository {
     endDate?: number;
   }): Promise<ExternalSetSummary[]>;
 
+  /**
+   * The latest run result per scenario inside the window. A scenario with no
+   * run in the window is simply absent from the result.
+   */
+  getLastResultSummaries(params: {
+    projectId: string;
+    scenarioIds?: string[];
+    startDate?: number;
+    endDate?: number;
+  }): Promise<ScenarioLastResultSummary[]>;
+
   getRunDataForAllSuites(params: {
     projectId: string;
     limit?: number;
@@ -119,6 +137,7 @@ export interface SimulationRepository {
     startDate?: number;
     endDate?: number;
     sinceTimestamp?: number;
+    shouldIncludeMessages?: boolean;
   }): Promise<AllSuitesRunDataResult>;
 
   /**
@@ -226,6 +245,10 @@ export class NullSimulationRepository implements SimulationRepository {
   }
 
   async getInternalSuiteSummaries(): Promise<ExternalSetSummary[]> {
+    return [];
+  }
+
+  async getLastResultSummaries(): Promise<ScenarioLastResultSummary[]> {
     return [];
   }
 

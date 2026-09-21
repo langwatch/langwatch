@@ -63,11 +63,22 @@
  * because hashing and verifying both read that same local pepper.
  */
 
+import { identifierDomain } from "@langwatch/identity";
+import {
+  computeIdentifierHash,
+  planIdentifiers,
+} from "@langwatch/identity-server";
 import { hash as hashPassword } from "bcrypt";
+import { randomBytes } from "crypto";
 import { parse as parseDotenv } from "dotenv";
 import fs from "fs";
 import path from "path";
-import { ENTERPRISE_LICENSE_KEY } from "../ee/licensing/__tests__/fixtures/testLicenses";
+import { ENTERPRISE_LICENSE_KEY as TEST_SUITE_ENTERPRISE_LICENSE_KEY } from "../ee/licensing/__tests__/fixtures/testLicenses";
+import { PUBLIC_KEY } from "../ee/licensing/constants";
+import {
+  LOCAL_DEV_ENTERPRISE_LICENSE_KEY,
+  resolveSeedLicense,
+} from "../scripts/localDevLicense";
 import {
   PrismaClient,
   RoleBindingScopeType,
@@ -87,6 +98,112 @@ import { seedDemoPlatform } from "./seed-demo-platform";
 const prisma = new PrismaClient({
   adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
 });
+
+/**
+ * State the identifier projection rows the legacy rows imply, for every user
+ * who has none — the seed-time stand-in for the D01 backfill, over the SAME
+ * pure plan (`planIdentifiers`) and the same derived ids, so a real backfill
+ * pass later converges on these rows instead of fighting them.
+ *
+ * Without this, a seeded user exists to the sign-up door (which reads
+ * `User`) and not to the sign-in router (which reads `Identifier`), and the
+ * two doors send a person in a circle: "no account yet" → "already has one".
+ */
+async function backfillIdentifierRows(): Promise<void> {
+  const covered = new Set(
+    (
+      await prisma.identifier.findMany({
+        select: { userId: true },
+        distinct: ["userId"],
+      })
+    ).map((row) => row.userId),
+  );
+  const users = await prisma.user.findMany({
+    where: { email: { not: null } },
+    select: {
+      id: true,
+      email: true,
+      emailVerified: true,
+      createdAt: true,
+      userHashKey: true,
+      accounts: {
+        select: {
+          id: true,
+          provider: true,
+          issuer: true,
+          providerAccountId: true,
+          createdAt: true,
+        },
+      },
+    },
+  });
+
+  let stated = 0;
+  for (const user of users) {
+    if (covered.has(user.id) || !user.email) continue;
+
+    // The per-user hash pepper is minted at user creation on the live path;
+    // a seeded or pre-pipeline user may predate it.
+    const userHashKey = user.userHashKey ?? randomBytes(32).toString("hex");
+    if (!user.userHashKey) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { userHashKey },
+      });
+    }
+
+    const planned = planIdentifiers({
+      user: {
+        id: user.id,
+        email: user.email,
+        emailVerified: user.emailVerified ?? false,
+        createdAtMs: user.createdAt.getTime(),
+        userHashKey,
+      },
+      accounts: user.accounts.map((account) => ({
+        id: account.id,
+        provider: account.provider,
+        issuer: account.issuer,
+        providerAccountId: account.providerAccountId,
+        createdAtMs: account.createdAt.getTime(),
+      })),
+    });
+
+    for (const plan of planned) {
+      await prisma.identifier.upsert({
+        where: { id: plan.identifierId },
+        create: {
+          id: plan.identifierId,
+          userId: user.id,
+          provider: plan.provider,
+          value: plan.value,
+          domain: identifierDomain(plan.value),
+          identifierHash: computeIdentifierHash({
+            userHashKey,
+            normalizedValue: plan.value,
+          }),
+          accountId: plan.accountId,
+          providerId: plan.providerId,
+          issuer: plan.issuer,
+          providerAccountId: plan.providerAccountId,
+          state: plan.expectedState,
+          connectionId: null,
+          verifiedAt:
+            plan.expectedState === "VERIFIED"
+              ? new Date(plan.occurredAtMs)
+              : null,
+          attachedAt: new Date(plan.occurredAtMs),
+          detachedAt: null,
+        },
+        update: {},
+      });
+      stated += 1;
+    }
+  }
+  if (stated > 0) {
+    console.log(`   stated ${stated} identifier rows for pre-pipeline users`);
+  }
+}
 
 const ORG_ID = "local-dev-organization";
 const ORG_SLUG = "local-dev-org";
@@ -148,15 +265,32 @@ async function main() {
     ? firstMessageOverride === "1" || firstMessageOverride === "true"
     : process.env.HAVEN_SEED_PRESET === "demo";
 
+  // The license must verify against the key this app boots with, otherwise
+  // every settings page reports it as invalid. `resolveSeedLicense` keeps a
+  // license that already verifies (someone activated a real one) and only
+  // replaces what does not. The local-dev key verifies under the default key;
+  // the test-suite fixture is there for CI, which seeds under the test key.
+  const existingOrganization = await prisma.organization.findUnique({
+    where: { id: ORG_ID },
+    select: { license: true },
+  });
+  const license = resolveSeedLicense({
+    stored: existingOrganization?.license ?? null,
+    publicKey: PUBLIC_KEY,
+    candidates: [
+      LOCAL_DEV_ENTERPRISE_LICENSE_KEY,
+      TEST_SUITE_ENTERPRISE_LICENSE_KEY,
+    ],
+  });
   const organization = await prisma.organization.upsert({
     where: { id: ORG_ID },
     create: {
       id: ORG_ID,
       name: ORG_NAME,
       slug: ORG_SLUG,
-      license: ENTERPRISE_LICENSE_KEY,
+      license,
     },
-    update: { license: ENTERPRISE_LICENSE_KEY },
+    update: { license },
   });
 
   // Prompt tags are org-defined, and `production` is the one
@@ -237,12 +371,29 @@ async function main() {
     create: {
       userId: user.id,
       provider: "credential",
+      // better-auth 1.7 keys an account by `(issuer, accountId)`; the local
+      // credential provider's issuer is `local:credential`, not
+      // `local:oauth:credential`. Without it sign-in cannot find this row.
+      issuer: "local:credential",
       providerAccountId: user.id,
       type: "credentials",
       password: hashedPassword,
     },
-    update: { password: hashedPassword },
+    // Repeated on the update leg so a re-run also repairs a row seeded before
+    // the column existed.
+    update: { issuer: "local:credential", password: hashedPassword },
   });
+
+  // The identifier projection's rows for every seeded-or-legacy user. The
+  // sign-in router answers "does this address have an account" from the
+  // projection, and the sign-up door answers it from `User` — a user this
+  // seed writes without identifier rows makes the two doors contradict each
+  // other about one address (sign-in: "no account yet"; sign-up: "already
+  // has one"). Production users get these rows from the birth path or the
+  // D01 backfill; a seed that bypasses both has to state the same rows, and
+  // it states them with the SAME derived ids the backfill would, so a later
+  // real backfill pass converges on them instead of duplicating.
+  await backfillIdentifierRows();
 
   await prisma.organizationUser.upsert({
     where: {

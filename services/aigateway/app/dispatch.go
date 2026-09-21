@@ -332,6 +332,29 @@ func classifyProviderError(err error) retry.Reason {
 	// (common with custom/OpenAI-compatible providers), and the next slot
 	// may. Rate-limit (429) and server errors (5xx) stay retryable so the
 	// gateway still falls back across the credential chain.
+	// The caller going away outranks every other signal, and must be read
+	// BEFORE the no-fallback marker below. Bifrost's context-done constructor
+	// (core/utils.go newBifrostCtxDoneError) is the only site in the engine that
+	// sets AllowFallbacks=false, so in production every abandoned request
+	// carries the marker; matching on it first sent them to ReasonNonRetryable,
+	// and recordBreaker credits anything that is neither a failure reason nor
+	// ContextDone as a SUCCESS — which force-closes the breaker and wipes the
+	// slot's failure window (pkg/breaker RecordSuccess). Clients giving up
+	// during a provider outage would have held the breaker closed on the dead
+	// slot. ReasonContextDone is the only reason that records nothing.
+	if herr.IsCode(err, domain.ErrRequestAbandoned) {
+		return retry.ReasonContextDone
+	}
+
+	// Bifrost's own refusal to fail over outranks the status, so it is read
+	// BEFORE the UpstreamError branch. AllowFallbacks is set on answered
+	// responses too, and errors.As matches through the marker's Unwrap — so
+	// reading it after that branch left it inert for exactly the errors that
+	// carry it, while the comment claimed otherwise.
+	if domain.IsNoFallback(err) {
+		return retry.ReasonNonRetryable
+	}
+
 	var ue *domain.UpstreamError
 	if errors.As(err, &ue) {
 		switch {
@@ -345,11 +368,37 @@ func classifyProviderError(err error) retry.Reason {
 			return retry.ReasonNonRetryable
 		}
 	}
+
 	switch {
 	case herr.IsCode(err, domain.ErrProviderTimeout):
 		return retry.ReasonTimeout
 	case herr.IsCode(err, domain.ErrRateLimited):
 		return retry.ReasonRateLimit
+	case herr.IsCode(err, domain.ErrProviderConnectionFailed):
+		// The host never answered, which says the slot is unhealthy — retry
+		// the chain and let it count toward the breaker, exactly like a
+		// timeout. Distinct from the two codes below, which the slot answered.
+		return retry.ReasonNetwork
+	case herr.IsCode(err, domain.ErrProviderCredentialInvalid),
+		herr.IsCode(err, domain.ErrProviderCredentialRejected),
+		herr.IsCode(err, domain.ErrProviderConfigInvalid):
+		// A credential that cannot authenticate, or a slot that does not serve
+		// this model, fails identically on every attempt. Retrying spends the
+		// whole chain to arrive at the same answer more slowly, and — while
+		// these wore provider_timeout — recorded a breaker failure each time,
+		// pushing a healthy provider's circuit toward open.
+		//
+		// NotDialed rather than NonRetryable: nothing reached the upstream, so
+		// the outcome says nothing about the slot. NonRetryable is the answered
+		// terminal 4xx, which recordBreaker credits as proof the slot is alive;
+		// crediting that here would force an open breaker closed on a provider
+		// that is genuinely down.
+		return retry.ReasonNotDialed
+	case herr.IsCode(err, domain.ErrRequestAbandoned):
+		// The caller went away. Says nothing about the slot, so it neither
+		// falls back nor moves the breaker — the same treatment a bare
+		// context error gets below.
+		return retry.ReasonContextDone
 	case herr.IsCode(err, domain.ErrProviderError):
 		return retry.ReasonRetryable5xx
 	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):

@@ -25,6 +25,7 @@ import {
   type FeatureFlagRules,
   type RuleEvaluationContext,
 } from "../rules";
+import { NOT_TARGETED } from "../targeting";
 import type { FeatureFlagServiceInterface } from "../types";
 
 const SYSTEM_FLAG = "ops_es_causality_loop_guard_disabled";
@@ -107,6 +108,8 @@ describe("FeatureFlagService", () => {
         process.env[NON_ENV_OVERRIDABLE_FLAG.toUpperCase()] = "1";
         const enabled = await service.isEnabled(NON_ENV_OVERRIDABLE_FLAG, {
           distinctId: "user-1",
+          projectId: NOT_TARGETED,
+          organizationId: NOT_TARGETED,
           defaultValue: false,
         });
         expect(enabled).toBe(false);
@@ -121,6 +124,8 @@ describe("FeatureFlagService", () => {
         const { service, legacy } = buildService();
         const enabled = await service.isEnabled(SYSTEM_FLAG, {
           distinctId: "tenant-a",
+          projectId: NOT_TARGETED,
+          organizationId: NOT_TARGETED,
           defaultValue: true,
         });
         expect(enabled).toBe(false);
@@ -134,6 +139,8 @@ describe("FeatureFlagService", () => {
         await store.set(SYSTEM_FLAG, true);
         const enabled = await service.isEnabled(SYSTEM_FLAG, {
           distinctId: "tenant-a",
+          projectId: NOT_TARGETED,
+          organizationId: NOT_TARGETED,
           defaultValue: false,
         });
         expect(enabled).toBe(true);
@@ -148,6 +155,8 @@ describe("FeatureFlagService", () => {
         process.env.OPS_ES_CAUSALITY_LOOP_GUARD_DISABLED = "1";
         const enabled = await service.isEnabled(SYSTEM_FLAG, {
           distinctId: "tenant-a",
+          projectId: NOT_TARGETED,
+          organizationId: NOT_TARGETED,
           defaultValue: false,
         });
         expect(enabled).toBe(true);
@@ -161,6 +170,8 @@ describe("FeatureFlagService", () => {
         process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD = "1";
         const enabled = await service.isEnabled(SYSTEM_FLAG, {
           distinctId: "tenant-a",
+          projectId: NOT_TARGETED,
+          organizationId: NOT_TARGETED,
           defaultValue: false,
         });
         expect(enabled).toBe(true);
@@ -175,6 +186,8 @@ describe("FeatureFlagService", () => {
         const { service, legacy } = buildService();
         const enabled = await service.isEnabled(FAMILY_FLAG, {
           distinctId: "tenant-a",
+          projectId: NOT_TARGETED,
+          organizationId: NOT_TARGETED,
           defaultValue: false,
         });
         expect(enabled).toBe(false);
@@ -188,6 +201,8 @@ describe("FeatureFlagService", () => {
         await store.set(FAMILY_FLAG, true);
         const enabled = await service.isEnabled(FAMILY_FLAG, {
           distinctId: "tenant-a",
+          projectId: NOT_TARGETED,
+          organizationId: NOT_TARGETED,
           defaultValue: false,
         });
         expect(enabled).toBe(true);
@@ -202,6 +217,8 @@ describe("FeatureFlagService", () => {
         const { service, legacy } = buildService();
         const enabled = await service.isEnabled(PRODUCT_FLAG, {
           distinctId: "user-1",
+          projectId: NOT_TARGETED,
+          organizationId: NOT_TARGETED,
           defaultValue: false,
         });
         expect(enabled).toBe(true);
@@ -215,6 +232,8 @@ describe("FeatureFlagService", () => {
         await store.set(PRODUCT_FLAG, true);
         const enabled = await service.isEnabled(PRODUCT_FLAG, {
           distinctId: "user-1",
+          projectId: NOT_TARGETED,
+          organizationId: NOT_TARGETED,
           defaultValue: false,
         });
         expect(enabled).toBe(true);
@@ -231,6 +250,8 @@ describe("FeatureFlagService", () => {
         );
         const enabled = await service.isEnabled(PRODUCT_FLAG, {
           distinctId: "user-1",
+          projectId: NOT_TARGETED,
+          organizationId: NOT_TARGETED,
           defaultValue: true,
         });
         expect(enabled).toBe(false);
@@ -246,6 +267,7 @@ describe("FeatureFlagService", () => {
         ]);
         const enabled = await service.isEnabled(PRODUCT_FLAG, {
           distinctId: "user-1",
+          projectId: NOT_TARGETED,
           organizationId: "org_lw",
           defaultValue: false,
         });
@@ -265,6 +287,7 @@ describe("FeatureFlagService", () => {
         ]);
         const enabled = await service.isEnabled(PRODUCT_FLAG, {
           distinctId: "user-1",
+          projectId: NOT_TARGETED,
           organizationId: "org_other",
           defaultValue: false,
         });
@@ -282,6 +305,7 @@ describe("FeatureFlagService", () => {
         ]);
         const enabled = await service.isEnabled(PRODUCT_FLAG, {
           distinctId: "user-1",
+          projectId: NOT_TARGETED,
           organizationId: "org_self",
           defaultValue: true,
         });
@@ -302,6 +326,8 @@ describe("FeatureFlagService", () => {
       // because the FeatureFlagKey signature wouldn't accept the key.
       const enabled = await service.isEnabled(UNREGISTERED_FLAG as never, {
         distinctId: "user-1",
+        projectId: NOT_TARGETED,
+        organizationId: NOT_TARGETED,
         defaultValue: false,
       });
       expect(enabled).toBe(true);

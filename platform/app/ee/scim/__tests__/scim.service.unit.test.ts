@@ -79,6 +79,8 @@ function buildMockUser(overrides: Partial<User> = {}): User {
     name: "Alice Smith",
     email: "alice@acme.com",
     emailVerified: false,
+    signupConfirmationPending: false,
+    passkeySignupClaimHash: null,
     image: null,
     pendingSsoSetup: false,
     createdAt: new Date("2024-01-01T00:00:00Z"),
@@ -86,7 +88,11 @@ function buildMockUser(overrides: Partial<User> = {}): User {
     lastLoginAt: null,
     deactivatedAt: null,
     lastHomePath: null,
+    userHashKey: null,
+    twoFactorEnabled: false,
     tracesExplorerTourDismissedAt: null,
+    passkeyNudgeDismissedAt: null,
+    langyCodeAccessPreference: null,
     ...overrides,
   };
 }

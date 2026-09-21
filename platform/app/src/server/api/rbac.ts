@@ -92,6 +92,7 @@ const ORG_EXCLUSIVE_RESOURCES: ReadonlySet<Resource> = new Set<Resource>([
   Resources.AI_TOOLS,
   Resources.WEBHOOK_ENDPOINTS,
   Resources.GATEWAY_SPEND,
+  Resources.GOVERNANCE_COST,
 ]);
 
 /**
@@ -181,6 +182,9 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Secrets
     "secrets:view",
     "secrets:manage",
+    // Agent cache
+    "agentCache:view",
+    "agentCache:manage",
     // Team
     "team:view",
     "team:manage",
@@ -266,6 +270,9 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Secrets
     "secrets:view",
     "secrets:manage",
+    // Agent cache
+    "agentCache:view",
+    "agentCache:manage",
     // Team
     "team:view",
     // AI Gateway (member: can manage own VKs + see budgets, cannot delete budgets)
@@ -422,6 +429,11 @@ const ORGANIZATION_ROLE_PERMISSIONS: Record<
     // envelopes to one endpoint.
     "gatewaySpend:view",
     "gatewaySpend:manage",
+    // The organization's cost screen (ADR-128). The matched half of the
+    // `packages/authz` ORG_ADMIN bag — roles-parity.unit.test.ts fails if
+    // only one of the two carries it, and a permission missing from either
+    // is held by nobody.
+    "governanceCost:view",
   ],
   // MEMBER + EXTERNAL get aiTools:view so the /me portal renders for
   // every org member. Catalog management stays admin-only.

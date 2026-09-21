@@ -157,10 +157,19 @@ describe("onboarding.initializeOrganization personal workspace", () => {
 
     /** @scenario Governance signup creates organization and team, but no shared project */
     it("creates no shared project", async () => {
+      // The population first, in the same query minus the predicate under
+      // test: this organization does hold a project. An organization holding
+      // none at all would satisfy the assertion below without the filter
+      // doing any work, and so would a query that had stopped returning rows.
+      const allProjects = await prisma.project.findMany({
+        where: { team: { organizationId } },
+      });
       const sharedProjects = await prisma.project.findMany({
         where: { team: { organizationId }, isPersonal: false },
       });
 
+      expect(allProjects).toHaveLength(1);
+      expect(allProjects[0]!.isPersonal).toBe(true);
       expect(sharedProjects).toHaveLength(0);
     });
 

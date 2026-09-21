@@ -1,10 +1,9 @@
 /**
  * @vitest-environment jsdom
  *
- * The section rail's navigation-v2 seam: sections whose pages the v2
+ * The section rail's product-shell seam: sections whose pages the
  * product sidebar already lists (Gateway, Governance) stand their rail
- * down inside a v2 shell, sections with page-local rails (Automations)
- * keep it, and legacy mode keeps every rail unchanged.
+ * down. Sections with page-local rails (Automations) keep it.
  *
  * Spec: specs/navigation/shared-section-navigation-layout.feature
  */
@@ -15,7 +14,6 @@ import type { PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let mockPathname = "/gateway/virtual-keys";
-let mockMode: "legacy" | "product-switcher" = "product-switcher";
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
@@ -25,10 +23,6 @@ vi.mock("~/utils/compat/next-router", () => ({
     push: vi.fn(),
     replace: vi.fn(),
   }),
-}));
-
-vi.mock("~/features/navigation/useNavigationMode", () => ({
-  useNavigationMode: () => ({ status: "ready", mode: mockMode }),
 }));
 
 vi.mock("~/components/DashboardLayout", () => ({
@@ -57,14 +51,13 @@ function renderSection(props: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   mockPathname = "/gateway/virtual-keys";
-  mockMode = "product-switcher";
 });
 
 afterEach(() => {
   cleanup();
 });
 
-describe("given the section rail inside a navigation-v2 shell", () => {
+describe("given the section rail", () => {
   describe("when the product sidebar carries the section's pages", () => {
     /** @scenario The rail stands down when the product sidebar carries the pages */
     it("stands the rail down and gives the content the full width", () => {
@@ -79,24 +72,10 @@ describe("given the section rail inside a navigation-v2 shell", () => {
   });
 
   describe("when the rail lists page-local destinations", () => {
-    /** @scenario A rail of page-local destinations stays in the new modes */
-    it("keeps the rail in a new mode", () => {
+    /** @scenario A rail of page-local destinations stays */
+    it("keeps the rail", () => {
       mockPathname = "/[project]/automations";
       renderSection({ sectionLabel: "Automations" });
-
-      expect(
-        screen.getByTestId("section-navigation-layout"),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByTestId("product-page-frame"),
-      ).not.toBeInTheDocument();
-    });
-  });
-
-  describe("when the device is in legacy mode", () => {
-    it("keeps the rail even for sections that stand down in the v2 shells", () => {
-      mockMode = "legacy";
-      renderSection({ standDownRailInProductShell: true });
 
       expect(
         screen.getByTestId("section-navigation-layout"),

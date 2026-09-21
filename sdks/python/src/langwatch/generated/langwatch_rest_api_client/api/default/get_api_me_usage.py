@@ -98,7 +98,7 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     window_start_ms: int | Unset = UNSET,
     window_end_ms: int | Unset = UNSET,
 ) -> Response[
@@ -137,7 +137,7 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     window_start_ms: int | Unset = UNSET,
     window_end_ms: int | Unset = UNSET,
 ) -> (
@@ -172,7 +172,7 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     window_start_ms: int | Unset = UNSET,
     window_end_ms: int | Unset = UNSET,
 ) -> Response[
@@ -209,7 +209,7 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     window_start_ms: int | Unset = UNSET,
     window_end_ms: int | Unset = UNSET,
 ) -> (

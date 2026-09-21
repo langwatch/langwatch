@@ -28,8 +28,10 @@ class PostApiTracesSearchBody:
         filters (PostApiTracesSearchBodyFilters | Unset):
         trace_ids (list[str] | Unset):
         negate_filters (bool | Unset):
-        page_offset (float | Unset):
-        page_size (float | Unset):
+        page_offset (float | Unset): Removed. Offset pagination is no longer supported and any value other than 0 is
+            rejected. Page with the scrollId returned by the previous response instead. The field remains on the schema so
+            that sending it produces an explanatory error rather than being silently discarded.
+        page_size (int | Unset):
         group_by (str | Unset):
         sort_by (str | Unset):
         sort_direction (str | Unset):
@@ -61,7 +63,7 @@ class PostApiTracesSearchBody:
     trace_ids: list[str] | Unset = UNSET
     negate_filters: bool | Unset = UNSET
     page_offset: float | Unset = UNSET
-    page_size: float | Unset = UNSET
+    page_size: int | Unset = UNSET
     group_by: str | Unset = UNSET
     sort_by: str | Unset = UNSET
     sort_direction: str | Unset = UNSET

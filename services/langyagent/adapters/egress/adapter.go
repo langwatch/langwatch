@@ -18,7 +18,7 @@ import (
 
 // egressAdapter is the per-worker outbound forward proxy (ADR-076). It is the
 // egress twin of the workerpool authProxy: the authProxy fronts a worker's
-// INBOUND opencode control port; this fronts the worker's OUTBOUND traffic. The
+// INBOUND control port; this fronts the worker's OUTBOUND traffic. The
 // worker's tools (`gh`, `git`, `npm`, `curl`, `pip`) egress through it via
 // HTTPS_PROXY, and the adapter enforces, per CONNECT:
 //

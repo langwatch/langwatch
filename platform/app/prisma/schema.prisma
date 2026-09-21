@@ -26,6 +26,11 @@ model Account {
   userId            String
   type              String    @default("oauth")
   provider          String
+  /// WHO asserted `providerAccountId` — the other half of better-auth 1.7's
+  /// account key, which it looks up as `(issuer, accountId)`. Nullable only
+  /// so the column could be added to a populated table; every write path
+  /// supplies it and the migration backfilled every existing row.
+  issuer            String?
   providerAccountId String
   refresh_token     String?   @db.Text
   access_token      String?   @db.Text
@@ -42,6 +47,53 @@ model Account {
 
   @@unique([provider, providerAccountId])
   @@index([userId])
+  // The pair better-auth 1.7 looks a row up by. NOT unique, on purpose: the
+  // uniqueness that matters is already enforced above, and every issuer here
+  // is derived from `provider`, so this pair is unique exactly when that one
+  // is. See migration 20260825030000.
+  @@index([issuer, providerAccountId])
+}
+
+// The credential half of the old `Account` row (ADR-116 §1). Row-truth
+// permanently: ADR-101's payload rule bars secrets from the event log, and
+// OAuth refresh rewrites these on a cadence no event log should carry. The
+// LINKAGE half - who holds which sign-in method - is `Identifier`, built by
+// the fold.
+//
+// `id` IS the pinned account id: the KSUID an attach pins, which
+// `Identifier.accountId` carries and which doubles as the `Account` row's id
+// while the bridge table exists. Nothing is re-keyed, and better-auth's
+// account id keeps its meaning after `Account` is dropped.
+//
+// Column names are better-auth's own canonical field names rather than
+// `Account`'s NextAuth-era snake_case, so the identity branch needs no field
+// mapping of its own. `provider` is a denormalized copy of the identifier's
+// and is read-side only: it answers "whose row is this?" without a second
+// read.
+//
+// `userId` relates to `User` and CASCADES, exactly as `Account` does. The
+// identity branch deletes these rows itself on unlink (ADR-116 §8), but a
+// user deleted outside it - by an unlatched path, an operator, a test - must
+// not leave their password hash and provider tokens behind with nothing left
+// to reap them. Under `relationMode = "prisma"` the cascade is the client's,
+// not the database's, so it needs no FK in the migration.
+// Spec: specs/identity/identity-storage-adapter.feature.
+model AccountCredential {
+  id                    String    @id
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider              String
+  password              String?   @db.Text
+  accessToken           String?   @db.Text
+  refreshToken          String?   @db.Text
+  idToken               String?   @db.Text
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @default(now()) @updatedAt
+
+  @@index([userId])
 }
 
 model Session {
@@ -53,10 +105,26 @@ model Session {
   impersonating Json?
   ipAddress     String?
   userAgent     String?  @db.Text
+  /// Which of the user's sign-in methods minted this session (D06). NULL on
+  /// every session that predates the column and on any mint we could not
+  /// attribute - an ordinary value, not an error. Nothing reads it to decide
+  /// whether the session is valid, so no session was ended to add it.
+  identifierId  String?
+  /// What the sign-in that minted this session PROVED, as RFC 8176 method
+  /// references (D06). Empty on every session minted before the column, and
+  /// on any ordinary password sign-in. An organization that requires a second
+  /// factor reads this when a member reaches its data; it is never read at
+  /// mint and never ends a session.
+  amr           String[] @default([])
+  actorUserId            String?
+  subjectUserId          String?
+  impersonationReason    String?   @db.Text
+  impersonationExpiresAt DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @default(now()) @updatedAt
 
   @@index([userId])
+  @@index([identifierId])
 }
 
 model User {
@@ -64,10 +132,25 @@ model User {
   name                          String?
   email                         String?                  @unique
   emailVerified                 Boolean                  @default(false)
+  signupConfirmationPending     Boolean                  @default(false)
+  passkeySignupClaimHash        String?
   image                         String?                  @db.Text
   pendingSsoSetup               Boolean                  @default(false)
+  // Per-user HMAC key for identity event payload hashes (ADR-101 §4): minted
+  // at user creation, shredded on erasure - after which every identifierHash
+  // in the user's event history is unlinkable noise. Row-truth; never in an
+  // event.
+  userHashKey                   String?
+  /// Owned by the two-factor plugin (D06), which is why it is a plain
+  /// boolean rather than a state: the plugin flips it when a setup is
+  /// confirmed and when it is turned off, and challenges every sign-in while
+  /// it is true. The lifecycle - and the history - lives on MfaEnrollment.
+  twoFactorEnabled              Boolean                  @default(false)
   accounts                      Account[]
+  accountCredentials            AccountCredential[]
   sessions                      Session[]
+  twoFactors                    TwoFactor[]
+  passkeys                      Passkey[]
   teamMemberships               TeamUser[]
   orgMemberships                OrganizationUser[]
   createdAt                     DateTime                 @default(now())
@@ -82,6 +165,18 @@ model User {
   // dismissal applies across projects, browsers, and devices.
   // Spec: specs/traces-v2/tour-visibility-and-persistence.feature
   tracesExplorerTourDismissedAt DateTime?
+  /// How Langy should reach this person's code when a task needs a change
+  /// (ADR-129). "github" means they chose the pull request path and asked to
+  /// be remembered; NULL means ask. A shared local folder is never stored
+  /// here, because a folder has to be shared again each time.
+  /// Spec: specs/langy/langy-code-access.feature
+  langyCodeAccessPreference     String?
+  /// When this person last said "not now" to being offered a passkey
+  /// (ADR-120). On the account rather than in browser storage for two
+  /// reasons: a per-browser record forgets on a new device, which is exactly
+  /// where the offer should be MORE eager, and an interval nobody can enforce
+  /// is not an interval. NULL means never asked.
+  passkeyNudgeDismissedAt       DateTime?
   Annotation                    Annotation[]
   shareLinks                    ShareLink[]
   Workflow                      Workflow[]
@@ -101,6 +196,7 @@ model User {
   promptTagsUpdated             PromptTag[]              @relation("promptTagUpdatedBy")
   groupMemberships              GroupMembership[]
   roleBindings                  RoleBinding[]
+  scimExternalIds               ScimExternalId[]
   apiKeys                       ApiKey[]
   gatewayBudgetsCreated         GatewayBudget[]          @relation("GatewayBudgetCreatedBy")
   principalVirtualKeys          VirtualKey[]             @relation("PrincipalScopedVirtualKeys")
@@ -126,6 +222,343 @@ model VerificationToken {
   updatedAt  DateTime @default(now()) @updatedAt
 
   @@unique([identifier, token])
+}
+
+// Pure event-truth projection of the identity pipeline (ADR-101, D01): one row
+// per sign-in method a user holds, fold-written from `lw.identity.*` events,
+// rebuilt whole-row by replay (ADR-022/015 apply unamended - no column here is
+// handler-written). Deliberately no foreign keys and no unique constraint on
+// the natural key: DETACHED rows are tombstones that persist forever, so
+// uniqueness of verified values is a command-time guard, not a database
+// constraint. `value` and `identifierHash` are wiped by erasure (R11); the row
+// itself remains as the tombstone replay reproduces.
+// Spec: specs/identity/identifier-model.feature.
+model Identifier {
+  id                String    @id
+  userId            String
+  provider          String
+  value             String?
+  domain            String?
+  identifierHash    String?
+  accountId         String?
+  // better-auth's own provider id, verbatim (ADR-116). `provider` above is
+  // the folded identifier vocabulary - auth0/okta/custom OIDC all collapse
+  // into `oidc`, microsoft into `azure-ad` - so it cannot answer a callback
+  // that asks for `auth0`. `Account` is a projection of the same log, and
+  // this is the column its uniqueness is keyed by. Null for an identifier no
+  // protocol row backs.
+  providerId        String?
+  // WHO asserted the subject below - the other half of better-auth 1.7's
+  // account key, and event truth rather than a derivation. A subject is
+  // unique only WITHIN an issuer, so `providerId` has only ever stood in for
+  // this while there is exactly one connection per configured provider. Null
+  // exactly when `providerId` is.
+  issuer            String?
+  // The provider's own subject (ADR-116). What an IdP callback arrives
+  // holding, so the projection can answer "who is this?" without the legacy
+  // Account row.
+  providerAccountId String?
+  state             String
+  connectionId      String?
+  verifiedAt        DateTime?
+  attachedAt        DateTime
+  detachedAt        DateTime?
+  lastUsedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @default(now()) @updatedAt
+
+  @@index([userId])
+  @@index([identifierHash])
+  @@index([value])
+  @@index([domain])
+  @@index([provider, providerAccountId])
+  @@index([issuer, providerAccountId])
+  @@index([accountId])
+  // A PARTIAL UNIQUE INDEX on (providerId, providerAccountId), over the live
+  // states only, is added by migration 20260824120004 - Prisma cannot express
+  // a partial index, so it is raw SQL there and this comment is its home in
+  // the model.
+  //
+  // Unique where `value` is not, and the difference is what the columns mean.
+  // One user legitimately holds several proven identifiers carrying the same
+  // ADDRESS, so address uniqueness is not a row-level rule. A provider
+  // SUBJECT is different: it names exactly one account at exactly one IdP, so
+  // two live identifiers sharing it are always either a duplicate or a
+  // takeover. `Account` has enforced exactly this globally all along; the
+  // identity branch dropped the guarantee until this index restored it.
+  //
+  // FORWARD CONSTRAINT, and it is load-bearing: the real invariant is that a
+  // subject is unique PER CONNECTION. `providerId` stands in for the
+  // connection today only because there is exactly one connection per
+  // configured provider (auth0, okta, cognito, onelogin, oidc). When
+  // connections become data (D04, and the Auth0 exit is what brings it), every
+  // connection MUST get its own distinct provider id, or this index MUST be
+  // extended to include `connectionId`. Many customer connections sharing one
+  // provider id - `oidc` being the one to watch - re-opens a cross-tenant
+  // sign-in, because subjects are then customer-chosen and collide.
+  //
+  // Deliberately no unique constraint on `value`: ONE user legitimately holds
+  // several proven identifiers carrying the same address (a credential
+  // sign-in and a Google sign-in are two rows with one email, both VERIFIED),
+  // so "one USER per proven address" is not a row-level rule. It lives in
+  // `IdentifierReservation`, claimed before any fact is stated.
+}
+
+// The address lock (ADR-116 §6). ROW-TRUTH, and deliberately not a projection:
+// it is a lock, not a record of who holds what. `Identifier` answers that.
+//
+// One user may hold a proven address, and "check the projection, then state
+// the fact" cannot decide two concurrent claims - both reads pass before
+// either write lands. So a claim is taken here first, atomically, BEFORE the
+// verification proof is consumed and BEFORE any fact is appended: the loser is
+// refused synchronously with `identity_email_in_use`, and the event log never
+// records a verification that did not hold.
+//
+// The primary key IS the constraint. A claim is released by the fold when the
+// identifier stops holding the value (detached, dead-ended, erased), and a
+// claim whose append never landed is reaped by the identity sweep.
+// Spec: specs/identity/identity-storage-adapter.feature.
+model IdentifierReservation {
+  normalizedValue String   @id
+  userId          String
+  identifierId    String
+  // The command that claimed it. A retry of the SAME command is not a
+  // collision - it is the same claim arriving twice, which the staged re-run
+  // of every ceremony guarantees will happen.
+  commandId       String
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([identifierId])
+}
+
+// One row per user: the identity fold's event cursor (the AuthzProjectionCursor
+// pattern, re-tenanted to users). Advanced by the projection writer itself;
+// its (acceptedAt, lastEventId) compare is what makes re-applies no-ops.
+model IdentityProjectionCursor {
+  userId            String   @id
+  lastEventId       String
+  acceptedAt        DateTime
+  occurredAt        DateTime
+  projectionVersion String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @default(now()) @updatedAt
+}
+
+/// The two-factor plugin's own table (D06). Protocol state, and row-truth for
+/// good (ADR-101 R12): the shared secret and the backup codes live here and
+/// in no event, ever. Nothing in this repo reads or writes these columns -
+/// the plugin owns them end to end, including the lockout counters, which is
+/// why `failedVerificationCount` and `lockedUntil` are here rather than
+/// rebuilt on the projection.
+///
+/// `backupCodes` holds an ENCRYPTED blob, not hashes. A backup code has to be
+/// compared against what somebody types, and the plugin decrypts and compares;
+/// hashing them would leave it unable to verify its own codes.
+model TwoFactor {
+  id                      String    @id @default(nanoid())
+  userId                  String
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  secret                  String    @db.Text
+  backupCodes             String    @db.Text
+  verified                Boolean   @default(true)
+  failedVerificationCount Int       @default(0)
+  lockedUntil             DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @default(now()) @updatedAt
+
+  @@index([userId])
+  @@index([secret])
+}
+
+/// The passkey plugin's own table (D07). Protocol state, like TwoFactor: the
+/// public key and the signature counter are the plugin's to read and write.
+/// A passkey also becomes an `Identifier` row with provider `passkey`, which
+/// is what makes it a sign-in method like any other - this table is the
+/// credential, that one is the identity.
+///
+/// `aaguid` names the authenticator MODEL, never a device or a person, and is
+/// only present at registration. Privacy-preserving platforms report all
+/// zeroes, so a label derived from it is best-effort by construction.
+model Passkey {
+  id           String   @id @default(nanoid())
+  name         String?
+  publicKey    String   @db.Text
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialID String
+  counter      Int      @default(0)
+  deviceType   String
+  backedUp     Boolean  @default(false)
+  transports   String?
+  aaguid       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  @@index([userId])
+  @@index([credentialID])
+}
+
+/// The two-step verification pipeline's projection (D06 - see
+/// specs/identity/mfa-and-session-shape.feature). One row per PERSON, because
+/// one person has one setup however many organizations they belong to.
+///
+/// A pure event-truth head like `SsoConnection`: every column is fold-written,
+/// rows are never deleted (DISABLED is a tombstone, so history survives being
+/// turned off), and a replay rebuilds it whole-row from the event log. The
+/// cursor columns are inline because the fold produces exactly one row per
+/// aggregate - the `Identifier` fan-out needed its own cursor table, this
+/// does not.
+///
+/// Every column here is a lifecycle fact. There is deliberately nowhere in
+/// this model a secret or a backup code could be put: `consumedBackupCodeIndexes`
+/// holds POSITIONS, which is what lets "how many are left" be answered
+/// without the projection ever knowing a code.
+model MfaEnrollment {
+  /// The user. Also the aggregate id and the tenant - one identity history
+  /// per person (ADR-029 §4).
+  userId                    String    @id
+  /// The current enrollment, or NULL for somebody who never started one.
+  enrollmentId              String?
+  /// totp. Never sms.
+  method                    String?
+  /// NONE | PENDING | ENABLED | EXPIRED | DISABLED
+  state                     String
+  enrolledAt                DateTime?
+  confirmedAt               DateTime?
+  expiredAt                 DateTime?
+  disabledAt                DateTime?
+  /// password+totp | org-admin - who ended it, and on whose authority.
+  disabledVia               String?
+  backupCodeCount           Int       @default(0)
+  /// Positions already spent, ascending. Never codes.
+  consumedBackupCodeIndexes Int[]     @default([])
+  failedCount               Int       @default(0)
+  occurredAt                DateTime
+  lastEventId               String
+  acceptedAt                DateTime
+  projectionVersion         String
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @default(now()) @updatedAt
+
+  @@index([state])
+}
+
+/// The SSO connection pipeline's projection (ADR-117 §5, D04 - see
+/// specs/identity/sso-connection-lifecycle.feature). A pure event-truth head
+/// like `Identifier`: every column is fold-written, rows are never deleted
+/// (TORN_DOWN is a tombstone), and a replay rebuilds it whole-row from the
+/// event log.
+///
+/// The fold cursor lives on the row rather than in a sibling table, because
+/// one row IS one aggregate here - a connection - so there is nothing for a
+/// separate cursor table to key on that this row does not already key on.
+///
+/// No relation to Organization on purpose, matching `Identifier`: a
+/// projection is rebuilt from events, and a foreign key would make a replay
+/// depend on relational state the log does not carry. `idpMetadata` holds
+/// endpoints and credential REFERENCES; no secret is ever stored here or in
+/// any event.
+model SsoConnection {
+  id                  String    @id
+  organizationId      String
+  /// oidc | saml
+  type                String
+  /// DRAFT | CLAIMED | APPROVED | REJECTED | DISCARDED |
+  /// VERIFICATION_PENDING | VERIFIED | ACTIVE | SUSPENDED |
+  /// TEARDOWN_PENDING | TORN_DOWN
+  state               String
+  claimedDomains      String[]
+  approvedDomains     String[]
+  /// The only domains that ever route, and only while state is ACTIVE.
+  verifiedDomains     String[]
+  /// [{ domain, method, actorId, verifiedAtMs }] - what proved each verified
+  /// domain, and who. Kept on the row rather than only in the log so that an
+  /// operator-attested domain can never be read as one the customer proved.
+  domainVerifications Json      @default("[]")
+  /// { domain, method, tokenHash } while a ceremony is in flight.
+  pendingVerification Json?
+  idpMetadata         Json
+  allowsJit           Boolean   @default(false)
+  /// self-serve | legacy-grandfathered
+  source              String
+  testLoginAccountId  String?
+  /// { domain, note } - the last ops rejection, read back on a re-claim.
+  rejection           Json?
+  createdBy           String?
+  /// While TEARDOWN_PENDING: when the process manager's wake completes it.
+  tearDownAfter       DateTime?
+  occurredAt          DateTime
+  lastEventId         String
+  acceptedAt          DateTime
+  projectionVersion   String
+  /// Event-derived, not database-managed: `@default(now())` / `@updatedAt`
+  /// would make a replayed row differ from the row it rebuilds, which is
+  /// exactly the parity this projection has to keep.
+  createdAt           DateTime
+  updatedAt           DateTime
+
+  @@index([organizationId])
+  @@index([state])
+  @@index([verifiedDomains], type: Gin)
+}
+
+/// The join-request pipeline's projection (ADR-117, D12 - see
+/// specs/identity/join-requests.feature). A pure event-truth head like
+/// `Identifier` and `SsoConnection`: every column is fold-written, rows are
+/// never deleted (a terminal state is a tombstone the admin panel stops
+/// listing, not an absence), and a replay rebuilds it whole-row from the
+/// event log.
+///
+/// The fold cursor lives on the row rather than in a sibling table, because
+/// one row IS one aggregate here - a request.
+///
+/// No relation to Organization or User on purpose, matching the two heads
+/// above: a projection is rebuilt from events, and a foreign key would make a
+/// replay depend on relational state the log does not carry.
+///
+/// Membership is NOT here. An approval dispatches an attach on the grants
+/// ledger, exactly as accepting an invitation does, and that ledger fact
+/// carries `source: "join-request"` as its provenance - which is what puts a
+/// join approval on the customer's audit page beside every other membership
+/// change rather than in a history of its own.
+///
+/// The requester's address is not here either: the DOMAIN is the fact, and it
+/// is the only part of an address a join decision may depend on.
+model JoinRequest {
+  id                String    @id
+  userId            String
+  organizationId    String
+  /// The normalized domain the match was made on.
+  domain            String
+  /// PENDING | APPROVED | REJECTED | EXPIRED | WITHDRAWN
+  state             String
+  /// How the domain was matched; `verified-identifier-domain` today.
+  matchedVia        String
+  /// While PENDING: when the day-14 wake lapses it. Null once resolved.
+  expiresAt         DateTime?
+  resolvedAt        DateTime?
+  /// user | policy | invite - who ended it. `policy` is domain auto-join's
+  /// own principal, deliberately not the one SSO auto-join uses.
+  resolvedByType    String?
+  /// The admin's user id, `domain-auto`, or the invitation id.
+  resolvedById      String?
+  /// user | invite-accepted, on a withdrawal.
+  withdrawalCause   String?
+  occurredAt        DateTime
+  lastEventId       String
+  acceptedAt        DateTime
+  projectionVersion String
+  /// Event-derived, not database-managed: `@default(now())` / `@updatedAt`
+  /// would make a replayed row differ from the row it rebuilds, which is
+  /// exactly the parity this projection has to keep.
+  createdAt         DateTime
+  updatedAt         DateTime
+
+  @@index([organizationId, state])
+  @@index([userId, state])
+  @@index([userId, organizationId])
+  @@index([domain])
 }
 
 enum TeamUserRole {
@@ -270,6 +703,13 @@ model Organization {
   /// this value, regardless of the underlying refresh-token TTL.
   /// Spec: specs/ai-governance/sessions/session-ttl.feature.
   maxSessionDurationDays Int                  @default(0)
+  /// Every member of this organization can prove a second factor (D06). A
+  /// MEMBERSHIP CONDITION, not a session policy: it is asked when a member
+  /// reaches this organization's data, it holds the ones who cannot prove
+  /// one at an enrollment gate for THIS organization alone, and it ends no
+  /// session, ever. Turning it on signs nobody out.
+  /// Spec: specs/identity/mfa-and-session-shape.feature.
+  mfaRequired            Boolean              @default(false)
   signupData             Json?
   signedDPA              Boolean              @default(false)
   elasticsearchNodeUrl   String?
@@ -283,6 +723,20 @@ model Organization {
   sentPlanLimitAlert     DateTime?
   ssoDomain              String?              @unique
   ssoProvider            String?
+  /// How colleagues on a matching domain get in (D12, ADR-117):
+  /// `off` (invisible to them entirely) | `request` (they ask, an admin
+  /// approves) | `auto` (a verified colleague walks straight in).
+  ///
+  /// `request` is the default for a self-serve organization; `auto` is never
+  /// a default and never inferred - an administrator turns it on, names the
+  /// domain in `joinDomains` while doing it, and the licence gate holds that
+  /// value while letting `request` through.
+  domainJoin             String               @default("request")
+  /// The domains an administrator NAMED when turning automatic joining on.
+  /// Empty means automatic joining admits nobody whatever `domainJoin` says -
+  /// which is what keeps a setting left on from admitting a domain nobody
+  /// ever agreed to.
+  joinDomains            String[]
   presenceEnabled        Boolean              @default(true)
   /// Org-level trace-sharing kill switch. Off = trace share links cannot be
   /// created in ANY project of this org, and existing links stop resolving —
@@ -337,6 +791,17 @@ model ScimToken {
   id             String       @id @default(nanoid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// D08: the SSO connection this token was issued for, and its ENTIRE write
+  /// authority — a token minted for one connection can never touch another
+  /// connection's people. No relation, matching `SsoConnection` itself: that
+  /// projection carries no foreign keys, so neither may a row pointing at it.
+  ///
+  /// Nullable only for the tokens that predate the column. They were minted
+  /// when "which organization" was the whole answer, so they keep the
+  /// organization-wide authority they were sold with; the backfill points
+  /// each at its organization's first connection where there is one. Minting
+  /// a NEW token without a connection is refused (`scim_connection_required`).
+  connectionId   String?
   hashedToken    String
   description    String?
   createdAt      DateTime     @default(now())
@@ -344,6 +809,75 @@ model ScimToken {
 
   @@index([organizationId])
   @@index([hashedToken])
+  @@index([connectionId])
+}
+
+/// D08 — who the directory means, per connection.
+///
+/// The identity provider's own identifier for a person, which is what
+/// survives their email changing: an address is not identity, people change
+/// theirs, and the same person carries different identifiers on two different
+/// connections. So the PAIR is the key and `externalId` alone never is.
+///
+/// No relation to `SsoConnection` (that projection carries no foreign keys);
+/// the `User` relation is real, so a deleted user takes their directory
+/// identities with them rather than stranding a mapping that resolves to
+/// nobody.
+model ScimExternalId {
+  id           String   @id @default(nanoid())
+  connectionId String
+  externalId   String
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  @@unique([connectionId, externalId])
+  @@index([userId])
+  @@index([connectionId])
+}
+
+/// D08 — one connection's directory sync, as the `scim-sync` pipeline's fold
+/// writes it.
+///
+/// Pure event truth: every column is fold-written, rows are never deleted,
+/// and REVOKED is a tombstone rather than an absence — a dead letter that
+/// vanished when a connection was torn down would be a removal nobody could
+/// check afterwards.
+///
+/// No relation to Organization or SsoConnection, matching `SsoConnection`
+/// itself: a projection is rebuilt from events, and a foreign key would make
+/// a replay depend on relational state the log does not carry.
+model ScimSyncState {
+  /// The aggregate: the connection's id, which IS its sync's id.
+  id                String    @id
+  connectionId      String
+  organizationId    String
+  /// TOKEN_ISSUED | SYNCING | ERROR | REVOKED
+  state             String
+  lastPushedAt      DateTime?
+  /// The failure standing right now: { op, errorCode, attempts, retiredAtMs,
+  /// userId, occurredAtMs }. A reason CODE and ids — never a token, never a
+  /// secret, never an internal hostname.
+  lastFailure       Json?
+  /// Every failure retired without ever being applied, newest last. The dead
+  /// letters an administrator has to see; retiring never drops one.
+  deadLetters       Json      @default("[]")
+  /// revoke | teardown, once the sync has ended.
+  revokedCause      String?
+  occurredAt        DateTime
+  lastEventId       String
+  acceptedAt        DateTime
+  projectionVersion String
+  /// Event-derived, not database-managed: `@default(now())` / `@updatedAt`
+  /// would make a replayed row differ from the row it rebuilds, which is
+  /// exactly the parity this projection has to keep.
+  createdAt         DateTime
+  updatedAt         DateTime
+
+  @@index([organizationId])
+  @@index([state])
+  @@index([connectionId])
 }
 
 enum PlanTypes {
@@ -531,6 +1065,36 @@ model Department {
   @@index([organizationId])
 }
 
+/// One dated person → department link (ADR-128 §13, #7882).
+///
+/// `OrganizationUser.departmentId` stays the CURRENT assignment every screen
+/// reads; these rows are its history, appended by the same `assignUser` write
+/// so the two cannot drift. They exist for the cost reads: January's spend
+/// stays with January's department, so a read resolves against the link that
+/// was open on the cost's day, not against today's pointer. Members with no
+/// link on a day resolve to "unassigned", never to an error.
+///
+/// Same shape as IdentityMatch's dated links, same one-open-link guard: the
+/// partial unique index in the migration rejects a second open row per
+/// (organizationId, userId) with SQLSTATE 23505.
+model DepartmentMembershipHistory {
+  id             String    @id @default(nanoid())
+  organizationId String
+  userId         String
+  departmentId   String
+  validFrom      DateTime
+  /// Null means the link is open. Reassignment and clearing close it.
+  validTo        DateTime?
+  createdAt      DateTime  @default(now())
+
+  // One-open-link guard, raw SQL in the migration because Prisma cannot
+  // express a partial unique index:
+  //   CREATE UNIQUE INDEX "DepartmentMembershipHistory_one_open_link_key"
+  //     ON "DepartmentMembershipHistory"("organizationId", "userId")
+  //     WHERE "validTo" IS NULL
+  @@index([organizationId, userId, validFrom])
+}
+
 /// Per-(organization, tool) override for which `langwatch <tool>` paths the
 /// CLI may use: `allowVk` gates the gateway / virtual-key path (Path A) and
 /// `allowOtelDirect` gates the direct-OTLP ingestion path (Path B). A missing
@@ -555,26 +1119,35 @@ model PlatformToolPolicy {
 enum INVITE_STATUS {
   PENDING
   ACCEPTED
+  // Deprecated (D11): the member-approval workflow is retired; existing rows
+  // were migrated to REVOKED and nothing writes this value any more. The
+  // enum member stays because dropping a Postgres enum value means
+  // rebuilding the type.
   WAITING_APPROVAL
   PAYMENT_PENDING
+  REVOKED
 }
 
 model OrganizationInvite {
-  id              String               @id @default(nanoid())
-  email           String
-  inviteCode      String               @unique
-  expiration      DateTime?
-  status          INVITE_STATUS        @default(PENDING)
-  organizationId  String
-  organization    Organization         @relation(fields: [organizationId], references: [id])
-  teamIds         String
-  teamAssignments Json? // Array of {teamId: string, role: TeamUserRole, customRoleId?: string}
-  role            OrganizationUserRole
-  requestedBy     String?
-  requestedByUser User?                @relation(fields: [requestedBy], references: [id])
-  subscriptionId  String?
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @default(now()) @updatedAt
+  id                      String               @id @default(nanoid())
+  email                   String
+  inviteCode              String               @unique
+  expiration              DateTime?
+  status                  INVITE_STATUS        @default(PENDING)
+  organizationId          String
+  organization            Organization         @relation(fields: [organizationId], references: [id])
+  teamIds                 String
+  teamAssignments         Json? // Array of {teamId: string, role: TeamUserRole, customRoleId?: string}
+  role                    OrganizationUserRole
+  requestedBy             String?
+  requestedByUser         User?                @relation(fields: [requestedBy], references: [id])
+  subscriptionId          String?
+  // Who accepted, and through which VERIFIED identifier the acceptance
+  // matched (null for pre-identifier users, who match on User.email).
+  acceptedByUserId        String?
+  acceptedViaIdentifierId String?
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @default(now()) @updatedAt
 
   @@index([organizationId])
   @@index([requestedBy])
@@ -1098,10 +1671,11 @@ model Experiment {
 //
 // Ordinary typing in the workbench writes a single rolling row with
 // `autoSaved = true`, updated in place so a long editing session does not
-// leave one row per keystroke behind. A commit, an agent write and a restore
-// each write a new `autoSaved = false` row, which is what a person sees in
-// the version list. `version` matches the `Experiment.workbenchVersion` the
-// write produced, so history and the live row share one number line.
+// leave one row per keystroke behind. That row is shown as "Autosave" and
+// carries no number a person reads. A commit, an agent write and a restore
+// each write a new `autoSaved = false` row, and those rows are numbered
+// 1, 2, 3 with no gaps: the number is one higher than the highest numbered
+// row of the experiment, not the counter.
 //
 // `state` never carries run results: those live only on the live experiment
 // row, because a snapshot exists to restore a setup, not to replay an old run.
@@ -1109,10 +1683,19 @@ model Experiment {
 // current results across, so bringing an old setup back never clears the
 // output cells and evaluator scores of the run the experiment holds now.
 model ExperimentVersion {
-  id           String @id @default(nanoid())
-  experimentId String
-  projectId    String
-  version      Int
+  id             String @id @default(nanoid())
+  experimentId   String
+  projectId      String
+  /// The number the version is addressed and displayed by. Numbered rows hold
+  /// a gap-free sequence. The rolling autosave row rides on the counter
+  /// instead, which is what keeps it clear of that sequence.
+  version        Int
+  /// `Experiment.workbenchVersion` at the moment this row was last written.
+  /// The rolling row is rewritten in place, so this is the only column that
+  /// says how recent its content is, and the version list sorts and pages by
+  /// it. It also joins a row to the live state: the row whose `counterVersion`
+  /// equals the experiment's counter holds what the workbench shows now.
+  counterVersion Int
 
   autoSaved     Boolean @default(false)
   commitMessage String?
@@ -1120,6 +1703,14 @@ model ExperimentVersion {
   authorId String?
   /// Who wrote this version: "user", "langy" or "api".
   authorLabel String
+  /// The run that wrote this version, when a run wrote it.
+  ///
+  /// A run writes its cells into the workbench state, which advances the
+  /// counter. Without this, the page that started that run reads the bump as
+  /// somebody else's write, refuses to save, and asks the reader to reload
+  /// over their own unsaved edits. Named here, the page adopts the version and
+  /// carries on.
+  runId String?
 
   state Json
   /// Schema version of `state`, so a later shape change can be read forward.
@@ -1130,10 +1721,13 @@ model ExperimentVersion {
 
   @@unique([experimentId, version])
   @@index([projectId, experimentId, autoSaved])
-  // The version list pages by version inside one experiment, and a restore
-  // reads one version number. Both name all three columns, so the sort key
-  // belongs in the index rather than being applied to fetched rows.
+  // A restore reads one version number of one experiment, and a numbered write
+  // reads the highest number that experiment holds. Both name all three
+  // columns, so the sort key belongs in the index rather than being applied to
+  // fetched rows.
   @@index([projectId, experimentId, version])
+  // The version list pages by counterVersion inside one experiment.
+  @@index([projectId, experimentId, counterVersion])
   @@index([createdAt])
 }
 
@@ -1232,6 +1826,13 @@ model ModelProvider {
   // Fallback priority used when a VK has no RoutingPolicy. Lower =
   // tried first. Tiebreak by createdAt ASC. Deterministic across runs.
   fallbackPriorityGlobal Int?
+
+  // Regular expression sources, one per entry, naming the models of this
+  // provider that may run a Langy conversation with the permission checks
+  // skipped on the developer's machine (ADR-129). Null or an empty list
+  // means the provider's registry default applies; a stored list replaces
+  // that default rather than extending it.
+  langySkipPermissionsModels Json?
 
   // Health / circuit breaker state written by the gateway.
   healthStatus      GatewayProviderHealthStatus @default(UNKNOWN)
@@ -2046,6 +2647,7 @@ model AuditLog {
   id             String   @id @default(cuid())
   createdAt      DateTime @default(now())
   userId         String?
+  actorUserId    String?
   projectId      String?
   organizationId String?
   action         String
@@ -2063,6 +2665,7 @@ model AuditLog {
 
   @@index([createdAt])
   @@index([userId])
+  @@index([actorUserId])
   @@index([projectId])
   @@index([action])
   @@index([ipAddress])
@@ -2239,20 +2842,30 @@ model Agent {
   projectId         String
   project           Project   @relation(fields: [projectId], references: [id])
   name              String
-  type              String // "signature" | "code" | "workflow" | "http"
+  type              String // "signature" | "code" | "workflow" | "http" | "connected" | "voice"
   config            Json // Node configuration (model, prompt, code, etc.)
   workflowId        String? // For "workflow" type - top level for joins
   workflow          Workflow? @relation(fields: [workflowId], references: [id])
   copiedFromAgentId String?
   copiedFrom        Agent?    @relation("AgentCopies", fields: [copiedFromAgentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   copiedAgents      Agent[]   @relation("AgentCopies")
+  // Connected agents (ADR-128): the environment the SDK resolved, the scope of
+  // a development agent (a personal key's owner, or the host of a project key),
+  // the identity the SDK upserts by, and the last time an instance was seen.
+  environment       String?
+  ownerUserId       String?
+  hostLabel         String?
+  identityKey       String?
+  lastSeenAt        DateTime?
   archivedAt        DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @default(now()) @updatedAt
 
+  @@unique([projectId, identityKey])
   @@index([projectId])
   @@index([workflowId])
   @@index([copiedFromAgentId])
+  @@index([projectId, lastSeenAt])
 }
 
 model Evaluator {
@@ -2307,6 +2920,30 @@ model Scenario {
   judgeModel      String?
   maxTurns        Int?
   minTurns        Int?
+  // The value this scenario carries for each field its test suite declares,
+  // keyed by field identifier: { golden_sql: "SELECT ...", max_rows: 12 }.
+  // Values are text, numbers or booleans. A field with no value has no key.
+  // Null reads as no values. See specs/scenarios/scenario-fields.feature.
+  fields          Json?
+  // The simulated caller's voice for a voice target: { voiceModel,
+  // interruptProbability, effects }. Null for a non-voice scenario or one that
+  // keeps every caller default. See caller-voice.config.ts and
+  // specs/features/agents/voice-agents-v1.feature (AC17).
+  callerVoice     Json?
+  // The test suite (a SimulationSuite with kind "test_suite") this scenario is
+  // filed in, or null for an unfiled scenario. This column is the source of
+  // truth for test suite membership; the test suite's scenarioIds is a
+  // denormalized copy kept in step by reconcileTestSuiteMembership
+  // (server/suites/test-suite-membership.ts).
+  // See specs/suites/test-suite-membership-invariant.feature.
+  testSuiteId     String?
+  testSuite       SimulationSuite? @relation("TestSuiteScenarios", fields: [testSuiteId], references: [id], onDelete: SetNull)
+  // Counts one up on every save of the editable fields. Each number has a
+  // ScenarioVersion row holding the state as saved; the unique constraint
+  // there is what keeps two concurrent saves from sharing a number. See
+  // specs/scenarios/scenario-versioning.feature.
+  version         Int       @default(1)
+  versions        ScenarioVersion[]
   lastUpdatedById String?
   lastUpdatedBy   User?     @relation(fields: [lastUpdatedById], references: [id])
   archivedAt      DateTime?
@@ -2314,6 +2951,46 @@ model Scenario {
   updatedAt       DateTime  @default(now()) @updatedAt
 
   @@index([projectId])
+  @@index([projectId, testSuiteId])
+}
+
+// One saved state of a scenario's editable fields. Append-only: a restore
+// writes a new row rather than rewriting an old one. See
+// specs/scenarios/scenario-versioning.feature and
+// specs/scenarios/scenario-version-restore.feature.
+model ScenarioVersion {
+  id         String @id @default(nanoid())
+  scenarioId String
+  /// Deleting the case takes its history with it. Under relationMode="prisma"
+  /// the cascade is the client's, so a raw SQL delete still has to clear these
+  /// rows itself.
+  scenario   Scenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  /// The project of the parent case, carried here so every read filters by
+  /// tenant without a join. The service is what keeps the pair honest: no
+  /// composite foreign key can, under relationMode="prisma".
+  projectId  String
+  version    Int
+
+  authorId String?
+  /// Who wrote this version: "user", "api", "cli" or "langy".
+  authorLabel String
+
+  changeDescription String?
+
+  /// Envelope { schemaVersion, fields, changedFields } holding the editable
+  /// field set as saved and the names of the fields this save changed.
+  snapshot Json
+  /// Schema version of `snapshot`, so a later shape change can be read forward.
+  schemaVersion Int @default(1)
+
+  createdAt DateTime @default(now())
+
+  @@unique([scenarioId, version])
+  // The history pages by version inside one scenario, and a restore reads one
+  // version number. Both name all three columns, so the sort key belongs in
+  // the index rather than being applied to fetched rows.
+  @@index([projectId, scenarioId, version])
+  @@index([createdAt])
 }
 
 model SimulationSuite {
@@ -2333,12 +3010,39 @@ model SimulationSuite {
   // specs/suites/suite-model-selection.feature.
   simulatorModel String?
   judgeModel     String?
+  // "test_suite" | "run_plan" (see SUITE_KINDS in server/suites/types.ts). A
+  // test suite groups scenarios through Scenario.testSuiteId; a run plan is
+  // hand-assembled. String rather than a Prisma enum so a new kind needs no
+  // database migration.
+  kind            String     @default("run_plan")
+  // What the plan covers, as { mode } plus the mode's own field: "all",
+  // "test_suites" with testSuiteIds, "labels" with labels, or "scenarios",
+  // which runs the stored scenarioIds. Null reads as "scenarios", so a plan
+  // written before scopes keeps the list it already held. A test suite carries
+  // none: its members come from Scenario.testSuiteId. See
+  // server/suites/scope.ts and specs/suites/run-plan-dynamic-scopes.feature.
+  scope           Json?
+  // The fields a test suite declares beyond situation and criteria, as an
+  // array of { identifier, type } with type text, number or boolean. Every
+  // scenario filed in the suite carries a value per field in Scenario.fields.
+  // A run plan carries none. Null reads as no fields. See
+  // server/scenarios/suite-fields.ts and specs/scenarios/scenario-fields.feature.
+  fields          Json?
+  // The evaluators that run after every scenario run of this suite or plan,
+  // as an array of { id, evaluatorId, required, mappings }. A mapping names
+  // where an evaluator input reads its value: the conversation, the scenario
+  // (situation, criteria or a field) or the trace. A run plan's attachments
+  // run beside the ones of the test suites its scenarios belong to. Null
+  // reads as none. See server/scenarios/evaluator-attachments.ts.
+  evaluators      Json?
+  testSuiteScenarios Scenario[] @relation("TestSuiteScenarios")
   archivedAt     DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @default(now()) @updatedAt
 
   @@unique([projectId, slug])
   @@index([projectId])
+  @@index([projectId, kind])
 }
 
 model Subscription {
@@ -2410,22 +3114,31 @@ model InvoiceItem {
 // ============================================================================
 
 model Group {
-  id             String            @id @default(nanoid())
-  organizationId String
-  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  name           String
-  slug           String
+  id               String            @id @default(nanoid())
+  organizationId   String
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name             String
+  slug             String
   // SCIM provenance - null for manually created groups
-  externalId     String? // IdP-side group ID (SCIM externalId)
-  scimSource     String? // e.g. "azure-ad", "okta"
-  members        GroupMembership[]
-  roleBindings   RoleBinding[]     @relation("GroupBindings")
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @default(now()) @updatedAt
+  externalId       String? // IdP-side group ID (SCIM externalId)
+  scimSource       String? // e.g. "azure-ad", "okta"
+  /// D08: which SSO connection provisioned this group. Null for manually
+  /// created groups and for the SCIM groups that predate connection scoping.
+  scimConnectionId String?
+  members          GroupMembership[]
+  roleBindings     RoleBinding[]     @relation("GroupBindings")
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @default(now()) @updatedAt
 
   @@unique([organizationId, slug])
   @@unique([organizationId, externalId])
+  /// D08: a directory's identifier for a group is its CONNECTION's, so two
+  /// connections in one organization each carry their own "engineering". The
+  /// organization-scoped uniqueness above stays as the legacy safety net for
+  /// the rows that carry no connection.
+  @@unique([scimConnectionId, externalId])
   @@index([organizationId])
+  @@index([scimConnectionId])
 }
 
 model GroupMembership {
@@ -2502,7 +3215,7 @@ model Grant {
   // lets a projection reloaded from these rows reconstruct the fact rather
   // than a lossy copy. Null on everything ledger-born; retired at cutover.
   legacyRole String? // ADMIN | MEMBER | VIEWER | CUSTOM
-  source     String // which writer emitted the fact: grants-service | scim | invite | backfill-b | genesis-import | read-through-mint | cutover-import
+  source     String // which writer emitted the fact: grants-service | scim | invite | join-request | read-through-mint | migration (the vocabulary is GRANT_EVENT_SOURCES in @langwatch/authz-server; ADR-110 folded backfill-b, genesis-import and cutover-import into `migration`)
 
   scopeType GrantScopeType
   scopeId   String
@@ -2547,6 +3260,16 @@ model Grant {
   // the partiality and rebuild it over every share-link row, which is the one
   // thing the WHERE clause exists to avoid.
   //
+  // The API-key permission check's holder lookup - who else holds this key's
+  // private role - is served by "Grant_organizationId_roleKey_live_idx",
+  // partial on `WHERE "revokedAt" IS NULL`, from migration
+  // 20260831120000_grant_role_key_live_index. Partial for the same reason and
+  // undeclarable here for the same reason as the principal scan above: every
+  // read that decides access fences on the mark, and an `@@index` would strip
+  // the WHERE on the next `prisma migrate dev`. Without it the leading column
+  // selects the whole organization and the read degrades to a full scan on
+  // every check.
+  //
   // "Grant_resource_terms_check" is an all-or-nothing CHECK over the tier's
   // four identity columns (token, permission, resourceKind, projectId), tied
   // to scopeType = 'RESOURCE'. Added over two columns in
@@ -2587,7 +3310,7 @@ model GrantUsage {
 // same fold. Imported roles keep their CustomRole id, so custom:<id>
 // roleKeys stay stable across the cutover.
 model Role {
-  id             String   @id
+  id             String    @id
   organizationId String // plain column, never a relation (see Grant)
   name           String
   description    String?
@@ -2621,6 +3344,24 @@ model ApiKey {
   expiresAt       DateTime?
   lastUsedAt      DateTime?
   revokedAt       DateTime?
+
+  /// Why the key was revoked, set with `revokedAt`: "user" when a person
+  /// revoked it (the API-keys page, the REST API, the devices tab), "rotation"
+  /// when a mint replaced it, "session" when the CLI login key it was parented
+  /// to was revoked, "expired" when that session ran out, "offboarded" when the
+  /// person's membership of the organization ended. "cap" survives on rows the
+  /// retired per-tool cap revoked. The CLI reads it to decide whether a dead
+  /// ingest key may be re-minted: a key a person revoked stays dead.
+  /// NULL for live keys and for keys revoked before the cause was recorded.
+  revocationCause String?
+
+  /// The CLI login key of the device session that minted this ingestion key.
+  /// Set by the CLI's personal mint, NULL for every other key. Revoking the
+  /// parent (logout, the devices tab, a re-login from the same device, session
+  /// expiry) revokes the children with it. Column ref only, no FK and no
+  /// index: lookups filter by the indexed `userId` first and match the parent
+  /// in memory over a person's few live ingest keys.
+  parentApiKeyId String?
 
   /// Non-null marks this key as an "ingestion key": a project-scoped,
   /// ingest-only ApiKey the unified `langwatch <tool>` CLI (and template
@@ -2683,12 +3424,16 @@ model BillingMeterCheckpoint {
   id                   String   @id @default(cuid())
   organizationId       String
   billingMonth         String // "2026-02"
+  // The Stripe meter event name this checkpoint tracks. Each meter reports
+  // its own running total, in its own unit: a count for billable events,
+  // ten-thousandths of a dollar for Instant Evals.
+  meter                String   @default("langwatch_billable_events")
   lastReportedTotal    Int      @default(0)
   pendingReportedTotal Int? // non-null = in-flight Stripe call
   consecutiveFailures  Int      @default(0)
   updatedAt            DateTime @updatedAt
 
-  @@unique([organizationId, billingMonth])
+  @@unique([organizationId, billingMonth, meter])
 }
 
 // ============================================================================
@@ -3255,9 +4000,60 @@ model IngestionSource {
   /// NOT the deferred cost-attribution projectId (ADR-088 Decision 4).
   traceProjectId String?
 
+  /// The account the provider itself named when this connection was saved -
+  /// an OpenAI or Anthropic organization id, read once per save and compared
+  /// so a second connection cannot read one account's spend twice. NOT
+  /// derived from the administrator key: nothing worked out from a customer
+  /// credential is stored here or anywhere else, because the account id is
+  /// not a secret and cannot be turned back into a key.
+  /// Nullable because every connection that predates the guard has none, and
+  /// because Azure and Power Platform name what they read in parserConfig
+  /// instead. "Unknown account" has to be a storable state.
+  /// Spec: specs/ai-gateway/governance/ingestion-sources.feature
+  providerAccountId String?
+
   /// Last event timestamp observed (any direction). Surfaces in the
   /// admin UI as "last event 2 minutes ago".
   lastEventAt DateTime?
+
+  /// ADR-128 - when a pull run last reached the provider without erroring,
+  /// mirrored from the ingestionPullRunStatus projection. Deliberately NOT
+  /// lastEventAt: an empty period is a working puller, and a run that
+  /// delivered data and then failed is not. Drives the health badge and
+  /// the "no data since" cut-off, below which a day's spend is unknown
+  /// rather than zero.
+  /// Spec: specs/governance/ingestion-source-health.feature
+  lastSuccessAt DateTime?
+
+  /// ADR-128 - how far the last run actually read, and whether it reached the
+  /// end. Mirrored from the ingestionPullRunStatus projection, in the same way
+  /// and for the same reason as lastSuccessAt above: every reader of this
+  /// surface selects from this row, and two of them render a LIST of sources,
+  /// so reaching a per-run projection would be one query per row on a screen
+  /// built to show many at once.
+  ///
+  /// These two are the only evidence separating a source that truncated once
+  /// and then finished from one that is stuck. A stuck source's run clock
+  /// advances on every attempt, so the clock cannot be that evidence and is
+  /// deliberately not stored here - only the point the run REACHED.
+  ///
+  /// Completeness is "complete" or "truncated". Null on both is unknown, which
+  /// is what every row written before this existed reads as, and unknown must
+  /// never render as either answer.
+  /// Spec: specs/governance/ingestion-source-health.feature
+  lastReadThroughAt   DateTime?
+  lastRunCompleteness String?
+
+  /// ADR-088 - the window this source read while pulled cost recording was
+  /// off for the organization, so its spend was dropped rather than priced.
+  /// Both null = nothing dropped. The pull cursor advances whether or not the
+  /// money path is live (audit-only is a supported mode), so without this the
+  /// loss is unrecoverable AND invisible: those days read as no spend rather
+  /// than as unknown. Widened by any run that drops a priced item, cleared
+  /// only when a later run re-reads back across the whole window.
+  /// Spec: specs/governance/pulled-usage-cost-gap.feature
+  unpricedUsageSince   DateTime?
+  unpricedUsageThrough DateTime?
 
   archivedAt DateTime?
 
@@ -3266,6 +4062,21 @@ model IngestionSource {
   createdById String?
   createdBy   User?    @relation("IngestionSourceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
+  // One live connection per provider account and report is held by
+  // "IngestionSource_provider_account_report_live_idx", a UNIQUE index from
+  // migration 20260907120012_ingestion_source_one_connection_per_account. It is
+  // both PARTIAL (`WHERE "providerAccountId" IS NOT NULL AND "archivedAt" IS
+  // NULL` - a connection that names no account claims none, and only archiving
+  // gives an account up) and over an EXPRESSION (the report normalised out of
+  // parserConfig the way the service normalises it). Prisma can express
+  // neither, so - exactly as Grant's partial indexes above are - it is NOT
+  // declared here: an `@@unique` would make the next `prisma migrate dev` drop
+  // the WHERE and the expression and rebuild a constraint that means something
+  // else entirely.
+  //
+  // The service refuses a duplicate before the write and says which connection
+  // holds the account; the index is what holds when two saves race the
+  // provider round trip that sits between that read and the write.
   @@unique([organizationId, name])
   @@index([organizationId])
   @@index([teamId])
@@ -4070,10 +4881,77 @@ model IngestionPullRunProjection {
   LastRunErrorCode  String? @map("lastRunErrorCode")
   ConsecutiveErrors Int     @default(0) @map("consecutiveErrors")
 
+  /// When a run last completed without erroring. Backfilled by replay, which
+  /// is why the projection version moved with this column.
+  LastSuccessAt Float? @map("lastSuccessAt")
+
   /// Identity of the run whose outcome this row reflects. Outcomes from a
   /// superseded run arrive with a smaller value and are ignored, so a late
   /// completion cannot regress Cursor or the status fields.
   LastRunScheduledFor Float? @map("lastRunScheduledFor")
+
+  /// ADR-128 - how far the last run read, in epoch milliseconds, and whether
+  /// it reached the end. The fold writes both; the IngestionSource row mirrors
+  /// them for the screens. Null read-through means no run has reported one.
+  /// Null completeness reads as unknown, never as either answer, which is what
+  /// every row written before this existed holds.
+  ///
+  /// Nullable on purpose, so replay is not required to make this migration
+  /// safe: a row that has never seen a run carrying these stays null and every
+  /// reader already handles unknown.
+  /// Spec: specs/governance/ingestion-source-health.feature
+  LastReadThroughAt   Float?  @map("lastReadThroughAt")
+  LastRunCompleteness String? @map("lastRunCompleteness")
+
+  /// The last time somebody asked this source to enumerate its agents, and how
+  /// that ask ended. A listing is a different scope on the same connection as
+  /// the pull above: a credential that cannot enumerate a directory still pulls
+  /// cost perfectly, so no health, coverage or completeness reader may treat a
+  /// refusal here as the source failing to pull.
+  ///
+  /// Count is set ONLY when the outcome is listed, and stays null on a refusal.
+  /// Zero is a real answer meaning the provider returned an empty list, so a
+  /// zero default would manufacture that answer for a source that refused.
+  /// Reason is set only on a refusal and is a plain string, never an enum and
+  /// never a foreign key, because the log outlives the vocabulary. Status is
+  /// nullable even when refused, because a refusal we generated ourselves has
+  /// no HTTP status, and it is never rendered to a customer.
+  ///
+  /// The two `...ListingAt` columns hold the instant the ASK was accepted, not
+  /// the instant its answer was recorded, and the fold orders outcomes by them
+  /// so a superseded listing cannot overwrite the one that replaced it. The
+  /// name predates that job and is kept because renaming a column is a
+  /// migration; the fold's own field docs are the statement of record.
+  LastAgentsListingAt      Float?  @map("lastAgentsListingAt")
+  LastAgentsListingOutcome String? @map("lastAgentsListingOutcome")
+  LastAgentsListingCount   Int?    @map("lastAgentsListingCount")
+  LastAgentsListingReason  String? @map("lastAgentsListingReason")
+  LastAgentsListingStatus  Int?    @map("lastAgentsListingStatus")
+
+  /// The same for people, in its own set of columns rather than sharing the
+  /// agents set with a kind discriminator. A source can be refused for people
+  /// and fine for agents, and one shared set holds only the most recent listing
+  /// of either kind, so syncing people would erase an agents refusal and the
+  /// agents page would go back to not knowing after briefly knowing.
+  ///
+  /// LastPeopleDirectoryCount is everyone the provider's directory named.
+  /// LastPeopleWithheldCount is how many of those this deployment does not hold
+  /// because erasure suppression removed them: a SUBSET of the directory count,
+  /// never an addition to it. Adding the two counts the same people twice.
+  /// Subtracting is the valid arithmetic, and the surviving total is that
+  /// subtraction rather than a third column that could disagree.
+  ///
+  /// The withheld count is safe to show as a CURRENT figure and never as a
+  /// series: it moving from zero to one at a known moment says an erasure
+  /// happened then, which on a small tenant identifies the person as surely as
+  /// a name would. So no trend line, no history drawer, no per-run export, and
+  /// never beside a per-person list.
+  LastPeopleListingAt      Float?  @map("lastPeopleListingAt")
+  LastPeopleListingOutcome String? @map("lastPeopleListingOutcome")
+  LastPeopleDirectoryCount Int?    @map("lastPeopleDirectoryCount")
+  LastPeopleWithheldCount  Int?    @map("lastPeopleWithheldCount")
+  LastPeopleListingReason  String? @map("lastPeopleListingReason")
+  LastPeopleListingStatus  Int?    @map("lastPeopleListingStatus")
 
   CreatedAt         Float  @map("createdAt")
   UpdatedAt         Float  @map("updatedAt")
@@ -4350,4 +5228,241 @@ model SystemMigrationEnrollment {
 
   @@id([organizationId, migrationName])
   @@index([migrationName])
+}
+
+// ---------------------------------------------------------------------------
+// Governance identity (ADR-128 wave 2, §9/§11).
+//
+// These tables sit BESIDE login identity (ADR-101), never inside it. A row
+// here is "a provider told us this name exists on a cost row" - it is not a
+// login, it grants nothing, and no authorization code path may read it (ADR-128
+// hard constraint 3).
+//
+// All of them are keyed by `organizationId`, never by the hidden governance
+// project. That project's id is the ClickHouse `TenantId`, and it is not
+// durable: one archive/re-mint cycle would orphan every identity and erasure
+// row keyed to it, and a delete job walking that key would then miss an erased
+// person's rows entirely. `GovernanceTenantHistory` below is how an
+// organization is translated back to its tenants for reads and for erasure.
+//
+// Spec: specs/governance/governance-identity-and-erasure.feature
+// ---------------------------------------------------------------------------
+
+/// A name-text seen on a provider's cost or audit rows: "the provider told us
+/// someone called m.silva exists". One row per provider-scoped identity.
+///
+/// This is the unit of GDPR erasure (ADR-128 §9), and deliberately so: most of
+/// these people have no LangWatch login at all - contractors, seat holders who
+/// never signed in, anyone whose email a provider put on a cost row - so there
+/// is no platform user to key on and a user-deletion event can never fire for
+/// them.
+model DiscoveredPerson {
+  id              String    @id @default(nanoid())
+  organizationId  String
+  /// "anthropic" | "openai" | "databricks" | ... - the provider that named them.
+  provider        String
+  /// What the provider calls them, verbatim. The join key onto the money rows'
+  /// RawActorId. Replaced by a deterministic pseudonym on erasure, which keeps
+  /// the row addressable for spend attribution without keeping the identifier.
+  rawActorId      String
+  /// Name or email text as seen. Pseudonymized alongside rawActorId on erasure.
+  displayText     String
+  /// person | service_account - determined deterministically per ADR-128 §10
+  /// (a bare UUID in Databricks `executed_by` is a service account, never an
+  /// agent), never guessed from the shape of a name.
+  kind            String
+  /// The department the provider's directory filed this person under, verbatim.
+  /// An OBSERVATION, not the `Department` entity: it is free text a tenant owns
+  /// on their side, it exists for people who hold no LangWatch account, and
+  /// nothing rolls spend up by it. Spend attribution stays on `Department`, via
+  /// the membership the match engine proves (directoryDepartmentSync.service).
+  /// Null means no directory has named one - never "no department", because a
+  /// blank field in the tenant's directory and a person no directory lists are
+  /// the same null here.
+  department      String?
+  firstSeenAt     DateTime
+  lastSeenAt      DateTime
+  /// Set when this row's identity has been erased. The row survives so its
+  /// spend stays attributable to *someone*; the identifier does not.
+  erasedAt           DateTime?
+  /// Set alongside `erasedAt` and cleared once the daily cost rows have been
+  /// removed and their rebuild requested. Non-null means the ClickHouse half
+  /// of the erasure did not finish — a crash between the delete and the
+  /// replay leaves days short by the erased amount, and without this marker a
+  /// re-run reads `erasedAt`, short-circuits, and reports a clean erasure that
+  /// did no work. The re-run resumes at that step instead.
+  moneyRowsPendingAt DateTime?
+  /// The earliest day to rebuild from, recorded BEFORE the rows are deleted.
+  /// Once they are gone there is nothing left to ask which days they were on,
+  /// so a resume with no record of this could only replay everything or
+  /// nothing. Null means nothing was rebuildable — either no day carried the
+  /// identifier, or every one of them is older than the event log keeps.
+  moneyRebuildSince  String?
+  /// ADR-128 §12 conflict rule: automatic linking has stopped for this
+  /// identity because evidence pointed at two candidates, or contradicted an
+  /// existing link. Stored HERE rather than on the suggestion rows, because a
+  /// halt on auto-linking that a recompute or a restart clears is not a halt.
+  suspendedAt     DateTime?
+  /// What tripped the suspension, for the human who reviews it.
+  suspendedReason String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now()) @updatedAt
+
+  @@unique([organizationId, provider, rawActorId])
+  // The identity screens list an organization's people newest-seen first.
+  @@index([organizationId, lastSeenAt])
+}
+
+/// The same shape as DiscoveredPerson for non-human actors - Genie spaces,
+/// Copilot bots, OpenAI projects - plus whatever provider-native metadata the
+/// source published. Discovering an agent grants it nothing either.
+model DiscoveredAgent {
+  id             String   @id @default(nanoid())
+  organizationId String
+  provider       String
+  /// Genie space / Copilot bot / OpenAI project id, verbatim.
+  rawAgentId     String
+  displayText    String
+  /// Workspace, plan, and kin - provider-native descriptive fields only. Never
+  /// credentials: this row is read by admin screens, not by any pull path.
+  metadata       Json
+  firstSeenAt    DateTime
+  lastSeenAt     DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  @@unique([organizationId, provider, rawAgentId])
+  @@index([organizationId, lastSeenAt])
+}
+
+/// The dated match table: "`user_abc123` on Anthropic is platform user #42,
+/// valid from March 3", closed when it stops being true.
+///
+/// Dating is what makes a re-issued email address survivable: the leaver's link
+/// closes at offboarding, the new hire gets a new link, and January's spend
+/// stays with January's person. A correction closes the old row and opens a new
+/// one; nothing is ever silently rewritten.
+model IdentityMatch {
+  id                 String    @id @default(nanoid())
+  organizationId     String
+  /// The provider-side identity this link is about.
+  discoveredPersonId String
+  /// The platform user. Nullable, and blanked by erasure (ADR-128 §9 step 2) -
+  /// the row and its dates remain, so the history of the link is not rewritten
+  /// by the erasure either.
+  userId             String?
+  /// directory_id | verified_email | human_confirmed. Exact verified-email
+  /// equality is the primary evidence; a directory id corroborates but never
+  /// stands alone (ADR-128 §12).
+  evidenceKind       String
+  validFrom          DateTime
+  /// Null means the link is open. Offboarding and corrections close it.
+  validTo            DateTime?
+  createdAt          DateTime  @default(now())
+
+  // One-open-link guard, and the ONLY uniqueness rule here: at most one row
+  // per discoveredPersonId may be open (validTo IS NULL). Raw SQL in the
+  // migration, because Prisma cannot express a partial unique index:
+  //   CREATE UNIQUE INDEX "IdentityMatch_one_open_link_key"
+  //     ON "IdentityMatch"("discoveredPersonId") WHERE "validTo" IS NULL
+  // A second open row is rejected with SQLSTATE 23505. Closed rows are outside
+  // the index on purpose: nothing writes validTo yet, so the general overlap
+  // rule this replaces (a btree_gist EXCLUDE constraint) guarded a case that
+  // cannot occur, at the price of an extension requirement on every Postgres
+  // (ADR-128 §7). Revisit when closing links ships.
+  // A CHECK rejects zero-width and inverted ranges, which the partial index
+  // cannot see: a zero-width row has validTo set and so counts as closed.
+  @@index([organizationId, discoveredPersonId])
+  // Offboarding and the erasure walk both ask "which links does this user hold".
+  @@index([organizationId, userId])
+}
+
+/// Every ClickHouse `TenantId` this organization has ever written governance
+/// rows under, appended on first use and never pruned.
+///
+/// The live `resolveGovProjectId` lookup cannot be this translation: it filters
+/// `archivedAt: null` and so returns null forever once someone archives the
+/// governance project, while the write path re-reads the same project by slug
+/// with no such filter and keeps landing rows under the old tenant. The
+/// organization would map to zero tenants on read and one on write - a
+/// permanent split-brain in which the cost screen reports "no governance data"
+/// and an erasure job erases nothing and reports success.
+///
+/// Reads resolve against the whole history; erasure walks all of it, because
+/// personal data does not stop existing in a tenant that stopped being current.
+model GovernanceTenantHistory {
+  id             String   @id @default(nanoid())
+  organizationId String
+  /// A hidden governance project id this organization has written rows under.
+  tenantId       String
+  firstUsedAt    DateTime
+  lastUsedAt     DateTime
+
+  @@unique([organizationId, tenantId])
+  @@index([organizationId])
+}
+
+/// Hashes of erased identifiers - the do-not-reimport list.
+///
+/// Without it the erasure is undone by the pipeline that produced it: the
+/// pullers look 30 days back, so the next day's pull re-ingests the same email
+/// and re-writes what we erased. Every write path carrying an identifier
+/// consults this list and drops a suppressed one (ADR-128 §9 step 1).
+///
+/// It stores hashes and never identifiers, so it is not itself a copy of the
+/// data it exists to keep out. The stored `identifierHash` and the pseudonym
+/// written in place of the erased value are the same function of the same
+/// input - HMAC-SHA256(secret, identifier) - so a write path computes that digest
+/// once and uses it twice: as the membership test, and, on a hit, as the
+/// replacement value. That is why no original-to-pseudonym mapping table
+/// exists; one would hold the erased identifier in plaintext forever.
+///
+/// Scoped to the provider as well as the organization: the same string can be a
+/// different person under a different provider.
+model ErasedIdentifierSuppression {
+  id             String   @id @default(nanoid())
+  organizationId String
+  provider       String
+  identifierHash String
+  erasedAt       DateTime
+
+  @@unique([organizationId, provider, identifierHash])
+  // The snapshot every write path reads: one organization's whole list.
+  @@index([organizationId])
+}
+
+/// Match candidates a background job computed and a human has yet to confirm
+/// (ADR-128 §12).
+///
+/// Stored rather than computed when the review screen asks, and the reason is
+/// measured rather than stylistic: fuzzy matching is quadratic, there is no
+/// database route to it here, and at this document's own example size - 2,000
+/// discovered people against 500 accounts - plain edit distance over the
+/// 1,000,000 pairs blocked the event loop for 2.9 seconds. Per page load,
+/// uncached, stalling every other request on the instance. A stored row also
+/// makes a pending count answerable without paying for the whole sweep.
+///
+/// Rows are written only by the job, which prefilters before it scores and
+/// recomputes when its inputs change. Confirming one opens an `IdentityMatch`
+/// and deletes the suggestion.
+///
+/// Suspension deliberately does NOT live here - it is on `DiscoveredPerson`,
+/// because a halt on automatic linking that the next recompute clears is not a
+/// halt.
+model IdentityMatchSuggestion {
+  id                 String   @id @default(nanoid())
+  organizationId     String
+  discoveredPersonId String
+  /// The platform user this might be. Not nullable: a suggestion with no
+  /// candidate is not a suggestion.
+  userId             String
+  /// Similarity of the two name texts, after the prefilter, in [0, 1]. A
+  /// display hint and an ordering key - never a threshold anything auto-links
+  /// on, which is the whole distinction this table exists to hold.
+  score              Float
+  computedAt         DateTime
+
+  @@unique([organizationId, discoveredPersonId, userId])
+  // The review surface reads one organization's candidates, strongest first.
+  @@index([organizationId, score])
 }

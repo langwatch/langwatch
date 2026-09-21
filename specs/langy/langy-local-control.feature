@@ -1,0 +1,503 @@
+Feature: Langy works in a folder shared from the developer's machine
+  As a developer who shared my folder with Langy
+  I want Langy to read, edit and run commands there as if it sat at my desk
+  So that a change lands as a branch and a pull request from my own checkout
+
+  # `langwatch langy --share-control` opens an outbound connection from the
+  # developer's machine to LangWatch and executes the calls Langy makes with
+  # its local tools. The transport follows the connected agents relay
+  # (ADR-128): presence in Redis, calls dispatched through Redis so the
+  # worker's request and the CLI's socket can land on different pods, and
+  # long-poll routes for a network that blocks WebSockets.
+  #
+  # What the CLI allows to run is specs/langy/langy-local-permissions.feature.
+  # What the developer sees in the terminal is
+  # specs/typescript-sdk/cli-langy-share-control.feature.
+  # See dev/docs/adr/129-langy-local-control.md.
+
+  Background:
+    Given I am signed in with Langy enabled for a project
+    And a conversation where Langy asked for code access
+
+  Rule: A control request binds one folder to one conversation
+
+    @integration
+    Scenario: Choosing the local folder records a request the CLI can find
+      When I choose to share my local folder
+      Then a control request exists for this conversation, my user and this project
+      And the request expires in fifteen minutes
+      And the CLI signed in as me lists it
+
+    @unit
+    Scenario: A new request replaces the conversation's older open request
+      Given a control request I created
+      When the same conversation asks for the folder again
+      Then only the newest request is open
+      And the CLI lists this conversation once
+
+    @integration
+    Scenario: Another user never sees my request
+      Given a control request I created
+      When a teammate lists their open requests
+      Then my request is not among them
+      And approving it with their session is refused
+
+    # A device login signs the command line in as the person's personal
+    # project, and the conversation that asked lives on a team project. The
+    # request is addressed to the person, so the login's project is not what
+    # finds it.
+    @integration
+    Scenario: A login on my personal project lists a request raised on a team project
+      Given a control request I created on a team project
+      When the CLI signed in as my personal project lists the open requests
+      Then my request is among them
+      And approving it mints the session key for the team project
+      And the conversation's address is on the team project
+
+    @integration
+    Scenario: A project key holds no requests
+      Given a control request I created
+      When the team project's own key lists the open requests
+      Then the list is refused, since no person is behind the key
+      And approving the request with that key is refused the same way
+
+    @integration
+    Scenario: Approving a request mints a session key for the conversation
+      Given an open control request
+      When the CLI approves it
+      Then the CLI receives a Langy session key bound to the conversation
+      And the key carries the permissions of a Langy session key and nothing more
+      And the request is used up, so a second approval is refused
+
+    @integration
+    Scenario: An expired request is refused with the reason
+      Given a control request older than fifteen minutes
+      When the CLI approves it
+      Then the approval is refused as expired
+      And the card in the chat reads that the request expired and offers a new one
+
+    @integration
+    Scenario: Cancelling a request from the terminal closes the card
+      Given an open control request
+      When the CLI cancels it
+      Then the card reads that sharing was cancelled
+      And Langy's next turn offers the code access card again
+
+  Rule: A connection is shown and starts the work
+
+    @integration
+    Scenario: A connected folder shows on the card and in the panel header
+      Given an approved control request
+      When the CLI connects
+      Then the card reads the folder path, the machine name and the current branch
+      And the panel header shows a chip with the folder name and a disconnect action
+
+    @integration
+    Scenario: Connecting starts the next turn on its own
+      Given an approved control request
+      And no turn is in flight
+      When the CLI connects
+      Then a user message reads that the local folder is connected
+      And that message carries nothing the card above it already shows
+      And Langy starts working on the change it offered
+
+    @integration
+    Scenario: The card reads connected within seconds of the terminal saying so
+      Given an approved control request
+      And no turn is in flight
+      When the CLI connects
+      Then the update signal makes the panel read the conversation's record again
+      And the card reads connected without waiting for the next turn to end
+
+    @integration
+    Scenario: Connecting while a turn runs does not start a second turn
+      Given an approved control request
+      And a turn is in flight
+      When the CLI connects
+      Then the connection is recorded
+      And no second turn is started
+      And the running turn can use the folder from its next tool call
+
+    # On film the terminal connected nine seconds after a turn ended, while
+    # that turn's end was still being folded. The connect turn was refused as
+    # a second turn, no turn was left to pick the folder up, and the
+    # conversation sat with the folder connected and no answer.
+    @integration @unit
+    Scenario: A folder connected as a turn ends is answered once the turn's end is folded
+      Given an approved control request
+      And the turn before still reads as in flight when the CLI connects
+      When that turn's end is folded
+      Then one turn reads that the local folder is connected, under the key the direct start would have used
+      And the same end folded again starts no second turn
+      And a turn that placed a call on the folder before ending is followed by no connect turn
+      And a folder that stopped sharing before the turn ended is owed nothing
+
+    @integration
+    Scenario: The connection carries what Langy would otherwise probe
+      When the CLI connects
+      Then Langy learns the folder root, the git branch and remote, whether the tree is dirty, the operating system, the node and python versions, whether the GitHub CLI is signed in and the package manager
+      And Langy does not spend a turn asking the folder for those
+
+    # The facts read the manager off a lock file, and a uv project with its
+    # lock file ignored, or not written yet, read as unknown: the venv uv made
+    # is the signal, and that venv has no pip in it.
+    @unit
+    Scenario: A folder uv manages names uv as its package manager
+      Given a folder with a uv.lock, or a pyproject.toml with a tool.uv table, or a .venv whose pyvenv.cfg names uv
+      When the CLI describes the folder
+      Then the facts name uv as the package manager, before any lock file of another language
+      And a plain venv beside a requirements.txt still names pip
+
+    @integration
+    Scenario: The connection survives a network blip
+      Given a connected folder
+      When the socket drops and the CLI reconnects within a minute
+      Then the folder reads connected throughout
+      And a call made during the gap is delivered after the reconnect
+
+    @integration
+    Scenario: A pause on the platform does not disconnect a live folder
+      Given a connected folder running a command that takes minutes
+      When LangWatch pauses for longer than the folder record lives
+      Then the open connection writes the record back
+      And the command's result is still delivered
+      And the next call runs in the folder instead of asking for code access again
+
+    @unit
+    Scenario: A call written while the folder registers is handed over once
+      Given a folder that has just registered
+      And a call written between the subscription and the scan of pending calls
+      When the connection is handed the call by both
+      Then the command line receives it once
+      And the id is forgotten when the result arrives
+
+    @integration
+    Scenario: A call the command line is still running is not handed over again
+      Given a command line that reconnects while a command still runs
+      And a register frame that names that call as still in flight
+      When the connection scans the calls pending on the conversation
+      Then the call is not handed over a second time
+      And a result for a call that already ended is accepted with no error
+
+    @integration
+    Scenario: A folder replaced by a newer one stops receiving work
+      Given a connected folder
+      When another folder connects to the same conversation
+      Then the first connection is told the folder was replaced, and it closes
+      And a new call goes only to the newest folder
+      And a result from the replaced connection is refused
+
+    @integration
+    Scenario: Ctrl-C disconnects at once, not when a heartbeat expires
+      Given a connected folder
+      When the CLI exits
+      Then the chip and the card read disconnected within a second
+      And a call in flight fails with the folder offline
+
+    @integration
+    Scenario: The chat says the folder is gone
+      Given a connected folder
+      When the CLI exits
+      Then the transcript carries a line that the folder is no longer connected
+      And that line names the folder and the machine, the way the connect line does
+      And it sits next to the line that said the folder connected
+      And no new turn is started for it
+
+    @unit
+    Scenario: The line that says the folder is gone names the folder, not the path
+      Given a folder shared from a deep path on my machine
+      When the folder disconnects
+      Then the line reads the folder name and the machine name
+      And it reads the path only for a folder that has no name
+
+    @unit
+    Scenario: The line that says the folder connected repeats nothing from the card
+      Given a code access card that names the folder path, the machine and the branch
+      When the folder connects
+      Then the line under the card reads only that the local folder is connected
+
+    @unit
+    Scenario: The disconnect notice does not put the conversation back to work
+      Given a conversation with no turn in flight
+      When the disconnect notice is written into the transcript
+      Then the conversation stays idle
+      And the panel starts no turn for the notice
+
+    @integration
+    Scenario: The disconnect notice reads as a notice, not as something I sent
+      Given a transcript that carries the disconnect notice
+      When the panel draws the conversation
+      Then the notice reads as a plain line
+      And it is not drawn as a message from me
+
+    @unit
+    Scenario: The card reads the connection off the record, not only off the stream
+      Given the folder connected on a turn this browser never watched
+      When the panel reads the conversation's record
+      Then the card is told the folder is there and reads connected
+
+    @integration
+    Scenario: A folder not seen for thirty seconds reads offline
+      Given a connected folder whose machine went to sleep
+      When thirty seconds pass with no heartbeat
+      Then the folder reads offline
+      And Langy's next local call gets the offline pushback
+
+  Rule: Local tools run on the developer's machine, never in the sandbox
+
+    @unit
+    Scenario: The worker carries one local tool for each built-in it mirrors
+      When a worker is provisioned
+      Then it has local tools for read, write, edit, bash, grep, find and ls
+      And each takes the same parameters as the built-in it mirrors
+      And each says in its description that it runs on the developer's machine
+
+    # A model offered both sets picks the sandbox one often enough: in one
+    # run it read the folder through local_read and then edited with the
+    # sandbox edit, got ENOENT twice, read that as the share being broken and
+    # stopped the whole path before the branch. While a folder is connected
+    # the sandbox file tools are not a wrong choice because they are not
+    # offered; bash stays for the langwatch CLI.
+    @unit
+    Scenario: The sandbox file tools are withdrawn while a folder is connected
+      Given a folder is connected to the conversation
+      When a turn starts
+      Then the worker's tool set has no sandbox read, edit, write, grep, find or ls
+      And it keeps bash, the local tools and every other tool
+      And a turn that starts with no folder connected has the sandbox file tools back
+      And a turn that starts while the app cannot say keeps them
+
+    # With the file tools gone, a run explored the worker's empty sandbox
+    # through bash instead ("not a git repository"), so the shell the model
+    # reaches for by its standard name lands in the folder while one is
+    # connected. The langwatch CLI is the exception: its cards, navigate opens
+    # and login belong to this conversation, so it runs in the sandbox either
+    # way.
+    @unit
+    Scenario: The shell runs in the folder while it is connected, and the CLI still runs here
+      Given a folder is connected to the conversation
+      When Langy runs a command through bash
+      Then the command runs on the developer's machine through the local_bash path, permission card and all
+      And a langwatch command runs in the sandbox, where the CLI has this conversation's login
+      And with no folder connected bash is the sandbox shell
+
+    # The manager's GitHub gate and the panel's install card once stood down
+    # by the tool name starting with local_. The shell that delegates to the
+    # folder is named bash, so a git push there raised the install card, killed
+    # the turn and disconnected the folder. The settled call now carries where
+    # it ran, and both read that instead of the name.
+    @unit
+    Scenario: A push or gh command in the shared folder never raises the GitHub install card
+      Given a folder is connected to the conversation
+      When Langy runs a git push or a gh command through bash
+      Then the settled call is marked as run in the developer's folder
+      And the manager's GitHub gate stands down on that marker, as it does on a local tool
+      And the same command with no marker still trips the gate as a sandbox push
+      And the panel's install card stands down on the same marker
+
+    @integration
+    Scenario: A local call travels to the CLI and its result comes back
+      Given a connected folder
+      When Langy lists the files in the folder root
+      Then the CLI executes the call in the folder
+      And Langy receives the listing as the tool result
+      And the panel shows the call as activity on my machine
+
+    @integration
+    Scenario: A call and its socket can be on different pods
+      Given a connected folder whose socket is held by one app replica
+      When the worker's call lands on another replica
+      Then the call is still delivered
+      And the result still reaches the worker
+
+    @integration
+    Scenario: Command output is capped and the rest is on disk
+      Given a connected folder
+      When Langy runs a command whose output exceeds the cap
+      Then Langy receives the first part of the output and a note with the log path
+      And the full output is in the log file in the folder's LangWatch directory
+
+    @integration
+    Scenario: A background command returns at once with its process and log
+      Given a connected folder
+      When Langy starts the development server in the background
+      Then Langy receives the process id and the log path at once
+      And the server keeps running after the tool returns
+
+    @integration
+    Scenario: Stopping the turn cancels the command on the machine
+      Given a connected folder
+      And Langy is running a long command
+      When I stop the turn
+      Then the CLI kills the command and its child processes
+      And the tool result reads cancelled
+
+    @integration
+    Scenario: A local call without a folder gets a pushback, not an error
+      Given no folder is connected to the conversation
+      When Langy makes a local call
+      Then the tool result says no folder is connected and names the code access step
+      And Langy asks for code access instead of retrying
+
+    # The worker's own conversation was accepted before the worker existed,
+    # but the app reads it from a projection folded afterwards; the first
+    # code access check of a conversation can land before that fold.
+    @unit
+    Scenario: A code access check that beats the conversation projection waits for it
+      Given a worker on a conversation whose projection row has not been folded yet
+      When Langy asks for code access and the app answers not found
+      Then the worker reads the folder state again until the app answers
+      And the code access card is raised as usual
+
+    @unit
+    Scenario: A code access check whose conversation never appears says the app did not answer
+      Given a worker whose conversation the app keeps answering not found for
+      When Langy asks for code access and the wait runs out
+      Then the tool result says the app did not answer the code access check
+      And no control request is created
+
+    @unit
+    Scenario: A command stopped at its time limit says the limit and how to raise it
+      Given a connected folder
+      When a command runs for longer than its time limit and is stopped
+      Then the result says the command was stopped at that limit
+      And it says the command can be asked for again with a longer time limit
+      And it says the longest limit a command may ask for
+
+    @integration
+    Scenario: A long command keeps its turn alive
+      Given a connected folder
+      And Langy is running a command that takes several minutes
+      When the command runs for longer than the turn stall window
+      Then the turn is still in flight and its answer is not lost
+      And the panel says what is running and on which machine
+
+    @integration
+    Scenario: The live stream stays alive during a long wait
+      Given a connected folder
+      When a local call waits more than three minutes for an answer
+      Then the turn's live stream is still readable
+      And a page reload shows the turn in flight with the waiting card
+
+    @integration
+    Scenario: The command line reports an answer given in the terminal
+      Given a call waiting on a permission card
+      When the command line sends the answer the developer gave in the terminal
+      Then the platform settles that card from the frame
+      And a frame for a card that already settled is ignored
+
+    @integration
+    Scenario: A call waiting on a permission card keeps its envelope
+      Given a call for a command with a time limit of thirty seconds
+      When the card waits ninety seconds for an answer
+      Then the call is still there when the answer arrives
+      And the poll for it does not answer "not found"
+      And the command gets its whole time limit from the moment of the answer
+
+    @unit
+    Scenario: A lost call is not reported to Langy as a folder that went away
+      Given a poll that answers "not found" until the worker gives up
+      When the worker reads the folder state
+      And the folder is still connected
+      Then Langy reads that the call was lost and to run the command one more time
+      And Langy does not read that the shared folder is gone
+
+    @unit
+    Scenario: A validation refusal reaches Langy as the issues, not as a lost call
+      Given the app refuses a local call with the parameters it found invalid
+      When the worker reads the refusal
+      Then Langy reads each issue with the parameter it names and that it can call the tool again
+      And Langy does not read that the call was lost or that the folder is gone
+      And the call is posted once
+
+    @unit
+    Scenario: An edit can append to the end of a file
+      Given an edit whose entry carries text to append instead of old text
+      When the command line applies it
+      Then the text is added as the last line of the file, which is created when absent
+      And a replacement in a file that is not there is still refused
+
+  Rule: The app gets its LangWatch key from the developer's login, never from Langy
+
+    @unit
+    Scenario: The app gets the project's key through the developer's own login
+      Given a folder shared by a developer whose login may update the project
+      When Langy asks for the project's credentials in the app's env file
+      Then the command line fetches the project's key with the developer's own login
+      And writes LANGWATCH_API_KEY and LANGWATCH_ENDPOINT into the file, keeping every other line
+      And the key appears in no frame, no result and no terminal line
+
+    @unit
+    Scenario: The key is refused when the login lacks the permission
+      Given a folder shared by a developer whose login may not update the project
+      When Langy asks for the project's credentials
+      Then the answer is the refusal code, naming the permission, the project and the file
+      And the env file is left as it was
+
+    @unit
+    Scenario: The credentials are not written when the terminal has no endpoint
+      Given a shared folder whose command line was started without an endpoint
+      When Langy asks for the project's credentials
+      Then the call fails the way the missing project does, naming the file
+      And the key is never requested and the env file is left as it was
+      And the app is never pointed at the cloud
+
+  Rule: The session key is the only credential and it ends with the conversation
+
+    @integration
+    Scenario: The CLI connects with the session key alone
+      Given an approved control request
+      When the CLI connects with an API key that is not the minted session key
+      Then the connection is refused
+      And the refusal names the reason
+
+    @integration
+    Scenario: Disconnecting from the panel revokes the key
+      Given a connected folder
+      When I disconnect from the panel header chip
+      Then the CLI exits with a message that the folder was disconnected from LangWatch
+      And the session key no longer connects
+
+    @integration
+    Scenario: Disconnecting revokes the key even when the command line cannot be reached
+      Given a connected folder whose command line misses the disconnect frame
+      When I disconnect from the panel header chip
+      Then the key that controlled the conversation controls nothing
+      And the command line that reconnects with it is refused
+
+  Rule: The link the command line prints opens the conversation
+
+    @unit
+    Scenario: The follow-along link names the project the conversation belongs to
+      When the platform builds the follow-along link
+      Then the link points at the home page of that project
+      And it carries the conversation parameter
+      And it falls back to the site root when the project is not known
+
+    @unit
+    Scenario: The command line prints the follow-along link once
+      Given a connected folder whose notice printed the follow-along link
+      And a line saying that permission questions are answered here, or on the card in LangWatch
+      When Langy reads a file and runs a command
+      Then the transcript prints one line per call with its result under it
+      And the link is not printed again
+
+    @unit
+    Scenario: The follow-along link opens the panel on that conversation
+      Given the command line printed a follow-along link for my conversation
+      When I open that link
+      Then the panel opens on that conversation
+      And the address bar no longer carries the conversation parameter
+
+    @unit
+    Scenario: A link to a conversation I cannot see is refused silently
+      Given a follow-along link for a conversation I have no access to
+      When I open that link
+      Then the panel does not switch conversation
+      And the address bar no longer carries the conversation parameter
+
+    @unit
+    Scenario: The conversation parameter survives the home redirect
+      Given a follow-along link, whose path is the site root
+      When the root resolves my home page
+      Then the conversation parameter travels to the page it lands on

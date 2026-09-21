@@ -181,9 +181,13 @@ describe("ScenarioService", () => {
       labels: [],
     });
 
-    const result = await service.update(created.id, projectId, {
-      name: "Updated",
-      situation: "Updated situation",
+    const result = await service.update({
+      id: created.id,
+      projectId,
+      data: {
+        name: "Updated",
+        situation: "Updated situation",
+      },
     });
 
     expect(result.name).toBe("Updated");

@@ -5,6 +5,7 @@ import { TraceSummaryClickHouseRepository } from "../../app-layer/traces/reposit
 import { EvaluationRunStore } from "../pipelines/evaluation-processing/projections/evaluationRun.store";
 import { createExperimentRunStateFoldStore } from "../pipelines/experiment-run-processing/projections/experimentRunState.store";
 import { ExperimentRunStateRepositoryClickHouse } from "../pipelines/experiment-run-processing/repositories/experimentRunState.clickhouse.repository";
+import { SimulationRunStateFoldStore } from "../pipelines/simulation-processing/projections/simulationRunState.store";
 import { SimulationRunStateRepositoryClickHouse } from "../pipelines/simulation-processing/repositories/simulationRunState.clickhouse.repository";
 import { SIMULATION_PROJECTION_VERSIONS } from "../pipelines/simulation-processing/schemas/constants";
 import { SuiteRunStateRepositoryClickHouse } from "../pipelines/suite-run-processing/repositories/suiteRunState.clickhouse.repository";
@@ -101,10 +102,12 @@ export function createReplayRuntime(config: {
     ],
     [
       "simulation_processing",
-      new RepositoryFoldStore(
-        new SimulationRunStateRepositoryClickHouse(clientResolver),
-        SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
-      ),
+      // The same store the pipeline writes through, so a replay obeys the same
+      // gate: an aggregate holding cost and no lifecycle event writes no run.
+      new SimulationRunStateFoldStore({
+        repository: new SimulationRunStateRepositoryClickHouse(clientResolver),
+        version: SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
+      }),
     ],
     [
       "suite_run_processing",

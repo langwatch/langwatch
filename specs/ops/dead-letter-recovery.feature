@@ -144,6 +144,39 @@ Feature: Dead-letter recovery
     And marking one as never-to-be-sent is called discard everywhere
     And replay stays reserved for projection rebuilds
 
+  # ── Recording the acts themselves ─────────────────────────────────────
+
+  # The controls doc says operator actions are audited, and the dead-letter
+  # verbs are. The queue-level verbs next to them were not: a drain removed
+  # every job in a group and nothing anywhere said who did it, because
+  # `QueueControlAction` had no name for the act. These pin the parity.
+
+  @unit
+  Scenario: A drain records who emptied the group
+    Given a queue group holding jobs
+    When the operator drains it
+    Then the audit trail records the operator, the queue, the group and how many jobs went
+
+  @unit
+  Scenario: A tenant drain records the filter that selected the groups
+    Given an operator draining one tenant's groups behind a name filter
+    When the drain runs
+    Then the audit trail records the filter as well as the counts
+    And an absent filter is recorded as absent rather than left out
+
+  @unit
+  Scenario: Moving a group to the dead-letter queue is recorded
+    Given a queue group the operator moves to the dead-letter queue
+    When the move runs
+    Then the audit trail records the operator, the queue and the group
+
+  @unit
+  Scenario: An unblock is recorded only when it changed something
+    Given a group the operator unblocks
+    When the group was blocked
+    Then the audit trail records the act
+    But when the group was not blocked nothing is recorded
+
   # ── The headline number ───────────────────────────────────────────────
 
   @unit

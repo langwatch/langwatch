@@ -9,6 +9,7 @@ import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
  * Returns the created secret's metadata rather than printing it: the output
@@ -42,7 +43,7 @@ export const createSecretCommand = async (
   const spinner = createSpinner(`Creating secret "${name}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/secrets`, {
+    const response = await langwatchFetch(`${endpoint}/api/secrets`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

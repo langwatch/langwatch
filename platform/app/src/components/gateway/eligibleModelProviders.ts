@@ -1,4 +1,5 @@
-import { modelProviderRegistry } from "~/features/onboarding/regions/model-providers/registry";
+import { CODEX_DEFAULT_MODEL } from "~/server/modelProviders/codexRestrictions";
+import { recommendedChatModel } from "~/server/modelProviders/latestAliases";
 import { isDispatchableProvider } from "~/server/modelProviders/registry";
 import { SCOPE_BREADTH, scopeBreadthRank } from "~/utils/scopeBreadth";
 
@@ -64,12 +65,13 @@ export type ScopeHierarchy = {
  * bound to a self-hosted vLLM/LiteLLM provider names a model that endpoint
  * actually serves instead of the OpenAI-only `gpt-5-mini`.
  *
- * Precedence: registry default (openai/anthropic/... have one) -> the
- * provider's first registry chat model -> the provider's first custom model
- * (this is where self-hosted "custom" providers keep their model ids, since
- * the custom registry entry has no default). Bare provider label only as a
- * last resort so the gateway surfaces a readable 404 instead of an empty
- * model field.
+ * Precedence: the catalog's recommended model (the newest main-tier model
+ * of the providers whose ids the tier grammar reads; Codex has no catalog
+ * and serves its own default) -> the provider's first registry chat model
+ * -> the provider's first custom model (this is where self-hosted "custom"
+ * providers keep their model ids, since the catalog has none for them).
+ * Bare provider label only as a last resort so the gateway surfaces a
+ * readable 404 instead of an empty model field.
  */
 export function resolveProviderDefaultModel(
   providerKey: string,
@@ -77,15 +79,14 @@ export function resolveProviderDefaultModel(
   providerModels: string[],
   customModels?: Array<{ modelId: string }> | null,
 ): string {
-  const registry = modelProviderRegistry.find(
-    (entry) => entry.backendModelProviderKey === providerKey,
-  );
+  if (providerKey === "openai_codex") return CODEX_DEFAULT_MODEL;
+  const recommended = recommendedChatModel(providerKey);
+  if (recommended) return recommended;
   const fallbackModel = providerModels[0] ?? customModels?.[0]?.modelId;
-  const defaultModel = registry?.defaultModel ?? fallbackModel;
-  if (!defaultModel) {
+  if (!fallbackModel) {
     return providerLabel.toLowerCase();
   }
-  return `${providerKey}/${defaultModel}`;
+  return `${providerKey}/${fallbackModel}`;
 }
 
 /**

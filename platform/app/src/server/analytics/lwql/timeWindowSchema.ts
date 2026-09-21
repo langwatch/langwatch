@@ -17,6 +17,17 @@
  */
 import { z } from "zod";
 
+import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+
+import { LWQL_GRANULARITY_STEPS } from "./timeWindow";
+
+// Unlike a route family's schema file, this module has no single owning
+// `app.ts`: the REST door's `app.ts` patches before importing it, but the
+// tRPC routers that import this file directly do not. Patch here so the
+// `.openapi()` call below can never run before `ZodDate.prototype.openapi`
+// exists, regardless of which door loads this module first.
+patchZodOpenapi();
+
 /**
  * The widest and narrowest UTC years a bound may land on.
  *
@@ -37,7 +48,19 @@ const MAX_UTC_YEAR = 9999;
  * this schema `.optional()`), so null is a client error and reads as one.
  */
 const lwqlTimeWindowBound = z
-  .union([z.string(), z.number(), z.date()])
+  .union([
+    z.string(),
+    z.number(),
+    // Without this, the published schema shows two identical
+    // `{"type":"string"}` members: zod-openapi has no default format for
+    // `z.date()` and gives it the same bare string shape as `z.string()`
+    // above. The description distinguishes them; it cannot narrow validation
+    // because `.openapi()` only attaches metadata and never touches `.parse()`.
+    z.date().openapi({
+      description:
+        "A value already parsed into a native Date. A JSON request body cannot produce this shape — send a string or a number instead.",
+    }),
+  ])
   .pipe(z.coerce.date())
   .refine(
     (value) => {
@@ -53,3 +76,23 @@ export const lwqlTimeWindowSchema = z.object({
   start: lwqlTimeWindowBound,
   end: lwqlTimeWindowBound,
 });
+
+/**
+ * The datapoint step a caller may request, as every door accepts it — one of
+ * the offered {@link LWQL_GRANULARITY_STEPS}, nothing else.
+ *
+ * Built from the tuple rather than three hand-written `z.literal` members, so
+ * a step added to or removed from {@link LWQL_GRANULARITY_STEPS} changes what
+ * every door accepts automatically. Three call sites once spelled this union
+ * out by literal tuple index (`LWQL_GRANULARITY_STEPS[0]`, `[1]`, `[2]`) —
+ * that pattern silently stops covering the offered steps the moment a fourth
+ * is added, because TypeScript has no reason to flag an index that is simply
+ * never read.
+ */
+export const lwqlGranularityStepSchema = z.union(
+  LWQL_GRANULARITY_STEPS.map((step) => z.literal(step)) as [
+    z.ZodLiteral<(typeof LWQL_GRANULARITY_STEPS)[number]>,
+    z.ZodLiteral<(typeof LWQL_GRANULARITY_STEPS)[number]>,
+    ...z.ZodLiteral<(typeof LWQL_GRANULARITY_STEPS)[number]>[],
+  ],
+);

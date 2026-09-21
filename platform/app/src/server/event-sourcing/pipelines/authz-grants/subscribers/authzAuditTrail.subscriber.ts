@@ -57,8 +57,14 @@ const logger = createLogger("langwatch:authz:audit-trail");
 /** Every fact these sources author is backdated history that already
  *  happened somewhere else — the legacy tables, an earlier backfill, or a
  *  key the resolver minted on read. Auditing them would fill the customer's
- *  audit page with thousands of rows for changes nobody made. */
-const NON_AUDITABLE_SOURCES: readonly GrantEventSource[] = [
+ *  audit page with thousands of rows for changes nobody made.
+ *
+ *  Exported because the pre-ledger writer applies the same rule to the
+ *  `AuditLog` rows it writes itself (`auditableSource` in
+ *  `app-layer/authz/ledger.ts`), and the two audit paths must not be able to
+ *  disagree about what earns a row. Every OTHER source states a change
+ *  somebody actually made and is audited. */
+export const NON_AUDITABLE_SOURCES: readonly GrantEventSource[] = [
   "migration",
   "read-through-mint",
 ];

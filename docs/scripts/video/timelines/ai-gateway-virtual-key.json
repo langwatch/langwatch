@@ -1,0 +1,93 @@
+{
+  "input": "../../../../.claude/tmp/video/raw/gateway-v2/gateway.webm",
+  "output": "../../../media/videos/ai-gateway-virtual-key.webm",
+  "fps": 30,
+  "page": { "width": 1440, "height": 900 },
+  "size": { "width": 1664, "height": 1040 },
+  "frame": { "background": "backgrounds/default.webp", "fit": "native" },
+  "quality": { "crf": 38, "cpuUsed": 2 },
+
+  "cut": {
+    "speed": 1.6,
+    "segments": [
+      [4.0, 41.8],
+      [369.0, 380.4]
+    ]
+  },
+
+  "cursor": { "start": { "x": 760, "y": 430 } },
+
+  "beats": [
+    {
+      "tRaw": 8.45, "x": 1330, "y": 97,
+      "zoom": 1.9, "zoomAt": { "x": 1230, "y": 130 }, "hold": 0.5,
+      "pause": { "before": 0.9, "after": 0.7 },
+      "note": "New virtual key, a corner, so it earns the zoom. The hold after it carries the camera onto the drawer"
+    },
+    {
+      "tRaw": 11.60, "x": 1176, "y": 123,
+      "zoom": 1.7, "zoomAt": { "x": 1170, "y": 260 }, "hold": 2.4,
+      "note": "name the key, the camera holds while it types"
+    },
+    {
+      "tRaw": 16.38, "x": 1041, "y": 559,
+      "zoom": 1.7, "zoomAt": { "x": 1170, "y": 570 }, "hold": 0.4,
+      "note": "the camera pans down the drawer to the budget"
+    },
+    {
+      "tRaw": 18.98, "x": 1215, "y": 559,
+      "zoom": 1.7, "zoomAt": { "x": 1170, "y": 570 }, "hold": 0.3,
+      "note": "per day becomes per month"
+    },
+    {
+      "tRaw": 20.39, "x": 1100, "y": 595,
+      "zoom": 1.7, "zoomAt": { "x": 1170, "y": 570 }, "hold": 0.6,
+      "click": false, "arc": 0,
+      "note": "read the budget back: max $50 a month, resets on the 1st"
+    },
+    {
+      "tRaw": 23.78, "x": 1375, "y": 859,
+      "zoom": 1.7, "zoomAt": { "x": 1170, "y": 660 }, "hold": 0.2,
+      "note": "Create. The camera eases out because the whole screen changes"
+    },
+    {
+      "tRaw": 27.96, "x": 700, "y": 155,
+      "zoom": 1.55, "zoomAt": { "x": 720, "y": 290 }, "hold": 0.1,
+      "click": false, "arc": 0,
+      "note": "the secret is shown once, and only once"
+    },
+    {
+      "tRaw": 29.07, "x": 940, "y": 155,
+      "zoom": 1.55, "zoomAt": { "x": 720, "y": 290 }, "hold": 0.1,
+      "click": false, "arc": 0,
+      "note": "sweep along the warning"
+    },
+    {
+      "tRaw": 31.79, "x": 700, "y": 354,
+      "zoom": 1.55, "zoomAt": { "x": 720, "y": 290 }, "hold": 0.9,
+      "click": false, "arc": 0,
+      "note": "down to the secret, which LangWatch stores only as a hash, and the base URL the SDK points at"
+    },
+    {
+      "tRaw": 35.19, "x": 471, "y": 825, "zoom": 1,
+      "note": "tick I have saved it"
+    },
+    {
+      "tRaw": 37.24, "x": 945, "y": 825, "zoom": 1,
+      "note": "close, a close button earns no zoom"
+    },
+    {
+      "tRaw": 371.0, "x": 400, "y": 258,
+      "zoom": 1.35, "zoomAt": { "x": 820, "y": 300 }, "hold": 0.1,
+      "click": false, "arc": 0,
+      "note": "back on the key list, the new key is at the top and it is live"
+    },
+    {
+      "tRaw": 374.0, "x": 1075, "y": 253,
+      "zoom": 1.35, "zoomAt": { "x": 820, "y": 300 }, "hold": 3.2,
+      "click": false, "arc": 0,
+      "note": "the payoff: the spend of its first request has already landed, and it was used less than a minute ago"
+    },
+    { "tRaw": 379.6, "hide": true }
+  ]
+}

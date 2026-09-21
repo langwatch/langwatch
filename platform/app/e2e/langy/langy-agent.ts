@@ -15,7 +15,9 @@ import type {
   AgentReturnTypes,
 } from "@langwatch/scenario";
 import { AgentRole } from "@langwatch/scenario";
-import { ADMIN_EMAIL, ADMIN_PASSWORD, APP_BASE, PROJECT_ID } from "./config";
+import type { ModelMessage } from "ai";
+import { APP_BASE, PROJECT_ID } from "./config";
+import { getSessionCookie, trpcMutate } from "./trpc";
 
 interface TurnPart {
   type: string;
@@ -26,8 +28,79 @@ interface TurnMessage {
   role: "user" | "assistant" | "system";
   parts: TurnPart[];
 }
-interface LangySessionState {
+
+/** One `ui` entry as the turn stream published it. */
+export interface UiActionEntry {
+  actionId: string;
+  kind: string;
+  payload: unknown;
+}
+
+/** A resource chip, as the composer attaches it to a turn. */
+export interface PageContextChip {
+  kind: string;
+  ref?: string;
+  label: string;
+}
+
+/**
+ * One tool frame on a turn stream: the call as the agent issued it (`start`)
+ * or as it settled (`end`), in stream order.
+ *
+ * The stored message flattens a turn's calls into one list, so it cannot say
+ * which calls were batched into one step and which waited for a result. The
+ * stream can: a call whose `start` precedes every `end` of its turn was issued
+ * blind, before any tool had answered.
+ */
+export interface LangyToolEvent {
+  turnId: string;
+  phase: "start" | "end";
+  id: string;
+  name: string;
+  /** The command the call ran, when it ran one. */
+  command: string | null;
+  input: unknown;
+}
+
+/** The tool event a stream entry describes, or null for any other entry. */
+export function toolEventOf({
+  entry,
+  turnId,
+}: {
+  entry: Record<string, unknown>;
+  turnId: string;
+}): LangyToolEvent | null {
+  if (entry.type !== "tool") return null;
+  const phase =
+    entry.phase === "start" || entry.phase === "end" ? entry.phase : null;
+  if (!phase) return null;
+  const input = entry.input;
+  const inputCommand = (input as { command?: unknown } | null | undefined)
+    ?.command;
+  const command =
+    typeof inputCommand === "string" && inputCommand
+      ? inputCommand
+      : typeof entry.command === "string" && entry.command
+        ? entry.command
+        : null;
+  return {
+    turnId,
+    phase,
+    id: typeof entry.id === "string" ? entry.id : "",
+    name: typeof entry.name === "string" ? entry.name : "tool",
+    command,
+    input,
+  };
+}
+
+export interface LangySessionState {
   conversationId: string | null;
+  /**
+   * The turn this session is streaming, or the last one it streamed. The fake
+   * workbench tab dedups the actions it sees on `turnId:actionId`, the same
+   * identity the panel uses, so it needs the id the send returned.
+   */
+  currentTurnId: string | null;
   /** Every navigate instruction observed on this session's turn streams, in
    * order. Navigation scenarios assert on these: the href is the hard fact
    * that the agent-driven navigate actually landed on the stream. */
@@ -36,63 +109,30 @@ interface LangySessionState {
    * order. The github-gate scenario asserts on these: the command card that
    * tripped the gate must reach the stream before the gate cancels it. */
   toolCommands: string[];
-}
-
-let cachedCookie: Promise<string> | null = null;
-
-/**
- * Sign in once (per test process) and cache the better-auth session cookie.
- * Clears the cache on rejection — otherwise a single transient sign-in
- * failure (a momentary network blip, the app mid-restart) would permanently
- * poison every remaining test in the run, since `??=` only checks for
- * null/undefined at assignment time and a rejected promise is neither.
- */
-function getSessionCookie(): Promise<string> {
-  cachedCookie ??= (async () => {
-    try {
-      let res: Response;
-      for (let attempt = 1; ; attempt++) {
-        res = await fetch(`${APP_BASE}/api/auth/sign-in/email`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Origin: APP_BASE },
-          body: JSON.stringify({
-            email: ADMIN_EMAIL,
-            password: ADMIN_PASSWORD,
-          }),
-          signal: AbortSignal.timeout(15_000),
-        });
-        // Every vitest run signs in once, so a burst of runs (a suite driven
-        // in chunks) can land on the auth rate limiter. That is the runner
-        // being throttled, not a scenario failing: wait out the window.
-        if (res.status !== 429 || attempt >= 6) break;
-        console.log(
-          `[scenario] sign-in rate-limited (429), waiting 20s (attempt ${attempt})`,
-        );
-        await new Promise((resolve) => setTimeout(resolve, 20_000));
-      }
-      if (!res.ok) {
-        throw new Error(
-          `Langy test sign-in failed: ${res.status} ${await res.text()}`,
-        );
-      }
-      const setCookie = res.headers.get("set-cookie") ?? "";
-      // better-auth only applies the __Secure- prefix on HTTPS origins, so a
-      // plain-http local stack sets the bare cookie name. Accept both.
-      const match = /(?:__Secure-)?better-auth\.session_token=[^;]+/.exec(
-        setCookie,
-      );
-      if (!match) {
-        throw new Error(
-          "Langy test sign-in: no better-auth session cookie in response",
-        );
-      }
-      return match[0];
-    } catch (error) {
-      cachedCookie = null;
-      throw error;
-    }
-  })();
-  return cachedCookie;
+  /**
+   * Every settled tool card's NAME, in order.
+   *
+   * A scenario that has to prove a tool did NOT run reads this: the negative
+   * is on no reply, and a judge asked "did it call code_access" is guessing
+   * from prose.
+   */
+  toolNames: string[];
+  /**
+   * Every settled tool card's OUTPUT, in order.
+   *
+   * The CLI prints the platform's own bytes unchanged, so a dispatched UI
+   * action's `"executedVia":"browser"` or `"backend"` marker reaches the test
+   * process here and nowhere else: it is on no durable turn record and on no
+   * field of this state. This is the product-truth handle for which leg
+   * carried an action.
+   */
+  toolOutputs: string[];
+  /**
+   * Every tool frame on this session's turn streams, start and end, in
+   * order. The ordering assertions read this: which call was issued after
+   * which result, a fact the settled list above cannot carry.
+   */
+  toolEvents: LangyToolEvent[];
 }
 
 /** Mirror langyChatTransport.ts's message shape: {role, parts: [{type, text}]}. */
@@ -111,49 +151,6 @@ function toTurnMessage(msg: { role: string; content: unknown }): TurnMessage {
     };
   }
   return { role, parts: [] };
-}
-
-async function trpcMutate<T>({
-  cookie,
-  path,
-  input,
-}: {
-  cookie: string;
-  path: string;
-  input: unknown;
-}): Promise<T> {
-  const res = await fetch(`${APP_BASE}/api/trpc/${path}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Cookie: cookie,
-      Origin: APP_BASE,
-    },
-    body: JSON.stringify({ json: input }),
-    // Generous on purpose: under a queue backlog the turn mutation has been
-    // measured completing server-side at 135s, and a full failure-analysis
-    // turn on the opencode harness has been measured working past 180s.
-    // Aborting a still-working turn destroys the run (the judge grades a
-    // one-token reply), and retrying is worse — the retry races the accepted
-    // first attempt into langy_turn_in_progress.
-    signal: AbortSignal.timeout(300_000),
-  });
-  const body: any = await res.json().catch(() => null);
-  if (!res.ok || !body || body.error) {
-    // The tRPC error envelope nests the domain code at data.error.code (see
-    // the langy_turn_in_progress payload: {"json":{"data":{"error":{"code":
-    // "langy_turn_in_progress"}}}}). The old data.domainError.code path never
-    // matched anything, which silently disabled the turn-lock retry below.
-    const domainErrorCode =
-      body?.error?.json?.data?.error?.code ??
-      body?.error?.json?.data?.domainError?.code;
-    const err = new Error(
-      `Langy ${path} -> ${res.status}: ${JSON.stringify(body?.error ?? body)}`,
-    ) as Error & { domainErrorCode?: string };
-    err.domainErrorCode = domainErrorCode;
-    throw err;
-  }
-  return body.result.data.json as T;
 }
 
 /**
@@ -299,26 +296,73 @@ export interface SettledToolCall {
   isError: boolean;
 }
 
+/** How long the harness listens to one turn's stream. */
+const TURN_STREAM_TIMEOUT_MS = 420_000;
+
+/** A turn's reply, and how the turn arrived at it. */
+interface TurnText {
+  /** The reply, chosen the way the product chooses it (see the fold below). */
+  text: string;
+  /**
+   * Whether `text` is the passage the turn ENDED on.
+   *
+   * False when the turn ran tools and then went quiet: there `text` is the
+   * whole narration, which `onNarration` has already reported passage by
+   * passage, so a caller that recorded those must not record it twice. This is
+   * the same distinction `orderedParts` draws server-side when it assembles the
+   * durable parts (`langy-final-parts.ts`).
+   */
+  hasEndedOnText: boolean;
+}
+
 /** Reads the onTurnStream SSE frames until the server closes the response. */
 async function streamTurnText({
   cookie,
   params,
   onNavigate,
+  onNarration,
   onSettledTool,
+  onToolFrame,
+  onUiAction,
 }: {
   cookie: string;
   params: { projectId: string; conversationId: string; turnId: string };
   /** Called for each navigate entry on the stream (live-only, never durable). */
   onNavigate?: (href: string) => void;
+  /**
+   * Called for each passage Langy writes BETWEEN its tool calls, in order,
+   * as the following call starts.
+   *
+   * The passage the turn ends on is not reported here: it is the reply, and it
+   * comes back as `text`.
+   */
+  onNarration?: (text: string) => void;
   /** Called for each settled tool card on the stream, in order. */
   onSettledTool?: (call: SettledToolCall) => void;
-}): Promise<string> {
+  /** Called for every tool frame, start and end, in stream order. */
+  onToolFrame?: (event: LangyToolEvent) => void;
+  /**
+   * Called for each dispatched UI action on the stream, in order.
+   *
+   * This is the whole browser leg's entry point: the entry arrives with no
+   * extra network hop, which is what buys a listener the 3 second claim
+   * window. Fired synchronously from the frame reader, so a listener must
+   * start its work and return rather than blocking the read loop.
+   */
+  onUiAction?: (entry: UiActionEntry) => void;
+}): Promise<TurnText> {
   const input = encodeURIComponent(JSON.stringify({ json: params }));
   const res = await fetch(
     `${APP_BASE}/api/sse/langy.onTurnStream?input=${input}`,
     {
       headers: { Cookie: cookie, Accept: "text/event-stream" },
-      signal: AbortSignal.timeout(240_000),
+      // How long a single turn may take before the harness stops listening.
+      // An improvement loop's opening turn reads the board, runs a subset,
+      // reads the results, writes a candidate and runs it again; measured at
+      // 273s on a loaded machine, against a 240s ceiling that then failed a
+      // turn the product had finished. Kept under vitest's own 600s per-test
+      // timeout, which is what still bounds a turn that never settles.
+      signal: AbortSignal.timeout(TURN_STREAM_TIMEOUT_MS),
     },
   );
   if (!res.ok || !res.body) {
@@ -356,9 +400,31 @@ async function streamTurnText({
       if (entry.type === "delta" && typeof entry.text === "string") {
         assistantText += entry.text;
         textAfterLastTool += entry.text;
+      } else if (entry.type === "tool" && entry.name === "say") {
+        // A line said with the `say` tool is Langy's own words, drawn as
+        // prose where the call happened, so it reads as text here: it joins
+        // the passage in progress and the next tool frame fixes its place.
+        // It is no work of the turn: not a settled call, and it does not
+        // start the trailing-text fold on its own.
+        if (entry.phase === "start") {
+          const said = sayTextOf(entry.input);
+          if (said) {
+            const separator = textAfterLastTool.trim() === "" ? "" : "\n\n";
+            assistantText += separator + said;
+            textAfterLastTool += separator + said;
+          }
+        }
+        const toolEvent = toolEventOf({ entry, turnId: params.turnId });
+        if (toolEvent) onToolFrame?.(toolEvent);
       } else if (entry.type === "tool") {
+        // The passage that was running when this call started belongs in front
+        // of it. Reported here rather than at the end of the stream because
+        // this frame is what fixes its place in the order.
+        if (textAfterLastTool.trim() !== "") onNarration?.(textAfterLastTool);
         textAfterLastTool = "";
         sawTool = true;
+        const toolEvent = toolEventOf({ entry, turnId: params.turnId });
+        if (toolEvent) onToolFrame?.(toolEvent);
         if (entry.phase === "end") {
           toolSeq += 1;
           onSettledTool?.({
@@ -410,6 +476,17 @@ async function streamTurnText({
       if (entry.type === "navigate" && typeof entry.href === "string") {
         onNavigate?.(entry.href);
       }
+      if (
+        entry.type === "ui" &&
+        typeof entry.actionId === "string" &&
+        typeof entry.kind === "string"
+      ) {
+        onUiAction?.({
+          actionId: entry.actionId,
+          kind: entry.kind,
+          payload: entry.payload,
+        });
+      }
       if (entry.type === "end") sawTerminal = true;
       // "complete" (SSE stream finished) / "connected" / "status" carry no
       // assistant text — nothing further to accumulate.
@@ -443,11 +520,15 @@ async function streamTurnText({
   // so the judge must grade what the user actually reads. The cards themselves
   // ride as tool messages (see makeLangyAdapter), never inside this text.
   if (sawTool && textAfterLastTool.trim() !== "") {
-    return textAfterLastTool.replace(/^[\s]+/, "");
+    return {
+      text: textAfterLastTool.replace(/^[\s]+/, ""),
+      hasEndedOnText: true,
+    };
   }
   // Whitespace is truthy, so a turn whose only deltas were blank lines would
   // otherwise be handed to the judge as a reply the user cannot see.
-  if (assistantText.trim()) return assistantText;
+  if (assistantText.trim())
+    return { text: assistantText, hasEndedOnText: !sawTool };
 
   // No text. WHICH no-text this is decides whether a judge should ever see it,
   // and the two used to be indistinguishable behind a literal "(no response)"
@@ -472,14 +553,171 @@ async function streamTurnText({
   );
 }
 
-export function makeLangyAdapter(): AgentAdapter & {
+/** The words a `say` tool call carries, or null when it carries none. */
+function sayTextOf(input: unknown): string | null {
+  const text = (input as { text?: unknown } | undefined)?.text;
+  return typeof text === "string" && text.trim() !== "" ? text : null;
+}
+
+/** One thing a turn did, in the order it did it. */
+type TurnSegment =
+  | { kind: "text"; narration: string }
+  | { kind: "tool"; call: SettledToolCall };
+
+/**
+ * The turn as the scenario framework receives it: what Langy wrote and what it
+ * ran, interleaved the way it happened.
+ *
+ * The product's tool cards ride as real tool traffic, so the judge sees a
+ * native tool-call/tool-result exchange (the retrieval that grounds the reply's
+ * claims) and the user simulator sees the framework's compact summaries of it.
+ *
+ * The passages Langy writes between those calls ride WITH them, in the same
+ * assistant message as the calls they introduce. They have to: a turn folds
+ * down to the passage it ended on (`turnfold.Result`), so a transcript built
+ * from that alone drops every line written before a call, and a rubric that
+ * grades the loop's narration then reads a turn that narrated well as silent.
+ * Keeping them beside their calls, rather than as replies of their own, also
+ * keeps them plainly part of the turn's WORK: the single trailing message with
+ * string content is the reply, exactly as it was, and no criterion that grades
+ * the reply starts grading a status line instead.
+ */
+function turnMessages({
+  segments,
+  text,
+  hasEndedOnText,
+}: {
+  segments: TurnSegment[];
+  text: string;
+  hasEndedOnText: boolean;
+}): ModelMessage[] {
+  const messages: ModelMessage[] = [];
+  let narration: string[] = [];
+  let batch: SettledToolCall[] = [];
+
+  const flush = () => {
+    if (batch.length === 0 && narration.length === 0) return;
+    messages.push({
+      role: "assistant",
+      content: [
+        ...narration.map((part) => ({ type: "text" as const, text: part })),
+        ...batch.map((call) => ({
+          type: "tool-call" as const,
+          toolCallId: call.id,
+          toolName: call.name,
+          input: call.input,
+        })),
+      ],
+    });
+    if (batch.length > 0) {
+      messages.push({
+        role: "tool",
+        content: batch.map((call) => ({
+          type: "tool-result" as const,
+          toolCallId: call.id,
+          toolName: call.name,
+          // The server already bounds tool output (8KB canonical reduction);
+          // mirror that bound rather than cutting deeper, and state the cut
+          // when one happens: a silent slice has cost a judge the very count a
+          // reply was grounded on.
+          output: {
+            type: call.isError ? ("error-text" as const) : ("text" as const),
+            value: boundOutputForJudge(call.output),
+          },
+        })),
+      });
+    }
+    narration = [];
+    batch = [];
+  };
+
+  for (const segment of segments) {
+    if (segment.kind === "tool") {
+      batch.push(segment.call);
+      continue;
+    }
+    // A passage after a call opens the next stretch of work, so the calls
+    // already gathered close here and keep their place in front of it.
+    if (batch.length > 0) flush();
+    narration.push(segment.narration);
+  }
+  flush();
+
+  // A turn that ran tools and then went quiet has no reply of its own: `text`
+  // is the narration already recorded above, and appending it would say every
+  // passage twice.
+  if (hasEndedOnText || messages.length === 0) {
+    messages.push({ role: "assistant", content: text });
+  }
+  return messages;
+}
+
+/** The adapter, plus the handles the suites and the fake tab read it through. */
+export type LangyAdapter = AgentAdapter & {
   state: LangySessionState;
-} {
+  /**
+   * Where a fake workbench tab attaches itself.
+   *
+   * Mutable rather than a constructor argument, because a tab opens and closes
+   * around the conversation rather than around the adapter: the live suite
+   * closes its tab between two turns and the same adapter carries on with the
+   * backend leg.
+   */
+  onUiAction?: (entry: UiActionEntry) => void;
+  /**
+   * Called with the id of a conversation this adapter opens, before its first
+   * turn is streamed. The guided fixtures record the id on the organization
+   * here, the way the panel does as soon as the transport names it, so no
+   * other tab on the account sees an organization still owing its kickoff.
+   */
+  onConversationCreated?: (conversationId: string) => Promise<void> | void;
+  /**
+   * Forget the conversation, so the next turn opens a new one.
+   *
+   * A replayed scenario has to start a NEW conversation. Carrying the old id
+   * over means the replay's first message arrives as `continueConversation` on
+   * a conversation whose turn is often still running, so the server answers
+   * `conversation_busy`, the replay burns its budget on 409s, and whatever it
+   * does record is grafted onto the transcript of the attempt that failed.
+   * `runScenarioAndLog` calls this on every agent that has it before it
+   * replays.
+   */
+  resetSession: () => void;
+  /**
+   * Send these parts on the next turn instead of the scenario's own text.
+   *
+   * The guided onboarding kickoff is a user message the app composes, not
+   * words the person typed: a typed part the panel renders as the tour card
+   * beside a text brief the model reads. A scenario that starts on the
+   * kickoff queues the parts and calls `scenario.agent()`; the turn goes
+   * through the same create or continue mutation as every other, and the
+   * override is spent once.
+   */
+  queueNextTurn: (input: { parts: Array<Record<string, unknown>> }) => void;
+};
+
+export function makeLangyAdapter(
+  options: {
+    /**
+     * The resource chips a real composer would carry.
+     *
+     * A turn with an `experiment` chip is what tells the agent the page it is
+     * looking at accepts live UI actions, so a suite that opens a fake tab
+     * sends one and a suite that does not leaves this out.
+     */
+    pageContext?: PageContextChip[];
+  } = {},
+): LangyAdapter {
   const state: LangySessionState = {
     conversationId: null,
+    currentTurnId: null,
     navigateHrefs: [],
     toolCommands: [],
+    toolNames: [],
+    toolOutputs: [],
+    toolEvents: [],
   };
+  let queuedParts: Array<Record<string, unknown>> | null = null;
   const adapter: AgentAdapter = {
     role: AgentRole.AGENT,
     call: async (input: AgentInput): Promise<AgentReturnTypes> => {
@@ -487,14 +725,24 @@ export function makeLangyAdapter(): AgentAdapter & {
       // Tool traffic from earlier turns stays out of the product payload: the
       // panel transport sends only the text history, and a role:"tool" message
       // would otherwise reach the API as an empty user message.
-      const messages = input.messages
+      const scriptedMessages = input.messages
         .filter((m: any) => m.role !== "tool")
         .map((m: any) => toTurnMessage(m))
         .filter((m) => m.parts.length > 0 || m.role === "user");
+      // The queued parts stay queued until a turn carrying them settles: a
+      // stream that closes without a terminal marker makes the framework
+      // retry the call, and that retry has to send the kickoff again rather
+      // than an empty message list.
+      const messages: Array<{ role: TurnMessage["role"]; parts: unknown[] }> =
+        queuedParts ? [{ role: "user", parts: queuedParts }] : scriptedMessages;
+      // The same wire shape the panel's transport sends: one identity per
+      // logical send, and the trigger a composer submit carries.
       const turnInput = {
-        requestId: crypto.randomUUID(),
+        idempotencyKey: crypto.randomUUID(),
+        trigger: "submit-message" as const,
         messages,
         projectId: PROJECT_ID,
+        ...(options.pageContext ? { pageContext: options.pageContext } : {}),
       };
       const { path, body } = state.conversationId
         ? {
@@ -507,58 +755,56 @@ export function makeLangyAdapter(): AgentAdapter & {
         conversationId: string;
         turnId: string;
       }>({ cookie, path, input: body });
+      const opened = state.conversationId !== conversationId;
       state.conversationId = conversationId;
+      state.currentTurnId = turnId;
+      if (opened)
+        await adapterWithState.onConversationCreated?.(conversationId);
 
+      const segments: TurnSegment[] = [];
       const settledTools: SettledToolCall[] = [];
-      const text = await streamTurnText({
+      const { text, hasEndedOnText } = await streamTurnText({
         cookie,
         params: { projectId: PROJECT_ID, conversationId, turnId },
         onNavigate: (href) => state.navigateHrefs.push(href),
+        onNarration: (narration) => segments.push({ kind: "text", narration }),
+        onToolFrame: (event) => state.toolEvents.push(event),
         onSettledTool: (call) => {
           settledTools.push(call);
+          segments.push({ kind: "tool", call });
           const command = (call.input as { command?: unknown } | null)?.command;
           if (typeof command === "string" && command) {
             state.toolCommands.push(command);
           }
+          state.toolNames.push(call.name);
+          state.toolOutputs.push(call.output);
         },
+        // Read at fire time, not captured: a tab attaches and detaches around
+        // the conversation, and a captured listener would keep answering for a
+        // tab that has closed.
+        onUiAction: (entry) => adapterWithState.onUiAction?.(entry),
       });
+      queuedParts = null;
       if (settledTools.length === 0) {
         return { role: "assistant", content: text };
       }
-      // The product's tool cards ride as real tool traffic: the judge sees a
-      // native tool-call/tool-result exchange (the retrieval that grounds the
-      // reply's claims), the user simulator sees the framework's compact
-      // summaries of it, and the reply text stays exactly the prose the panel
-      // renders.
-      return [
-        {
-          role: "assistant",
-          content: settledTools.map((call) => ({
-            type: "tool-call" as const,
-            toolCallId: call.id,
-            toolName: call.name,
-            input: call.input,
-          })),
-        },
-        {
-          role: "tool",
-          content: settledTools.map((call) => ({
-            type: "tool-result" as const,
-            toolCallId: call.id,
-            toolName: call.name,
-            // The server already bounds tool output (8KB canonical reduction);
-            // mirror that bound rather than cutting deeper, and state the cut
-            // when one happens — a silent slice has cost a judge the very
-            // count a reply was grounded on.
-            output: {
-              type: call.isError ? ("error-text" as const) : ("text" as const),
-              value: boundOutputForJudge(call.output),
-            },
-          })),
-        },
-        { role: "assistant", content: text },
-      ];
+      return turnMessages({ segments, text, hasEndedOnText });
     },
   };
-  return Object.assign(adapter, { state });
+  const adapterWithState: LangyAdapter = Object.assign(adapter, {
+    state,
+    resetSession: () => {
+      state.conversationId = null;
+      state.currentTurnId = null;
+      state.navigateHrefs.length = 0;
+      state.toolCommands.length = 0;
+      state.toolNames.length = 0;
+      state.toolOutputs.length = 0;
+      state.toolEvents.length = 0;
+    },
+    queueNextTurn: ({ parts }: { parts: Array<Record<string, unknown>> }) => {
+      queuedParts = parts;
+    },
+  });
+  return adapterWithState;
 }

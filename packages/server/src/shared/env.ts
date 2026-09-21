@@ -97,7 +97,7 @@ export function portBoundEnv(ports: PortAllocation) {
 			expected: `http://localhost:${ports.aigateway}`,
 			scaffoldShape: LOCALHOST_URL_SHAPE,
 		},
-		OPENCODE_AGENT_URL: {
+		LANGY_AGENT_URL: {
 			expected: `http://localhost:${ports.langyagent}`,
 			scaffoldShape: LOCALHOST_URL_SHAPE,
 		},
@@ -172,7 +172,7 @@ export function buildEnv({
 	sectionBreak("LANGY ASSISTANT");
 	// Shared bearer between the app and the agent; see PERSISTENT_SECRET_KEYS.
 	set("LANGY_INTERNAL_SECRET", hex(32));
-	set("OPENCODE_AGENT_URL", portBound.OPENCODE_AGENT_URL.expected);
+	set("LANGY_AGENT_URL", portBound.LANGY_AGENT_URL.expected);
 	// Langy's rollout flag is SYSTEM-scoped and defaults off so the hosted
 	// product can open it one cohort at a time. A laptop install is a cohort of
 	// one, and it just installed the assistant on purpose.

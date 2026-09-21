@@ -572,6 +572,23 @@ describe("OtlpSpanPiiRedactionService api key id attribute", () => {
 });
 
 /**
+ * The run id is how the pipeline attaches a trace to its simulation run. A
+ * shape rule read it as a vendor key and wrote `[SECRET]` over it, so every
+ * trace of every run in a project addressed the same wrong run, and the cost
+ * of all of them landed on a run that never existed.
+ */
+describe("OtlpSpanPiiRedactionService scenario run id attribute", () => {
+  /** @scenario "A simulation trace keeps the run id that links it to its run" */
+  it("keeps the run id on the span it stores", async () => {
+    const { service } = makeService(mkPolicy({}));
+    const runId = "scenariorun_0005FFcHZ7IBvPE1OSWymml0ikKqB";
+    const span = spanWith({ "scenario.run_id": runId });
+    await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+    expect(attr(span, "scenario.run_id")).toBe(runId);
+  });
+});
+
+/**
  * The log and metric pipelines flatten a decoded OTLP tree into one record
  * keyed by a JSON path, because two attributes may share a name and each value
  * still needs its own address. A path can never satisfy a sensitive-NAME rule,

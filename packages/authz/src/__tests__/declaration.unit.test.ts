@@ -3,6 +3,7 @@ import {
   declaredScopeId,
   isPlatformTierPermission,
   permissionGrantTiers,
+  resolveDeclaredScope,
 } from "../declaration";
 
 describe("permissionGrantTiers", () => {
@@ -106,6 +107,146 @@ describe("declaredScopeId", () => {
           input: { projectId: 42 as unknown as string },
         }),
       ).toBeNull();
+    });
+  });
+});
+
+describe("resolveDeclaredScope", () => {
+  describe("when the input names the scope field but leaves it empty", () => {
+    /** @scenario "A scope id the caller left blank is answered as invalid input" */
+    it("reports the blank field rather than a missing declaration", () => {
+      expect(
+        resolveDeclaredScope({
+          permission: "traces:view",
+          input: { projectId: "" },
+        }),
+      ).toEqual({
+        resolved: false,
+        unresolved: { reason: "blank", field: "projectId" },
+      });
+    });
+
+    /** @scenario "A blank scope id never shadows one the caller did fill in" */
+    it("keeps walking to a wider tier the caller did fill in", () => {
+      expect(
+        resolveDeclaredScope({
+          permission: "traces:view",
+          input: { projectId: "", organizationId: "org_1" },
+        }),
+      ).toEqual({
+        resolved: true,
+        scope: { tier: "organization", id: "org_1" },
+      });
+    });
+
+    /** @scenario "A scope id the caller left blank is answered as invalid input" */
+    it("names the blank via field when the declaration derives its scope", () => {
+      expect(
+        resolveDeclaredScope({
+          permission: "organization:manage",
+          input: { teamId: "" },
+          via: "teamId",
+        }),
+      ).toEqual({
+        resolved: false,
+        unresolved: { reason: "blank", field: "teamId" },
+      });
+    });
+  });
+
+  describe("when the input names the scope field with a value that is not a string", () => {
+    /**
+     * Only reachable past a bypassed type layer — every declaration parses its
+     * input before this runs, so a wrong-typed id is already a 400 by here.
+     * Pinned because the tempting "fix" is to call it `absent`, which would
+     * page an engineer for a caller's malformed request: the caller named the
+     * field, so the mistake is theirs to correct whatever they put in it.
+     */
+    it("answers the caller rather than reporting a wiring bug", () => {
+      expect(
+        resolveDeclaredScope({
+          permission: "traces:view",
+          input: { projectId: 42 as unknown as string },
+        }),
+      ).toEqual({
+        resolved: false,
+        unresolved: { reason: "blank", field: "projectId" },
+      });
+      expect(
+        resolveDeclaredScope({
+          permission: "traces:view",
+          input: { projectId: undefined },
+        }),
+      ).toEqual({
+        resolved: false,
+        unresolved: { reason: "blank", field: "projectId" },
+      });
+    });
+
+    it("still walks past it to a wider tier the caller did fill in", () => {
+      expect(
+        resolveDeclaredScope({
+          permission: "traces:view",
+          input: {
+            projectId: 42 as unknown as string,
+            organizationId: "org_1",
+          },
+        }),
+      ).toEqual({
+        resolved: true,
+        scope: { tier: "organization", id: "org_1" },
+      });
+    });
+  });
+
+  describe("when the input names no scope field the permission can use", () => {
+    /** @scenario "An input carrying no scope id at all is still a wiring bug" */
+    it("reports the declaration as miswired, not the caller as wrong", () => {
+      expect(
+        resolveDeclaredScope({ permission: "traces:view", input: {} }),
+      ).toEqual({ resolved: false, unresolved: { reason: "absent" } });
+    });
+
+    /**
+     * The input itself is not an object. `namesField` was written to survive
+     * exactly this, but the resolution walk read a field off the input BEFORE
+     * reaching it, so `null` threw where it should have answered. Which is
+     * this change's own lesson said twice: the signature says
+     * `Partial<Record<...>>`, and the signature is not what arrives.
+     *
+     * @scenario "An input carrying no scope id at all is still a wiring bug"
+     */
+    it.each([
+      ["null", null],
+      ["undefined", undefined],
+      ["a primitive", 42],
+      ["a string", "org_1"],
+    ])(
+      "answers absent rather than throwing when the input is %s",
+      (_label, input) => {
+        expect(
+          resolveDeclaredScope({
+            permission: "traces:view",
+            // The bypassed type layer this path exists to survive.
+            input: input as never,
+          }),
+        ).toEqual({ resolved: false, unresolved: { reason: "absent" } });
+      },
+    );
+
+    /**
+     * A tier the permission cannot be granted at is not a field the caller
+     * was asked to fill, so filling it badly is still our wiring, not theirs.
+     *
+     * @scenario "An input carrying no scope id at all is still a wiring bug"
+     */
+    it("ignores a blank id at a tier the permission cannot be granted at", () => {
+      expect(
+        resolveDeclaredScope({
+          permission: "governance:view",
+          input: { projectId: "" },
+        }),
+      ).toEqual({ resolved: false, unresolved: { reason: "absent" } });
     });
   });
 });

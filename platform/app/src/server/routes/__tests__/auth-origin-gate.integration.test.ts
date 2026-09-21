@@ -112,6 +112,10 @@ describe("given a dev checkout running on a non-default port", () => {
       data: {
         userId: user.id,
         provider: "credential",
+        // better-auth 1.7 keys a credential account by
+        // `(providerId, issuer, accountId)`; a row without the issuer is
+        // invisible to its lookup and this sign-in answers 401.
+        issuer: "local:credential",
         providerAccountId: user.id,
         type: "credentials",
         password: await hash(PASSWORD, 10),
@@ -159,13 +163,19 @@ describe("given a dev checkout running on a non-default port", () => {
       const response = await post(app, `http://localhost:${APP_PORT}`);
 
       expect(response.status).toBe(401);
+      // The refusal reaches the wire as the handled-error envelope, whose
+      // `error` is the stable code. Better than the raw better-auth string it
+      // replaced: one shape for every refusal, and the words a customer reads
+      // come from the presentation registry keyed by this code, not from here.
       expect(await response.json()).toMatchObject({
-        code: "INVALID_EMAIL_OR_PASSWORD",
+        error: "identity_sign_in_refused",
+        fault: "customer",
       });
     });
   });
 
   describe("when the post comes from somewhere else entirely", () => {
+    /** @scenario A cross-site sign-in post reaches no further than the refusal */
     it("is still refused, so the gate has not been weakened", async () => {
       const response = await post(app, "http://evil.example.com");
 

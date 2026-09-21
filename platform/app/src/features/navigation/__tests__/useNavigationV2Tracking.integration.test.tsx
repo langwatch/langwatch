@@ -2,8 +2,7 @@
  * @vitest-environment jsdom
  *
  * The navigation-v2 write points against a real memory router: product
- * memory follows navigation, settings entry captures the page left, and
- * legacy mode writes nothing at all.
+ * memory follows navigation and settings entry captures the page left.
  *
  * Spec: specs/navigation/navigation-v2-product-memory.feature
  */
@@ -11,12 +10,6 @@
 import { act, render } from "@testing-library/react";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-let mockMode: "legacy" | "product-switcher" = "product-switcher";
-
-vi.mock("../useNavigationMode", () => ({
-  useNavigationMode: () => ({ status: "ready", mode: mockMode }),
-}));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
@@ -51,7 +44,6 @@ function renderRouterAt(initialPath: string) {
 beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
-  mockMode = "product-switcher";
 });
 
 describe("useNavigationV2Tracking", () => {
@@ -128,21 +120,6 @@ describe("useNavigationV2Tracking", () => {
           projectSlug: null,
         }),
       ).toEqual({ label: "Back", href: "/" });
-    });
-  });
-
-  describe("when the device is in legacy mode", () => {
-    /** @scenario Legacy mode writes no product memory */
-    it("writes nothing", async () => {
-      mockMode = "legacy";
-      const router = renderRouterAt("/gateway/virtual-keys");
-
-      await act(async () => {
-        await router.navigate("/governance");
-      });
-
-      expect(readLastVisitedProduct({ organizationId: "org_1" })).toBeNull();
-      expect(sessionStorage.length).toBe(0);
     });
   });
 });

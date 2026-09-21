@@ -55,9 +55,21 @@ export function ProjectSwitcherCombobox({
   return (
     <Combobox.Root
       collection={collection}
-      value={[currentProjectId]}
+      // Deliberately uncontrolled. Holding the current project as the
+      // combobox's selected value makes the machine drag the highlight back
+      // onto it whenever the collection changes — and once a search has
+      // filtered that project out, the highlight lands on an option that is
+      // no longer rendered, so Enter resolves to the project the reader is
+      // already on and opens nothing. The current project is marked by the
+      // Check in ProjectItemRow, which reads `currentProjectId` directly, so
+      // nothing needs the selection here.
       openOnClick
       selectionBehavior="clear"
+      // Typing highlights the top result, so a reader can search and press
+      // Enter without reaching for the arrow keys or the mouse. A running
+      // search offers projects only, so Enter can never land on a create
+      // entry (see `useProjectPickItems`).
+      inputBehavior="autohighlight"
       onValueChange={(details) => {
         const next = details.value?.[0];
         if (next) pick(next);
@@ -93,6 +105,7 @@ function ProjectComboboxTrigger({
         <Button
           variant="ghost"
           aria-label="Switch project"
+          data-tour="project-switcher"
           fontSize="13px"
           fontWeight="normal"
           paddingX={2}

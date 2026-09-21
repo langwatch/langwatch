@@ -151,6 +151,11 @@ export const UNPUBLISHED = [
     why: "in-app report form intake",
   },
   {
+    match: "/api/v1/onboarding/guided",
+    category: "internal",
+    why: "the guided onboarding state of the caller's organization, read and completed by Langy through the CLI. It reports on the organization an application runs inside rather than on the application's own data, so it is not exported from the client SDK's public index and there is nothing for an API-key caller to do with it",
+  },
+  {
     match: "/api/unsubscribe",
     category: "internal",
     why: "RFC 8058 one-click unsubscribe, addressed by mail clients from a link we send",
@@ -206,6 +211,11 @@ export const UNPUBLISHED = [
     category: "internal",
     why: "the dashboard's download button for scenario runs, session-authenticated in the same way as the trace export",
   },
+  {
+    match: "/api/voice",
+    category: "internal",
+    why: "the Talk to it panel's own back channel: the browser mints a short-lived voice session, reports the finished call and streams its recording through a same-origin proxy. Every call carries a signed session token the panel just received, so an API-key caller has nothing to send; scenario runs against voice agents go through the documented scenario routes",
+  },
   // ── Aliases: older paths kept working ──────────────────────────────────
   {
     match: "/api/github-langy",
@@ -244,6 +254,18 @@ export const UNPUBLISHED = [
     match: "GET /api/openapi.json",
     category: "elsewhere",
     why: "serves the document itself, for the same reason /api/gateway/v1/openapi.json above is absent: an operation inside the document describing where to fetch that same document is circular, and a reader holding it has already answered the question",
+  },
+
+  {
+    match: "/api/langy/local",
+    category: "internal",
+    why: "the Langy worker's door onto a folder the developer shared from their own machine (ADR-129). Every call is bound to the conversation the caller's own session key was minted for and only answers while that turn runs, so no reader of the API reference can call it; the payload contract is the in-repo local control protocol, which the command line and the worker both ship with",
+  },
+
+  {
+    match: "/api/langy/waits",
+    category: "internal",
+    why: "the other half of the same worker surface: it parks a tool while a card waits for the developer's answer in the chat. Same session key, same conversation binding, same in-repo contract",
   },
 
   {

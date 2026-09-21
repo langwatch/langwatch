@@ -11,34 +11,33 @@ import (
 )
 
 // seedRecordingAgent is a minimal app.CodingAgent that records every Post's
-// turn and fails on demand, so the seed-once gate can be exercised without an
-// opencode process.
+// turn and fails on demand, so the seed-once gate can be exercised without a
+// worker process.
 type seedRecordingAgent struct {
 	posts   []app.Turn
 	postErr error
 }
 
-func (a *seedRecordingAgent) WaitReady(context.Context, app.Endpoint) error { return nil }
-func (a *seedRecordingAgent) OpenSession(context.Context, app.Endpoint) (string, bool, error) {
+func (a *seedRecordingAgent) WaitReady(context.Context) error { return nil }
+func (a *seedRecordingAgent) OpenSession(context.Context) (string, bool, error) {
 	return "sess", false, nil
 }
-func (a *seedRecordingAgent) Post(_ context.Context, _ app.Endpoint, _ string, turn app.Turn) error {
+func (a *seedRecordingAgent) Post(_ context.Context, _ string, turn app.Turn) error {
 	a.posts = append(a.posts, turn)
 	return a.postErr
 }
-func (a *seedRecordingAgent) Stream(context.Context, app.Endpoint, string, app.ChatSink) error {
+func (a *seedRecordingAgent) Stream(context.Context, string, app.ChatSink) error {
 	return nil
 }
-func (a *seedRecordingAgent) NotifyShutdownImminent(context.Context, app.Endpoint, string, time.Time) error {
+func (a *seedRecordingAgent) NotifyShutdownImminent(context.Context, string, time.Time) error {
 	return nil
 }
 
 func newSeedWorker(agent app.CodingAgent) *Worker {
 	return &Worker{
-		conversationID:    "conv-1",
-		agent:             agent,
-		endpoint:          app.Endpoint{BaseURL: "http://127.0.0.1:0", BearerToken: "b"},
-		openCodeSessionID: "sess",
+		conversationID: "conv-1",
+		agent:          agent,
+		sessionID:      "sess",
 	}
 }
 

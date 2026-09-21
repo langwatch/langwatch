@@ -331,6 +331,17 @@ export const experimentsRouter = createTRPCRouter({
         experimentId: workbench.experimentId,
         version: workbench.version,
         updatedAt: workbench.updatedAt,
+        // Who wrote the version the probing tab is comparing against. A tab
+        // that has to tell its reader their work is out of date owes them the
+        // name: Langy usually wrote it, on their behalf, in the page they are
+        // looking at, and "somewhere else" reads as a stranger.
+        ...(workbench.actorLabel !== undefined
+          ? { actorLabel: workbench.actorLabel }
+          : {}),
+        // The run that wrote it, when a run did. A tab coming back from the
+        // background adopts a version its own run wrote instead of standing
+        // down over a write it already holds every cell of.
+        ...(workbench.runId !== undefined ? { runId: workbench.runId } : {}),
       };
     }),
 

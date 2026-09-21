@@ -15,31 +15,22 @@
  * it is registered as a public endpoint with the reason written out, because it
  * serves nothing but a 404 for unknown version segments.
  */
-import { createService, type MountedRoute } from "@langwatch/api";
+import { createService } from "@langwatch/api";
 import type { AuthzPermission } from "@langwatch/authz";
 import { appContextMiddleware } from "~/app/api/middleware/app-context";
 import { requireEnterprisePlanRest } from "~/app/api/middleware/enterprise-gate";
 import { requireOrgPermissionOrThrow } from "~/app/api/middleware/org-auth";
 import type { EnterpriseFeature } from "~/server/api/enterprise";
 import {
-  type AccessPolicy,
-  credentialClassFor,
-  familyFromBasePath,
-  publicEndpoint,
-  registerRoutePolicy,
-  requires,
-} from "~/server/api/security";
+  registerMountedRoute,
+  type ServiceEndpointMeta,
+} from "~/server/api/route-mount-registry";
+import { familyFromBasePath, requires } from "~/server/api/security";
 import { createOrgAuthMiddleware } from "~/server/api-key/auth-middleware";
 import { prisma } from "~/server/db";
 
-/**
- * The per-endpoint meta contract this factory reads back on
- * `onRouteMounted`. Produced by `guard(...)`; an endpoint whose config lacks
- * it fails the build, so a route cannot reach the router unclassified.
- */
-export interface ManagementEndpointMeta {
-  policy: AccessPolicy;
-}
+/** @see ServiceEndpointMeta, which this family's `guard(...)` produces. */
+export type ManagementEndpointMeta = ServiceEndpointMeta;
 
 /**
  * A versioned management service with org-key auth in throw mode and a
@@ -90,7 +81,13 @@ export function createManagementService({
     // the framework owns the mounting, an endpoint's `middleware` array can
     // no longer displace the check its declared policy promises.
     permissionEnforcer: (permission) => requireOrgPermissionOrThrow(permission),
-    onRouteMounted: (route) => registerMountedRoute({ route, family }),
+    onRouteMounted: (route) =>
+      registerMountedRoute({
+        route,
+        family,
+        scope: "organization",
+        surface: "Management",
+      }),
   });
 
   const guard = (permission: AuthzPermission) => ({
@@ -100,70 +97,4 @@ export function createManagementService({
   });
 
   return { service, guard };
-}
-
-/**
- * Puts one mount in the route-policy registry, refusing to classify a route
- * that never declared a policy. Every mount the framework creates arrives
- * here: each dated version, `latest`, the bare alias, withdrawn 410 tombstones
- * (their inherited config carries the meta), and the two version-namespace
- * guards.
- */
-function registerMountedRoute({
-  route,
-  family,
-}: {
-  route: MountedRoute;
-  family: string;
-}): void {
-  if (route.isNamespaceGuard) {
-    const policy = publicEndpoint(
-      "version-namespace guard: answers 404 for unknown version segments " +
-        "so they cannot fall through to a dynamic unversioned route; " +
-        "reads no data and takes no credential",
-    );
-    registerRoutePolicy({
-      method: route.method,
-      path: route.path,
-      policy,
-      family,
-      credentialClass: credentialClassFor({ scope: "organization", policy }),
-    });
-    return;
-  }
-
-  const meta = route.config?.meta as ManagementEndpointMeta | undefined;
-  if (!meta?.policy) {
-    throw new Error(
-      `Management endpoint ${route.method.toUpperCase()} ${route.path} ` +
-        `declares no access policy; spread guard(permission) into its ` +
-        `endpoint config`,
-    );
-  }
-  // The registry must never promise a check the pipeline does not mount: a
-  // permission policy in `meta` is only honest when the SAME permission is on
-  // `config.permission`, which is what the framework enforces from.
-  if (
-    meta.policy.kind === "permission" &&
-    route.config?.permission !== meta.policy.permission
-  ) {
-    throw new Error(
-      `Management endpoint ${route.method.toUpperCase()} ${route.path} ` +
-        `declares policy "${meta.policy.permission}" but enforces ` +
-        `"${route.config?.permission ?? "nothing"}"; both halves must come ` +
-        `from the same guard(permission)`,
-    );
-  }
-  registerRoutePolicy({
-    method: route.method,
-    path: route.path,
-    policy: meta.policy,
-    family,
-    // The whole family authenticates with an organization-scoped key, so the
-    // class is the one a SecuredApp on the organization scope derives.
-    credentialClass: credentialClassFor({
-      scope: "organization",
-      policy: meta.policy,
-    }),
-  });
 }

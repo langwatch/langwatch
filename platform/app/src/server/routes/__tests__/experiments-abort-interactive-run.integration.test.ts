@@ -3,13 +3,13 @@
  *
  * @see specs/experiments-v3/execution-backend.feature
  *
- * Regression guard: an interactive workbench run streams over SSE and never
- * creates a polling run-state record (runStateManager.createRun is only called
- * by the CI/CD polling path). The orchestrator instead registers the run owner
- * via abortManager.setRunning. Before the fix, POST /api/experiments/abort only
- * consulted runStateManager.getRunState, so every workbench run 404'd and the
- * Stop button reported "Abort Failed". Abort must authorize against the
- * running-owner that the orchestrator records.
+ * Regression guard: abort must authorize against the running-owner the
+ * orchestrator records (abortManager.setRunning), not only against the polling
+ * run-state record. Before the fix, POST /api/experiments/abort consulted
+ * runStateManager.getRunState alone, so a workbench run 404'd and the Stop
+ * button reported "Abort Failed". The run-state record can also be missing
+ * entirely — Redis is optional, and it expires after 24h — so the owner lookup
+ * must still answer from the abort manager.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";

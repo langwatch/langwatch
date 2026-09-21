@@ -138,7 +138,21 @@ jobs:
       - uses: ./.github/actions/go-build-cache
         with:
           suffix: race
-      - run: go test -count=1 -race ./services/aigateway/... ./services/langyagent/... ./services/nlpgo/... ./pkg/... ./tools/migrationorder/... ./tools/thuishaven/... ./tools/herrgen/... ./tools/linkcheck/... ./cmd/linkcheck/... ./tools/docscheck/...
+      # The code-block example tests run the committed Python examples through
+      # the real runner, so the interpreter they use needs the sandbox packages.
+      # `langwatch` comes from this repository rather than from PyPI, because
+      # the shared-session example calls SDK methods that ship with the next
+      # release. Without this the tests skip, and a skipped test proves nothing.
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+          cache-dependency-glob: "sdks/python/uv.lock"
+      - name: Install the code-block sandbox packages
+        run: |
+          uv venv "$RUNNER_TEMP/codeblock-venv"
+          uv pip install --python "$RUNNER_TEMP/codeblock-venv" requests ./sdks/python
+          echo "LANGWATCH_CODEBLOCK_PYTHON=$RUNNER_TEMP/codeblock-venv/bin/python" >> "$GITHUB_ENV"
+      - run: go test -count=1 -race ./services/aigateway/... ./services/idpsim/... ./services/langyagent/... ./services/nlpgo/... ./pkg/... ./tools/migrationorder/... ./tools/thuishaven/... ./tools/herrgen/... ./tools/linkcheck/... ./cmd/linkcheck/... ./tools/docscheck/...
 
   lint:
     needs: changes
@@ -192,7 +206,7 @@ jobs:
           verify: false
           args: >-
             --disable=funlen,gocognit,revive
-            ./services/aigateway/... ./services/langyagent/... ./services/nlpgo/... ./pkg/... ./cmd/...
+            ./services/aigateway/... ./services/idpsim/... ./services/langyagent/... ./services/nlpgo/... ./pkg/... ./cmd/...
             ./tools/migrationorder/... ./tools/herrgen/... ./tools/ciguard/...
             ./tools/linkcheck/... ./tools/docscheck/...
 
@@ -216,7 +230,7 @@ jobs:
           args: >-
             --new-from-merge-base=origin/${{ github.base_ref || 'main' }}
             --enable-only=funlen,gocognit,revive
-            ./services/aigateway/... ./services/langyagent/... ./services/nlpgo/... ./pkg/... ./cmd/...
+            ./services/aigateway/... ./services/idpsim/... ./services/langyagent/... ./services/nlpgo/... ./pkg/... ./cmd/...
             ./tools/...
 
       # The schema validation the two steps above no longer run inline. Last so
@@ -249,7 +263,7 @@ jobs:
       # pinning that to what `go vet` runs, so "already covered" is likely but
       # not guaranteed. A cheap job is the wrong thing to bet coverage on.
       - uses: ./.github/actions/go-build-cache
-      - run: go vet ./services/aigateway/... ./services/langyagent/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/migrationorder/... ./tools/thuishaven/... ./tools/herrgen/... ./tools/linkcheck/... ./tools/docscheck/...
+      - run: go vet ./services/aigateway/... ./services/idpsim/... ./services/langyagent/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/migrationorder/... ./tools/thuishaven/... ./tools/herrgen/... ./tools/linkcheck/... ./tools/docscheck/...
 
   # packages/handled-error/src/codes.generated.ts mirrors the services' herr
   # codes; the TypeScript presentation registry is keyed off it, so a Go code

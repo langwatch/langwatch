@@ -45,6 +45,12 @@ vi.mock("~/hooks/useRequiredSession", () => ({
   }),
 }));
 
+// The guided tour host reads the guided onboarding state over tRPC; this
+// suite covers the layout, not the tour.
+vi.mock("~/features/guided-onboarding/tour/GuidedOnboardingHost", () => ({
+  GuidedOnboardingHost: () => null,
+}));
+
 vi.mock("~/hooks/useOrganizationTeamProject", async () => {
   const { useSyncExternalStore } = await import("react");
   return {
@@ -98,6 +104,13 @@ vi.mock("~/hooks/useDrawer", () => ({
 const sidecarMounts = { count: 0 };
 vi.mock("../components/LangyPanel", () => ({
   LangySidecar: () => <LangySidecarStub />,
+}));
+
+// The follow-along deep link reads a tRPC query, and this suite renders the
+// layout with no tRPC provider. Its own behaviour is pinned by
+// langyConversationDeepLink.unit.test.tsx.
+vi.mock("../hooks/useLangyConversationDeepLink", () => ({
+  useLangyConversationDeepLink: () => undefined,
 }));
 
 import { useEffect } from "react";

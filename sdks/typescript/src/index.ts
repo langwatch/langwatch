@@ -244,3 +244,17 @@ export const logger = {
   ConsoleLogger,
   NoOpLogger,
 };
+
+/**
+ * The HTTP client every SDK request to the LangWatch API goes through. It
+ * follows a redirect only when it upgrades http to https on the same URL and
+ * refuses every other one with `LangWatchRedirectError`. `createLangWatchFetch`
+ * builds one over another transport or logger.
+ */
+export {
+  langwatchFetch,
+  createLangWatchFetch,
+  LangWatchRedirectError,
+  type LangWatchFetch,
+  type CreateLangWatchFetchOptions,
+} from "./internal/http/langwatchFetch";

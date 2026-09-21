@@ -224,11 +224,11 @@ export class AuthzEngineMigration implements SystemMigration {
   // Finalizing changes who answers permission checks for the organization,
   // so an operator action on it takes the typed destructive confirmation.
   readonly requiresOperatorConfirmation = true;
-  // RELEASED FOR SELF-HOSTED. Cloud soaked it first, per organization, by
-  // enrollment. Flipping this IS the self-hosted release act — there is no
-  // enrollment off cloud, so from the release that carries this line every
-  // self-hosted installation migrates every organization it has,
-  // automatically, at worker boot.
+  // RELEASED FOR SELF-HOSTED. Cloud soaked it first, per organization.
+  // Flipping this IS the self-hosted release act — there is no enrollment
+  // off cloud, so from the release that carries this line every self-hosted
+  // installation migrates every organization it has, automatically, at
+  // worker boot.
   //
   // It stays true. This is the prerequisite for removing the legacy
   // authorization path altogether: that removal cannot be safe until every
@@ -240,6 +240,17 @@ export class AuthzEngineMigration implements SystemMigration {
   // time it happens. Every later pass states only what the heads do not
   // already carry (#7429), so this does not repeat at each boot.
   readonly runsAutomaticallyOnSelfHosted = true;
+  // AUTOMATIC ON CLOUD TOO. The per-organization rollout is finished for the
+  // organizations that existed while it ran; what enrollment now decides is
+  // only whether an organization created SINCE ever migrates, and the answer
+  // must not be "whenever an operator remembers it". Every organization is
+  // in the cohort, so a new one is adopted by the next pass instead of
+  // sitting on the legacy authorization path indefinitely.
+  //
+  // This does not make the migration eager at creation time. An organization
+  // is created against the legacy path, exactly as it is today, and the pass
+  // adopts its rows afterwards - creation never waits on the ledger.
+  readonly enrolledAutomatically = true;
 
   constructor(private readonly deps: AuthzEngineMigrationDeps) {}
 

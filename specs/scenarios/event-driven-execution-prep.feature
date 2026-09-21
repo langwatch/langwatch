@@ -68,3 +68,20 @@ Feature: Event-driven scenario execution
     Then queued events are distributed across the 6 workers
     And each worker's execute intent handler fires for its assigned scenarios
 
+  # ============================================================================
+  # 6. The fold reads its own writes
+  # ============================================================================
+
+  # A run's identity (scenario, batch and set) is written by its first event.
+  # Later events fold on top of it, reading the stored state back when the
+  # state store misses. A write that returns before it is visible makes that
+  # read miss too, and the run is rewritten without its identity: still
+  # reachable by run id, but absent from every batch and set listing. That is
+  # the run that "disappeared" from a suite.
+
+  @integration
+  Scenario: A stored projection is readable by the next event's fold
+    Given a projection stored for a scenario run
+    When the run's state is read back straight away
+    Then the stored run identity is returned rather than nothing
+

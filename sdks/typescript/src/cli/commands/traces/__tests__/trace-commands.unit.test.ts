@@ -89,6 +89,62 @@ describe("searchTracesCommand()", () => {
 		mockProcessExit();
 	});
 
+	describe("when a filter is given", () => {
+		/** @scenario "The CLI sends a filter and keeps free text separate" */
+		it("sends the filter and the text query as two different things", async () => {
+			mockSearch.mockResolvedValue({
+				traces: [],
+				pagination: { totalHits: 0 },
+			});
+
+			await searchTracesCommand({
+				filter: "status:error",
+				query: "refund",
+			});
+
+			const body = mockSearch.mock.calls[0]?.[0] as {
+				filter?: string;
+				query?: string;
+			};
+			expect(body.filter).toBe("status:error");
+			expect(body.query).toBe("refund");
+		});
+
+		it("sends no filter key when none was given", async () => {
+			mockSearch.mockResolvedValue({
+				traces: [],
+				pagination: { totalHits: 0 },
+			});
+
+			await searchTracesCommand({ query: "refund" });
+
+			const body = mockSearch.mock.calls[0]?.[0] as { filter?: string };
+			expect(body.filter).toBeUndefined();
+		});
+
+		/**
+		 * A filter that parses and matches nothing is almost always a value
+		 * spelled the way a person would spell it, which is the one question the
+		 * facets command answers.
+		 *
+		 */
+		/** @scenario "An empty filtered result points at the facets command" */
+		it("points an empty result at the facets command", async () => {
+			mockSearch.mockResolvedValue({
+				traces: [],
+				pagination: { totalHits: 0 },
+			});
+
+			await searchTracesCommand({ filter: "model:gpt5" });
+
+			const printed = vi
+				.mocked(console.log)
+				.mock.calls.map((call) => String(call[0] ?? ""))
+				.join("\n");
+			expect(printed).toContain("langwatch trace facets");
+		});
+	});
+
 	describe("when traces are found", () => {
 		it("calls search and prints results", async () => {
 			mockSearch.mockResolvedValue({
@@ -157,7 +213,8 @@ describe("searchTracesCommand()", () => {
 	});
 
 	describe("when format is json", () => {
-		it("outputs raw JSON", async () => {
+		/** @scenario "A search-backed list also carries the total under the common name" */
+		it("outputs the document it was given, with the total under the common name", async () => {
 			const result = {
 				traces: [{ traceId: "t1" }],
 				pagination: { totalHits: 1 },
@@ -166,7 +223,19 @@ describe("searchTracesCommand()", () => {
 
 			await searchTracesCommand({ format: "json" });
 
-			expect(console.log).toHaveBeenCalledWith(JSON.stringify(result, null, 2));
+			// A trace search says how many it matched as `totalHits`, and every
+			// resource list says it as `total`. Both are printed, so a caller has
+			// one name to read on any list.
+			expect(console.log).toHaveBeenCalledWith(
+				JSON.stringify(
+					{
+						traces: [{ traceId: "t1" }],
+						pagination: { totalHits: 1, total: 1 },
+					},
+					null,
+					2,
+				),
+			);
 		});
 	});
 

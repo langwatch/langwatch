@@ -19,6 +19,7 @@ import {
   HomeBriefingSection,
   SetupHairline,
 } from "~/features/briefing";
+import { GuidedOnboardingOffer } from "~/features/guided-onboarding/home/GuidedOnboardingOffer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { DashboardLayout } from "../DashboardLayout";
@@ -103,6 +104,11 @@ export function HomePage() {
               <ConsideringLangWatch />
             </HStack>
 
+            {/* The Langy home carries the offer inside its hero, under the
+                ask field; the other homes carry it here, under the header. */}
+            {composition === "signal-focused" || composition === "classic" ? (
+              <GuidedOnboardingOffer space="project" />
+            ) : null}
             {composition === "undecided" ? (
               <HomeCompositionSkeleton />
             ) : composition === "signal-focused" ? (

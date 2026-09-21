@@ -115,7 +115,7 @@ describe("IngestionKey ownership + list visibility", () => {
 
   describe("when a team-admin mints a personal-project ingest key", () => {
     it("mints (team-admin ceiling covers project traces:create) and owns the key", async () => {
-      const issued = await ingestKeys.ensureForProject({
+      const issued = await ingestKeys.issueForProject({
         callerUserId: USER_A,
         ownerUserId: USER_A,
         organizationId: ORG_ID,
@@ -134,21 +134,21 @@ describe("IngestionKey ownership + list visibility", () => {
     describe("when user A lists API keys (non-admin list path)", () => {
       /** @scenario Personal ingestion keys are not listed to other organization members */
       it("returns A's own ingest key and the regular service key, but not B's ingest key or the org-owned ingest key", async () => {
-        const aKey = await ingestKeys.ensureForProject({
+        const aKey = await ingestKeys.issueForProject({
           callerUserId: USER_A,
           ownerUserId: USER_A,
           organizationId: ORG_ID,
           projectId: PROJECT_ID,
           sourceType: "gemini",
         });
-        const bKey = await ingestKeys.ensureForProject({
+        const bKey = await ingestKeys.issueForProject({
           callerUserId: USER_B,
           ownerUserId: USER_B,
           organizationId: ORG_ID,
           projectId: PROJECT_ID,
           sourceType: "opencode",
         });
-        const orgOwned = await ingestKeys.ensureForProject({
+        const orgOwned = await ingestKeys.issueForProject({
           callerUserId: USER_A,
           ownerUserId: null,
           organizationId: ORG_ID,

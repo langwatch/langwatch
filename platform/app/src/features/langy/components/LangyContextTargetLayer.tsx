@@ -589,7 +589,7 @@ function TargetAffordance({ targetId }: { targetId: string }) {
       // sight. The title carries the reverse, which the label alone can't.
       title={
         isAdded
-          ? `Langy has ${target.label} — click to release it`
+          ? `Langy has ${target.label}. Click to release it`
           : `Give Langy ${target.label}`
       }
       position="fixed"

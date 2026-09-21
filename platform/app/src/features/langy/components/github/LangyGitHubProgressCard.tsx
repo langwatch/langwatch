@@ -11,9 +11,12 @@
  * Because tool parts are persisted with the message (the sentinels were stripped
  * before persistence), the card now survives a refresh. It did not used to.
  *
+ * The last step carries the pull request's own URL when `gh pr create` printed
+ * one, so the PR pill is a link straight to it.
+ *
  * Spec: specs/langy/langy-github-prs.feature. Issue: #4747.
  */
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { Box, HStack, Link, Text } from "@chakra-ui/react";
 import { Check } from "lucide-react";
 import type {
   GithubProgressEvent,
@@ -38,21 +41,44 @@ const TRACK: Step[] = [
   { stage: "opened", label: "PR" },
 ];
 
+/**
+ * What a settled turn reached, furthest step first. A finished turn is never
+ * "working on it" — it either opened the pull request or it stopped somewhere,
+ * and the card says which.
+ */
+const SETTLED_LABELS: { stage: GithubProgressStage; label: string }[] = [
+  { stage: "opened", label: "Opened" },
+  { stage: "pushed", label: "Pushed" },
+  { stage: "committed", label: "Committed" },
+  { stage: "branched", label: "Branched" },
+  { stage: "cloned", label: "Cloned" },
+  { stage: "cloning", label: "Cloned" },
+];
+
 export function LangyGitHubProgressCard({
   events,
+  live = false,
 }: {
   events: GithubProgressEvent[];
+  /** The turn is still running. A settled turn stops saying "working on it". */
+  live?: boolean;
 }) {
   if (events.length === 0) return null;
   const reached = new Set(events.map((e) => e.stage));
   const latest = events[events.length - 1]?.detail;
   const opened = reached.has("opened");
-  // Single mono label line, e.g. "WORKING ON IT · PUSHING BRANCH…".
+  // `gh pr create` printed it, so the last pill can lead to the pull request.
+  const prUrl = events.find((event) => event.stage === "opened")?.url;
+  // Single mono label line, e.g. "WORKING ON IT · PUSHING BRANCH…" while the
+  // turn runs, and the furthest step reached once it has ended.
   const label = opened
     ? "Opened"
-    : latest
-      ? `Working on it · ${latest}`
-      : "Working on it";
+    : !live
+      ? (SETTLED_LABELS.find((entry) => reached.has(entry.stage))?.label ??
+        "Finished")
+      : latest
+        ? `Working on it · ${latest}`
+        : "Working on it";
 
   return (
     <Box
@@ -76,20 +102,40 @@ export function LangyGitHubProgressCard({
       <HStack gap={1.5} flexWrap="wrap">
         {TRACK.map((step) => {
           const done = isDoneFor(step.stage, reached);
-          return (
-            <HStack
-              key={step.stage}
-              gap={1}
-              paddingX={2.5}
-              paddingY={1}
-              borderRadius="full"
-              borderWidth="1px"
-              borderColor={done ? "green.fg" : "border.muted"}
-              color={done ? "green.fg" : "fg.muted"}
-              textStyle="xs"
-            >
+          const href = step.stage === "opened" ? prUrl : undefined;
+          const pill = {
+            gap: 1,
+            paddingX: 2.5,
+            paddingY: 1,
+            borderRadius: "full",
+            borderWidth: "1px",
+            borderColor: done ? "green.fg" : "border.muted",
+            color: done ? "green.fg" : "fg.muted",
+            textStyle: "xs",
+          } as const;
+          const content = (
+            <>
               {done ? <Check size={12} /> : null}
               <Text>{step.label}</Text>
+            </>
+          );
+
+          return href ? (
+            <Link
+              key={step.stage}
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              display="inline-flex"
+              alignItems="center"
+              {...pill}
+              _hover={{ borderColor: "green.fg", textDecoration: "none" }}
+            >
+              {content}
+            </Link>
+          ) : (
+            <HStack key={step.stage} {...pill}>
+              {content}
             </HStack>
           );
         })}

@@ -1,16 +1,35 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { BillableEventsClickHouseRepository } from "@ee/billing/services/billableEvents.clickhouse.repository";
 import { createNoopEnterprisePipelineCommands } from "@ee/event-sourcing/pipelineSet";
+import { GovernanceCostRollupStore } from "@ee/governance/projections/governanceCostRollup.store";
+import {
+  DiscoveredPersonRepository,
+  ErasedIdentifierSuppressionRepository,
+  GovernanceTenantHistoryRepository,
+  IdentityMatchRepository,
+  IdentityMatchSuggestionRepository,
+} from "@ee/governance/repositories/governanceIdentity.repository";
+import { ActivityMonitorClickHouseRepository } from "@ee/governance/services/activity-monitor/activityMonitor.clickhouse.repository";
 import { resolveSourceNonBillable } from "@ee/governance/services/costAttributionPolicy.service";
+import { CostRollupComparatorService } from "@ee/governance/services/costRollupComparator.service";
+import { installGovernanceSuppressionSnapshot } from "@ee/governance/services/erasureSuppression.service";
+import { GovernanceCostRollupClickHouseRepository } from "@ee/governance/services/governanceCostRollup.clickhouse.repository";
+import { GovernanceGatewaySpendClickHouseRepository } from "@ee/governance/services/governanceGatewaySpend.clickhouse.repository";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
+import { GovernanceRollupErasureClickHouseRepository } from "@ee/governance/services/governanceRollupErasure.clickhouse.repository";
+import { createGovernanceRollupReplayPort } from "@ee/governance/services/governanceRollupReplay.port";
 import { GovernanceTraceActivityClickHouseRepository } from "@ee/governance/services/governanceTraceActivity.clickhouse.repository";
+import { IdentityErasureService } from "@ee/governance/services/identityErasure.service";
+import { IdentityMatchService } from "@ee/governance/services/identityMatch.service";
+import { IdentityMatchSuggestionService } from "@ee/governance/services/identityMatchSuggestion.service";
 import { PersonalUsageClickHouseRepository } from "@ee/governance/services/personalUsage.clickhouse.repository";
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { createLogger } from "@langwatch/observability";
 import { RedisConnectionService } from "@langwatch/redis-client";
 import { env } from "~/env.mjs";
+import { guidedKickoffStateFactsOf } from "~/features/guided-onboarding/kickoff";
 import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 import { ClickHouseAnalyticsService } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
 import {
@@ -26,11 +45,11 @@ import {
   mintLangySessionApiKey,
   revokeLangySessionApiKey,
 } from "~/server/app-layer/langy/langyApiKey";
-import { resolveLangyHarness } from "~/server/app-layer/langy/langyHarness";
 import { createLangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
 import { createLangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
+import { createLangyTurnOrderReader } from "~/server/app-layer/langy/streaming/langyTurnOrder";
 import { OpsExplainClickHouseRepository } from "~/server/app-layer/ops/repositories/ops-explain.clickhouse.repository";
 import { InstanceUsageStatsClickHouseRepository } from "~/server/app-layer/usage-stats/repositories/instance-usage.clickhouse.repository";
 import {
@@ -49,7 +68,9 @@ import { prisma as globalPrisma } from "~/server/db";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import { bindProcessFleetMetricsSource } from "~/server/event-sourcing/process-manager/metrics";
 import { BillableEventsMeterClickHouseRepository } from "~/server/event-sourcing/projections/global/repositories/billable-events.clickhouse.repository";
+import { featureFlagService } from "~/server/featureFlag";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { FilterService } from "~/server/filters/filter.service";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { createBudgetChangeEventDedupeService } from "~/server/gateway/budgetChangeEventDedupe.service";
@@ -65,10 +86,13 @@ import {
 } from "~/server/middleware/rate-limit-langy-github-prs";
 import { LANGY_CHAT_FEATURE_KEY } from "~/server/modelProviders/codexRestrictions";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
+import { withInstanceFacts } from "~/server/onboarding/guided-onboarding.instance";
+import { GuidedOnboardingService } from "~/server/onboarding/guided-onboarding.service";
 import { OpsExplainService } from "~/server/ops/opsExplain.service";
 import { getPostHogInstance } from "~/server/posthog";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
+import { createRunModelsResolver } from "~/server/scenarios/run-models.resolver";
 import { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { getSaaSPlanProvider } from "../../../ee/billing";
@@ -222,6 +246,34 @@ import { PrismaGithubInstallationsRepository } from "./github/repositories/githu
 import { NullGithubInstallationsRepository } from "./github/repositories/github-installations.repository";
 import { PrismaGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.prisma.repository";
 import { NullGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.repository";
+import { LocalDoorBreakGlassBinding } from "./identity/break-glass-binding";
+import {
+  EmailJoinRequestNotifier,
+  JoinRequestLifecycleDispatcher,
+} from "./identity/join-request-adapters";
+import { AdminEmailPlatformOperators } from "./identity/platform-operators";
+import { EventLogIdentityRepository } from "./identity/repositories/identity-event-log.repository";
+import { PrismaIdentityHeadsRepository } from "./identity/repositories/identity-heads.prisma.repository";
+import { PrismaIdentityProjectionRepository } from "./identity/repositories/identity-projection.prisma.repository";
+import { PrismaIdentityReservationRepository } from "./identity/repositories/identity-reservations.prisma.repository";
+import { PrismaIdentityUsersRepository } from "./identity/repositories/identity-users.prisma.repository";
+import { PrismaJoinRequestReadRepository } from "./identity/repositories/join-request.prisma.repository";
+import { PrismaJoinRequestProjectionRepository } from "./identity/repositories/join-request-projection.prisma.repository";
+import { PrismaMfaEnrollmentRepository } from "./identity/repositories/mfa-enrollment.prisma.repository";
+import { PrismaMfaEnrollmentProjectionRepository } from "./identity/repositories/mfa-enrollment-projection.prisma.repository";
+import { PrismaScimSyncProjectionRepository } from "./identity/repositories/scim-sync-projection.prisma.repository";
+import { PrismaSsoConnectionProjectionRepository } from "./identity/repositories/sso-connection-projection.prisma.repository";
+import {
+  PrismaSsoConnectionReadRepository,
+  PrismaSsoConnectionStrandingRepository,
+} from "./identity/repositories/sso-connection-reads.prisma.repository";
+import { SsoConnectionTeardownDispatcher } from "./identity/sso-connection-teardown";
+import { LoggingInstantEvalSpendRecorder } from "./instant-evals/instant-eval-spend.recorder";
+import { createInstantEvalRunPortFromEnv } from "./instant-evals/run";
+import { ClickHouseInstantEvalJudgmentsRepository } from "./instant-evals/run/instant-eval-judgments.repository";
+import { ClickHouseInstantEvalRunProjectionStore } from "./instant-evals/run/instant-eval-run.projection-store";
+import { ClickHouseInstantEvalRunRepository } from "./instant-evals/run/instant-eval-run.repository";
+import { createInstantEvalSpendRecorderFromEnv } from "./instant-evals/spend";
 import { LangyConversationService } from "./langy/langy-conversation.service";
 import {
   createLangyTrustedMessageReader,
@@ -299,13 +351,16 @@ import { PrismaShareRepository } from "./share/repositories/share.prisma.reposit
 import { ShareService } from "./share/share.service";
 import { createShareViewDedupeService } from "./share/share-view-dedupe.service";
 import { createSharedTracePayloadCache } from "./share/shared-trace-cache.service";
+import { ResultAtomsClickHouseRepository } from "./simulations/result-atoms/result-atoms.clickhouse.repository";
+import { ResultAtomsService } from "./simulations/result-atoms/result-atoms.service";
+import { RunConfigurationsClickHouseRepository } from "./simulations/run-configurations/run-configurations.clickhouse.repository";
+import { RunConfigurationsService } from "./simulations/run-configurations/run-configurations.service";
 import { SimulationRunService } from "./simulations/simulation-run.service";
 import { createCompositePlanProvider } from "./subscription/composite-plan-provider";
 import { PlanProviderService } from "./subscription/plan-provider";
 import { createSelfHostedPlanProvider } from "./subscription/self-hosted-plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import { SuiteRunService } from "./suites/suite-run.service";
-import { startSystemMigrations } from "./system-migrations/boot";
 import { startTopicClusteringBootSeeds } from "./topic-clustering/bootSeeds";
 import { clusterTopicsForProject } from "./topic-clustering/clustering";
 import { NullTopicRepository } from "./topic-clustering/repositories/null-topic.repository";
@@ -371,6 +426,14 @@ export function initializeWorkerApp(): App {
 }
 
 /**
+ * One-shot system-migration role. It processes only migration event work on
+ * an isolated queue without starting shared consumers, schedulers, or workers.
+ */
+export function initializeMigrationApp(): App {
+  return initializeDefaultApp({ processRole: "migration" });
+}
+
+/**
  * Dev-only single-process mode: the web server also hosts the worker stack
  * in-process (opt-in via WORKERS_IN_PROCESS=1). Boots the App with the "all"
  * role so process outbox/wake consumers and schedulers wire up exactly as
@@ -403,6 +466,21 @@ export function initializeDefaultApp(options?: {
     return client;
   };
 
+  // ADR-137: one runs store and one judgements store, handed to the
+  // pipeline's run port and to the App, so the run surface never resolves a
+  // client of its own. The spend recorder is the logging default until the
+  // gateway spend pipeline binds its own.
+  const instantEvalRuns = new ClickHouseInstantEvalRunRepository({
+    resolveClient: resolveClickHouseClient,
+  });
+  const instantEvalJudgments = new ClickHouseInstantEvalJudgmentsRepository(
+    resolveClickHouseClient,
+  );
+  // The spend spine when it is registered, a log line when it is not: the
+  // pipelines register after this container is built, so the choice is made
+  // per record rather than here.
+  const instantEvalSpend = createInstantEvalSpendRecorderFromEnv();
+
   // Clustering reads ClickHouse directly (its query has no repository yet), so
   // it takes the resolver as a parameter. Bound once here, then handed to both
   // the event-sourcing run port and the App, so no caller re-derives one.
@@ -425,9 +503,12 @@ export function initializeDefaultApp(options?: {
   });
 
   const broadcast = new BroadcastService(redis);
+  // One instance, shared with the governance cost screen's metered-lane scope
+  // below, so both read projects through the same repository.
+  const projectRepository = new PrismaProjectRepository(prisma);
   const projects = traced(
     new ProjectService(
-      new PrismaProjectRepository(prisma),
+      projectRepository,
       new LwqlKeyMapClickHouseRepository(resolveClickHouseClient),
     ),
     "ProjectService",
@@ -598,6 +679,14 @@ export function initializeDefaultApp(options?: {
   // the run history does, rather than opening a second one.
   const scenarioRunExport = ScenarioRunExportService.create(
     simulationReads.repository,
+  );
+  const resultAtoms = new ResultAtomsService(
+    new ResultAtomsClickHouseRepository(resolveClickHouseClient),
+    globalPrisma,
+  );
+  const runConfigurations = new RunConfigurationsService(
+    new RunConfigurationsClickHouseRepository(resolveClickHouseClient),
+    globalPrisma,
   );
   // SuiteRunService is created after pipeline registration (needs startSuiteRun command)
 
@@ -790,8 +879,11 @@ export function initializeDefaultApp(options?: {
     prisma,
   );
   const langyTurnAdmission = new PrismaLangyTurnAdmissionRepository(prisma);
+  const scimSyncProjectionRepository = new PrismaScimSyncProjectionRepository(
+    prisma,
+  );
   const langyMessageRepository = new PrismaLangyMessageRepository(prisma);
-  const langyAgentUrl = process.env.OPENCODE_AGENT_URL;
+  const langyAgentUrl = process.env.LANGY_AGENT_URL;
   const langyInternalSecret = process.env.LANGY_INTERNAL_SECRET;
   const langyWorker = createLangyWorkerPort({
     agentUrl: langyAgentUrl ?? "",
@@ -802,6 +894,13 @@ export function initializeDefaultApp(options?: {
   const langyTitleGenerator = createLangyConversationTitleGenerator({
     messages: createLangyTrustedMessageReader(langyMessageRepository),
   });
+
+  // The address lock is shared: the guards claim through it and the fold
+  // releases through it, so the two must be the same instance (ADR-116 §6).
+  const identityReservations = new PrismaIdentityReservationRepository(prisma);
+  // One instance, two roles: the `User` reads identity runs on, and the one
+  // address the platform-operator list asks about an actor.
+  const identityUsers = new PrismaIdentityUsersRepository(prisma);
 
   // Construct repositories at the composition root — ClickHouse-or-Memory decisions live here.
   const repositories: PipelineRepositories = {
@@ -887,6 +986,42 @@ export function initializeDefaultApp(options?: {
     processStore: new PrismaProcessStore(prisma),
     authzGrantsWrite: new PrismaAuthzGrantsWriteRepository(prisma),
     authzAuditTrail: new PrismaAuthzAuditTrailRepository(prisma),
+    identityProjection: new PrismaIdentityProjectionRepository(
+      prisma,
+      identityReservations,
+    ),
+    identityHeads: new PrismaIdentityHeadsRepository(prisma),
+    identityUsers,
+    identityReservations,
+    // The proposal log, not a table: reads the identity events back through
+    // the App's own event store, resolved lazily for the same reason the
+    // ledger writer resolves it lazily — this composes before an App exists.
+    identityLinkProposals: new EventLogIdentityRepository(),
+    mfaProjection: new PrismaMfaEnrollmentProjectionRepository(prisma),
+    mfaEnrollments: new PrismaMfaEnrollmentRepository(prisma),
+    ssoConnectionProjection: new PrismaSsoConnectionProjectionRepository(
+      prisma,
+    ),
+    ssoConnectionReads: new PrismaSsoConnectionReadRepository(prisma),
+    ssoConnectionStranding: new PrismaSsoConnectionStrandingRepository(prisma),
+    ssoBreakGlassBindings: new LocalDoorBreakGlassBinding(),
+    ssoPlatformOperators: new AdminEmailPlatformOperators(identityUsers),
+    ssoConnectionTeardown: new SsoConnectionTeardownDispatcher(),
+    // One repository, two roles (D08): the fold's store and the guards' read
+    // are the same `ScimSyncState` rows, so composing them separately would
+    // be two objects that must agree about a JSON column and eventually
+    // would not.
+    scimSyncProjection: scimSyncProjectionRepository,
+    scimSyncReads: scimSyncProjectionRepository,
+    joinRequestProjection: new PrismaJoinRequestProjectionRepository(prisma),
+    joinRequestReads: new PrismaJoinRequestReadRepository(prisma),
+    joinRequestLifecycle: new JoinRequestLifecycleDispatcher(
+      prisma,
+      new EmailJoinRequestNotifier(prisma),
+    ),
+    instantEvalRun: new ClickHouseInstantEvalRunProjectionStore(
+      instantEvalRuns,
+    ),
     topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
       prisma,
     ),
@@ -956,6 +1091,95 @@ export function initializeDefaultApp(options?: {
     ? { governanceKpisRepository }
     : undefined;
 
+  // ADR-128's daily cost rollup. One instance for the whole App: the fold
+  // writes through it on the pulled-usage pipeline (the metered lane reads
+  // the gateway ledger directly and never reaches this table), the
+  // comparator reads through it, and `app.governance.costRollup` hands out the
+  // same reference — so the watchdog can never be reading a different table
+  // from the one the product shows.
+  const governanceCostRollupRepository = clickhouseEnabled
+    ? new GovernanceCostRollupClickHouseRepository(resolveClickHouseClient)
+    : undefined;
+  const governanceCostRollupStore = governanceCostRollupRepository
+    ? new GovernanceCostRollupStore(governanceCostRollupRepository)
+    : undefined;
+  // The drift check reads the same repository the fold writes through, so the
+  // watchdog can never be comparing a day against a different table from the
+  // one the product shows. Gated on the repository rather than on ClickHouse
+  // directly: with no summary there is nothing to compare against, and the
+  // pipeline mounts no watch at all rather than one that cannot pass.
+  const costRollupDayComparer = governanceCostRollupRepository
+    ? new CostRollupComparatorService(governanceCostRollupRepository)
+    : undefined;
+
+  // ADR-128's metered lane reads the gateway's own per-request ledger rather
+  // than the rollup, scoped to every project of the organization. One instance
+  // for the whole App, resolving its ClickHouse the same way the rollup does.
+  const governanceGatewaySpendRepository = clickhouseEnabled
+    ? new GovernanceGatewaySpendClickHouseRepository(resolveClickHouseClient)
+    : undefined;
+
+  // ADR-128 §9 step 5. The fold substitutes a pseudonym for an erased
+  // identifier on its way past, and it reads the erasure list through a
+  // process-wide snapshot because its dimension tuple is computed
+  // synchronously. Installing that snapshot is what makes the substitution
+  // happen at all: without this line the fold finds nothing installed and
+  // writes every identifier verbatim, so an erasure's own replay puts the
+  // erased address straight back into the money table.
+  //
+  // Unconditional, and on every role. Nothing is read until a money event asks
+  // a question, and the fold runs on both the web and the worker side.
+  installGovernanceSuppressionSnapshot(prisma);
+
+  // The erasure itself (ADR-128 §9). Its ClickHouse side deletes the money rows
+  // carrying an identifier and reads back which days they were on — a mutation
+  // rather than a query, hence its own repository rather than a method on the
+  // rollup's.
+  const governanceRollupErasureRepository = clickhouseEnabled
+    ? new GovernanceRollupErasureClickHouseRepository(resolveClickHouseClient)
+    : undefined;
+  const governanceIdentityErasure = governanceRollupErasureRepository
+    ? new IdentityErasureService({
+        prisma,
+        tenantHistory: new GovernanceTenantHistoryRepository(),
+        suppression: new ErasedIdentifierSuppressionRepository(),
+        discoveredPeople: new DiscoveredPersonRepository(),
+        identityMatches: new IdentityMatchRepository(),
+        matchSuggestions: new IdentityMatchSuggestionRepository(),
+        rollupErasure: governanceRollupErasureRepository,
+        // Resolved at call time: the ops group is composed further down, and
+        // an erasure happens long after boot. Refusing rather than skipping the
+        // rebuild — the money rows are already deleted by then, so a silent
+        // no-op here is a day's totals quietly missing an amount.
+        replay: createGovernanceRollupReplayPort(() => {
+          const ops = getApp().ops;
+          if (!ops) {
+            throw new Error(
+              "Governance erasure needs the ops replay service to rebuild the daily cost rows, and this process composed no ops group",
+            );
+          }
+          return ops.replay;
+        }),
+        // ADR-022 makes the event log's retention the ceiling on what can be
+        // rebuilt. Stated as null until PR-D wires the configured retention
+        // through: every affected day is then attempted rather than being
+        // pre-emptively written off, and a day that genuinely cannot be
+        // replayed surfaces as a rebuild that changed nothing.
+        replayHorizon: () => null,
+      })
+    : undefined;
+
+  // ADR-128 §12's match engine, and the review surface that reads it. Pure
+  // Postgres — the evidence is confirmed addresses and directory identifiers,
+  // and the links it writes are admin-curated rows — so unlike the erasure next
+  // door it does not ride the ClickHouse gate: an instance with no ClickHouse
+  // still has people to match.
+  //
+  // NOT the suggestion half. That one scores names, and it is composed only
+  // behind the worker-role gate in `enterprisePipelines.identityMatch` below,
+  // so no request path can reach the scorer through this bag.
+  const governanceIdentityMatch = new IdentityMatchService({ prisma });
+
   // Governance's OCSF SIEM-export sink. One instance for the whole App: the
   // subscriber sync writes through it, the puller worker and the workspace-view
   // audit trail write through it, and the SIEM export procedure reads
@@ -978,6 +1202,14 @@ export function initializeDefaultApp(options?: {
   // and the gateway ledger's PRINCIPAL rows.
   const personalUsageRepository = clickhouseEnabled
     ? new PersonalUsageClickHouseRepository(resolveClickHouseClient)
+    : undefined;
+
+  // The /governance activity-monitor read side (spend rollups, per-source
+  // events and health). Org-scoped aggregates, but the queries key on the
+  // hidden governance Project, so it takes the standard per-tenant resolver —
+  // getClickHouseClientForTenant maps a project id to its org's route.
+  const activityMonitorRepository = clickhouseEnabled
+    ? new ActivityMonitorClickHouseRepository(resolveClickHouseClient)
     : undefined;
 
   // Billing-month usage rollups (billable_events + trace_summaries),
@@ -1040,16 +1272,6 @@ export function initializeDefaultApp(options?: {
       })
     : undefined;
   scheduler?.start();
-
-  // ADR-092 stage B: the in-place system migrations. Worker-only and
-  // fire-and-forget - one pass per boot, level-triggered, so held and parked
-  // organizations retry on the restart cadence with nobody running anything.
-  // Redis is handed in rather than read back off the App: this composes the
-  // App, so `tryGetApp()` is still null here, and a null handle would make
-  // the lease unacquirable and every pass a silent no-op.
-  const systemMigrations = roleRunsWorkers(config.processRole)
-    ? startSystemMigrations({ redis })
-    : undefined;
 
   // ADR-044 Phase 3c: register the report handler so a due report ScheduledJob
   // renders + dispatches on schedule (worker-only, same notify pipeline as
@@ -1235,6 +1457,13 @@ export function initializeDefaultApp(options?: {
           }),
       },
     },
+    instantEvals: {
+      runPort: createInstantEvalRunPortFromEnv({
+        runs: instantEvalRuns,
+        judgments: instantEvalJudgments,
+        spend: instantEvalSpend,
+      }),
+    },
     enterprisePipelines: {
       prisma,
       runsWorkers: roleRunsWorkers(config.processRole),
@@ -1246,6 +1475,41 @@ export function initializeDefaultApp(options?: {
             budgetCHRepository: new GatewayBudgetClickHouseRepository(
               resolveClickHouseClient,
             ),
+            // Called at EMIT time, once per withdrawal, never memoized here.
+            // A gate resolved when the app booted would keep withdrawing for
+            // as long as the process lived after somebody switched it off.
+            retractionEnabled: async (organizationId: string) =>
+              await featureFlagService.isEnabled(
+                "release_pulled_usage_retraction_enabled",
+                {
+                  distinctId: organizationId,
+                  // Pulled usage is priced for a whole organization, so the
+                  // gate is too — matching the recording flag beside it.
+                  projectId: NOT_TARGETED,
+                  organizationId,
+                },
+              ),
+          }
+        : undefined,
+      governanceCostRollupStore,
+      costRollupDayComparer,
+      // ADR-128 §12: the suggestion half's ONLY runtime composition, and the
+      // engine's only trigger — the feed that discovers people, a call site
+      // rather than a calendar entry. Worker role only (the name scorer
+      // measured 2.9 seconds of blocked event loop at the ADR's example size)
+      // and proof before guesses, the order the engine spec fixes. This import
+      // is what the scorer's import-graph guard names as the one allowed
+      // caller.
+      identityMatch: roleRunsWorkers(config.processRole)
+        ? {
+            runFor: async ({ organizationId }) => {
+              await IdentityMatchService.create(prisma).linkProvenMatches({
+                organizationId,
+              });
+              await IdentityMatchSuggestionService.create(prisma).recompute({
+                organizationId,
+              });
+            },
           }
         : undefined,
     },
@@ -1262,6 +1526,7 @@ export function initializeDefaultApp(options?: {
     gatewaySpend,
     webhookDelivery,
     gatewayDebits,
+    governanceCostRollupStore,
     // ADR-022: Inject BlobStore into the pipeline registry so RecordSpanCommand
     // can reconstitute oversized commands (fetch from transient S3 spool) and
     // best-effort delete the spool after event_log INSERT succeeds.
@@ -1298,6 +1563,10 @@ export function initializeDefaultApp(options?: {
     langyConversationRepository,
     langyMessageRepository,
     es.getEventStore<LangyConversationProcessingEvent>() ?? null,
+    // The turn's own account of what happened when, read off the live edge at
+    // finalize so the record keeps the paragraphs written between the calls.
+    // Null without Redis: the record then keeps the calls-then-reply shape.
+    redis ? createLangyTurnOrderReader(langyTokenBuffer) : null,
   );
   const langyMessages = new LangyMessageService(
     langyMessageRepository,
@@ -1341,6 +1610,14 @@ export function initializeDefaultApp(options?: {
   const langyTurns = LangyTurnService.create({
     conversations: langyConversations,
     credentials: LangyCredentialService.create(prisma),
+    guidedKickoffFacts: async ({ organizationId }) =>
+      guidedKickoffStateFactsOf(
+        withInstanceFacts(
+          await GuidedOnboardingService.create(prisma).getState({
+            organizationId,
+          }),
+        ),
+      ),
     // ADR-050 versioned prompts. Only consulted when LANGY_PROMPT_PROJECT_ID
     // names the project holding the rows; unset (the default) skips the
     // registry entirely and the in-repo text is used verbatim.
@@ -1361,9 +1638,6 @@ export function initializeDefaultApp(options?: {
     // Check-only cap view for the panel-open warm: signature parity with the
     // turn's token strip, without spending a PR permit on a panel open.
     checkPermit: getLangyGithubPrUsage,
-    // The harness flag (`release_langy_pi_harness`), evaluated once per turn
-    // and riding `credentials.harness` into probe, stash and dispatch.
-    resolveHarness: resolveLangyHarness,
     perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
     mintSessionKey: ({ session, projectId, organizationId }) =>
       mintLangySessionApiKey({ prisma, session, projectId, organizationId }),
@@ -1384,6 +1658,7 @@ export function initializeDefaultApp(options?: {
     resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
     startSuiteRun: commands.suiteRuns.startSuiteRun,
     queueSimulationRun: commands.simulations.queueRun,
+    resolveRunModels: createRunModelsResolver(prisma),
   });
 
   const traceCollection = traced(
@@ -1623,14 +1898,6 @@ export function initializeDefaultApp(options?: {
       close: () => scheduler.stop(),
     });
   }
-  if (systemMigrations) {
-    // Aborts the pass between tenants; a truncated pass is harmless because
-    // every migration is idempotent and the next boot resumes the sweep.
-    gracefulCloseables.push({
-      name: "system-migrations",
-      close: () => systemMigrations.stop(),
-    });
-  }
   gracefulCloseables.push({
     name: "prisma",
     close: () => prisma.$disconnect(),
@@ -1732,7 +1999,12 @@ export function initializeDefaultApp(options?: {
     emailSuppressions,
     dspySteps: { steps: dspySteps },
     analytics: { service: analyticsService },
-    simulations: { runs: simulationReads, export: scenarioRunExport },
+    simulations: {
+      runs: simulationReads,
+      results: resultAtoms,
+      runConfigurations,
+      export: scenarioRunExport,
+    },
     suiteRuns: { runs: suiteRunService },
     topicClustering: {
       status: new TopicClusteringStatusService(
@@ -1740,6 +2012,11 @@ export function initializeDefaultApp(options?: {
       ),
       topics,
       runPage: runClusteringPage,
+    },
+    instantEvals: {
+      runs: instantEvalRuns,
+      judgments: instantEvalJudgments,
+      spend: instantEvalSpend,
     },
     gateway: {
       budgets: gatewayBudgetRepository,
@@ -1776,6 +2053,12 @@ export function initializeDefaultApp(options?: {
       traceActivity: governanceTraceActivityRepository,
       kpis: governanceKpisRepository,
       personalUsage: personalUsageRepository,
+      activityMonitor: activityMonitorRepository,
+      costRollup: governanceCostRollupRepository,
+      gatewaySpend: governanceGatewaySpendRepository,
+      projects: projectRepository,
+      identityErasure: governanceIdentityErasure,
+      identityMatch: governanceIdentityMatch,
     },
     billableEvents: billableEventsRepository,
     codingAgents: {
@@ -1849,7 +2132,19 @@ export function initializeDefaultApp(options?: {
 }
 
 /** Tests — noop commands, null-backed services. */
-export function createTestApp(overrides?: Partial<AppDependencies>): App {
+/**
+ * Overrides a test app takes.
+ *
+ * `simulations` merges into the preset's group rather than replacing it, so a
+ * test that names the one service it cares about keeps the rest. Replacing the
+ * whole group made every test that named two of three services fail to compile
+ * the moment a third was added.
+ */
+export type TestAppOverrides = Omit<Partial<AppDependencies>, "simulations"> & {
+  simulations?: Partial<AppDependencies["simulations"]>;
+};
+
+export function createTestApp(overrides?: TestAppOverrides): App {
   const testPrisma = globalPrisma;
   const testRetentionPolicyRepo = new DataRetentionPolicyRepository(testPrisma);
   const testRetentionPolicyCache = new RetentionPolicyCache(
@@ -1865,6 +2160,31 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
   // Hoisted so the export shares the null repository with `runs`, matching how
   // the production preset wires the pair.
   const testSimulationReads = SimulationRunService.create(null);
+
+  // The caller's overrides merge into this group rather than replacing it, so
+  // a test that names the one service it cares about keeps the rest. Replacing
+  // the whole group made every test naming two of three services stop
+  // compiling the moment a fourth service was added.
+  const testSimulations = {
+    runs: testSimulationReads,
+    // The results read has no null repository. It fails on use rather than
+    // answering an empty page, so a test that reaches it says so instead of
+    // reading as a project with no runs.
+    results: new ResultAtomsService(
+      new ResultAtomsClickHouseRepository(() => {
+        throw new Error("ClickHouse not available in test app");
+      }),
+      testPrisma,
+    ),
+    runConfigurations: new RunConfigurationsService(
+      new RunConfigurationsClickHouseRepository(() => {
+        throw new Error("ClickHouse not available in test app");
+      }),
+      testPrisma,
+    ),
+    export: ScenarioRunExportService.create(testSimulationReads.repository),
+    ...overrides?.simulations,
+  };
   const noop = async () => {
     /* noop */
   };
@@ -1891,11 +2211,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     } as unknown as PromptTagRepository),
     "OrganizationService",
   );
+  const nullProjectRepository = new NullProjectRepository();
   const nullProjects = traced(
-    new ProjectService(
-      new NullProjectRepository(),
-      new NullLwqlKeyMapRepository(),
-    ),
+    new ProjectService(nullProjectRepository, new NullLwqlKeyMapRepository()),
     "ProjectService",
   );
 
@@ -2059,10 +2377,6 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
           testFireTrigger(testDeps, input),
       };
     })(),
-    simulations: {
-      runs: testSimulationReads,
-      export: ScenarioRunExportService.create(testSimulationReads.repository),
-    },
     suiteRuns: {
       runs: SuiteRunService.create({
         resolveClickHouseClient: null,
@@ -2086,6 +2400,17 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       webhookEvents: undefined,
     },
     filters: { options: new FilterService(null) },
+    instantEvals: {
+      runs: new ClickHouseInstantEvalRunRepository({
+        resolveClient: async () => {
+          throw new Error("ClickHouse is not available in the test app");
+        },
+      }),
+      judgments: new ClickHouseInstantEvalJudgmentsRepository(async () => {
+        throw new Error("ClickHouse is not available in the test app");
+      }),
+      spend: new LoggingInstantEvalSpendRecorder(),
+    },
     clickhouse: {
       enabled: false,
       resolveClient: async () => {
@@ -2112,6 +2437,15 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       traceActivity: undefined,
       kpis: undefined,
       personalUsage: undefined,
+      activityMonitor: undefined,
+      costRollup: undefined,
+      gatewaySpend: undefined,
+      projects: nullProjectRepository,
+      identityErasure: undefined,
+      // Real rather than a double: it is Postgres-only, and a test that drives
+      // the review surface wants the actual evidence rules, not a stub that
+      // agrees with whatever the test expects.
+      identityMatch: new IdentityMatchService({ prisma: testPrisma }),
     },
     billableEvents: undefined,
     codingAgents: {
@@ -2161,6 +2495,12 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
           recordTurnHandoff: noop,
           consumeTurnHandoff: noop,
           generateConversationTitle: noop,
+          requestLocalControl: noop,
+          connectLocalWorkspace: noop,
+          disconnectLocalWorkspace: noop,
+          changeLocalPolicy: noop,
+          startUserWait: noop,
+          endUserWait: noop,
         },
         new NullLangyConversationRepository(),
       ),
@@ -2274,6 +2614,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         textMessageStart: noop,
         textMessageEnd: noop,
         finishRun: noop,
+        recordEvaluations: noop,
+        recordAgentInstance: noop,
+        recordCutAtLimit: noop,
         cancelRun: noop,
         deleteRun: noop,
         computeRunMetrics: noop,
@@ -2282,6 +2625,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         startSuiteRun: noop,
         recordSuiteRunItemStarted: noop,
         completeSuiteRunItem: noop,
+        regradeSuiteRunItem: noop,
       } as AppCommands["suiteRuns"],
       langy: {
         createConversation: noop,
@@ -2300,6 +2644,12 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         recordTurnHandoff: noop,
         consumeTurnHandoff: noop,
         generateConversationTitle: noop,
+        requestLocalControl: noop,
+        connectLocalWorkspace: noop,
+        disconnectLocalWorkspace: noop,
+        changeLocalPolicy: noop,
+        startUserWait: noop,
+        endUserWait: noop,
       } as AppCommands["langy"],
       topicClustering: {
         requestClustering: noop,
@@ -2308,6 +2658,13 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         recordClusteringRunFailed: noop,
         recordTopics: noop,
       } as AppCommands["topicClustering"],
+      instantEvals: {
+        requestRun: noop,
+        recordPlanned: noop,
+        recordPageJudged: noop,
+        requestCancel: noop,
+        recordFinished: noop,
+      } as AppCommands["instantEvals"],
       ...createNoopEnterprisePipelineCommands(),
       billing: {
         reportUsageForMonth: noop,
@@ -2372,5 +2729,8 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     // is cached, which is the stricter behaviour of both.
     sharedTraceCache: createSharedTracePayloadCache(null),
     ...overrides,
+    // After the spread, which would otherwise replace the whole group with
+    // whatever subset the caller named.
+    simulations: testSimulations,
   });
 }

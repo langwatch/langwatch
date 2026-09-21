@@ -69,6 +69,8 @@ const ONE_OF_EVERYTHING = {
   cacheCreationTokens: 1,
   inputCharacters: 1,
   audioSeconds: 1,
+  inputImageTokens: 1,
+  outputImageTokens: 1,
 };
 
 /** The unit an entry's rates bill in, from the rate fields it carries. */
@@ -79,6 +81,8 @@ function pricedUnits(entry: LLMModelEntry): Set<string> {
     (p.inputCostPerToken ?? 0) > 0 ||
     (p.outputCostPerToken ?? 0) > 0 ||
     (p.audioCostPerToken ?? 0) > 0 ||
+    (p.imageCostPerToken ?? 0) > 0 ||
+    (p.imageOutputCostPerToken ?? 0) > 0 ||
     (p.inputCacheReadPerToken ?? 0) > 0 ||
     (p.inputCacheWritePerToken ?? 0) > 0
   ) {

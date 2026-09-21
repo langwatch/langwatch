@@ -21,6 +21,7 @@ import type {
   AuthzGrantsRepository,
   AuthzReadRepository,
   BindingPrincipalWhere,
+  GrantEventSource,
   OffboardCounts,
   RoleBindingWrite,
 } from "@langwatch/authz-server";
@@ -139,9 +140,11 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
   async createBinding({
     row,
     actor,
+    source,
   }: {
     row: RoleBindingWrite;
     actor: LedgerActor;
+    source?: GrantEventSource;
   }): Promise<void> {
     const { organizationId, ...binding } = row;
     await withPortFailures(() =>
@@ -149,6 +152,9 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
         organizationId,
         bindings: [binding],
         actor,
+        // Omitted rather than defaulted here: the writer owns the default,
+        // and stating it twice is how the two drift apart.
+        ...(source ? { source } : {}),
         onDuplicate: "reject",
       }),
     );

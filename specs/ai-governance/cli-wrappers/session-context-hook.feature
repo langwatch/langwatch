@@ -38,9 +38,12 @@
 #
 # One command serves all three: the git work, the fingerprint, the payload and
 # the endpoint resolution are tool-agnostic and only the seam differs. It must
-# never write to stdout (a Claude Code SessionStart hook's stdout is injected
-# into the user's session context) and must never fail the session (always exit
-# zero).
+# never fail the session (always exit zero), and it writes to stdout for one
+# reason only: the Claude Code notice after a key heals (see "A revoked ingest
+# key heals itself"), a single JSON line carrying `systemMessage` and nothing
+# the model reads. Every other path stays silent, a failed heal and the
+# non-Claude tools included, because a Claude Code SessionStart hook's stdout
+# is read as its answer to the session.
 
 Feature: Coding agent session context hook
 
@@ -263,10 +266,282 @@ Rule: The hook never disturbs the session
     Then nothing is posted and the exit code is zero
 
   @unit
-  Scenario: The hook never writes to stdout even when the post fails
+  Scenario: The hook writes nothing to stdout when the post fails
     Given a hook invocation whose telemetry endpoint is unreachable
     When the hook runs
     Then stdout stays empty and the exit code is zero
+
+Rule: A tool pinned to a project reports with the pinned key
+
+  # `langwatch instrument <tool> --key` and `--project` pin the tool to one
+  # ingest key, stored per tool rather than per agent, and while that pin
+  # stands the personal path is neither consulted nor rewritten. So a pinned
+  # tool has no personal key to fall back on, and a hook that read only the
+  # personal path sent nothing at all: the session's traces arrived and the
+  # repository, branch and worktree never did, which is what leaves those
+  # sessions unjoined to their pull requests. A pin is an explicit choice of
+  # where this tool's data goes, so it wins over the personal key, and the
+  # endpoint the pin carries wins with it: a machine instrumented against
+  # another instance declares to that instance. This is the normal shape for a
+  # background agent, which traces to a fixed project on a machine that may
+  # never have logged in.
+
+  @unit
+  Scenario: A pinned tool posts its session context with the pinned key
+    Given a hook invocation whose environment carries no OTLP variables
+    And a CLI whose tool is pinned to a project key
+    When the hook runs
+    Then the record is posted to the control plane
+    And it is authorized with the pinned key
+
+  @unit
+  Scenario: The endpoint the pin carries wins over the control plane
+    Given a tool pinned to a key with an endpoint of its own
+    When the hook runs
+    Then the record is posted to the pinned endpoint
+
+  @unit
+  Scenario: A tool with both a pin and a personal key uses the pin
+    Given a CLI holding a personal ingest key for this agent
+    And the same tool pinned to a project key
+    When the hook runs
+    Then it is authorized with the pinned key
+
+  @unit
+  Scenario: A pin for another tool leaves this one on its personal key
+    Given a CLI holding a personal ingest key for this agent
+    And a different tool pinned to a project key
+    When the hook runs
+    Then it is authorized with the personal ingest key
+
+  @unit
+  Scenario: A pin to a loopback endpoint over http still reports
+    Given a tool pinned to a key with a loopback endpoint over plain http
+    When the hook runs
+    Then the record is posted to that loopback endpoint
+
+  @unit
+  Scenario: A pin on a CLI that names no control plane sends nothing
+    Given a tool pinned to a project key with no endpoint of its own
+    And a CLI that names no control plane
+    When the hook runs
+    Then nothing is posted and the exit code is zero
+
+Rule: A revoked ingest key heals itself
+
+  # A personal ingest key can die under a running agent: revoked on the
+  # API-keys page, or retired with the session that minted it after a
+  # re-login on this device. The agent's own exporter answers that 401 with silence, and so did the
+  # hook, so a machine could export into a void for weeks. The hook is the one
+  # process that learns the key is dead on every session, so it repairs it:
+  # re-mint through the CLI's own resolver, rewrite the wiring, retry the
+  # record, and tell the user to restart the agent, which still holds the old
+  # key in its environment. The notice is the only thing the hook ever writes
+  # to stdout.
+
+  @unit
+  Scenario: A rejected personal key is re-minted, rewired and retried
+    Given a signed-in CLI whose cached personal key the collector answers 401 to
+    When the hook runs
+    Then a new key is minted and the tool's wiring is rewritten
+    And the record is posted again with the new key
+    And the user is told to restart the agent
+
+  @unit
+  Scenario: A rejected key with no login to mint with stays silent
+    Given a CLI that is not signed in
+    And a collector that answers 401
+    When the hook runs
+    Then nothing is re-minted, stdout stays empty and the exit code is zero
+
+  @unit
+  Scenario: A second rejection inside the throttle window does not re-mint
+    Given a hook that healed a rejected key minutes ago
+    When the collector answers 401 again
+    Then no new key is minted
+
+  # The window exists to stop a device asking the platform for a key every
+  # session. Only an attempt is worth throttling: a decline is read off the
+  # device's own config before any network call, costs nothing to repeat, and
+  # spending the window on one would silence the next 401 this device can fix.
+
+  @unit
+  Scenario: A decline does not spend the heal throttle
+    Given a 401 the hook declines to heal, because the device sent no key
+    When a repairable 401 arrives inside the same window
+    Then that one is still healed
+
+  @unit
+  Scenario: A failed heal spends the throttle
+    Given a heal that reached the platform and came back with no wired tool
+    When the next session starts inside the window
+    Then no second mint is attempted
+
+  # The window is claimed before the mint rather than recorded after it. Two
+  # sessions opened at the same second read the same 401, and a device that
+  # asked the platform twice for one dead key would spend two of the slots
+  # the per-tool cap gives it.
+
+  @unit
+  Scenario: Two sessions rejected at the same moment mint one key
+    Given two hooks that start together, both exporting with the rejected key
+    When they run at the same time
+    Then only one of them reaches the healer
+
+  # A claim left by a run that died mid-heal is replaced by a delete and a
+  # create, and two hooks reading it stale could interleave those into two
+  # winners. The right to replace it is claimed exclusively first, so the
+  # hooks that lose it stand down rather than deleting the winner's claim.
+
+  @unit
+  Scenario: Two sessions taking over the same stale claim mint one key
+    Given a heal claim left behind by a run that died mid-heal
+    And two hooks that start together, both exporting with the rejected key
+    When they run at the same time
+    Then only one of them reaches the healer
+
+  @unit
+  Scenario: A hook that loses the takeover leaves the winner's claim alone
+    Given a heal claim left behind by a run that died mid-heal
+    And another hook already holding the right to replace it
+    When the hook runs
+    Then it does not reach the healer
+    And the claim being replaced is left in place
+
+  @unit
+  Scenario: A tool pinned to a project is not re-minted on the personal path
+    Given a tool pinned to a project key
+    And a collector that answers 401
+    When the hook runs
+    Then no personal key is minted
+
+  # A pinned key that dies is a decision for whoever pinned it: minting a
+  # personal one in its place would move the session's telemetry to another
+  # project without telling anyone. So the hook stops at the report.
+
+  @unit
+  Scenario: A rejected pinned key is reported rather than healed
+    Given a tool pinned to a project key
+    And a collector that answers 401
+    When the hook runs
+    Then the healer is never reached
+    And the user is told the pinned key was rejected
+
+  @unit
+  Scenario: A pasted credential is never replaced
+    Given a hook exporting with a key that is not the cached personal key
+    And a collector that answers 401
+    When the hook runs
+    Then no personal key is minted
+
+  @unit
+  Scenario: A key the platform still lists as live is not re-minted
+    Given a signed-in CLI whose cached key the platform still lists as live
+    And a collector that answers 401
+    When the hook runs
+    Then no new key is minted
+
+  @unit
+  Scenario: A 401 the device sent no key with is not this key's failure
+    Given a hook whose telemetry target carries no authorization header
+    And a collector that answers 401
+    When the hook runs
+    Then no personal key is minted
+    And stdout stays empty and the exit code is zero
+
+  # A revoke from the API-keys page is a decision about the device that held
+  # the key. The platform records why each key died, and the hook asks before
+  # it re-mints: a key the cap retired or a rotation replaced is the platform's
+  # own doing and is re-minted; a key a person revoked stays dead, and the
+  # person is told to set the machine up again.
+
+  @unit
+  Scenario: A key a person revoked is not re-minted
+    Given a signed-in CLI whose cached key the platform says a person revoked
+    And a collector that answers 401
+    When the hook runs
+    Then no new key is minted
+    And the user is told to run langwatch instrument again
+
+  # Asking is part of the repair, so an answer that never arrives stops it.
+  # Minting on a platform that did not respond would replace a key a person
+  # may have revoked on purpose, on the strength of nothing.
+
+  @unit
+  Scenario: A status call that does not answer ends the heal
+    Given a signed-in CLI whose cached personal key the collector answers 401 to
+    And a platform whose key status call does not answer inside its deadline
+    When the hook runs
+    Then no new key is minted
+    And the window is spent, so the next session asks again later
+
+  # A key revoked before the platform recorded causes reads as revoked with
+  # no cause. It may have been a person, so it is treated as one: withheld.
+
+  @unit
+  Scenario: A key revoked before the cause was recorded is not re-minted
+    Given a signed-in CLI whose cached key the platform says was revoked with no recorded cause
+    And a collector that answers 401
+    When the hook runs
+    Then no new key is minted
+
+  # A key retired with its session is the platform's own doing: this device
+  # signed in again and the old session's keys went with it, or another
+  # session that shared this key was logged out. The device holds a live
+  # session, so it mints a replacement under it.
+
+  @unit
+  Scenario: A key retired with its session is re-minted under the device's current session
+    Given a platform that says the cached key was retired with its session
+    When the hook runs
+    Then a new key is minted and wired
+
+  @unit
+  Scenario: A key whose session expired is re-minted when the device signed in again
+    Given a platform that says the cached key expired with its session
+    And the device holds a live session
+    When the hook runs
+    Then a new key is minted and wired
+
+  # A device whose own session the platform refuses can neither check its key
+  # nor mint a replacement. Saying nothing leaves the session exporting into
+  # a 401 with no sign of why, so the one repair a person can make is named.
+
+  @unit
+  Scenario: A signed-out device is told to sign in again
+    Given a signed-in CLI whose cached personal key the collector answers 401 to
+    And a platform that refuses the device's session
+    When the hook runs
+    Then no new key is minted
+    And the user is told to sign this machine in again
+
+  @unit
+  Scenario: A withheld heal spends the throttle
+    Given a hook that was told a person revoked its key minutes ago
+    When the collector answers 401 again
+    Then the platform is not asked again inside the window
+
+  @unit
+  Scenario: Wiring that writes no target leaves the cached key in place
+    Given a signed-in CLI whose cached personal key the collector answers 401 to
+    And a device where writing the tool's wiring lands no target
+    When the hook runs
+    Then the hook reports no healed target
+    And the cache still holds the key the collector rejected, so the next
+    session heals instead of comparing against a key it never exported with
+    And stdout stays empty and the exit code is zero
+
+  # A heal the device cannot remember is not a heal. The next 401 is repaired
+  # only when the rejected key is the one the cache names, so a tool wired
+  # with a key the cache never recorded would decline its own repair forever.
+
+  @unit
+  Scenario: A key the cache cannot record is not reported as healed
+    Given a signed-in CLI whose cached personal key the collector answers 401 to
+    And a device whose config file cannot be written
+    When the hook runs
+    Then the tool's wiring is left on the key the collector rejected
+    And the hook reports no healed target
 
   @unit
   Scenario: A payload that never arrives does not outlive the session

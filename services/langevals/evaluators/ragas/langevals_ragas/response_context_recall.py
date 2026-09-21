@@ -57,8 +57,10 @@ class RagasResponseContextRecallEvaluator(
         llm, _ = prepare_llm(self, self.settings)
 
         skip = check_max_tokens(
+            input=entry.input,
             output=entry.output,
             expected_output=entry.expected_output,
+            contexts=entry.contexts,
             settings=self.settings,
         )
         if skip:

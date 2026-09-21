@@ -16,28 +16,80 @@ vi.mock("@langwatch/observability", () => ({
 }));
 
 import { getApp } from "~/server/app-layer/app";
-import { archiveScenarioSetRuns } from "../[[...route]]/app";
+import {
+  archiveScenarioRun,
+  archiveScenarioSetRuns,
+} from "../[[...route]]/app";
 
-describe("archiveScenarioSetRuns()", () => {
-  let mockGetRunIdsForSet: Mock;
-  let mockDeleteRun: Mock;
+let mockGetRunIdsForSet: Mock;
+let mockGetScenarioRunData: Mock;
+let mockDeleteRun: Mock;
 
-  beforeEach(() => {
-    vi.clearAllMocks();
+beforeEach(() => {
+  vi.clearAllMocks();
 
-    mockGetRunIdsForSet = vi.fn();
-    mockDeleteRun = vi.fn().mockResolvedValue(undefined);
+  mockGetRunIdsForSet = vi.fn();
+  mockGetScenarioRunData = vi.fn().mockResolvedValue(null);
+  mockDeleteRun = vi.fn().mockResolvedValue(undefined);
 
-    (getApp as Mock).mockReturnValue({
-      simulations: {
-        runs: {
-          getRunIdsForSet: mockGetRunIdsForSet,
-        },
-        deleteRun: mockDeleteRun,
+  (getApp as Mock).mockReturnValue({
+    simulations: {
+      runs: {
+        getRunIdsForSet: mockGetRunIdsForSet,
+        getScenarioRunData: mockGetScenarioRunData,
       },
+      deleteRun: mockDeleteRun,
+    },
+  });
+});
+
+describe("archiveScenarioRun()", () => {
+  describe("when the run belongs to the project", () => {
+    /** @scenario "DELETE with scenarioRunId archives exactly that run" */
+    it("dispatches deleteRun for that run only and reports it", async () => {
+      mockGetScenarioRunData.mockResolvedValue({ scenarioRunId: "run-1" });
+
+      const result = await archiveScenarioRun({
+        projectId: "project-a",
+        scenarioRunId: "run-1",
+      });
+
+      expect(result).toEqual({
+        archived: 1,
+        failed: 0,
+        scenarioRunId: "run-1",
+      });
+      expect(mockGetScenarioRunData).toHaveBeenCalledWith({
+        projectId: "project-a",
+        scenarioRunId: "run-1",
+      });
+      expect(mockDeleteRun).toHaveBeenCalledTimes(1);
+      expect(mockDeleteRun).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: "project-a",
+          scenarioRunId: "run-1",
+        }),
+      );
     });
   });
 
+  describe("when the project does not hold the run", () => {
+    /** @scenario "DELETE with a scenarioRunId the project does not hold is not found" */
+    it("returns null and archives nothing", async () => {
+      mockGetScenarioRunData.mockResolvedValue(null);
+
+      const result = await archiveScenarioRun({
+        projectId: "project-a",
+        scenarioRunId: "run-of-project-b",
+      });
+
+      expect(result).toBeNull();
+      expect(mockDeleteRun).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("archiveScenarioSetRuns()", () => {
   describe("when getRunIdsForSet returns N runs", () => {
     /** @scenario "Archiving one set leaves runs in other sets untouched" */
     it("dispatches deleteRun for each and returns archived=N, failed=0, scenarioSetId, hasMore=false", async () => {

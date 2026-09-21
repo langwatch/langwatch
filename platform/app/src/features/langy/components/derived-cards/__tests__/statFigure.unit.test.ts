@@ -4,9 +4,35 @@
 import { describe, expect, it } from "vitest";
 import {
   formatStatFigure,
+  formatStatNumber,
   isComparableSeries,
   resolveStatUnit,
 } from "../statFigure";
+
+describe("formatStatNumber", () => {
+  describe("given a reading smaller than a hundredth", () => {
+    /** @scenario "A reading smaller than a hundredth keeps its digits" */
+    it("keeps the digits rather than rounding to zero", () => {
+      expect(formatStatNumber(0.0001543)).toBe("0.0001543");
+      expect(formatStatNumber(-0.0001543)).toBe("-0.0001543");
+    });
+  });
+
+  describe("given a reading of zero", () => {
+    /** @scenario "A reading of zero is still drawn as zero" */
+    it("draws it as zero, with no sign", () => {
+      expect(formatStatNumber(0)).toBe("0");
+      expect(formatStatNumber(-0)).toBe("0");
+    });
+  });
+
+  describe("given a reading a hundredth or larger", () => {
+    it("leaves the reading as it was", () => {
+      expect(formatStatNumber(0.01)).toBe("0.01");
+      expect(formatStatNumber(1204)).toBe("1,204");
+    });
+  });
+});
 
 describe("formatStatFigure", () => {
   describe("given a unit word with a canonical symbol", () => {
@@ -41,6 +67,37 @@ describe("formatStatFigure", () => {
     it("draws the number alone", () => {
       expect(formatStatFigure({ value: 1204 })).toBe("1,204");
       expect(formatStatFigure({ value: 1204, unit: "   " })).toBe("1,204");
+    });
+  });
+
+  describe("given a value smaller than a hundredth", () => {
+    /** @scenario "A reading smaller than a hundredth keeps its digits" */
+    it("keeps the digits rather than rounding to zero", () => {
+      expect(formatStatFigure({ value: 0.0001543, unit: "usd" })).toBe(
+        "0.0001543 usd",
+      );
+      expect(formatStatFigure({ value: -0.0001543, unit: "usd" })).toBe(
+        "-0.0001543 usd",
+      );
+      expect(formatStatFigure({ value: 0.00025 })).toBe("0.00025");
+    });
+
+    /** @scenario "A reading of zero is still drawn as zero" */
+    it("still draws zero as zero", () => {
+      expect(formatStatFigure({ value: 0, unit: "usd" })).toBe("0 usd");
+    });
+
+    /** @scenario "A reading of zero is still drawn as zero" */
+    it("draws negative zero as zero, with no sign", () => {
+      expect(formatStatFigure({ value: -0, unit: "usd" })).toBe("0 usd");
+    });
+  });
+
+  describe("given a value a hundredth or larger", () => {
+    it("leaves the reading as it was", () => {
+      expect(formatStatFigure({ value: 0.01, unit: "usd" })).toBe("0.01 usd");
+      expect(formatStatFigure({ value: 0.5, unit: "usd" })).toBe("0.5 usd");
+      expect(formatStatFigure({ value: 1204 })).toBe("1,204");
     });
   });
 

@@ -1,5 +1,10 @@
 export { addColumn } from "./addColumn";
-export { addEvaluator, attachEvaluator, newEvaluatorId } from "./addEvaluator";
+export {
+  addEvaluator,
+  assertComparisonColumnAllowed,
+  attachEvaluator,
+  newEvaluatorId,
+} from "./addEvaluator";
 export { addRows } from "./addRows";
 export { addTarget, attachTarget, newTargetId } from "./addTarget";
 export { duplicateTarget } from "./duplicateTarget";

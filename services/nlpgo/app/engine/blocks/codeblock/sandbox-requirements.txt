@@ -24,4 +24,8 @@ pydantic
 # The LangWatch Python SDK, so code blocks can fetch prompts, datasets, and
 # emit traces. Pulls pydantic + httpx (already here) + otel + python-liquid;
 # it does NOT require pandas/numpy.
-langwatch
+#
+# Installed from sdks/python/ in the monorepo, not from PyPI. The Dockerfile
+# COPYs it into /tmp/langwatch-sdk/ so the sandbox gets the same version as
+# the commit that built the image.
+/tmp/langwatch-sdk

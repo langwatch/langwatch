@@ -15,9 +15,14 @@ import type { UsageLimitService } from "../../../ee/billing/notifications/usage-
 import type { NurturingService } from "../../../ee/billing/nurturing/nurturing.service";
 import type { BillableEventsClickHouseRepository } from "../../../ee/billing/services/billableEvents.clickhouse.repository";
 import type { WebhookService } from "../../../ee/billing/services/webhookService";
+import type { ActivityMonitorClickHouseRepository } from "../../../ee/governance/services/activity-monitor/activityMonitor.clickhouse.repository";
+import type { GovernanceCostRollupClickHouseRepository } from "../../../ee/governance/services/governanceCostRollup.clickhouse.repository";
+import type { GovernanceGatewaySpendClickHouseRepository } from "../../../ee/governance/services/governanceGatewaySpend.clickhouse.repository";
 import type { GovernanceKpisClickHouseRepository } from "../../../ee/governance/services/governanceKpis.clickhouse.repository";
 import type { GovernanceOcsfEventsClickHouseRepository } from "../../../ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import type { GovernanceTraceActivityClickHouseRepository } from "../../../ee/governance/services/governanceTraceActivity.clickhouse.repository";
+import type { IdentityErasureService } from "../../../ee/governance/services/identityErasure.service";
+import type { IdentityMatchService } from "../../../ee/governance/services/identityMatch.service";
 import type { PersonalUsageClickHouseRepository } from "../../../ee/governance/services/personalUsage.clickhouse.repository";
 import type { ClickHouseClientResolver } from "../clickhouse/clickhouseClient";
 import type { StorageMeterService } from "../data-retention/metering/storageMeter.service";
@@ -51,6 +56,9 @@ import type { GithubInstallationsService } from "./github/github-installations.s
 import type { GithubPullRequestMappingService } from "./github/github-pull-request-mapping.service";
 import type { GithubPullRequestStatusService } from "./github/github-pull-request-status.service";
 import type { GithubPullRequestsRepository } from "./github/repositories/github-pull-requests.repository";
+import type { InstantEvalSpendRecorder } from "./instant-evals/instant-eval-spend.recorder";
+import type { InstantEvalJudgmentsRepository } from "./instant-evals/run/instant-eval-judgments.repository";
+import type { InstantEvalRunRepository } from "./instant-evals/run/instant-eval-run.repository";
 import type { LangyCredentialService } from "./langy/LangyCredentialService";
 import type { LangyConversationService } from "./langy/langy-conversation.service";
 import type { LangyFeedbackPromptService } from "./langy/langy-feedback-prompt.service";
@@ -68,8 +76,11 @@ import type { OrganizationService } from "./organizations/organization.service";
 import type { PermissionsService } from "./permissions/permissions.service";
 import type { PresenceService } from "./presence/presence.service";
 import type { ProjectService } from "./projects/project.service";
+import type { ProjectRepository } from "./projects/repositories/project.repository";
 import type { ShareService } from "./share/share.service";
 import type { SharedTracePayloadCache } from "./share/shared-trace-cache.service";
+import type { ResultAtomsService } from "./simulations/result-atoms/result-atoms.service";
+import type { RunConfigurationsService } from "./simulations/run-configurations/run-configurations.service";
 import type { SimulationRunService } from "./simulations/simulation-run.service";
 import type { PlanProvider } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
@@ -156,6 +167,18 @@ export interface AppDependencies {
   simulations: {
     runs: SimulationRunService;
     /**
+     * The atom reads behind the Results tab: one scenario, one target, one
+     * run. A sibling of `runs` because it answers a different question, and
+     * because nothing it does may change what `runs` serves to v1.
+     */
+    results: ResultAtomsService;
+    /**
+     * The configurations the run dialog offers back: what each run of a plan
+     * was asked to do, read off the runs rather than off the plan row, which
+     * holds only the configuration of its last run.
+     */
+    runConfigurations: RunConfigurationsService;
+    /**
      * CSV export of run history. A sibling of `runs` rather than a method on
      * it: the export sweeps with its own keyset pagination and serializers,
      * and the API layer should reach it here instead of assembling one from
@@ -184,6 +207,17 @@ export interface AppDependencies {
       searchAfter?: [number, string];
       runContext?: ClusteringRunContext;
     }) => Promise<ClusteringPageOutcome>;
+  };
+  /**
+   * ADR-137: the Instant Eval stores, already bound to the composition root's
+   * ClickHouse resolver, and where a query's or a run's spend is reported.
+   * The run surface reads and writes runs and verdicts through these instead
+   * of resolving a client of its own.
+   */
+  instantEvals: {
+    runs: InstantEvalRunRepository;
+    judgments: InstantEvalJudgmentsRepository;
+    spend: InstantEvalSpendRecorder;
   };
   /**
    * The gateway's ClickHouse-backed repositories. Undefined on a deployment
@@ -274,6 +308,32 @@ export interface AppDependencies {
     kpis: GovernanceKpisClickHouseRepository | undefined;
     /** The /me dashboard's spend/token/model rollups. */
     personalUsage: PersonalUsageClickHouseRepository | undefined;
+    /** The /governance activity-monitor read side (spend rollups, per-source
+     *  events and health). Undefined on a deployment without ClickHouse. */
+    activityMonitor: ActivityMonitorClickHouseRepository | undefined;
+    /** ADR-128's daily cost rollup — the fold's write side and the read both
+     *  the screen and the drift comparator go through. */
+    costRollup: GovernanceCostRollupClickHouseRepository | undefined;
+    /** ADR-128's metered lane: the gateway's per-request billing ledger
+     *  (`gateway_spend`), read scoped to every project of the organization.
+     *  Undefined on a deployment without ClickHouse. */
+    gatewaySpend: GovernanceGatewaySpendClickHouseRepository | undefined;
+    /** The metered lane's tenant scope: every project of the organization,
+     *  archived ones included, since `gateway_spend.TenantId` is the traffic's
+     *  own project id. The same instance the ProjectService reads through. */
+    projects: ProjectRepository;
+    /** ADR-128 §9: erasing a discovered person from the governance data —
+     *  the suppression list, the account links, the person row and the
+     *  money rows. Undefined on a deployment without ClickHouse, which has
+     *  no money rows to erase from. */
+    identityErasure: IdentityErasureService | undefined;
+    /** ADR-128 §12: linking provider-named people to accounts on proof, and
+     *  the review queue for everything proof cannot settle. Always present —
+     *  its evidence is confirmed addresses and directory identifiers, so it
+     *  has work to do on a deployment with no ClickHouse. The half that SCORES
+     *  names is deliberately not here: it is composed only on the worker role,
+     *  so no request path can reach it. */
+    identityMatch: IdentityMatchService;
   };
   /** Billing-month usage rollups (billable_events + trace_summaries) behind
    *  `billableEventsQuery.ts`'s exported query functions. */

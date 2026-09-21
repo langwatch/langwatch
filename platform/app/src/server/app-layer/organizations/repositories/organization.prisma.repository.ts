@@ -29,8 +29,8 @@ import {
 } from "~/utils/memberRoleConstraints";
 import { GROWTH_SEAT_PLAN_TYPES } from "../../../../../ee/billing/utils/growthSeatEvent";
 import { isCustomRole } from "../../../api/enterprise";
-import { revokeAllSessionsForUser } from "../../../better-auth/revokeSessions";
 import { CustomRoleNotAssignableError } from "../../../role-bindings/errors";
+import { sessionRevocation } from "../../identity/runtime";
 import {
   CannotRemoveSelfAsLastAdminError,
   LiteMemberViewerOnlyError,
@@ -47,6 +47,7 @@ import {
 } from "../errors";
 import type {
   AuditLogFilters,
+  BillingOrganizationLookup,
   CreateAndAssignInput,
   CreateAndAssignResult,
   CreateForProvisioningInput,
@@ -54,7 +55,6 @@ import type {
   EnrichedAuditLog,
   FullyLoadedOrganization,
   MemberTeamBinding,
-  OrganizationForBilling,
   OrganizationMemberSummary,
   OrganizationMemberWithUser,
   OrganizationProvisioningSummary,
@@ -441,7 +441,10 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     organizationId: string,
   ): Promise<Array<{ id: string; name: string }>> {
     return this.prisma.project.findMany({
-      where: { team: { organizationId } },
+      // Named projects reach a customer — the plan-limit alert email lists
+      // them per project. The governance project's usage stays in the
+      // org-level total rather than becoming a line that reveals it.
+      where: { team: { organizationId }, kind: { not: "internal_governance" } },
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     });
@@ -515,11 +518,17 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
 
   async getOrganizationForBilling(
     organizationId: string,
-  ): Promise<OrganizationForBilling | null> {
-    return this.prisma.organization.findFirst({
-      where: { id: organizationId, pricingModel: PricingModel.SEAT_EVENT },
+  ): Promise<BillingOrganizationLookup> {
+    // The pricing model is SELECTED rather than filtered on, so one query
+    // still answers both questions. Filtering on it made a non-usage-billed
+    // organization indistinguishable from an absent row, and the only way to
+    // tell them apart afterwards would have been a second query on the exact
+    // path this lookup is trying to keep cheap.
+    const organization = await this.prisma.organization.findFirst({
+      where: { id: organizationId },
       select: {
         id: true,
+        pricingModel: true,
         stripeCustomerId: true,
         subscriptions: {
           where: {
@@ -532,6 +541,14 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         },
       },
     });
+
+    if (!organization) return { outcome: "not_found" };
+    if (organization.pricingModel !== PricingModel.SEAT_EVENT) {
+      return { outcome: "not_usage_billed" };
+    }
+
+    const { pricingModel: _pricingModel, ...forBilling } = organization;
+    return { outcome: "usage_billed", organization: forBilling };
   }
 
   async createAndAssign(
@@ -1265,7 +1282,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     if (disabled) {
       // Revoking the seat has to revoke the live session too, or the person
       // keeps working until their token happens to expire.
-      await revokeAllSessionsForUser({ prisma: this.prisma, userId });
+      await sessionRevocation({ prisma: this.prisma }).revokeAll({ userId });
     }
   }
 

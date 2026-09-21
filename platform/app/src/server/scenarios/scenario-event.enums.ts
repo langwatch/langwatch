@@ -44,6 +44,19 @@ export enum ScenarioRunStatus {
   QUEUED = "QUEUED",
   /** Queue active state - job is being executed by a worker */
   RUNNING = "RUNNING",
+  /**
+   * The conversation is over and the judge has decided, but the evaluators the
+   * run's suite and plan attach have not been recorded yet, so the run may
+   * still be failed by a required one.
+   *
+   * Stored by the fold when the run finishes, the way QUEUED is, and
+   * replaced by the gated terminal status when the evaluated event records
+   * the results. A grading job that is lost is recorded as errored evaluators
+   * once its deadline passes, so a run never stays here for good.
+   *
+   * @see specs/scenarios/scenario-evaluation-pending.feature
+   */
+  PENDING_EVALUATION = "PENDING_EVALUATION",
 }
 
 /** Statuses that are eligible for cancellation (still in-flight). */

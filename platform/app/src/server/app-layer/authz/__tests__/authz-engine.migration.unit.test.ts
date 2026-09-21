@@ -1476,3 +1476,22 @@ describe("given a self-hosted installation", () => {
     });
   });
 });
+
+describe("given a cloud installation", () => {
+  describe("when the migration's cohort declaration is read", () => {
+    /** @scenario "The migration reaches every cloud organization without enrollment" */
+    it("declares that every organization is enrolled automatically", () => {
+      // The per-organization rollout is finished; what enrollment would
+      // still decide is only whether an organization created SINCE ever
+      // migrates. Reverting this leaves every new organization on the legacy
+      // authorization path until an operator notices, so it is pinned.
+      expect(
+        new AuthzEngineMigration({
+          store: {} as never,
+          ledger: {} as never,
+          now: () => 0,
+        }).enrolledAutomatically,
+      ).toBe(true);
+    });
+  });
+});

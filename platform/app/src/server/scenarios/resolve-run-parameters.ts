@@ -18,6 +18,8 @@
 
 import {
   ScenarioParameterMissingError,
+  ScenarioParameterOptionInvalidError,
+  ScenarioParameterRequiredError,
   ScenarioParameterTemplateInvalidError,
   ScenarioParameterUnknownError,
   ScenarioSecretParameterConflictError,
@@ -50,17 +52,23 @@ export type ResolvedScenarioParameters = {
 };
 
 /**
- * Refuses the run when the caller named something no scenario in it declares.
+ * Refuses the run when the caller named something nothing in it declares.
  *
  * A name the run cannot act on is almost always a typo, and a run that
  * silently ignored it would report a pass for values the target never saw.
+ * The declarations read are the scenarios' own plus the target's, so the
+ * refusal names the target: the same value can be right for one agent of the
+ * run and unknown to the next.
  */
 function assertEveryNameIsDeclared({
   declaredNames,
   values,
+  targetLabel,
 }: {
   declaredNames: Set<string>;
   values?: RunParameterValues;
+  /** The target this set of values was resolved for, when the run names one. */
+  targetLabel?: string;
 }): void {
   if (!values) return;
   const unknownKeys = findUnknownParameterKeys({ declaredNames, values });
@@ -68,7 +76,67 @@ function assertEveryNameIsDeclared({
   throw new ScenarioParameterUnknownError({
     unknownKeys,
     declaredNames: [...declaredNames],
+    ...(targetLabel ? { targetLabel } : {}),
   });
+}
+
+/**
+ * Refuses the run when a supplied value is outside the closed option list a
+ * parameter declares.
+ *
+ * Checked on the supplied values alone: a default is one of the options by
+ * construction, and a value the run never named cannot be wrong. The first
+ * declaration of a name that lists options is the one that decides.
+ */
+function assertEveryValueIsAnOption({
+  definitions,
+  values,
+}: {
+  definitions: readonly ScenarioParameterDefinition[];
+  values?: RunParameterValues;
+}): void {
+  if (!values) return;
+  const optionsByName = new Map<
+    string,
+    ScenarioParameterDefinition["options"]
+  >();
+  for (const definition of definitions) {
+    if (definition.options && !optionsByName.has(definition.name)) {
+      optionsByName.set(definition.name, definition.options);
+    }
+  }
+  for (const [name, value] of Object.entries(values)) {
+    const options = optionsByName.get(name);
+    if (!options || options.includes(value)) continue;
+    throw new ScenarioParameterOptionInvalidError({ name, value, options });
+  }
+}
+
+/**
+ * Refuses the run when a parameter declared required resolved no value.
+ *
+ * A connected agent declares required every function parameter its own code
+ * gives no default, and the SDK refuses a call that carries none. Read on the
+ * merged values rather than on the supplied ones, so a default declared by
+ * the scenario answers the agent's requirement.
+ */
+function assertEveryRequiredHasAValue({
+  definitions,
+  parameters,
+}: {
+  definitions: readonly ScenarioParameterDefinition[];
+  parameters: RunParameterValues;
+}): void {
+  const required = new Set(
+    definitions
+      .filter((definition) => definition.required === true)
+      .map((definition) => definition.name),
+  );
+  const missing = [...required].filter(
+    (name) => parameters[name] === undefined,
+  );
+  if (missing.length === 0) return;
+  throw new ScenarioParameterRequiredError({ names: missing });
 }
 
 /**
@@ -177,11 +245,13 @@ function secretValuesFor({
  * the secret ones out of that merge.
  *
  * @throws {ScenarioParameterUnknownError} when a supplied name is declared by
- *   no scenario in the run.
+ *   no scenario in the run and by no target of it.
  * @throws {ScenarioSecretParameterConflictError} when one name is declared
  *   secret by one scenario in the run and plain by another.
  * @throws {ScenarioSecretParameterMissingError} when a declared secret has no
  *   text value for this run.
+ * @throws {ScenarioParameterRequiredError} when a parameter declared required
+ *   resolved no value for this run.
  * @throws {ScenarioSecretParameterInTextError} when a scenario's own text
  *   reads a secret parameter.
  * @throws {ScenarioParameterMissingError} when a scenario's own text reads a
@@ -191,29 +261,60 @@ function secretValuesFor({
  */
 export async function resolveRunParameters({
   scenarios,
+  targetDefinitions = [],
+  targetLabel,
   values,
 }: {
   scenarios: readonly ScenarioRunConfig[];
+  /**
+   * The parameters the run's target declares on its own, a connected agent's
+   * function parameters. Every scenario of the run reads them after its own
+   * declarations, so a scenario's default wins over the agent's. They are
+   * never secret: a secret stays scenario-declared and run-level.
+   */
+  targetDefinitions?: readonly ScenarioParameterDefinition[];
+  /** What the target is called, for a refusal that names it. */
+  targetLabel?: string;
   values?: RunParameterValues;
 }): Promise<Map<string, ResolvedScenarioParameters>> {
+  const targetPlain = targetDefinitions.filter(
+    (definition) => definition.secret !== true,
+  );
   const definitionsByScenarioId = new Map(
-    scenarios.map((scenario) => [
-      scenario.id,
-      partitionParameterDefinitions(
+    scenarios.map((scenario) => {
+      const own = partitionParameterDefinitions(
         parseScenarioParameterDefinitions(scenario.parameters),
-      ),
-    ]),
+      );
+      // The agent's definitions sit before the scenario's own, and a later
+      // default overwrites an earlier one in the merge, so the scenario's
+      // own default is the one the run reads.
+      return [
+        scenario.id,
+        {
+          plain: [...targetPlain, ...own.plain],
+          secret: own.secret,
+          own: [...own.plain, ...own.secret],
+        },
+      ];
+    }),
   );
 
   const secretNames = new Set<string>();
   const plainNames = new Set<string>();
-  for (const { plain, secret } of definitionsByScenarioId.values()) {
+  const allDefinitions: ScenarioParameterDefinition[] = [];
+  for (const { plain, secret, own } of definitionsByScenarioId.values()) {
     for (const definition of plain) plainNames.add(definition.name);
     for (const definition of secret) secretNames.add(definition.name);
+    allDefinitions.push(...own);
   }
+  for (const definition of targetPlain) plainNames.add(definition.name);
   const declaredNames = new Set([...plainNames, ...secretNames]);
 
-  assertEveryNameIsDeclared({ declaredNames, values });
+  assertEveryNameIsDeclared({ declaredNames, values, targetLabel });
+  assertEveryValueIsAnOption({
+    definitions: [...allDefinitions, ...targetPlain],
+    values,
+  });
   assertNoSecretConflict({ secretNames, plainNames });
   assertEverySecretHasAValue({ secretNames, values });
 
@@ -231,6 +332,8 @@ export async function resolveRunParameters({
       definitions: plain,
       values: plainValues,
     });
+
+    assertEveryRequiredHasAValue({ definitions: plain, parameters });
 
     await assertScenarioTextRenders({
       scenario,

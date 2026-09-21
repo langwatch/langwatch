@@ -1,0 +1,512 @@
+import { describe, expect, it } from "vitest";
+import { normalizeIdentifierValue } from "../identifier";
+import {
+  type AccountSignInMethods,
+  rankAccountMethods,
+  type RoutableConnection,
+  type RoutingDecision,
+  type SignInMethod,
+  type SignInMethodPolicy,
+  routeSignIn,
+  routingIdentifierOf,
+} from "../signin-routing";
+
+const PASSWORD: SignInMethod = {
+  id: "password",
+  kind: "password",
+  connectionId: null,
+};
+
+const okta: SignInMethod = {
+  id: "okta",
+  kind: "federated",
+  connectionId: "conn_acme",
+};
+
+function connection(
+  overrides: Partial<RoutableConnection> = {},
+): RoutableConnection {
+  return {
+    connectionId: "conn_acme",
+    method: okta,
+    state: "ACTIVE",
+    configured: true,
+    // The field this replaced was `arrivalPolicy`; "admit" is the answer that
+    // let an unmatched subject through, which is `allowsJit: true`.
+    allowsJit: true,
+    ...overrides,
+  };
+}
+
+function policy(
+  overrides: Partial<SignInMethodPolicy> = {},
+): SignInMethodPolicy {
+  return {
+    defaultMethods: [PASSWORD],
+    localMethods: [PASSWORD],
+    federationLicensed: true,
+    selfHosted: true,
+    ...overrides,
+  };
+}
+
+function route({
+  raw = null,
+  breakGlass = false,
+  domainConnection = null,
+  activeConnections = [],
+  methodPolicy = policy(),
+  account,
+}: {
+  raw?: string | null;
+  breakGlass?: boolean;
+  domainConnection?: RoutableConnection | null;
+  activeConnections?: readonly RoutableConnection[];
+  methodPolicy?: SignInMethodPolicy;
+  account?: AccountSignInMethods | null;
+} = {}): RoutingDecision {
+  return routeSignIn({
+    identifier: raw === null ? null : routingIdentifierOf(raw),
+    breakGlass,
+    policy: methodPolicy,
+    domainConnection,
+    activeConnections,
+    account,
+  });
+}
+
+/** An account holding a password and nothing else. */
+const PASSWORD_ACCOUNT: AccountSignInMethods = {
+  hasPassword: true,
+  hasPasskey: false,
+  providerIds: [],
+  connectionIds: [],
+};
+
+describe("the identifier-first sign-in router", () => {
+  describe("given a domain that belongs to an ACTIVE connection", () => {
+    /** @scenario "An email on an SSO domain routes to that connection's provider" */
+    it("redirects to that connection's identity provider", () => {
+      const decision = route({
+        raw: "Sam.J+news@Acme.com",
+        domainConnection: connection(),
+      });
+
+      expect(decision).toEqual({
+        outcome: "redirect_to_connection",
+        connectionId: "conn_acme",
+        methodSet: [okta],
+        reasonCode: "domain_routed",
+      });
+    });
+
+    /** @scenario "An email on an SSO domain routes to that connection's provider" */
+    it("normalizes the submitted value exactly as an attach does", () => {
+      const identifier = routingIdentifierOf("Sam.J+news@Acme.com");
+
+      expect(identifier.normalized).toBe(
+        normalizeIdentifierValue("Sam.J+news@Acme.com"),
+      );
+      // The tag survives the fold, and the DOMAIN is still what routes: a
+      // tagged address reaches its organization's connection exactly as the
+      // bare one does.
+      expect(identifier).toEqual({
+        normalized: "sam.j+news@acme.com",
+        domain: "acme.com",
+      });
+    });
+  });
+
+  describe("given a domain that belongs to no ACTIVE connection", () => {
+    it("offers the instance's default method set", () => {
+      const decision = route({ raw: "sam@home.net" });
+
+      expect(decision).toEqual({
+        outcome: "method_picker",
+        methodSet: [PASSWORD],
+        reasonCode: "no_domain_match",
+      });
+    });
+
+    /**
+     * The old invariant here — "answers a known address and an unknown one
+     * with one decision, field for field" — is RETIRED by ADR-117's
+     * 2026-08-25 revision, and this is its replacement rather than its
+     * deletion. Telling the two apart is now the point; what must still hold
+     * is that a deployment which never wires the lookup is unchanged, which is
+     * what this asserts.
+     */
+    /** @scenario "A router that was never asked about accounts answers as it always did" */
+    it("offers the uniform picker when the account was never looked up", () => {
+      // No `account` key at all: the composition layer skipped the lookup.
+      // Distinct from `null`, which is a routing answer meaning "nobody holds
+      // this address" — conflating the two is what would make a deployment
+      // without the lookup send every visitor to sign-up.
+      const known = route({ raw: "sam@home.net" });
+      const unknown = route({ raw: "nobody-has-ever-signed-up@home.net" });
+
+      expect(known).toEqual(unknown);
+      expect(known.reasonCode).toBe("no_domain_match");
+      expect(JSON.stringify(known)).not.toContain("sam");
+    });
+
+    /** @scenario "An address with no account carries on as a sign-up" */
+    it("routes an address nobody holds to sign-up, offering no method at all", () => {
+      const decision = route({ raw: "nobody@home.net", account: null });
+
+      expect(decision).toEqual({
+        outcome: "route_to_signup",
+        methodSet: [],
+        reasonCode: "identifier_unknown",
+      });
+    });
+
+    /** @scenario "The methods offered are the ones that account holds" */
+    it("offers the account's own methods rather than the instance's", () => {
+      const decision = route({
+        raw: "sam@home.net",
+        account: {
+          hasPassword: false,
+          hasPasskey: true,
+          providerIds: [],
+          connectionIds: [],
+        },
+        methodPolicy: policy({
+          defaultMethods: [
+            PASSWORD,
+            { id: "passkey", kind: "passkey", connectionId: null },
+          ],
+        }),
+      });
+
+      expect(decision.outcome).toBe("method_picker");
+      expect(decision.reasonCode).toBe("account_methods");
+      // The password this deployment offers is NOT offered to an account that
+      // holds none: that box could only ever fail.
+      expect(decision.methodSet).toEqual([
+        { id: "passkey", kind: "passkey", connectionId: null },
+      ]);
+    });
+
+    /** @scenario "An account whose only method is federated redirects straight to it" */
+    it("redirects an account whose one way in is a federated provider", () => {
+      const auth0: SignInMethod = {
+        id: "auth0",
+        kind: "federated",
+        connectionId: null,
+      };
+      const decision = route({
+        raw: "sam@home.net",
+        account: {
+          hasPassword: false,
+          hasPasskey: false,
+          providerIds: ["auth0"],
+          connectionIds: [],
+        },
+        methodPolicy: policy({ defaultMethods: [auth0, PASSWORD] }),
+      });
+
+      // No connectionId: the legacy env provider is instance-level, and a
+      // key holding `undefined` would still be a key the recorder reads.
+      expect(decision).toEqual({
+        outcome: "redirect_to_connection",
+        methodSet: [auth0],
+        reasonCode: "account_methods",
+      });
+    });
+
+    /** @scenario "An account whose only method is federated redirects straight to it" */
+    it("keeps the picker when the sole method belongs to a connection", () => {
+      // A connection carries a lifecycle this branch cannot see — SUSPENDED,
+      // unconfigured — and every other redirect to one passes those gates.
+      // Until the account branch can ask for the connection's state, a
+      // connection-scoped sole method draws the picker it always did.
+      const decision = route({
+        raw: "sam@home.net",
+        account: {
+          hasPassword: false,
+          hasPasskey: false,
+          providerIds: [],
+          connectionIds: ["conn_acme"],
+        },
+        methodPolicy: policy({ defaultMethods: [okta] }),
+      });
+
+      expect(decision).toEqual({
+        outcome: "method_picker",
+        methodSet: [okta],
+        reasonCode: "account_methods",
+      });
+    });
+
+    /** @scenario "An account whose only method is federated redirects straight to it" */
+    it("keeps the picker when a second method stands beside the federated one", () => {
+      const auth0: SignInMethod = {
+        id: "auth0",
+        kind: "federated",
+        connectionId: null,
+      };
+      const passkey: SignInMethod = {
+        id: "passkey",
+        kind: "passkey",
+        connectionId: null,
+      };
+      const decision = route({
+        raw: "sam@home.net",
+        account: {
+          hasPassword: false,
+          hasPasskey: true,
+          providerIds: ["auth0"],
+          connectionIds: [],
+        },
+        methodPolicy: policy({ defaultMethods: [auth0, passkey] }),
+      });
+
+      expect(decision.outcome).toBe("method_picker");
+      expect(decision.methodSet).toEqual([passkey, auth0]);
+    });
+
+    /** @scenario "An account whose only method is federated redirects straight to it" */
+    it("never redirects an account holding only a password", () => {
+      const decision = route({ raw: "sam@home.net", account: PASSWORD_ACCOUNT });
+
+      expect(decision).toEqual({
+        outcome: "method_picker",
+        methodSet: [PASSWORD],
+        reasonCode: "account_methods",
+      });
+    });
+
+    /** @scenario "An account whose every method was turned off still gets a way in" */
+    it("falls back to the uniform picker when policy offers none of the account's methods", () => {
+      const decision = route({
+        raw: "sam@home.net",
+        // Holds a password on a deployment that has since stopped offering one.
+        account: PASSWORD_ACCOUNT,
+        methodPolicy: policy({
+          defaultMethods: [{ id: "google", kind: "federated", connectionId: null }],
+        }),
+      });
+
+      // Not a sign-up: the account is real, and somebody may yet turn the
+      // method back on. It gets the ways in that do work.
+      expect(decision.outcome).toBe("method_picker");
+      expect(decision.reasonCode).toBe("no_domain_match");
+    });
+  });
+
+  describe("given an address on a domain a connection owns", () => {
+    /** @scenario "A connected domain routes before the account is consulted" */
+    it("redirects a brand-new hire to their identity provider rather than to sign-up", () => {
+      // The ordering that makes just-in-time provisioning work. Asking "do we
+      // know this person" first would send every genuine new employee to a
+      // sign-up form instead of to their employer's single sign-on.
+      const decision = route({
+        raw: "newhire@acme.com",
+        domainConnection: connection(),
+        account: null,
+      });
+
+      expect(decision.outcome).toBe("redirect_to_connection");
+      expect(decision.reasonCode).toBe("domain_routed");
+    });
+  });
+
+  describe("given an account holding several kinds of method", () => {
+    const passkey: SignInMethod = {
+      id: "passkey",
+      kind: "passkey",
+      connectionId: null,
+    };
+
+    /** @scenario "The methods offered are the ones that account holds" */
+    it("ranks a passkey above a connection and a connection above a password", () => {
+      const ranked = rankAccountMethods({
+        account: {
+          hasPassword: true,
+          hasPasskey: true,
+          providerIds: [],
+          connectionIds: ["conn_acme"],
+        },
+        policy: policy({ defaultMethods: [PASSWORD, okta, passkey] }),
+      });
+
+      expect(ranked).toEqual([passkey, okta, PASSWORD]);
+    });
+
+    it("keeps a configured legacy provider alongside a passkey", () => {
+      const auth0: SignInMethod = {
+        id: "auth0",
+        kind: "federated",
+        connectionId: null,
+      };
+      const ranked = rankAccountMethods({
+        account: {
+          hasPassword: false,
+          hasPasskey: true,
+          providerIds: ["auth0"],
+          connectionIds: [],
+        },
+        policy: policy({ defaultMethods: [auth0, passkey] }),
+      });
+
+      expect(ranked).toEqual([passkey, auth0]);
+    });
+
+    /** @scenario "The methods offered are the ones that account holds" */
+    it("drops a connection the account has never signed in through", () => {
+      const ranked = rankAccountMethods({
+        account: {
+          hasPassword: true,
+          hasPasskey: false,
+          providerIds: [],
+          connectionIds: [],
+        },
+        policy: policy({ defaultMethods: [PASSWORD, okta] }),
+      });
+
+      expect(ranked).toEqual([PASSWORD]);
+    });
+
+    it("does not treat a legacy provider id as a held connection", () => {
+      const ranked = rankAccountMethods({
+        account: {
+          hasPassword: false,
+          hasPasskey: false,
+          providerIds: ["okta"],
+          connectionIds: [],
+        },
+        policy: policy({ defaultMethods: [okta] }),
+      });
+
+      expect(ranked).toEqual([]);
+    });
+  });
+
+  describe("given a connection that has been suspended", () => {
+    /** @scenario "A suspended connection stops routing its domain" */
+    it("offers the method picker and names why with a code the screens can render", () => {
+      const decision = route({
+        raw: "sam@acme.com",
+        domainConnection: connection({ state: "SUSPENDED" }),
+      });
+
+      expect(decision.outcome).toBe("method_picker");
+      expect(decision.connectionId).toBeUndefined();
+      expect(decision.reasonCode).toBe("connection_suspended");
+    });
+  });
+
+  describe("given a self-hosted installation with exactly one ACTIVE connection", () => {
+    /** @scenario "A sole ACTIVE connection auto-redirects before any email is asked" */
+    it("redirects immediately, with no address asked for", () => {
+      const decision = route({ activeConnections: [connection()] });
+
+      expect(decision).toEqual({
+        outcome: "redirect_to_connection",
+        connectionId: "conn_acme",
+        methodSet: [okta],
+        reasonCode: "sole_active_connection",
+      });
+    });
+
+    it("asks for an address instead when a second connection exists", () => {
+      const decision = route({
+        activeConnections: [
+          connection(),
+          connection({ connectionId: "conn_other" }),
+        ],
+      });
+
+      expect(decision.outcome).toBe("method_picker");
+      expect(decision.reasonCode).toBe("no_domain_match");
+    });
+
+    it("never auto-redirects on cloud, where one org may not claim the door", () => {
+      const decision = route({
+        activeConnections: [connection()],
+        methodPolicy: policy({ selfHosted: false }),
+      });
+
+      expect(decision.outcome).toBe("method_picker");
+    });
+
+    /** @scenario "The break-glass path always reaches a local sign-in" */
+    it("reaches the local method set through the break-glass parameter", () => {
+      const decision = route({
+        breakGlass: true,
+        activeConnections: [connection()],
+      });
+
+      expect(decision).toEqual({
+        outcome: "method_picker",
+        methodSet: [PASSWORD],
+        reasonCode: "break_glass",
+      });
+    });
+
+    /** @scenario "The break-glass path always reaches a local sign-in" */
+    it("reaches it even when the submitted address routes to a connection", () => {
+      const decision = route({
+        raw: "sam@acme.com",
+        breakGlass: true,
+        domainConnection: connection(),
+      });
+
+      expect(decision.outcome).toBe("method_picker");
+      expect(decision.reasonCode).toBe("break_glass");
+    });
+  });
+
+  describe("given a deployment whose license gate denies federation", () => {
+    /** @scenario "A never-licensed installation offers no federated method" */
+    it("keeps every federated method out of the decision and offers the local set", () => {
+      const denied = policy({
+        federationLicensed: false,
+        defaultMethods: [PASSWORD],
+      });
+
+      const withoutEmail = route({
+        activeConnections: [connection()],
+        methodPolicy: denied,
+      });
+      const withEmail = route({
+        raw: "sam@acme.com",
+        domainConnection: connection(),
+        methodPolicy: denied,
+      });
+
+      for (const decision of [withoutEmail, withEmail]) {
+        expect(decision.outcome).toBe("method_picker");
+        expect(decision.methodSet).toEqual([PASSWORD]);
+        expect(
+          decision.methodSet.some((method) => method.kind === "federated"),
+        ).toBe(false);
+      }
+      expect(withEmail.reasonCode).toBe("method_not_licensed");
+    });
+  });
+
+  describe("given a connection whose method this build never mounted", () => {
+    it("falls back to the local set and says which of the two failed", () => {
+      const decision = route({
+        raw: "sam@acme.com",
+        domainConnection: connection({ configured: false }),
+      });
+
+      expect(decision.methodSet).toEqual([PASSWORD]);
+      expect(decision.reasonCode).toBe("method_not_configured");
+    });
+  });
+
+  describe("given a submitted value that is not email-shaped", () => {
+    it("treats it as no domain at all rather than routing on a fragment", () => {
+      const decision = route({
+        raw: "sam",
+        domainConnection: connection(),
+      });
+
+      expect(decision.reasonCode).toBe("no_domain_match");
+    });
+  });
+});

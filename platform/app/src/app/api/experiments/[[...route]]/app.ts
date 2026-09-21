@@ -5,6 +5,7 @@
  * `/api/experiments/{slug}/run` and `/runs/{runId}` routes:
  *
  *   GET  /api/experiments
+ *   GET  /api/experiments/{slug}
  *   POST /api/experiments
  *
  * The workbench endpoints an integrator uses to read and write one
@@ -30,6 +31,7 @@ import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { createBlankWorkbenchState } from "~/server/experiments/blankWorkbenchState";
+import { ExperimentNotFoundError } from "~/server/experiments/errors";
 import { ExperimentService } from "~/server/experiments/experiment.service";
 import { workbenchActorFrom } from "~/server/experiments/workbenchActor";
 import { ExperimentRunService } from "~/server/experiments-v3/services/experiment-run.service";
@@ -209,6 +211,101 @@ secured.access(requires("experiments:view")).get(
         hasMore: offset + paged.length < totalHits,
       },
     });
+  },
+);
+
+// Read one experiment, by the slug the list route just handed the caller.
+//
+// The namespace already answered `POST /:slug/run`, `GET /:slug/versions` and
+// `GET /:slug/workbench-state` for that same slug, so the one call a reader
+// makes first, list and then fetch one, was the only one missing. It fell
+// through to the framework's own 404, which says `{"error":"Not Found"}` and
+// cannot be told apart from "no such experiment": callers concluded the
+// experiment was gone while the list was still returning it.
+//
+// Answers the same object the list puts in its array, run count and last run
+// included, so a caller holds one shape for both calls.
+//
+// `:slug` is a parameter segment at the root of a namespace whose siblings are
+// literal (`/runs`, `/runs/:runId`), and those live in the v3 app, which mounts
+// ahead of this one (see `server/api-router.ts`). The route-auth regression
+// test pins both directions, because a parameter swallowing a literal sibling
+// breaks in production rather than in a unit test.
+secured.access(requires("experiments:view")).get(
+  "/:slug",
+  describeRoute({
+    summary: "Read one experiment",
+    description:
+      "Read a single experiment by its slug, in the same shape the list returns. Accepts the experiment id as well, so either identifier the list hands back can be used.",
+    tags: ["Experiments"],
+    parameters: [
+      {
+        in: "path",
+        name: "slug",
+        required: true,
+        schema: { type: "string" },
+        description: "The experiment's slug, or its id",
+      },
+    ],
+    responses: {
+      ...baseResponses,
+      404: {
+        description: "No experiment with that slug or id in this project",
+        content: {
+          "application/json": {
+            schema: resolver(handledErrorEnvelopeSchema),
+          },
+        },
+      },
+      200: {
+        description: "Success",
+        content: {
+          "application/json": {
+            schema: resolver(experimentSummarySchema),
+          },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const project = c.get("project");
+    const slugOrId = c.req.param("slug");
+
+    const service = ExperimentService.create({ prisma });
+    // Slug first, because that is what the list route returns as `slug` and
+    // what every sibling route in this namespace takes. The id is accepted too
+    // rather than refused, since the same list row carries both and a caller
+    // reaching for `id` is not making a mistake worth a 404.
+    const experiment =
+      (await service.findBySlug({ projectId: project.id, slug: slugOrId })) ??
+      (await service.findById({ projectId: project.id, id: slugOrId }));
+
+    if (!experiment) {
+      logger.info(
+        { projectId: project.id, slugOrId },
+        "Experiment not found over REST",
+      );
+      throw new ExperimentNotFoundError(slugOrId);
+    }
+
+    const aggregates = await ExperimentRunService.create(
+      prisma,
+    ).getRunAggregatesForExperimentIds({
+      projectId: project.id,
+      experimentIds: [experiment.id],
+    });
+    const aggregate = aggregates[experiment.id] ?? {
+      runsCount: 0,
+      lastRunAt: null,
+    };
+
+    return c.json(
+      toExperimentSummary({
+        experiment,
+        runsCount: aggregate.runsCount,
+        lastRunAt: aggregate.lastRunAt,
+      }),
+    );
   },
 );
 

@@ -210,21 +210,40 @@ Feature: Moving an organization onto the grants projection
     Then the organization's migration status is the only fork
     And no separate cutover record exists
 
-  # ═══ Self-hosted installations ════════════════════════════════════════
+  # ═══ Who this migration reaches ═══════════════════════════════════════
   #
-  # Cloud paces this migration per organization by enrollment. Self-hosted
-  # has no enrollment: a migration either runs for every organization or for
-  # none, and which it is comes from the migration's own release
-  # declaration. Releasing it is the prerequisite for ever removing the
-  # legacy authorization path, because that removal is only safe once every
-  # installation that might upgrade into it has already had a release that
-  # runs this migration.
+  # Every organization, on every installation. The per-organization cloud
+  # rollout is finished, and what enrollment would still decide is only
+  # whether an organization created SINCE ever migrates - which must not
+  # depend on an operator remembering it. So the migration declares itself
+  # automatically enrolled and the cohort admits every organization with no
+  # row and no operator action. The generic mechanism is
+  # specs/migration/system-migrations-runner.feature; what is authz-specific
+  # is that this migration is the one that has made the declaration.
+  #
+  # Self-hosted never had enrollment: a migration either runs for every
+  # organization or for none, and which it is comes from the migration's own
+  # release declaration. Releasing it is the prerequisite for ever removing
+  # the legacy authorization path, because that removal is only safe once
+  # every installation that might upgrade into it has already had a release
+  # that runs this migration.
 
   @unit
   Scenario: The migration is released for self-hosted installations
     When the migration's release declaration is read
     Then it runs automatically on a self-hosted installation
     And every organization there migrates without anyone enrolling it
+
+  # A brand-new organization is created against the legacy authorization path
+  # exactly as before - creation never waits on the engine, which is the
+  # coupling "born on engine" was removed to avoid. It writes legacy rows
+  # imperatively (the scenario above), and the pass adopts them afterwards.
+  @unit
+  Scenario: The migration reaches every cloud organization without enrollment
+    Given a cloud installation
+    When the migration's cohort declaration is read
+    Then every organization is in its cohort
+    And an organization created after the rollout finished migrates on the next pass
 
   # ═══ Undoing it ═══════════════════════════════════════════════════════
   # The operator action and its mechanics are the runner's. What is authz-

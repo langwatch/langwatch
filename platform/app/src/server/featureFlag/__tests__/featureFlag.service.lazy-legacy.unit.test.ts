@@ -11,6 +11,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FeatureFlagService } from "../featureFlag.service";
 import type { FeatureFlagStorePostgres } from "../featureFlagStore.postgres";
+import { NOT_TARGETED } from "../targeting";
 
 const { memoryCreateSpy } = vi.hoisted(() => ({
   memoryCreateSpy: vi.fn(),
@@ -74,6 +75,8 @@ describe("FeatureFlagService legacy backend construction", () => {
 
         await service.isEnabled(SYSTEM_FLAG, {
           distinctId: "tenant-a",
+          projectId: NOT_TARGETED,
+          organizationId: NOT_TARGETED,
           defaultValue: false,
         });
 
@@ -97,10 +100,14 @@ describe("FeatureFlagService legacy backend construction", () => {
 
         const first = await service.isEnabled(PRODUCT_FLAG, {
           distinctId: "user-1",
+          projectId: NOT_TARGETED,
+          organizationId: NOT_TARGETED,
           defaultValue: false,
         });
         const second = await service.isEnabled(PRODUCT_FLAG, {
           distinctId: "user-2",
+          projectId: NOT_TARGETED,
+          organizationId: NOT_TARGETED,
           defaultValue: false,
         });
 
@@ -118,6 +125,8 @@ describe("FeatureFlagService legacy backend construction", () => {
 
         await service.isEnabled(UNREGISTERED_FLAG as never, {
           distinctId: "user-1",
+          projectId: NOT_TARGETED,
+          organizationId: NOT_TARGETED,
           defaultValue: false,
         });
 
@@ -129,10 +138,14 @@ describe("FeatureFlagService legacy backend construction", () => {
 
         await service.isEnabled(UNREGISTERED_FLAG as never, {
           distinctId: "user-1",
+          projectId: NOT_TARGETED,
+          organizationId: NOT_TARGETED,
           defaultValue: false,
         });
         await service.isEnabled(UNREGISTERED_FLAG as never, {
           distinctId: "user-2",
+          projectId: NOT_TARGETED,
+          organizationId: NOT_TARGETED,
           defaultValue: false,
         });
 

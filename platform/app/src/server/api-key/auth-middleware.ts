@@ -255,6 +255,244 @@ async function resolveProjectPrincipal({
 export { extractCredentials };
 
 /**
+ * A caller resolved from any API key, without a project having been named.
+ *
+ * The unified project middleware above demands a project — an organization key
+ * with no `X-Project-Id` fails to resolve one and is refused. A fan-out door
+ * (LangWatchQL, #8085) needs the opposite: authenticate the key, then let the
+ * feature enumerate the projects it may read. So the credential collapses to
+ * one of two shapes the feature can fan out from — a single project the key IS,
+ * or the organization a key reaches across.
+ *
+ *  - `project` — a legacy project key, which is exactly its own project.
+ *  - `apiKey`  — a scoped API key; the feature resolves which projects in its
+ *                organization the key holds the permission on.
+ */
+export type KeyPrincipal =
+  | {
+      kind: "project";
+      project: Project & { team: { id: string; organizationId: string } };
+    }
+  | {
+      kind: "apiKey";
+      apiKeyId: string;
+      userId: string | null;
+      organizationId: string;
+    };
+
+/** Variables set by {@link createUnifiedKeyAuthMiddleware}. */
+export type KeyAuthVariables = {
+  keyPrincipal: KeyPrincipal;
+  /** The resolved token details, for parity with the project middleware. */
+  resolvedToken?: ResolvedToken;
+};
+
+/**
+ * Authenticate ANY API key without demanding a project.
+ *
+ * The sibling of {@link createUnifiedAuthMiddleware}, for a family that fans a
+ * key out across the projects it can read rather than pinning it to one. It
+ * resolves the credential to a {@link KeyPrincipal} and sets it on context; it
+ * enforces NO permission ceiling — the feature decides which projects the key
+ * reaches, and a key that reaches none is a valid empty scope, not a refusal.
+ * The three refusals it does answer are authentication failures only, in the
+ * same vocabulary and shape the project middleware uses so a caller branching
+ * on `error.code` needs to learn nothing new.
+ *
+ * `markUsed` is late, only on a 2xx, exactly as the project middleware.
+ */
+export function createUnifiedKeyAuthMiddleware({
+  prisma,
+  errorEnvelope = "legacy",
+}: {
+  prisma: PrismaClient;
+  errorEnvelope?: ApiErrorEnvelope;
+}): MiddlewareHandler {
+  const resolver = TokenResolver.create(prisma);
+  const refusal = authRefusalBody(errorEnvelope);
+
+  return async (c, next) => {
+    const outcome = await resolveKeyPrincipal({
+      resolver,
+      credentials: extractCredentials((name) => c.req.header(name)),
+      diag: collectAuthDiagnostics(c),
+    });
+
+    if (!outcome.ok) {
+      return c.json(
+        refusal(outcome.refusal),
+        outcome.refusal.status as 401 | 500,
+      );
+    }
+
+    c.set("keyPrincipal", outcome.principal);
+    if (outcome.resolved) c.set("resolvedToken", outcome.resolved);
+
+    await next();
+
+    if (
+      outcome.principal.kind === "apiKey" &&
+      c.res.status >= 200 &&
+      c.res.status < 300
+    ) {
+      resolver.markUsed({ apiKeyId: outcome.principal.apiKeyId });
+    }
+  };
+}
+
+/**
+ * The principal behind a request, or the reason there isn't one.
+ *
+ * A project key (legacy, or an API key that self-scopes to one project) IS a
+ * project; anything else that authenticates is an organization-reaching API
+ * key. An API key with no project named resolves to no project through
+ * {@link TokenResolver.resolve} — that is not a refusal here, it is the
+ * organization path, taken through {@link TokenResolver.resolveOrgOnly}.
+ */
+async function resolveKeyPrincipal({
+  resolver,
+  credentials,
+  diag,
+}: {
+  resolver: TokenResolver;
+  credentials: { token: string; projectId: string | null } | null;
+  diag: AuthDiagnostics;
+}): Promise<
+  | { ok: true; principal: KeyPrincipal; resolved?: ResolvedToken }
+  | { ok: false; refusal: AuthRefusal }
+> {
+  if (!credentials) {
+    logger.warn(
+      diag,
+      diag.hasEmptyAuthToken
+        ? "Key authentication failed: X-Auth-Token sent but empty"
+        : "Key authentication failed: no auth header present",
+    );
+    return {
+      ok: false,
+      refusal: {
+        status: 401,
+        code: "missing_credentials",
+        legacyError: "Unauthorized",
+        message:
+          "Authentication required. Use Authorization: Basic base64(projectId:token), Authorization: Bearer <token>, or X-Auth-Token header.",
+      },
+    };
+  }
+
+  let resolved: ResolvedToken | null;
+  try {
+    resolved = await resolver.resolve({
+      token: credentials.token,
+      projectId: credentials.projectId,
+    });
+  } catch (error) {
+    logger.error(
+      { ...diag, error },
+      "Database error during key authentication",
+    );
+    return {
+      ok: false,
+      refusal: {
+        status: 500,
+        code: "internal_error",
+        legacyError: "Internal Server Error",
+        message: "Authentication service error",
+      },
+    };
+  }
+
+  if (resolved) {
+    if (resolved.type === "legacyProjectKey") {
+      return {
+        ok: true,
+        principal: { kind: "project", project: resolved.project },
+        resolved,
+      };
+    }
+    // A scoped API key that resolved (self-scoped to one project, or given a
+    // project id). It still fans out across its organization — the narrowing
+    // is done inside the query, not by which project happened to resolve here.
+    return {
+      ok: true,
+      principal: {
+        kind: "apiKey",
+        apiKeyId: resolved.apiKeyId,
+        userId: resolved.userId,
+        organizationId: resolved.organizationId,
+      },
+      resolved,
+    };
+  }
+
+  // No project resolved: an organization / multi-project API key that named no
+  // project. That is the fan-out case, not a failure — resolve the org.
+  return resolveOrgFanoutPrincipal({ resolver, credentials, diag });
+}
+
+/**
+ * The organization fan-out path: an API key that authenticated but named no
+ * project. Resolving the org is the success case here; only a token that
+ * resolves to neither a project nor an org is invalid.
+ */
+async function resolveOrgFanoutPrincipal({
+  resolver,
+  credentials,
+  diag,
+}: {
+  resolver: TokenResolver;
+  credentials: { token: string; projectId: string | null };
+  diag: AuthDiagnostics;
+}): Promise<
+  { ok: true; principal: KeyPrincipal } | { ok: false; refusal: AuthRefusal }
+> {
+  let org: OrgResolution;
+  try {
+    org = await resolver.resolveOrgOnly({ token: credentials.token });
+  } catch (error) {
+    logger.error(
+      { ...diag, error },
+      "Database error during key authentication",
+    );
+    return {
+      ok: false,
+      refusal: {
+        status: 500,
+        code: "internal_error",
+        legacyError: "Internal Server Error",
+        message: "Authentication service error",
+      },
+    };
+  }
+
+  if (org.ok) {
+    return {
+      ok: true,
+      principal: {
+        kind: "apiKey",
+        apiKeyId: org.resolved.apiKeyId,
+        userId: org.resolved.userId,
+        organizationId: org.resolved.organizationId,
+      },
+    };
+  }
+
+  logger.warn(
+    { ...diag, hasToken: true, tokenType: getTokenType(credentials.token) },
+    "Key authentication failed: invalid credentials",
+  );
+  return {
+    ok: false,
+    refusal: {
+      status: 401,
+      code: "invalid_credentials",
+      legacyError: "Unauthorized",
+      message: "Invalid credentials",
+    },
+  };
+}
+
+/**
  * Variables set by the org-level auth middleware.
  */
 export type OrgAuthVariables = {
@@ -621,6 +859,28 @@ export function collectAuthDiagnostics(c: {
 }
 
 /**
+ * A Langy session key is refused for two different reasons that look
+ * identical from the ceiling check: the human it mirrors does not hold the
+ * permission, or Langy is never delegated it at all. Only the first one is
+ * fixed by a wider key, so the policy that decides the second gets to say so.
+ *
+ * `excluded` (policy refusal) and `unreachable` (org-tier grain on a
+ * project-scoped key) both mean no grant anyone can make will help, so both
+ * get the not-delegable message instead of "widen your key".
+ */
+function langyNotDelegableReason({
+  resolved,
+  permission,
+}: {
+  resolved: ResolvedToken & { type: "apiKey" };
+  permission: Permission;
+}): string | undefined {
+  if (!resolved.isLangySessionKey) return undefined;
+  const verdict = classifyForLangy(permission);
+  return verdict.disposition !== "granted" ? verdict.reason : undefined;
+}
+
+/**
  * Enforces the API key permission ceiling for an already-resolved token.
  *
  * Legacy project keys are granted full access (current behavior — project API
@@ -682,11 +942,10 @@ function refuseApiKeyCeiling({
   resolved: Extract<ResolvedToken, { type: "apiKey" }>;
   permission: Permission;
 }): never {
-  const langyVerdict = resolved.isLangySessionKey
-    ? classifyForLangy(permission)
-    : undefined;
-  const notDelegableReason =
-    langyVerdict?.disposition === "excluded" ? langyVerdict.reason : undefined;
+  const notDelegableReason = langyNotDelegableReason({
+    resolved,
+    permission,
+  });
 
   const meta = {
     apiKeyId: resolved.apiKeyId,

@@ -37,6 +37,7 @@ vi.mock("../hooks/useEvaluatorName", () => ({
 
 import { TargetHeader } from "../components/TargetSection/TargetHeader";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
+import { PromptTemplateFieldsContext } from "../hooks/usePromptTemplateFields";
 import type { DatasetReference, EvaluatorConfig, TargetConfig } from "../types";
 import { DEFAULT_TEST_DATA_ID } from "../types";
 import {
@@ -93,6 +94,32 @@ const createTestTarget = (
 
 const renderWithProviders = (ui: React.ReactElement) => {
   return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
+};
+
+/**
+ * Stands in for the saved templates the workbench resolves for prompt targets
+ * that carry no local draft, keyed by target id.
+ */
+const templateFieldsLookup =
+  (usedFieldsByTargetId: Record<string, string[]>) =>
+  (target: TargetConfig): Set<string> | undefined => {
+    const fields = usedFieldsByTargetId[target.id];
+    return fields ? new Set(fields) : undefined;
+  };
+
+const renderWithTemplateFields = (
+  ui: React.ReactElement,
+  usedFieldsByTargetId: Record<string, string[]>,
+) => {
+  return render(
+    <ChakraProvider value={defaultSystem}>
+      <PromptTemplateFieldsContext.Provider
+        value={templateFieldsLookup(usedFieldsByTargetId)}
+      >
+        {ui}
+      </PromptTemplateFieldsContext.Provider>
+    </ChakraProvider>,
+  );
 };
 
 // ============================================================================
@@ -266,7 +293,11 @@ describe("mappingValidation utility", () => {
           },
         }),
       ];
-      const result = validateWorkbench(targets, [], DEFAULT_TEST_DATA_ID);
+      const result = validateWorkbench({
+        targets,
+        evaluators: [],
+        activeDatasetId: DEFAULT_TEST_DATA_ID,
+      });
       expect(result.isValid).toBe(true);
     });
 
@@ -284,7 +315,11 @@ describe("mappingValidation utility", () => {
         }),
         createTestTarget("r2", [{ identifier: "context", type: "str" }], {}),
       ];
-      const result = validateWorkbench(targets, [], DEFAULT_TEST_DATA_ID);
+      const result = validateWorkbench({
+        targets,
+        evaluators: [],
+        activeDatasetId: DEFAULT_TEST_DATA_ID,
+      });
 
       expect(result.isValid).toBe(false);
       expect(result.firstInvalidTarget?.target.id).toBe("r2");
@@ -446,13 +481,12 @@ describe("TargetHeader alert icon", () => {
 // ============================================================================
 
 describe("Validation edge cases", () => {
-  /** @scenario A declared prompt variable not referenced by any message is not required */
-  it("surfaces declared inputs as advisory (not run-blocking) when no localPromptConfig", () => {
+  /** @scenario A declared input the template does not use needs no mapping */
+  it("neither warns nor blocks on a declared input when no template is loaded", () => {
     // A prompt that follows the latest version with no local edits has no
     // message content here. A declared variable like the default "input"
-    // may never be referenced by the template, so it must NOT hard-block
-    // the run. It is still surfaced (advisory) so the alert icon shows and
-    // nudges the user to configure the target.
+    // may never be referenced by the template, so it must neither raise the
+    // alert icon nor block the run.
     const target: TargetConfig = {
       ...createTestTarget("r1", [{ identifier: "input", type: "str" }]),
       localPromptConfig: undefined, // follows latest, prompt not loaded yet
@@ -460,14 +494,9 @@ describe("Validation edge cases", () => {
 
     const result = getTargetMissingMappings(target, DEFAULT_TEST_DATA_ID);
 
-    // Run is NOT blocked: no required mapping is missing.
     expect(result.isValid).toBe(true);
-    // But the missing mapping is still surfaced as advisory.
-    expect(result.missingMappings.length).toBe(1);
-    expect(result.missingMappings[0]?.fieldId).toBe("input");
-    expect(result.missingMappings[0]?.isRequired).toBe(false);
-    // The alert icon still shows so the user knows to configure it.
-    expect(targetHasMissingMappings(target, DEFAULT_TEST_DATA_ID)).toBe(true);
+    expect(result.missingMappings.every((m) => !m.isRequired)).toBe(true);
+    expect(targetHasMissingMappings(target, DEFAULT_TEST_DATA_ID)).toBe(false);
   });
 
   /** @scenario A declared prompt variable that IS referenced still requires a mapping */
@@ -500,7 +529,7 @@ describe("Validation edge cases", () => {
     ).toBe(true);
   });
 
-  /** @scenario A declared prompt variable not referenced by any message is not required */
+  /** @scenario A declared input the template does not use needs no mapping */
   it("does not block the run when an explicit user message omits a declared 'input'", () => {
     // Mirrors the reported bug: explicit user message uses real variables,
     // but the prompt still carries a default declared "input" it never
@@ -807,7 +836,7 @@ describe("Target header alert icon integration", () => {
   it("shows alert icon when target has variable that cannot be auto-inferred", () => {
     // This tests the real scenario:
     // 1. Dataset has columns: foo, bar (nothing that matches "my_custom_var")
-    // 2. Prompt has variable: my_custom_var
+    // 2. The prompt template references {{my_custom_var}}
     // 3. "my_custom_var" CANNOT be auto-inferred (no matching column or semantic equiv)
     // 4. Alert icon should show!
 
@@ -843,6 +872,9 @@ describe("Target header alert icon integration", () => {
       .getState()
       .targets.find((r) => r.id === targetId)!;
 
+    // The saved template references {{my_custom_var}}, so it needs a mapping.
+    const usedFields = { [targetId]: ["my_custom_var"] };
+
     // Verify "my_custom_var" was NOT auto-inferred (no matching column)
     expect(
       storeTarget.mappings["dataset-no-match"]?.my_custom_var,
@@ -852,16 +884,18 @@ describe("Target header alert icon integration", () => {
     const hasMissing = targetHasMissingMappings(
       storeTarget,
       "dataset-no-match",
+      { promptTemplateFields: templateFieldsLookup(usedFields) },
     );
     expect(hasMissing).toBe(true); // Should have missing mappings
 
-    renderWithProviders(
+    renderWithTemplateFields(
       <TargetHeader
         target={storeTarget}
         onEdit={vi.fn()}
         onRemove={vi.fn()}
         onRun={vi.fn()}
       />,
+      usedFields,
     );
 
     // Alert icon SHOULD be present because "my_custom_var" has no mapping
@@ -1211,21 +1245,26 @@ describe("Target header alert icon integration", () => {
     const foobarMapping = storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.foobar;
     expect(foobarMapping).toBeUndefined();
 
+    // The saved template references both variables.
+    const usedFields = { [targetId]: ["foobar", "user_input"] };
+
     // Validation should detect foobar is missing
     const hasMissing = targetHasMissingMappings(
       storeTarget,
       DEFAULT_TEST_DATA_ID,
+      { promptTemplateFields: templateFieldsLookup(usedFields) },
     );
     expect(hasMissing).toBe(true); // foobar has no mapping!
 
     // Render TargetHeader and check for alert icon
-    renderWithProviders(
+    renderWithTemplateFields(
       <TargetHeader
         target={storeTarget}
         onEdit={vi.fn()}
         onRemove={vi.fn()}
         onRun={vi.fn()}
       />,
+      usedFields,
     );
 
     // Alert icon SHOULD be present because foobar has no mapping

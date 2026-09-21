@@ -1,13 +1,12 @@
 import { Box, chakra, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useRef } from "react";
-import { LuArrowRight } from "react-icons/lu";
 import { Composer } from "~/features/langy/components/Composer";
 import { ComposerMorphGhost } from "~/features/langy/components/ComposerMorphGhost";
-import { LangyMark } from "~/features/langy/components/LangyMark";
 import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
 import { useComposerMorph } from "~/features/langy/hooks/useComposerMorph";
 import { selectLangySuggestions } from "~/features/langy/logic/langyHomeSuggestions";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
+import { ContinueLine, useConversationOpen } from "./ContinueLine";
 import { useHomeDevState } from "./dev/homeDevState";
 import { OnboardAgentPill } from "./OnboardAgentPill";
 import { useProjectReach } from "./useProjectReach";
@@ -66,11 +65,7 @@ export function LangyHomeLantern() {
       });
 
   const modelOverride = useLangyStore((s) => s.modelOverride);
-  const setModelOverride = useLangyStore((s) => s.setModelOverride);
-  const isOpen = useLangyStore((s) => s.isOpen);
-  const openPanel = useLangyStore((s) => s.openPanel);
-  const activeConversationId = useLangyStore((s) => s.activeConversationId);
-  const pendingPrompt = useLangyStore((s) => s.pendingPrompt);
+  const pickModel = useLangyStore((s) => s.pickModel);
 
   // Previewing a destination means actually using it: the two land in
   // genuinely different places, so a preview that only relabelled the state
@@ -91,21 +86,8 @@ export function LangyHomeLantern() {
   // one conversation is one mouth too many: this one starts conversations, the
   // panel's continues them. The slot keeps the bar's height either way, so the
   // block never collapses by 46px the moment the bar leaves.
-  const conversationOpen =
-    devState === "after-turn" ||
-    devState === "stalled" ||
-    !!pendingPrompt ||
-    (isOpen && !!activeConversationId);
-
-  const stalled = devState === "stalled";
-
-  const continueInLangy = () => {
-    openPanel();
-    document
-      .querySelector<HTMLElement>('[data-langy-composer="panel"]')
-      ?.querySelector("textarea")
-      ?.focus();
-  };
+  const { conversationOpen, stalled, continueInLangy } =
+    useConversationOpen(devState);
 
   return (
     <>
@@ -137,7 +119,7 @@ export function LangyHomeLantern() {
                   cardRef={heroCardRef}
                   model={modelOverride}
                   modelOptions={[]}
-                  onModelChange={setModelOverride}
+                  onModelChange={pickModel}
                   onSend={ask}
                   onStop={() => undefined}
                   disabled={false}
@@ -152,8 +134,21 @@ export function LangyHomeLantern() {
                 // Absolute, filling the composer's reserved footprint: the
                 // slot keeps its height (nothing below jumps) AND the space
                 // reads as an intentional resume card rather than a short line
-                // stranded in emptiness.
-                <ContinueLine stalled={stalled} onContinue={continueInLangy} />
+                // stranded in emptiness. Pinned to the box's full height but
+                // only its left edge, so the width comes from the content.
+                <Box
+                  position="absolute"
+                  left={0}
+                  top={0}
+                  bottom={0}
+                  maxWidth="full"
+                  display="flex"
+                >
+                  <ContinueLine
+                    stalled={stalled}
+                    onContinue={continueInLangy}
+                  />
+                </Box>
               ) : null}
             </>
           )}
@@ -238,81 +233,6 @@ export function LangyHomeLantern() {
 
       {flight ? <ComposerMorphGhost flight={flight} /> : null}
     </>
-  );
-}
-
-/**
- * The hero slot while a conversation is open.
- *
- * It offers a way back rather than a second place to talk: clicking it focuses
- * the conversation that already exists, and never starts a new one.
- *
- * It takes the composer's HEIGHT but not its width. The composer is full-bleed
- * because it is an input and an input wants the room; a resume control that
- * inherited that stretched one short sentence across the whole block and read
- * as an empty container with some text stranded at one end. It hugs its own
- * content instead, and what sits beside it is the block's moving canvas —
- * which is the thing the lantern is for.
- */
-function ContinueLine({
-  stalled,
-  onContinue,
-}: {
-  stalled: boolean;
-  onContinue: () => void;
-}) {
-  return (
-    <chakra.button
-      type="button"
-      onClick={onContinue}
-      // Pinned to the reserved box's full height (its parent is
-      // position:relative) but only its left edge — no `right`, so the width
-      // comes from the content.
-      position="absolute"
-      left={0}
-      top={0}
-      bottom={0}
-      maxWidth="full"
-      display="flex"
-      alignItems="center"
-      gap={2.5}
-      textAlign="left"
-      paddingLeft={3.5}
-      paddingRight={4}
-      borderRadius="18px"
-      borderWidth="1px"
-      borderStyle="solid"
-      borderColor="border.muted"
-      background="bg.panel/70"
-      backdropFilter="blur(8px)"
-      cursor="pointer"
-      color="fg.muted"
-      transition="color 130ms ease, border-color 130ms ease, background 130ms ease"
-      _hover={{
-        color: "fg",
-        borderColor: "orange.emphasized",
-        background: "bg.panel/85",
-      }}
-    >
-      <LangyMark size={16} />
-      <VStack align="start" gap={0.5} minWidth={0}>
-        <Text fontFamily="mono" fontSize="13px" color="fg" lineHeight="1.3">
-          {stalled ? "Langy is still working" : "Continue your conversation"}
-        </Text>
-        <Text
-          fontSize="xs"
-          color="fg.subtle"
-          lineHeight="1.3"
-          whiteSpace="nowrap"
-          overflow="hidden"
-          textOverflow="ellipsis"
-          maxWidth="full"
-        >
-          {stalled ? "Its answer is on the way" : "Pick up where you left off"}
-        </Text>
-      </VStack>
-      <LuArrowRight size={14} aria-hidden />
-    </chakra.button>
   );
 }
 

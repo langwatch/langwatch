@@ -76,12 +76,57 @@ Feature: Langy runs on the model the project chose
     Then the turn carries what was already said in this conversation
     And the new model can answer from it
 
+  # A credential connected at the organization or the team serves every project
+  # under it (ADR-021), and the turn's virtual key walks that same ladder. The
+  # picker reads the project's provider list, which carries those rows, so a
+  # project with no provider row of its own still gets the models.
+  @integration
+  Scenario: A provider configured on the organization enables its models in the picker
+    Given the project's only model provider is connected at the organization
+    When the composer's model picker opens
+    Then it offers the models that provider serves
+    And it offers no model from a provider nobody connected
+
+  # The picker locks while a turn runs, and the locked pill collapses to a
+  # provider glyph. That is the moment someone most wants to know which model is
+  # answering, and the greyed glyph was the only thing left to read. Hovering it
+  # now names the model and says the lock ends with the turn.
+  @integration
+  Scenario: The model in use stays visible while Langy is working
+    Given a turn is running and the composer's model picker is locked
+    When the user hovers the model pill
+    Then it names the provider and model the turn is running on
+    And it says the model can be switched once the turn stops
+    And the picker still does not open
+
+  # The default model is resolved from the project's configuration, which can
+  # name a provider nobody connected here. Seeding it put a model in the pill
+  # that the pill's own menu never offered, and every send died at the gateway
+  # with "no provider connected". The seed reads the same list the menu does.
+  @unit
+  Scenario: A default naming a provider nobody connected never reaches the composer
+    Given the resolved Langy default names a provider this project cannot reach
+    When the composer seeds its model
+    Then it holds the first model the project's providers serve
+    And a model the project can serve is seeded unchanged
+
   @unit
   Scenario: The composer follows a default-model change made in settings
     Given the composer's model was seeded from the resolved default
     When the default model configuration is saved or removed while the panel is open
     Then the composer's picker snaps to the newly resolved default without a reload
     And a model the user picked on purpose is never replaced
+
+  # "The user never picked" was read from the pill itself: an empty pick, or one
+  # equal to the resolved default. Accepting "make it the default" makes the
+  # pick EQUAL the default, so from that moment their choice reads as untouched,
+  # and the next default resolution or history landing puts the old model back
+  # in front of someone who had just chosen. The choice is tracked, not inferred.
+  @unit
+  Scenario: A pick that matches the default is still the user's pick
+    Given the user picks a model and accepts the offer to make it the default
+    When the defaults resolve again, or the conversation's history lands
+    Then the picker still holds the model they chose
 
   @unit
   Scenario: Picking a model offers to make it the default at the scope that holds it

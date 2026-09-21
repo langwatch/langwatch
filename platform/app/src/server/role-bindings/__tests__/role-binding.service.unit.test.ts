@@ -426,4 +426,55 @@ describe("RoleBindingService applyGroupEdits", () => {
       expect(groupMembershipDeleteMany).toHaveBeenCalled();
     });
   });
+
+  /**
+   * A group the directory owns is edited by the directory or not at all,
+   * whichever way its access is stored underneath. These three used to throw
+   * a raw TRPCError whose `code` published as "BAD_REQUEST" and whose message
+   * was the whole contract, so the `scim_managed_group` anchor in
+   * specs/groups/groups-rest-api.feature held on `group.service.ts`'s path
+   * only. Both paths answer the customer the same code now.
+   */
+  describe("when the group is managed by an identity provider", () => {
+    beforeEach(() => {
+      groupFindFirst.mockResolvedValue({ id: "group_1", scimSource: "okta" });
+    });
+
+    it("refuses a rename with scim_managed_group", async () => {
+      await expect(
+        service.applyGroupEdits({
+          ...groupEditInput,
+          memberUserIdsToRemove: [],
+          bindingIdsToDelete: [],
+          rename: { name: "New Name", slug: "new-name" },
+        }),
+      ).rejects.toMatchObject({ code: "scim_managed_group", httpStatus: 409 });
+
+      expect(groupUpdate).not.toHaveBeenCalled();
+    });
+
+    it("refuses a member removal with scim_managed_group", async () => {
+      await expect(
+        service.applyGroupEdits({
+          ...groupEditInput,
+          bindingIdsToDelete: [],
+        }),
+      ).rejects.toMatchObject({ code: "scim_managed_group", httpStatus: 409 });
+
+      expect(groupMembershipDeleteMany).not.toHaveBeenCalled();
+    });
+
+    it("refuses a member addition with scim_managed_group", async () => {
+      await expect(
+        service.applyGroupEdits({
+          ...groupEditInput,
+          memberUserIdsToRemove: [],
+          memberUserIdsToAdd: ["user_added"],
+          bindingIdsToDelete: [],
+        }),
+      ).rejects.toMatchObject({ code: "scim_managed_group", httpStatus: 409 });
+
+      expect(groupMembershipCreateMany).not.toHaveBeenCalled();
+    });
+  });
 });

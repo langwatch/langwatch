@@ -29,6 +29,17 @@ const STUCK_DRAIN_LEASE_MULTIPLE = 5;
 const STUCK_DRAIN_FLOOR_MS = 300_000;
 
 /**
+ * Resolves the process instance an event belongs to: the declared `keyBy`, or
+ * the event's aggregate — see `ProcessManagerConfig.keyBy`.
+ */
+function processKeyResolver<E extends Event>(
+  keyBy: ((event: E) => string) | undefined,
+): (params: { event: E; aggregateId: string }) => string {
+  if (!keyBy) return ({ aggregateId }) => aggregateId;
+  return ({ event }) => keyBy(event);
+}
+
+/**
  * Far above any legitimate drain (a full batch of slow deliveries fits in one
  * lease), so only a never-settling delivery trips it.
  */
@@ -73,6 +84,7 @@ export function buildIntentHandlers(
         tenantId: message.tenantId,
         messageKey: message.messageKey,
         attempt: message.attempt,
+        leaseExpiresAt: message.leaseExpiresAt,
       });
     };
   }
@@ -183,9 +195,17 @@ export class ProcessRuntime {
     for (const definition of params.processManagers.values()) {
       const registered = this.registerProcessManager(definition);
       if (definition.config.eventTypes.length === 0) continue;
+      const keyBy = definition.config.keyBy as
+        | ((event: E) => string)
+        | undefined;
+      const processKeyOf = processKeyResolver(keyBy);
       subscribers.push({
         name: `pm:${definition.config.name}`,
         eventTypes: definition.config.eventTypes,
+        // A keyed process gathers several aggregates into one instance, so
+        // its deliveries must serialize into one lane per key — concurrent
+        // ones would fight over the instance revision.
+        options: keyBy ? { groupKeyFn: keyBy } : undefined,
         handle: async (event, context) => {
           const envelope: ProcessEventEnvelope = {
             // The event log can briefly expose two physical rows before its
@@ -197,7 +217,10 @@ export class ProcessRuntime {
             occurredAt: event.occurredAt,
             tenantId: context.tenantId,
             projectId: context.tenantId,
-            processKey: context.aggregateId,
+            processKey: processKeyOf({
+              event,
+              aggregateId: context.aggregateId,
+            }),
             // `toPayload` is the content boundary. Without one the raw event
             // data is persisted into process state and outbox rows verbatim.
             payload: definition.config.toPayload

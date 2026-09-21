@@ -1,19 +1,22 @@
 /**
  * Saved workbench charts — the REST routes.
  *
- * Five endpoints under the LangWatchQL analytics SQL family:
+ * Seven endpoints under the LangWatchQL analytics SQL family:
  *
  *  - `GET    /api/v1/projects/{projectId}/analytics/charts`
  *  - `POST   /api/v1/projects/{projectId}/analytics/charts`
  *  - `GET    /api/v1/projects/{projectId}/analytics/charts/{chartId}`
  *  - `PATCH  /api/v1/projects/{projectId}/analytics/charts/{chartId}`
  *  - `DELETE /api/v1/projects/{projectId}/analytics/charts/{chartId}`
+ *  - `PUT    /api/v1/projects/{projectId}/analytics/charts/{chartId}/placement`
+ *  - `DELETE /api/v1/projects/{projectId}/analytics/charts/{chartId}/placement`
  *
  * They sit here rather than under `/api/dashboards` because a saved chart is a
  * LangWatchQL artifact before it is a dashboard one: it is behind the same
  * experimental switch, resolved for the project's organization by the same
  * guard, and its refusals are `HandledError`s the family already serialises
- * with their `meta` intact. Dashboard placement stays a dashboard concern.
+ * with their `meta` intact. Placement, too, is an operation on the chart — the
+ * dashboard is the value it is given, not the resource being edited.
  *
  * ## Nothing is validated here
  *
@@ -26,7 +29,7 @@
  * slice 1 exists to prevent.
  *
  * @see ~/server/analytics/saved-workbench-charts — the service and its schema
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { describeRoute, resolver } from "hono-openapi";
@@ -35,6 +38,8 @@ import { LWQL_VEGA_LIMITS } from "~/features/analytics-query/visualization/vegaL
 import { measureSpecBytes } from "~/features/analytics-query/visualization/vegaLiteStructure";
 import type { Project } from "~/generated/prisma/client";
 
+import { customChartPlaygroundEnabled } from "~/server/analytics/dashboard-widgets/access";
+import { SavedWorkbenchChartsDisabledForPlaygroundError } from "~/server/analytics/saved-workbench-charts/errors";
 import {
   type SavedWorkbenchChart,
   SavedWorkbenchChartService,
@@ -95,6 +100,22 @@ const definitionSchema = z.unknown().superRefine((definition, ctx) => {
   });
 });
 
+/**
+ * A placement request's envelope: a dashboard id, and an optional grid
+ * position. What a valid position *is* — the column and span ceilings, and
+ * which dashboard this project may name — is the service's placement schema
+ * and its tenancy check, not this route's. Re-declaring the bounds here would
+ * fork them, and a placement this route admitted that the service refuses is
+ * answered with the service's own refusal.
+ */
+const placeChartSchema = z.object({
+  dashboardId: z.string().min(1),
+  gridColumn: z.number().int().optional(),
+  gridRow: z.number().int().optional(),
+  colSpan: z.number().int().optional(),
+  rowSpan: z.number().int().optional(),
+});
+
 const createChartSchema = z.object({
   name: nameSchema,
   definition: definitionSchema,
@@ -135,6 +156,12 @@ const chartSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
   platformUrl: z.string(),
+  /** `null` when the chart has never been placed, or has been unplaced. */
+  dashboardId: z.string().nullable(),
+  gridColumn: z.number().int(),
+  gridRow: z.number().int(),
+  colSpan: z.number().int(),
+  rowSpan: z.number().int(),
 });
 
 const chartListSchema = z.object({ data: z.array(chartSchema) });
@@ -188,11 +215,44 @@ function chartResource({
       projectSlug: project.slug,
       path: "/analytics/query",
     }),
+    dashboardId: chart.dashboardId,
+    gridColumn: chart.gridColumn,
+    gridRow: chart.gridRow,
+    colSpan: chart.colSpan,
+    rowSpan: chart.rowSpan,
   };
 }
 
 function chartService(): SavedWorkbenchChartService {
   return SavedWorkbenchChartService.create(prisma);
+}
+
+/**
+ * The project this saved-chart request runs for: `lwqlProject`'s usual pair
+ * of checks, plus the INVERSE of the dashboard-widgets gate — saved
+ * workbench charts and the custom-chart-playground are mutually exclusive
+ * while the playground is experimental, so this route refuses instead of
+ * competing with `dashboard-widget` as two answers to "make me a chart."
+ *
+ * @throws {SavedWorkbenchChartsDisabledForPlaygroundError} when
+ *   `release_custom_chart_playground` is ON for this project.
+ */
+async function chartsProject({
+  project,
+  requestedProjectId,
+}: {
+  project: Project;
+  requestedProjectId: string | undefined;
+}): Promise<Project> {
+  const resolved = await lwqlProject({ project, requestedProjectId });
+  const playgroundEnabled = await customChartPlaygroundEnabled({
+    prisma,
+    projectId: resolved.id,
+  });
+  if (playgroundEnabled) {
+    throw new SavedWorkbenchChartsDisabledForPlaygroundError();
+  }
+  return resolved;
 }
 
 /**
@@ -229,7 +289,7 @@ function registerList(secured: ReturnType<typeof createProjectApp>): void {
       },
     }),
     async (c) => {
-      const project = await lwqlProject({
+      const project = await chartsProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
@@ -259,7 +319,7 @@ function registerCreate(secured: ReturnType<typeof createProjectApp>): void {
     }),
     zValidator("json", createChartSchema),
     async (c) => {
-      const project = await lwqlProject({
+      const project = await chartsProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
@@ -294,7 +354,7 @@ function registerRead(secured: ReturnType<typeof createProjectApp>): void {
       },
     }),
     async (c) => {
-      const project = await lwqlProject({
+      const project = await chartsProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
@@ -326,7 +386,7 @@ function registerUpdate(secured: ReturnType<typeof createProjectApp>): void {
     }),
     zValidator("json", updateChartSchema),
     async (c) => {
-      const project = await lwqlProject({
+      const project = await chartsProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
@@ -362,11 +422,72 @@ function registerDelete(secured: ReturnType<typeof createProjectApp>): void {
       },
     }),
     async (c) => {
-      const project = await lwqlProject({
+      const project = await chartsProject({
         project: c.get("project"),
         requestedProjectId: c.req.param("projectId"),
       });
       await chartService().deleteChart({
+        id: chartIdOf(c.req.param("chartId")),
+        projectId: project.id,
+      });
+      return c.body(null, 204);
+    },
+  );
+}
+
+function registerPlace(secured: ReturnType<typeof createProjectApp>): void {
+  secured.access(requires("analytics:update")).put(
+    "/:projectId/analytics/charts/:chartId/placement",
+    describeRoute({
+      summary: "Place a saved workbench chart on a dashboard",
+      description:
+        "Places one saved LangWatchQL chart on a dashboard in the same project, at the grid position supplied — or, when no grid row is given, at the next row free on that dashboard, counting charts of every kind. A dashboard that is not in this project is reported as not found, exactly like a chart that is not, and nothing is written.",
+      tags: CHART_TAGS,
+      responses: {
+        ...canonicalBaseResponses,
+        ...chartNotFoundResponse,
+        200: {
+          description: "The chart, now placed",
+          content: { "application/json": { schema: resolver(chartSchema) } },
+        },
+      },
+    }),
+    zValidator("json", placeChartSchema),
+    async (c) => {
+      const project = await chartsProject({
+        project: c.get("project"),
+        requestedProjectId: c.req.param("projectId"),
+      });
+      const chart = await chartService().placeChart({
+        id: chartIdOf(c.req.param("chartId")),
+        projectId: project.id,
+        input: c.req.valid("json"),
+      });
+      return c.json(chartResource({ chart, project }));
+    },
+  );
+}
+
+function registerUnplace(secured: ReturnType<typeof createProjectApp>): void {
+  secured.access(requires("analytics:update")).delete(
+    "/:projectId/analytics/charts/:chartId/placement",
+    describeRoute({
+      summary: "Remove a saved workbench chart from its dashboard",
+      description:
+        "Removes one saved LangWatchQL chart from whatever dashboard it is on, clearing its grid position along with the dashboard id. Idempotent: unplacing a chart that is not placed answers 204 all the same. The chart itself — its statement, parameter values and specification — is untouched.",
+      tags: CHART_TAGS,
+      responses: {
+        ...canonicalBaseResponses,
+        ...chartNotFoundResponse,
+        204: { description: "The chart is no longer on any dashboard" },
+      },
+    }),
+    async (c) => {
+      const project = await chartsProject({
+        project: c.get("project"),
+        requestedProjectId: c.req.param("projectId"),
+      });
+      await chartService().unplaceChart({
         id: chartIdOf(c.req.param("chartId")),
         projectId: project.id,
       });
@@ -390,4 +511,6 @@ export function registerSavedWorkbenchChartRoutes(
   registerRead(secured);
   registerUpdate(secured);
   registerDelete(secured);
+  registerPlace(secured);
+  registerUnplace(secured);
 }

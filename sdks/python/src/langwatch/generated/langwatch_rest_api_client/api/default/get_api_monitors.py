@@ -90,7 +90,7 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[
     GetApiMonitorsResponse400
     | GetApiMonitorsResponse401
@@ -119,7 +119,7 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> (
     GetApiMonitorsResponse400
     | GetApiMonitorsResponse401
@@ -145,7 +145,7 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> Response[
     GetApiMonitorsResponse400
     | GetApiMonitorsResponse401
@@ -172,7 +172,7 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
 ) -> (
     GetApiMonitorsResponse400
     | GetApiMonitorsResponse401

@@ -1,7 +1,15 @@
 import type { z } from "zod";
+import {
+  type BoardResults,
+  planBoardCarryOver,
+  planComparisonSeeding,
+  type SeedableResults,
+  type SeedTargetOutputs,
+} from "~/experiments-v3/execution/buildExecutionRequest";
 import type { EvaluationsV3State } from "~/experiments-v3/types";
 import { createInitialUIState } from "~/experiments-v3/types";
 import { persistedEvaluationsV3StateSchema } from "~/experiments-v3/types/persistence";
+import type { CellId } from "~/experiments-v3/utils/executionScope";
 import { ExperimentType } from "~/generated/prisma/client";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { prisma } from "~/server/db";
@@ -12,6 +20,7 @@ import {
 import { ExperimentService } from "~/server/experiments/experiment.service";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { type ExecutionDataInputs, loadExecutionData } from "./dataLoader";
+import type { CarriedOverCell, ExecutionScope } from "./types";
 
 type LoadedExecutionData = Extract<
   Awaited<ReturnType<typeof loadExecutionData>>,
@@ -40,6 +49,58 @@ export interface SavedStateExecutionRefusal {
   error: string;
   status: number;
 }
+
+/**
+ * The saved outputs a scoped run may reuse instead of producing again.
+ *
+ * A run with no browser attached starts from a state whose results are empty by
+ * construction, so a candidate-only run had nothing for the comparison judge to
+ * read for the OTHER variants and Phase 2 reported every one of them as
+ * "Waiting on …". The saved cells are exactly what an open page would have
+ * seeded, so the two paths read the same comparison the same way.
+ */
+export const planSavedRunSeeding = ({
+  prepared,
+  scope,
+}: {
+  prepared: SavedStateExecution;
+  scope: ExecutionScope;
+}): SeedTargetOutputs | undefined => {
+  const { seedTargetOutputs } = planComparisonSeeding({
+    targets: prepared.state.targets,
+    evaluators: prepared.state.evaluators,
+    scope,
+    rowCount: prepared.datasetRows.length,
+    results: prepared.workbenchState.results as SeedableResults | undefined,
+  });
+  return Object.keys(seedTargetOutputs).length > 0
+    ? seedTargetOutputs
+    : undefined;
+};
+
+/**
+ * The board cells a run with no page attached carries rather than produces.
+ *
+ * Its board is the saved workbench state, which is the only board there is
+ * when no tab is open. A full run carries nothing, because it covers every
+ * cell itself; a run given a row subset carries the rows it leaves alone.
+ */
+export const planSavedRunCarryOver = ({
+  prepared,
+  scope,
+  extraCells,
+}: {
+  prepared: SavedStateExecution;
+  scope: ExecutionScope;
+  extraCells?: CellId[];
+}): CarriedOverCell[] =>
+  planBoardCarryOver({
+    targets: prepared.state.targets,
+    scope,
+    datasetRows: prepared.datasetRows,
+    results: prepared.workbenchState.results as Partial<BoardResults>,
+    ...(extraCells ? { extraCells } : {}),
+  });
 
 export const buildStateFromWorkbench = (
   workbenchState: z.infer<typeof persistedEvaluationsV3StateSchema>,

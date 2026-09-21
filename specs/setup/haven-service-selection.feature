@@ -15,7 +15,7 @@ Feature: haven service selection
   Scenario: A fresh worktree starts lean
     Given a worktree that has never been up
     When the developer runs "haven up"
-    Then the stack runs the app (workers in-process), nlp, and gateway
+    Then the stack runs the app (workers in-process), nlp, gateway, and the idp simulator
     And langy is not started
     And the first up prints the selection and how to change it
 

@@ -103,6 +103,7 @@ describe("personalVirtualKeys — scope-aware RBAC", () => {
 
   let leoVk: string;
   let mayaVk: string;
+  let sweeperVk: string;
 
   beforeAll(async () => {
     await startTestContainers();
@@ -206,6 +207,9 @@ describe("personalVirtualKeys — scope-aware RBAC", () => {
 
     leoVk = await seedPersonalVk(LEO, "leo-default");
     mayaVk = await seedPersonalVk(MAYA, "maya-default");
+    // The auditor owns one too: without it, "scoped to me" and "returned
+    // nothing at all" look identical to an exclusion-only assertion.
+    sweeperVk = await seedPersonalVk(SWEEPER, "sweeper-default");
   }, 60_000);
 
   afterAll(async () => {
@@ -310,6 +314,31 @@ describe("personalVirtualKeys — scope-aware RBAC", () => {
       ).map((k) => k.id);
       expect(ids).toContain(leoVk);
       expect(ids).not.toContain(mayaVk);
+    });
+
+    /**
+     * Deliberately unbound: this is a regression test for a fix, not a
+     * specified scenario. An `@scenario` here would have to name a title in
+     * `vk-scope-rbac.feature`, and inventing one to satisfy the annotation is
+     * how a spec drifts from what it claims to govern.
+     *
+     * This is the branch `/me` relies on. The page sends the signed-in user's
+     * own id as `targetUserId` so a permission holder sees a first-person
+     * view rather than the org-wide sweep; that only works because the
+     * self-target check runs BEFORE the permission probe. Without this case
+     * nothing pins that ordering, and moving the probe first would silently
+     * widen `/me` back to every member's keys.
+     */
+    it("returns only the auditor's own keys when they name themselves", async () => {
+      const ids = (
+        await callerFor(SWEEPER).personalVirtualKeys.list({
+          organizationId: ORG_ID,
+          targetUserId: SWEEPER,
+        })
+      ).map((k) => k.id);
+      // Exact set, not two exclusions: an empty result would satisfy
+      // "excludes Leo and Maya" while proving nothing about the read.
+      expect(ids).toEqual([sweeperVk]);
     });
   });
 });

@@ -169,7 +169,7 @@ vi.mock("~/utils/api", () => ({
     useUtils: () => ({
       scenarios: {
         getAll: { invalidate: vi.fn() },
-        getById: { invalidate: vi.fn() },
+        getById: { invalidate: vi.fn(), setData: vi.fn() },
       },
       agents: {
         getById: { fetch: vi.fn() },
@@ -196,6 +196,12 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
     project: { id: "project-123", slug: "my-project" },
     organization: { id: "org-123" },
   }),
+}));
+
+// Voice surfaces are flag-gated (release_voice_agents_enabled); this suite is
+// not about that gate, so stub the flag on to keep prior behavior.
+vi.mock("~/components/agents/voice/useVoiceAgentsEnabled", () => ({
+  useVoiceAgentsEnabled: () => true,
 }));
 
 vi.mock("~/utils/compat/next-router", () => ({
@@ -286,6 +292,7 @@ describe("<ScenarioFormDrawer /> save-and-run data-loss regression", () => {
         mocks.mockRunScenario.mockResolvedValue(undefined);
       });
 
+      /** @scenario "The v1 page still sends the person to the run after a single run" */
       it("calls update mutation and navigates to simulations page", async () => {
         const user = userEvent.setup();
         renderEditModeDrawer();

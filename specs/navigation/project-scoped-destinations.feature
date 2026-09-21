@@ -6,8 +6,9 @@ Feature: Navigation destinations that live inside a project
   Most of the sidebar leads to a place inside a project: Home, Analytics,
   Traces, Prompts, and so on. Some signups do not get a project, so those
   destinations have nowhere to go yet. An item with nowhere to go is shown
-  dimmed and inert with the reason on it, not pointed at some other page. The
-  items that do not need a project, like Settings, keep working.
+  dimmed and inert with the reason on it, not pointed at some other page.
+  Destinations that do not need a project, like Settings, live outside the
+  product sidebar now, on the product switcher, so they keep working.
 
   Background:
     Given I am signed in
@@ -25,12 +26,6 @@ Feature: Navigation destinations that live inside a project
     Given my organization has no project
     When I look at the sidebar
     Then no item in it links to the sign-in page
-
-  @integration
-  Scenario: Destinations that do not need a project keep working
-    Given my organization has no project
-    When I look at the sidebar
-    Then "Settings" still opens the settings page
 
   @integration
   Scenario: Grouped destinations follow the same rule

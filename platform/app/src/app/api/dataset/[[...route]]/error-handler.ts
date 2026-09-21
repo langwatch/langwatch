@@ -16,6 +16,12 @@ const logger = createLogger("langwatch:api:dataset:errors");
  * that let these propagate to `onError` (the direct-upload family) get one
  * consistent translation here instead of repeating `error.name === "X"` ladders
  * inline. `message` is always carried through from the thrown error.
+ *
+ * Handled errors are NOT listed here. They already know their own status, code,
+ * fault and remediation, and `handleError` at the bottom of this file answers
+ * with all of it; a domain entry would flatten that back into a bare
+ * `{ error, message }`. `StorageNotWritableError` is the one that used to be
+ * here and is now handled (`storage_not_writable`).
  */
 const DOMAIN_ERROR_HTTP: Record<
   string,
@@ -38,7 +44,6 @@ const DOMAIN_ERROR_HTTP: Record<
   },
   UploadTooLargeError: { status: 400, code: "UploadTooLarge" },
   StagedUploadNotFoundError: { status: 422, code: "UploadNotFound" },
-  StorageNotWritableError: { status: 500, code: "StorageNotWritable" },
   // A PATCH that changes columnTypes on an s3_jsonl dataset is a client request
   // error, not a server fault — 400, matching the tRPC layer's BAD_REQUEST.
   ColumnTypeChangeNotSupportedError: {

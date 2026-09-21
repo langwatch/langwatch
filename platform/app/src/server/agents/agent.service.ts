@@ -1,12 +1,23 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
 
 import type { PrismaClient } from "~/generated/prisma/client";
-import type { Workflow } from "~/optimization_studio/types/dsl";
+import type {
+  ConnectedComponentConfig,
+  Workflow,
+} from "~/optimization_studio/types/dsl";
+import {
+  type VoiceAgentConfig,
+  type VoiceTransport,
+  voiceAgentIdentityKey,
+} from "~/server/agents/voice/voice-agent.config";
+import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
+import type { RunActor } from "~/server/scenarios/run-actor";
 import {
   type AgentComponentConfig,
   type AgentCopyRow,
   AgentRepository,
   type AgentType,
+  type ConnectedAgentIdentity,
   type CreateAgentInput,
   type TypedAgent,
   type UpdateAgentInput,
@@ -16,7 +27,54 @@ import {
   linkedWorkflowId,
   resolveAgentFields,
 } from "./agent-fields";
-import { AgentNotFoundError } from "./errors";
+import {
+  type AgentTestRunResult,
+  createAgentTestRunDeps,
+  scheduleAgentTestRun,
+} from "./agent-test-run";
+import { AgentNotFoundError, AgentRegisterOnlyError } from "./errors";
+
+/**
+ * One agent as the REST list and read answer it: the row, plus the identity
+ * and the declared parameters of a connected agent, absent on the others.
+ */
+export type AgentListRow = {
+  id: string;
+  name: string;
+  type: string;
+  config: AgentComponentConfig;
+  environment: string | null;
+  ownerUserId: string | null;
+  hostLabel: string | null;
+  lastSeenAt: Date | null;
+  parameters: ScenarioParameterDefinition[];
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+/** The parameters a connected agent declares; every other type declares none. */
+export function declaredAgentParameters(
+  agent: Pick<TypedAgent, "type" | "config">,
+): ScenarioParameterDefinition[] {
+  if (agent.type !== "connected") return [];
+  return (agent.config as ConnectedComponentConfig).parameters ?? [];
+}
+
+export function toAgentListRow(agent: TypedAgent): AgentListRow {
+  return {
+    id: agent.id,
+    name: agent.name,
+    type: agent.type,
+    config: agent.config,
+    environment: agent.environment,
+    ownerUserId: agent.ownerUserId,
+    hostLabel: agent.hostLabel,
+    lastSeenAt: agent.lastSeenAt,
+    parameters: declaredAgentParameters(agent),
+    createdAt: agent.createdAt,
+    updatedAt: agent.updatedAt,
+  };
+}
 
 /**
  * Service layer for Agent business logic.
@@ -24,6 +82,18 @@ import { AgentNotFoundError } from "./errors";
  *
  * Framework-agnostic - no tRPC dependencies.
  */
+/**
+ * Whether Prisma refused a write because a unique index already holds the
+ * value. The row the caller wanted exists, written by somebody else.
+ */
+function isUniqueConstraintViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { code?: unknown }).code === "P2002"
+  );
+}
+
 export class AgentService {
   constructor(
     private readonly prisma: PrismaClient,
@@ -52,6 +122,32 @@ export class AgentService {
       projectId: input.projectId,
     });
     return enriched ?? null;
+  }
+
+  /**
+   * The owner of every personal development agent given, by user id.
+   *
+   * One read for the whole list: the agents page labels every personal row
+   * with its owner, and the run refusal names the owner too.
+   */
+  async ownersOf(
+    agents: readonly { ownerUserId: string | null }[],
+  ): Promise<Map<string, { userId: string; name: string | null }>> {
+    const userIds = [
+      ...new Set(
+        agents
+          .map((agent) => agent.ownerUserId)
+          .filter((id): id is string => !!id),
+      ),
+    ];
+    if (userIds.length === 0) return new Map();
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, name: true },
+    });
+    return new Map(
+      users.map((user) => [user.id, { userId: user.id, name: user.name }]),
+    );
   }
 
   /**
@@ -116,8 +212,12 @@ export class AgentService {
 
   /**
    * Creates a new agent.
+   *
+   * A connected agent is never created here: the SDK registers it from the
+   * process that runs it, through {@link registerConnected}.
    */
   async create(input: CreateAgentInput): Promise<AgentWithFields> {
+    if (input.type === "connected") throw new AgentRegisterOnlyError();
     const agent = await this.repository.create(input);
     const [enriched] = await this.withFields({
       agents: [agent],
@@ -127,15 +227,179 @@ export class AgentService {
   }
 
   /**
+   * Creates the voice agent row a "Talk to it" call is saved under on first
+   * hang-up, deduped by its natural identity key so a retried finish for a
+   * not-yet-saved agent (or two browser tabs racing the same one) reuses the
+   * one row rather than creating a second (#8020, decision 1). This replaces the
+   * old run-based guard, which stopped covering the drawer path once a drawer
+   * call no longer writes a run.
+   *
+   * Race-safe the same way {@link registerConnected} is: look up the identity
+   * key, create, and on the unique-constraint race re-read and reuse the winner.
+   */
+  async createVoiceAgent(input: {
+    id: string;
+    projectId: string;
+    name: string;
+    transport: VoiceTransport;
+    agentId: string;
+  }): Promise<TypedAgent> {
+    const identityKey = voiceAgentIdentityKey({
+      transport: input.transport,
+      agentExternalId: input.agentId,
+    });
+    const existing = await this.repository.findByIdentityKey({
+      projectId: input.projectId,
+      identityKey,
+    });
+    if (existing) return existing;
+    // The external id (agentId) carries the identity for either transport: the
+    // ElevenLabs agent id, or the phone number. Store it under the field the
+    // transport's config member names, narrowing so the discriminated union
+    // stays valid without a cast.
+    const config: VoiceAgentConfig =
+      input.transport === "phone"
+        ? {
+            transport: "phone",
+            phoneNumber: input.agentId,
+            callDirection: "outbound",
+          }
+        : { transport: input.transport, agentId: input.agentId };
+    try {
+      return await this.repository.create({
+        id: input.id,
+        projectId: input.projectId,
+        name: input.name,
+        type: "voice",
+        config,
+        identityKey,
+      });
+    } catch (error) {
+      if (!isUniqueConstraintViolation(error)) throw error;
+      const raced = await this.repository.findByIdentityKey({
+        projectId: input.projectId,
+        identityKey,
+      });
+      if (!raced) throw error;
+      return raced;
+    }
+  }
+
+  /**
+   * Whether this project saved a voice agent for the given vendor agent id,
+   * matched on the identity key drawer hang-up dedupes rows by. Used to
+   * authorize recording playback for a drawer call, which writes no run (#8020).
+   */
+  async hasVoiceAgentForExternalId(input: {
+    projectId: string;
+    transport: VoiceTransport;
+    agentExternalId: string;
+  }): Promise<boolean> {
+    const identityKey = voiceAgentIdentityKey({
+      transport: input.transport,
+      agentExternalId: input.agentExternalId,
+    });
+    const agent = await this.repository.findByIdentityKey({
+      projectId: input.projectId,
+      identityKey,
+    });
+    return agent?.type === "voice";
+  }
+
+  /**
    * Updates an existing agent.
+   *
+   * A connected agent takes no edit at all: the row is what the SDK
+   * registered, so an edit is refused with `agent_register_only`.
    */
   async update(input: UpdateAgentInput): Promise<AgentWithFields> {
+    await this.refuseConnectedUpdate(input);
     const agent = await this.repository.update(input);
     const [enriched] = await this.withFields({
       agents: [agent],
       projectId: input.projectId,
     });
     return enriched!;
+  }
+
+  /**
+   * Creates or re-registers a connected agent on the row its identity key
+   * names. The re-register writes `lastSeenAt`, so a row unseen for too long
+   * is listed again, and it clears `archivedAt`, so a row deleted by hand
+   * comes back when the process connects again.
+   *
+   * Several instances of one agent normally start together, so two of them
+   * can read no row and both go on to create one. `(projectId, identityKey)`
+   * is unique, so the loser of that race is answered with the row the winner
+   * wrote rather than with a constraint violation.
+   */
+  async registerConnected(input: {
+    id: string;
+    projectId: string;
+    name: string;
+    config: ConnectedComponentConfig;
+    identity: ConnectedAgentIdentity;
+  }): Promise<TypedAgent> {
+    const existing = await this.repository.findByIdentityKey({
+      projectId: input.projectId,
+      identityKey: input.identity.identityKey,
+    });
+    if (existing) {
+      return this.reregister({ existingId: existing.id, input });
+    }
+    try {
+      return await this.repository.create({
+        id: input.id,
+        projectId: input.projectId,
+        name: input.name,
+        type: "connected",
+        config: input.config,
+        identity: input.identity,
+      });
+    } catch (error) {
+      if (!isUniqueConstraintViolation(error)) throw error;
+      const raced = await this.repository.findByIdentityKey({
+        projectId: input.projectId,
+        identityKey: input.identity.identityKey,
+      });
+      if (!raced) throw error;
+      return this.reregister({ existingId: raced.id, input });
+    }
+  }
+
+  private reregister({
+    existingId,
+    input,
+  }: {
+    existingId: string;
+    input: {
+      projectId: string;
+      name: string;
+      config: ConnectedComponentConfig;
+    };
+  }): Promise<TypedAgent> {
+    return this.repository.reregisterConnected({
+      id: existingId,
+      projectId: input.projectId,
+      name: input.name,
+      config: input.config,
+    });
+  }
+
+  /**
+   * Refuses an edit of a connected agent. Its type, name, environment and
+   * parameters are what the process that runs it declared, so the only way to
+   * change them is to change the code and register again.
+   */
+  private async refuseConnectedUpdate(input: UpdateAgentInput): Promise<void> {
+    if (input.data.type === "connected") throw new AgentRegisterOnlyError();
+    // Archived rows included: an archived connected agent is still the SDK's
+    // to change, and it comes back on the next register.
+    const existing = await this.repository.findByIdIncludingArchived({
+      id: input.id,
+      projectId: input.projectId,
+    });
+    if (existing?.type === "connected") throw new AgentRegisterOnlyError();
   }
 
   /**
@@ -153,14 +417,7 @@ export class AgentService {
     page: number;
     limit: number;
   }): Promise<{
-    data: Array<{
-      id: string;
-      name: string;
-      type: string;
-      config: AgentComponentConfig;
-      createdAt: Date;
-      updatedAt: Date;
-    }>;
+    data: Array<AgentListRow>;
     pagination: {
       page: number;
       limit: number;
@@ -171,14 +428,7 @@ export class AgentService {
     const { data, total } = await this.repository.findAllPaginated(input);
 
     return {
-      data: data.map((agent) => ({
-        id: agent.id,
-        name: agent.name,
-        type: agent.type,
-        config: agent.config,
-        createdAt: agent.createdAt,
-        updatedAt: agent.updatedAt,
-      })),
+      data: data.map(toAgentListRow),
       pagination: {
         page: input.page,
         limit: input.limit,
@@ -197,6 +447,30 @@ export class AgentService {
       throw new AgentNotFoundError();
     }
     return agent;
+  }
+
+  /**
+   * Runs one scripted scenario against the agent and answers with the run's
+   * ids, saving nothing. The person who asked is the run's actor; a personal
+   * development agent of someone else is refused.
+   *
+   * @throws {AgentNotFoundError} when no such agent is in the project
+   * @throws {AgentTestRefusedError} when the agent cannot be run as it is
+   * @throws {AgentOwnerOnlyError} when the agent belongs to someone else
+   * @throws {AgentOfflineError} when no process is holding the connected agent
+   */
+  async testRun(input: {
+    projectId: string;
+    agentId: string;
+    actor: RunActor | undefined;
+  }): Promise<AgentTestRunResult> {
+    return scheduleAgentTestRun({
+      ...input,
+      deps: createAgentTestRunDeps({
+        prisma: this.prisma,
+        readAgent: (params) => this.getById(params),
+      }),
+    });
   }
 
   /**
@@ -230,6 +504,7 @@ export class AgentService {
     if (!existing) {
       throw new AgentNotFoundError();
     }
+    await this.refuseConnectedUpdate(input);
     return this.repository.update(input);
   }
 

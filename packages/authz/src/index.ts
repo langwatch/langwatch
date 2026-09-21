@@ -52,12 +52,15 @@ export {
   declaredScopeId,
   isPlatformTierPermission,
   permissionGrantTiers,
+  resolveDeclaredScope,
   SCOPE_TIER_BY_FIELD,
   SCOPE_TIER_FIELDS,
 } from "./declaration";
 export type {
   AccessDeclaration,
   DeclaredScopeId,
+  DeclaredScopeResolution,
+  UnresolvedDeclaredScope,
   NoPermissionOptions,
   DeclarationError,
   PermissionGrantTiers,
@@ -74,7 +77,7 @@ export {
   roleKeyForTeamRole,
 } from "./roles";
 export type { BuiltinRoleKey } from "./roles";
-export { PermissionDeniedError } from "./errors";
+export { BlankScopeIdError, PermissionDeniedError } from "./errors";
 export type { Authorized } from "./witness";
 export { bitsetHasPermission, encodePermissionBitset } from "./bitset";
 export {

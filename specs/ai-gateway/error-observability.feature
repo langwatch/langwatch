@@ -35,16 +35,14 @@ Feature: Gateway errors are logged with fault attribution
   # held only our summary of it ("codex backend HTTP 400"). A production outage
   # on codex models took a live probe of the backend to name, because the one
   # place an operator looks never carried the reply that said "Unsupported
-  # parameter: prompt_cache_retention". The reason is read from the shapes
-  # providers use, so a body with none of them still gives the operator its
-  # first line rather than nothing.
+  # parameter: prompt_cache_retention".
   @unit
   Scenario: A forwarded provider rejection names the provider's own reason
     Given the upstream provider rejects the request with a reason in its body
     When the gateway forwards the rejection to the client
-    Then the log carries that reason next to the status
-    And a body in any of the shapes providers use is read the same way
-    And an unrecognized body is reported by its first line, capped
+    Then the operator reads that reason next to the status
+    And a rejection worded in any of the ways providers word it reads the same
+    And a body that states no reason is described, never quoted, so nothing the customer sent can reach the log
     And a reason our own message already states is not repeated
 
   @unit

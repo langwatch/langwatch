@@ -123,7 +123,10 @@ export async function getRetentionPolicySnapshot(
         orderBy: { name: "asc" },
       }),
       ctx.prisma.project.findMany({
-        where: { team: { organizationId } },
+        where: {
+          team: { organizationId },
+          kind: { not: "internal_governance" },
+        },
         // `archivedAt` is selected (not filtered in the query) so the name
         // lookup below still resolves a rule that targets a since-archived
         // project; the archived ones are dropped only from the scope PICKER.

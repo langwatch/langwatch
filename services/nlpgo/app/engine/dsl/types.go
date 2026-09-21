@@ -370,6 +370,12 @@ type Workflow struct {
 	// their JSON types, so a number stays a number and a boolean stays a
 	// boolean by the time user code reads params.NAME.
 	Params map[string]any `json:"params,omitempty"`
+	// SandboxAPIKey is the credential a code node authenticates with. It is
+	// minted for one run, reaches the project's agent cache and nothing else,
+	// and expires by itself. It is never the project key. An empty value means
+	// the run injects no credential, which is what a caller that could not
+	// mint one sends.
+	SandboxAPIKey string `json:"sandbox_api_key,omitempty"`
 }
 
 // ParseWorkflow deserializes a Workflow from JSON, returning a wrapped

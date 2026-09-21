@@ -9,12 +9,13 @@
  * the same mistake.
  *
  * @see dev/docs/best_practices/error-handling.md
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { HandledError } from "@langwatch/handled-error";
 
 import type { VegaValidationError } from "~/features/analytics-query/visualization/visualization.types";
+import { CUSTOM_CHART_PLAYGROUND_FLAG } from "~/server/analytics/dashboard-widgets/access";
 import { remediation } from "~/server/app-layer/error-remediation";
 
 /**
@@ -59,6 +60,31 @@ export class SavedWorkbenchChartAlreadyExistsError extends HandledError {
       },
     );
     this.name = "SavedWorkbenchChartAlreadyExistsError";
+  }
+}
+
+/**
+ * The dashboard a chart was asked to be placed on does not exist in this
+ * project.
+ *
+ * Covers both a foreign dashboard's id and one that never existed, and
+ * deliberately does not distinguish them — the same reasoning as
+ * {@link SavedWorkbenchChartNotFoundError}, applied to the id on the other
+ * side of a placement. Derived from
+ * {@link import("~/server/analytics/dashboardBelongsToProject").dashboardBelongsToProject},
+ * the identical tenancy check `graphs.create` already runs before it places a
+ * newly created chart.
+ */
+export class SavedWorkbenchChartDashboardNotFoundError extends HandledError {
+  declare readonly code: "saved_workbench_chart_dashboard_not_found";
+
+  constructor() {
+    super("saved_workbench_chart_dashboard_not_found", "Dashboard not found.", {
+      httpStatus: 404,
+      fault: "customer",
+      ...remediation("saved_workbench_chart_dashboard_not_found"),
+    });
+    this.name = "SavedWorkbenchChartDashboardNotFoundError";
   }
 }
 
@@ -128,5 +154,33 @@ export class SavedWorkbenchChartDefinitionInvalidError extends HandledError {
       },
     );
     this.name = "SavedWorkbenchChartDefinitionInvalidError";
+  }
+}
+
+/**
+ * Saved workbench charts and the custom-chart-playground are mutually
+ * exclusive while the playground is experimental: with
+ * `release_custom_chart_playground` ON for this project, `chart` REST/CLI
+ * operations refuse rather than compete with `dashboard-widget` as two
+ * answers to "make me a chart." `customer` fault, 403 — a product decision
+ * an administrator can change, not an incident.
+ *
+ * The message NAMES the flag and the alternative deliberately: this is the
+ * one caller-visible signal that stops an agent from retrying the same
+ * command and pushes it toward `dashboard-widget` instead.
+ */
+export class SavedWorkbenchChartsDisabledForPlaygroundError extends HandledError {
+  declare readonly code: "saved_workbench_charts_disabled_for_playground";
+
+  constructor() {
+    super(
+      "saved_workbench_charts_disabled_for_playground",
+      `Saved workbench charts are turned off for this project while the custom-chart-playground is enabled (feature flag: ${CUSTOM_CHART_PLAYGROUND_FLAG}). Do not retry — use the dashboard-widgets skill / \`langwatch dashboard-widget\` commands instead.`,
+      {
+        httpStatus: 403,
+        ...remediation("saved_workbench_charts_disabled_for_playground"),
+      },
+    );
+    this.name = "SavedWorkbenchChartsDisabledForPlaygroundError";
   }
 }

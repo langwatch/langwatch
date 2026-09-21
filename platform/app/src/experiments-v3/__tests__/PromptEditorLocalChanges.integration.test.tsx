@@ -17,6 +17,7 @@ import { forwardRef } from "react";
 
 import { PromptEditorDrawer } from "~/components/prompts/PromptEditorDrawer";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
+import { PromptTemplateFieldsContext } from "../hooks/usePromptTemplateFields";
 import type { LocalPromptConfig } from "../types";
 
 // Mock name hooks to avoid tRPC queries
@@ -263,6 +264,20 @@ vi.mock("~/utils/api", () => ({
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
+
+/**
+ * Wrapper for a target that has no local draft, standing in for the saved
+ * template the workbench resolves for it.
+ */
+const wrapperWithTemplateFields =
+  (usedFields: string[]) =>
+  ({ children }: { children: React.ReactNode }) => (
+    <ChakraProvider value={defaultSystem}>
+      <PromptTemplateFieldsContext.Provider value={() => new Set(usedFields)}>
+        {children}
+      </PromptTemplateFieldsContext.Provider>
+    </ChakraProvider>
+  );
 
 describe("Prompt Editor Local Changes", () => {
   beforeEach(() => {
@@ -542,7 +557,8 @@ describe("Prompt Editor Local Changes", () => {
         ],
       });
 
-      // Step 5: Verify alert icon STILL shows
+      // Step 5: Verify alert icon STILL shows. The saved template is the one
+      // the user just wrote, so it references {{input}} and {{wtf}}.
       target = useEvaluationsV3Store.getState().targets[0]!;
       render(
         <TargetHeader
@@ -551,11 +567,10 @@ describe("Prompt Editor Local Changes", () => {
           onRemove={vi.fn()}
           onRun={vi.fn()}
         />,
-        { wrapper: Wrapper },
+        { wrapper: wrapperWithTemplateFields(["input", "wtf"]) },
       );
 
       // KEY ASSERTION: Alert icon should STILL be visible because wtf is still unmapped!
-      // BUG: This FAILS because target.inputs is [input] not [input, wtf]
       expect(screen.queryByTestId("missing-mapping-alert")).toBeInTheDocument();
     }, 25000);
   });

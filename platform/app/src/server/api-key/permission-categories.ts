@@ -66,6 +66,7 @@ const GOVERNANCE_RESOURCES: AuthzResource[] = [
   "complianceExport",
   "activityMonitor",
   "aiTools",
+  "governanceCost",
 ];
 
 export const PERMISSION_CATEGORIES: readonly PermissionCategory[] = [
@@ -169,6 +170,13 @@ export const PERMISSION_CATEGORIES: readonly PermissionCategory[] = [
     accessLevels: ["read", "write"],
     readPermissions: viewsOf("secrets"),
     writePermissions: allActionsOf("secrets"),
+  },
+  {
+    key: "agentCache",
+    label: "Agent Cache",
+    accessLevels: ["read", "write"],
+    readPermissions: viewsOf("agentCache"),
+    writePermissions: allActionsOf("agentCache"),
   },
   {
     key: "auditLog",

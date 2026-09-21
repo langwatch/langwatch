@@ -3,6 +3,9 @@ import { aiToolsRouter } from "@ee/governance/routers/aiTools";
 import { anomalyRulesRouter } from "@ee/governance/routers/anomalyRules";
 import { departmentsRouter } from "@ee/governance/routers/departments";
 import { governanceRouter } from "@ee/governance/routers/governance";
+import { governanceAgentsRouter } from "@ee/governance/routers/governanceAgents";
+import { governanceCostRouter } from "@ee/governance/routers/governanceCost";
+import { governancePeopleRouter } from "@ee/governance/routers/governancePeople";
 import { ingestionKeyRouter } from "@ee/governance/routers/ingestionKey";
 import { ingestionSourcesRouter } from "@ee/governance/routers/ingestionSources";
 import { ingestionTemplatesRouter } from "@ee/governance/routers/ingestionTemplates";
@@ -14,6 +17,7 @@ import { analyticsRouter } from "./routers/analytics";
 import { annotationRouter } from "./routers/annotation";
 import { annotationScoreRouter } from "./routers/annotationScore";
 import { apiKeyRouter } from "./routers/apiKey";
+import { authRouter } from "./routers/auth";
 import { authzRouter } from "./routers/authz";
 import { automationRouter } from "./routers/automations";
 import { batchRecordRouter } from "./routers/batchRecord";
@@ -22,6 +26,7 @@ import { codingAgentsRouter } from "./routers/codingAgents";
 import { costsRouter } from "./routers/costs";
 import { currencyRouter } from "./routers/currency";
 import { dashboardsRouter } from "./routers/dashboards";
+import { dashboardWidgetsRouter } from "./routers/dashboardWidgets";
 import { dataPrivacyRouter } from "./routers/dataPrivacy";
 import { dataRetentionRouter } from "./routers/dataRetention";
 import { datasetRouter } from "./routers/dataset";
@@ -42,7 +47,11 @@ import { graphsRouter } from "./routers/graphs";
 import { groupRouter } from "./routers/group";
 import { homeRouter } from "./routers/home";
 import { httpProxyRouter } from "./routers/httpProxy";
+import { identityRouter } from "./routers/identity";
+import { identityLookupRouter } from "./routers/identityLookup";
 import { integrationsChecksRouter } from "./routers/integrationsChecks";
+import { inviteRouter } from "./routers/invite";
+import { joinRequestsRouter } from "./routers/joinRequests";
 import { langyRouter } from "./routers/langy";
 import { langyEgressRouter } from "./routers/langyEgress";
 import { licenseRouter } from "./routers/license";
@@ -75,6 +84,7 @@ import { setupSkillsRouter } from "./routers/setupSkills";
 import { shareRouter } from "./routers/share";
 import { sharedTraceRouter } from "./routers/sharedTrace";
 import { spansRouter } from "./routers/spans";
+import { ssoConnectionsRouter } from "./routers/ssoConnections";
 import { storedObjectsRouter } from "./routers/stored-objects.router";
 import { subscriptionRouter } from "./routers/subscription";
 import { suiteRouter } from "./routers/suites";
@@ -84,6 +94,7 @@ import { traceEditOverlayRouter } from "./routers/traceEditOverlay";
 import { tracesRouter } from "./routers/traces";
 import { tracesV2Router } from "./routers/tracesV2";
 import { translateRouter } from "./routers/translate";
+import { twoStepVerificationRouter } from "./routers/twoStepVerification";
 import { userRouter } from "./routers/user";
 import { virtualKeysRouter } from "./routers/virtualKeys";
 import { webhookEndpointsRouter } from "./routers/webhookEndpoints";
@@ -94,6 +105,9 @@ const coreRouters = {
   evaluators: evaluatorsRouter,
   httpProxy: httpProxyRouter,
   organization: organizationRouter,
+  invite: inviteRouter,
+  joinRequests: joinRequestsRouter,
+  twoStepVerification: twoStepVerificationRouter,
   project: projectRouter,
   team: teamRouter,
   traces: tracesRouter,
@@ -110,6 +124,7 @@ const coreRouters = {
   dataset: datasetRouter,
   datasetRecord: datasetRecordRouter,
   graphs: graphsRouter,
+  dashboardWidgets: dashboardWidgetsRouter,
   dashboards: dashboardsRouter,
   home: homeRouter,
   evaluations: evaluationsRouter,
@@ -118,6 +133,9 @@ const coreRouters = {
   limits: limitsRouter,
   automation: automationRouter,
   authz: authzRouter,
+  identity: identityRouter,
+  identityLookup: identityLookupRouter,
+  auth: authRouter,
   experiments: experimentsRouter,
   featureFlag: featureFlagRouter,
   annotation: annotationRouter,
@@ -125,6 +143,7 @@ const coreRouters = {
   llmModelCost: llmModelCostsRouter,
   user: userRouter,
   bugReports: bugReportsRouter,
+  ssoConnections: ssoConnectionsRouter,
   annotationScore: annotationScoreRouter,
   publicEnv: publicEnvRouter,
   setupSkills: setupSkillsRouter,
@@ -166,6 +185,9 @@ const coreRouters = {
   ingestionTemplates: ingestionTemplatesRouter,
   ingestionKey: ingestionKeyRouter,
   governance: governanceRouter,
+  governanceAgents: governanceAgentsRouter,
+  governanceCost: governanceCostRouter,
+  governancePeople: governancePeopleRouter,
   personalSessions: personalSessionsRouter,
   sessionPolicy: sessionPolicyRouter,
   gatewayBudgets: gatewayBudgetsRouter,

@@ -74,6 +74,19 @@ const FALLBACK_BY_CODE: Record<string, ErrorExplanation> = {
       "Compare your arguments against the command's `--help` output",
     ],
   },
+  not_authenticated: {
+    suggestions: ["Run `langwatch login --device` to sign in via your company SSO"],
+  },
+  // Enabling a provider does not choose a model for a role. The default lives
+  // on the Default Models settings page, and is almost always written at the
+  // organization scope, so the advice names both.
+  model_not_configured: {
+    suggestions: [
+      "Open Settings, then Default Models in the LangWatch dashboard, and set a model for the role named in this error",
+      "Set it at the organization scope so every team and project inherits it",
+    ],
+    docUrl: `${DOCS}/platform/model-providers`,
+  },
   budget_exceeded: {
     suggestions: [
       "Raise or adjust the project's budget in the gateway settings",

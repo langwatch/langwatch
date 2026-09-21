@@ -53,12 +53,18 @@ func TestTruncateToolOutput_ReducesJSONStructurally(t *testing.T) {
 		t.Errorf("scalar fields must survive the reduction, totalHits = %d", parsed.Pagination.TotalHits)
 	}
 	if len(parsed.Traces) < 2 {
-		t.Errorf("a sample of the array must survive, got %d items", len(parsed.Traces))
+		// Fatal, not an error: the tail read below would panic on an empty array
+		// and a panic diagnoses nothing.
+		t.Fatalf("a sample of the array must survive, got %d items", len(parsed.Traces))
 	}
-	// The clip marker rides IN the array, shape intact.
+	// The clip marker rides IN the array, shape intact, and states the true
+	// total so a reader with no count field of its own still has one.
 	last, _ := parsed.Traces[len(parsed.Traces)-1].(string)
 	if !strings.Contains(last, "more items truncated") {
 		t.Errorf("clipped array must carry the in-band marker, tail = %v", parsed.Traces[len(parsed.Traces)-1])
+	}
+	if !strings.Contains(last, "40 total") {
+		t.Errorf("the marker must state the array's true size, tail = %q", last)
 	}
 }
 
@@ -199,6 +205,38 @@ func TestHasToolInput(t *testing.T) {
 	}
 }
 
+// The local tools and the two tools that talk to the person carry a title of
+// ours, because pi sends none: without it the panel row reads "Local_bash"
+// instead of saying the call runs on the developer's machine. Every other tool
+// keeps the empty title and the card falls back to the tool name.
+func TestToolTitle(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		want string
+	}{
+		{"code_access", "Code access"},
+		{"question", "Question"},
+		{"say", "Say"},
+		{"secret_snippet", "Secret snippet"},
+		{"local_read", "Read on your machine"},
+		{"local_write", "Write on your machine"},
+		{"local_edit", "Edit on your machine"},
+		{"local_bash", "Run on your machine"},
+		{"local_grep", "Search on your machine"},
+		{"local_find", "Find on your machine"},
+		{"local_ls", "List on your machine"},
+		{"LOCAL_LS", "List on your machine"},
+		{" local_ls ", "List on your machine"},
+		{"bash", ""},
+		{"todowrite", ""},
+		{"", ""},
+	} {
+		if got := ToolTitle(tc.name); got != tc.want {
+			t.Errorf("ToolTitle(%q) = %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}
+
 // The tracker guarantees exactly one start and one end per call id, and the
 // settle of a non-plan call feeds the measured-progress batch timing.
 func TestToolCallTracker_DeDupeAndMeasuredTiming(t *testing.T) {
@@ -252,12 +290,36 @@ func TestToolCallTracker_PlanToolSettleContributesNoTiming(t *testing.T) {
 	tracker.EndIfNew("plan_1", "todowrite")
 
 	frame, ok := tracker.MeasuredProgressFromPlan([]frames.PlanItem{
-		{Content: "Scanning — 1/10", Status: "in_progress"},
+		{Content: "Scanning - 1/10", Status: "in_progress"},
 	})
 	if !ok {
 		t.Fatalf("expected a measured progress frame")
 	}
 	if strings.Contains(frame.JSON(), "batchDurationMs") {
 		t.Fatalf("todowrite settle timing leaked into the sample: %s", frame.JSON())
+	}
+}
+
+// A line said to the person is not work either: its settle contributes no
+// timing, and it carries a title so the frame names it.
+func TestToolCallTracker_SayToolSettleContributesNoTiming(t *testing.T) {
+	now := time.Unix(100, 0)
+	tracker := NewToolCallTrackerWithClock(func() time.Time { return now })
+
+	tracker.StartIfNew("say_1")
+	now = now.Add(5 * time.Second)
+	tracker.EndIfNew("say_1", "say")
+
+	frame, ok := tracker.MeasuredProgressFromPlan([]frames.PlanItem{
+		{Content: "Scanning - 1/10", Status: "in_progress"},
+	})
+	if !ok {
+		t.Fatalf("expected a measured progress frame")
+	}
+	if strings.Contains(frame.JSON(), "batchDurationMs") {
+		t.Fatalf("say settle timing leaked into the sample: %s", frame.JSON())
+	}
+	if !IsSayTool("Say") || IsSayTool("bash") {
+		t.Fatalf("IsSayTool must match the say tool by name, case-insensitively")
 	}
 }

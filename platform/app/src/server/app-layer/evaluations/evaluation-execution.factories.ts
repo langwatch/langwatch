@@ -4,6 +4,7 @@ import {
   prepareLitellmParams,
 } from "~/server/api/routers/modelProviders.utils";
 import { prisma } from "~/server/db";
+import { pickGenerationParams } from "~/server/evaluations/generationParams";
 import { ModelProviderService } from "~/server/modelProviders/modelProvider.service";
 import { resolveMaxTokensCeiling } from "~/server/modelProviders/resolveMaxTokensCeiling";
 import { clampMaxTokens } from "~/utils/clampMaxTokens";
@@ -155,27 +156,17 @@ export async function setupModelEnv(
   );
 
   // Generation params (temperature, max_tokens, etc.)
-  const generationParams = [
-    "temperature",
-    "max_tokens",
-    "top_p",
-    "frequency_penalty",
-    "presence_penalty",
-    "seed",
-    "reasoning_effort",
-  ];
   const maxTokensCeiling = resolveMaxTokensCeiling(model, modelProvider);
-  for (const param of generationParams) {
-    let value = settings?.[param];
-    if (value !== undefined && value !== null) {
-      if (param === "max_tokens" && typeof value === "number") {
-        value = clampMaxTokens(value, maxTokensCeiling);
-      }
-      const envKey = embeddings
-        ? `X_LITELLM_EMBEDDINGS_${param}`
-        : `X_LITELLM_${param}`;
-      envResult[envKey] = String(value);
+  const generationParams = pickGenerationParams(settings);
+  for (const [param, rawValue] of Object.entries(generationParams)) {
+    let value = rawValue;
+    if (param === "max_tokens" && typeof value === "number") {
+      value = clampMaxTokens(value, maxTokensCeiling);
     }
+    const envKey = embeddings
+      ? `X_LITELLM_EMBEDDINGS_${param}`
+      : `X_LITELLM_${param}`;
+    envResult[envKey] = String(value);
   }
 
   if (embeddings) {

@@ -13,11 +13,31 @@
  * and left the client rendering "unknown error" for a denial it could have
  * named.
  */
-import { PermissionDeniedError } from "@langwatch/authz";
+import { BlankScopeIdError, PermissionDeniedError } from "@langwatch/authz";
 import type { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
+
+/**
+ * Severity is behaviour here, not decoration: the blank-id split exists so a
+ * caller's empty string stops being logged as a platform fault, and only an
+ * assertion on the error channel can hold that.
+ */
+const loggedError = vi.fn();
+vi.mock("@langwatch/observability", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    createLogger: () => ({
+      error: (...args: unknown[]) => loggedError(...args),
+      warn: vi.fn(),
+      info: vi.fn(),
+      debug: vi.fn(),
+      trace: vi.fn(),
+    }),
+  };
+});
 
 const resolveProjectPermission = vi.fn();
 const resolveTeamPermission = vi.fn();
@@ -65,6 +85,11 @@ const paramsFor = (
     session: (authed ? session : null) as any,
     permissionChecked: false,
     organizationRole: undefined as any,
+    // The seam's own suite, not the second-factor gate's: the gate runs after
+    // the permission and reads the organization it guards, which no fixture
+    // here creates. Handed in through the ctx slot that exists for exactly
+    // this — `mfa-gate`'s behaviour is asserted by its own tests.
+    mfaGate: { offered: () => false } as any,
   },
   input,
   next: vi.fn().mockReturnValue("next-called"),
@@ -197,8 +222,8 @@ describe("checkDeclaredPermission", () => {
     });
   });
 
-  describe("when the input carries no usable id", () => {
-    /** @scenario "Declaring a permission with no usable scope id in the input fails to compile" */
+  describe("when the input names no scope id at all", () => {
+    /** @scenario "An input carrying no scope id at all is still a wiring bug" */
     it("fails loudly as a wiring bug, not a denial", async () => {
       const error = await rejection(() =>
         checkDeclaredPermission({ permission: "traces:view" })(
@@ -206,6 +231,67 @@ describe("checkDeclaredPermission", () => {
         ),
       );
       expect(error.code).toBe("INTERNAL_SERVER_ERROR");
+      expect(loggedError).toHaveBeenCalledWith(
+        expect.objectContaining({ permission: "traces:view" }),
+        "declared permission's input carries no usable scope id",
+      );
+    });
+  });
+
+  describe("when the caller leaves the scope id blank", () => {
+    /** @scenario "A scope id the caller left blank is answered as invalid input" */
+    it("answers invalid input, naming the field, without deciding anything", async () => {
+      const error = await rejection(() =>
+        checkDeclaredPermission({ permission: "traces:view" })(
+          paramsFor({ projectId: "" }) as any,
+        ),
+      );
+
+      expect(error.code).toBe("BAD_REQUEST");
+      const cause = error.cause as BlankScopeIdError;
+      expect(cause).toBeInstanceOf(BlankScopeIdError);
+      expect(cause.code).toBe("validation_error");
+      expect(cause.fault).toBe("customer");
+      expect(cause.httpStatus).toBe(400);
+      expect(cause.meta.fieldErrors).toEqual({ projectId: ["Required"] });
+      // The caller's own blank string never becomes a probe for someone
+      // else's scope, so no decision is asked for.
+      expect(resolveProjectPermission).not.toHaveBeenCalled();
+    });
+
+    /**
+     * The regression this whole split exists for: a routine bad request used
+     * to land on the error dashboard as a platform fault and page the team.
+     *
+     */
+    /** @scenario "A scope id the caller left blank is answered as invalid input" */
+    it("does not report the caller's blank id as an internal error", async () => {
+      await rejection(() =>
+        checkDeclaredPermission({ permission: "traces:view" })(
+          paramsFor({ projectId: "" }) as any,
+        ),
+      );
+      expect(loggedError).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A blank scope id never shadows one the caller did fill in" */
+    it("still checks at a wider tier the caller did fill in", async () => {
+      const params = paramsFor({
+        projectId: "",
+        organizationId: "org-1",
+      });
+
+      await expect(
+        checkDeclaredPermission({ permission: "traces:view" })(params as any),
+      ).resolves.toBe("next-called");
+
+      expect(hasOrganizationPermission).toHaveBeenCalledWith(
+        expect.objectContaining({
+          session: { user: { id: "alice" }, expires: "" },
+        }),
+        "org-1",
+        "traces:view",
+      );
     });
   });
 
@@ -245,6 +331,49 @@ describe("checkDeclaredPermission", () => {
         "permission_denied",
       );
       expect(denied.message).not.toContain("does-not-exist");
+    });
+
+    it("can conceal a project outside the caller's organization as not found", async () => {
+      resolveProjectPermission.mockResolvedValue({
+        permitted: false,
+        organizationRole: null,
+        denialReason: "no-membership",
+      });
+      const middleware = checkDeclaredPermission({
+        permission: "project:manage",
+        nondisclosure: "not-found-outside-organization",
+      });
+
+      const error = await rejection(() =>
+        middleware(paramsFor({ projectId: "project-foreign" }) as any),
+      );
+
+      expect(error).toMatchObject({
+        code: "NOT_FOUND",
+        message: "Project not found",
+      });
+      expect(authzDeclarationOf(middleware)).toMatchObject({
+        kind: "permission",
+        permission: "project:manage",
+        nondisclosure: "not-found-outside-organization",
+      });
+    });
+
+    it("does not conceal a same-organization permission denial", async () => {
+      resolveProjectPermission.mockResolvedValue({
+        permitted: false,
+        organizationRole: "MEMBER",
+        denialReason: "no-binding",
+      });
+
+      const error = await rejection(() =>
+        checkDeclaredPermission({
+          permission: "project:manage",
+          nondisclosure: "not-found-outside-organization",
+        })(paramsFor({ projectId: "project-own" }) as any),
+      );
+
+      expect(error.cause).toBeInstanceOf(PermissionDeniedError);
     });
 
     /** @scenario "A lite member's denial is distinguishable from a missing grant" */
@@ -304,6 +433,20 @@ describe("checkDeclaredPermissionAny", () => {
       permission: "traces:view",
     });
   });
+
+  /** @scenario "A blank project id on a multi-permission check is answered the same way" */
+  it("answers a blank project id as invalid input, not an internal error", async () => {
+    const error = await rejection(() =>
+      checkDeclaredPermissionAny(["traces:view", "scenarios:view"])(
+        paramsFor({ projectId: "" }) as any,
+      ),
+    );
+
+    expect(error.code).toBe("BAD_REQUEST");
+    expect(error.cause).toBeInstanceOf(BlankScopeIdError);
+    expect(resolveProjectPermissionAny).not.toHaveBeenCalled();
+    expect(loggedError).not.toHaveBeenCalled();
+  });
 });
 
 describe("declaredNoPermission", () => {
@@ -333,6 +476,71 @@ describe("declaredNoPermission", () => {
         allow: { organizationId: "creating inside this organization" },
       })(paramsFor({ organizationId: "org-1" }) as any),
     ).resolves.toBe("next-called");
+  });
+
+  /** @scenario "An opted-out procedure cannot silently read scoped input" */
+  it("passes a procedure that declares no input at all, rather than throwing on it", async () => {
+    // `in` throws on `undefined`, so a procedure with no `.input()` used to
+    // fail here — every call became a 500 at the boundary before the handler
+    // ran, which is how `identity.myIdentifiers` took the authentication
+    // settings page down. Nothing is skipped by allowing it: an input that
+    // does not exist carries no scope id to smuggle past the check.
+    const middleware = declaredNoPermission({ reason: "no input at all" });
+    const params = { ...paramsFor({}), input: undefined };
+
+    await expect(middleware(params as any)).resolves.toBe("next-called");
+    expect(params.ctx.permissionChecked).toBe(true);
+  });
+
+  describe("given an organization that holds this member at its MFA gate", () => {
+    const heldParams = () => {
+      const standingForSession = vi.fn(async () => ({
+        satisfaction: { satisfied: false } as const,
+      }));
+      const params = paramsFor({ organizationId: "org-acme" });
+      params.ctx.mfaGate = {
+        offered: () => true,
+        organizationMfa: () => ({ standingForSession }),
+      } as any;
+      return { params, standingForSession };
+    };
+
+    it("still blocks an ordinary no-permission route such as an API-key mutation", async () => {
+      const { params } = heldParams();
+      const middleware = declaredNoPermission({
+        reason: "the caller's own API keys",
+        allow: {
+          organizationId: "creating a key in the caller's organization",
+        },
+      });
+
+      await expect(middleware(params as any)).rejects.toMatchObject({
+        code: "identity_mfa_enrollment_required",
+      });
+      expect(params.next).not.toHaveBeenCalled();
+    });
+
+    it("allows only an explicitly declared recovery read past the MFA gate", async () => {
+      const { params, standingForSession } = heldParams();
+      const middleware = declaredNoPermission({
+        reason: "the caller's own MFA standing",
+        allow: { organizationId: "the organization whose gate they reached" },
+        mfaRecovery: {
+          reason:
+            "the standing answer tells the caller how to satisfy the gate",
+        },
+      });
+
+      await expect(middleware(params as any)).resolves.toBe("next-called");
+      expect(standingForSession).not.toHaveBeenCalled();
+      expect(authzDeclarationOf(middleware)).toMatchObject({
+        kind: "no-permission",
+        mfaRecovery: {
+          reason:
+            "the standing answer tells the caller how to satisfy the gate",
+        },
+      });
+    });
   });
 });
 

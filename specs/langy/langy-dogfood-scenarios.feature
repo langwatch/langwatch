@@ -121,6 +121,128 @@ Feature: Langy is tested with LangWatch's own scenario and evaluation tooling
     And the judge confirms Langy offered no prose options and invented no id
 
   # ---------------------------------------------------------------------------
+  # Langy changes the customer's code through a shared local folder (ADR-129)
+  # ---------------------------------------------------------------------------
+
+  # These scenarios drive the real CLI in a terminal against a demo
+  # application copied into a temporary git repository, and answer the
+  # permission cards as the user would. Facts are read from the repository
+  # before the judge speaks.
+
+  @e2e
+  Scenario: A scenario checks that Langy instruments tracing through a shared folder
+    Given a Langy dogfood scenario where the user asks to instrument traces and shares the local folder
+    When the scenario runs against Langy
+    Then Langy works in a new branch from the folder's main branch
+    And the application's entry point calls the LangWatch SDK
+    And Langy runs the project's own checks before it commits
+    And Langy opens a pull request or reports the one blocker
+    And the judge confirms Langy explained the two ways to reach the code and asked once
+
+  @e2e
+  Scenario: A scenario checks that a remembered GitHub choice is not asked again
+    Given a Langy dogfood scenario where the user chose GitHub and remembered it
+    When a second conversation needs code access
+    Then no code access card is rendered
+    And the status card reads that Langy uses GitHub
+    And changing the choice clears it for the next conversation
+
+  @e2e
+  Scenario: A scenario checks that platform work never asks for the code
+    Given a Langy dogfood scenario where the user asks for a scenario about refunds
+    When the scenario runs against Langy
+    Then no code access card is rendered
+    And no control request is recorded for the conversation
+    And Langy creates the scenario on the platform
+
+  @e2e
+  Scenario: A scenario checks that Langy adds a run parameter to a connected agent
+    Given a Langy dogfood scenario where the demo agent is connected and the user asks for a free-plan-only case using a named account
+    When the scenario runs against Langy
+    Then the connect call declares a plan parameter with the plans as options
+    And the demo's account store holds the named account
+    And Langy restarts the agent in the background through the folder
+    And the agent registers again with the new parameter in its schema
+    And the scenario runs with the parameter set
+
+  @e2e
+  Scenario: A scenario checks that Langy respects the folder boundary and my denials
+    Given a Langy dogfood scenario where the user asks for a file outside the folder and denies a removal
+    When the scenario runs against Langy
+    Then Langy explains it can only work inside the shared folder and does not retry
+    And the denied removal is not run again
+    And a pattern the user allowed is not asked again in a later turn
+
+  @e2e
+  Scenario: A scenario checks that Langy recovers when the folder disconnects mid-task
+    Given a Langy dogfood scenario where the CLI exits while Langy is working
+    When the scenario runs against Langy
+    Then Langy reports that the folder is no longer connected
+    And Langy offers the code access card again
+    And the judge confirms Langy did not pretend the work continued
+
+  # A filmed run called the trace search seven times in a row, saw nothing, and
+  # reported its own verification as inconclusive. The search was right and the
+  # window was right; the trace had simply not been ingested yet, and the skill
+  # said nothing about waiting.
+  @unit
+  Scenario: The tracing skill waits for the trace instead of asking again at once
+    Given the tracing skill
+    When its verification step is read
+    Then it says an empty first answer means the trace has not arrived yet
+    And it bounds the retries and says how long to leave between them
+    And it says not to report the change as verified when the wait runs out
+
+  # A filmed run put langwatch.setup() at the top of the entry file, above the
+  # import that loaded the .env it had just written, and the agent died at
+  # import with "LangWatch API key is required but not provided".
+  @unit
+  Scenario: LangWatch initialises after the project's environment is loaded
+    Given the tracing skill
+    When its instrumentation step is read
+    Then setup runs below the import that loads the environment, in Python and in TypeScript
+    And the env loader is added to the entry file when the project has it and the entry file does not load it
+    And the key is checked visible to the process the way the project reads it, without printing it
+    And the given command is the first and only check, copied as written for the project's runner, with no probe before it
+
+  # A filmed run put the LangChain callback on the model call inside one graph
+  # node. The trace then held llm spans only: the tool nodes and the plain
+  # function nodes never appeared, and a scenario judge looking for the payment
+  # step found no span to read.
+  @unit
+  Scenario: A LangGraph callback is attached at the graph, not inside a node
+    Given the tracing skill
+    When its instrumentation step is read
+    Then the LangChain callback goes in the config of the graph invocation
+    And it says every node the run touches becomes a span under the trace
+    And it says a callback on one model call leaves the nodes out of the trace
+
+  @unit
+  Scenario: A run cleans up the demo folders the runs before it left
+    Given several finished runs left their demo folder on disk
+    When a new scenario prepares its own folder
+    Then only the most recent few folders are kept
+    And the rest are deleted, because each one is hundreds of megabytes
+
+  # Registration asks for a proof from an emailed link, and a scenario has no
+  # mailbox to read. A scenario that needs a person of their own writes the
+  # account into the database of the local stack it runs against.
+  @unit
+  Scenario: A scenario's own account is seeded in the local stack's database
+    Given a scenario that needs a person of their own
+    When the harness seeds the account
+    Then it writes a verified user and a password account the sign-in accepts
+    And the two are written together, so a failure leaves neither behind
+    And it reads the database address from the environment, or from the app's own .env
+
+  @unit
+  Scenario: An account is never seeded outside this machine
+    Given the app under test or its database is not on this machine
+    When the harness seeds an account
+    Then it refuses and names the host it would not write to
+    And the refusal carries no user, password, path or query of that address
+
+  # ---------------------------------------------------------------------------
   # The judge rubric grades outcomes, never the prompt restated
   # ---------------------------------------------------------------------------
 

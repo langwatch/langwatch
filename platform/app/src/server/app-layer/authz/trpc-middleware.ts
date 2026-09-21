@@ -16,12 +16,12 @@
  * changes no decision anywhere; the contract PR later rewires only the
  * repository — one file, not four hundred call sites.
  *
- * What IS deliberately new here is the denial shape: every tier's refusal now
- * carries the engine's one handled code (`permission_denied`, with the
- * permission and tier in `meta`) where the legacy team/organization
+ * What IS deliberately new here is the ordinary denial shape: every tier's
+ * refusal carries the engine's one handled code (`permission_denied`, with
+ * the permission and tier in `meta`) where the legacy team/organization
  * middlewares shipped bare prose the client could only render as "unknown
- * error". Lite-member denials keep their dedicated cause — the client modal
- * keys on it.
+ * error". A declaration may explicitly conceal a foreign project as absent;
+ * lite-member denials keep their dedicated cause for the client modal.
  *
  * Every middleware built here carries an `AUTHZ_DECLARATION` descriptor, the
  * machine-readable half of the declaration: the sweep test walks the router
@@ -30,11 +30,13 @@
 import {
   type AuthzDenialReason,
   type AuthzPermission,
+  BlankScopeIdError,
   type DeclaredAuthzMiddleware,
   type DeclaredScopeId,
   declareAuthzMiddleware,
-  declaredScopeId,
   PermissionDeniedError,
+  resolveDeclaredScope,
+  SCOPE_TIER_BY_FIELD,
   SCOPE_TIER_FIELDS,
   type ScopeTierField,
 } from "@langwatch/authz";
@@ -42,11 +44,26 @@ import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import type { OrganizationUserRole } from "~/generated/prisma/client";
 import type { Session } from "../../auth";
+import { prisma } from "../../db";
 import { type App, getApp } from "../app";
+import { organizationMfa } from "../identity/runtime";
+import { deploymentOffersTwoStepVerification } from "../identity/signin-method-policy";
 import {
   LiteMemberRestrictedError,
   MembershipDisabledError,
 } from "../permissions/errors";
+import {
+  permissionDecisionRecord,
+  principalOfSession,
+  recordPermissionDecision,
+} from "./decision-record";
+import {
+  assertSecondFactorSatisfied,
+  type MfaGateCache,
+  type MfaGateDeps,
+  newMfaGateCache,
+} from "./mfa-gate";
+import { PrismaScopeOwnership } from "./mfa-gate-adapters";
 
 const logger = createLogger("langwatch:authz");
 
@@ -59,9 +76,36 @@ type MiddlewareParams = {
     app?: App;
     permissionChecked: boolean;
     organizationRole?: OrganizationUserRole | null;
+    /**
+     * The two-step verification gate's per-request memo (D06). A tRPC batch
+     * shares one context, so this is what makes one person cost one query
+     * across a dozen procedure calls rather than a dozen queries. Created on
+     * first use — a context that never reaches a permission check never
+     * allocates one.
+     */
+    mfaGateCache?: MfaGateCache;
+    /** Injectable so a test can watch the gate without mocking a module. */
+    mfaGate?: Partial<
+      Pick<MfaGateDeps, "offered" | "scopes" | "organizationMfa">
+    >;
   };
   input: ScopeInput;
   next: () => any;
+};
+
+/**
+ * The gate's dependencies for this request: the flag, the scope lookup, the
+ * organization service — and the memo that makes the whole thing cost one
+ * query per person per request.
+ */
+const mfaGateDepsFor = (ctx: MiddlewareParams["ctx"]): MfaGateDeps => {
+  ctx.mfaGateCache ??= newMfaGateCache();
+  return {
+    offered: ctx.mfaGate?.offered ?? deploymentOffersTwoStepVerification,
+    scopes: ctx.mfaGate?.scopes ?? new PrismaScopeOwnership(prisma),
+    organizationMfa: ctx.mfaGate?.organizationMfa ?? organizationMfa,
+    cache: ctx.mfaGateCache,
+  };
 };
 
 /**
@@ -77,7 +121,7 @@ type DeclaredMiddleware = DeclaredAuthzMiddleware<
 >;
 
 /**
- * `.permission(p)` / `.permission(p, { via })`. The type layer
+ * `.permission(p)` and its explicit policy options. The type layer
  * (`@langwatch/authz` declaration.ts + the builder in `api/trpc.ts`)
  * guarantees the input carries a usable id; the runtime re-derives the same
  * answer and still fails loudly if the two ever disagree.
@@ -85,12 +129,14 @@ type DeclaredMiddleware = DeclaredAuthzMiddleware<
 export const checkDeclaredPermission = ({
   permission,
   via,
+  nondisclosure,
 }: {
   permission: AuthzPermission;
   via?: ScopeTierField;
+  nondisclosure?: "not-found-outside-organization";
 }): DeclaredMiddleware =>
   declareAuthzMiddleware(
-    { kind: "permission", permission, via },
+    { kind: "permission", permission, via, nondisclosure },
     async ({ ctx, input, next }: MiddlewareParams) => {
       // `publicProcedure` exposes `.permission()` too, so a session is not a
       // given. Answering "unauthenticated" before any id is looked at keeps
@@ -107,14 +153,43 @@ export const checkDeclaredPermission = ({
         permission,
         scope,
       });
+
+      // D06: both people, on every decision. Under an impersonation the actor
+      // is the operator and the subject is the person whose access they are
+      // borrowing, so the audit trail can answer who really did it. On every
+      // other request the two halves are the same person and it says so.
+      recordPermissionDecision(
+        permissionDecisionRecord({
+          principal: principalOfSession({ session: ctx.session }),
+          permission,
+          scope,
+          permitted,
+          denialReason,
+        }),
+      );
+
       if (!permitted) {
         throw deniedError({
           permission,
           scope,
           organizationRole,
           denialReason,
+          nondisclosure,
         });
       }
+
+      // D06 follow-up 2: the organization's membership condition, enforced
+      // rather than merely offered. Runs AFTER the permission, so somebody
+      // who has no business here is refused for that reason rather than sent
+      // to set up a second factor they would still be refused with. With
+      // `MFA_ENROLLMENT_OPEN` off this is a boolean and a return.
+      await assertSecondFactorSatisfied({
+        deps: mfaGateDepsFor(ctx),
+        userId: ctx.session.user.id,
+        sessionId: ctx.session.sessionId,
+        scope,
+      });
+
       // Legacy parity: the organization tier never carried a role onto the
       // context, so only the project/team resolutions (non-null role) do.
       if (organizationRole !== null) {
@@ -142,10 +217,14 @@ export const checkDeclaredPermissionAny = (
       if (!ctx.session?.user) {
         throw new TRPCError({ code: "UNAUTHORIZED" });
       }
-      const projectId = input.projectId;
-      if (typeof projectId !== "string" || projectId.length === 0) {
-        throw wiringBug({ permission: permissions[0] });
-      }
+      // Always the project tier, so the field is named outright — but read
+      // through the same resolution the single-permission seam uses, so the
+      // blank-versus-missing split is decided in exactly one place.
+      const { id: projectId } = requireDeclaredScope({
+        permission: permissions[0],
+        input,
+        via: "projectId",
+      });
       const { permitted, organizationRole, denialReason } = await appOf(
         ctx,
       ).permissions.getProjectAnyDecision({
@@ -153,14 +232,46 @@ export const checkDeclaredPermissionAny = (
         projectId,
         permissions,
       });
+
+      const scope = { tier: "project", id: projectId } as const;
+
+      // The same two things the single-permission seam does, and for the same
+      // reasons — "any one of these" is a different question about the same
+      // access, not a lighter one.
+      //
+      // D06 says both people on EVERY decision. A decision made under an
+      // impersonation through this branch named nobody, which is the one
+      // place the trail is supposed to answer who really did it.
+      recordPermissionDecision(
+        permissionDecisionRecord({
+          principal: principalOfSession({ session: ctx.session }),
+          permission: permissions[0],
+          scope,
+          permitted,
+          denialReason,
+        }),
+      );
+
       if (!permitted) {
         throw deniedError({
           permission: permissions[0],
-          scope: { tier: "project", id: projectId },
+          scope,
           organizationRole,
           denialReason,
         });
       }
+
+      // And the organization's membership condition. Without it a member who
+      // could not prove a second factor was refused by every `.permission()`
+      // procedure and then reached the same organization's data through a
+      // `.permissionAny()` one.
+      await assertSecondFactorSatisfied({
+        deps: mfaGateDepsFor(ctx),
+        userId: ctx.session.user.id,
+        sessionId: ctx.session.sessionId,
+        scope,
+      });
+
       ctx.organizationRole = organizationRole;
       ctx.permissionChecked = true;
       return next();
@@ -181,25 +292,93 @@ const SENSITIVE_SCOPE_FIELDS = Object.values(
 export const declaredNoPermission = ({
   reason,
   allow,
+  mfaRecovery,
 }: {
   reason: string;
   allow?: Record<string, string>;
+  mfaRecovery?: { reason: string };
 }): DeclaredMiddleware =>
   declareAuthzMiddleware(
-    { kind: "no-permission", reason, allow },
+    { kind: "no-permission", reason, allow, mfaRecovery },
     async ({ ctx, input, next }: MiddlewareParams) => {
       const allowedKeys = Object.keys(allow ?? {});
-      for (const key of SENSITIVE_SCOPE_FIELDS) {
-        if (key in input && !allowedKeys.includes(key)) {
-          throw new Error(
-            `${key} is not allowed to be used without permission check`,
-          );
-        }
+      // A procedure that declares no `.input()` arrives here with `undefined`,
+      // and `in` throws on it — which turned every such procedure into a 500
+      // at the boundary rather than a call (`identity.myIdentifiers` was one).
+      // Nothing is skipped by this: an input that does not exist carries no
+      // scope field to smuggle past the check.
+      const declaredInput =
+        typeof input === "object" && input !== null ? input : {};
+
+      refuseUndeclaredScopeFields({ declaredInput, allowedKeys });
+      // A held member needs this one answer to render the recovery screen.
+      // Every ordinary no-permission route still enforces the condition.
+      if (!mfaRecovery) {
+        await assertSecondFactorOnAllowedScopes({
+          ctx,
+          declaredInput,
+          allowedKeys,
+        });
       }
+
       ctx.permissionChecked = true;
       return next();
     },
   );
+
+/**
+ * A scoped field the declaration did not individually allow is refused, which
+ * is the runtime half of what the type layer already forbids.
+ */
+function refuseUndeclaredScopeFields({
+  declaredInput,
+  allowedKeys,
+}: {
+  declaredInput: object;
+  allowedKeys: string[];
+}): void {
+  for (const key of SENSITIVE_SCOPE_FIELDS) {
+    if (key in declaredInput && !allowedKeys.includes(key)) {
+      throw new Error(
+        `${key} is not allowed to be used without permission check`,
+      );
+    }
+  }
+}
+
+/**
+ * NO PERMISSION IS NOT NO CONDITION. These procedures are deliberately
+ * unchecked for permission — the reason is declared and reviewed — but an
+ * organization that requires a second factor requires it of anybody reaching
+ * its data, and this branch reaches it by an ALLOWED scope field. Without
+ * this, a member who could not prove one was refused by every `.permission()`
+ * procedure and then minted a durable API key for the same organization
+ * through `apiKey.create`.
+ */
+async function assertSecondFactorOnAllowedScopes({
+  ctx,
+  declaredInput,
+  allowedKeys,
+}: {
+  ctx: MiddlewareParams["ctx"];
+  declaredInput: object;
+  allowedKeys: string[];
+}): Promise<void> {
+  if (!ctx.session?.user) return;
+  for (const key of allowedKeys) {
+    const named = (declaredInput as Record<string, unknown>)[key];
+    const tier = SCOPE_TIER_BY_FIELD[key as ScopeTierField];
+    if (tier === undefined || typeof named !== "string" || !named) {
+      continue;
+    }
+    await assertSecondFactorSatisfied({
+      deps: mfaGateDepsFor(ctx),
+      userId: ctx.session.user.id,
+      sessionId: ctx.session.sessionId,
+      scope: { tier, id: named },
+    });
+  }
+}
 
 /**
  * `.authorizeInService({ reason, permissions })` — the scope is data the
@@ -231,16 +410,39 @@ function requireDeclaredScope({
   input: ScopeInput;
   via?: ScopeTierField;
 }): DeclaredScopeId {
-  const scope = declaredScopeId({ permission, input, via });
-  if (scope) return scope;
+  const resolution = resolveDeclaredScope({ permission, input, via });
+  if (resolution.resolved) return resolution.scope;
+  if (resolution.unresolved.reason === "blank") {
+    throw blankScopeId({ field: resolution.unresolved.field });
+  }
   throw wiringBug({ permission, via });
 }
 
 /**
- * Nothing the caller did can fix a declaration whose input carries no usable
- * id, so the sentence they read says only that; which procedure is miswired
- * goes to the log. The types make this unreachable — this is the runtime
- * backstop for the day they are bypassed.
+ * The caller named the scope field and left it empty. Answered as the bad
+ * request it is, rather than as the wiring bug below: a blank id is something
+ * the caller can fix, and reporting it as an internal error both misleads them
+ * and pages us for their typo.
+ */
+function blankScopeId({ field }: { field: string }): TRPCError {
+  const blank = new BlankScopeIdError({ field });
+  return new TRPCError({
+    code: "BAD_REQUEST",
+    message: blank.message,
+    cause: blank,
+  });
+}
+
+/**
+ * The input names no scope field at all. Nothing the caller did can fix that,
+ * so the sentence they read says only that; which procedure is miswired goes
+ * to the log. The types make this unreachable — this is the runtime backstop
+ * for the day they are bypassed.
+ *
+ * A field that is present and empty is NOT this: the types only ever promised
+ * the field would exist, never that a caller would fill it, and treating a
+ * blank id as a wiring bug is what put a routine bad request on the error
+ * dashboard at ERROR severity. That case answers through `blankScopeId`.
  */
 function wiringBug({
   permission,
@@ -260,23 +462,25 @@ function wiringBug({
 }
 
 /**
- * The one denial shape for every tier. An id that resolves to nothing
- * answers exactly like an id the caller may not touch — the resolvers
- * already fold both into `permitted: false`, so no probe can learn whether a
- * scope EXISTS. The lite-member cause drives the client's restriction modal;
- * the `PermissionDeniedError` cause carries the stable code and meta for
- * everything else.
+ * The one denial mapper for every tier. Ordinarily an id that resolves to
+ * nothing answers exactly like an id the caller may not touch. The narrow
+ * project-key policy may instead conceal a project outside the caller's
+ * organization as NOT_FOUND; a member without the grant still receives the
+ * ordinary denial. The lite-member cause drives the client's restriction
+ * modal.
  */
 function deniedError({
   permission,
   scope,
   organizationRole,
   denialReason,
+  nondisclosure,
 }: {
   permission: AuthzPermission;
   scope: DeclaredScopeId;
   organizationRole: OrganizationUserRole | null;
   denialReason?: AuthzDenialReason;
+  nondisclosure?: "not-found-outside-organization";
 }): TRPCError {
   // Checked before the role, because a disabled member HAS a role and the
   // role-shaped answers would all be wrong for them: the lite-member modal
@@ -288,6 +492,16 @@ function deniedError({
       code: "UNAUTHORIZED",
       message: disabled.message,
       cause: disabled,
+    });
+  }
+  if (
+    nondisclosure === "not-found-outside-organization" &&
+    scope.tier === "project" &&
+    organizationRole === null
+  ) {
+    return new TRPCError({
+      code: "NOT_FOUND",
+      message: "Project not found",
     });
   }
   // String comparison on purpose: a VALUE import of the Prisma enum would put

@@ -9,7 +9,9 @@
  * the grants the key already had — never a live credential holding nothing,
  * which is the shape the read-through mint used to read as "legacy".
  */
+import { HandledError } from "@langwatch/handled-error";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { AuthzGrantNotConfirmedError } from "~/server/app-layer/authz/errors";
 import { ApiKeyService } from "../api-key.service";
 
 vi.mock("../api-key-token.utils", () => ({
@@ -167,6 +169,129 @@ describe("ApiKeyService — the crash windows around a grant write", () => {
       );
       expect(activationsOf(prisma)).toHaveLength(1);
       expect(apiKey.revokedAt).toBeNull();
+    });
+  });
+
+  describe("when the grants are written but not yet readable", () => {
+    /** @scenario "A key whose grants did not become readable is never activated" */
+    it("leaves the credential revoked and returns no token", async () => {
+      ledger.attachBindings.mockRejectedValueOnce(
+        new AuthzGrantNotConfirmedError(),
+      );
+
+      const failure = await service
+        .create({
+          name: "Automation Key",
+          userId: null,
+          organizationId: ORG_ID,
+          permissionMode: "all",
+          bindings: [
+            { role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+          ],
+        })
+        .then(
+          () => null,
+          (error: unknown) => error,
+        );
+
+      expect(HandledError.isHandled(failure)).toBe(true);
+      expect((failure as HandledError).code).toBe("authz_grant_not_confirmed");
+      expect(
+        prisma.apiKey.create.mock.calls[0]![0].data.revokedAt,
+      ).toBeInstanceOf(Date);
+      expect(activationsOf(prisma)).toHaveLength(0);
+    });
+
+    /** @scenario "A key whose grants are readable is activated and returned" */
+    it("asks the ledger to confirm the grants before activating", async () => {
+      await service.create({
+        name: "Automation Key",
+        userId: null,
+        organizationId: ORG_ID,
+        permissionMode: "all",
+        bindings: [
+          { role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+        ],
+      });
+
+      expect(ledger.attachBindings).toHaveBeenCalledWith(
+        expect.objectContaining({ requireProjection: true }),
+      );
+      expect(activationsOf(prisma)).toHaveLength(1);
+    });
+
+    /** @scenario "A key whose custom role did not become readable is never activated" */
+    it("leaves a restricted key revoked when its role does not become readable", async () => {
+      ledger.defineRole.mockRejectedValueOnce(
+        new AuthzGrantNotConfirmedError(),
+      );
+
+      const failure = await service
+        .create({
+          name: "Restricted Key",
+          userId: null,
+          organizationId: ORG_ID,
+          permissionMode: "restricted",
+          permissions: ["langy:view"],
+          bindings: [
+            { role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+          ],
+        })
+        .then(
+          () => null,
+          (error: unknown) => error,
+        );
+
+      expect((failure as HandledError).code).toBe("authz_grant_not_confirmed");
+      expect(activationsOf(prisma)).toHaveLength(0);
+    });
+
+    /** @scenario "Replacing a key's grants keeps the old ones when the new ones do not land" */
+    it("revokes nothing the key already held when a replace cannot confirm", async () => {
+      ledger.attachBindings.mockRejectedValueOnce(
+        new AuthzGrantNotConfirmedError(),
+      );
+
+      const failure = await service
+        .update({
+          id: "ak_existing",
+          callerUserId: USER_ID,
+          callerIsAdmin: true,
+          organizationId: ORG_ID,
+          bindings: [
+            { role: "MEMBER", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+          ],
+        })
+        .then(
+          () => null,
+          (error: unknown) => error,
+        );
+
+      expect((failure as HandledError).code).toBe("authz_grant_not_confirmed");
+      expect(ledger.revokeBindingsWhere).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Replacing a key's grants leaves its metadata alone when the new ones do not land" */
+    it("leaves the key's own row alone when a replace cannot confirm", async () => {
+      ledger.attachBindings.mockRejectedValueOnce(
+        new AuthzGrantNotConfirmedError(),
+      );
+
+      await service
+        .update({
+          id: "ak_existing",
+          callerUserId: USER_ID,
+          callerIsAdmin: true,
+          organizationId: ORG_ID,
+          permissionMode: "restricted",
+          permissions: ["langy:view"],
+          bindings: [
+            { role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+          ],
+        })
+        .catch(() => null);
+
+      expect(prisma.apiKey.update).not.toHaveBeenCalled();
     });
   });
 

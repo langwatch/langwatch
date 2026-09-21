@@ -66,6 +66,23 @@ describe("PipelineRegistry.registerAll", () => {
         expect(registeredPipelineNames()).toContain("langy_maintenance");
       });
 
+      it("mounts the agent sandbox key reaper", () => {
+        // Nothing revokes a sandbox key at the end of a run, so an unmounted
+        // sweep leaves every key of every run live until it expires.
+        expect(registeredPipelineNames()).toContain(
+          "agent_sandbox_maintenance",
+        );
+      });
+
+      it("mounts the CLI login key reaper", () => {
+        // A session the CLI stops refreshing leaves Redis by TTL, which runs
+        // no code, so an unmounted sweep leaves its login key and every
+        // ingest key under it live for good.
+        expect(registeredPipelineNames()).toContain(
+          "cli_login_key_maintenance",
+        );
+      });
+
       it("mounts the blob-maintenance sweep alongside it", () => {
         // Same class of defect, same guard: a scheduled sweep with no caller
         // is indistinguishable from a working one until the thing it protects

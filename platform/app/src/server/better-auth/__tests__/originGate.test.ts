@@ -5,6 +5,7 @@ const BASE = "http://localhost:5571";
 
 describe("isAllowedAuthOrigin", () => {
   describe("when method is GET / OPTIONS / HEAD", () => {
+    /** @scenario "Reading authentication state is never refused for where it came from" */
     it("allows GET requests regardless of origin", () => {
       expect(
         isAllowedAuthOrigin({
@@ -16,6 +17,7 @@ describe("isAllowedAuthOrigin", () => {
       ).toBe(true);
     });
 
+    /** @scenario "Reading authentication state is never refused for where it came from" */
     it("allows OPTIONS preflight from any origin", () => {
       expect(
         isAllowedAuthOrigin({
@@ -27,6 +29,7 @@ describe("isAllowedAuthOrigin", () => {
       ).toBe(true);
     });
 
+    /** @scenario "Reading authentication state is never refused for where it came from" */
     it("allows HEAD from any origin", () => {
       expect(
         isAllowedAuthOrigin({
@@ -41,6 +44,7 @@ describe("isAllowedAuthOrigin", () => {
 
   describe("when method is POST / PUT / DELETE / PATCH", () => {
     describe("and Origin header matches baseUrl", () => {
+      /** @scenario "A request from this installation's own pages is allowed through" */
       it("allows POST", () => {
         expect(
           isAllowedAuthOrigin({
@@ -52,6 +56,7 @@ describe("isAllowedAuthOrigin", () => {
         ).toBe(true);
       });
 
+      /** @scenario "A request from this installation's own pages is allowed through" */
       it("allows PUT", () => {
         expect(
           isAllowedAuthOrigin({
@@ -63,6 +68,7 @@ describe("isAllowedAuthOrigin", () => {
         ).toBe(true);
       });
 
+      /** @scenario "A request from this installation's own pages is allowed through" */
       it("allows DELETE", () => {
         expect(
           isAllowedAuthOrigin({
@@ -74,6 +80,7 @@ describe("isAllowedAuthOrigin", () => {
         ).toBe(true);
       });
 
+      /** @scenario "A request from this installation's own pages is allowed through" */
       it("allows PATCH", () => {
         expect(
           isAllowedAuthOrigin({
@@ -85,6 +92,7 @@ describe("isAllowedAuthOrigin", () => {
         ).toBe(true);
       });
 
+      /** @scenario "A request from this installation's own pages is allowed through" */
       it("compares only the origin part, not the full URL with path", () => {
         expect(
           isAllowedAuthOrigin({
@@ -98,6 +106,7 @@ describe("isAllowedAuthOrigin", () => {
     });
 
     describe("and Origin header is from a different origin", () => {
+      /** @scenario "A state-changing auth request from another site is refused" */
       it("rejects requests from a different host", () => {
         expect(
           isAllowedAuthOrigin({
@@ -109,6 +118,7 @@ describe("isAllowedAuthOrigin", () => {
         ).toBe(false);
       });
 
+      /** @scenario "A state-changing auth request from another site is refused" */
       it("rejects requests from a subdomain (different origin)", () => {
         expect(
           isAllowedAuthOrigin({
@@ -120,6 +130,7 @@ describe("isAllowedAuthOrigin", () => {
         ).toBe(false);
       });
 
+      /** @scenario "A state-changing auth request from another site is refused" */
       it("rejects requests from a different port", () => {
         expect(
           isAllowedAuthOrigin({
@@ -131,6 +142,7 @@ describe("isAllowedAuthOrigin", () => {
         ).toBe(false);
       });
 
+      /** @scenario "A state-changing auth request from another site is refused" */
       it("rejects requests from https when base is http", () => {
         expect(
           isAllowedAuthOrigin({
@@ -144,6 +156,7 @@ describe("isAllowedAuthOrigin", () => {
     });
 
     describe("and Origin is missing", () => {
+      /** @scenario "A browser that names only the page it came from is still recognised" */
       it("falls back to Referer when Referer matches", () => {
         expect(
           isAllowedAuthOrigin({
@@ -155,6 +168,7 @@ describe("isAllowedAuthOrigin", () => {
         ).toBe(true);
       });
 
+      /** @scenario "A state-changing auth request from another site is refused" */
       it("rejects when Referer is from a different origin", () => {
         expect(
           isAllowedAuthOrigin({
@@ -166,6 +180,7 @@ describe("isAllowedAuthOrigin", () => {
         ).toBe(false);
       });
 
+      /** @scenario "A request that proves no origin at all is refused" */
       it("rejects when both Origin and Referer are missing", () => {
         expect(
           isAllowedAuthOrigin({
@@ -177,6 +192,7 @@ describe("isAllowedAuthOrigin", () => {
         ).toBe(false);
       });
 
+      /** @scenario "A request that proves no origin at all is refused" */
       it("rejects when Referer is malformed", () => {
         expect(
           isAllowedAuthOrigin({
@@ -190,6 +206,7 @@ describe("isAllowedAuthOrigin", () => {
     });
 
     describe("and Origin is malformed", () => {
+      /** @scenario "A browser that names only the page it came from is still recognised" */
       it("falls through to Referer when Origin is garbage", () => {
         // Origin header is present but malformed → originOf returns null →
         // falls through to the Referer fallback path which matches BASE.
@@ -206,6 +223,7 @@ describe("isAllowedAuthOrigin", () => {
   });
 
   describe("when baseUrl is malformed", () => {
+    /** @scenario "A misconfigured own address refuses every state-changing request rather than none" */
     it("fails closed: rejects all state-changing requests", () => {
       expect(
         isAllowedAuthOrigin({
@@ -217,6 +235,7 @@ describe("isAllowedAuthOrigin", () => {
       ).toBe(false);
     });
 
+    /** @scenario "Reading authentication state is never refused for where it came from" */
     it("still allows GET requests (read-only never gated)", () => {
       expect(
         isAllowedAuthOrigin({

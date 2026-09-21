@@ -26,8 +26,8 @@
  */
 import type { MigrationTenantStatus } from "@langwatch/authz-server";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { perSubjectCachedFlag } from "../_shared/per-subject-cached-gate";
 import { AUTHZ_ENGINE_MIGRATION_NAME } from "./migration-name";
-import { perOrganizationCachedFlag } from "./per-organization-cached-gate";
 
 /**
  * How a failed state read is reported. A no-op by default because this module
@@ -71,7 +71,7 @@ const ON_ENGINE_STATUSES: readonly MigrationTenantStatus[] = ["finalized"];
  */
 export const ENGINE_GATE_CACHE_TTL_MS = 60_000;
 
-const gate = perOrganizationCachedFlag({
+const gate = perSubjectCachedFlag({
   name: "authz-engine-gate",
   ttlMs: ENGINE_GATE_CACHE_TTL_MS,
 });
@@ -150,7 +150,7 @@ export async function organizationOnAuthzEngine({
   organizationId: string;
 }): Promise<boolean> {
   return gate.get({
-    organizationId,
+    subject: organizationId,
     read: () => queryOrganizationOnAuthzEngine({ prisma, organizationId }),
   });
 }
@@ -170,7 +170,7 @@ export function invalidateAuthzEngineGate({
 }: {
   organizationId: string;
 }): void {
-  gate.invalidate({ organizationId });
+  gate.invalidate({ subject: organizationId });
 }
 
 /** The cache, dropped — for tests that migrate an organization mid-suite. */

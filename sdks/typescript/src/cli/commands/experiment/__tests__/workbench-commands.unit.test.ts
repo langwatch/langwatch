@@ -228,30 +228,49 @@ describe("the experiment workbench commands", () => {
   });
 
   describe("given a versions call", () => {
+    /**
+     * A history the seam wrote: two deliberate versions numbered without gaps,
+     * and the one autosave row a session of typing left behind. The autosave
+     * keeps a number so a script can restore it, and the table names it for
+     * what it is instead.
+     */
+    const historyWithAnAutosave = {
+      versions: [
+        {
+          version: 2,
+          counterVersion: 8,
+          autoSaved: false,
+          commitMessage: "Added a target",
+          authorLabel: "langy",
+          authorId: null,
+          createdAt: new Date().toISOString(),
+        },
+        {
+          version: 7,
+          counterVersion: 7,
+          autoSaved: true,
+          commitMessage: null,
+          authorLabel: "user",
+          authorId: "user_1",
+          createdAt: new Date().toISOString(),
+        },
+        {
+          version: 1,
+          counterVersion: 1,
+          autoSaved: false,
+          commitMessage: "First setup",
+          authorLabel: "user",
+          authorId: "user_1",
+          createdAt: new Date().toISOString(),
+        },
+      ],
+      nextCursor: null,
+    };
+
     describe("when the experiment has versions", () => {
       /** @scenario "Listing an experiment's versions" */
       it("renders a row per version naming who wrote it", async () => {
-        mockListVersions.mockResolvedValue({
-          versions: [
-            {
-              version: 2,
-              autoSaved: false,
-              commitMessage: "Added a target",
-              authorLabel: "langy",
-              authorId: null,
-              createdAt: new Date().toISOString(),
-            },
-            {
-              version: 1,
-              autoSaved: true,
-              commitMessage: null,
-              authorLabel: "user",
-              authorId: "user_1",
-              createdAt: new Date().toISOString(),
-            },
-          ],
-          nextCursor: null,
-        });
+        mockListVersions.mockResolvedValue(historyWithAnAutosave);
 
         const result = await experimentVersionsCommand("checkout");
         result?.table();
@@ -262,8 +281,29 @@ describe("the experiment workbench commands", () => {
           limit: 50,
         });
         expect(printed).toContain("v2");
+        expect(printed).toContain("v1");
         expect(printed).toContain("Langy");
         expect(printed).toContain("Added a target");
+      });
+
+      /** @scenario "The command line names the autosave instead of numbering it" */
+      it("prints the autosave row as an autosave", async () => {
+        mockListVersions.mockResolvedValue(historyWithAnAutosave);
+
+        const result = await experimentVersionsCommand("checkout");
+        result?.table();
+        const printed = logSpy.mock.calls.flat().join("\n");
+
+        expect(printed).toContain("autosave");
+        expect(printed).not.toContain("v7");
+      });
+
+      it("hands the raw rows to a script, autosave number and all", async () => {
+        mockListVersions.mockResolvedValue(historyWithAnAutosave);
+
+        const result = await experimentVersionsCommand("checkout");
+
+        expect(result?.data).toEqual(historyWithAnAutosave);
       });
     });
 

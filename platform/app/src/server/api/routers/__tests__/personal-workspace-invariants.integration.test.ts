@@ -971,6 +971,21 @@ function movingAMemberWithAPersonalWorkspaceToALiteSeat() {
     ).resolves.toBe(false);
   });
 
+  /** @scenario Personal context remains usable when its base key is withheld */
+  it("returns personal context with a blank base key when manage is ceilinged", async () => {
+    await setSeatUserOrganizationRole(OrganizationUserRole.EXTERNAL);
+
+    const seatCaller = appRouter.createCaller(
+      createInnerTRPCContext(rbacCtxForSeatUser()),
+    );
+    const context = await seatCaller.user.personalContext({
+      organizationId,
+    });
+
+    expect(context.workspace.project.id).toBe(seatPersonalProjectId);
+    expect(context.workspace.project.apiKey).toBe("");
+  });
+
   /** @scenario Giving a Lite Member their full access back restores writing in their own workspace */
   it("lets them write again once they are a member, with nothing to repair", async () => {
     await setSeatUserOrganizationRole(OrganizationUserRole.EXTERNAL);
@@ -1002,16 +1017,23 @@ function movingAMemberWithAPersonalWorkspaceToALiteSeat() {
 
   /** @scenario A personal workspace is not listed among the access an admin manages */
   it("keeps every member's workspace out of the organization-wide list", async () => {
+    // The population first, or the two exclusions below prove nothing: an
+    // empty answer excludes every workspace too, and a fixture that stopped
+    // minting these bindings would read as the guard holding. Both workspaces
+    // hold a binding, and the listing returns a workspace it is meant to.
+    await expect(teamBindingRoles(seatPersonalTeamId)).resolves.toEqual([
+      TeamUserRole.ADMIN,
+    ]);
+    expect(await ownerBindingsOnPersonalTeam()).not.toHaveLength(0);
+
     const bindings = await callerAsOwner().roleBinding.listForOrg({
       organizationId,
     });
+    const scopeIds = bindings.map((binding) => binding.scopeId);
 
-    expect(bindings.map((binding) => binding.scopeId)).not.toContain(
-      seatPersonalTeamId,
-    );
-    expect(bindings.map((binding) => binding.scopeId)).not.toContain(
-      personalTeamId,
-    );
+    expect(scopeIds).toContain(sharedTeamId);
+    expect(scopeIds).not.toContain(seatPersonalTeamId);
+    expect(scopeIds).not.toContain(personalTeamId);
   });
 }
 

@@ -49,9 +49,53 @@ export const paginationSchema = z.looseObject({
 export type Pagination = z.infer<typeof paginationSchema>;
 
 /**
+ * The marker a reduction leaves behind in place of the rows it removed, read
+ * back. The marker now also states the true total ("… 29 more items truncated,
+ * 41 total"); recorded conversations still carry the older form without it, so
+ * both parse and `statedTotal` is undefined for the older one.
+ */
+export const parseTruncationMarker = (
+  row: unknown,
+): { removed: number; statedTotal?: number } | undefined => {
+  if (typeof row !== "string") return undefined;
+  const match = /^…\s*(\d+)\s+more items truncated(?:,\s*(\d+)\s+total)?$/.exec(
+    row.trim(),
+  );
+  if (!match) return undefined;
+  const stated = match[2];
+  return {
+    removed: Number(match[1]),
+    ...(stated === undefined ? {} : { statedTotal: Number(stated) }),
+  };
+};
+
+/**
+ * How many rows the upstream reduction took out of an array.
+ *
+ * Zero for every other value, so a caller can fold this over rows without first
+ * asking which of them are markers.
+ */
+export const truncatedAwayCount = (row: unknown): number =>
+  parseTruncationMarker(row)?.removed ?? 0;
+
+/** Whether a row is the reduction's marker rather than a result. */
+export const isTruncationMarker = (row: unknown): boolean =>
+  truncatedAwayCount(row) > 0;
+
+/**
  * The one true total behind a result: what the query matched, which is NOT the
  * same as how many rows came back. This is the number the stat card rolls up, so
  * getting it right is the difference between "1,204 traces" and "25 traces".
+ *
+ * A stated total always wins over a counted one, and there are two places one
+ * can be stated: the pagination envelope, and the reduction marker itself. A
+ * result that states neither is counted, and the count has to include the rows
+ * the reduction removed: their marker is the only record left that they
+ * existed, so dropping it turns "41 prompts" into "12 prompts" beside an answer
+ * that says 41.
+ *
+ * Pass the rows as the document holds them, markers included. A marker counts
+ * as the rows it stands for, never as one row of its own.
  */
 export const resolveTotal = ({
   pagination,
@@ -59,8 +103,21 @@ export const resolveTotal = ({
 }: {
   pagination?: Pagination | null;
   rows: readonly unknown[];
-}): number =>
-  pagination?.totalHits ?? pagination?.total ?? rows.length;
+}): number => {
+  const paginated = pagination?.totalHits ?? pagination?.total;
+  if (paginated !== undefined) return paginated;
+
+  const markers = rows.map(parseTruncationMarker);
+  const statedTotal = markers.find(
+    (marker) => marker?.statedTotal !== undefined,
+  )?.statedTotal;
+  if (statedTotal !== undefined) return statedTotal;
+
+  return markers.reduce<number>(
+    (count, marker) => count + (marker ? marker.removed : 1),
+    0,
+  );
+};
 
 /**
  * A text field the platform sends either bare (`"hello"`) or wrapped in the trace

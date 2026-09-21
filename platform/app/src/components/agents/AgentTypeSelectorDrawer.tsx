@@ -1,16 +1,17 @@
 import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
-import { Code, Globe, Workflow } from "lucide-react";
+import { Cable, Code, Globe, Mic, Workflow } from "lucide-react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
 import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
+import { useVoiceAgentsEnabled } from "./voice/useVoiceAgentsEnabled";
 
 /**
- * Agent types - code, workflow, or http.
- * Note: "signature" (prompt) agents have been removed.
- * Use the Prompts feature directly for LLM-based prompts.
+ * The kinds of agent the selector can create — one per entry in the
+ * `agentTypes` list below. Prompt ("signature") agents were removed; use
+ * the Prompts feature directly for LLM-based prompts.
  */
-export type AgentType = "code" | "workflow" | "http";
+export type AgentType = "code" | "workflow" | "http" | "voice";
 
 export type AgentTypeSelectorDrawerProps = {
   open?: boolean;
@@ -31,6 +32,13 @@ const agentTypes: Array<{
     description: "Connect to an external API endpoint to process requests",
   },
   {
+    type: "voice",
+    icon: Mic,
+    title: "Voice Agent",
+    description:
+      "Test a voice agent hosted on ElevenLabs: talk to it or send a simulated caller",
+  },
+  {
     type: "code",
     icon: Code,
     title: "Code Agent",
@@ -46,13 +54,17 @@ const agentTypes: Array<{
 ];
 
 /**
- * Drawer for selecting the type of agent to create.
- * Shows cards for Code and Workflow agent types.
- * Note: Prompt-based agents have been removed - use Prompts directly instead.
+ * Drawer for selecting the type of agent to create: one card per entry in the
+ * `agentTypes` list, with the voice card hidden unless the project's flag is
+ * on. Prompt-based agents were removed — use Prompts directly instead.
  */
 export function AgentTypeSelectorDrawer(props: AgentTypeSelectorDrawerProps) {
   const { closeDrawer, openDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
+  const voiceAgentsEnabled = useVoiceAgentsEnabled();
+  const visibleAgentTypes = voiceAgentsEnabled
+    ? agentTypes
+    : agentTypes.filter((agentType) => agentType.type !== "voice");
 
   const onClose = props.onClose ?? closeDrawer;
   const onSelect =
@@ -72,6 +84,9 @@ export function AgentTypeSelectorDrawer(props: AgentTypeSelectorDrawerProps) {
         break;
       case "http":
         openDrawer("agentHttpEditor");
+        break;
+      case "voice":
+        openDrawer("agentVoiceEditor");
         break;
       default: {
         const _exhaustive: never = type;
@@ -103,7 +118,7 @@ export function AgentTypeSelectorDrawer(props: AgentTypeSelectorDrawerProps) {
                 <LuArrowLeft size={20} />
               </Button>
             )}
-            <Heading>Choose Agent Type</Heading>
+            <Heading>Choose Agent Connection Type</Heading>
           </HStack>
         </Drawer.Header>
         <Drawer.Body
@@ -114,12 +129,14 @@ export function AgentTypeSelectorDrawer(props: AgentTypeSelectorDrawerProps) {
         >
           <VStack gap={4} align="stretch" flex={1} overflow="hidden">
             <Text color="fg.muted" fontSize="sm" paddingX={6} paddingTop={4}>
-              Select the type of agent you want to create.
+              Select how you want to integrate your agent for testing.
             </Text>
 
-            {/* Agent type cards */}
             <VStack gap={3} align="stretch" paddingX={6} paddingBottom={4}>
-              {agentTypes.map((agentType) => (
+              <ConnectFromCodeCard
+                onClick={() => openDrawer("agentConnectFromCode")}
+              />
+              {visibleAgentTypes.map((agentType) => (
                 <AgentTypeCard
                   key={agentType.type}
                   {...agentType}
@@ -136,6 +153,55 @@ export function AgentTypeSelectorDrawer(props: AgentTypeSelectorDrawerProps) {
         </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+/**
+ * The first choice of the flow: connect the agent the project already
+ * runs instead of writing one here. The green dot is the same one an
+ * online agent wears, since that is what the choice ends as. The copy
+ * follows the connect-your-agent docs page: a small connect function
+ * beside the service startup calls the agent that already exists.
+ */
+function ConnectFromCodeCard({ onClick }: { onClick: () => void }) {
+  return (
+    <Box
+      as="button"
+      onClick={onClick}
+      padding={4}
+      borderRadius="lg"
+      border="1px solid"
+      borderColor="border"
+      bg="bg.panel"
+      textAlign="left"
+      width="full"
+      _hover={{ borderColor: "green.muted", bg: "green.subtle" }}
+      transition="all 0.15s"
+      data-testid="agent-type-connected"
+      cursor="pointer"
+    >
+      <HStack gap={3} align="start">
+        <Box padding={1} borderRadius="md" bg="green.subtle" color="green.fg">
+          <Cable size={18} />
+        </Box>
+        <VStack align="start" gap={1} flex={1}>
+          <HStack gap={2}>
+            <Box
+              boxSize="8px"
+              borderRadius="full"
+              background="green.500"
+              data-testid="agent-type-connected-dot"
+            />
+            <Text fontWeight="500" fontSize="sm">
+              Connect from Code
+            </Text>
+          </HStack>
+          <Text fontSize="xs" color="fg.muted">
+            Setup your agent to connect automatically when it starts up
+          </Text>
+        </VStack>
+      </HStack>
+    </Box>
   );
 }
 

@@ -3,32 +3,23 @@ Feature: Forgot / reset password on credential (email-mode) sign-in
   I want to reset my password from the sign-in screen when I forget it
   So that I can recover my account on my own, without contacting support
 
-  # Password reset only exists in on-prem credential mode
-  # (NEXTAUTH_PROVIDER="email"). In Auth0 / Google / SSO deployments the
-  # identity provider owns the credential, so the sign-in screen renders a
-  # provider redirect instead of the email/password form — and BetterAuth's
-  # /request-password-reset and /reset-password endpoints stay blocked by the
-  # cloud-mode gate. The flow reuses the same email infrastructure
+  # Password reset belongs to the account rather than to the deployment: it is
+  # offered wherever the installation holds passwords of its own, and refused
+  # where it holds none, because there the endpoints are not mounted and the
+  # identity provider owns the credential. Which of the two an installation is
+  # is the method-set policy's answer (ADR-117 §6), not the name of a provider
+  # in its environment. The flow reuses the same email infrastructure
   # (SendGrid or AWS SES via `sendEmail`) that powers invites and other
   # transactional mail. BetterAuth already mounts and rate-limits the reset
   # endpoints; this feature wires the previously-missing `sendResetPassword`
   # callback to the mailer and adds the two user-facing pages.
 
-  # --- Sign-in entry point ---
-
-  @integration
-  Scenario: The credential sign-in form shows a Forgot password link
-    Given the tenant runs on NEXTAUTH_PROVIDER="email"
-    When I open /auth/signin
-    Then I see the email and password fields
-    And I see a "Forgot password?" link pointing to /auth/forgot-password
-
-  @integration
-  Scenario: SSO sign-in renders no credential form and no Forgot password link
-    Given the tenant runs on a social provider (NEXTAUTH_PROVIDER is not "email")
-    When I open /auth/signin
-    Then the credential form is not rendered
-    And there is no "Forgot password?" link
+  # The sign-in entry point used to be described here as a property of the
+  # credential form: email and password fields with a reset link beside them,
+  # absent on a social deployment. There is no credential form on the sign-in
+  # screen now. The router says which methods an address is offered, and the
+  # reset link travels with the password method wherever it appears - bound in
+  # specs/identity/signin-signup-screens.feature.
 
   @integration
   Scenario: The forgot and reset pages are reachable without signing in
@@ -89,23 +80,72 @@ Feature: Forgot / reset password on credential (email-mode) sign-in
 
   @integration
   Scenario: A successful reset revokes all of the user's existing sessions
-    Given a user completes a password reset
-    Then every existing session for that user is revoked
+    Given a credential user is signed in on two devices
+    When the user completes a password reset on a third device
+    Then both existing session cookies no longer identify a session
+    And the reset response opens one usable session on the third device
+    And the old password is refused while the new password can sign in
+
+  @integration
+  Scenario: A consumed reset token cannot change credentials or mint a session
+    Given a reset token has already changed the user's password
+    When the same token is submitted again with a different password
+    Then the reset is refused as an invalid token
+    And neither the credential nor the set of sessions changes
+
+  @integration
+  Scenario: An expired reset token cannot change credentials or mint a session
+    Given a reset token for a credential user has expired
+    When the token is submitted with a new password
+    Then the reset is refused as an invalid token
+    And neither the credential nor the set of sessions changes
+
+  @integration
+  Scenario: Wrong-password and unknown-email attempts have one backend refusal
+    Given one submitted email has a credential account and one has no account
+    When the existing email uses a wrong password and the unknown email uses any password
+    Then both handlers refuse with the same generic email-or-password error
+    And neither handler creates or changes an account or session
 
   @integration
   Scenario: Password reset endpoints are rate-limited to five attempts per hour
     Given the BetterAuth rate-limit configuration
     Then /request-password-reset allows at most 5 attempts per hour
     And /reset-password allows at most 5 attempts per hour
+    And a caller past either number is refused rather than answered
+
+  # A RESET PROVES A MAILBOX, not that a half-created account is anybody's. A
+  # sign-up that never confirmed its address may already hold a credential
+  # planted before any proof arrived, so recovery is not allowed to be the
+  # thing that opens it.
+  @unit
+  Scenario: Password reset cannot open a session on an unconfirmed sign-up
+    Given an account whose sign-up is still waiting for its address to be confirmed
+    When a reset link for that address is opened and a new password submitted
+    Then the password is changed and no session is opened for it
+    And signing in with the new password is still refused until the sign-up is confirmed
 
   # --- Setting the new password (/auth/reset-password) ---
 
-  @integration
-  Scenario: Submitting a valid new password with a token resets it and returns to sign-in
+  # The reset SIGNS ME IN. The link proved the address and the password I just
+  # set is the credential, so there is nothing left for the log-in screen to
+  # check; sending me there to type both again was the old ending. The
+  # session is opened by the reset endpoint itself, after every old session
+  # is revoked, so the device that set the password is the one device signed
+  # in afterwards.
+  @integration @e2e
+  Scenario: Submitting a valid new password with a token resets it and signs me in
     Given I open /auth/reset-password with a valid token
     When I enter a new password and a matching confirmation and submit
     Then the app calls BetterAuth resetPassword with the new password and token
-    And on success I see a confirmation and a link to sign in
+    And on success I see a confirmation and a way to continue into LangWatch
+
+  @unit
+  Scenario: A completed reset opens a session for the device that set the password
+    Given the reset endpoint accepted my new password
+    When BetterAuth's after-hook runs for that request
+    Then a session is created for my account and its cookie is set
+    And a refused reset opens nothing
 
   @integration
   Scenario: The reset form rejects passwords shorter than 8 characters
@@ -132,29 +172,95 @@ Feature: Forgot / reset password on credential (email-mode) sign-in
     Then I am told the link is invalid
     And I see a link to request a new reset
 
-  # --- Cloud / SSO mode guard (existing invariant) ---
+  # --- Who may reset: the identifier, not the deployment mode ---
+  #
+  # Amended at D13 (ADR-117 §6, epic Q9). Reset follows the IDENTIFIER: an
+  # installation that authenticates people itself keeps this door open however
+  # it federates, so somebody whose identity provider is the thing that is
+  # broken can still recover. The retired scenario is the one that read the
+  # deployment's provider name as the answer.
+  #
+  # What a deployment still decides is whether it holds any passwords at all.
+  # Where none exist there is nothing to reset, the endpoints are not mounted,
+  # and saying so beats promising an email nobody can send. That is the
+  # method-set policy speaking (ADR-027's semantics, kept), and it stops
+  # speaking when those installations hold password identifiers.
 
-  # Enforced by the existing BetterAuth `hooks.before` gate and the
-  # `emailAndPassword.enabled = NEXTAUTH_PROVIDER === "email"` flag: in
-  # cloud/SSO mode the reset endpoints throw EMAIL_PASSWORD_DISABLED. The
-  # `auth` instance binds NEXTAUTH_PROVIDER at module load, so exercising the
-  # non-email branch would need an env override the singleton can't take in a
-  # unit test (mirrors index.test.ts, which only asserts the live-env case).
-  # Covered end-to-end by the cloud deployment; left unbound here.
-  @regression @unimplemented
-  Scenario: Password reset is rejected in cloud/SSO mode
-    Given the tenant runs on NEXTAUTH_PROVIDER="auth0"
-    When a request hits /request-password-reset or /reset-password
-    Then BetterAuth rejects it with EMAIL_PASSWORD_DISABLED
 
-  # --- Full end-to-end (manual dogfood) ---
+  @integration
+  Scenario: Password reset follows the identifier
+    Given an installation that federates but holds passwords of its own
+    When I request a password reset
+    Then the reset is offered
+    And the answer is the same confirmation whether or not the address has an account
 
-  # Verified manually in the QA phase against a real database and a real
-  # SendGrid send: request a reset for a seeded credential user, open the
-  # emailed link, set a new password, and sign in with it. There is no
-  # automated full-stack auth e2e harness with email interception in this
-  # repo, so this stays @unimplemented and is proved via browser QA in the PR.
-  @e2e @unimplemented
+  @integration
+  Scenario: Password reset is offered only where passwords can be reset
+    Given an installation that holds no passwords at all
+    When I open the reset screen
+    Then I am told my password is managed by my identity provider
+    And no reset is offered that could not be completed
+
+  # --- After the reset: the moment to offer a passkey ---
+  #
+  # ADR-120's rule is that a passkey is offered where somebody already is, and
+  # this is one of the three places they already are: they just proved control
+  # of the address, they are thinking about how they get in, and the thing
+  # they have most recently learned is that the password did not work.
+  #
+  # It is an OFFER and it behaves like one. It never stands between them and
+  # finishing, it can be waved away, and it never opens a system prompt on its
+  # own - the ceremony starts on a real gesture, the same rule the sign-in
+  # screen's conditional offer obeys.
+  #
+  # The offer is TAKEN here rather than somewhere else. The reset signed them
+  # in, so the ceremony this screen can run is the same one the settings page
+  # runs, and sending somebody to a settings page to press a second button was
+  # a step that existed only because this screen used to have no session.
+
+  @integration @e2e
+  Scenario: A completed reset offers a passkey rather than assuming one
+    Given I have just set a new password from a valid link
+    Then the screen confirms the reset and offers to add a passkey
+    And signing in is still the plain, unmissable way on
+    And no device prompt has opened, because I have not asked for one
+
+  @integration
+  Scenario: Declining the offer costs nothing
+    Given I am offered a passkey after resetting my password
+    When I dismiss the offer
+    Then the confirmation and the way to sign in are both still there
+    And the offer does not come back on this screen
+
+  @integration @e2e
+  Scenario: Accepting the offer adds the passkey on this screen
+    Given I am offered a passkey after resetting my password
+    When I ask for one
+    Then the screen waits on my device and says whose prompt it is
+    And once the device answers the screen says the passkey was added
+    And the way on is still there throughout
+
+  @integration
+  Scenario: A refused ceremony says so in words and leaves the way on
+    Given I asked for a passkey after resetting my password
+    When the ceremony is refused
+    Then the screen shows the copy registered for that refusal
+    And it never shows the code itself or an internal message
+    And the way on is still there
+
+  # --- Full end-to-end ---
+
+  # No inbox exists in CI to receive the "emailed" link — there is still no
+  # full-stack auth e2e harness with real EMAIL interception in this repo.
+  # What changed: the request endpoint writes its single-use token row
+  # BEFORE it ever tries to send mail (`runInBackgroundOrAwait` around
+  # `sendResetPassword`, better-auth's own `password.mjs`), so a Playwright
+  # test can call the request endpoint directly and read that row straight
+  # out of Postgres — reproducing exactly what clicking the email does,
+  # without needing the email. See
+  # `tests/agentic-e2e/tests/front-door/password-reset.test.ts` and its
+  # `db.ts` for the coupling this leans on.
+  @e2e
   Scenario: A user who forgot their password resets it and signs in with the new one
     Given a credential user who forgot their password
     When they request a reset, open the emailed link, and set a new password

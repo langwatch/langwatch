@@ -63,22 +63,57 @@ describe("given the Add source menu", () => {
         "Claude Code (Anthropic OAuth)",
         "Anthropic Claude (Cowork)",
         "Workato",
-        "Microsoft Copilot Studio (Purview)",
-        "OpenAI Enterprise Compliance",
-        "Anthropic Claude Enterprise Compliance",
-        "Anthropic Admin API (usage & cost)",
+        "Microsoft Copilot Studio",
+        "OpenAI Admin",
+        "Anthropic Admin API",
         "Databricks AI/BI Genie",
         "Custom S3 audit log",
         "Custom HTTP audit-log API",
       ]) {
         expect(screen.getByText(label)).toBeTruthy();
       }
+
+      // The retired directory-audit source is filtered out of the picker, so
+      // the offer carries one Copilot entry, not two near-identical ones.
+      expect(
+        screen.queryByText("Microsoft Copilot Studio (Purview)"),
+      ).toBeNull();
+
+      // The two Enterprise Compliance types are defined but never offered:
+      // neither has a finished data path, so picking one buys a source that
+      // stays silent. The loop above is what proves this menu renders its
+      // items at all, so their absence here reads as filtering rather than
+      // an empty menu.
+      for (const withheld of [
+        "OpenAI Enterprise Compliance",
+        "Anthropic Claude Enterprise Compliance",
+      ]) {
+        expect(screen.queryByText(withheld)).toBeNull();
+      }
+    });
+
+    /** @scenario "A type is named after the product, not after what it returns" */
+    it("names the Anthropic type after the product, not after its reports", async () => {
+      renderMenu({ isEnterprise: true });
+      await openMenu();
+
+      // The label was "Anthropic Admin API (usage & cost)". A menu is for
+      // picking a product; which report a source pulls is a question the
+      // composer asks two fields later, where the admin can actually answer
+      // it. The parenthetical was an answer offered where no choice was.
+      expect(screen.getByText("Anthropic Admin API")).toBeTruthy();
+      expect(screen.queryByText(/usage\s*&\s*cost/i)).toBeNull();
     });
 
     /** @scenario "Add source menu lists every type by vendor, grouped in plain language" */
     it("carries no technical mode suffix on any item", async () => {
       renderMenu({ isEnterprise: true });
       await openMenu();
+
+      // An empty menu carries no suffix either, and the group headings that
+      // openMenu waits on render with or without items under them. Prove the
+      // items are there before reading anything into their absence.
+      expect(screen.getAllByRole("menuitem").length).toBeGreaterThan(0);
 
       expect(screen.queryByText(/·\s*(push|pull|s3)/i)).toBeNull();
     });
@@ -172,6 +207,16 @@ describe("given the Add source menu", () => {
         disabledReason: "Source limit reached.",
       });
       const user = userEvent.setup();
+
+      // The trigger is the caller's own button: it renders whether or not this
+      // component does anything at all, so on its own it proves nothing and
+      // the assertions below would report green off a broken render. The
+      // reason on hover is the control, because only this component puts it
+      // there — it goes quiet the moment the disabled path stops wiring up.
+      await user.hover(screen.getByText("Add source"));
+      await waitFor(() => {
+        expect(screen.getByText("Source limit reached.")).toBeTruthy();
+      });
 
       await user.click(screen.getByText("Add source"));
 

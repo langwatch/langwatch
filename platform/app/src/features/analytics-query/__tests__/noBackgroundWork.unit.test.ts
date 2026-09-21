@@ -11,7 +11,7 @@
  * `__tests__` directory, is deliberate: the promise is about the surface, not
  * about the file that happens to hold the request state today.
  *
- * Spec: specs/analytics/lwql-workbench.feature
+ * Spec: specs/lwql/workbench.feature
  */
 
 import { readdirSync, readFileSync } from "node:fs";
@@ -126,9 +126,9 @@ function offencesIn(files: readonly string[]): string[] {
   });
 }
 
-describe("the workbench feature's source", () => {
+describe("the feature's source", () => {
   describe("given it is inspected for schedules, background refreshes and persistence", () => {
-    /** @scenario "The workbench ships no polling, browser-side persistence, export, or agent surface" */
+    /** @scenario "The chart engine ships no polling, browser-side persistence, export, or agent surface" */
     it("contains none of them", () => {
       const files = sourceFiles(FEATURE_ROOT);
 

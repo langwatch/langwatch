@@ -1,8 +1,8 @@
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { forwardRef, useMemo } from "react";
-import { topLevelNavigationCommands } from "../command-registry";
 import { COMMAND_BAR_MAX_HEIGHT } from "../constants";
 import type { ListItem } from "../getIconInfo";
+import { useTopLevelNavigationCommands } from "../hooks/useCommandFeatureFlags";
 import type { FilteredProject } from "../hooks/useFilteredProjects";
 import type { Command, RecentItem, SearchResult } from "../types";
 import { CommandGroup } from "./CommandGroup";
@@ -72,6 +72,8 @@ export const CommandBarResults = forwardRef<
   },
   ref,
 ) {
+  const topLevelNavigation = useTopLevelNavigationCommands();
+
   // Build group configurations for empty query state
   const emptyQueryGroups = useMemo<GroupConfig[]>(
     () => [
@@ -84,13 +86,13 @@ export const CommandBarResults = forwardRef<
       },
       {
         label: "Navigation",
-        items: topLevelNavigationCommands.map((d) => ({
+        items: topLevelNavigation.map((d) => ({
           type: "command" as const,
           data: d,
         })),
       },
     ],
-    [recentItemsLimited],
+    [recentItemsLimited, topLevelNavigation],
   );
 
   // Build group configurations for query state

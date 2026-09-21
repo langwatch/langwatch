@@ -1,10 +1,10 @@
-// Package toolmap holds the harness-independent tool-frame mapping helpers the
+// Package toolmap holds the tool-frame mapping helpers the
 // coding-agent adapters share: output bounding, the CLI failure-document rule,
 // the plan (todowrite) snapshot mapping, the measured X/Y progress mapper, and
-// the per-turn tool-call de-dupe tracker. Both adapters (opencode and pi) map
+// the per-turn tool-call de-dupe tracker. The adapter maps
 // their own wire events onto internal/frames values through these helpers, so
 // the tool cards, the plan checklist and the progress protocol behave the same
-// whichever harness runs the turn.
+// whichever agent runs the turn.
 package toolmap
 
 import (
@@ -37,6 +37,22 @@ const (
 // IsTodoWriteTool reports whether a tool name is the plan tool.
 func IsTodoWriteTool(name string) bool {
 	return strings.EqualFold(name, todowriteToolName)
+}
+
+// The `say` tool shows a line to the person where the call happens; the panel
+// draws its text as reply prose, never as an activity row.
+const sayToolName = "say"
+
+// IsSayTool reports whether a tool name is the say tool.
+func IsSayTool(name string) bool {
+	return strings.EqualFold(name, sayToolName)
+}
+
+// isBookkeepingTool reports whether a settled call is bookkeeping rather than
+// work: the plan rewrite and a line said to the person take no measurable
+// time, so neither feeds the batch timing a progress sample carries.
+func isBookkeepingTool(name string) bool {
+	return IsTodoWriteTool(name) || IsSayTool(name)
 }
 
 // truncatePlanContent caps one item's text at MaxPlanContentChars runes, marking
@@ -110,6 +126,32 @@ func BoundPlanItems(items []frames.PlanItem) ([]frames.PlanItem, bool) {
 	return out, true
 }
 
+// The tools whose work happens outside the sandbox: the seven local mirrors run
+// on the developer's own machine through the shared folder (ADR-129), and
+// `code_access`, `question`, `say` and `secret_snippet` speak to the person,
+// not to the model. pi sends no title of its own, so the manager supplies one
+// here and the panel's activity row can say where the call runs instead of
+// showing a bare tool name.
+var toolTitles = map[string]string{
+	"code_access":    "Code access",
+	"question":       "Question",
+	"say":            "Say",
+	"secret_snippet": "Secret snippet",
+	"local_read":     "Read on your machine",
+	"local_write":    "Write on your machine",
+	"local_edit":     "Edit on your machine",
+	"local_bash":     "Run on your machine",
+	"local_grep":     "Search on your machine",
+	"local_find":     "Find on your machine",
+	"local_ls":       "List on your machine",
+}
+
+// ToolTitle returns the activity row label for a tool name, or "" when the tool
+// has no title of ours (the card then falls back to the tool's own name).
+func ToolTitle(name string) string {
+	return toolTitles[strings.ToLower(strings.TrimSpace(name))]
+}
+
 // MaxToolOutputBytes caps a forwarded tool result. A tool can return megabytes
 // (a big file read, a wide query); the card only ever shows a preview, so the
 // stream must not carry the whole thing. Overflow is cut on a rune boundary and
@@ -130,7 +172,7 @@ func RawToolValue(raw json.RawMessage) json.RawMessage {
 // call is doing, i.e. whether it carries any argument at all.
 //
 // `{}` is the case that matters and the one RawToolValue cannot see: it is a
-// present, valid, entirely uninformative object. opencode really does emit a
+// present, valid, entirely uninformative object. An agent really does emit a
 // `running` transition whose input is still `{}` and then RE-SEND the same
 // `running` once the arguments have materialized (the re-send is a known shape,
 // see the tracker's dedupe). Treating that first empty `{}` as "we know the
@@ -289,8 +331,11 @@ func reduceJSONValue(v any, maxString, maxItems int) any {
 		}
 		if clipped {
 			// An in-band, shape-preserving marker: cards render the head as the
-			// sample it already is; totals ride the document's own count fields.
-			out = append(out, fmt.Sprintf("… %d more items truncated", len(value)-maxItems))
+			// sample it already is. The marker states the array's true size,
+			// because a bare array has no count field of its own for a reader to
+			// ride: the agent otherwise counts the marker as a row and reports
+			// one more item than exists.
+			out = append(out, fmt.Sprintf("… %d more items truncated, %d total", len(value)-maxItems, len(value)))
 		}
 		return out
 	case map[string]any:
@@ -325,7 +370,7 @@ func reduceJSONValue(v any, maxString, maxItems int) any {
 }
 
 // ToolCallTracker de-dupes the tool lifecycle across re-delivered call updates:
-// a call's state can land on the stream many times (opencode re-publishes a
+// a call's state can land on the stream many times (an agent re-publishes a
 // tool part on every state transition; a wire protocol can re-send an event).
 // The tracker holds the per-turn set of ids it has already opened and closed,
 // which is what guarantees EXACTLY one `start` and one `end` per call. Scoped
@@ -372,15 +417,16 @@ func (t *ToolCallTracker) StartIfNew(id string) bool {
 }
 
 // EndIfNew marks id as settled and reports whether this is the FIRST settle,
-// the caller emits the end frame exactly when it answers true. A settled
-// non-plan call updates the last-work duration the progress mapper reads
-// (todowrite is bookkeeping, not work, so it never contributes timing).
+// the caller emits the end frame exactly when it answers true. A settled call
+// that did work updates the last-work duration the progress mapper reads
+// (todowrite and say are bookkeeping, not work, so they never contribute
+// timing).
 func (t *ToolCallTracker) EndIfNew(id, toolName string) bool {
 	if _, seen := t.ended[id]; seen {
 		return false
 	}
 	t.ended[id] = struct{}{}
-	if startedAt, ok := t.startedAt[id]; ok && !IsTodoWriteTool(toolName) {
+	if startedAt, ok := t.startedAt[id]; ok && !isBookkeepingTool(toolName) {
 		if elapsed := t.now().Sub(startedAt).Milliseconds(); elapsed > 0 {
 			t.lastWorkMs = elapsed
 		}

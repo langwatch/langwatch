@@ -37,10 +37,15 @@ if [[ "$NODE_ENV" = "development" ]]; then
   # with `override: true` after this runs, which would put the committed 5560
   # back, so the app realigns again on the other side of that load in
   # `alignDevAuthUrlsToPort` (src/env-create.mjs). Keep the two in step.
+  #
+  # LANGWATCH_ENDPOINT is the address the app hands out as itself (the Langy
+  # worker callback, scenario child processes, setup snippets), so it follows
+  # the same port for the same reason.
   if [ -n "$PORT" ]; then
     export BASE_HOST="http://localhost:${PORT}"
     export NEXTAUTH_URL="http://localhost:${PORT}"
-    echo "  ✓ BASE_HOST=NEXTAUTH_URL=${BASE_HOST} (auto-aligned to PORT=${PORT})"
+    export LANGWATCH_ENDPOINT="http://localhost:${PORT}"
+    echo "  ✓ BASE_HOST=NEXTAUTH_URL=LANGWATCH_ENDPOINT=${BASE_HOST} (auto-aligned to PORT=${PORT})"
   fi
 
   # AI Gateway port + URL auto-derivation. Default layout:
@@ -96,18 +101,18 @@ fi
 # output starts with real logs, not the script header. Child stdout is untouched.
 #
 # Dev runs the app from source via tsx (hot reload); production runs the
-# pre-built bundle on plain node (start:app -> node dist/server/server.cjs), so
+# pre-built bundle on plain node (runtime:app -> node dist/server/server.cjs), so
 # the prod image ships no tsx. Same split for the standalone workers lane below.
 if [[ "$NODE_ENV" = "development" ]]; then
-  START_APP_COMMAND="pnpm -s run start:app:dev"
+  START_APP_COMMAND="pnpm -s run runtime:app:dev"
 else
-  START_APP_COMMAND="pnpm -s run start:app"
+  START_APP_COMMAND="pnpm -s run runtime:app"
 fi
 
 # Dev-only single-process mode: WORKERS_IN_PROCESS=1 hosts the worker stack
-# inside `start:app` (the app boots with the "all" role) instead of a separate
+# inside `runtime:app` (the app boots with the "all" role) instead of a separate
 # concurrently lane. When it's set we skip the standalone workers command below
-# and let start:app inherit the flag from the environment. Production never sets
+# and let runtime:app inherit the flag from the environment. Production never sets
 # this — it runs web and worker as separate deployments.
 START_WORKERS_COMMAND=""
 if [[ "$NODE_ENV" = "development" && ( "$WORKERS_IN_PROCESS" = "true" || "$WORKERS_IN_PROCESS" = "1" ) ]]; then
@@ -119,9 +124,9 @@ elif [[ "$START_WORKERS" = "true" || "$START_WORKERS" = "1" ]]; then
   # app: tsx only for an explicit development env, the bundle otherwise — the
   # prod image has no tsx, so START_WORKERS=1 there must not select it.
   if [[ "$NODE_ENV" = "development" ]]; then
-    START_WORKERS_COMMAND="pnpm -s run start:workers:dev && exit 1"
+    START_WORKERS_COMMAND="pnpm -s run runtime:workers:dev && exit 1"
   else
-    START_WORKERS_COMMAND="pnpm -s run start:workers && exit 1"
+    START_WORKERS_COMMAND="pnpm -s run runtime:workers && exit 1"
   fi
 fi
 
@@ -201,7 +206,31 @@ if [[ "$NODE_ENV" = "development" && "$LANGWATCH_SKIP_NLP" != "1" ]]; then
   fi
 fi
 
-pnpm run start:prepare:db
+# langyagent (Go agent manager). Bundled into pnpm dev so a chat with Langy in
+# a local app reaches a live manager instead of a dead port. The manager itself
+# is cheap: no database client, about 30 MB idle, and it spawns a worker only
+# when a person chats. The lane caps that pool to the local size.
+#
+# The decision has more branches than the lanes above, so it lives in
+# dev/scripts/lib/plan-langy-lane.sh: langyagent takes its listen port from
+# PORT, which is the app's here, and fails fast without its secret and roots.
+# Opt-out: LANGWATCH_SKIP_LANGY=1.
+START_LANGY_COMMAND=""
+if [[ "$NODE_ENV" = "development" ]]; then
+  . "$(dirname "$0")/../../../dev/scripts/lib/plan-langy-lane.sh"
+  plan_langy_lane "$(dirname "$0")/.." "$_APP_PORT"
+  if [ "$LANGY_LANE_DECISION" = "start" ]; then
+    START_LANGY_COMMAND=$(langy_lane_command "../.." "$LANGY_LANE_PORT")
+    echo "  ✓ langyagent: $LANGY_LANE_REASON"
+  elif [[ "$LANGY_LANE_REASON" == skipped* ]]; then
+    echo "  ! langyagent: $LANGY_LANE_REASON"
+  else
+    echo "  ✓ langyagent: $LANGY_LANE_REASON"
+  fi
+fi
+
+source "$(dirname "$0")/start-runtime.sh"
+run_startup_preflight
 
 COMMANDS=()
 NAMES=()
@@ -221,6 +250,10 @@ if [ -n "$START_NLP_COMMAND" ]; then
   COMMANDS+=("$START_NLP_COMMAND")
   NAMES+=("nlpgo")
 fi
+if [ -n "$START_LANGY_COMMAND" ]; then
+  COMMANDS+=("$START_LANGY_COMMAND")
+  NAMES+=("langy")
+fi
 if [ -n "$START_APP_COMMAND" ]; then
   COMMANDS+=("$RUNTIME_ENV $START_APP_COMMAND")
   NAMES+=("api")
@@ -231,5 +264,5 @@ if [ ${#COMMANDS[@]} -eq 1 ]; then
   eval "$RUNTIME_ENV exec $START_APP_COMMAND"
 else
   NAMES_STR=$(IFS=,; echo "${NAMES[*]}")
-  concurrently --restart-tries -1 --names "$NAMES_STR" --prefix-colors "green,blue,yellow,magenta,cyan" "${COMMANDS[@]}"
+  concurrently --restart-tries -1 --names "$NAMES_STR" --prefix-colors "green,blue,yellow,magenta,red,cyan" "${COMMANDS[@]}"
 fi

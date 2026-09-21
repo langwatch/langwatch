@@ -65,6 +65,7 @@ export { GrantsService } from "./grants.service";
 export type {
   AuthzAuditWriter,
   AuthzEpochBumper,
+  GrantActor,
   GrantPrincipal,
   GrantRole,
   GrantsServiceDeps,

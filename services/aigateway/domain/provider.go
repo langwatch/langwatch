@@ -205,9 +205,9 @@ func (c Credential) DeclaresCatalog() bool {
 }
 
 // WithDeploymentSelfMap ensures Azure / Bedrock / Vertex credentials carry a
-// deployment entry for bareModel so Bifrost's per-key readers resolve a
-// deployment ("deployment not found for model X" / "deployments not set"
-// otherwise). By default the model id IS the deployment name
+// deployment entry for bareModel, so every dispatch lane can read the
+// deployment for a model out of one place instead of each rediscovering the
+// provider's own naming. By default the model id IS the deployment name
 // (azure/gpt-5-mini → deployment "gpt-5-mini"), so a {bareModel: bareModel}
 // self-map suffices; when the provider defines an explicit deployment (the
 // model id need not equal the deployment name), the control plane / gateway
@@ -216,9 +216,11 @@ func (c Credential) DeclaresCatalog() bool {
 //
 // Every dispatch path shares this so Azure resolves its deployment identically
 // regardless of entry point: dispatcheradapter (Studio / workflows /
-// runSignature) and the gatewayproxy /go/proxy path (scenario User Simulator,
-// playground). The /go/proxy path previously skipped it, so Azure calls that
-// got past the endpoint check then failed deployment resolution (#5760).
+// runSignature), the gatewayproxy /go/proxy path (scenario User Simulator,
+// playground), and the gateway's own dispatch lanes. The /go/proxy path
+// previously skipped it, so Azure calls that got past the endpoint check then
+// failed deployment resolution (#5760); the gateway skipped it too, and sent
+// Azure the model id where the provider had named a deployment (#7765).
 func WithDeploymentSelfMap(cred Credential, bareModel string) Credential {
 	if bareModel == "" {
 		return cred

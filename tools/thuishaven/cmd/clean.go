@@ -88,7 +88,7 @@ func reapOrphanPlays(ctx context.Context, d deps) {
 }
 
 // reapOrphanRuntimes is the always-safe tail of a clean: kill dev runtimes
-// (tsgo, node, pnpm, uv, python, opencode) that have been orphaned to pid 1 but
+// (tsgo, node, pnpm, uv, python) that have been orphaned to pid 1 but
 // still reference this worktree.
 func reapOrphanRuntimes(d deps) {
 	procsupervisor.ReapOrphans([]string{d.worktree})

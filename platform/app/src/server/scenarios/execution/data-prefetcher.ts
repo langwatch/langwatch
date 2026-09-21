@@ -10,17 +10,24 @@
  * - Tests can inject mocks without vi.mock
  */
 
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { Edge, Node } from "@xyflow/react";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import { normalizeToSnakeCase } from "~/optimization_studio/components/properties/llm-configs/normalizeToSnakeCase";
+import type { ConnectedComponentConfig } from "~/optimization_studio/types/dsl";
+import {
+  DEFAULT_CALL_TIMEOUT_MS,
+  MAX_CALL_TIMEOUT_MS,
+} from "~/server/connected-agents/constants";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
 import { ModelNotConfiguredError } from "../../modelProviders/modelNotConfiguredError";
 import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
 import { extractSuiteId } from "../../suites/suite-set-id";
 import { parseSuiteTargets } from "../../suites/types";
+import { isAgentTestScenarioId } from "../agent-test-scenario";
 import {
   mergeRunParameters,
   parseScenarioParameterDefinitions,
@@ -28,36 +35,58 @@ import {
   type RunParameterValues,
   withoutParameterNames,
 } from "../parameters";
+import { type ResolvedRunModels, resolveRunModels } from "../run-models";
 import {
   decryptRunSecretValues,
   type RunSecretCiphertext,
 } from "../run-secret-values";
+import { prefetchAgentTestData } from "./agent-test-prefetch";
 import { renderScenarioContent } from "./scenario-content-template";
 import { validateWorkflowAgentMappings } from "./validate-workflow-mappings";
 
 const logger = createLogger("langwatch:scenarios:data-prefetcher");
 
+import { tryGetAgentSandboxApiKey } from "~/server/api-key/agent-sandbox-key";
 import { decrypt } from "~/utils/encryption";
 import {
   AgentRepository,
   type TypedAgent,
 } from "../../agents/agent.repository";
 import {
+  parseVoiceAgentConfig,
+  voiceAgentExternalId,
+} from "../../agents/voice/voice-agent.config";
+import {
   getProjectModelProviders,
+  prepareEnvKeys,
   prepareLitellmParams,
 } from "../../api/routers/modelProviders.utils";
 import { prisma } from "../../db";
+import {
+  findElevenLabsProviderForProject,
+  getElevenLabsApiCredential,
+} from "../../gateway/elevenLabsCredential.service";
+import {
+  findTwilioProviderForProject,
+  getTwilioCredential,
+} from "../../gateway/twilioCredential.service";
 import {
   PromptService,
   type VersionedPrompt,
 } from "../../prompt-config/prompt.service";
 import { type FieldMapping, FieldMappingSchema } from "../field-mapping";
 import { ScenarioService } from "../scenario.service";
+import {
+  type CallerVoiceConfig,
+  parseCallerVoiceConfig,
+} from "../voice/caller-voice.config";
+import { voiceCallMaxSeconds } from "../voice/voice-limits";
 import { resolveTraceWaitTimeoutMs } from "./ingest-lag.service";
 import {
   AuthConfigSchema,
   type ChildProcessJobData,
   type CodeAgentData,
+  type ConnectedAgentData,
   type ExecutionContext,
   type HttpAgentData,
   type LiteLLMParams,
@@ -65,6 +94,7 @@ import {
   type ScenarioConfig,
   type TargetAdapterData,
   type TargetConfig,
+  type VoiceAgentData,
   type WorkflowAgentData,
 } from "./types";
 
@@ -89,6 +119,8 @@ export interface ScenarioFetcher {
     /** Turn config (ADR-015); null = SDK default. */
     maxTurns?: number | null;
     minTurns?: number | null;
+    /** The scenario's caller-voice JSON, for a voice target. Parsed tolerantly. */
+    callerVoice?: unknown;
   } | null>;
 }
 
@@ -146,11 +178,29 @@ export interface WorkflowVersionFetcher {
   }): Promise<{ workflowId: string; dsl: Record<string, unknown> } | null>;
 }
 
-/** Minimal interface for project lookup */
+/**
+ * Minimal interface for project lookup.
+ *
+ * The organization comes along because minting a run's sandbox key needs it,
+ * and the project row is already being read.
+ */
 export interface ProjectFetcher {
   findUnique(projectId: string): Promise<{
     apiKey: string | null;
+    team: { organizationId: string } | null;
   } | null>;
+}
+
+/**
+ * Mints the short-lived credential a code agent's sandbox authenticates with.
+ * Answers undefined when the platform could not mint one, which leaves the run
+ * to do its work once per row.
+ */
+export interface SandboxKeyMinter {
+  mint(params: {
+    projectId: string;
+    organizationId: string;
+  }): Promise<string | undefined>;
 }
 
 /**
@@ -215,6 +265,7 @@ export interface DataPrefetcherDependencies {
   modelResolver: ModelResolver;
   projectSecretsFetcher: ProjectSecretsFetcher;
   traceWaitBudgetResolver: TraceWaitBudgetResolver;
+  sandboxKeyMinter: SandboxKeyMinter;
 }
 
 // ============================================================================
@@ -226,6 +277,13 @@ export type PrefetchResult =
       success: true;
       data: ChildProcessJobData;
       telemetry: { endpoint: string; apiKey: string };
+      /**
+       * The models this run resolved. A sibling of `data` rather than a member
+       * of it: the child process builds its models from the prepared params,
+       * so it needs no name, while the caller that queues the run records the
+       * names on it. Null for a scripted run, which resolves no model.
+       */
+      resolvedModels: ResolvedRunModels | null;
     }
   | {
       success: false;
@@ -298,6 +356,19 @@ function withRunSecrets({
 }
 
 /**
+ * How a target reads in the failure a run reports when its row is gone, one
+ * label per target type so the run names the kind the customer picked.
+ */
+const MISSING_TARGET_LABELS: Record<TargetConfig["type"], string> = {
+  prompt: "Prompt",
+  code: "Code agent",
+  workflow: "Workflow agent",
+  connected: "Connected agent",
+  http: "HTTP agent",
+  voice: "Voice agent",
+};
+
+/**
  * Pre-fetch all data needed for scenario execution.
  *
  * @param context - Execution context with project/scenario IDs and the run's
@@ -334,6 +405,27 @@ export async function prefetchScenarioData({
     },
     "Prefetching scenario data",
   );
+
+  // An agent test has no scenario row and no model: it reads the project and
+  // the agent the way every run does, and nothing else.
+  if (isAgentTestScenarioId(context.scenarioId)) {
+    return prefetchAgentTestData({
+      context,
+      target,
+      reads: {
+        project: () => fetchProject(context.projectId, deps.projectFetcher),
+        adapter: () => fetchAgentData(context.projectId, target, deps),
+        agentName: async () =>
+          (
+            await deps.agentFetcher.findById({
+              projectId: context.projectId,
+              id: target.referenceId,
+            })
+          )?.name ?? null,
+      },
+      onChildEnvReady,
+    });
+  }
 
   // Decrypted once, before anything is fetched. A key that no longer opens the
   // values fails the run here rather than sending the target a request with a
@@ -465,17 +557,9 @@ export async function prefetchScenarioData({
       },
       "Target adapter not found",
     );
-    const targetLabel =
-      target.type === "prompt"
-        ? "Prompt"
-        : target.type === "code"
-          ? "Code agent"
-          : target.type === "workflow"
-            ? "Workflow agent"
-            : "HTTP agent";
     return {
       success: false,
-      error: `${targetLabel} ${target.referenceId} not found`,
+      error: `${MISSING_TARGET_LABELS[target.type]} ${target.referenceId} not found`,
     };
   }
 
@@ -499,6 +583,17 @@ export async function prefetchScenarioData({
   // prompt with this run plan, so they arrive with the suite rather than with
   // the prompt. Agents carry their own on the agent record, already loaded
   // above.
+  // One key for the whole run, and the same key the project's other runs
+  // hold: every turn of this run shares the cache entries it writes, and a key
+  // per turn or per run would leave a ledger of live credentials behind. A
+  // run that cannot get one still runs, and every turn does its own work.
+  if (adapterData.type === "code" && project.organizationId) {
+    adapterData.sandboxApiKey = await deps.sandboxKeyMinter.mint({
+      projectId: context.projectId,
+      organizationId: project.organizationId,
+    });
+  }
+
   if (adapterData.type === "prompt") {
     adapterData.scenarioMappings = suiteOverrides?.targets?.find(
       (candidate) =>
@@ -519,28 +614,39 @@ export async function prefetchScenarioData({
             context.projectId,
           );
     }
-    simulatorModel =
-      suiteOverrides?.simulatorModel ??
-      scenarioResult.simulatorModel ??
-      (await deps.modelResolver.resolve(
-        "scenarios.user_simulator",
-        context.projectId,
-      ));
-    judgeModel =
-      suiteOverrides?.judgeModel ??
-      scenarioResult.judgeModel ??
-      (await deps.modelResolver.resolve("scenarios.judge", context.projectId));
+    ({ simulatorModel, judgeModel } = await resolveRunModels({
+      plan: {
+        simulatorModel: suiteOverrides?.simulatorModel,
+        judgeModel: suiteOverrides?.judgeModel,
+      },
+      scenario: {
+        simulatorModel: scenarioResult.simulatorModel,
+        judgeModel: scenarioResult.judgeModel,
+      },
+      resolveFeatureModel: (featureKey) =>
+        deps.modelResolver.resolve(featureKey, context.projectId),
+    }));
   } catch (err) {
-    const message =
-      err instanceof Error
-        ? err.message
-        : "No default model configured for this project";
     // A project with no model set for scenarios is the customer's to fix and
     // carries its own remediation message, so it is named rather than left
     // reasonless — otherwise the caller cannot tell it from a fault of ours.
+    //
+    // Any other failure here is ours. `error` reaches the customer as the
+    // reason a run or an agent test was refused, so only a message LangWatch
+    // authored may go in it. A HandledError carries a customer-safe message by
+    // contract; everything else is logged and named in one sentence.
+    if (!(err instanceof HandledError)) {
+      logger.error(
+        { projectId: context.projectId, error: err },
+        "Model resolution failed for a scenario run",
+      );
+    }
     return {
       success: false,
-      error: message,
+      error:
+        err instanceof HandledError
+          ? err.message
+          : "The models this run needs could not be resolved",
       ...(err instanceof ModelNotConfiguredError
         ? { reason: "model_not_configured" as const }
         : {}),
@@ -618,11 +724,11 @@ export async function prefetchScenarioData({
     ? modelParamsResult.params
     : undefined;
 
-  // Only an http target's judge fetches remote traces, so only it needs a
-  // wait budget. The resolver degrades to a default on any failure, so this
+  // Only an http or a connected target's judge fetches remote traces, so
+  // only those need a wait budget. The resolver degrades to a default on any failure, so this
   // never fails the prefetch.
   const traceWaitTimeoutMs =
-    target.type === "http"
+    target.type === "http" || target.type === "connected"
       ? await deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs({
           projectId: context.projectId,
         })
@@ -641,11 +747,18 @@ export async function prefetchScenarioData({
       nlpServiceUrl: env.LANGWATCH_NLP_SERVICE,
       target,
       ...(traceWaitTimeoutMs !== undefined ? { traceWaitTimeoutMs } : {}),
+      // The simulated caller's voice, carried to the child for a voice target
+      // only. The child builds the voice user simulator from it and records the
+      // effective values on the run (AC20).
+      ...(target.type === "voice"
+        ? { callerVoice: scenarioResult.callerVoice }
+        : {}),
     },
     telemetry: {
       endpoint: env.LANGWATCH_ENDPOINT,
       apiKey: project.apiKey,
     },
+    resolvedModels: { simulatorModel, judgeModel },
   };
 }
 
@@ -668,6 +781,7 @@ async function fetchScenario({
   parameters: RunParameterValues;
   simulatorModel: string | null;
   judgeModel: string | null;
+  callerVoice: CallerVoiceConfig;
 } | null> {
   const scenario = await fetcher.getById({ projectId, id: scenarioId });
   if (!scenario) return null;
@@ -715,11 +829,15 @@ async function fetchScenario({
     parameters,
     simulatorModel: scenario.simulatorModel ?? null,
     judgeModel: scenario.judgeModel ?? null,
+    callerVoice: parseCallerVoiceConfig(scenario.callerVoice),
   };
 }
 
 type FetchProjectResult =
-  | { success: true; data: { apiKey: string } }
+  | {
+      success: true;
+      data: { apiKey: string; organizationId: string | null };
+    }
   | { success: false; error: string };
 
 async function fetchProject(
@@ -733,7 +851,13 @@ async function fetchProject(
   if (!project.apiKey) {
     return { success: false, error: `Project ${projectId} missing API key` };
   }
-  return { success: true, data: { apiKey: project.apiKey } };
+  return {
+    success: true,
+    data: {
+      apiKey: project.apiKey,
+      organizationId: project.team?.organizationId ?? null,
+    },
+  };
 }
 
 /** Failure result propagated from hydrateLlmParameters through the fetch chain */
@@ -763,6 +887,13 @@ async function fetchAgentData(
       deps.projectSecretsFetcher,
     );
   }
+  if (target.type === "connected") {
+    return fetchConnectedAgentData({
+      projectId,
+      agentId: target.referenceId,
+      fetcher: deps.agentFetcher,
+    });
+  }
   if (target.type === "workflow") {
     return fetchWorkflowAgentData({
       projectId,
@@ -771,6 +902,13 @@ async function fetchAgentData(
       workflowVersionFetcher: deps.workflowVersionFetcher,
       modelParamsProvider: deps.modelParamsProvider,
       projectSecretsFetcher: deps.projectSecretsFetcher,
+    });
+  }
+  if (target.type === "voice") {
+    return fetchVoiceAgentData({
+      projectId,
+      agentId: target.referenceId,
+      fetcher: deps.agentFetcher,
     });
   }
   return fetchHttpAgentData({
@@ -821,6 +959,7 @@ const HttpAgentConfigSchema = z.object({
   auth: AuthConfigSchema.optional(),
   bodyTemplate: z.string().optional(),
   outputPath: z.string().optional(),
+  sessionPath: z.string().optional(),
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
 });
 
@@ -858,8 +997,132 @@ async function fetchHttpAgentData({
     auth: config.auth,
     bodyTemplate: config.bodyTemplate,
     outputPath: config.outputPath,
+    sessionPath: config.sessionPath,
     scenarioMappings: config.scenarioMappings,
     secrets,
+  };
+}
+
+/**
+ * The child reaches a connected agent through the relay route, so the job
+ * carries the agent id, where the platform is, and the per-call budget the
+ * agent declared, capped by the platform.
+ */
+async function fetchConnectedAgentData({
+  projectId,
+  agentId,
+  fetcher,
+}: {
+  projectId: string;
+  agentId: string;
+  fetcher: AgentFetcher;
+}): Promise<ConnectedAgentData | null> {
+  const agent = await fetcher.findById({ projectId, id: agentId });
+  if (agent?.type !== "connected") return null;
+  const config = agent.config as ConnectedComponentConfig;
+  return {
+    type: "connected",
+    agentId: agent.id,
+    endpoint: env.LANGWATCH_ENDPOINT,
+    timeoutMs: Math.min(
+      config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,
+      MAX_CALL_TIMEOUT_MS,
+    ),
+  };
+}
+
+/**
+ * The transport credential a voice run carries to the child, resolved from the
+ * project's model-provider row for the target's transport. The agent stores no
+ * secret; ElevenLabs reads its API key and host, phone reads the Twilio account
+ * SID, auth token and from-number. `null` when the project has no provider row
+ * for the transport, which the child surfaces as the transport's named
+ * missing-key failure (there is no operator env for either credential).
+ */
+export async function resolveVoiceTarget({
+  projectId,
+  config,
+}: {
+  projectId: string;
+  config: ReturnType<typeof parseVoiceAgentConfig>;
+}): Promise<VoiceAgentData["voiceTarget"]> {
+  switch (config.transport) {
+    case "elevenlabs_convai": {
+      const provider = await findElevenLabsProviderForProject({ projectId });
+      const credential = provider
+        ? await getElevenLabsApiCredential({ modelProviderId: provider.id })
+        : null;
+      return {
+        transport: "elevenlabs_convai",
+        agentId: voiceAgentExternalId(config),
+        credential: credential ? { kind: "elevenlabs", ...credential } : null,
+      };
+    }
+    case "phone": {
+      const provider = await findTwilioProviderForProject({ projectId });
+      const credential = provider
+        ? await getTwilioCredential({ modelProviderId: provider.id })
+        : null;
+      return {
+        transport: "phone",
+        agentId: voiceAgentExternalId(config),
+        credential: credential ? { kind: "twilio", ...credential } : null,
+        callDirection: config.callDirection,
+      };
+    }
+  }
+}
+
+/**
+ * The child reaches a voice agent with the project's provider credential, so
+ * the job carries the transport, the agent id on it (the ElevenLabs agent id,
+ * or the phone number for a phone target), and the credential resolved from the
+ * provider row. The agent stores no secret; the key comes from the ElevenLabs
+ * or Twilio model provider, and is `null` when the project has none, which the
+ * child surfaces as a named failure.
+ */
+async function fetchVoiceAgentData({
+  projectId,
+  agentId,
+  fetcher,
+}: {
+  projectId: string;
+  agentId: string;
+  fetcher: AgentFetcher;
+}): Promise<VoiceAgentData | null> {
+  const agent = await fetcher.findById({ projectId, id: agentId });
+  if (agent?.type !== "voice") return null;
+
+  const config = parseVoiceAgentConfig(agent.config);
+  const voiceTarget = await resolveVoiceTarget({ projectId, config });
+
+  // The SDK builds its own OpenAI client from the child's process env for the
+  // caller's TTS and for the transcription the judge uses. The platform's
+  // guardrail is that credentials come from the project's model provider rows
+  // only, so resolve it the same way the model params are: `prepareEnvKeys`
+  // maps the OpenAI provider's customKeys / env fallbacks onto
+  // `OPENAI_API_KEY`. Nothing else from the operator env reaches the child.
+  // (No ElevenLabs key travels here: the target transport's adapter takes its
+  // key as an explicit option, never from env, and `CALLER_VOICES` offers no
+  // `elevenlabs/...` voice today, so no code path in the child reads
+  // `ELEVENLABS_API_KEY`.)
+  const providers = await getProjectModelProviders(projectId);
+  const openaiProvider = providers.openai;
+  const callerEnv: Record<string, string> = {};
+  const openaiApiKey = openaiProvider?.enabled
+    ? prepareEnvKeys(openaiProvider).OPENAI_API_KEY
+    : undefined;
+  if (openaiApiKey) callerEnv.OPENAI_API_KEY = openaiApiKey;
+
+  return {
+    type: "voice",
+    agentId: agent.id,
+    voiceTarget,
+    callerEnv,
+    // The whole-call budget the child enforces and the transport clamps a turn
+    // to. Read here (not in the child) so a run records the limit it started
+    // under even if the env changes mid-flight.
+    maxCallSeconds: voiceCallMaxSeconds(),
   };
 }
 
@@ -893,6 +1156,8 @@ const RawCodeAgentConfigSchema = z.object({
     .optional(),
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
   scenarioOutputField: z.string().optional(),
+  /** Per-agent code budget in ms; the engine clamps it to the operator ceiling. */
+  timeoutMs: z.number().int().positive().optional(),
 });
 
 async function fetchCodeAgentData(
@@ -928,6 +1193,7 @@ async function fetchCodeAgentData(
     scenarioMappings: config.scenarioMappings,
     scenarioOutputField: config.scenarioOutputField,
     secrets,
+    timeoutMs: config.timeoutMs,
   };
 }
 
@@ -1295,8 +1561,11 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
       findUnique: async (projectId) =>
         prisma.project.findUnique({
           where: { id: projectId },
-          select: { apiKey: true },
+          select: { apiKey: true, team: { select: { organizationId: true } } },
         }),
+    },
+    sandboxKeyMinter: {
+      mint: (params) => tryGetAgentSandboxApiKey({ prisma, ...params }),
     },
     modelResolver: {
       resolve: async (featureKey, projectId) => {

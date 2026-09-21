@@ -21,6 +21,7 @@ import type { EvaluationsV3State } from "~/experiments-v3/types";
 import { nodeErrorToDomainError } from "~/optimization_studio/utils/nodeErrorDomain";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+import { promptLoadKey } from "../dataLoader";
 import {
   buildEvaluatorResultDispatch,
   buildTargetMetadata,
@@ -48,7 +49,10 @@ describe("buildTargetMetadata", () => {
   describe("given a target with a localPromptConfig model", () => {
     it("attributes the model from localPromptConfig even when a loaded prompt exists", () => {
       const loadedPrompts = new Map([
-        ["prompt-1", { name: "Saved Prompt", model: "openai/saved-model" }],
+        [
+          promptLoadKey({ promptId: "prompt-1", promptVersionNumber: 3 }),
+          { name: "Saved Prompt", model: "openai/saved-model" },
+        ],
       ]) as unknown as Map<string, VersionedPrompt>;
 
       const [target] = buildTargetMetadata({
@@ -69,7 +73,10 @@ describe("buildTargetMetadata", () => {
   describe("given a saved prompt target with no localPromptConfig", () => {
     it("falls back to the loaded prompt's model", () => {
       const loadedPrompts = new Map([
-        ["prompt-1", { name: "Saved Prompt", model: "openai/saved-model" }],
+        [
+          promptLoadKey({ promptId: "prompt-1", promptVersionNumber: 3 }),
+          { name: "Saved Prompt", model: "openai/saved-model" },
+        ],
       ]) as unknown as Map<string, VersionedPrompt>;
 
       const [target] = buildTargetMetadata({
@@ -381,6 +388,22 @@ describe("buildEvaluatorResultDispatch", () => {
       });
 
       expect(dispatch.cost).toBeNull();
+    });
+
+    /** @scenario "The stored row keeps the reason a row was skipped" */
+    it("records why the row was skipped", () => {
+      const dispatch = buildEvaluatorResultDispatch({
+        ...base,
+        result: {
+          status: "skipped",
+          details: "Total tokens exceed the maximum of 64000: 70000",
+        },
+      });
+
+      expect(dispatch.status).toBe("skipped");
+      expect(dispatch.details).toBe(
+        "Total tokens exceed the maximum of 64000: 70000",
+      );
     });
   });
 

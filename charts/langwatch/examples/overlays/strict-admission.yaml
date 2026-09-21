@@ -44,7 +44,7 @@ clickhouse:
 
 # The Langy assistant's manager process runs as UID 0 with CHOWN, DAC_OVERRIDE,
 # FOWNER, SETUID and SETGID, and carries no seccomp profile. That is deliberate
-# and load-bearing, NOT an oversight: the manager hands every opencode worker a
+# and load-bearing, NOT an oversight: the manager hands every worker a
 # distinct UID via child_process.spawn({uid,gid}), which needs those exact
 # capabilities from a root-effective-uid process. Without them, sibling workers
 # share a UID and can read each other's project API keys and GitHub tokens off

@@ -6,16 +6,20 @@ import {
   type LangyConversationTurnWireEvent,
   type LangyEventCursor,
   type LangyTurnProjectionState,
+  abandonSend as reduceAbandonSend,
   abandonStop as reduceAbandonStop,
+  beginSend as reduceBeginSend,
   beginTurn as reduceBeginTurn,
   observeBackendTurn as reduceObserveBackendTurn,
   requestStop as reduceRequestStop,
   settleTurn as reduceSettleTurn,
+  stopDispatched as reduceStopDispatched,
   seedLangyTurnProjection,
   type TurnPhaseState,
 } from "@langwatch/langy";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { GuidedKickoff } from "~/features/guided-onboarding/kickoff";
 import type { LangyResourceKind } from "~/shared/langy/langyResourceKinds";
 
 /**
@@ -46,6 +50,11 @@ import type { LangyResourceKind } from "~/shared/langy/langyResourceKinds";
  * it (a shared machine, an impersonation session), where the project id alone
  * says nothing has moved.
  */
+/**
+ * What the tour hands the panel: everything the takeover collected, plus the
+ * conversation to continue when the organization already attached one.
+ */
+
 export interface LangyScope {
   userId: string | null;
   organizationId: string | null;
@@ -211,6 +220,22 @@ interface LangyState extends TurnPhaseState {
   consumePendingPrompt: () => void;
 
   /**
+   * The guided onboarding handing over to Langy: the tour ended (or was
+   * skipped, or the path has no tour) and the panel sends the kickoff message
+   * on the next idle render. Ephemeral like `pendingPrompt`; the message
+   * itself is what lasts (specs/langy/langy-guided-onboarding.feature).
+   */
+  pendingKickoff: GuidedKickoff | null;
+  /**
+   * Open Langy and queue the kickoff. With `conversationId` (the conversation
+   * the organization already attached) the panel continues that conversation;
+   * without one it starts fresh and attaches what the transport creates.
+   */
+  queueGuidedKickoff: (kickoff: GuidedKickoff) => void;
+  /** The panel has taken the queued kickoff: clear it so it sends once. */
+  consumePendingKickoff: () => void;
+
+  /**
    * The panel's composer is asked to take focus. Three producers: an
    * `askLangy` handoff (the reader just handed a question over and expects to
    * keep typing), a new chat (the one gesture whose whole point is to write
@@ -356,7 +381,26 @@ interface LangyState extends TurnPhaseState {
   setDraft: (draft: string) => void;
   /** Per-session model override for the next send. "" = use the project default. */
   modelOverride: string;
+  /**
+   * Seeding: the panel writing the resolved default, or an allowlist snap.
+   * Either way the model is not the user's choice, so this clears the pick
+   * flag. An allowlist snap in particular OVERRULES a pick, and a pick the
+   * panel has taken away must not go on holding the pill off the default.
+   */
   setModelOverride: (model: string) => void;
+  /** The user choosing a model in the picker. Their pick, not a seed. */
+  pickModel: (model: string) => void;
+  /**
+   * Whether the model in the picker is the user's own choice rather than a
+   * seeded value. Session-only, never persisted, and cleared with the
+   * conversation it was made in.
+   *
+   * The flag exists because the two are otherwise indistinguishable at the
+   * one moment it matters: accept "make it the default" and the pick BECOMES
+   * the default, so every "is this still the default?" test reads an explicit
+   * choice as untouched and the follow rules below overwrite it.
+   */
+  isModelPickedByUser: boolean;
   /**
    * Which conversation the picker was last seeded for from the durable
    * record — so a poll of the same history does not re-apply a model the
@@ -365,27 +409,21 @@ interface LangyState extends TurnPhaseState {
   modelSeededForConversationId: string | null;
   /**
    * A conversation remembers the model its last turn ran on; opening it
-   * brings that model back to the picker. Applies once per selection, only
-   * while the pick is still the seeded default (an explicit pick since the
-   * conversation was opened is never replaced).
+   * brings that model back to the picker. Applies once per selection, and
+   * never over the user's own pick.
    */
   followConversationModel: (args: {
     conversationId: string;
     model: string;
-    resolvedDefault: string | null;
   }) => void;
   /**
    * The project's coding default changed server-side (a codex connect flow
    * wrote the LANGY role default). Follow it with the composer's pill ONLY
-   * when the pill is still on the default it replaced: an empty override, or
-   * one equal to the outgoing default (the panel seeds the override from the
-   * resolved default on open), both mean the user never explicitly diverged.
-   * A model the user picked on purpose is never hijacked.
+   * while the pill still holds a seeded value: the user's own pick is never
+   * hijacked, including when they picked the model that just became the
+   * default.
    */
-  followCodingDefaultChange: (change: {
-    previousDefault: string | null;
-    nextDefault: string;
-  }) => void;
+  followCodingDefaultChange: (change: { nextDefault: string }) => void;
 
   /**
    * Page-context chips the user has CHOSEN, by id.
@@ -472,10 +510,28 @@ interface LangyState extends TurnPhaseState {
   // The phase STATE fields (turnPhase, activeTurnId, settledTurnId,
   // backendSawTurnInFlight) come from `TurnPhaseState`; the machine's pure
   // transitions live in @langwatch/langy's turnPhase.ts. The store exposes them as events:
+  /**
+   * The user sent a message: go `active` at once, before the server has
+   * answered with the ids. What makes Stop available during the startup window
+   * instead of leaving Send on screen for the seconds a cold worker takes.
+   */
+  beginSend: () => void;
   /** A turn was dispatched (transport adopted its ids): adopt it, go `active`. */
   beginTurn: (args: { conversationId: string; turnId: string }) => void;
-  /** The user hit Stop: `active` → `stopping` (a no-op in any other phase). */
-  requestStop: () => void;
+  /**
+   * The user hit Stop: `active` → `stopping` (a no-op in any other phase).
+   * `dispatched: false` says the caller had no turn id to name yet, so the
+   * intent is remembered (`stopPending`) and sent the moment one arrives.
+   */
+  requestStop: (args?: { dispatched?: boolean }) => void;
+  /** The remembered stop went out: nothing is owed, the phase stays `stopping`. */
+  stopDispatched: () => void;
+  /**
+   * The send failed before any turn id existed: back to `idle`, dropping a
+   * pending stop with it. A no-op once the turn has an id, where the turn's own
+   * terminal tells the story.
+   */
+  abandonSend: () => void;
   /**
    * The conversation whose last turn THIS browser stopped (ADR-078). What lets
    * an empty stopped reply read "Interrupted" instead of "No content". Session
@@ -636,6 +692,7 @@ const emptyConversationState = () => ({
   turnPlan: null as Array<{ content: string; status: string }> | null,
   // A fresh conversation drops any question still queued for the previous one.
   pendingPrompt: null as string | null,
+  pendingKickoff: null as GuidedKickoff | null,
   // A conversation change also drops the id a panel-open warm minted: the
   // pending id belongs to the fresh chat the warm was fired for, and the warm
   // hook re-warms (and re-mints) for whatever the panel points at next.
@@ -729,6 +786,12 @@ export const useLangyStore = create<LangyState>()(
           activeConversationId: null,
           historyLoadConversationId: null,
           draft: "",
+          // The model pick belongs to the conversation being left behind, the
+          // same as a new chat. Kept, it would steer a conversation the user
+          // never picked it for, and hold the pill off the default for good.
+          modelOverride: "",
+          isModelPickedByUser: false,
+          modelSeededForConversationId: null,
           ...emptyConversationState(),
           // AFTER the spread: emptyConversationState() nulls `pendingPrompt`, so
           // the queued question is written last or it would be wiped out.
@@ -737,6 +800,26 @@ export const useLangyStore = create<LangyState>()(
           composerFocusRequested: true,
         })),
       consumePendingPrompt: () => set({ pendingPrompt: null }),
+
+      pendingKickoff: null,
+      queueGuidedKickoff: (kickoff) =>
+        set(() => ({
+          isOpen: true,
+          // The kickoff lands where the organization's conversation is: the
+          // attached one when there is one (its history loads, and the
+          // kickoff continues it), a fresh one otherwise.
+          activeConversationId: kickoff.conversationId ?? null,
+          historyLoadConversationId: kickoff.conversationId ?? null,
+          draft: "",
+          modelOverride: "",
+          isModelPickedByUser: false,
+          modelSeededForConversationId: null,
+          ...emptyConversationState(),
+          // AFTER the spread, like `pendingPrompt`: emptyConversationState()
+          // nulls the kickoff.
+          pendingKickoff: kickoff,
+        })),
+      consumePendingKickoff: () => set({ pendingKickoff: null }),
 
       composerFocusRequested: false,
       requestComposerFocus: () => set({ composerFocusRequested: true }),
@@ -792,6 +875,7 @@ export const useLangyStore = create<LangyState>()(
           // being opened seeds its own from the durable record (or the
           // default) once its history lands.
           modelOverride: "",
+          isModelPickedByUser: false,
           modelSeededForConversationId: null,
           ...emptyConversationState(),
         }),
@@ -812,6 +896,7 @@ export const useLangyStore = create<LangyState>()(
           // conversation" is the dialog's promise) — a new chat starts on
           // the resolved default again.
           modelOverride: "",
+          isModelPickedByUser: false,
           modelSeededForConversationId: null,
           chosenChipIds: new Set<string>(),
           // The targets the user pointed at were gathered for the conversation
@@ -828,31 +913,27 @@ export const useLangyStore = create<LangyState>()(
       draft: "",
       setDraft: (draft) => set({ draft }),
       modelOverride: "",
-      setModelOverride: (modelOverride) => set({ modelOverride }),
+      setModelOverride: (modelOverride) =>
+        set({ modelOverride, isModelPickedByUser: false }),
+      pickModel: (modelOverride) =>
+        set({ modelOverride, isModelPickedByUser: true }),
+      isModelPickedByUser: false,
       modelSeededForConversationId: null,
-      followConversationModel: ({ conversationId, model, resolvedDefault }) =>
+      followConversationModel: ({ conversationId, model }) =>
         set((state) => {
           if (state.activeConversationId !== conversationId) return state;
           if (state.modelSeededForConversationId === conversationId)
             return state;
-          // An empty override, or one equal to the resolved default the panel
-          // seeds on open, both mean the user never picked since opening this
-          // conversation — only then may the record's model take the pill.
-          const isUntouched =
-            state.modelOverride === "" ||
-            state.modelOverride === resolvedDefault;
-          return isUntouched
-            ? {
+          return state.isModelPickedByUser
+            ? { modelSeededForConversationId: conversationId }
+            : {
                 modelOverride: model,
                 modelSeededForConversationId: conversationId,
-              }
-            : { modelSeededForConversationId: conversationId };
+              };
         }),
-      followCodingDefaultChange: ({ previousDefault, nextDefault }) =>
+      followCodingDefaultChange: ({ nextDefault }) =>
         set((state) =>
-          state.modelOverride === "" || state.modelOverride === previousDefault
-            ? { modelOverride: nextDefault }
-            : state,
+          state.isModelPickedByUser ? state : { modelOverride: nextDefault },
         ),
 
       chosenChipIds: new Set<string>(),
@@ -979,8 +1060,21 @@ export const useLangyStore = create<LangyState>()(
         }),
 
       // The turn phase machine (@langwatch/langy turnPhase.ts) — pure transitions wired in a
-      // few lines. Every phase change goes through these four events.
+      // few lines. Every phase change goes through these events.
       ...initialTurnPhaseState,
+      beginSend: () =>
+        set((s) => ({
+          ...reduceBeginSend(s),
+          // The same live signals a dispatched turn clears: the previous
+          // answer's status line must not sit under the new question.
+          turnStatus: null,
+          turnStatusIsReadiness: false,
+          turnProgress: null,
+          turnProgressSample: null,
+          turnReasoning: null,
+          turnPlan: null,
+          interruptedConversationId: null,
+        })),
       beginTurn: ({ conversationId, turnId }) =>
         set((s) => ({
           ...reduceBeginTurn(s, turnId),
@@ -1017,15 +1111,32 @@ export const useLangyStore = create<LangyState>()(
           return { unconfirmedConversations: rest };
         }),
       interruptedConversationId: null,
-      requestStop: () =>
+      requestStop: (args) =>
         set((s) => ({
-          ...reduceRequestStop(s),
+          ...reduceRequestStop(s, args ?? {}),
           // Only a stop that actually moved the machine counts as an
           // interruption — requestStop is a no-op outside `active`.
           interruptedConversationId:
             s.turnPhase === "active"
               ? s.activeConversationId
               : s.interruptedConversationId,
+        })),
+      stopDispatched: () =>
+        set((s) => ({
+          ...reduceStopDispatched(s),
+          // The kept stop is real now, and the reply it cuts short belongs to
+          // this conversation: without this an empty stopped reply would read
+          // "No content" rather than "Interrupted".
+          interruptedConversationId: s.stopPending
+            ? s.activeConversationId
+            : s.interruptedConversationId,
+        })),
+      abandonSend: () =>
+        set((s) => ({
+          ...reduceAbandonSend(s),
+          // Nothing ran, so nothing was interrupted.
+          interruptedConversationId:
+            s.activeTurnId === null ? null : s.interruptedConversationId,
         })),
       abandonStop: () =>
         set((s) => ({

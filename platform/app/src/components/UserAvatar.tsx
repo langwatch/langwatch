@@ -1,5 +1,5 @@
-import { Avatar, type AvatarRootProps } from "@chakra-ui/react";
 import { useState } from "react";
+import { Avatar, type AvatarRootProps } from "~/components/ui/avatar";
 
 /**
  * Canonical person avatar: renders the uploaded/SSO `image` when present and

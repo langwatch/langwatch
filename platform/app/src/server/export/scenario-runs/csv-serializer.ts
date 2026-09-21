@@ -21,6 +21,7 @@
 import Parse from "papaparse";
 import type { ExportableRun } from "~/server/app-layer/simulations/repositories/simulation.repository";
 import { categorizeRunStatus } from "~/server/scenarios/scenario-run-category";
+import { neutralizeFormula } from "~/utils/csvFormulaGuard";
 
 /**
  * The columns a person reads, shortest and highest-signal first so the useful
@@ -333,19 +334,20 @@ function stringOrEmpty(value: unknown): string {
 /**
  * Neutralize a free-text cell against spreadsheet formula injection.
  *
- * A cell whose first character is `=`, `+`, `-`, `@`, TAB or CR is evaluated
- * as a formula by Excel and Sheets. RFC 4180 quoting does not prevent this —
- * quoting protects the CSV grammar, not the spreadsheet that reads it. Since
- * scenario names, judge reasoning, criteria and message content are all
- * user- or model-controlled, and the entire point of this file is to be
- * opened in a spreadsheet, every free-text cell is prefixed with an
- * apostrophe, which those tools strip on display and treat as literal text.
+ * Scenario names, judge reasoning, criteria and message content are all user-
+ * or model-controlled, and the entire point of this file is to be opened in a
+ * spreadsheet, so every free-text cell goes through the guard.
  *
- * Deliberately applied only to text: numbers and timestamps are generated
- * here, and prefixing a negative number would corrupt it.
+ * The rule itself lives in `~/utils/csvFormulaGuard`; this file used to carry
+ * its own copy, written independently of the browser-side one. Delegating also
+ * picks up the guard's number exemption, so a text cell that happens to read
+ * `-5` stays a number to the reader rather than becoming quoted text.
+ *
+ * Still applied only to text: numbers and timestamps are generated here and
+ * never need it.
  */
 function text(value: string): string {
-  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  return neutralizeFormula(value);
 }
 
 /**

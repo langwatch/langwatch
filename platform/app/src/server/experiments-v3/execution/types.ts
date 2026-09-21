@@ -49,6 +49,51 @@ export type ExecutionScope =
     };
 
 /**
+ * One board cell a run carries rather than produces.
+ *
+ * A run holds a snapshot of the whole board, so opening it shows what the
+ * person was looking at instead of the single column they clicked. The cells
+ * outside the execution scope are copied in from the board at run start; the
+ * cells inside it fill in as they execute.
+ *
+ * The cell keeps what it cost and how long it took when it was produced,
+ * because the results page reads those to draw the column's header metrics.
+ * The run's own totals leave them out, which is what the recorded item's
+ * `carriedOver` flag is for.
+ */
+export type CarriedOverCell = {
+  rowIndex: number;
+  targetId: string;
+  output?: unknown;
+  cost?: number;
+  duration?: number;
+  traceId?: string;
+  /** The engine's raw string for a cell that failed. */
+  error?: string;
+  domainError?: SerializedHandledError;
+  /** Verdicts on this cell, by evaluator id. */
+  evaluatorResults: Array<{ evaluatorId: string; result: unknown }>;
+};
+
+export const carriedOverCellSchema = z.object({
+  rowIndex: z.number(),
+  targetId: z.string(),
+  output: z.unknown().optional(),
+  cost: z.number().optional(),
+  duration: z.number().optional(),
+  traceId: z.string().optional(),
+  error: z.string().optional(),
+  domainError: z
+    .custom<SerializedHandledError>(
+      (value) => typeof value === "object" && value !== null,
+    )
+    .optional(),
+  evaluatorResults: z.array(
+    z.object({ evaluatorId: z.string(), result: z.unknown() }),
+  ),
+});
+
+/**
  * Input to start an evaluation execution.
  * The frontend sends the full state to avoid autosave timing issues.
  */
@@ -73,6 +118,12 @@ export type ExecutionRequest = {
     string,
     { output: unknown; cost?: number; duration?: number }
   >;
+  /**
+   * Board cells the run carries rather than produces, so the run holds the
+   * whole board and not only the column that was clicked. Sent by the page,
+   * because the page's board can be ahead of the last autosave.
+   */
+  carriedOverCells?: CarriedOverCell[];
   /** Inline row data to evaluate instead of a saved or attached dataset. */
   data?: Array<Record<string, unknown>>;
   /** Saved platform dataset id to load and evaluate. Mutually exclusive with data. */
@@ -166,6 +217,7 @@ export const executionRequestSchema = z
         }),
       )
       .optional(),
+    carriedOverCells: z.array(carriedOverCellSchema).optional(),
   })
   .refine((req) => !(req.data && req.dataset_id), {
     message: "Pass either inline data or a dataset_id, not both",

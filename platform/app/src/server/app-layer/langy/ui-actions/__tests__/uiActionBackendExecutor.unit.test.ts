@@ -9,11 +9,21 @@ import { StaleWorkbenchStateError } from "~/server/experiments/errors";
 import type { ExperimentService } from "~/server/experiments/experiment.service";
 import { executeBackendAction } from "../uiActionBackendExecutor";
 
-vi.mock("~/server/experiments-v3/execution/savedStateExecution", () => ({
-  prepareSavedStateExecution: vi.fn(),
-}));
+vi.mock(
+  import("~/server/experiments-v3/execution/savedStateExecution"),
+  async (importOriginal) => ({
+    ...(await importOriginal()),
+    prepareSavedStateExecution: vi.fn(),
+  }),
+);
 vi.mock("~/server/experiments-v3/execution/experimentRunner", () => ({
   startPollingRun: vi.fn(),
+}));
+// Resolving column names reaches the prompt, agent and evaluator rows. The
+// projection's fallback covers what cannot be resolved, and this suite is about
+// the executor rather than about the names.
+vi.mock("~/server/experiments-v3/workbenchTargetNames", () => ({
+  resolveWorkbenchTargetNames: vi.fn().mockResolvedValue({}),
 }));
 
 import { startPollingRun } from "~/server/experiments-v3/execution/experimentRunner";
@@ -300,6 +310,86 @@ describe("executeBackendAction", () => {
         type: "target-rows",
         targetIds: ["target-1"],
         rowIndices: [0, 1],
+      });
+    });
+
+    /**
+     * A run with no browser attached starts from a state whose results are
+     * empty by construction. Without the saved cells, a comparison judging the
+     * scoped column against another one finds no output for that other column
+     * and reports every row as waiting on it.
+     */
+    describe("given a comparison over the scoped column and another one", () => {
+      const comparisonState = () => ({
+        ...structuredClone(BASE_STATE),
+        targets: [
+          ...structuredClone(BASE_STATE).targets,
+          {
+            id: "target-2",
+            type: "prompt",
+            promptId: "prompt_2",
+            inputs: [{ identifier: "input", type: "str" }],
+            outputs: [{ identifier: "output", type: "str" }],
+            mappings: {},
+          },
+        ],
+        evaluators: [
+          {
+            id: "evaluator_compare",
+            evaluatorType: "langevals/select_best_compare",
+            inputs: [],
+            mappings: {},
+            comparison: {
+              variants: ["target-1", "target-2"],
+              hasGoldenAnswer: true,
+              goldenField: "expected_output",
+              includeMetrics: [],
+              randomizeOrder: true,
+            },
+          },
+        ],
+        results: {
+          targetOutputs: { "target-1": ["saved baseline"] },
+          targetMetadata: { "target-1": [{ cost: 0.01, duration: 90 }] },
+          evaluatorResults: {},
+          errors: {},
+        },
+      });
+
+      /** @scenario "Running one candidate keeps the comparison's other columns" */
+      it("seeds the other column's saved output into the run", async () => {
+        const experiments = makeExperiments();
+        const state = comparisonState();
+        vi.mocked(prepareSavedStateExecution).mockResolvedValue({
+          experiment: { id: "experiment_1", slug: "my-exp" },
+          workbenchState: state,
+          state,
+          datasetRows: [{ input: "hi" }],
+          datasetColumns: [{ id: "input", name: "input", type: "string" }],
+          loadedPrompts: new Map(),
+          loadedAgents: new Map(),
+          loadedEvaluators: new Map(),
+          loadedWorkflows: new Map(),
+        } as never);
+        vi.mocked(startPollingRun).mockResolvedValue({
+          runId: "run-3",
+          runUrl: "https://example/run-3",
+          total: 1,
+        } as never);
+
+        await executeBackendAction({
+          experiments,
+          context: CONTEXT,
+          kind: "workbench.run",
+          definition: WORKBENCH_ACTIONS["workbench.run"],
+          payload: { targetIds: ["target-2"] },
+        });
+
+        expect(
+          vi.mocked(startPollingRun).mock.calls[0]![0].seedTargetOutputs,
+        ).toEqual({
+          "0:target-1": { output: "saved baseline", cost: 0.01, duration: 90 },
+        });
       });
     });
   });

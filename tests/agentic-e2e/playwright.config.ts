@@ -44,6 +44,16 @@ export default defineConfig({
   use: {
     baseURL: BASE_URL,
 
+    /* Quiet every animation that honours prefers-reduced-motion. The auth
+     * screens paint a live shader ground and a one-shot entrance, and both
+     * stand down under this setting (AuthGround, LogoHandoff, the tweened
+     * ground). Without it the perpetual ground keeps interactive elements
+     * from ever settling, so Playwright's "visible, enabled and stable"
+     * actionability wait on a button never resolves and the click times out.
+     * This became load-bearing when the ground stopped being hosted-only and
+     * started rendering on the self-hosted (non-IS_SAAS) surface CI runs. */
+    reducedMotion: "reduce",
+
     /* In CI, use the runner's preinstalled Google Chrome
      * (E2E_BROWSER_CHANNEL=chrome) to skip the ~170 MB Chromium download.
      * Locally it falls back to Playwright's bundled Chromium. Applies to all
@@ -95,8 +105,30 @@ export default defineConfig({
      * Chromium provides sufficient coverage for our use case */
   ],
 
-  /* Global timeout */
-  timeout: 60000,
+  /* Whole-test budget. This is a SUM, not a hang detector: `actionTimeout`
+   * and `navigationTimeout` above are what catch a genuinely stuck step, and
+   * they are unchanged, so a hang still fails at the step in 15-30s either
+   * way. What this bounds is how many steps one test may spend.
+   *
+   * The front-door journeys sign a fresh account in through the real screens,
+   * and on a CI runner (software-rendered Chrome, no GPU) every Playwright
+   * actionability check costs several hundred milliseconds — a single
+   * `Continue` click measures ~4.2s there against well under a second
+   * locally, spread evenly over resolve/stable/scroll/click/navigate rather
+   * than stuck on any one of them.
+   *
+   * At 60s that tax left passkeys passing with 7s to spare and the
+   * no-display-name sign-up flaky. Both needed more than 60s on the very next
+   * run (72s and 60s), which is the measurement this number answers; the
+   * runner's speed swings enough between runs — 14.4 and 18.7 minutes for the
+   * same suite on the same code — that a budget sitting just above the last
+   * good figure is red again on the next one.
+   *
+   * One test is long enough that this is still not the right lever, and it
+   * says so itself with `test.slow()` rather than pushing this up for
+   * everybody. Local keeps the tighter budget, which is where a newly-slow
+   * test should be noticed. */
+  timeout: IS_CI ? 120000 : 60000,
 
   /* Expect timeout */
   expect: {

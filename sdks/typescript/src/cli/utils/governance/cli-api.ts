@@ -109,6 +109,20 @@ export class GovernanceCliError extends Error {
 }
 
 /**
+ * Whether a governance call failed because this device's session is dead.
+ *
+ * `requestREST` refreshes a spent access token and retries on its own, so a
+ * 401 that reaches a caller is a refresh the server itself rejected: the
+ * device is signed out and every governance call it makes will fail the same
+ * way until someone runs `langwatch login --device` on it again. That is a
+ * different repair from an unreachable platform, and the paths that fall back
+ * to a cached ingest key have to tell the two apart.
+ */
+export function isExpiredSession(error: unknown): boolean {
+  return error instanceof GovernanceCliError && error.status === 401;
+}
+
+/**
  * The ADR-045 error path for a non-2xx governance response. Before throwing the
  * CLI's own {@link GovernanceCliError}, hand the parsed body to
  * `throwIfHandledError`: when the platform NAMED the failure (a domain-error
@@ -708,6 +722,66 @@ export async function listIngestionKeys(
     sourceType: k.source_type,
     lookupId: k.lookup_id,
   }));
+}
+
+/**
+ * Why a key was revoked, as the server records it: `user` for a person's
+ * revoke, `session` when the login key it was parented to was revoked,
+ * `expired` when that session ran out, `offboarded` when the person's
+ * membership of the organization ended, `rotation` when a rotate from the
+ * personal tile replaced it, `cap` from an older server's per-tool cap.
+ */
+export type IngestionKeyRevocationCause =
+  | "user"
+  | "rotation"
+  | "session"
+  | "expired"
+  | "offboarded"
+  | "cap";
+
+export interface IngestionKeyDescription {
+  /** `unknown` is also what a key of another user reads as. */
+  status: "live" | "revoked" | "unknown";
+  sourceType?: string;
+  /** Null for a live key, and for one revoked before the cause was recorded. */
+  revocationCause: IngestionKeyRevocationCause | null;
+}
+
+/**
+ * What became of one of the caller's own personal ingestion keys. The hook's
+ * self-heal asks this before it re-mints a key the collector rejected: a key
+ * a person revoked from the API-keys page is left dead, one retired with its
+ * session or replaced by a rotation is re-minted. A server from before this
+ * route answers 404, which reads as `unknown`, so an older platform heals as
+ * it always did.
+ */
+export async function describeIngestionKey(
+  cfg: GovernanceConfig,
+  lookupId: string,
+  options: CliApiOptions = {},
+): Promise<IngestionKeyDescription> {
+  try {
+    const body = await requestREST<{
+      status: "live" | "revoked" | "unknown";
+      source_type?: string;
+      revocation_cause?: IngestionKeyRevocationCause | null;
+    }>(
+      cfg,
+      "GET",
+      `/api/auth/cli/governance/ingestion-keys/${encodeURIComponent(lookupId)}`,
+      options,
+    );
+    return {
+      status: body.status,
+      sourceType: body.source_type,
+      revocationCause: body.revocation_cause ?? null,
+    };
+  } catch (error) {
+    if (error instanceof GovernanceCliError && error.status === 404) {
+      return { status: "unknown", revocationCause: null };
+    }
+    throw error;
+  }
 }
 
 // IngestionTemplate verbs ----------------------------------------------------

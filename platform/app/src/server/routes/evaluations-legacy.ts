@@ -59,6 +59,7 @@ import {
   evaluatorsSchema,
   type SingleEvaluationResult,
 } from "~/server/evaluations/evaluators";
+import { pickGenerationParams } from "~/server/evaluations/generationParams";
 import {
   type CustomEvaluatorDefinition,
   getEvaluatorDefaultSettings,
@@ -1312,7 +1313,16 @@ async function handleEvaluatorCall(
       );
     }
 
-    settings = evaluatorSettingSchema?.parse(finalSettings);
+    // The generated settings schema declares only the evaluator's own fields,
+    // so its parse drops the generation parameters the model editor saved
+    // next to them. Put those back so the route dispatches the same judge
+    // configuration a scenario run does.
+    settings = evaluatorSettingSchema
+      ? {
+          ...pickGenerationParams(finalSettings),
+          ...evaluatorSettingSchema.parse(finalSettings),
+        }
+      : undefined;
   } catch (error) {
     const message =
       error instanceof ZodErrorClass

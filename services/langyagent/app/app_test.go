@@ -185,6 +185,51 @@ func TestApp_CancelTurn_DelegatesToThePool(t *testing.T) {
 	}
 }
 
+// A stop that lands while the worker is still starting finds nothing to abort,
+// so the manager remembers the turn id: the dispatch that follows must not run
+// the turn. The 202 (nil error, no-op runner) is deliberate — the turn is
+// settled on the durable record, so the caller has nothing to re-drive.
+//
+// @scenario A stop before the worker starts still stops the turn
+func TestApp_StartTurn_StoppedBeforeTheWorkerStartedDoesNotRun(t *testing.T) {
+	worker := &fakeWorker{claimOK: true, streamWrites: true}
+	pool := &fakePool{worker: worker}
+	a := newTestApp(pool, &fakeRelay{})
+	stopped := req()
+	stopped.TurnID = "turn-stopped"
+
+	a.CancelTurn(context.Background(), stopped.ConversationID, stopped.TurnID)
+
+	run, err := a.StartTurn(context.Background(), stopped)
+	if err != nil {
+		t.Fatalf("StartTurn: %v", err)
+	}
+	run(context.Background())
+
+	if worker.claimed != 0 {
+		t.Errorf("a stopped turn must claim no worker, claimed %d times", worker.claimed)
+	}
+	if worker.posted != 0 {
+		t.Errorf("a stopped turn must post no prompt, posted %d times", worker.posted)
+	}
+}
+
+// Only the stopped turn is refused: the next question on the same conversation
+// runs normally.
+func TestApp_StartTurn_ADifferentTurnStillRunsAfterAStop(t *testing.T) {
+	worker := &fakeWorker{claimOK: true, streamWrites: true}
+	a := newTestApp(&fakePool{worker: worker}, &fakeRelay{})
+	a.CancelTurn(context.Background(), "c1", "turn-stopped")
+
+	next := req()
+	next.TurnID = "turn-next"
+	runTurn(t, a, next)
+
+	if worker.claimed != 1 {
+		t.Errorf("the following turn must claim the worker once, got %d", worker.claimed)
+	}
+}
+
 // runTurn drives StartTurn's returned runner to completion synchronously (the
 // transport runs it detached; the test does it in-line to observe the outcome).
 func runTurn(t *testing.T, a *App, r ChatRequest) {
@@ -338,12 +383,12 @@ func TestApp_Turn_StreamErrorEmitsWorkerStoppedFrame(t *testing.T) {
 }
 
 func TestApp_Turn_AgentErrorFrameCarriesTypedCauseChain(t *testing.T) {
-	// The agent reported its own failure (an opencode error event) and the LLM
+	// The agent reported its own failure (an error terminal) and the LLM
 	// proxy captured the gateway's typed herr for this turn. The wire frame must
 	// be the vetted agent_error herr with the gateway's herr as a REASON — the
 	// full typed chain the control plane deserializes into a DomainError — and
 	// the raw agent prose must stay in the log, never on the wire.
-	rawAgentProse := "AI_APICallError: something opencode made up"
+	rawAgentProse := "AI_APICallError: something the agent made up"
 	worker := &fakeWorker{
 		claimOK:   true,
 		streamErr: herr.NewLight(context.Background(), domain.ErrAgentError, nil, errors.New(rawAgentProse)),

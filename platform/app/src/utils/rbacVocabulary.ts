@@ -129,6 +129,29 @@ export const Resources = {
   // `release_langy_enabled` flag is — so it draws the line at "can this person
   // act on the project at all" rather than trying to be finer than that.
   LANGY: "langy",
+  // The per-project agent cache. An agent stores a value it produced during a
+  // run (a login session, a handle it paid to obtain) and reads it back on the
+  // next row, so the work happens once for the run instead of once per row.
+  // Entries expire on their own and the platform encrypts them at rest.
+  //
+  // `agentCache:manage` guards every route, the read included: a caller that
+  // can overwrite an entry already chooses what the next read answers, so a
+  // read-only tier would divide nothing. `agentCache:view` is the read half of
+  // the vocabulary and reaches no route yet, so grant it only together with a
+  // route that can answer it safely. Granted from MEMBER upward; VIEWER and
+  // EXTERNAL get nothing, because a cache entry is agent-written state a
+  // reader has no call to see.
+  AGENT_CACHE: "agentCache",
+  // The organization's cost screen (ADR-128): the provider-billed lane, the
+  // gateway-metered lane and the seat lane, each labeled for what it is.
+  //
+  // Its own resource rather than a grain of `governance`, because reading
+  // what the organization spends is a strictly different capability from
+  // administering ingestion and anomaly rules — a finance reviewer needs the
+  // figures and nothing else, and `governance:view` today carries the whole
+  // admin surface with it. Read-only: `governanceCost:view` is the only
+  // grain, since nothing on the screen is editable.
+  GOVERNANCE_COST: "governanceCost",
 } as const;
 
 export type Resource = (typeof Resources)[keyof typeof Resources];

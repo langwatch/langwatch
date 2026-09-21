@@ -31,6 +31,7 @@ const genieComposer = (overrides: Partial<ComposerState>): ComposerState => ({
   },
   ottlStatements: [],
   pullSchedule: "",
+  traceProjectId: null,
   ...overrides,
 });
 
@@ -46,7 +47,7 @@ describe("given the Genie composer field definitions", () => {
     });
 
     /** @scenario "Genie setup asks for the service principal first" */
-    it("marks the token, space IDs, and warehouse ID as Advanced", () => {
+    it("marks the token, space IDs, warehouse ID and paid bill switch as Advanced", () => {
       const advancedKeys = genieFields
         .filter((f) => f.advanced)
         .map((f) => f.key);
@@ -54,7 +55,15 @@ describe("given the Genie composer field definitions", () => {
         "credentialsToken",
         "spaceIds",
         "warehouseId",
+        "readPaidGenieBill",
       ]);
+    });
+
+    /** @scenario "The paid Genie bill read is off unless switched on" */
+    it("offers the paid bill read as a switch that starts off", () => {
+      const field = genieFields.find((f) => f.key === "readPaidGenieBill");
+      expect(field?.control).toBe("switch");
+      expect(field?.defaultOn).toBe(false);
     });
 
     /** @scenario "Genie setup asks for the service principal first" */
@@ -122,6 +131,64 @@ describe("given the create input for a pull-mode source", () => {
       expect((input?.pullConfig as { spaceIds?: string[] }).spaceIds).toEqual(
         [],
       );
+    });
+  });
+
+  describe("when the paid bill switch was never touched", () => {
+    /** @scenario "The paid Genie bill read is off unless switched on" */
+    it("sends the adapter a real false, never a missing setting", () => {
+      const input = buildCreateInput({
+        composer: genieComposer({}),
+        organizationId: "org-1",
+      });
+      expect(
+        (input?.pullConfig as { readPaidGenieBill?: unknown })
+          .readPaidGenieBill,
+      ).toBe(false);
+    });
+  });
+
+  describe("when the admin switched the paid bill read on", () => {
+    /** @scenario "The paid Genie bill read is off unless switched on" */
+    it("sends the adapter a real true", () => {
+      const input = buildCreateInput({
+        composer: genieComposer({
+          parserConfig: {
+            workspaceUrl: "https://adb-123.7.azuredatabricks.net",
+            credentialsClientId: "client-id",
+            credentialsClientSecret: "client-secret",
+            readPaidGenieBill: "true",
+          },
+        }),
+        organizationId: "org-1",
+      });
+      expect(
+        (input?.pullConfig as { readPaidGenieBill?: unknown })
+          .readPaidGenieBill,
+      ).toBe(true);
+    });
+  });
+
+  describe("when a trace destination was picked", () => {
+    /** @scenario "The composer of a conversation source offers a destination" */
+    it("carries it on the create request", () => {
+      const input = buildCreateInput({
+        composer: genieComposer({ traceProjectId: "proj_analytics" }),
+        organizationId: "org-1",
+      });
+      expect(input?.traceProjectId).toBe("proj_analytics");
+    });
+  });
+
+  describe("when no trace destination was picked", () => {
+    /** @scenario "A source created without a destination routes nothing" */
+    it("creates the source anyway, carrying no destination", () => {
+      const input = buildCreateInput({
+        composer: genieComposer({}),
+        organizationId: "org-1",
+      });
+      expect(input).not.toBeNull();
+      expect(input?.traceProjectId).toBeNull();
     });
   });
 });

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import datetime
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
+from dateutil.parser import isoparse
 
 from ..models.post_api_gateway_v1_virtual_keys_response_201_virtual_key_purpose import (
     PostApiGatewayV1VirtualKeysResponse201VirtualKeyPurpose,
@@ -41,17 +43,28 @@ class PostApiGatewayV1VirtualKeysResponse201VirtualKey:
         purpose (PostApiGatewayV1VirtualKeysResponse201VirtualKeyPurpose):
         display_prefix (str):
         principal_user_id (None | str):
-        trace_project_id (None | str):
+        trace_project_id (None | str): The project this key's traces and costs land in, which is the project its spend
+            is attributed to. Not a scope: it grants no access to the key. Decided when the key is written and stored on it,
+            so editing what the key is scoped to never moves it; send `trace_project_id` on an update to move it. Null only
+            on a key created before this was stored, in an organization that had no governance project to fall back to;
+            those keys export no spans until they are given a destination.
+        trace_project_archived (bool): True when the project in `trace_project_id` has been deleted. The key goes on
+            sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never
+            refused for it. Nothing else on the key says the destination is gone.
         external_id (None | str):
         metadata (PostApiGatewayV1VirtualKeysResponse201VirtualKeyMetadata):
         scopes (list[PostApiGatewayV1VirtualKeysResponse201VirtualKeyScopesItem]):
         routing_policy_id (None | str):
         routing_mode (PostApiGatewayV1VirtualKeysResponse201VirtualKeyRoutingMode):
         revision (str):
-        created_at (str):
-        updated_at (str):
-        last_used_at (None | str):
-        revoked_at (None | str):
+        created_at (datetime.datetime):
+        updated_at (datetime.datetime):
+        last_used_at (datetime.datetime | None):
+        revoked_at (datetime.datetime | None):
+        expires_at (datetime.datetime | None): When the key stops serving, or null for a key that never expires.
+            Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the
+            date on purpose: the three status values are what clients switch on, and the key stays editable so the date can
+            be extended.
         config (Any | Unset):
     """
 
@@ -64,16 +77,18 @@ class PostApiGatewayV1VirtualKeysResponse201VirtualKey:
     display_prefix: str
     principal_user_id: None | str
     trace_project_id: None | str
+    trace_project_archived: bool
     external_id: None | str
     metadata: PostApiGatewayV1VirtualKeysResponse201VirtualKeyMetadata
     scopes: list[PostApiGatewayV1VirtualKeysResponse201VirtualKeyScopesItem]
     routing_policy_id: None | str
     routing_mode: PostApiGatewayV1VirtualKeysResponse201VirtualKeyRoutingMode
     revision: str
-    created_at: str
-    updated_at: str
-    last_used_at: None | str
-    revoked_at: None | str
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+    last_used_at: datetime.datetime | None
+    revoked_at: datetime.datetime | None
+    expires_at: datetime.datetime | None
     config: Any | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -99,6 +114,8 @@ class PostApiGatewayV1VirtualKeysResponse201VirtualKey:
         trace_project_id: None | str
         trace_project_id = self.trace_project_id
 
+        trace_project_archived = self.trace_project_archived
+
         external_id: None | str
         external_id = self.external_id
 
@@ -116,15 +133,27 @@ class PostApiGatewayV1VirtualKeysResponse201VirtualKey:
 
         revision = self.revision
 
-        created_at = self.created_at
+        created_at = self.created_at.isoformat()
 
-        updated_at = self.updated_at
+        updated_at = self.updated_at.isoformat()
 
         last_used_at: None | str
-        last_used_at = self.last_used_at
+        if isinstance(self.last_used_at, datetime.datetime):
+            last_used_at = self.last_used_at.isoformat()
+        else:
+            last_used_at = self.last_used_at
 
         revoked_at: None | str
-        revoked_at = self.revoked_at
+        if isinstance(self.revoked_at, datetime.datetime):
+            revoked_at = self.revoked_at.isoformat()
+        else:
+            revoked_at = self.revoked_at
+
+        expires_at: None | str
+        if isinstance(self.expires_at, datetime.datetime):
+            expires_at = self.expires_at.isoformat()
+        else:
+            expires_at = self.expires_at
 
         config = self.config
 
@@ -141,6 +170,7 @@ class PostApiGatewayV1VirtualKeysResponse201VirtualKey:
                 "display_prefix": display_prefix,
                 "principal_user_id": principal_user_id,
                 "trace_project_id": trace_project_id,
+                "trace_project_archived": trace_project_archived,
                 "external_id": external_id,
                 "metadata": metadata,
                 "scopes": scopes,
@@ -151,6 +181,7 @@ class PostApiGatewayV1VirtualKeysResponse201VirtualKey:
                 "updated_at": updated_at,
                 "last_used_at": last_used_at,
                 "revoked_at": revoked_at,
+                "expires_at": expires_at,
             }
         )
         if config is not UNSET:
@@ -201,6 +232,8 @@ class PostApiGatewayV1VirtualKeysResponse201VirtualKey:
 
         trace_project_id = _parse_trace_project_id(d.pop("trace_project_id"))
 
+        trace_project_archived = d.pop("trace_project_archived")
+
         def _parse_external_id(data: object) -> None | str:
             if data is None:
                 return data
@@ -228,23 +261,54 @@ class PostApiGatewayV1VirtualKeysResponse201VirtualKey:
 
         revision = d.pop("revision")
 
-        created_at = d.pop("created_at")
+        created_at = isoparse(d.pop("created_at"))
 
-        updated_at = d.pop("updated_at")
+        updated_at = isoparse(d.pop("updated_at"))
 
-        def _parse_last_used_at(data: object) -> None | str:
+        def _parse_last_used_at(data: object) -> datetime.datetime | None:
             if data is None:
                 return data
-            return cast(None | str, data)
+            try:
+                if not isinstance(data, str):
+                    raise TypeError()
+                last_used_at_type_0 = isoparse(data)
+
+                return last_used_at_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(datetime.datetime | None, data)
 
         last_used_at = _parse_last_used_at(d.pop("last_used_at"))
 
-        def _parse_revoked_at(data: object) -> None | str:
+        def _parse_revoked_at(data: object) -> datetime.datetime | None:
             if data is None:
                 return data
-            return cast(None | str, data)
+            try:
+                if not isinstance(data, str):
+                    raise TypeError()
+                revoked_at_type_0 = isoparse(data)
+
+                return revoked_at_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(datetime.datetime | None, data)
 
         revoked_at = _parse_revoked_at(d.pop("revoked_at"))
+
+        def _parse_expires_at(data: object) -> datetime.datetime | None:
+            if data is None:
+                return data
+            try:
+                if not isinstance(data, str):
+                    raise TypeError()
+                expires_at_type_0 = isoparse(data)
+
+                return expires_at_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(datetime.datetime | None, data)
+
+        expires_at = _parse_expires_at(d.pop("expires_at"))
 
         config = d.pop("config", UNSET)
 
@@ -258,6 +322,7 @@ class PostApiGatewayV1VirtualKeysResponse201VirtualKey:
             display_prefix=display_prefix,
             principal_user_id=principal_user_id,
             trace_project_id=trace_project_id,
+            trace_project_archived=trace_project_archived,
             external_id=external_id,
             metadata=metadata,
             scopes=scopes,
@@ -268,6 +333,7 @@ class PostApiGatewayV1VirtualKeysResponse201VirtualKey:
             updated_at=updated_at,
             last_used_at=last_used_at,
             revoked_at=revoked_at,
+            expires_at=expires_at,
             config=config,
         )
 

@@ -6,13 +6,13 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.post_api_dataset_by_slug_or_id_records_body import PostApiDatasetBySlugOrIdRecordsBody
-from ...types import UNSET, Response, Unset, safe_http_status
+from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
     slug_or_id: str,
     *,
-    body: PostApiDatasetBySlugOrIdRecordsBody | Unset = UNSET,
+    body: PostApiDatasetBySlugOrIdRecordsBody,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -23,8 +23,7 @@ def _get_kwargs(
         ),
     }
 
-    if not isinstance(body, Unset):
-        _kwargs["json"] = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -54,14 +53,14 @@ def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Res
 def sync_detailed(
     slug_or_id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiDatasetBySlugOrIdRecordsBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiDatasetBySlugOrIdRecordsBody,
 ) -> Response[Any]:
     """Create records in a dataset in batch
 
     Args:
         slug_or_id (str):
-        body (PostApiDatasetBySlugOrIdRecordsBody | Unset):
+        body (PostApiDatasetBySlugOrIdRecordsBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -86,14 +85,14 @@ def sync_detailed(
 async def asyncio_detailed(
     slug_or_id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiDatasetBySlugOrIdRecordsBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiDatasetBySlugOrIdRecordsBody,
 ) -> Response[Any]:
     """Create records in a dataset in batch
 
     Args:
         slug_or_id (str):
-        body (PostApiDatasetBySlugOrIdRecordsBody | Unset):
+        body (PostApiDatasetBySlugOrIdRecordsBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

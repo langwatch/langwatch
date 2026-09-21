@@ -3,11 +3,40 @@ import { createSpinner } from "../utils/spinner";
 import { PromptsApiService, PromptsError } from "@/client-sdk/services/prompts";
 import { resolveCredentials } from "../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../utils/formatting";
+import { parsePositiveIntOrNull } from "../utils/positiveInt";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { failSpinner } from "../utils/spinnerError";
 import type { CommandResult } from "../utils/output";
 
-export const listCommand = async (): Promise<CommandResult | void> => {
+export interface PromptListOptions {
+  /** How many prompts to return. All of them when absent. */
+  limit?: string;
+}
+
+/**
+ * `--limit` is the paging flag every other list command in this CLI takes, so a
+ * caller that has used one of those reaches for it here too.
+ *
+ * A value that is not a positive whole number ends the command rather than
+ * being dropped: dropping it lists everything, and the caller reads the whole
+ * server as the page they asked for. This is what `experiment versions` does
+ * with the same flag.
+ */
+const resolveLimit = (raw: string | undefined): number | undefined => {
+  if (raw === undefined) return undefined;
+  const parsed = parsePositiveIntOrNull(raw);
+  if (parsed === null) {
+    console.error(
+      `--limit takes a whole number of prompts, 1 or more. Got "${raw}".`,
+    );
+    process.exit(1);
+  }
+  return parsed;
+};
+
+export const listCommand = async (
+  options: PromptListOptions = {},
+): Promise<CommandResult | void> => {
   try {
     // Check API key before doing anything else
     await resolveCredentials();
@@ -19,9 +48,13 @@ export const listCommand = async (): Promise<CommandResult | void> => {
 
     try {
       // Fetch all prompts
-      const allPrompts = await promptsApiService.getAll();
+      const fetched = await promptsApiService.getAll();
+      const limit = resolveLimit(options.limit);
+      const allPrompts =
+        limit === undefined ? fetched : fetched.slice(0, limit);
       const prompts = allPrompts.filter((prompt) => prompt.version);
       const draftPrompts = allPrompts.filter((prompt) => !prompt.version);
+      const cut = allPrompts.length < fetched.length;
 
       spinner.succeed(
         `Found ${prompts.length} published prompt${
@@ -39,6 +72,18 @@ export const listCommand = async (): Promise<CommandResult | void> => {
         table: () => {
           if (prompts.length === 0) {
             console.log();
+            if (cut) {
+              // The cap ran before the published filter, so the page can hold
+              // only drafts while the server holds published prompts too.
+              // Saying "none on the server" here would be false.
+              console.log(
+                chalk.gray(
+                  `No published prompts in the first ${allPrompts.length} of ${fetched.length}. Raise or drop --limit to see the rest.`,
+                ),
+              );
+              console.log();
+              return;
+            }
             console.log(chalk.gray("No prompts found on the server."));
             console.log(chalk.gray("Create your first prompt with:"));
             console.log(chalk.cyan("  langwatch prompt init"));
@@ -71,6 +116,15 @@ export const listCommand = async (): Promise<CommandResult | void> => {
             },
             emptyMessage: "No prompts found",
           });
+
+          if (cut) {
+            console.log();
+            console.log(
+              chalk.gray(
+                `Showing ${allPrompts.length} of ${fetched.length}. Raise or drop --limit to see the rest.`,
+              ),
+            );
+          }
 
           console.log();
           console.log(

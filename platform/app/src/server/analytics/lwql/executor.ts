@@ -25,22 +25,40 @@
  * much of it is handed back — and never about relaxing what the database will
  * do.
  *
- * @see ./provisioning.ts — the identity, the profile, and the key map
+ * @see ./provisioning/accessModel.ts — the identity, the profile, and the key map
  * @see ./capability.ts — the value sent as the tenant setting
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 
 import {
-  isClickHouseObjectUnavailableError,
+  isClickHouseObjectAccessDeniedError,
+  isClickHouseObjectMissingError,
+  isClickHouseResultTooLargeError,
+  isClickHouseUnknownFunctionError,
+  isClickHouseUnknownIdentifierError,
   translateClickHouseQueryError,
+  unknownIdentifierFromError,
 } from "~/server/app-layer/clients/clickhouse/translate-query-error";
 import { toError } from "~/utils/posthogErrorCapture";
-
-import { LangWatchQLUnavailableError } from "./errors";
-import { DEFAULT_LWQL_RESOURCE_LIMITS } from "./provisioning";
+import {
+  type LangWatchQLConnection,
+  lwqlDerivedConnectionFromEnv,
+} from "./connection";
+import {
+  LangWatchQLAppFunctionUnavailableError,
+  LangWatchQLProvisioningIncompleteError,
+  LangWatchQLResultTooLargeError,
+  LangWatchQLUnavailableError,
+  LangWatchQLUnknownIdentifierError,
+} from "./errors";
+import {
+  DEFAULT_LWQL_RESOURCE_LIMITS,
+  LWQL_MAX_RESULT_BYTES,
+  LWQL_MAX_RESULT_ROWS,
+} from "./limits";
 
 const logger = createLogger("langwatch:analytics:lwql:executor");
 
@@ -58,58 +76,89 @@ export interface LangWatchQLStatistics {
   /** Physical rows read off the parts — the number partition pruning moves. */
   readonly rowsRead: number;
   readonly bytesRead: number;
-  /** Rows handed back, after the result ceilings. */
+  /** Rows handed back. */
   readonly rowsReturned: number;
 }
 
-/** A submitted, already-validated query and the ceilings on what it returns. */
+/** A submitted, already-validated query as it reaches the transport. */
 export interface LangWatchQLExecutionRequest {
-  /** Exactly as the caller wrote it. Never rewritten. */
+  /**
+   * The statement to run. The caller's, with one exception: the service appends
+   * a default `LIMIT` to a statement that names none (see `LWQL_MAX_RESULT_ROWS`
+   * and `lwql.service.ts`). Nothing else is ever added.
+   */
   readonly sql: string;
   /** Values for the parameters the SQL declares. */
   readonly parameters?: Readonly<Record<string, unknown>>;
   /** The caller's tenant capability, sent as the one changeable setting. */
   readonly tenantCapability: string;
-  readonly limits: LangWatchQLResultLimits;
+  /**
+   * Whether this statement calls an app function.
+   *
+   * Only used to read `UNKNOWN_FUNCTION` correctly. The validator's allowlist
+   * also admits native ClickHouse functions, and the BYO contract pins no
+   * server version, so an older server can refuse a native-only query with the
+   * same error. Mapping that to "the extraction functions are not provisioned"
+   * would name the wrong cause and hand the caller an action that changes
+   * nothing.
+   */
+  readonly usesAppFunctions?: boolean;
 }
 
 /**
- * How much of a result reaches the caller.
- *
- * Distinct from the ceilings the settings profile pins, and the distinction is
- * the whole design: the database's ceilings decide whether the query is allowed
- * to *finish* and throw when it is not, while these decide how much of a
- * finished result is serialised into the response. Overflow here is never
- * silent — the result carries `truncated`, and the service turns that into a
- * diagnostic the caller can branch on.
+ * The two numeric bounds this API applies to a result, held together because
+ * `DEFAULT_LWQL_RESULT_LIMITS` and every test that lowers a bound name them as a
+ * pair. Neither is enforced *here*: the executor is a pure transport now. The
+ * service reads `maxRows` to size the `LIMIT` it appends to an unbounded
+ * statement, and `maxResultBytes` to reject an oversized result outright.
  */
 export interface LangWatchQLResultLimits {
-  /** Most rows a response may carry. */
+  /** The row cap — the `LIMIT` appended to a bare statement. */
   readonly maxRows: number;
-  /** Approximate JSON byte budget for those rows. */
+  /** The hard JSON byte ceiling; a result past it is refused, never cut. */
   readonly maxResultBytes: number;
+  /**
+   * Byte budget for the result *after* the app-function hydration stage has
+   * replaced keys with values.
+   *
+   * A second, much larger ceiling rather than a raised `maxResultBytes`,
+   * because the two bound different things. The database returns a page of
+   * keys, which is small by construction; the application then puts a
+   * conversation or a whole trace in each of them, which is where a response
+   * reaches megabytes. Bounding only the first would let the second grow
+   * unbounded; bounding both with one number would refuse ordinary key-only
+   * queries to make room for hydrated ones.
+   */
+  readonly maxHydratedBytes: number;
+  /**
+   * Byte ceiling for a single hydrated value.
+   *
+   * One trace in a page of a hundred can be far larger than the rest. Cutting
+   * that cell and saying so costs the caller one value; letting it consume the
+   * whole result ceiling would cost them the ninety-nine rows after it.
+   */
+  readonly maxHydratedValueBytes: number;
 }
 
 /**
- * The shipped result ceilings.
+ * The shipped result bounds.
  *
- * Sized so a full page of an analytical answer fits comfortably — the shapes
- * the issue enumerates aggregate to tens or hundreds of rows — while a query
- * that forgot to aggregate is cut off long before the response becomes
- * something a caller has to stream.
+ * Single-sourced from `./limits.ts` so the validator (which refuses a too-high
+ * `LIMIT`), the service (which appends the default one and enforces the byte
+ * ceiling) and this default all read the same two numbers.
  */
 export const DEFAULT_LWQL_RESULT_LIMITS: LangWatchQLResultLimits = {
-  maxRows: 10_000,
-  maxResultBytes: 8_000_000,
+  maxRows: LWQL_MAX_RESULT_ROWS,
+  maxResultBytes: LWQL_MAX_RESULT_BYTES,
+  maxHydratedBytes: 32_000_000,
+  maxHydratedValueBytes: 4_000_000,
 };
 
-/** A finished execution, already bounded by the result ceilings. */
+/** A finished execution. Every row the database returned; the service bounds them. */
 export interface LangWatchQLExecutionResult {
   readonly columns: readonly LangWatchQLColumn[];
   readonly rows: readonly Record<string, unknown>[];
   readonly statistics: LangWatchQLStatistics;
-  /** Whether a ceiling cut the result short. Never silent. */
-  readonly truncated: boolean;
 }
 
 /** The narrow seam the service depends on. */
@@ -127,52 +176,6 @@ export interface LangWatchQLExecutor {
    * same server for the lifetime of the process.
    */
   close?(): Promise<void>;
-}
-
-/** How to reach the LangWatchQL schema as the restricted identity. */
-export interface LangWatchQLConnection {
-  /** ClickHouse HTTP endpoint. */
-  readonly url: string;
-  /** The restricted identity — never an administrative account. */
-  readonly username: string;
-  readonly password: string;
-  /** Database an unqualified table name resolves to, i.e. the LangWatchQL one. */
-  readonly database: string;
-  /** Custom setting carrying the tenant capability, per the settings profile. */
-  readonly tenantSetting: string;
-}
-
-/**
- * Applies the row ceiling, then the byte ceiling, reporting whether either bit.
- *
- * Byte cost is measured on the JSON encoding of each retained row, which is
- * what the response body actually carries. It is an accounting of the *result*,
- * not of the query: the rows were already materialised by the time this runs,
- * so this bounds what a caller receives rather than what the gateway holds.
- * Bounding the latter is the database's job and it already does it, with
- * `max_memory_usage` pinned `CONST` by the profile.
- */
-export function applyLangWatchQLResultLimits({
-  rows,
-  limits,
-}: {
-  rows: readonly Record<string, unknown>[];
-  limits: LangWatchQLResultLimits;
-}): { rows: Record<string, unknown>[]; truncated: boolean } {
-  const capped = rows.slice(0, limits.maxRows);
-  let truncated = capped.length < rows.length;
-
-  const kept: Record<string, unknown>[] = [];
-  let bytes = 0;
-  for (const row of capped) {
-    bytes += JSON.stringify(row)?.length ?? 0;
-    if (bytes > limits.maxResultBytes) {
-      truncated = true;
-      break;
-    }
-    kept.push(row);
-  }
-  return { rows: kept, truncated };
 }
 
 /** ClickHouse reports elapsed time in seconds; the response speaks milliseconds. */
@@ -208,6 +211,88 @@ const LWQL_REQUEST_TIMEOUT_MS =
 const LWQL_MAX_OPEN_CONNECTIONS = 10;
 
 /**
+ * What a failed governed run is reported as.
+ *
+ * Three answers, and which one applies is decided by what the server refused
+ * rather than by anything the caller sent:
+ *
+ *  - **The deployment is incomplete.** An unknown table or database, or an
+ *    access refusal, cannot be the caller's SQL: the validator only lets
+ *    catalog-approved names reach here. So it is the same "not provisioned
+ *    here" condition as having no executor at all, and gets the same answer.
+ *  - **The caller named a column that is not there.** This one IS their SQL,
+ *    and is the only refusal on this path they fix themselves. The validator
+ *    approves table names, not columns, and column existence is not knowable
+ *    when a chart is saved, so run time is the only place it can be named.
+ *  - **Anything else** goes through the read path's own translation, so the
+ *    resource ceilings a caller can act on arrive as the platform's existing
+ *    codes rather than as a second vocabulary for the same failures. What that
+ *    does not recognise stays unhandled and degrades to "unknown", which is
+ *    correct: a driver diagnostic is not something a caller can act on, and is
+ *    exactly the kind of text this API must not relay.
+ *
+ * In every case the raw error rides in `reasons` for the operator's logs and
+ * never in the response. Lifted out of the `execute` body rather than inlined
+ * so the decision has a name, and so `execute` stays within the complexity
+ * budget the house rules enforce on changed lines.
+ */
+function refusalFor({
+  error,
+  durationMs,
+  usesAppFunctions,
+}: {
+  error: unknown;
+  durationMs: number;
+  usesAppFunctions: boolean;
+}): unknown {
+  // An unknown table/database or an access refusal cannot be the caller's SQL:
+  // the validator only lets catalog-approved names reach this point. Both mean
+  // this deployment's LangWatchQL objects or grants are incomplete, but not the
+  // same way, and the customer-facing codes say so differently.
+  if (isClickHouseObjectMissingError(error)) {
+    // The object itself is not there — the same "not provisioned here"
+    // condition as a null executor (no restricted identity configured at all).
+    return new LangWatchQLUnavailableError({ reasons: [toError(error)] });
+  }
+  if (isClickHouseObjectAccessDeniedError(error)) {
+    // The object exists; this identity's grants on it are incomplete — narrower
+    // than "not provisioned," and purely our own gap rather than something a
+    // customer's workspace administrator could act on.
+    return new LangWatchQLProvisioningIncompleteError({
+      reasons: [toError(error)],
+    });
+  }
+  if (isClickHouseUnknownIdentifierError(error)) {
+    return new LangWatchQLUnknownIdentifierError({
+      identifier: unknownIdentifierFromError(error),
+      reasons: [toError(error)],
+    });
+  }
+  if (isClickHouseResultTooLargeError(error)) {
+    // The server-side backstop (`max_result_rows` / `max_result_bytes`)
+    // fired — the validator's static LIMIT check cannot see a bound
+    // parameter, but the profile's ceiling still catches it. Same customer
+    // code as the post-fetch byte check, never the raw driver diagnostic.
+    return new LangWatchQLResultTooLargeError(LWQL_MAX_RESULT_BYTES, {
+      reasons: [toError(error)],
+    });
+  }
+  // An unknown function in a statement that calls one of ours cannot be the
+  // caller's either: the catalog is what the provisioning DDL is generated
+  // from, so the server is missing the projection UDFs this API declares,
+  // which is a deployment gap rather than anything a customer wrote. A
+  // statement that calls none falls through to the ordinary translation: there
+  // the unknown name is a native function this server is too old for, and
+  // saying "extraction functions unavailable" would misname it.
+  if (usesAppFunctions && isClickHouseUnknownFunctionError(error)) {
+    return new LangWatchQLAppFunctionUnavailableError({
+      reasons: [toError(error)],
+    });
+  }
+  return translateClickHouseQueryError(error, durationMs);
+}
+
+/**
  * An executor that runs LangWatchQL as the restricted identity.
  *
  * The client is built here rather than taken as an argument so that the two
@@ -228,26 +313,23 @@ export function createLangWatchQLExecutor(
   });
 
   return {
-    async execute({ sql, parameters, tenantCapability, limits }) {
+    async execute({ sql, parameters, tenantCapability, usesAppFunctions }) {
       const startedAt = Date.now();
       try {
         const resultSet = await client.query({
-          // The submitted statement, unmodified. The only thing the transport
-          // adds is the `FORMAT` the driver appends to read the response.
+          // The statement the service handed down — the caller's, save for a
+          // default `LIMIT` appended upstream when they named none. The only
+          // thing the transport adds is the `FORMAT` the driver needs.
           query: sql,
           format: "JSON",
           clickhouse_settings: { [connection.tenantSetting]: tenantCapability },
           query_params: parameters as Record<string, unknown> | undefined,
         });
         const response = await resultSet.json<Record<string, unknown>>();
-        const { rows, truncated } = applyLangWatchQLResultLimits({
-          rows: response.data,
-          limits,
-        });
+        const rows = response.data;
         return {
           columns: response.meta ?? [],
           rows,
-          truncated,
           statistics: {
             elapsedMs: elapsedMs(response.statistics?.elapsed),
             rowsRead: response.statistics?.rows_read ?? 0,
@@ -256,22 +338,11 @@ export function createLangWatchQLExecutor(
           },
         };
       } catch (error) {
-        // An unknown table/database or an access refusal cannot be the
-        // caller's SQL: the validator only lets catalog-approved names reach
-        // this point. It is a deployment whose LangWatchQL objects or grants
-        // are missing — the same "not provisioned here" condition as a null
-        // executor, and it gets the same answer. The raw error rides in
-        // `reasons` for the operator's logs and never in the response.
-        if (isClickHouseObjectUnavailableError(error)) {
-          throw new LangWatchQLUnavailableError({ reasons: [toError(error)] });
-        }
-        // Reuses the read path's translation, so the two resource ceilings a
-        // caller can act on arrive as the platform's existing codes rather than
-        // as a second vocabulary for the same two failures. Anything it does
-        // not recognise stays unhandled and degrades to "unknown" — correct,
-        // because a driver diagnostic is not something a caller can act on and
-        // is exactly the kind of text this API must not relay.
-        throw translateClickHouseQueryError(error, Date.now() - startedAt);
+        throw refusalFor({
+          error,
+          durationMs: Date.now() - startedAt,
+          usesAppFunctions: usesAppFunctions === true,
+        });
       }
     },
 
@@ -298,6 +369,18 @@ export function createLangWatchQLExecutor(
  * required would refuse to boot every deployment that does not run this API.
  */
 export function lwqlConnectionFromEnv(): LangWatchQLConnection | null {
+  // Self-provisioning (issue #6635) owns the target: `provisionLwql` creates
+  // the access model on the connection derived from the admin `CLICKHOUSE_URL`,
+  // so resolving a *different* connection here would query a server where none
+  // of it exists. Checked before `absent` rather than after: a deployment that
+  // sets all five explicitly *and* `LWQL_SELF_PROVISION` would otherwise fall
+  // through to the explicit values and split provisioning from querying.
+  // `lwqlDerivedConnectionFromEnv` treats the per-field `LWQL_*` as overrides
+  // and refuses outright on one that cannot be honoured.
+  if (process.env.LWQL_SELF_PROVISION === "true") {
+    return lwqlDerivedConnectionFromEnv();
+  }
+
   const url = process.env.LWQL_CLICKHOUSE_URL;
   const username = process.env.LWQL_CLICKHOUSE_USER;
   const password = process.env.LWQL_CLICKHOUSE_PASSWORD;

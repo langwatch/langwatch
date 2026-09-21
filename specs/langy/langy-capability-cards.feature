@@ -74,6 +74,22 @@ Feature: Langy renders domain-capability cards for tool calls
     And the card links to Simulations
 
   @integration
+  Scenario: A scenario card names the scenario and its status, never the payload
+    When Langy fetches a scenario and the result is a structured payload
+    Then the card titles itself with the scenario name
+    And the card shows the scenario status when the payload carries one
+    And the card shows no line of the serialised payload
+
+  # The agent's document is a machine contract: ids, timestamps and a host
+  # label that the skills read. The card names the catalog's fields instead
+  # of printing the row.
+  @integration
+  Scenario: An agent card reads in customer copy
+    When Langy reads one connected agent, or lists them
+    Then the card shows its status as Online or Offline, its environment and its host
+    And it shows no id, type, timestamp or host label field
+
+  @integration
   Scenario: Every LangWatch action Langy takes shows a result card
     When Langy runs any LangWatch action and it returns a result
     Then Langy shows a result card for that action
@@ -108,6 +124,17 @@ Feature: Langy renders domain-capability cards for tool calls
     When Langy reads the failing rows of a run that succeeded
     Then the card shows no failure
     And it counts the rows it read instead of printing their JSON
+
+  # The CLI's suite run document carries the batch's outcome and tallies with
+  # the per-run rows under them. The card read none of those fields, fell to
+  # word-matching the text, and wore the first row's "FAILED" as the run's
+  # badge, beside a page reading two of three passed.
+  @integration
+  Scenario: A run card carries the run's aggregate, not one row's verdict
+    When Langy runs a suite or a scenario with the CLI and waits for it
+    Then the card's badge is the batch's state, completed once every run answered
+    And it shows the pass rate and how many passed, failed and ran, from the run's tallies
+    And a row's verdict never becomes the run's badge
 
   @integration
   Scenario: An unmapped tool falls through to the raw view
@@ -146,6 +173,19 @@ Feature: Langy renders domain-capability cards for tool calls
     Then the card still shows the correct total
     And a readable sample of the results
     And the way into the full result set
+
+  # A search reports its own total, so a reduced search card still counts
+  # correctly. A plain list reports no total: the only record of what the
+  # reduction took out is the marker it leaves behind in the rows. Read that
+  # marker, or the card counts the sample it kept and presents it as the total,
+  # which contradicts the answer Langy writes beside it.
+
+  @unit
+  Scenario: A list too large for the chat counts the rows the reduction removed
+    When Langy lists a resource that returns more rows than a chat message can carry
+    And the result carries no total of its own
+    Then the card counts the rows it kept plus the rows the reduction removed
+    And the reduction marker is never shown as a row
 
   @integration
   Scenario: Results start appearing while Langy is still working
@@ -316,6 +356,87 @@ Feature: Langy renders domain-capability cards for tool calls
       Given a turn that wrote text and ran tools in turn
       When it settles
       Then the settled turn keeps the order the reader watched it arrive in
+
+    # The cards a call raises (a question, a pull request, a proposal, the
+    # code access ask, a secret) rendered in a pile under the whole reply, so
+    # the closing line of a guided path sat above the question the path had
+    # asked three steps earlier, and above the commit receipt.
+    @integration
+    Scenario: A card raised by a call sits where the call ran
+      Given Langy asked a question with a tool call and went on to write a closing line
+      Then the question card is shown before the closing line
+      And the pull request progress card sits after the call that committed, not under the closing line
+      And a guided conversation leaves the progress card out
+
+    # The record was built as every tool call first and the reply after them,
+    # from the text the agent wrote after its LAST call. Everything written
+    # between calls existed only on the live edge, so a reader who refreshed
+    # got a pile of cards and one closing paragraph, and the account of what
+    # happened was gone. The agent was even told to hoard its text to the end
+    # because of it, which is the wrong way round: the record follows the turn,
+    # the turn does not bend to fit the record.
+    @unit
+    Scenario: The record keeps the paragraphs written between the calls
+      Given a turn that wrote, ran a call, wrote again, and ran a second call
+      When the turn is recorded
+      Then the recorded parts are the paragraphs and the calls in the order they happened
+      And no paragraph written between two calls is dropped
+
+    @unit
+    Scenario: A card is recorded where the work began
+      Given a call whose result arrived after the agent had written more text
+      When the turn is recorded
+      Then the call is recorded at the point it started, not where it finished
+
+    @unit
+    Scenario: A reloaded turn reads the same as the turn that was watched
+      Given a turn that wrote text and ran tools in turn
+      When the reader reloads the page
+      Then the turn reads in the same order it did while it was happening
+
+    # A turn long enough to outlive its live buffer has no ordered account to
+    # rebuild from. It records what it always did rather than guessing an order.
+    @unit
+    Scenario: A turn with no ordered account on hand records what it always did
+      Given a finalized turn whose ordered account is not available
+      When the turn is recorded
+      Then the recorded parts are its calls followed by its reply
+
+    # A turn that goes quiet after its last call hands over its WHOLE narration
+    # as the reply, because there is no closing paragraph to hand over instead.
+    # Recording that reply after the account would print every paragraph a
+    # second time, below the cards it was written between.
+    @unit
+    Scenario: A turn that ends on a call does not repeat what it already wrote
+      Given a turn that wrote between its calls and said nothing after the last one
+      When the turn is recorded
+      Then each paragraph appears once, where it was written
+      And no closing paragraph is added after the last call
+
+    @unit
+    Scenario: A line Langy wrote is shown once
+      Given a turn that said four lines with the say tool and then wrote a reply repeating three of them
+      And the proposal was both said and passed as the question of its question card
+      When the turn is recorded
+      Then each said line appears once, where it was said
+      And the reply keeps only the lines that were not said
+      And the proposal is drawn by its question card alone
+
+    # Two paths finish a turn and race each other: the live relay's terminal
+    # frame, and the agent's own post over HTTP. The record keeps whichever
+    # lands first, so the order must not be read by one of them. It is read
+    # where the turn is recorded, once, for both.
+    @unit
+    Scenario: The order does not depend on which path finished the turn
+      Given a turn that wrote between its calls
+      When the turn is recorded by the path that posts the result directly
+      Then the recorded parts read in the same order as the relay would record them
+
+    @unit
+    Scenario: A turn whose order cannot be read is still recorded
+      Given a turn whose live account cannot be read back
+      When the turn is recorded
+      Then the reply and the calls are still recorded
 
   # The scenario library lives under Simulations, and a scenario's own page is
   # the library with that scenario open. Pointing at the Simulations index sent

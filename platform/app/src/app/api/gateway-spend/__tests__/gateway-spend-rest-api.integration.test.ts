@@ -130,6 +130,18 @@ async function deleteOrganizationDependents(
 // view out from under these fixtures.
 holdClickHouseSchemaLockForFile();
 
+/** The usage block every spend read surface publishes. */
+type Usage = {
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_input_tokens: number;
+  cache_creation_input_tokens: number;
+  reasoning_tokens: number;
+  input_image_tokens: number;
+  output_image_tokens: number;
+  image_count: number;
+};
+
 describe("Feature: Gateway spend reconciliation REST surface", () => {
   let organization: Organization;
   let foreignOrganization: Organization;
@@ -163,6 +175,9 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
     tokensCacheRead: 10,
     tokensCacheWrite: 5,
     tokensReasoning: 0,
+    tokensInputImage: 0,
+    tokensOutputImage: 0,
+    imageCount: 0,
     costUsd: "0.010000",
     costNanoUsd: 10_000_000,
     rateVersion: "catalog@2026-07-26",
@@ -213,6 +228,9 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
             cache_creation_1h_tokens: 0,
             input_audio_tokens: 0,
             output_audio_tokens: 0,
+            input_image_tokens: row.tokensInputImage,
+            output_image_tokens: row.tokensOutputImage,
+            image_count: row.imageCount,
             input_chars: 0,
             audio_ms: 0,
           },
@@ -795,6 +813,149 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
       { headers: headers() },
     );
     expect(res.status).toBe(400);
+  });
+
+  /** @scenario An image generation publishes its output image tokens */
+  it("publishes the output image tokens of an image generation", async () => {
+    const requestId = `${ns}-img-gen`;
+    await seed([
+      spendRow(requestId, {
+        model: "openai/gpt-image-2",
+        requestType: "image_generation",
+        tokensInput: 23,
+        tokensOutput: 0,
+        tokensCacheRead: 0,
+        tokensCacheWrite: 0,
+        tokensInputImage: 0,
+        tokensOutputImage: 158,
+        imageCount: 1,
+        costUsd: "0.004855",
+        occurredAt: new Date(baseTime + 70_000),
+      }),
+    ]);
+
+    const res = await app.request(
+      `/api/gateway/v1/spend-events?limit=200&from=${baseTime + 69_000}&to=${baseTime + 71_000}`,
+      { headers: headers() },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: Array<{ data: { gateway_request_id: string; usage: Usage } }>;
+    };
+    const usage = body.data.find(
+      (e) => e.data.gateway_request_id === requestId,
+    )!.data.usage;
+    expect(usage).toEqual({
+      input_tokens: 23,
+      output_tokens: 0,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 0,
+      reasoning_tokens: 0,
+      input_image_tokens: 0,
+      output_image_tokens: 158,
+      image_count: 1,
+    });
+  });
+
+  /** @scenario An image edit publishes its input image tokens and image count */
+  it("publishes the input image tokens and image count of an image edit", async () => {
+    const requestId = `${ns}-img-edit`;
+    await seed([
+      spendRow(requestId, {
+        model: "openai/gpt-image-2",
+        requestType: "image_edit",
+        tokensInput: 21,
+        tokensOutput: 0,
+        tokensCacheRead: 0,
+        tokensCacheWrite: 0,
+        tokensInputImage: 1024,
+        tokensOutputImage: 196,
+        imageCount: 1,
+        costUsd: "0.014177",
+        occurredAt: new Date(baseTime + 72_000),
+      }),
+    ]);
+
+    const res = await app.request(
+      `/api/gateway/v1/spend-events?limit=200&from=${baseTime + 71_000}&to=${baseTime + 73_000}`,
+      { headers: headers() },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: Array<{ data: { gateway_request_id: string; usage: Usage } }>;
+    };
+    const usage = body.data.find(
+      (e) => e.data.gateway_request_id === requestId,
+    )!.data.usage;
+    expect(usage.input_tokens).toBe(21);
+    expect(usage.input_image_tokens).toBe(1024);
+    expect(usage.output_image_tokens).toBe(196);
+    expect(usage.image_count).toBe(1);
+  });
+
+  /** @scenario The rollups sum image quantities beside the text ones */
+  it("sums image quantities in the summaries and the end-user rollup", async () => {
+    const user = `${ns}-img-user`;
+    await seed([
+      spendRow(`${ns}-img-roll-1`, {
+        endUserId: user,
+        model: "openai/gpt-image-2",
+        requestType: "image_generation",
+        tokensInput: 23,
+        tokensOutput: 0,
+        tokensCacheRead: 0,
+        tokensCacheWrite: 0,
+        tokensInputImage: 0,
+        tokensOutputImage: 158,
+        imageCount: 1,
+        costUsd: "0.004855",
+        occurredAt: new Date(baseTime + 80_000),
+      }),
+      spendRow(`${ns}-img-roll-2`, {
+        endUserId: user,
+        model: "openai/gpt-image-2",
+        requestType: "image_edit",
+        tokensInput: 21,
+        tokensOutput: 0,
+        tokensCacheRead: 0,
+        tokensCacheWrite: 0,
+        tokensInputImage: 1024,
+        tokensOutputImage: 196,
+        imageCount: 1,
+        costUsd: "0.014177",
+        occurredAt: new Date(baseTime + 81_000),
+      }),
+      spendRow(`${ns}-img-roll-3`, {
+        endUserId: user,
+        occurredAt: new Date(baseTime + 82_000),
+      }),
+    ]);
+
+    const summaries = await app.request(
+      `/api/gateway/v1/spend-summaries?group_by=end_user&from=${baseTime + 79_000}&to=${baseTime + 83_000}`,
+      { headers: headers() },
+    );
+    expect(summaries.status).toBe(200);
+    const summaryBody = (await summaries.json()) as {
+      data: Array<{ key: string; usage: Usage }>;
+    };
+    const summary = summaryBody.data.find((r) => r.key === user)!;
+    expect(summary.usage.input_image_tokens).toBe(1024);
+    expect(summary.usage.output_image_tokens).toBe(354);
+    expect(summary.usage.image_count).toBe(2);
+    // The text row contributes the only output tokens: image tokens are a
+    // separate bucket and never fold into the text totals.
+    expect(summary.usage.output_tokens).toBe(50);
+
+    const rollup = await app.request(
+      `/api/gateway/v1/end-users/${user}/spend?from=${baseTime + 79_000}&to=${baseTime + 83_000}`,
+      { headers: headers() },
+    );
+    expect(rollup.status).toBe(200);
+    const rollupBody = (await rollup.json()) as { data: { usage: Usage } };
+    expect(rollupBody.data.usage.input_image_tokens).toBe(1024);
+    expect(rollupBody.data.usage.output_image_tokens).toBe(354);
+    expect(rollupBody.data.usage.image_count).toBe(2);
   });
 
   /** @scenario Per key summaries roll up priced outcomes with settled counted separately */

@@ -5,7 +5,13 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import { isEnterpriseTier } from "~/server/api/enterprise";
 import { getApp } from "~/server/app-layer/app";
 import type { PlanProvider } from "~/server/app-layer/subscription/plan-provider";
-import { ScimTokenNotFoundError } from "./errors";
+import {
+  ScimConnectionNotFoundError,
+  ScimConnectionRequiredError,
+  ScimTokenNotFoundError,
+} from "./errors";
+import { scimSyncLifecycle } from "./scim-sync.runtime";
+import type { ScimSyncLifecycle } from "./scim-sync.service";
 
 /**
  * The three answers a bearer credential can get from {@link ScimTokenService.verifyEntitled}:
@@ -18,7 +24,18 @@ import { ScimTokenNotFoundError } from "./errors";
 export type ScimTokenEntitlement =
   | { status: "invalid_token" }
   | { status: "plan_not_entitled"; organizationId: string }
-  | { status: "ok"; organizationId: string };
+  | {
+      status: "ok";
+      organizationId: string;
+      /**
+       * The connection this token was issued for, and the whole of its write
+       * authority (D08). Null only for a token minted before connection
+       * scoping whose organization has no connection to have been backfilled
+       * onto — such a token keeps the organization-wide authority it was sold
+       * with, and every new token has one.
+       */
+      connectionId: string | null;
+    };
 
 /**
  * Manages SCIM bearer tokens: generation, hashing, and verification.
@@ -28,15 +45,22 @@ export type ScimTokenEntitlement =
  * (the InviteService pattern), so production callers keep constructing with
  * just Prisma.
  */
+export type ScimTokenServiceDeps = {
+  planProvider?: PlanProvider;
+  /** The directory-sync history a mint and a revoke state facts on (D08).
+   *  Composed lazily so production callers keep constructing with Prisma. */
+  syncLifecycle?: ScimSyncLifecycle;
+};
+
 export class ScimTokenService {
   constructor(
     private readonly prisma: PrismaClient,
-    private readonly deps: { planProvider?: PlanProvider } = {},
+    private readonly deps: ScimTokenServiceDeps = {},
   ) {}
 
   static create(
     prisma: PrismaClient,
-    deps: { planProvider?: PlanProvider } = {},
+    deps: ScimTokenServiceDeps = {},
   ): ScimTokenService {
     return new ScimTokenService(prisma, deps);
   }
@@ -45,29 +69,65 @@ export class ScimTokenService {
     return this.deps.planProvider ?? getApp().planProvider;
   }
 
+  private get syncLifecycle(): ScimSyncLifecycle {
+    return this.deps.syncLifecycle ?? scimSyncLifecycle(this.prisma);
+  }
+
   /**
-   * Generates a new SCIM token for the given organization.
+   * Mints a SCIM token for one connection of the given organization.
    * Returns the plaintext token (shown once) and stores the SHA-256 hash.
+   *
+   * The connection is required and verified against the organization before
+   * anything is written (D08). It is the token's entire write authority, so
+   * defaulting it would hand out authority nobody asked for, and accepting an
+   * unverified one would let a caller mint a credential against another
+   * organization's connection. A connection this organization does not have
+   * reads as not found whether it belongs to somebody else or to nobody, so
+   * the refusal confirms nothing about another customer.
+   *
+   * Minting also starts the connection's directory-sync history — the point
+   * `TOKEN_ISSUED` names — so a connection wired up and never pushed to is
+   * distinguishable from one that never got a token.
    */
   async generate({
     organizationId,
+    connectionId,
     description,
   }: {
     organizationId: string;
+    connectionId?: string | null;
     description?: string;
-  }): Promise<{ token: string; tokenId: string }> {
+  }): Promise<{ token: string; tokenId: string; connectionId: string }> {
+    if (!connectionId) {
+      throw new ScimConnectionRequiredError();
+    }
+    const connection = await this.prisma.ssoConnection.findFirst({
+      where: { id: connectionId, organizationId },
+      select: { id: true },
+    });
+    if (!connection) {
+      throw new ScimConnectionNotFoundError(connectionId);
+    }
+
     const token = crypto.randomBytes(32).toString("hex");
     const hashedToken = this.hashToken(token);
 
     const scimToken = await this.prisma.scimToken.create({
       data: {
         organizationId,
+        connectionId,
         hashedToken,
         description: description ?? null,
       },
     });
 
-    return { token, tokenId: scimToken.id };
+    await this.syncLifecycle.tokenIssued({
+      organizationId,
+      connectionId,
+      tokenId: scimToken.id,
+    });
+
+    return { token, tokenId: scimToken.id, connectionId };
   }
 
   /**
@@ -79,6 +139,7 @@ export class ScimTokenService {
     Array<{
       id: string;
       description: string | null;
+      connectionId: string | null;
       createdAt: Date;
       lastUsedAt: Date | null;
     }>
@@ -88,6 +149,9 @@ export class ScimTokenService {
       select: {
         id: true,
         description: true,
+        // Which connection a token reaches is the most important thing about
+        // it, so the management surfaces show it. It is an id, not a secret.
+        connectionId: true,
         createdAt: true,
         lastUsedAt: true,
       },
@@ -108,6 +172,13 @@ export class ScimTokenService {
     organizationId: string;
     tokenId: string;
   }): Promise<{ success: true }> {
+    // Read the connection BEFORE the delete: once the row is gone there is
+    // nothing left to say which sync just ended, and a revoke whose history
+    // says nothing is a revoke nobody can check afterwards.
+    const revoked = await this.prisma.scimToken.findFirst({
+      where: { id: tokenId, organizationId },
+      select: { connectionId: true },
+    });
     // A single deleteMany keeps revocation atomic: a find-then-delete pair
     // lets a concurrent or retried revoke land between the two statements
     // and surface as a raw Prisma P2025 instead of the stable code.
@@ -117,7 +188,48 @@ export class ScimTokenService {
     if (count === 0) {
       throw new ScimTokenNotFoundError(tokenId);
     }
+    if (revoked?.connectionId) {
+      await this.syncLifecycle.revoked({
+        organizationId,
+        connectionId: revoked.connectionId,
+        tokenId,
+        cause: "revoke",
+      });
+    }
     return { success: true };
+  }
+
+  /**
+   * Every token issued for a connection stops verifying, because the
+   * connection it was issued against is gone (D08: "Tearing a connection down
+   * ends its tokens"). Called by the connection teardown path, not by an
+   * administrator: a torn-down connection whose tokens still verified would
+   * be a directory writing into an organization that no longer trusts it.
+   *
+   * Answers how many it revoked, so teardown can say what it took with it.
+   * Every other connection's tokens are untouched — the `where` is the whole
+   * of that guarantee.
+   */
+  async revokeForConnection({
+    organizationId,
+    connectionId,
+  }: {
+    organizationId: string;
+    connectionId: string;
+  }): Promise<{ revoked: number }> {
+    const { count } = await this.prisma.scimToken.deleteMany({
+      where: { organizationId, connectionId },
+    });
+    // Stated even when no token existed: a connection torn down before
+    // anyone minted one still ended its sync, and a projection that stayed
+    // TOKEN_ISSUED would read as a setup somebody could still finish.
+    await this.syncLifecycle.revoked({
+      organizationId,
+      connectionId,
+      tokenId: null,
+      cause: "teardown",
+    });
+    return { revoked: count };
   }
 
   /**
@@ -164,7 +276,7 @@ export class ScimTokenService {
       return { status: "invalid_token" };
     }
 
-    const { id, organizationId } = scimToken;
+    const { id, organizationId, connectionId } = scimToken;
     const plan = await this.planProvider.getActivePlan({ organizationId });
 
     if (!isEnterpriseTier(plan.type)) {
@@ -173,7 +285,7 @@ export class ScimTokenService {
 
     await this.recordUse(id);
 
-    return { status: "ok", organizationId };
+    return { status: "ok", organizationId, connectionId };
   }
 
   private findByToken(token: string) {

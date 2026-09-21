@@ -10,6 +10,7 @@ import type {
   CodingAgentSessionMetricSeriesRow,
   CodingAgentSessionRow,
 } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
+import type { SessionContextUsage } from "~/server/event-sourcing/pipelines/coding-agent-processing/services/coding-agent-session.types";
 import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import {
@@ -22,6 +23,34 @@ import type {
 } from "./coding-agent-session.repository";
 
 const TABLE_NAME = "coding_agent_sessions" as const;
+
+/**
+ * The columns behind a `CodingAgentBranchSessionRow`: only what the
+ * pull-request rollup adds up, groups by and names, plus the scalar tie-break
+ * keys — never content. Shared by the branch read and the by-id read so the
+ * two can never answer with different shapes.
+ */
+const BRANCH_SESSION_COLUMNS = `
+  SessionId,
+  TenantId,
+  StartedAt,
+  InputTokens,
+  OutputTokens,
+  CacheReadTokens,
+  CacheCreationTokens,
+  CostUsd,
+  Agent,
+  Models,
+  UserId,
+  GitBranch,
+  GitBranches,
+  UsageByContext,
+  Title,
+  LastEventOccurredAt,
+  ModelCalls,
+  ToolCalls,
+  Prompts
+`;
 
 /**
  * How much `findManyRecent` over-reads so its TypeScript dedup cannot shorten
@@ -66,6 +95,7 @@ interface ClickHouseWriteRecord {
   Entrypoint: string;
   ParentSessionId: string;
   IsFork: boolean;
+  Auxiliary: boolean;
   RepositoryHost: string;
   RepositoryOwner: string;
   RepositoryName: string;
@@ -99,6 +129,20 @@ interface ClickHouseWriteRecord {
   CacheCreationTokens: string;
   CostUsd: number;
   AgentReportedCostUsd: number;
+  // Array(Tuple(RepositoryHost, RepositoryOwner, RepositoryName, Branch,
+  // InputTokens, OutputTokens, CacheReadTokens, CacheCreationTokens, CostUsd));
+  // the UInt64 members ride as strings like every other UInt64 column.
+  UsageByContext: [
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    number,
+  ][];
 
   ModelCallMs: string;
   ToolMs: string;
@@ -191,6 +235,7 @@ function toBranchSessionRow(
     userId: String(record.UserId ?? ""),
     gitBranch: String(record.GitBranch ?? ""),
     gitBranches: asStringArray(record.GitBranches),
+    usageByContext: asContextUsageRows(record.UsageByContext),
     title: String(record.Title ?? ""),
   };
 }
@@ -228,11 +273,23 @@ function toRecord({
     Entrypoint: row.entrypoint,
     ParentSessionId: row.parentSessionId,
     IsFork: row.isFork,
+    Auxiliary: row.auxiliary,
     RepositoryHost: row.repositoryHost,
     RepositoryOwner: row.repositoryOwner,
     RepositoryName: row.repositoryName,
     GitBranch: row.gitBranch,
     GitBranches: row.gitBranches,
+    UsageByContext: row.usageByContext.map((usage) => [
+      usage.repositoryHost,
+      usage.repositoryOwner,
+      usage.repositoryName,
+      usage.branch,
+      big(usage.inputTokens),
+      big(usage.outputTokens),
+      big(usage.cacheReadTokens),
+      big(usage.cacheCreationTokens),
+      usage.costUsd,
+    ]),
     GitWorktree: row.gitWorktree,
     Title: row.title,
     TitleSource: row.titleSource,
@@ -609,6 +666,17 @@ export class CodingAgentSessionClickHouseRepository
    * Only `TenantId` is genuinely immune, because it is part of the key.
    * Omitted for personal-workspace usage, where the personal project already
    * isolates the user.
+   *
+   * Sessions the agent ran for itself (00096) leave the read in the dedup
+   * group, as `HAVING max(Auxiliary) = 0`. That is not the row predicate the
+   * paragraph above rules out: `HAVING` runs after the grouping, so it changes
+   * no group's winner. It drops a session outright whenever ANY of its
+   * versions carried the mark, which is exactly what the fold's sticky flag
+   * means, and a marked version losing a `max(UpdatedAt)` tie can no longer
+   * list the unmarked tie in its place. Dropping them here rather than after
+   * the read is also what keeps the page full: `LIMIT` counts only sessions
+   * the caller can see, so a run of helper threads can neither shorten the
+   * list nor leave a session out of `getUsageTotals`.
    */
   async findManyRecent({
     tenantId,
@@ -654,6 +722,7 @@ export class CodingAgentSessionClickHouseRepository
               FROM ${TABLE_NAME}
               WHERE TenantId = {tenantId:String}
               GROUP BY TenantId, SessionId
+              HAVING max(toUInt8(Auxiliary)) = 0
             )
           ORDER BY StartedAt DESC
           LIMIT {limit:UInt32}
@@ -687,8 +756,12 @@ export class CodingAgentSessionClickHouseRepository
     // scan's own floor from anything that scales with page size.
     observe(rows.length > 0 ? "hit" : "empty");
 
+    // Marked sessions left the read with the dedup group above; this repeats
+    // the rule on the version the dedup settles on, so the method's answer
+    // holds whatever the query returned.
     return dedupToLatestPerSession(rows)
       .map(fromRecord)
+      .filter((row) => !row.auxiliary)
       .sort((a, b) => b.startedAtMs - a.startedAtMs)
       .slice(0, limit);
   }
@@ -794,25 +867,7 @@ export class CodingAgentSessionClickHouseRepository
   }): Promise<CodingAgentBranchSessionRow[]> {
     const result = await client.query({
       query: `
-        SELECT
-          SessionId,
-          TenantId,
-          StartedAt,
-          InputTokens,
-          OutputTokens,
-          CacheReadTokens,
-          CacheCreationTokens,
-          CostUsd,
-          Agent,
-          Models,
-          UserId,
-          GitBranch,
-          GitBranches,
-          Title,
-          LastEventOccurredAt,
-          ModelCalls,
-          ToolCalls,
-          Prompts
+        SELECT ${BRANCH_SESSION_COLUMNS}
         FROM ${TABLE_NAME}
         WHERE TenantId IN {tenantIds:Array(String)}
           AND lower(RepositoryHost) = {repositoryHost:String}
@@ -866,6 +921,75 @@ export class CodingAgentSessionClickHouseRepository
     return [...byTenant.values()].flatMap((tenantRows) =>
       dedupToLatestPerSession(tenantRows).map(toBranchSessionRow),
     );
+  }
+
+  /**
+   * The same row shape as `listByRepositoryBranch`, anchored on session ids:
+   * the second leg of fact-stamp discovery, fetching the session rows for
+   * sessions whose stamped events named a repository their own row has since
+   * moved away from. Same tenant grouping, same unwindowed dedup, same
+   * per-tenant collapse, for the reasons documented there.
+   */
+  async listBySessionIds({
+    tenantIds,
+    sessionIds,
+    startedAtFromMs,
+  }: {
+    tenantIds: string[];
+    sessionIds: string[];
+    startedAtFromMs: number;
+  }): Promise<CodingAgentBranchSessionRow[]> {
+    if (tenantIds.length === 0 || sessionIds.length === 0) return [];
+    for (const tenantId of tenantIds) {
+      EventUtils.validateTenantId(
+        { tenantId },
+        "CodingAgentSessionClickHouseRepository.listBySessionIds",
+      );
+    }
+
+    const groups = await groupTenantsByClient({
+      tenantIds,
+      resolveClient: this.resolveClient,
+    });
+    const collected: CodingAgentBranchSessionRow[] = [];
+    for (const group of groups) {
+      const result = await group.client.query({
+        query: `
+          SELECT ${BRANCH_SESSION_COLUMNS}
+          FROM ${TABLE_NAME}
+          WHERE TenantId IN {tenantIds:Array(String)}
+            AND SessionId IN {sessionIds:Array(String)}
+            AND StartedAt >= fromUnixTimestamp64Milli({from:Int64})
+            AND (TenantId, SessionId, UpdatedAt) IN (
+              SELECT TenantId, SessionId, max(UpdatedAt)
+              FROM ${TABLE_NAME}
+              WHERE TenantId IN {tenantIds:Array(String)}
+              GROUP BY TenantId, SessionId
+            )
+          ORDER BY StartedAt ASC
+        `,
+        query_params: {
+          tenantIds: group.tenantIds,
+          sessionIds,
+          from: startedAtFromMs,
+        },
+        format: "JSONEachRow",
+      });
+      const rows = await result.json<Record<string, unknown>>();
+      const byTenant = new Map<string, Record<string, unknown>[]>();
+      for (const row of rows) {
+        const tenantId = String(row.TenantId ?? "");
+        const list = byTenant.get(tenantId) ?? [];
+        list.push(row);
+        byTenant.set(tenantId, list);
+      }
+      collected.push(
+        ...[...byTenant.values()].flatMap((tenantRows) =>
+          dedupToLatestPerSession(tenantRows).map(toBranchSessionRow),
+        ),
+      );
+    }
+    return collected;
   }
 
   async upsertBatch(
@@ -943,6 +1067,25 @@ const asMetricSeriesRows = (
           decision: String(tuple[3] ?? ""),
           language: String(tuple[4] ?? ""),
           value: asNumber(tuple[5]),
+        };
+      })
+    : [];
+
+/** Parse the `UsageByContext` Array(Tuple(...)), read as an array of arrays. */
+const asContextUsageRows = (value: unknown): SessionContextUsage[] =>
+  Array.isArray(value)
+    ? value.map((entry) => {
+        const tuple = entry as unknown[];
+        return {
+          repositoryHost: String(tuple[0] ?? ""),
+          repositoryOwner: String(tuple[1] ?? ""),
+          repositoryName: String(tuple[2] ?? ""),
+          branch: String(tuple[3] ?? ""),
+          inputTokens: asNumber(tuple[4]),
+          outputTokens: asNumber(tuple[5]),
+          cacheReadTokens: asNumber(tuple[6]),
+          cacheCreationTokens: asNumber(tuple[7]),
+          costUsd: asNumber(tuple[8]),
         };
       })
     : [];
@@ -1071,11 +1214,13 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     entrypoint: String(record.Entrypoint ?? ""),
     parentSessionId: String(record.ParentSessionId ?? ""),
     isFork: Boolean(record.IsFork),
+    auxiliary: Boolean(record.Auxiliary),
     repositoryHost: String(record.RepositoryHost ?? ""),
     repositoryOwner: String(record.RepositoryOwner ?? ""),
     repositoryName: String(record.RepositoryName ?? ""),
     gitBranch: String(record.GitBranch ?? ""),
     gitBranches: asStringArray(record.GitBranches),
+    usageByContext: asContextUsageRows(record.UsageByContext),
     gitWorktree: String(record.GitWorktree ?? ""),
     title: String(record.Title ?? ""),
     titleSource: String(record.TitleSource ?? ""),

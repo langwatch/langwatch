@@ -265,6 +265,14 @@ export const ATTR_KEYS = {
   // cache buckets, so each token prices once.
   GEN_AI_USAGE_INPUT_AUDIO_TOKENS: "gen_ai.usage.input_audio_tokens",
   GEN_AI_USAGE_OUTPUT_AUDIO_TOKENS: "gen_ai.usage.output_audio_tokens",
+  // Image token counts on the gateway's image_generation / image_edit spans,
+  // which the token-billed image models price far above text ($30 to $40 per
+  // million output image tokens on gpt-image). Emitted DISJOINT from the
+  // input/output token attributes, so each token prices once. The image
+  // count is observability only and prices nothing.
+  GEN_AI_USAGE_INPUT_IMAGE_TOKENS: "gen_ai.usage.input_image_tokens",
+  GEN_AI_USAGE_OUTPUT_IMAGE_TOKENS: "gen_ai.usage.output_image_tokens",
+  GEN_AI_USAGE_IMAGE_COUNT: "gen_ai.usage.image_count",
 
   // Set by an extractor on a span whose token usage is a redundant copy of
   // another span's (e.g. codex emits one turn-rollup span AND a lower-level
@@ -292,3 +300,22 @@ export const SPAN_TYPE_TO_GEN_AI_OP: Record<string, string> = {
   agent: "agent",
   rag: "retrieval",
 };
+
+/**
+ * The vendor namespaces whose subkeys canonicalise to `metadata.<bareKey>`.
+ *
+ * Both spellings mean the same thing to a sender and are folded to the same
+ * canonical name here, so anything that reasons about a metadata key by its
+ * name has to accept every prefix on this list.
+ *
+ * It matters beyond canonicalisation because redaction runs BEFORE the fold:
+ * the personal-data pass sees the prefixed spelling, and a namespace added here
+ * but not taught to `isReservedIdentifierAttributeKey` is a namespace whose
+ * trace identifiers are handed to the recognizers. That is why this is one
+ * exported constant and not a literal in each place — the copy that gets
+ * forgotten is the one that silently stops protecting anything.
+ */
+export const METADATA_SUBKEY_PREFIXES = [
+  "langwatch.metadata.",
+  "langwatch.trace.",
+] as const;

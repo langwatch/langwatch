@@ -38,7 +38,10 @@ import {
   ExperimentVersionNotFoundError,
   RunNotFoundError,
 } from "~/server/experiments/errors";
-import { ExperimentService } from "~/server/experiments/experiment.service";
+import {
+  ExperimentService,
+  type WorkbenchActor,
+} from "~/server/experiments/experiment.service";
 import { workbenchActorFrom } from "~/server/experiments/workbenchActor";
 import { abortManager } from "~/server/experiments-v3/execution/abortManager";
 import { loadExecutionData } from "~/server/experiments-v3/execution/dataLoader";
@@ -48,8 +51,13 @@ import {
   runOrchestrator,
 } from "~/server/experiments-v3/execution/orchestrator";
 import { mapThrownErrorEvent } from "~/server/experiments-v3/execution/resultMapper";
+import { runResultsWriterFor } from "~/server/experiments-v3/execution/runResultsWriter";
 import { runStateManager } from "~/server/experiments-v3/execution/runStateManager";
-import { prepareSavedStateExecution } from "~/server/experiments-v3/execution/savedStateExecution";
+import { createRunStateMirror } from "~/server/experiments-v3/execution/runStateMirror";
+import {
+  planSavedRunCarryOver,
+  prepareSavedStateExecution,
+} from "~/server/experiments-v3/execution/savedStateExecution";
 import {
   type ExecutionScope,
   executionRequestSchema,
@@ -362,6 +370,30 @@ secured.access(sessionAuth).post(
       ui: createInitialUIState(),
     };
 
+    const mirror = createRunStateMirror({
+      projectId,
+      experimentId: request.experimentId,
+      experimentSlug: request.experimentSlug ?? "",
+    });
+
+    // The page saves these cells too, and it is the faster of the two. The
+    // server writes them so the board does not depend on the tab surviving:
+    // a background tab holds its save timer, and a dropped connection loses
+    // the cells the page was holding, while the run reads as complete.
+    const actor: WorkbenchActor = {
+      ...(session.user?.id ? { userId: session.user.id } : {}),
+      label: "user",
+    };
+    const resultsWriter = runResultsWriterFor({
+      persistence: { experiments: getApp().experiments, actor },
+      projectId,
+      experimentId: request.experimentId,
+      scope: request.scope,
+      data: request.data,
+      datasetId: request.dataset_id,
+      parameters: request.parameters,
+    });
+
     return streamSSE(c, async (stream) => {
       try {
         const isFullRun = request.scope.type === "full";
@@ -379,9 +411,32 @@ secured.access(sessionAuth).post(
           loadedWorkflows,
           concurrency: request.concurrency,
           seedTargetOutputs: request.seedTargetOutputs,
+          // Who is running it, which decides whether a personal development
+          // agent among the targets may be reached at all.
+          ...(session.user?.id
+            ? { actor: { id: session.user.id, label: "user" as const } }
+            : {}),
+          // The board as the page had it, minus what this run produces. The
+          // page sends it rather than the server reading the saved state,
+          // because the page can be ahead of its own autosave and the run has
+          // to hold what the person is looking at.
+          carriedOverCells: request.carriedOverCells,
         });
 
         for await (const event of orchestrator) {
+          // The board first, then the run store, then the customer. The cells
+          // go in before the run reports it ended, for the same reason the
+          // backend runner writes them first: a caller that reads "done" and
+          // then reads the workbench finds them there. The writer swallows its
+          // own failures, so a write that fails costs the page a refresh and
+          // never the run.
+          await resultsWriter?.record(event);
+          // The `execution_started` frame names the run, and the page hands
+          // that id to a poller as soon as it reads it, so a frame released
+          // before the store knows the run makes the first poll read 404 on a
+          // healthy run. Ordering it this way keeps the store a superset of
+          // what the page has seen. The mirror swallows its own failures too.
+          await mirror.record(event);
           await stream.writeSSE({
             data: JSON.stringify(event),
           });
@@ -417,8 +472,20 @@ secured.access(sessionAuth).post(
         //
         // No `rowIndex`: the orchestrator itself threw, so the whole run is
         // gone and the mapper says so, rather than blaming one row.
+        const failure = mapThrownErrorEvent({ error });
+        if (failure.type === "error") {
+          // The code, never the thrown message: a poller reads this straight
+          // out of the run API. Written before the frame, for the same reason
+          // the loop above records first: a poller must never read the run as
+          // still going after the page has been told it died.
+          await mirror.fail({
+            code: failure.message,
+            domainError: failure.domainError,
+            traceId: failure.traceId,
+          });
+        }
         await stream.writeSSE({
-          data: JSON.stringify(mapThrownErrorEvent({ error })),
+          data: JSON.stringify(failure),
         });
       }
     });
@@ -472,11 +539,9 @@ secured.access(sessionAuth).post("/abort", async (c) => {
   // project before signaling an abort. Without this, a user could abort another
   // tenant's experiment run by guessing its runId.
   //
-  // In-flight runs register their owner via abortManager.setRunning, which
-  // covers the interactive workbench SSE path — that path streams results
-  // directly and never creates a polling run-state record, so consulting only
-  // runStateManager would 404 every workbench abort. runStateManager remains
-  // the fallback for the CI/CD polling path.
+  // In-flight runs register their owner via abortManager.setRunning, which is
+  // set before the first frame of either path. runStateManager is the fallback:
+  // it also holds the owner, for as long as the run state lives.
   const ownerProjectId =
     (await abortManager.getRunningProjectId(runId)) ??
     (await runStateManager.getRunState(runId))?.projectId;
@@ -653,8 +718,23 @@ secured.access(apiKeyAuthRun).post(
       ? { type: "rows", rowIndices: runInputs.row_indices }
       : { type: "full" };
 
+    // The board the run carries in. Its board is the saved workbench state,
+    // which is the only board there is when no tab is open. A full run carries
+    // nothing, because it covers every cell itself.
+    const carriedOverCells = planSavedRunCarryOver({ prepared, scope });
+
     const acceptHeader = c.req.header("Accept") ?? "";
     const isSSE = acceptHeader.includes("text/event-stream");
+
+    // The person behind the key, when the key names one. A personal
+    // development agent is reachable only by its owner, and a key that names
+    // no person is refused by that rule rather than passed through. Both the
+    // streaming and the polling variant of this route run the same agents, so
+    // both carry the same actor.
+    const keyActor =
+      resolved.type === "apiKey" && resolved.userId
+        ? { actor: { id: resolved.userId, label: "api" as const } }
+        : {};
 
     logger.info(
       { projectId: project.id, slug, isSSE, rowCount: datasetRows.length },
@@ -677,6 +757,8 @@ secured.access(apiKeyAuthRun).post(
             loadedAgents: loadedAgents as Map<string, TypedAgent>,
             loadedEvaluators,
             loadedWorkflows,
+            ...(carriedOverCells.length > 0 ? { carriedOverCells } : {}),
+            ...keyActor,
           });
 
           for await (const event of orchestrator) {
@@ -726,6 +808,8 @@ secured.access(apiKeyAuthRun).post(
       loadedAgents: loadedAgents as Map<string, TypedAgent>,
       loadedEvaluators,
       loadedWorkflows,
+      ...(carriedOverCells.length > 0 ? { carriedOverCells } : {}),
+      ...keyActor,
       // A run of the saved dataset fills the cells the workbench shows. The
       // app-layer service is the one that tells the tenant the experiment
       // moved, which is what makes an open page pick the cells up.
@@ -1231,7 +1315,7 @@ secured.access(apiKeyAuthExperimentsView).get(
   describeRoute({
     summary: "List an experiment's versions",
     description:
-      "Every saved version of the experiment's setup, newest first. Page through them with `limit` and `cursor`.",
+      "Every saved version of the experiment's setup, newest first. A commit, an agent write and a restore each add a numbered version. Ordinary typing rewrites one autosave row, which is the entry with `autoSaved` true. Page through them with `limit` and `cursor`.",
     tags: ["Experiments"],
     parameters: [
       {
@@ -1300,11 +1384,13 @@ secured.access(apiKeyAuthExperimentsView).get(
     return c.json({
       versions: versions.map((version) => ({
         version: version.version,
+        counterVersion: version.counterVersion,
         autoSaved: version.autoSaved,
         commitMessage: version.commitMessage,
         authorLabel: version.authorLabel,
         authorId: version.authorId,
         createdAt: version.createdAt.toISOString(),
+        updatedAt: version.updatedAt.toISOString(),
       })),
       nextCursor,
     });

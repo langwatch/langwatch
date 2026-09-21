@@ -2,12 +2,14 @@ import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
+import { readFetchFailure } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 import { buildAuthHeaders } from "@/internal/api/auth";
+import type { SimulationRunEvaluation } from "@/client-sdk/services/simulation-runs";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 /**
  * Flattens Anthropic-style content (string OR array of {type:text|tool_use|tool_result|thinking})
  * into a readable single-line string. Thinking blocks are dropped; tool_use shows the tool name;
@@ -55,6 +57,44 @@ function renderContent(raw: unknown): string {
   return "";
 }
 
+const EVALUATION_STATUS_COLOR: Record<
+  SimulationRunEvaluation["status"],
+  (text: string) => string
+> = {
+  passed: chalk.green,
+  failed: chalk.red,
+  scored: chalk.cyan,
+  skipped: chalk.gray,
+  error: chalk.red,
+};
+
+/**
+ * One line per evaluator that ran after the conversation: its status, its
+ * score when it produced one, whether it gates the scenario, and the reason
+ * it gave. A skipped one names the field the scenario left blank; a failed
+ * required one is what failed the scenario.
+ */
+function printEvaluations(
+  evaluations: SimulationRunEvaluation[] | undefined,
+): void {
+  if (!evaluations || evaluations.length === 0) return;
+  console.log();
+  console.log(chalk.bold("  Evaluators:"));
+  for (const evaluation of evaluations) {
+    const color = EVALUATION_STATUS_COLOR[evaluation.status] ?? chalk.white;
+    const parts = [color(evaluation.status)];
+    if (evaluation.score !== undefined) parts.push(`score ${evaluation.score}`);
+    if (evaluation.label !== undefined) parts.push(evaluation.label);
+    if (evaluation.required) parts.push(chalk.gray("required"));
+    console.log(
+      `    ${chalk.gray("•")} ${evaluation.name} ${chalk.gray("·")} ${parts.join(chalk.gray(" · "))}`,
+    );
+    if (evaluation.details) {
+      console.log(`        ${chalk.gray(evaluation.details)}`);
+    }
+  }
+}
+
 export const getSimulationRunCommand = async (
   runId: string,
   options?: { full?: boolean },
@@ -67,7 +107,7 @@ export const getSimulationRunCommand = async (
   const spinner = createSpinner(`Fetching simulation run "${runId}"...`).start();
 
   try {
-    const response = await fetch(
+    const response = await langwatchFetch(
       `${endpoint}/api/simulation-runs/${encodeURIComponent(runId)}`,
       {
         method: "GET",
@@ -76,8 +116,11 @@ export const getSimulationRunCommand = async (
     );
 
     if (!response.ok) {
-      const message = await formatFetchError(response);
-      failSpinner({ spinner, error: new Error(message), action: "fetch simulation run" });
+      failSpinner({
+        spinner,
+        error: await readFetchFailure(response),
+        action: "fetch simulation run",
+      });
       process.exit(1);
     }
 
@@ -94,12 +137,15 @@ export const getSimulationRunCommand = async (
         metCriteria?: string[];
         unmetCriteria?: string[];
         error?: string | null;
+        evaluations?: SimulationRunEvaluation[];
       } | null;
       messages: Array<{ role: string; content: string }>;
       timestamp: number;
       updatedAt: number;
       durationInMs: number;
       totalCost?: number;
+      note?: string | null;
+      scenarioVersion?: number | null;
     };
 
     spinner.succeed(`Found simulation run "${run.name ?? run.scenarioRunId}"`);
@@ -124,6 +170,15 @@ export const getSimulationRunCommand = async (
           console.log(`    ${chalk.gray("Cost:")}        $${run.totalCost.toFixed(4)}`);
         }
         console.log(`    ${chalk.gray("Started:")}     ${new Date(run.timestamp).toLocaleString()}`);
+        // Both lines are left out when the run carries nothing: a run stored
+        // before versions were recorded has no version to name, and a batch
+        // started without a note has no note.
+        if (run.scenarioVersion) {
+          console.log(`    ${chalk.gray("Version:")}     v${run.scenarioVersion}`);
+        }
+        if (run.note) {
+          console.log(`    ${chalk.gray("Note:")}        ${run.note}`);
+        }
 
         if (run.results) {
           console.log();
@@ -144,6 +199,7 @@ export const getSimulationRunCommand = async (
           if (run.results.error) {
             console.log(`    ${chalk.gray("Error:")}      ${chalk.red(run.results.error)}`);
           }
+          printEvaluations(run.results.evaluations);
         }
 
         if (run.messages && run.messages.length > 0) {

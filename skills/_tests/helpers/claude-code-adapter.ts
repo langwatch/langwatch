@@ -1,10 +1,9 @@
 import {
 	type AgentAdapter,
-	AgentRole,
-	type ScenarioExecutionStateLike,
+	claudeCodeAgent,
+	pointClaudeMdAtSkills,
 } from "@langwatch/scenario";
 import chalk from "chalk";
-import { execSync, spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -19,6 +18,13 @@ const __dirname = path.dirname(__filename);
  * the skills themselves create at runtime end up.
  */
 export const SKILL_TESTS_SET_ID = "skill-tests";
+
+/**
+ * How long one Claude Code turn may take. A skill run installs dependencies,
+ * writes tests and runs them, so a turn is measured in minutes, not the two
+ * the SDK defaults to. Matches the vitest test timeout.
+ */
+const CLAUDE_TURN_TIMEOUT_MS = 60 * 60 * 1000;
 
 const skillTestWorkRoot = path.resolve(
 	__dirname,
@@ -120,48 +126,18 @@ exec node "${cliDistPath}" "$@"
 	fs.writeFileSync(wrapperPath, wrapperScript, { mode: 0o755 });
 }
 
-export function ensureClaudeSkillInstructions(workingDirectory: string): void {
-	const skillsDir = path.join(workingDirectory, ".skills");
-	if (!fs.existsSync(skillsDir)) return;
-
-	const skillPaths = fs
-		.readdirSync(skillsDir, { withFileTypes: true })
-		.filter(
-			(entry) =>
-				entry.isDirectory() &&
-				fs.existsSync(path.join(skillsDir, entry.name, "SKILL.md")),
-		)
-		.map((entry) => `.skills/${entry.name}/SKILL.md`);
-	if (skillPaths.length === 0) return;
-
-	const claudeMdPath = path.join(workingDirectory, "CLAUDE.md");
-	const existingInstructions = fs.existsSync(claudeMdPath)
-		? fs.readFileSync(claudeMdPath, "utf8")
-		: "";
-	const missingSkillPaths = skillPaths.filter(
-		(skillPath) => !existingInstructions.includes(skillPath),
-	);
-	if (missingSkillPaths.length === 0) return;
-
-	const separator =
-		existingInstructions.length > 0 && !existingInstructions.endsWith("\n")
-			? "\n"
-			: "";
-	fs.appendFileSync(
-		claudeMdPath,
-		`${separator}Read and follow the instructions in ${missingSkillPaths.join(
-			" and ",
-		)} before doing anything else.\n`,
-	);
-}
-
 /**
- * Creates a Claude Code agent adapter for use with @langwatch/scenario.
+ * Creates the Claude Code agent under test, the `claudeCodeAgent` of
+ * `@langwatch/scenario` configured for skill testing.
  *
- * Spawns Claude Code via child_process.spawn. Skills are CLI-only, and the locally
- * built `langwatch` CLI is always wired onto PATH so the agent can use
- * `langwatch docs`, `langwatch scenario-docs`, and every platform command.
- * No MCP server is configured; skills must work end-to-end through the CLI.
+ * Skills are CLI-only, and the locally built `langwatch` CLI is always wired
+ * onto PATH so the agent can use `langwatch docs`, `langwatch scenario-docs`,
+ * and every platform command. No MCP server is configured; skills must work
+ * end-to-end through the CLI. The turn comes back as AI SDK messages with
+ * `tool-call` and `tool-result` parts, so the judge reads what the agent ran
+ * and the run view renders it as tool calls. The SDK keeps the spawned Claude
+ * in its own process group and kills it, with everything it started, when
+ * the test process dies, so an interrupted run leaves no Claude behind.
  *
  * @param workingDirectory - The directory to run Claude Code in
  * @param skillPath - Optional path to a SKILL.md to copy into the working directory
@@ -170,218 +146,60 @@ export function ensureClaudeSkillInstructions(workingDirectory: string): void {
  *   cold-start flows where the agent must discover keys from .env files.
  * @param omitEnvKeys - Additional variables to keep in the test process but
  *   remove from Claude Code, such as a provider key used only by the judge.
+ * @param extraEnv - Variables to add to the spawned Claude Code process,
+ *   such as LANGWATCH_CLI_CONFIG, which points the CLI at its own config
+ *   file so the `langwatch login` of the developer machine never reaches
+ *   a scenario that must start with no credential at all.
  */
 export function createClaudeCodeAgent({
 	workingDirectory,
 	skillPath,
 	cleanEnv,
 	omitEnvKeys = [],
+	extraEnv = {},
 }: {
 	workingDirectory: string;
 	skillPath?: string;
 	cleanEnv?: boolean;
 	omitEnvKeys?: string[];
+	extraEnv?: Record<string, string>;
 }): AgentAdapter {
 	setupLocalCli(workingDirectory);
-	if (skillPath) {
-		const skillName = path.basename(path.dirname(skillPath));
-		const skillDir = path.join(workingDirectory, ".skills", skillName);
-		fs.mkdirSync(skillDir, { recursive: true });
-		fs.copyFileSync(skillPath, path.join(skillDir, "SKILL.md"));
+
+	// The batch of the harness is not the batch of the agent. Several skills
+	// tell the agent to write scenario tests and run them, and those runs would
+	// otherwise join the batch this suite reports under and read as results of
+	// the suite itself.
+	const removedKeys = ["SCENARIO_BATCH_RUN_ID", ...omitEnvKeys];
+	if (cleanEnv) {
+		removedKeys.push("LANGWATCH_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY");
 	}
 
-	// Claude Code does not auto-discover .skills/ in arbitrary directories.
-	// Preserve any existing CLAUDE.md and append only missing skill references.
-	ensureClaudeSkillInstructions(workingDirectory);
-
-	return {
-		role: AgentRole.AGENT,
-		call: async (state) => {
-			// Render each turn as plain text. Anthropic-format messages can have
-			// `content` as an array of blocks (text, tool_use, tool_result, image,
-			// …). String-interpolating that array yields `[object Object]`, which
-			// the next Claude Code session then sees as the previous turn, making
-			// multi-turn scenarios appear garbled to the agent. Flatten content
-			// blocks down to readable text instead.
-			const renderContent = (content: unknown): string => {
-				if (typeof content === "string") return content;
-				if (!Array.isArray(content)) {
-					try {
-						return JSON.stringify(content);
-					} catch {
-						return String(content);
-					}
-				}
-				return content
-					.map((block: any) => {
-						if (block == null) return "";
-						if (typeof block === "string") return block;
-						switch (block.type) {
-							case "text":
-								return block.text ?? "";
-							case "tool_use": {
-								const input =
-									block.input != null ? JSON.stringify(block.input) : "";
-								return `[tool_use ${block.name ?? "?"}(${input})]`;
-							}
-							case "tool_result": {
-								const inner =
-									typeof block.content === "string"
-										? block.content
-										: Array.isArray(block.content)
-											? renderContent(block.content)
-											: JSON.stringify(block.content ?? "");
-								return `[tool_result] ${inner}`;
-							}
-							case "image":
-								return "[image omitted]";
-							default:
-								try {
-									return JSON.stringify(block);
-								} catch {
-									return String(block);
-								}
-						}
-					})
-					.filter(Boolean)
-					.join("\n");
-			};
-
-			const formattedMessages = state.messages
-				.map((message) => `${message.role}: ${renderContent(message.content)}`)
-				.join("\n\n");
-
-			return new Promise<string>((resolve, reject) => {
-				const claudeBin =
-					process.env.CLAUDE_BIN ||
-					execSync("which claude", { encoding: "utf8" }).trim();
-
-				const args = [
-					"--output-format",
-					"stream-json",
-					"-p",
-					"--dangerously-skip-permissions",
-					"--verbose",
-					formattedMessages,
-				];
-
-				console.log(chalk.blue("Starting claude in:"), workingDirectory);
-
-				const omittedKeys = new Set(omitEnvKeys);
-				if (cleanEnv) {
-					omittedKeys.add("LANGWATCH_API_KEY");
-					omittedKeys.add("OPENAI_API_KEY");
-					omittedKeys.add("ANTHROPIC_API_KEY");
-				}
-				const envVars =
-					omittedKeys.size > 0
-						? Object.fromEntries(
-								Object.entries(process.env).filter(
-									([key]) => !omittedKeys.has(key),
-								),
-							)
-						: process.env;
-
-				// Prepend the local bin/ wrapper (created by setupLocalCli) so Claude
-				// uses the locally-built `langwatch` CLI with the latest commands.
-				const localBinDir = path.join(workingDirectory, "bin");
-				const pathPrefix = `${localBinDir}:${envVars.PATH ?? ""}`;
-
-				const child = spawn(claudeBin, args, {
-					cwd: workingDirectory,
-					env: { ...envVars, FORCE_COLOR: "0", PATH: pathPrefix },
-					stdio: ["ignore", "pipe", "pipe"],
-				});
-
-				let output = "";
-
-				child.stdout.on("data", (data: Buffer) => {
-					const text = data.toString();
-					console.log(chalk.cyan("Claude Code:"), text);
-					output += text;
-				});
-
-				child.stderr.on("data", (data: Buffer) => {
-					console.log(chalk.yellow("Claude Code stderr:"), data.toString());
-				});
-
-				child.on("close", (exitCode) => {
-					if (exitCode === 0) {
-						const messages: any = output
-							.split("\n")
-							.map((line) => {
-								try {
-									return JSON.parse(line.trim());
-								} catch {
-									return null;
-								}
-							})
-							.filter((message) => message !== null && "message" in message)
-							.map((message) => message.message);
-						console.log("messages", JSON.stringify(messages, undefined, 2));
-
-						resolve(messages);
-					} else {
-						reject(new Error(`Command failed with exit code ${exitCode}`));
-					}
-				});
-
-				child.on("error", (err) => {
-					reject(err);
-				});
-			});
+	const agent = claudeCodeAgent({
+		workingDirectory,
+		skillPath,
+		// Pin the model. The user's default in ~/.claude/settings.json can be
+		// a more expensive tier, and these tests run many sub Claudes.
+		model: "opus",
+		skipPermissions: true,
+		output: "messages",
+		timeout: CLAUDE_TURN_TIMEOUT_MS,
+		env: {
+			...Object.fromEntries(removedKeys.map((key) => [key, undefined])),
+			...extraEnv,
+			// The local bin/ wrapper first, so Claude uses the locally-built
+			// `langwatch` CLI with the latest commands.
+			PATH: `${path.join(workingDirectory, "bin")}:${extraEnv.PATH ?? process.env.PATH ?? ""}`,
 		},
-	};
-}
-
-/**
- * Asserts that the agent actually read the SKILL.md file during execution.
- * Checks the conversation messages for evidence of a Read tool call on
- * a .skills/ directory file or explicit SKILL.md content references.
- */
-export function assertSkillWasRead(
-	state: ScenarioExecutionStateLike,
-	skillName: string,
-): void {
-	const allContent = state.messages
-		.map((m) =>
-			typeof m.content === "string" ? m.content : JSON.stringify(m.content),
-		)
-		.join("\n");
-
-	const hasSkillRead =
-		allContent.includes("SKILL.md") ||
-		allContent.includes(`.skills/${skillName}`) ||
-		allContent.includes(`skills/${skillName}`);
-
-	if (!hasSkillRead) {
-		throw new Error(
-			`Expected agent to read the ${skillName} SKILL.md file, but found no evidence ` +
-				`of reading .skills/${skillName}/SKILL.md in the conversation. ` +
-				`The agent may have ignored the skill and hallucinated instructions.`,
-		);
-	}
-}
-
-/**
- * Fixes Anthropic tool use format in message state so it is compatible
- * with the Vercel AI SDK judge agent.
- *
- * Anthropic returns tool_use content blocks that the Vercel AI SDK does
- * not understand. This converts non-text blocks to text blocks containing
- * the JSON representation.
- */
-export function toolCallFix(state: ScenarioExecutionStateLike): void {
-	state.messages.forEach((message) => {
-		if (Array.isArray(message.content)) {
-			message.content.forEach((content, index) => {
-				if (content.type !== "text") {
-					(message.content as any)[index] = {
-						type: "text",
-						text: JSON.stringify(content),
-					};
-				}
-			});
-		}
+		logger: {
+			log: (message) => console.log(chalk.cyan("Claude Code:"), message),
+			warn: (message) => console.log(chalk.yellow("Claude Code:"), message),
+		},
 	});
+
+	// The skills a test installed with installSkillToWorkDir are not the one
+	// skillPath injects, and Claude Code does not discover .skills/ on its own.
+	pointClaudeMdAtSkills(workingDirectory);
+
+	return agent;
 }

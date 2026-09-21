@@ -48,6 +48,42 @@ describe("scenario-run-status-config", () => {
         expect(typeof config.fgColor).toBe("string");
       });
     });
+
+    describe("when a run has not settled yet", () => {
+      // A run still in flight once read in the same warm colour as a
+      // failure, so a list of running scenarios looked like a broken run.
+      /** @scenario "A run that is still going does not read as a failure" */
+      it("reads in the colour of a queued run, not of a failed one", () => {
+        const queued = SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.QUEUED];
+        const failed = SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.FAILED];
+        const unsettled = [
+          ScenarioRunStatus.RUNNING,
+          ScenarioRunStatus.IN_PROGRESS,
+        ];
+
+        for (const status of unsettled) {
+          const config = SCENARIO_RUN_STATUS_CONFIG[status];
+          expect(config.fgColor).toBe(queued.fgColor);
+          expect(config.colorPalette).toBe(queued.colorPalette);
+          expect(config.fgColor).not.toBe(failed.fgColor);
+          expect(config.colorPalette).not.toBe(failed.colorPalette);
+        }
+      });
+    });
+  });
+
+  describe("when a run is waiting on its evaluators", () => {
+    /** @scenario "The results page draws a pending run as still going" */
+    it("reads as evaluating and not as a completed run", () => {
+      const config =
+        SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.PENDING_EVALUATION];
+
+      expect(config.label).toBe("evaluating");
+      expect(config.isComplete).toBe(false);
+      expect(
+        SCENARIO_RUN_STATUS_ICONS[ScenarioRunStatus.PENDING_EVALUATION],
+      ).toBeDefined();
+    });
   });
 
   describe("getIconAndColor", () => {

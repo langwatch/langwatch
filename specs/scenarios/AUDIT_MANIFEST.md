@@ -4,6 +4,18 @@ Phase 0 audit of every unimplemented-tagged scenario under `specs/scenarios/` (2
 
 Tracking: https://github.com/langwatch/langwatch/issues/3458
 
+## Agent Testing v2 additions
+
+Four spec files were added for Agent Testing v2. They are outside the #3458
+audit: they describe behavior being built now, not legacy debt.
+
+| File | Tagging | Note |
+|------|---------|------|
+| scenario-test-suite-assignment.feature | all bound tags | Bound as WS1 and WS2 land. |
+| scenario-versioning.feature | all bound tags | Bound. The editor-reload clause of the stale-save scenario is a frontend surface (WS4). |
+| scenario-version-on-runs.feature | all bound tags | Stamping scenarios bound. The three run-drawer scenarios are a frontend surface (WS4). "A one-off run of a single scenario records that scenario version" is bound in simulation-runner.router.unit.test.ts: the stamp decision lives in the router, and the queue-time version read is integration-covered by scenario-versioning.integration.test.ts. |
+| scenario-version-restore.feature | all bound tags | Restore shipped; the `@unimplemented` tags are removed and every scenario is bound. |
+
 ## TL;DR
 
 | Class | Count | % | Phase 1 action |
@@ -235,8 +247,8 @@ Concentrations:
 | specs/scenarios/scenario-api.feature | "Get run state returns conversation events" | KEEP | scenarios.getRunState exists in scenario-events.router.ts:190 but no test asserts state+events shape |
 | specs/scenarios/scenario-editor-new-agent-flow.feature | "Clicking Add New Agent in save-and-run menu opens agent type selection" | KEEP | SaveAndRunMenu has Add New Agent; ScenarioFormDrawer opens AgentTypeSelectorDrawer. No integration test for menu->drawer. |
 | specs/scenarios/scenario-editor-new-agent-flow.feature | "Agent type selector drawer remains open after clicking Add New Agent" | DUPLICATE | ScenarioFormDrawer.integration.test.tsx asserts drawer renders + no URL openDrawer (regression #1903). |
-| specs/scenarios/scenario-editor-new-agent-flow.feature | "Selecting code agent type from scenario editor opens code editor" | DUPLICATE | AgentTypeSelectorDrawer.test.tsx asserts code click->openDrawer agentCodeEditor. |
-| specs/scenarios/scenario-editor-new-agent-flow.feature | "Selecting workflow agent type from scenario editor opens workflow selector" | DUPLICATE | AgentTypeSelectorDrawer.test.tsx asserts workflow click->openDrawer workflowSelector. |
+| specs/scenarios/scenario-editor-new-agent-flow.feature | "Selecting code agent type from scenario editor opens code editor" | DUPLICATE | AgentTypeSelectorDrawer.integration.test.tsx asserts code click->openDrawer agentCodeEditor. |
+| specs/scenarios/scenario-editor-new-agent-flow.feature | "Selecting workflow agent type from scenario editor opens workflow selector" | DUPLICATE | AgentTypeSelectorDrawer.integration.test.tsx asserts workflow click->openDrawer workflowSelector. |
 | specs/scenarios/scenario-editor-new-agent-flow.feature | "Selecting HTTP agent type from scenario editor opens HTTP editor" | KEEP | AgentTypeSelectorDrawer code routes http->agentHttpEditor; existing test only covers code+workflow. |
 | specs/scenarios/scenario-editor-new-agent-flow.feature | "New agent created from scenario editor is auto-selected as target" | DUPLICATE | ScenarioFormDrawer.integration.test.tsx covers onSave callback auto-selecting agent + toaster. |
 | specs/scenarios/scenario-editor-new-agent-flow.feature | "Cancelling agent type selection returns to scenario editor" | KEEP | AgentTypeSelectorDrawer has Cancel button; no test for cancel-without-create flow. |

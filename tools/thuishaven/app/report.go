@@ -57,7 +57,7 @@ func (o *Orchestrator) Status(asJSON bool, worktreeDir string) error {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
 		return enc.Encode(map[string]any{
-			"stacks":        stacks,
+			"stacks":        o.stackStatuses(stacks),
 			"dashboard":     shared(domain.HubService),
 			"observability": shared("observability"),
 			"telemetry":     shared("telemetry"),
@@ -111,6 +111,47 @@ func (o *Orchestrator) Status(asJSON bool, worktreeDir string) error {
 	fmt.Printf("\nstacks: %d (%d live, ~%s RAM)   dashboard %s   tld: .%s\n",
 		len(stacks), live, domain.HumanBytes(int64(rss)), shared(domain.HubService), o.cfg.Naming.TLD)
 	return nil
+}
+
+// stackStatus is a stack as the JSON report renders it: the persisted record
+// plus the liveness a reader cannot derive from it. "Registered" and "running"
+// are not the same thing: a stack stays on record from `up` until the daemon
+// reaps it, so a script that reads a listed stack as a live one sends its
+// requests to a hostname with nothing behind it.
+type stackStatus struct {
+	domain.Stack
+	// Live is whether the launcher process is still running.
+	Live bool `json:"live"`
+	// Services shadows the embedded record's list to add per-service liveness.
+	Services []serviceStatus `json:"services"`
+}
+
+// serviceStatus is one routed service plus whether anything is actually
+// accepting connections on the port its hostname points at.
+type serviceStatus struct {
+	domain.Service
+	Listening bool `json:"listening"`
+}
+
+// stackStatuses renders every registered stack for the JSON report. It always
+// returns a list, never nil: `stacks: null` and `stacks: []` decode the same in
+// most clients but read differently to a person debugging, and "no stack is
+// registered" is exactly the state a reader has to be able to tell apart from
+// "a stack is registered but dead".
+func (o *Orchestrator) stackStatuses(stacks []domain.Stack) []stackStatus {
+	out := make([]stackStatus, 0, len(stacks))
+	for _, s := range stacks {
+		svcs := make([]serviceStatus, 0, len(s.Services))
+		for _, svc := range s.Services {
+			svcs = append(svcs, serviceStatus{Service: svc, Listening: svc.Port != 0 && o.sys.PortInUse(svc.Port)})
+		}
+		out = append(out, stackStatus{
+			Stack:    s,
+			Live:     s.LauncherPID != 0 && o.sys.ProcessAlive(s.LauncherPID),
+			Services: svcs,
+		})
+	}
+	return out
 }
 
 func (o *Orchestrator) liveness(s domain.Stack) string {

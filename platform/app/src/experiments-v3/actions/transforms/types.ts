@@ -36,6 +36,11 @@ export const TRANSFORM_ERROR_CODES = [
   "target_already_exists",
   /** The payload named an evaluator id the workbench already holds. */
   "evaluator_already_exists",
+  /**
+   * A `comparison` config was given for an evaluator type that cannot own a
+   * standalone comparison column.
+   */
+  "evaluator_comparison_type_invalid",
   "invalid_payload",
 ] as const;
 

@@ -225,6 +225,7 @@ function appendOpenApiMiddleware({
   if (docs?.tags !== undefined) options.tags = docs.tags;
   if (docs?.operationId !== undefined) options.operationId = docs.operationId;
   if (docs?.security !== undefined) options.security = docs.security;
+  if (docs?.requestBody !== undefined) options.requestBody = docs.requestBody;
 
   stack.push(describeRoute(options) as unknown as MiddlewareHandler);
 }

@@ -22,9 +22,13 @@
  * `findX` / `runX` (see this module's repositories/ files).
  */
 
+import { ValidationError } from "@langwatch/handled-error";
 import { createHash } from "crypto";
 import { getLangWatchTracer } from "langwatch";
-import type { TimeseriesInputType } from "~/server/analytics/registry";
+import {
+  getMetric,
+  type TimeseriesInputType,
+} from "~/server/analytics/registry";
 import type {
   AnalyticsBackend,
   FeedbacksResult,
@@ -34,6 +38,7 @@ import type {
 import { currentVsPreviousDates } from "~/server/api/routers/analytics/common";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { featureFlagService } from "~/server/featureFlag";
+import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import type { FilterField } from "~/server/filters/types";
 import { TtlCache } from "~/server/utils/ttlCache";
 import { adjustTimeScaleForBucketCap } from "./query-builders/_shared";
@@ -109,6 +114,13 @@ export class AnalyticsService {
       "AnalyticsService.getTimeseries",
       { attributes: { "tenant.id": input.projectId } },
       async () => {
+        // Reject a series whose aggregation its metric does not declare
+        // BEFORE any routing or repository call — a query builder has no
+        // way to refuse an aggregation, it just emits SQL for it, and
+        // ClickHouse is the only thing left to say no (see #8009: "sum" on
+        // evaluation_runs, a String column, crashes with a raw type error).
+        this.assertSeriesAggregationsAllowed(input);
+
         const hash = createHash("sha256")
           // `options` is part of the cache identity, not a side channel: a
           // bounded read and an unbounded one are different questions, and a
@@ -165,6 +177,37 @@ export class AnalyticsService {
         return routedResult;
       },
     );
+  }
+
+  /**
+   * Throws `ValidationError` for the first series naming a metric absent
+   * from the registry, or an aggregation that metric doesn't declare in
+   * `allowedAggregations`. Split out of `getTimeseries` to keep that
+   * function's cognitive complexity under the house lint cap.
+   */
+  private assertSeriesAggregationsAllowed(input: TimeseriesInputType): void {
+    for (const series of input.series) {
+      const metric = getMetric(series.metric);
+      if (!metric) {
+        throw new ValidationError(
+          `Metric "${series.metric}" is not defined in the analytics registry`,
+          { meta: { metric: series.metric } },
+        );
+      }
+      if (!metric.allowedAggregations.includes(series.aggregation)) {
+        throw new ValidationError(
+          `Metric "${series.metric}" does not support aggregation "${series.aggregation}" ` +
+            `(allowed: ${metric.allowedAggregations.join(", ")})`,
+          {
+            meta: {
+              metric: series.metric,
+              aggregation: series.aggregation,
+              allowedAggregations: metric.allowedAggregations,
+            },
+          },
+        );
+      }
+    }
   }
 
   async getFeedbacks(
@@ -239,6 +282,7 @@ export class AnalyticsService {
       groupBy: input.groupBy,
       traceIds: input.traceIds,
       negateFilters: input.negateFilters,
+      excludeOrigins: input.excludeOrigins,
     });
   }
 
@@ -276,6 +320,7 @@ export class AnalyticsService {
       groupByKey: input.groupByKey,
       timeScale: adjustedTimeScale,
       timeZone: input.timeZone,
+      excludeOrigins: input.excludeOrigins,
     };
 
     if (table === "trace_analytics_rollup") {
@@ -333,7 +378,9 @@ export class AnalyticsService {
 async function isTripwireEnabled(projectId: string): Promise<boolean> {
   return featureFlagService.isEnabled(
     "release_event_sourced_analytics_read_tripwire",
-    { distinctId: projectId, projectId },
+    // A read tripwire on the analytics hot path. It takes no organization
+    // lookup, so only the project targets it.
+    { distinctId: projectId, projectId, organizationId: NOT_TARGETED },
   );
 }
 

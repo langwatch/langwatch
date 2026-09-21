@@ -22,6 +22,8 @@ import {
   GENIE_AGENT_MODEL,
   GENIE_MESSAGE_SPAN_NAME,
   GENIE_QUERY_SPAN_NAME,
+  GENIE_ROUTING_PROFILE,
+  KNOWN_AGENT_IDENTITIES,
   mapGenieEventsToTraceRequest,
 } from "../genieTraceMapper";
 import type { NormalizedPullEvent } from "../pullerAdapter";
@@ -30,6 +32,7 @@ const ORIGIN = {
   ingestionSourceId: "source-1",
   organizationId: "org-1",
   sourceType: "databricks_genie",
+  profile: GENIE_ROUTING_PROFILE,
 };
 
 function genieEvent(
@@ -124,7 +127,10 @@ function attrsOf(span: { attributes?: { key: string; value: unknown }[] }) {
 }
 
 function spansOf(events: NormalizedPullEvent[]) {
-  const request = mapGenieEventsToTraceRequest(events, ORIGIN);
+  const request = mapGenieEventsToTraceRequest({
+    events: events,
+    origin: ORIGIN,
+  });
   return request?.resourceSpans?.[0]?.scopeSpans?.[0]?.spans ?? [];
 }
 
@@ -325,7 +331,9 @@ describe("given events that are not conversations", () => {
       ...genieEvent(completedMessage()),
       action: "usage_bucket",
     };
-    expect(mapGenieEventsToTraceRequest([aggregate], ORIGIN)).toBeNull();
+    expect(
+      mapGenieEventsToTraceRequest({ events: [aggregate], origin: ORIGIN }),
+    ).toBeNull();
   });
 });
 
@@ -335,14 +343,19 @@ describe("given a message a sweep caught mid-answer", () => {
       const inFlight = genieEvent(
         completedMessage({ status: "ASKING_AI", attachments: [] }),
       );
-      expect(mapGenieEventsToTraceRequest([inFlight], ORIGIN)).toBeNull();
+      expect(
+        mapGenieEventsToTraceRequest({ events: [inFlight], origin: ORIGIN }),
+      ).toBeNull();
     });
   });
 
   describe("when the re-read finds the status settled", () => {
     it("routes the message", () => {
       const settled = genieEvent(completedMessage());
-      const request = mapGenieEventsToTraceRequest([settled], ORIGIN);
+      const request = mapGenieEventsToTraceRequest({
+        events: [settled],
+        origin: ORIGIN,
+      });
       expect(request).not.toBeNull();
     });
   });
@@ -352,7 +365,9 @@ describe("given a message a sweep caught mid-answer", () => {
       const unknown = genieEvent(
         completedMessage({ status: "SOMETHING_NEW", attachments: [] }),
       );
-      expect(mapGenieEventsToTraceRequest([unknown], ORIGIN)).toBeNull();
+      expect(
+        mapGenieEventsToTraceRequest({ events: [unknown], origin: ORIGIN }),
+      ).toBeNull();
     });
   });
 
@@ -361,7 +376,10 @@ describe("given a message a sweep caught mid-answer", () => {
       const statusless = genieEvent(
         completedMessage({ status: undefined, attachments: [] }),
       );
-      const request = mapGenieEventsToTraceRequest([statusless], ORIGIN);
+      const request = mapGenieEventsToTraceRequest({
+        events: [statusless],
+        origin: ORIGIN,
+      });
       expect(request).not.toBeNull();
     });
   });
@@ -375,7 +393,10 @@ describe("given two ingestion sources routing into one destination project", () 
   const message = completedMessage();
 
   function rootOf(origin: typeof ORIGIN) {
-    const request = mapGenieEventsToTraceRequest([genieEvent(message)], origin);
+    const request = mapGenieEventsToTraceRequest({
+      events: [genieEvent(message)],
+      origin: origin,
+    });
     const spans = request?.resourceSpans?.[0]?.scopeSpans?.[0]?.spans ?? [];
     return spans.find((s) => s.name === GENIE_MESSAGE_SPAN_NAME)!;
   }
@@ -410,6 +431,26 @@ describe("given the pricing table (Decision 14(d) pin)", () => {
     const cost = computeSpanCost({
       attrs: {},
       model: GENIE_AGENT_MODEL,
+      promptTokens: 100_000,
+      completionTokens: 100_000,
+    });
+    expect(cost).toBe(0);
+  });
+
+  /**
+   * The pin has to cover every agent a routing profile may name, not just
+   * Genie's. The agent label became a per-source value when the mapper
+   * started serving more than one source, and a name that matched a price
+   * row would put real dollars on conversations nobody was charged for.
+   * Adding an agent to the set without checking that is what this catches.
+   */
+  /** @scenario "A source cannot name a real model as its agent" */
+  it.each([
+    ...KNOWN_AGENT_IDENTITIES,
+  ])("%s resolves to no price either", (agent) => {
+    const cost = computeSpanCost({
+      attrs: {},
+      model: agent,
       promptTokens: 100_000,
       completionTokens: 100_000,
     });

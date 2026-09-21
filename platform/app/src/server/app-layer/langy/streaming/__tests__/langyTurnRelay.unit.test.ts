@@ -152,12 +152,18 @@ function makeRelay(
       conversationId: string;
       turnId: string;
     }) => Promise<string | null>;
+    refreshHandoffTtl?: (a: {
+      conversationId: string;
+      turnId: string;
+    }) => Promise<void>;
   } = {},
 ) {
   const buffer = fakeBuffer();
   const conversations = over.conversations ?? fakeConversations();
   const resourceLinks = over.resourceLinks ?? fakeResourceLinks();
   const reserveFrameNonce = vi.fn(async () => over.fresh ?? true);
+  const refreshHandoffTtl =
+    over.refreshHandoffTtl ?? vi.fn(async () => undefined);
   const relay = new LangyTurnRelay({
     buffer,
     conversations,
@@ -165,12 +171,20 @@ function makeRelay(
     ...(over.readHandoffRunToken
       ? { readHandoffRunToken: over.readHandoffRunToken }
       : {}),
+    refreshHandoffTtl,
     resourceLinks,
     ...(over.resolveResourceUrl
       ? { resolveResourceUrl: over.resolveResourceUrl }
       : {}),
   });
-  return { relay, buffer, conversations, reserveFrameNonce, resourceLinks };
+  return {
+    relay,
+    buffer,
+    conversations,
+    reserveFrameNonce,
+    resourceLinks,
+    refreshHandoffTtl,
+  };
 }
 
 /** A real signed envelope for a payload object. */
@@ -211,6 +225,32 @@ describe("LangyTurnRelay", () => {
     it("routes a heartbeat to liveness with no content", async () => {
       const { relay, buffer } = makeRelay();
       await relay.handle(frame({ type: "heartbeat" }));
+      expect(buffer.heartbeat).toHaveBeenCalledWith({
+        conversationId: "conv-1",
+        turnId: "turn-1",
+      });
+    });
+
+    /** @scenario "A heartbeat keeps the turn's revival record alive" */
+    it("extends the turn's handoff on the same heartbeat", async () => {
+      const { relay, refreshHandoffTtl } = makeRelay();
+      await relay.handle(frame({ type: "heartbeat" }));
+      expect(refreshHandoffTtl).toHaveBeenCalledWith({
+        conversationId: "conv-1",
+        turnId: "turn-1",
+      });
+    });
+
+    /** @scenario "A heartbeat still counts when the revival record cannot be reached" */
+    it("still counts the heartbeat when the handoff store refuses", async () => {
+      const refreshHandoffTtl = vi.fn(async () => {
+        throw new Error("redis unavailable");
+      });
+      const { relay, buffer } = makeRelay({ refreshHandoffTtl });
+
+      const out = await relay.handle(frame({ type: "heartbeat" }));
+
+      expect(out).toEqual({ status: "applied" });
       expect(buffer.heartbeat).toHaveBeenCalledWith({
         conversationId: "conv-1",
         turnId: "turn-1",
@@ -356,6 +396,24 @@ describe("LangyTurnRelay", () => {
           toolName: "bash",
           command: "ls",
         }),
+      );
+    });
+
+    it("carries a settled call's local marker onto the live card", async () => {
+      const { relay, buffer } = makeRelay();
+      await relay.handle(
+        frame({
+          type: "tool",
+          id: "tc-local",
+          name: "bash",
+          phase: "end",
+          output: "ok",
+          local: true,
+        }),
+      );
+
+      expect(buffer.appendTool).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "tc-local", name: "bash", local: true }),
       );
     });
 
@@ -576,6 +634,66 @@ describe("LangyTurnRelay", () => {
           href: "/acme/simulations?drawer.open=scenarioRunDetail&drawer.scenarioRunId=run_7",
         });
       }
+    });
+
+    /** @scenario "A navigate run in the shared folder opens the resource just the same" */
+    it("fires a navigate run in the shared folder, with no card for the call", async () => {
+      // The guided run does its work in the folder the developer shared, so
+      // the lookup and the navigate both reach the relay as `local_bash`
+      // calls. The shell's name says where a command ran, not what it was.
+      const { relay, buffer, conversations } = makeRelay();
+      const localCall = (id: string, command: string) =>
+        [
+          { phase: "start" as const },
+          {
+            phase: "end" as const,
+            output: JSON.stringify({
+              trace_id: "run_1",
+              platformUrl:
+                "https://app.langwatch.ai/acme/simulations/set_1/batch_1?openRun=run_1",
+            }),
+          },
+        ].map((phase) =>
+          frame({
+            type: "tool",
+            id,
+            name: "local_bash",
+            local: true,
+            ...phase,
+            input: { command },
+          }),
+        );
+
+      for (const f of localCall(
+        "call-local-surface",
+        "langwatch trace get run_1",
+      )) {
+        await relay.handle(f);
+      }
+      // The lookup is a call like any other: a card, re-typed as the CLI
+      // capability it ran, still marked as run in the folder.
+      expect(buffer.appendTool).toHaveBeenLastCalledWith(
+        expect.objectContaining({ name: "langwatch.trace.get", local: true }),
+      );
+      buffer.appendTool.mockClear();
+      conversations.recordToolCallStarted.mockClear();
+      conversations.recordToolCallCompleted.mockClear();
+
+      for (const f of localCall(
+        "call-local-navigate",
+        "langwatch navigate open run_1",
+      )) {
+        await relay.handle(f);
+      }
+
+      expect(buffer.appendNavigate).toHaveBeenCalledWith({
+        conversationId: "conv-1",
+        turnId: "turn-1",
+        href: "/acme/simulations/set_1/batch_1?openRun=run_1",
+      });
+      expect(buffer.appendTool).not.toHaveBeenCalled();
+      expect(conversations.recordToolCallStarted).not.toHaveBeenCalled();
+      expect(conversations.recordToolCallCompleted).not.toHaveBeenCalled();
     });
 
     it("fires a navigate CHAINED onto another command — while the call keeps its normal card life", async () => {

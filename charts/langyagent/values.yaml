@@ -14,7 +14,7 @@ chartManaged: true
 # without adding conversation-sticky routing first.
 replicaCount: 1
 
-# Sized for v1 (low traffic, ~5-15 concurrent sessions). Each OpenCode
+# Sized for v1 (low traffic, ~5-15 concurrent sessions). Each worker
 # subprocess costs memory; LANGY_MAX_WORKERS caps concurrency.
 resources:
   requests:
@@ -39,9 +39,9 @@ manager:
   port: 8080
   maxWorkers: 20
   workerIdleMs: 600000        # 10 min — idle workers are reaped
-  # How long to wait for a freshly-spawned worker's opencode to bind before
+  # How long to wait for a freshly-spawned worker to report ready before
   # aborting the spawn. Under gVisor (runsc), process/syscall startup is
-  # materially slower than runc: a cold opencode boot on the dev gVisor node
+  # materially slower than runc: a cold worker boot on the dev gVisor node
   # measured ~28s (2026-07-07), so the previous 15s default aborted the FIRST
   # message of every conversation (and every message after workerIdleMs) with
   # "context deadline exceeded", surfacing as an empty reply. 60s gives gVisor
@@ -129,9 +129,9 @@ scratchSizeLimit: 1Gi
 ## per-worker UID isolation requires `child_process.spawn({uid, gid})` —
 ## that syscall path needs CAP_SETUID + CAP_SETGID + CAP_CHOWN, which only
 ## a root-effective-uid process holds inside a container. With the manager
-## as UID 1000, every OpenCode subprocess inherited UID 1000 too, so worker
-## A could `cat /workspace/sessions/<worker-B>/.config/opencode/config.json`
-## and steal worker B's project API key + GitHub token (PR #4913 review).
+## as UID 1000, every worker subprocess inherited UID 1000 too, so worker
+## A could read worker B's home under `/workspace/sessions/<worker-B>/` and
+## steal its project API key + GitHub token (PR #4913 review).
 ##
 ## Mitigations that keep the blast radius small even with root in the pod:
 ##   - Drop ALL caps and add back ONLY what's strictly required: the five
@@ -139,7 +139,7 @@ scratchSizeLimit: 1Gi
 ##     FOWNER lets root chmod a per-worker dir it has already chowned away
 ##     to the worker UID). NET_ADMIN was dropped alongside the iptables
 ##     lockdown it existed for — the worker→worker exfil hole it guarded is
-##     now closed by opencode's own per-worker password (ADR-033 Fix A′),
+##     now closed because a worker has no listener at all (ADR-033 Fix A′),
 ##     which needs no netfilter. No SYS_*.
 ##   - allowPrivilegeEscalation: false → no_new_privs is set, so children
 ##     cannot regain caps via setuid binaries.
@@ -163,7 +163,7 @@ containerSecurityContext:
     drop: ["ALL"]
     # CHOWN, DAC_OVERRIDE, SETUID, SETGID are required so the manager can
     # chown per-session dirs to a unique UID, write 0600 config blobs as
-    # that UID, and spawn the OpenCode subprocess directly into it.
+    # that UID, and spawn the worker subprocess directly into it.
     #
     # FOWNER is required because setupWorkerHome (worker.go) chowns the
     # per-worker home to the worker UID and THEN chmods it 0700. Once the
@@ -174,10 +174,10 @@ containerSecurityContext:
     # gVisor-specific: the same EPERM occurs on runc under drop-ALL.
     #
     # NET_ADMIN was previously added (2026-06-30) for an iptables OUTPUT rule
-    # dropping loopback-TCP from non-root UIDs to the opencode internal port
+    # dropping loopback-TCP from non-root UIDs to a worker's internal port
     # range. That rule (services/langyagent/iptables.go) is deleted in this
-    # change — dead under gVisor (no netfilter) and superseded by the
-    # per-worker OPENCODE_SERVER_PASSWORD (ADR-033 Fix A′) — so NET_ADMIN is
+    # change — dead under gVisor (no netfilter) and superseded by workers
+    # that bind no listener at all (ADR-033 Fix A′) — so NET_ADMIN is
     # dropped here too. Nothing else in the manager touches the network stack.
     #
     # Any addition beyond this needs to be justified in the
@@ -185,7 +185,7 @@ containerSecurityContext:
     add: ["CHOWN", "DAC_OVERRIDE", "FOWNER", "SETUID", "SETGID"]
 
 # Sandboxed container runtime for this pod. The agent runs LLM-driven
-# arbitrary code (opencode workers shell out to git/npm/gh), so a worker
+# arbitrary code (workers shell out to git/npm/gh), so a worker
 # breaking OUT of the container to the node is a real risk, and a sandboxed
 # runtime (gvisor/runsc, or Kata) is what closes it.
 #
@@ -195,7 +195,7 @@ containerSecurityContext:
 # default that misbehaves on their nodes reads as "Langy is broken", and when
 # the RuntimeClass is simply absent the pod is rejected at admission, so it
 # never appears at all. The controls that bound the attack that actually
-# happens (per-worker UID isolation, the per-worker opencode password, and a
+# happens (per-worker UID isolation, workers with no listener, and a
 # NetworkPolicy with egress off) are on by default and work everywhere.
 #
 # HARDENING, once, on purpose:
@@ -214,9 +214,9 @@ runtimeClassName: ""
 #
 # What you give up: the pod->host escape surface reverts to standard cgroups +
 # namespaces, so a worker that breaks out of the container faces only the node
-# kernel. What you keep: per-worker UID isolation and the per-worker opencode
-# password still separate one conversation's credentials from another's inside
-# the pod, and the NetworkPolicy still bounds where workers can reach.
+# kernel. What you keep: per-worker UID isolation still separates one
+# conversation's credentials from another's inside the pod, and the
+# NetworkPolicy still bounds where workers can reach.
 #
 # The judgement call this leaves the operator: a single-tenant install whose
 # users are all colleagues carries a much smaller worker-versus-worker risk
@@ -238,7 +238,7 @@ networkPolicy:
   # NetworkPolicy egress uses a podSelector + ports[].port, which Kubernetes
   # matches against the destination POD port (post-DNAT), not the Service
   # port. The earlier value 80 was the Service port: traffic to the gateway
-  # at 5563 was dropped, so opencode couldn't reach the gateway and Langy
+  # at 5563 was dropped, so a worker couldn't reach the gateway and Langy
   # was dead-on-arrival the moment an operator enabled `chartManaged: true`.
   egressToControlPlane: []
   gatewayPort: 5563
@@ -263,9 +263,9 @@ networkPolicy:
   # The collector's POD port for the rule above (NetworkPolicy egress ports
   # match the destination pod port). 4318 is OTLP/HTTP's default.
   otelCollectorPort: 4318
-  # External HTTPS egress for OpenCode workers — needed for `git clone`,
-  # `gh` API calls, npm/pip installs the LLM-driven tools shell out to, and
-  # opencode's own update/telemetry. Default false: this pod runs LLM-
+  # External HTTPS egress for workers — needed for `git clone`,
+  # `gh` API calls, and npm/pip installs the LLM-driven tools shell out
+  # to. Default false: this pod runs LLM-
   # driven arbitrary shell with the user's API key + GitHub user-to-server
   # token in env, so default-on egress IS the most dangerous posture (a
   # prompt-injection can curl creds to attacker-controlled IPs). Private

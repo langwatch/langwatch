@@ -29,18 +29,20 @@ export async function runBootstrapScenario({
   name: string;
   description: string;
   slug: string;
-  script: Parameters<typeof runScenarioAndLog>[0]["script"];
+  script: Parameters<typeof scenario.run>[0]["script"];
   criteria: string[];
 }) {
   return runScenarioAndLog({
-    name,
-    description: `${description} The experiment's slug is "${slug}".`,
-    agents: [
-      makeLangyAdapter(),
-      scenario.userSimulatorAgent({ model }),
-      scenario.judgeAgent({ model, criteria }),
-    ],
-    script,
+    config: {
+      name,
+      description: `${description} The experiment's slug is "${slug}".`,
+      agents: [
+        makeLangyAdapter(),
+        scenario.userSimulatorAgent({ model }),
+        scenario.judgeAgent({ model, criteria }),
+      ],
+      script,
+    },
   });
 }
 

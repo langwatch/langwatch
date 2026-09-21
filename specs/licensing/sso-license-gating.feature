@@ -8,7 +8,18 @@ Feature: License-Gated SSO
   #
   # Vocabulary:
   #   - "SSO" = any non-email login provider (google, github, gitlab,
-  #     azure-ad, okta, auth0) plus per-org domain auto-join.
+  #     azure-ad, okta, auth0) plus per-org domain AUTO-join: the setting
+  #     where a verified colleague is admitted with nobody in the loop. That
+  #     is federation - the deployment decides who counts as a colleague and
+  #     acts on it - which is what this gate has always covered.
+  #   - Asking to join an organization is NOT SSO and is NOT gated. An
+  #     administrator approves every request, no identity provider is
+  #     involved, and gating it would leave an unlicensed deployment with no
+  #     way for a colleague to find their own company. The privacy rules do
+  #     that work instead: verified address, domain match, no public email
+  #     domains, never a personal organization
+  #     (specs/identity/join-matching-and-privacy.feature). D12 owns both
+  #     paths; specs/identity/domain-auto-join.feature carries the setting.
   #   - "genuine license" = a stored license whose signature verifies.
   #     Expiry is deliberately irrelevant to SSO: once a customer, never
   #     blocked. (Plan limits still expire; only login federation doesn't.)
@@ -185,6 +196,23 @@ Feature: License-Gated SSO
     When a new user signs up with an email address on that domain
     Then the account is created
     And the user is not added to that organization
+
+  @unit @unimplemented
+  Scenario: An unlicensed deployment cannot switch an organization to automatic joining
+    Given an unlicensed self-hosted deployment running in email mode
+    And an organization whose members hold verified addresses on their company domain
+    When an admin tries to turn on automatic joining for that domain
+    Then the attempt is refused with code join_auto_not_licensed and status 403
+    And colleagues on that domain may still ask to join
+
+  @unit @unimplemented
+  Scenario: An unlicensed deployment still lets a colleague ask to join
+    Given an unlicensed self-hosted deployment running in email mode
+    And an organization accepting requests to join from its company domain
+    When a new user verifies an email address on that domain and asks to join
+    Then the request reaches the organization's admins
+    And approving it adds the user to the organization
+    And no part of that journey consulted the license
 
   @unit
   Scenario: A licensing-store outage refuses SSO and heals itself

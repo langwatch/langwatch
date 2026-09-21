@@ -9,6 +9,7 @@ import { getApp } from "~/server/app-layer/app";
 import { provisionLangyVirtualKey } from "~/server/app-layer/langy/langyVirtualKey";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import {
+  governanceProjectRouteViolation,
   personalWorkspaceArchiveViolation,
   personalWorkspaceCreateViolation,
   personalWorkspaceMoveViolation,
@@ -63,6 +64,19 @@ function assertMoveStaysOutOfPersonalWorkspaces({
     isProjectPersonal,
     isDestinationTeamPersonal,
   });
+  if (violation) {
+    throw new TRPCError({ code: "FORBIDDEN", message: violation });
+  }
+}
+
+/**
+ * The hidden governance project is not a workspace, and these mutations write
+ * Prisma directly rather than going through `ProjectService`, so they enforce
+ * the guard themselves. The rule itself is defined once in the projects app
+ * layer; see the helper there for why the id being reachable at all matters.
+ */
+function assertNotGovernanceProject(kind: string | null | undefined): void {
+  const violation = governanceProjectRouteViolation(kind);
   if (violation) {
     throw new TRPCError({ code: "FORBIDDEN", message: violation });
   }
@@ -192,13 +206,14 @@ export const projectRouter = createTRPCRouter({
       return { success: true, projectSlug: project.slug };
     }),
   /**
-   * The base key is a project-level write credential, so reading it is gated
-   * with `project:update` to match the access it grants. Rotation stays at
-   * `project:manage`.
+   * The base key grants full access to one project. Revealing it is therefore
+   * an administrator action, just like rotating it.
    */
   getProjectAPIKey: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .permission("project:update")
+    .permission("project:manage", {
+      nondisclosure: "not-found-outside-organization",
+    })
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
@@ -229,6 +244,12 @@ export const projectRouter = createTRPCRouter({
     .permission("project:manage")
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
+
+      const target = await prisma.project.findUnique({
+        where: { id: input.projectId },
+        select: { kind: true },
+      });
+      assertNotGovernanceProject(target?.kind);
 
       // Generate new API key
       const newApiKey = generateApiKey();
@@ -315,6 +336,8 @@ export const projectRouter = createTRPCRouter({
           message: "Project not found",
         });
       }
+
+      assertNotGovernanceProject(project.kind);
 
       if (input.teamId) {
         const destinationTeam = await prisma.team.findFirst({
@@ -426,8 +449,9 @@ export const projectRouter = createTRPCRouter({
 
       const target = await prisma.project.findUnique({
         where: { id: input.projectToArchiveId },
-        select: { isPersonal: true },
+        select: { isPersonal: true, kind: true },
       });
+      assertNotGovernanceProject(target?.kind);
       const archiveViolation = personalWorkspaceArchiveViolation(
         target?.isPersonal ?? false,
       );

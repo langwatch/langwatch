@@ -189,6 +189,67 @@ func TestRouter_MidStreamPlainError_UsesErrorEventObject(t *testing.T) {
 	assert.NotContains(t, body, `{"error":"`)
 }
 
+// @scenario "A handled failure states the same thing mid-stream as it does before the stream opens"
+//
+// herr.E.Error() renders "code (map[...whole meta...])" plus every wrapped
+// reason, so building the frame from it published the engine's internal cause
+// — the credential parse offset, the unreadable provider body — that the JSON
+// boundary deliberately keeps to the log line. That is also the exact shape
+// the production report arrived in: provider_timeout (map[message:error
+// creating auth token source status:0]).
+func TestRouter_MidStreamHandledError_StatesCustomerCopyNotTheCause(t *testing.T) {
+	handled := herr.New(context.Background(), domain.ErrProviderCredentialInvalid,
+		herr.M{"message": "The credentials configured for this model provider were not accepted."},
+		errors.New("failed to parse auth credentials JSON: {\"private_key\": \"redacted-by-this-fixture\""))
+
+	provider := &mockStreamProvider{
+		dispatchStreamFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (domain.StreamIterator, error) {
+			return &midStreamErrIter{err: handled}, nil
+		},
+	}
+	router := buildRouter(
+		app.WithAuth(errTransportAuth()),
+		app.WithProviders(provider),
+		app.WithLogger(zap.NewNop()),
+	)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, messagesRequest(true))
+	body := rec.Body.String()
+
+	require.Contains(t, body, "event: error")
+	assert.Contains(t, body, `"type":"provider_credential_invalid"`,
+		"the frame carries the handled code, the way the JSON boundary does")
+	assert.Contains(t, body, "The credentials configured for this model provider were not accepted.")
+	assert.NotContains(t, body, "BEGIN PRIVATE KEY")
+	assert.NotContains(t, body, "failed to parse auth credentials JSON")
+	assert.NotContains(t, body, "map[", "the meta map must not be rendered into the frame")
+}
+
+// A handled error with no customer copy still must not fall back to
+// err.Error(). The code alone is the floor.
+func TestRouter_MidStreamHandledError_WithoutCopyFallsBackToTheCode(t *testing.T) {
+	handled := herr.New(context.Background(), domain.ErrProviderError, herr.M{"provider": "vertex"})
+
+	provider := &mockStreamProvider{
+		dispatchStreamFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (domain.StreamIterator, error) {
+			return &midStreamErrIter{err: handled}, nil
+		},
+	}
+	router := buildRouter(
+		app.WithAuth(errTransportAuth()),
+		app.WithProviders(provider),
+		app.WithLogger(zap.NewNop()),
+	)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, messagesRequest(true))
+	body := rec.Body.String()
+
+	assert.Contains(t, body, `"message":"provider_error"`)
+	assert.NotContains(t, body, "map[")
+}
+
 // @scenario "Terminal upstream error is identical across stream and non-stream"
 func TestRouter_UpstreamTerminal_IdenticalAcrossPaths(t *testing.T) {
 	const authErrBody = `{"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}`

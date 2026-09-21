@@ -85,6 +85,30 @@ describe("ChildProcessJobDataSchema", () => {
     });
   });
 
+  describe("given a payload that carries a script and no model params", () => {
+    /** @scenario "A child job with a script parses without model params" */
+    it("parses, because a scripted run builds no simulator and no judge", () => {
+      const result = ChildProcessJobDataSchema.safeParse({
+        ...basePayload,
+        script: { kind: "agent_test", userMessage: "ping" },
+      });
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.script).toEqual({
+        kind: "agent_test",
+        userMessage: "ping",
+      });
+    });
+
+    it("still refuses a script with no message", () => {
+      const result = ChildProcessJobDataSchema.safeParse({
+        ...basePayload,
+        script: { kind: "agent_test", userMessage: "" },
+      });
+      expect(result.success).toBe(false);
+    });
+  });
+
   describe("given a payload with only simulator and judge model params (no adapter model)", () => {
     /** @scenario "A workflow target resolves no adapter-role model" */
     it("parses successfully — modelParams is optional", () => {

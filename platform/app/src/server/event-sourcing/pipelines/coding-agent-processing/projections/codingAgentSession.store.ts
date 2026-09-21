@@ -271,6 +271,10 @@ function hasPersistableSignal(state: CodingAgentSessionState): boolean {
     state.editsAccepted > 0 ||
     state.editsRejected > 0 ||
     (state.title !== null && state.title !== "") ||
-    (state.repositoryName !== null && state.repositoryName !== "")
+    (state.repositoryName !== null && state.repositoryName !== "") ||
+    // A helper thread's request span can land before anything the thread
+    // said; the mark is what keeps the row out of the list, so it is worth
+    // a row on its own rather than a state a cache loss could forget.
+    state.auxiliary
   );
 }

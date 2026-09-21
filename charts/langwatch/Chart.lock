@@ -4,12 +4,12 @@ dependencies:
   version: 25.27.0
 - name: clickhouse-serverless
   repository: file://../clickhouse-serverless
-  version: 0.3.0
+  version: 0.4.0
 - name: langwatch-gateway
   repository: file://../gateway
-  version: 3.16.0
+  version: 3.17.0
 - name: langwatch-langyagent
   repository: file://../langyagent
-  version: 3.16.0
-digest: sha256:1733768d24a68cfae164751ebe7082a6ac13d774aa0b789ac118e1f89ae6a705
-generated: "2026-08-21T13:21:47.648448109Z"
+  version: 3.17.0
+digest: sha256:d4a209f438a36bdf719ddbd83e4777e231c613a9fc1e7941ad221dcf0bde7cdf
+generated: "2026-09-12T07:28:27.481062396Z"

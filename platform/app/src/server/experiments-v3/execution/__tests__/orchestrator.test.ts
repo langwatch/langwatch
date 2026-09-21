@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { EvaluationsV3State } from "~/experiments-v3/types";
+import { promptLoadKey } from "../dataLoader";
 import {
   buildEvaluatorInputs,
+  comparisonSkipMessage,
   generateCells,
   generateComparisonCells,
+  hasNoResolvedInputs,
   resolveScopedRowIndices,
 } from "../orchestrator";
-import type { ExecutionScope } from "../types";
+import type { ExecutionCell, ExecutionScope } from "../types";
 
 describe("orchestrator", () => {
   // Helper to create test state (partial state with just what generateCells needs)
@@ -1043,7 +1046,7 @@ describe("orchestrator", () => {
 
         const loadedPrompts = new Map(
           handles.map((handle, i) => [
-            `prompt-${i + 1}`,
+            promptLoadKey({ promptId: `prompt-${i + 1}` }),
             { handle, name: handle, model: "openai/gpt-4o-mini" },
           ]),
         ) as never;
@@ -1283,8 +1286,14 @@ describe("orchestrator", () => {
         string,
         { handle: string } & Record<string, unknown>
       >([
-        ["prompt_A", { handle: "say-hi" } as never],
-        ["prompt_B", { handle: "be-formal" } as never],
+        [
+          promptLoadKey({ promptId: "prompt_A" }),
+          { handle: "say-hi" } as never,
+        ],
+        [
+          promptLoadKey({ promptId: "prompt_B" }),
+          { handle: "be-formal" } as never,
+        ],
       ]);
       const { cells } = generateComparisonCells({
         scopedRowIndices: undefined,
@@ -1333,7 +1342,12 @@ describe("orchestrator", () => {
       const loadedPrompts = new Map<
         string,
         { handle: string } & Record<string, unknown>
-      >([["prompt_X", { handle: "shared-handle" } as never]]);
+      >([
+        [
+          promptLoadKey({ promptId: "prompt_X" }),
+          { handle: "shared-handle" } as never,
+        ],
+      ]);
 
       const { cells } = generateComparisonCells({
         scopedRowIndices: undefined,
@@ -1462,7 +1476,7 @@ describe("orchestrator", () => {
 
       const loadedPrompts = new Map([
         [
-          "prompt-1",
+          promptLoadKey({ promptId: "prompt-1" }),
           {
             handle: "candidate-a",
             name: "candidate-a",
@@ -1470,7 +1484,7 @@ describe("orchestrator", () => {
           },
         ],
         [
-          "prompt-2",
+          promptLoadKey({ promptId: "prompt-2" }),
           {
             handle: "candidate-b",
             name: "candidate-b",
@@ -1877,6 +1891,351 @@ describe("orchestrator", () => {
       const cells = generateCells(state, datasetRows, scope);
 
       expect(cells).toHaveLength(0);
+    });
+  });
+
+  describe("hasNoResolvedInputs", () => {
+    const evaluatorConfig = (
+      overrides: Partial<EvaluationsV3State["evaluators"][0]> = {},
+    ) =>
+      ({
+        id: "eval-1",
+        evaluatorType: "langevals/exact_match",
+        inputs: [
+          { identifier: "output", type: "str" },
+          { identifier: "expected_output", type: "str" },
+        ],
+        mappings: {},
+        ...overrides,
+      }) as EvaluationsV3State["evaluators"][0];
+
+    const cellFor = (
+      evaluator: EvaluationsV3State["evaluators"][0],
+      overrides: Partial<ExecutionCell> = {},
+    ): ExecutionCell => ({
+      rowIndex: 0,
+      targetId: "target-1",
+      targetConfig: {
+        id: "target-1",
+        type: "prompt",
+        inputs: [],
+        outputs: [],
+        mappings: {},
+      } as unknown as ExecutionCell["targetConfig"],
+      evaluatorConfigs: [evaluator],
+      datasetEntry: { _datasetId: "dataset-1" },
+      ...overrides,
+    });
+
+    describe("given the evaluator declares fields", () => {
+      describe("when no mapping resolved a value", () => {
+        /** @scenario "An evaluator with no resolved inputs reports an error instead of a pass" */
+        it("reports the dispatch as carrying nothing", () => {
+          const evaluator = evaluatorConfig();
+
+          expect(
+            hasNoResolvedInputs({
+              cell: cellFor(evaluator),
+              evaluator,
+              inputs: {},
+            }),
+          ).toBe(true);
+        });
+
+        /** @scenario "An evaluator with no resolved inputs reports an error instead of a pass" */
+        it("counts blank, null and undefined values as nothing", () => {
+          const evaluator = evaluatorConfig();
+
+          expect(
+            hasNoResolvedInputs({
+              cell: cellFor(evaluator),
+              evaluator,
+              inputs: {
+                output: "   ",
+                expected_output: null,
+                extra: undefined,
+              },
+            }),
+          ).toBe(true);
+        });
+      });
+
+      describe("when one field resolved to text", () => {
+        /** @scenario "An evaluator with no resolved inputs reports an error instead of a pass" */
+        it("lets the dispatch through", () => {
+          const evaluator = evaluatorConfig();
+
+          expect(
+            hasNoResolvedInputs({
+              cell: cellFor(evaluator),
+              evaluator,
+              inputs: { output: "hello", expected_output: "" },
+            }),
+          ).toBe(false);
+        });
+
+        it("counts a falsy but present value as resolved", () => {
+          const evaluator = evaluatorConfig();
+
+          expect(
+            hasNoResolvedInputs({
+              cell: cellFor(evaluator),
+              evaluator,
+              inputs: { output: 0, expected_output: false },
+            }),
+          ).toBe(false);
+        });
+      });
+    });
+
+    describe("given a comparison cell", () => {
+      const comparisonEvaluator = evaluatorConfig({
+        id: "cmp-eval",
+        evaluatorType: "langevals/select_best_compare",
+        inputs: [],
+        comparison: {
+          variants: ["target-1", "target-2"],
+          hasGoldenAnswer: false,
+          goldenField: "",
+          includeMetrics: [],
+          randomizeOrder: true,
+        },
+      } as Partial<EvaluationsV3State["evaluators"][0]>);
+
+      describe("when a candidate carries text", () => {
+        /** @scenario "An evaluator with no resolved inputs reports an error instead of a pass" */
+        it("leaves the comparison branch alone", () => {
+          const cell = cellFor(comparisonEvaluator, {
+            comparison: {
+              candidates: [
+                { id: "a", output: "answer from A" },
+                { id: "b", output: "" },
+              ],
+            },
+          });
+
+          expect(
+            hasNoResolvedInputs({
+              cell,
+              evaluator: comparisonEvaluator,
+              inputs: buildEvaluatorInputs(cell, "cmp-eval", {}),
+            }),
+          ).toBe(false);
+        });
+      });
+    });
+  });
+
+  describe("given a comparison the user has not finished configuring", () => {
+    const columnTarget = (
+      comparison: Record<string, unknown>,
+    ): EvaluationsV3State["targets"][0] =>
+      ({
+        id: "comparison-column",
+        type: "evaluator",
+        targetEvaluatorId: "db-comparison-evaluator",
+        inputs: [],
+        outputs: [{ identifier: "label", type: "str" }],
+        mappings: {},
+        comparison,
+      }) as unknown as EvaluationsV3State["targets"][0];
+
+    const runWith = (target: EvaluationsV3State["targets"][0]) => {
+      const state = createTestState({ targetCount: 2, evaluatorCount: 0 });
+      state.targets.push(target);
+      return generateComparisonCells({
+        scopedRowIndices: undefined,
+        state,
+        datasetRows: createTestDataset(2),
+        completedTargetOutputs: new Map([
+          ["0:target-1", { output: { output: "answer from A" } }],
+          ["0:target-2", { output: { output: "answer from B" } }],
+          ["1:target-1", { output: { output: "answer from A" } }],
+          ["1:target-2", { output: { output: "answer from B" } }],
+        ]),
+      });
+    };
+
+    describe("when fewer than two columns are picked", () => {
+      /** @scenario "A comparison the user has not finished configuring says what to fix" */
+      it("reports every scoped row instead of skipping in silence", () => {
+        const { cells, skipReasons } = runWith(
+          columnTarget({
+            variants: ["target-1"],
+            hasGoldenAnswer: false,
+            goldenField: "",
+            includeMetrics: [],
+            randomizeOrder: true,
+          }),
+        );
+
+        expect(cells).toHaveLength(0);
+        expect(skipReasons.map((r) => r.rowIndex)).toEqual([0, 1]);
+        expect(skipReasons[0]?.kind).toBe("too-few-variants");
+        expect(skipReasons[0]?.targetId).toBe("comparison-column");
+        expect(comparisonSkipMessage(skipReasons[0]!).errorType).toBe(
+          "TooFewComparisonVariants",
+        );
+      });
+    });
+
+    describe("when the golden answer is on but no column is picked for it", () => {
+      /** @scenario "A comparison the user has not finished configuring says what to fix" */
+      it("reports the golden field as the thing to fix", () => {
+        const { cells, skipReasons } = runWith(
+          columnTarget({
+            variants: ["target-1", "target-2"],
+            hasGoldenAnswer: true,
+            goldenField: "",
+            includeMetrics: [],
+            randomizeOrder: true,
+          }),
+        );
+
+        expect(cells).toHaveLength(0);
+        expect(skipReasons).toHaveLength(2);
+        expect(skipReasons[0]?.kind).toBe("golden-not-set");
+        expect(comparisonSkipMessage(skipReasons[0]!).errorType).toBe(
+          "GoldenFieldNotSet",
+        );
+      });
+    });
+
+    describe("when a picked column no longer exists", () => {
+      /** @scenario "A comparison the user has not finished configuring says what to fix" */
+      it("reports the missing column rather than judging what is left", () => {
+        const { cells, skipReasons } = runWith(
+          columnTarget({
+            variants: ["target-1", "target-deleted"],
+            hasGoldenAnswer: false,
+            goldenField: "",
+            includeMetrics: [],
+            randomizeOrder: true,
+          }),
+        );
+
+        expect(cells).toHaveLength(0);
+        expect(skipReasons).toHaveLength(2);
+        expect(skipReasons[0]?.kind).toBe("variant-not-found");
+        expect(comparisonSkipMessage(skipReasons[0]!).errorType).toBe(
+          "ComparisonVariantNotFound",
+        );
+      });
+    });
+
+    describe("when the carrier is a chip evaluator on a variant column", () => {
+      /** @scenario "A comparison the user has not finished configuring says what to fix" */
+      it("anchors the error on the first column it still has", () => {
+        const state = createTestState({ targetCount: 2, evaluatorCount: 0 });
+        state.evaluators.push({
+          id: "eval-chip-comparison",
+          evaluatorType: "langevals/select_best_compare",
+          inputs: [],
+          mappings: {},
+          comparison: {
+            variants: ["target-2"],
+            hasGoldenAnswer: false,
+            goldenField: "",
+            includeMetrics: [],
+            randomizeOrder: true,
+          },
+        } as unknown as EvaluationsV3State["evaluators"][0]);
+
+        const { cells, skipReasons } = generateComparisonCells({
+          scopedRowIndices: [1],
+          state,
+          datasetRows: createTestDataset(2),
+          completedTargetOutputs: new Map(),
+        });
+
+        expect(cells).toHaveLength(0);
+        expect(skipReasons).toHaveLength(1);
+        expect(skipReasons[0]?.rowIndex).toBe(1);
+        expect(skipReasons[0]?.targetId).toBe("target-2");
+        expect(skipReasons[0]?.evaluatorId).toBe("eval-chip-comparison");
+      });
+    });
+  });
+
+  describe("given two datasets where the active one is not the first", () => {
+    const twoDatasetState = (): Pick<
+      EvaluationsV3State,
+      "datasets" | "activeDatasetId" | "targets" | "evaluators"
+    > => ({
+      datasets: [
+        { id: "dataset-old", name: "Old" },
+        { id: "dataset-active", name: "Active" },
+      ] as EvaluationsV3State["datasets"],
+      activeDatasetId: "dataset-active",
+      targets: [
+        {
+          id: "target-1",
+          type: "prompt",
+          inputs: [{ identifier: "input", type: "str" }],
+          outputs: [{ identifier: "output", type: "str" }],
+          mappings: {
+            "dataset-active": {
+              input: {
+                type: "source",
+                source: "dataset",
+                sourceId: "dataset-active",
+                sourceField: "question",
+              },
+            },
+          },
+        },
+      ] as EvaluationsV3State["targets"],
+      evaluators: [
+        {
+          id: "eval-1",
+          evaluatorType: "langevals/exact_match",
+          inputs: [
+            { identifier: "output", type: "str" },
+            { identifier: "expected_output", type: "str" },
+          ],
+          mappings: {
+            "dataset-active": {
+              "target-1": {
+                output: {
+                  type: "source",
+                  source: "target",
+                  sourceId: "target-1",
+                  sourceField: "output",
+                },
+                expected_output: {
+                  type: "source",
+                  source: "dataset",
+                  sourceId: "dataset-active",
+                  sourceField: "expected",
+                },
+              },
+            },
+          },
+        },
+      ] as EvaluationsV3State["evaluators"],
+    });
+
+    describe("when the run builds its cells", () => {
+      /** @scenario "The run reads its mappings from the dataset the rows come from" */
+      it("reads the mapping bucket of the active dataset", () => {
+        const cells = generateCells(twoDatasetState(), createTestDataset(1), {
+          type: "full",
+        });
+
+        expect(cells).toHaveLength(1);
+        expect(cells[0]?.datasetEntry._datasetId).toBe("dataset-active");
+      });
+
+      /** @scenario "The run reads its mappings from the dataset the rows come from" */
+      it("resolves the evaluator's inputs instead of dispatching an empty payload", () => {
+        const cells = generateCells(twoDatasetState(), createTestDataset(1), {
+          type: "full",
+        });
+
+        expect(
+          buildEvaluatorInputs(cells[0]!, "eval-1", { output: "Answer 0" }),
+        ).toEqual({ output: "Answer 0", expected_output: "Answer 0" });
+      });
     });
   });
 

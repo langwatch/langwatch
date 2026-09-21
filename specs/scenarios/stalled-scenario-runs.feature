@@ -33,6 +33,18 @@ Feature: Detect and display stalled scenario runs
     When the stall watchdog wake fires
     Then the run finishes with status ERROR and reason "stalled"
 
+  # A run reported from outside opens with RUN_STARTED: only the platform
+  # emits QUEUED. The watchdog must decide the stall from the activity the
+  # process really saw, not from the identity only the queued path stamps,
+  # or a CI machine that dies mid-run leaves the run in progress forever.
+  @unit
+  Scenario: An externally reported run quiet past the threshold is finished as stalled
+    Given a run reported by an SDK from outside the platform, so no queued event exists
+    And the reporting process died before it sent a finished event
+    When the stall watchdog wake fires after the threshold of silence
+    Then the run finishes with status ERROR and reason "stalled"
+    And a run still sending activity keeps its wake armed instead
+
   # The watchdog only puts the reason on its finish command; the command is
   # what must carry it onto the recorded event, or the run shows an error
   # with no explanation.

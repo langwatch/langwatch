@@ -27,6 +27,7 @@ import {
   stateFilePath,
   writeFingerprint,
 } from "./hook-state";
+import { drainSessionContextSpool } from "./session-context-spool";
 import {
   codexSessionIndexPath,
   readCodexThreadNames,
@@ -212,6 +213,51 @@ export async function findRolloutForThread(
  * already final. Worth knowing before making the emitted content depend on
  * anything that keeps changing after the turn ends.
  */
+/**
+ * Send the declarations a sandboxed `langwatch ingest context` could not.
+ *
+ * The notify program codex runs is spawned from codex's own process, outside
+ * the sandbox it puts its shell in, so this is the seam that can reach the
+ * collector when the agent's own shell cannot. It runs after the session
+ * context posts above, so a declared checkout is the last one written and
+ * becomes the session's current branch.
+ */
+async function drainCodexSpool(args: {
+  nowMs: number;
+  logsEndpoint: string | null;
+  token: string;
+  stateDir?: string;
+  fetchImpl?: typeof fetch;
+}): Promise<void> {
+  const { logsEndpoint, token } = args;
+  if (!logsEndpoint) return;
+  const doFetch = args.fetchImpl ?? fetch;
+  await drainSessionContextSpool({
+    stateDir: args.stateDir ?? defaultStateDir(),
+    now: () => args.nowMs,
+    post: async (payload) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5_000);
+      try {
+        const response = await doFetch(logsEndpoint, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+        return response.ok;
+      } catch {
+        return false;
+      } finally {
+        clearTimeout(timer);
+      }
+    },
+  });
+}
+
 export async function harvestCodexThread(args: {
   threadId: string;
   nowMs: number;
@@ -244,6 +290,7 @@ export async function harvestCodexThread(args: {
     fetchImpl: args.fetchImpl,
     runGit: args.runGit,
   });
+  await drainCodexSpool(args);
   const recent = turns.slice(-RECENT_TURN_WINDOW);
   if (recent.length === 0) return 0;
   await postCodexTurns({
@@ -617,6 +664,7 @@ export async function harvestAndEmitCodexIO(args: {
     fetchImpl,
     runGit,
   });
+  await drainCodexSpool(args);
   if (turns.length === 0) return 0;
   await postCodexTurns({ turns, nowMs, endpoint, token, fetchImpl });
   return turns.length;

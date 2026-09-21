@@ -167,9 +167,12 @@ const serveCliAuthEndpoints = () => {
     async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.includes("/api/auth/cli/lookup")) {
+        // Echo the requested code back, so a test can open the screen for a
+        // second code and observe the difference.
+        const echoed = /user_code=([^&]+)/.exec(url)?.[1] ?? "WDJB-MJHT";
         return new Response(
           JSON.stringify({
-            user_code: "WDJB-MJHT",
+            user_code: echoed,
             status: "pending",
             expires_at: Date.now() + 10 * 60_000,
             credential_type: "device_session",
@@ -194,15 +197,33 @@ const serveCliAuthEndpoints = () => {
   );
 };
 
-const renderPage = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <CliAuthPage />
-    </ChakraProvider>,
-  );
+const pageElement = () => (
+  <ChakraProvider value={defaultSystem}>
+    <CliAuthPage />
+  </ChakraProvider>
+);
+
+const renderPage = () => render(pageElement());
 
 const approveButton = () =>
   screen.getByRole("button", { name: "Approve" }) as HTMLButtonElement;
+
+/**
+ * Step one of the screen: the code check. The organization picker, the
+ * access selection and the approve action do not exist until it passes, so
+ * every flow below confirms the terminal code right after rendering.
+ */
+const confirmCode = async (user: ReturnType<typeof userEvent.setup>) => {
+  await waitFor(() =>
+    expect(screen.getByText("WDJB-MJHT")).toBeInTheDocument(),
+  );
+  await user.click(screen.getByRole("button", { name: "Confirm" }));
+  await waitFor(() =>
+    expect(
+      screen.queryByText(/Confirm this matches the code shown in your/),
+    ).toBeNull(),
+  );
+};
 
 beforeEach(() => {
   fetchMock.mockReset();
@@ -231,6 +252,7 @@ describe("/cli/auth key selection, given an organization admin", () => {
   it("preselects the whole organization and approves with an organization binding", async () => {
     const user = userEvent.setup();
     renderPage();
+    await confirmCode(user);
 
     await waitFor(() =>
       expect(screen.getAllByText("Acme Org").length).toBeGreaterThan(0),
@@ -252,6 +274,7 @@ describe("/cli/auth key selection, given an organization admin", () => {
   it("sends a default permission list without the organization-management set", async () => {
     const user = userEvent.setup();
     renderPage();
+    await confirmCode(user);
 
     await waitFor(() => expect(approveButton().disabled).toBe(false));
     await user.click(approveButton());
@@ -279,6 +302,7 @@ describe("/cli/auth key selection, given an organization admin", () => {
   it("disables the approve action when every scope is deselected", async () => {
     const user = userEvent.setup();
     renderPage();
+    await confirmCode(user);
 
     await waitFor(() => expect(approveButton().disabled).toBe(false));
 
@@ -295,6 +319,7 @@ describe("/cli/auth key selection, given an organization admin", () => {
   it("sends the customized permission list after narrowing traces to read", async () => {
     const user = userEvent.setup();
     renderPage();
+    await confirmCode(user);
 
     await waitFor(() => expect(approveButton().disabled).toBe(false));
     await user.click(screen.getByRole("button", { name: "Customize" }));
@@ -324,6 +349,7 @@ describe("/cli/auth key selection, given a regular member of two shared teams", 
   it("preselects the shared teams plus the personal workspace, not the organization", async () => {
     const user = userEvent.setup();
     renderPage();
+    await confirmCode(user);
 
     await waitFor(() =>
       expect(screen.getAllByText("Engineering").length).toBeGreaterThan(0),
@@ -366,6 +392,7 @@ describe("/cli/auth key selection, given teams the user holds different roles on
   it("sends only the permissions every selected team grants", async () => {
     const user = userEvent.setup();
     renderPage();
+    await confirmCode(user);
 
     await waitFor(() => expect(approveButton().disabled).toBe(false));
     await user.click(approveButton());
@@ -392,6 +419,7 @@ describe("/cli/auth key selection, given teams the user holds different roles on
   it("locks the write level on rows only one team grants", async () => {
     const user = userEvent.setup();
     renderPage();
+    await confirmCode(user);
 
     await waitFor(() => expect(approveButton().disabled).toBe(false));
     await user.click(screen.getByRole("button", { name: "Customize" }));
@@ -404,5 +432,84 @@ describe("/cli/auth key selection, given teams the user holds different roles on
       await screen.findByRole("menuitem", { name: "Read" }),
     ).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Write" })).toBeNull();
+  });
+});
+
+describe("/cli/auth code confirmation", () => {
+  describe("given a pending device code", () => {
+    describe("when the page opens", () => {
+      /** @scenario "the screen asks for the code check first" */
+      it("shows only the code and the confirm action before anything else", async () => {
+        renderPage();
+
+        await waitFor(() =>
+          expect(screen.getByText("WDJB-MJHT")).toBeInTheDocument(),
+        );
+        expect(
+          screen.getByRole("button", { name: "Confirm" }),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByText(/Confirm this matches the code shown in your/),
+        ).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+        expect(screen.queryByText("What the CLI can access")).toBeNull();
+      });
+    });
+
+    describe("when the user confirms the code", () => {
+      /** @scenario "confirming the code reveals the access selection" */
+      it("hides the code section and shows the access selection", async () => {
+        const user = userEvent.setup();
+        renderPage();
+        await confirmCode(user);
+
+        expect(screen.queryByText("WDJB-MJHT")).toBeNull();
+        expect(
+          screen.queryByText(/Confirm this matches the code shown in your/),
+        ).toBeNull();
+        expect(
+          screen.getByRole("button", { name: "Approve" }),
+        ).toBeInTheDocument();
+        expect(screen.getByText("What the CLI can access")).toBeInTheDocument();
+      });
+    });
+
+    describe("when a different code is opened in the same tab", () => {
+      beforeEach(() => {
+        bindingsRef.current = [
+          { scopeType: "ORGANIZATION", scopeId: "org-1", role: "ADMIN" },
+        ];
+      });
+
+      /** @scenario "a new device code starts the confirmation over" */
+      it("returns to the confirmation step with no trace of the old flow", async () => {
+        const user = userEvent.setup();
+        const view = renderPage();
+        await confirmCode(user);
+
+        // The old code runs its whole course first: approve reaches the
+        // success screen, so the reset below has real finished state to clear.
+        await waitFor(() => expect(approveButton().disabled).toBe(false));
+        await user.click(approveButton());
+        await waitFor(() =>
+          expect(screen.getByText("You're signed in!")).toBeInTheDocument(),
+        );
+
+        mockRouter.query = { user_code: "AAAA-BBBB" };
+        view.rerender(pageElement());
+
+        await waitFor(() =>
+          expect(screen.getByText("AAAA-BBBB")).toBeInTheDocument(),
+        );
+        expect(
+          screen.getByRole("button", { name: "Confirm" }),
+        ).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+        expect(screen.queryByText("You're signed in!")).toBeNull();
+        expect(
+          screen.queryByText(/Confirm this matches the code shown in your/),
+        ).toBeInTheDocument();
+      });
+    });
   });
 });

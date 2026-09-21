@@ -50,7 +50,10 @@ export function buildRemoteTraceRunConfig({
   langwatchEndpoint: string;
   langwatchApiKey: string;
 }): RemoteTraceRunConfig | Record<string, never> {
-  if (targetType !== "http") {
+  // A connected agent's SDK adopts the turn's traceparent before it calls the
+  // function, so its spans land in the turn's trace exactly as an http
+  // target's do behind a traceparent middleware.
+  if (targetType !== "http" && targetType !== "connected") {
     return {};
   }
   return {

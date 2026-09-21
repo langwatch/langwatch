@@ -751,6 +751,34 @@ export const BUILTIN_SECRET_RULES: readonly {
 }[] = VALUE_RULES.map(({ id, description }) => ({ id, description }));
 
 /**
+ * The rules that judge a token by its own SHAPE.
+ *
+ * Every other value rule needs the text to name the credential, either with a
+ * namespace the vendor really mints (`sk-`, `ghp_`, `AKIA`, `glpat-`), with
+ * armour, with a URL that carries a password, with an `Authorization` scheme,
+ * or with a credential keyword in front of the value. A record id carries none
+ * of those, so none of those rules can take one.
+ *
+ * These two read the token and nothing else. `shaped_api_key` asks only whether
+ * the body looks random enough, and a record id minted as `prefix_<random body>`
+ * looks exactly that random: that rule is what took `scenario.run_id` in
+ * production. `prefixed_hex_api_key` asks for an all-hex body behind a middle
+ * word (`live`, `test`, `key`, `secret`), and those are ordinary English words
+ * that any product is free to put in an id of its own, so it reads a shape too
+ * rather than a name a vendor owns.
+ *
+ * They are therefore the only rules that can take an identifier, and the only
+ * ones a caller ever has cause to turn off. Offered as a named list so a caller
+ * states which layer it is turning off rather than hard-coding rule ids, and so
+ * a new shape rule joins the list here instead of being forgotten at every call
+ * site.
+ */
+export const SHAPE_ONLY_SECRET_RULE_IDS: readonly string[] = [
+  "prefixed_hex_api_key",
+  "shaped_api_key",
+];
+
+/**
  * Attribute names whose VALUE should always be scrubbed regardless of shape.
  * Non-global (so `.test` is safe) and bounded by `._-` separators so plural or
  * compound metadata keys like `gen_ai.usage.input_tokens` never match `token`.
@@ -1042,37 +1070,60 @@ const PEM_END = "-----END";
  * Redact secrets from one string. Runs every built-in value rule, then any
  * caller-supplied custom patterns. Returns the scrubbed text and how many
  * secrets were replaced.
+ *
+ * `skipRuleIds` names built-in rules to leave out of this one scan. It reaches
+ * the built-in rules only: a custom pattern is a decision the customer made
+ * about their own data and always runs. See
+ * {@link SHAPE_ONLY_SECRET_RULE_IDS} for the one list a caller has cause to
+ * pass.
  */
 export function redactSecretsInText({
   text,
   customPatterns = [],
+  skipRuleIds,
 }: {
   text: string;
   customPatterns?: readonly RegExp[];
+  skipRuleIds?: readonly string[];
 }): SecretsRedactionResult {
   if (typeof text !== "string" || text.length === 0) {
     return { text, redactedCount: 0 };
   }
+  const skipped = toSkipSet(skipRuleIds);
   if (text.length > MAX_SCAN_LENGTH) {
     let total = 0;
     const pieces = sliceForScan(text).map((slice) => {
-      const scanned = redactOneSlice(slice, customPatterns);
+      const scanned = redactOneSlice(slice, customPatterns, skipped);
       total += scanned.redactedCount;
       return scanned.text;
     });
     return { text: pieces.join(""), redactedCount: total };
   }
-  return redactOneSlice(text, customPatterns);
+  return redactOneSlice(text, customPatterns, skipped);
+}
+
+/**
+ * The skip list as a set, built once per scan rather than once per rule. An
+ * absent or empty list becomes `null`, which the rule loop reads as "run
+ * everything" without a lookup per rule.
+ */
+function toSkipSet(
+  skipRuleIds: readonly string[] | undefined,
+): ReadonlySet<string> | null {
+  if (!skipRuleIds || skipRuleIds.length === 0) return null;
+  return new Set(skipRuleIds);
 }
 
 function redactOneSlice(
   text: string,
   customPatterns: readonly RegExp[],
+  skipped: ReadonlySet<string> | null,
 ): SecretsRedactionResult {
   let redactedCount = 0;
   let result = text;
 
   for (const rule of VALUE_RULES) {
+    if (skipped?.has(rule.id)) continue;
     if (rule.precondition && !rule.precondition(result)) continue;
     result = result.replace(rule.regex, (...args: string[]) => {
       const replacement = replacementFor(rule, args);
@@ -1108,7 +1159,8 @@ export interface SecretMatch {
  * Detect secrets in one string WITHOUT redacting it: returns the rule that
  * matched and where, so the secrets evaluator can report a leak (and which
  * kind) while leaving the text alone. Shares the exact rule set used by
- * `redactSecretsInText`, so what the evaluator flags is what redaction scrubs.
+ * `redactSecretsInText`, including `skipRuleIds`, so what the evaluator flags
+ * is what redaction scrubs.
  *
  * Uses `matchAll`, which clones the regex internally, so the module-level global
  * rules keep `lastIndex === 0` just like the `.replace` path. Detection scans
@@ -1119,9 +1171,11 @@ export interface SecretMatch {
 export function detectSecretsInText({
   text,
   customPatterns = [],
+  skipRuleIds,
 }: {
   text: string;
   customPatterns?: readonly RegExp[];
+  skipRuleIds?: readonly string[];
 }): SecretMatch[] {
   if (
     typeof text !== "string" ||
@@ -1131,8 +1185,10 @@ export function detectSecretsInText({
     return [];
   }
 
+  const skipped = toSkipSet(skipRuleIds);
   const matches: SecretMatch[] = [];
   for (const rule of VALUE_RULES) {
+    if (skipped?.has(rule.id)) continue;
     matches.push(...matchesOfRule(rule, text));
   }
   for (const pattern of customPatterns) {

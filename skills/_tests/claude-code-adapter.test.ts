@@ -1,16 +1,16 @@
+import { pointClaudeMdAtSkills } from "@langwatch/scenario";
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
 	createSkillTestWorkDir,
-	ensureClaudeSkillInstructions,
 	installSkillToWorkDir,
 	removeSkillTestWorkDir,
 } from "./helpers/claude-code-adapter";
 
 describe("Claude Code skill discovery", () => {
-	it("preserves existing instructions and appends each missing skill once", () => {
+	it("points an existing CLAUDE.md at each installed skill once", () => {
 		const workingDirectory = createSkillTestWorkDir(
 			"claude-skill-discovery-",
 		);
@@ -28,8 +28,8 @@ describe("Claude Code skill discovery", () => {
 				skillSubpath: "online-evaluations",
 			});
 
-			ensureClaudeSkillInstructions(workingDirectory);
-			ensureClaudeSkillInstructions(workingDirectory);
+			pointClaudeMdAtSkills(workingDirectory);
+			pointClaudeMdAtSkills(workingDirectory);
 
 			const contents = fs.readFileSync(
 				path.join(workingDirectory, "CLAUDE.md"),

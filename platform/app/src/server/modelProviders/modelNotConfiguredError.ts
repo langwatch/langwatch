@@ -1,4 +1,5 @@
 import { HandledError } from "@langwatch/handled-error";
+import { remediation } from "../app-layer/error-remediation";
 import type { ModelRole } from "./featureRegistry";
 
 /**
@@ -58,6 +59,10 @@ export class ModelNotConfiguredError extends HandledError {
       {
         httpStatus: 400,
         meta: { featureKey, role, featureDisplayName, projectId },
+        // Names the settings page and the scope to set it at. A caller with no
+        // UI (CLI, MCP, an agent driving the API) has nothing else to go on,
+        // and "no model configured" alone does not say where the setting is.
+        ...remediation("model_not_configured"),
       },
     );
     this.name = "ModelNotConfiguredError";

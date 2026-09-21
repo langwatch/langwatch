@@ -24,6 +24,7 @@ import {
 } from "./projections/sessionMetricSeries.mapProjection";
 import { CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH } from "./schemas/constants";
 import type { CodingAgentProcessingEvent } from "./schemas/events";
+import type { SessionContextMemo } from "./services/session-context-memo";
 import {
   PULL_REQUEST_MAPPING_WINDOW_MS,
   pullRequestMappingGroupKey,
@@ -37,6 +38,12 @@ export interface CodingAgentProcessingPipelineDeps {
   codingAgentTraceSessionAppendStore: AppendStore<CodingAgentTraceSessionRecord>;
   sessionMetricSeriesAppendStore: AppendStore<SessionMetricSeriesRecord>;
   codingAgentSessionEventsAppendStore: AppendStore<CodingAgentSessionEventRecord>;
+  /**
+   * The "context the session last declared" store the log-facts command stamps
+   * fact rows from (see `services/session-context-memo.ts`). Redis-backed in
+   * the app; in-memory in tests.
+   */
+  sessionContextMemo: SessionContextMemo;
   /**
    * Asks the organization's GitHub connection which pull requests a folded
    * session's branch has hosted. Absent where there is no GitHub connection to
@@ -123,12 +130,26 @@ export function createCodingAgentProcessingPipeline(
     // `CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH` and the derivation's
     // model-call chain. Each handler derives its event from its own command
     // alone and never reads back a same-batch append.
-    .withCommand("contributeSpanFacts", ContributeSpanFactsCommand, {
-      coalesceMaxBatch: CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH,
-    })
-    .withCommand("contributeLogFacts", ContributeLogFactsCommand, {
-      coalesceMaxBatch: CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH,
-    })
+    // Instances rather than classes: both commands carry the session-context
+    // memo. The log-facts command fills it from a declaration and stamps
+    // row-bearing contributions from it; the span-facts command only reads
+    // it, to stamp the spans that carry a model call.
+    .withCommandInstance(
+      "contributeSpanFacts",
+      ContributeSpanFactsCommand,
+      new ContributeSpanFactsCommand({ contextMemo: deps.sessionContextMemo }),
+      {
+        coalesceMaxBatch: CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH,
+      },
+    )
+    .withCommandInstance(
+      "contributeLogFacts",
+      ContributeLogFactsCommand,
+      new ContributeLogFactsCommand({ contextMemo: deps.sessionContextMemo }),
+      {
+        coalesceMaxBatch: CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH,
+      },
+    )
     .withCommand("contributeMetricFacts", ContributeMetricFactsCommand, {
       coalesceMaxBatch: CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH,
     });

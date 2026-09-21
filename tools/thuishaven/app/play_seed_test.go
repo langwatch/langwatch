@@ -36,14 +36,22 @@ func (fakeContainer) Ensure(context.Context) (string, error) { return "unix:///f
 func (fakeContainer) Profile() string                        { return "fake" }
 
 // playCheckout is a complete-enough checkout for the launcher: a lockfile (so
-// the dependency install resolves a workspace root) and the app directory.
+// the dependency install resolves a workspace root), the app directory, and an
+// already-built api bundle. The bundle is part of "complete enough" because
+// preparePlaySandbox refuses to continue without one — these are seed tests, so
+// they start from a checkout that has been built and say nothing about the
+// build itself; TestPreparePlaySandbox* covers that.
 func playCheckout(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "pnpm-lock.yaml"), []byte("x"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(dir, "platform", "app"), 0o750); err != nil {
+	bundle := filepath.Join(dir, "platform", "app", apiBundleRelPath)
+	if err := os.MkdirAll(filepath.Dir(bundle), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(bundle, []byte("// built\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	return dir

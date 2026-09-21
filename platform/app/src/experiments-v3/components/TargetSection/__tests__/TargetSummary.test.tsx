@@ -392,4 +392,42 @@ describe("TargetSummary", () => {
       );
     });
   });
+
+  describe("given a column whose run has stopped", () => {
+    describe("when it has results for only some of the dataset", () => {
+      /** @scenario "A score over part of the dataset says how much it covers" */
+      it("draws the row count beside the score", () => {
+        const aggregates = createAggregate({
+          completedRows: 30,
+          totalRows: 40,
+          overallPassRate: 93,
+        });
+
+        render(<TargetSummary aggregates={aggregates} evaluators={[]} />, {
+          wrapper: Wrapper,
+        });
+
+        // The score alone reads as this column's result. The count is what
+        // stops it being compared against a column that answered every row.
+        expect(screen.getByText("30/40")).toBeInTheDocument();
+      });
+    });
+
+    describe("when it has results for the whole dataset", () => {
+      /** @scenario "A score over the whole dataset stands on its own" */
+      it("draws the score with no row count beside it", () => {
+        const aggregates = createAggregate({
+          completedRows: 40,
+          totalRows: 40,
+          overallPassRate: 92,
+        });
+
+        render(<TargetSummary aggregates={aggregates} evaluators={[]} />, {
+          wrapper: Wrapper,
+        });
+
+        expect(screen.queryByText("40/40")).not.toBeInTheDocument();
+      });
+    });
+  });
 });

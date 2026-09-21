@@ -315,10 +315,11 @@ secured.access(annotationsViewAuth).get("/annotations/trace/:id", async (c) => {
 secured
   .access(annotationsCreateAuth)
   .post("/annotations/trace/:id", async (c) => {
-    // `:create` (not `:manage`) — same fix as evaluators' POST route. Creating
-    // is a lesser privilege than update/delete, and LANGY_CANDIDATE_PERMISSIONS
-    // only ever grants annotations:create, never :manage. PATCH/DELETE above
-    // correctly stay on :manage.
+    // `:create` (not `:manage`) — same fix as evaluators' POST route. A create
+    // asks for the create grain; demanding `:manage` here would refuse every
+    // restricted key that can create but not delete, which is exactly how
+    // `scenarios:create` produced a production 403. (`:manage` still implies
+    // `:create` via the hierarchy, so nobody loses access.)
     const auth = await authenticateRequest(c, "annotations:create");
     if ("error" in auth) {
       return c.json(auth.body, auth.status);

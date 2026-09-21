@@ -90,8 +90,9 @@ func (o *Orchestrator) RunHeavy(ctx context.Context, r HeavyRun) error {
 	started := o.sys.Now()
 	// The inner script takes a machine-wide slot of its own. We already hold
 	// one, so turn that gate off for this run: counting it twice would queue it
-	// behind itself.
-	env := []string{"CHECK_SLOTS=0", "HAVEN_SLOT_HELD=1"}
+	// behind itself. The pid marker is what agent shells honor, and it only
+	// convinces a descendant.
+	env := []string{"CHECK_SLOTS=0", "CHECK_QUEUE_HELD=" + strconv.Itoa(os.Getpid()), "HAVEN_SLOT_HELD=1"}
 	if r.Workers > 0 {
 		env = append(env, "VITEST_MAX_WORKERS="+strconv.Itoa(r.Workers))
 	}

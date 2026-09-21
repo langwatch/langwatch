@@ -11,26 +11,39 @@ func tsgoAt(pid int, class TsgoClass, rssGiB int64, started time.Time) TsgoProce
 	return TsgoProcess{PID: pid, Class: class, RSS: rssGiB * tsgoGiB, Started: started}
 }
 
-// @scenario "The governor only ever touches tsgo"
-func TestIsTsgoCommand(t *testing.T) {
+// @scenario "The governor only ever touches the TypeScript compiler"
+// @scenario "The compiler is governed under both of its names"
+func TestIsTypeScriptCompilerCommand(t *testing.T) {
 	t.Run("matches the binary path, not the arguments", func(t *testing.T) {
 		yes := []string{
+			// The preview package's name, still live on machines that have it
+			// and on a local build of the TypeScript repo.
 			"/x/node_modules/@typescript/native-preview-darwin-arm64/lib/tsgo --lsp --stdio",
 			"tsgo --noEmit --project ./tsconfig.tsgo.json",
+			// typescript@7 publishes the same Go binary as `tsc`, and
+			// lib/tsc.js execve()s it, so the live process IS the compiler.
+			"/Users/x/repo/node_modules/.pnpm/@typescript+typescript-darwin-arm64@7.0.2/node_modules/@typescript/typescript-darwin-arm64/lib/tsc --noEmit --project ./tsconfig.tsgo.json",
+			"./node_modules/.bin/tsc --noEmit -p tsconfig.tsgo.json",
+			"tsc --lsp --stdio",
 		}
 		no := []string{
 			"node dev/scripts/check-queue.mjs ./node_modules/.bin/tsgo.real",
+			"node dev/scripts/check-queue.mjs ./node_modules/.bin/tsc.real --noEmit",
 			"grep tsgo server.log",
+			"grep -rn tsc dev/scripts",
 			"/usr/bin/vim tsgo.go",
+			"/x/bin/tsclint --fix",
+			"/x/bin/mytsc --noEmit",
+			"/x/node --tsc",
 			"clickhouse-server --daemon",
 		}
 		for _, c := range yes {
-			if !IsTsgoCommand(c) {
-				t.Errorf("expected tsgo: %q", c)
+			if !IsTypeScriptCompilerCommand(c) {
+				t.Errorf("expected the TypeScript compiler: %q", c)
 			}
 		}
 		for _, c := range no {
-			if IsTsgoCommand(c) {
+			if IsTypeScriptCompilerCommand(c) {
 				t.Errorf("must never be a candidate: %q", c)
 			}
 		}
@@ -38,12 +51,64 @@ func TestIsTsgoCommand(t *testing.T) {
 }
 
 func TestClassifyTsgo(t *testing.T) {
-	if ClassifyTsgo("/lib/tsgo --lsp --stdio") != TsgoLSP {
-		t.Error("an --lsp invocation is a language server")
-	}
-	if ClassifyTsgo("/lib/tsgo --noEmit -p tsconfig.json") != TsgoRun {
-		t.Error("everything else is a run")
-	}
+	t.Run("given the preview binary name", func(t *testing.T) {
+		if ClassifyTsgo("/lib/tsgo --lsp --stdio") != TsgoLSP {
+			t.Error("an --lsp invocation is a language server")
+		}
+		if ClassifyTsgo("/lib/tsgo --noEmit -p tsconfig.json") != TsgoRun {
+			t.Error("everything else is a run")
+		}
+	})
+
+	// The split is arg-based, so the rename cannot have touched it — pinned
+	// because an LSP's protection (its own ceiling, its own idle TTL) hangs
+	// off the role and not off the binary's name.
+	t.Run("given the typescript@7 binary name", func(t *testing.T) {
+		if ClassifyTsgo("/lib/tsc --lsp --stdio") != TsgoLSP {
+			t.Error("an --lsp invocation is a language server")
+		}
+		if ClassifyTsgo("/lib/tsc --noEmit -p tsconfig.tsgo.json") != TsgoRun {
+			t.Error("everything else is a run")
+		}
+	})
+}
+
+// @scenario "The compiler is governed under both of its names"
+func TestClassifyWatchedProcessPutsBothCompilerNamesInOneClass(t *testing.T) {
+	t.Run("given the compiler under each of its names", func(t *testing.T) {
+		cases := map[string]TsgoClass{
+			"/Users/x/repo/node_modules/.pnpm/@typescript+typescript-darwin-arm64@7.0.2/node_modules/@typescript/typescript-darwin-arm64/lib/tsc --noEmit --project ./tsconfig.tsgo.json": TsgoRun,
+			"/x/lib/tsgo --noEmit -p tsconfig.tsgo.json": TsgoRun,
+			"/x/lib/tsc --lsp --stdio":                   TsgoLSP,
+			"/x/lib/tsgo --lsp --stdio":                  TsgoLSP,
+		}
+
+		t.Run("each lands in the one class, with its own role", func(t *testing.T) {
+			for command, role := range cases {
+				w, ok := ClassifyWatchedProcess(command)
+				if !ok {
+					t.Fatalf("%q must be watched", command)
+				}
+				// One class, so limits, dashboards and reap events aggregate
+				// the one compiler instead of splitting the budget in two.
+				if w.Class != TypeScriptCompilerClass {
+					t.Errorf("%q classed %q, want %q", command, w.Class, TypeScriptCompilerClass)
+				}
+				if w.Role != role {
+					t.Errorf("%q role %q, want %q", command, w.Role, role)
+				}
+			}
+		})
+	})
+
+	t.Run("given a process that only mentions the compiler", func(t *testing.T) {
+		t.Run("it is not watched as the compiler", func(t *testing.T) {
+			w, ok := ClassifyWatchedProcess("/usr/bin/grep -rn tsc dev/scripts")
+			if ok && w.Class == TypeScriptCompilerClass {
+				t.Fatalf("an argument mention must never be the compiler, got %+v", w)
+			}
+		})
+	})
 }
 
 func TestGovernTsgo(t *testing.T) {
@@ -139,6 +204,28 @@ func TestGovernTsgo(t *testing.T) {
 		}
 	})
 
+	// One compiler, one budget: the two names have to be weighed together or
+	// each half of a machine's compilers is governed against the whole budget.
+	// @scenario "The compiler is governed under both of its names"
+	t.Run("given a tsc run and a tsgo run that only exceed the budget together", func(t *testing.T) {
+		procs := governedSubset(t, []sampled{
+			{command: "/x/lib/tsc --noEmit -p tsconfig.tsgo.json", rssGiB: 7, started: now.Add(-10 * time.Minute)},
+			{command: "/y/lib/tsgo --noEmit -p tsconfig.tsgo.json", rssGiB: 7, started: now.Add(-1 * time.Minute)},
+		})
+
+		// 7 + 7 = 14 GiB against a 12 GiB budget, and neither is over the
+		// 12 GiB per-run ceiling on its own: drop either from the sum and
+		// nothing would be reclaimed at all.
+		kills := GovernTsgo(procs, limits)
+
+		if len(kills) != 1 || kills[0].PID != 2 {
+			t.Fatalf("expected the youngest of the two compilers stopped, got %+v", kills)
+		}
+		if kills[0].Reason != "combined tsgo footprint exceeds the machine budget" {
+			t.Fatalf("expected the combined-budget reason, got %q", kills[0].Reason)
+		}
+	})
+
 	// @scenario "The operator can disable the governor"
 	t.Run("given the per-run ceiling is disabled", func(t *testing.T) {
 		off := limits
@@ -148,6 +235,33 @@ func TestGovernTsgo(t *testing.T) {
 			t.Fatalf("a disabled governor considers nothing, got %+v", kills)
 		}
 	})
+}
+
+// sampled is one live process as ps would report it, for the tests that start
+// from a command line rather than from an already-classified process.
+type sampled struct {
+	command string
+	rssGiB  int64
+	started time.Time
+}
+
+// governedSubset is what the daemon's tick does, in the two lines that matter
+// here: classify every sampled process and keep the ones in the compiler
+// class. Going through the classifier is the point — it is what decides
+// whether a `tsc` process reaches the governor at all.
+func governedSubset(t *testing.T, samples []sampled) []TsgoProcess {
+	t.Helper()
+	var procs []TsgoProcess
+	for i, s := range samples {
+		w, ok := ClassifyWatchedProcess(s.command)
+		if !ok || w.Class != TypeScriptCompilerClass {
+			t.Fatalf("%q must reach the governor, got %+v ok=%v", s.command, w, ok)
+		}
+		procs = append(procs, TsgoProcess{
+			PID: i + 1, Class: w.Role, RSS: s.rssGiB * tsgoGiB, Started: s.started,
+		})
+	}
+	return procs
 }
 
 func TestParsePSDuration(t *testing.T) {

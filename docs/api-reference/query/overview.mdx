@@ -1,0 +1,219 @@
+---
+title: "Overview"
+description: "Run a read-only LangWatchQL SELECT over your project's analytics views, or discover which views and columns your key can query."
+---
+
+The Query API runs read-only LangWatchQL `SELECT` statements over your project's analytics views. `POST /api/v1/query` runs one statement. `GET /api/v1/query/schema` lists the views, columns, and function names your key can query.
+
+The request body is the query itself, and a `200` is the result itself: no envelope, no wrapper object around it. A failure answers with the standard LangWatch error envelope and a real HTTP status, so one parser reads every response.
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/query` | Run one LangWatchQL statement. |
+| `GET` | `/api/v1/query/schema` | List queryable views, columns, permission gates, and function names. |
+
+## Authentication
+
+Send your LangWatch API key in any one of these forms:
+
+| Form | Header |
+|------|--------|
+| Token header | `X-Auth-Token: <token>` |
+| Bearer | `Authorization: Bearer <token>` |
+| Basic | `Authorization: Basic base64(projectId:token)` |
+
+Any LangWatch API key works here: project, organization, or personal. Rows come from every project the key holds the `analytics:view` permission on: a project key reaches its one project, an organization or personal key reaches every project it can read. No project header is required. To narrow the result to one project, filter inside the statement itself with `WHERE TenantId = '<project id>'`.
+
+A result that mixes rows from more than one project carries the `MULTI_PROJECT_RESULT` diagnostic, so a caller who expected a single project can tell.
+
+## Errors
+
+Both endpoints answer with the standard LangWatch error envelope and a real HTTP status. No wrapper sits around it. See [Error Envelope](/ai-gateway/api/errors). Where a failure has a fix, the envelope's `meta` carries the corrective fields for it. For example, `FUNCTION_NOT_ALLOWED` lists `allowedFunctions`.
+
+| Status | `code` | When |
+|--------|--------|------|
+| `400` | `validation_error` | The request body failed validation. |
+| `400` | `lwql_unparseable` | The statement is not valid LangWatchQL. |
+| `400` | `lwql_not_permitted` | The statement is valid but calls something the policy withholds, for example a function outside the allowlist, or a `LIMIT` above 10,000 rows (`meta.violations` names it `LIMIT_TOO_HIGH` or `LIMIT_REQUIRED_PER_BRANCH`). |
+| `401` | `missing_credentials` | No supported authentication credential was sent. |
+| `401` | `invalid_credentials` | The API key is unknown, revoked, or has the wrong secret. |
+| `403` | `api_key_permission_denied` | The key lacks the `analytics:view` permission on any project. |
+| `413` | `lwql_result_too_large` | The result body exceeds about 8,000,000 bytes. |
+| `422` | `query_scan_limit_exceeded` | The statement is valid but would scan more data than the key allows. |
+
+## Queryable views
+
+Every view is a read-only projection over one ClickHouse or PostgreSQL table. `GET /api/v1/query/schema` is the live source of truth: the table below is a human-readable index of the same 47 views, grouped by what they're for.
+
+### How the catalog is built
+
+Every ClickHouse table is a view by default: the catalog is derived from a generated columns manifest, so a new table shows up here automatically once it's catalogued, rather than needing a hand-written entry.
+
+Two column families are gated rather than freely selectable: free-text carriers (captured input, captured output, tool output, log bodies) sit behind the `output` gate (`input` for a few views that separate the two), and billed/derived cost columns sit behind the `costs` gate. A gate's state comes from the project's privacy settings, never from the query. Selecting a gated column your key's project has not opened is refused outright with `GATED_COLUMN`, never silently dropped from the result.
+
+{/* lwql-views-start */}
+
+#### Observability: traces, spans, logs
+
+| View | Description | Gates | Grain | Time column |
+|------|-------------|-------|-------|-------------|
+| `traces` | One row per trace, with its timing, token, cost and error rollups. | `input`, `output`, `costs` | one row per (TenantId, TraceId), latest version only | `OccurredAt` |
+| `spans` | One row per span, with its timing, status and attributes. | `input`, `output`, `costs` | one row per (TenantId, TraceId, SpanId), latest version only | `StartTime` |
+| `logs` | Canonical OpenTelemetry log records: requests, responses and provider events, correlated to their trace and span. | `input`, `output` | one row per (TenantId, TraceId, TimeUnixMs, RecordId) | `TimeUnixMs` |
+| `log_ingestion_usage` | Per-tenant log ingestion usage estimates. | None | one row per (OrganizationId, RecordId), latest version only | `AcceptedAt` |
+| `metric_points` | Individual metric data points with gauges, sums, histograms, and summaries. | `output` | one row per (SeriesId, TimeUnixMs, PointId) | `TimeUnixMs` |
+| `metric_series_definitions` | Metric series definitions from OpenTelemetry: name, unit, attributes, kind. | `output` | one row per SeriesId | `LastSeenAt` |
+| `metric_ingestion_usage` | Per-tenant metric ingestion usage estimates. | None | one row per (OrganizationId, PointId), latest version only | `AcceptedAt` |
+| `objects` | Stored file objects: what was captured, its size and hash. | None | one row per id | `created_at` |
+| `annotations` | One row per human annotation of a trace, with the reviewer's thumbs verdict. | None | one row per AnnotationId | `CreatedAt` |
+| `langy_conversation_messages` | Langy conversation turns, one row per message. | `output` | one row per (TenantId, ConversationId, MessageId) | `CreatedAt` |
+| `langy_usage_events` | Langy usage telemetry: tool calls, outcomes and durations. | None | one row per (TenantId, OccurredAt, EventId) | `OccurredAt` |
+
+#### Coding agents
+
+| View | Description | Gates | Grain | Time column |
+|------|-------------|-------|-------|-------------|
+| `coding_sessions` | One row per coding-agent session, with its shape, economics, git context and outcome. Deduplicated by session. | `input`, `costs` | one row per (TenantId, SessionId), latest version only | `StartedAt` |
+| `coding_session_events` | One row per coding-agent session event: model calls, compactions, rate limits, tool runs and more, in event order. | `costs` | one row per (TenantId, SessionId, TimeUnixMs, RecordId) | `TimeUnixMs` |
+| `coding_trace_sessions` | Correlates a trace to the coding-agent session it belongs to. | None | one row per (TenantId, TraceId) | `OccurredAt` |
+| `coding_tool_results` | One row per coding-agent tool call, with the text it printed back to the agent. | `output` | one row per (TenantId, TraceId, SpanId), latest version only | `StartTime` |
+| `judgments` | One row per Instant Eval run, trace and question, with the verdict the judge gave. | None | one row per (TenantId, RunId, TraceId, SpanId, QuestionId), latest version only | `CreatedAt` |
+
+`coding_tool_results.OutputText` is what the tool printed back to the agent. Read it to answer "what did this failed tool call print":
+
+```sql
+SELECT ToolName, OutputText
+FROM coding_tool_results
+WHERE TenantId = '<project id>' AND Success = 0
+ORDER BY StartTime DESC
+LIMIT 20
+```
+
+#### Experiments & evaluations
+
+| View | Description | Gates | Grain | Time column |
+|------|-------------|-------|-------|-------------|
+| `evaluations` | One row per evaluation run, with its score and outcome. | `input`, `output` | one row per (TenantId, EvaluationId), latest version only | `ScheduledAt` |
+| `simulations` | One row per simulation run, with its verdict and criteria. | `input`, `output` | one row per (TenantId, ScenarioRunId), latest version only | `StartedAt` |
+| `simulation_trace_metrics` | Cost and latency metrics per simulated trace. | `costs` | one row per (ScenarioRunId, TraceId) | `OccurredAt` |
+| `experiments` | One row per experiment, with its display name and kind. | None | one row per ExperimentId | `CreatedAt` |
+| `experiment_items` | Individual item results within an experiment run with evaluations. | `input`, `output`, `costs` | one row per (RunId, ProjectionId) | `OccurredAt` |
+| `experiment_run_results` | Experiment run results: completion counts, cost, and aggregate scores. | `output`, `costs` | one row per (RunId, ExperimentId) | `StartedAt` |
+| `dspy_optimizer_steps` | DSPy optimizer steps with prompts, examples, and LLM call details. | `output`, `costs` | one row per (ExperimentId, RunId, StepIndex) | `CreatedAt` |
+| `batch_evaluations` | One row per offline batch evaluation of a dataset row, with its score, outcome and cost. | `costs` | one row per BatchEvaluationId | `CreatedAt` |
+| `test_suite_runs` | Test suite execution results with completion and pass counts. | None | one row per (ScenarioSetId, BatchRunId) | `StartedAt` |
+
+Note: "dataset" above refers to an evaluation dataset (rows a batch evaluation runs over). Everything else queryable through LangWatchQL is a view.
+
+#### Metrics & rollups
+
+Rollup views (`_by_minute`, `_rollups`) return **finalised values only**: figures for a bucket that was still open when the row was written are absent, not partial. A metric a caller wants without touching per-row data belongs here.
+
+| View | Description | Gates | Grain | Time column |
+|------|-------------|-------|-------|-------------|
+| `trace_metrics` | One row per trace, time-sorted, carrying its metrics and the user, conversation, customer and origin dimensions. Count traces with `uniqExact(TraceId)`. | `costs` | one row per (TenantId, OccurredAt, TraceId), latest version only; one row per trace wherever OccurredAt held still | `OccurredAt` |
+| `trace_metrics_by_minute` | Trace and span metrics summed per minute. Every measure is a sum: divide by TraceCount for a per-trace average. | `costs` | one row per (TenantId, BucketStart), every measure summed | `BucketStart` |
+| `model_usage_by_minute` | Span metrics summed per minute, per model and span type: span counts, costs and tokens. | `costs` | one merged row per (TenantId, BucketStart, Model, SpanType), every measure summed | `BucketStart` |
+| `evaluation_metrics` | One row per evaluation, its latest state, time-sorted, carrying its outcome, cost and the trace dimensions it inherited. | `costs` | one row per (TenantId, EvaluationId), latest version only | `OccurredAt` |
+| `evaluation_metrics_by_minute` | Evaluation outcomes summed per minute, per evaluator type and terminal status. Every measure is a sum: pass rate is PassCount over PassCount plus FailCount. | `costs` | one merged row per (TenantId, BucketStart, EvaluatorType, Status), every measure summed | `BucketStart` |
+| `metric_rollups` | Time-bucketed rollups of a metric series: per-bucket min, max, sum, count and histogram buckets. | None | one row per (SeriesId, BucketStart) | `BucketStart` |
+| `session_metrics` | Per-session time-series metrics with aggregate statistics. | None | one row per (SessionId, SeriesId) | `AsOf` |
+| `simulation_metric_rollups` | Per-trace simulation cost and latency, merged from the aggregating rollup: total cost and per-role cost and latency maps. | `costs` | one row per (TenantId, ScenarioRunId, TraceId), latest version only | `OccurredAt` |
+
+#### Gateway & billing
+
+| View | Description | Gates | Grain | Time column |
+|------|-------------|-------|-------|-------------|
+| `gateway_budget_ledger` | Budget ledger entries per request with token counts and spend. | `costs` | one row per (BudgetId, GatewayRequestId) | `OccurredAt` |
+| `gateway_budget_totals` | Per-scope budget totals, merged from the aggregating rollup: spend, token counts and request count per budget window. | `costs` | one row per (TenantId, Scope, ScopeId, Window, PeriodStart, BudgetId), latest version only | `PeriodStart` |
+| `gateway_request_spend` | Individual API request spend and reconciliation details. | `costs`, `output` | one row per GatewayRequestId | `OccurredAt` |
+| `billing_events` | Billing events for customer invoice generation. | None | one row per DeduplicationKeyHash | `EventTimestamp` |
+
+#### Governance & audit
+
+Governance views are keyed by the organization's hidden `internal_governance` project. A key scoped to an ordinary project sees **zero rows** here, not an error and not a gate refusal, until the caller's project set includes the org-level governance project.
+
+| View | Description | Gates | Grain | Time column |
+|------|-------------|-------|-------|-------------|
+| `governance_cost_restatements` | Index of cost-rollup restatements, keyed by the org's internal_governance project; visible only to a caller whose project set includes it. | `costs` | one row per (TenantId, RestatementKey) | `TenantId` |
+| `governance_daily_cost_rollup` | Daily cost rollups per tenant, provider and model, keyed by the org's internal_governance project; visible only to a caller whose project set includes it. | `costs`, `output` | one row per (TenantId, Day, CostSource, IngestionSourceId, Provider, Model, AgentId, CurrencyCode, RawActorId) | `Day` |
+| `governance_hourly_kpis` | Hourly spend and token KPIs per source, keyed by the org's internal_governance project; visible only to a caller whose project set includes it. | `costs` | one row per (TenantId, SourceId, HourBucket, TraceId) | `HourBucket` |
+| `governance_security_events` | Raw OCSF-shaped security events, keyed by the org's internal_governance project; visible only to a caller whose project set includes it. | `output` | one row per (TenantId, EventId) | `EventTime` |
+| `automation_events` | Audit log of automation trigger executions and actions. | None | one row per EventId | `OccurredAt` |
+
+#### Legacy
+
+Superseded by the canonical views above; kept for rolling-deployment reads and draining under their own TTL.
+
+| View | Description | Gates | Grain | Time column |
+|------|-------------|-------|-------|-------------|
+| `legacy_event_log` | Legacy append-only event log, superseded by the canonical fact tables. | `output` | one row per (AggregateType, AggregateId, IdempotencyKey) | `EventOccurredAt` |
+| `legacy_log_records` | Pre-canonical OpenTelemetry log record storage, superseded by `logs`; retained for rolling-deployment reads and draining under its own TTL. | `output` | one row per (TraceId, SpanId, ProjectionId), latest version only | `TimeUnixMs` |
+| `legacy_metric_records` | Pre-canonical OpenTelemetry metric record storage, superseded by the `metric_points` family; retained for rolling-deployment reads and draining under its own TTL. | None | one row per (TraceId, SpanId, MetricName, ProjectionId), latest version only | `TimeUnixMs` |
+
+#### Entities & reference data
+
+| View | Description | Gates | Grain | Time column |
+|------|-------------|-------|-------|-------------|
+| `projects` | The caller's project, with its display name and slug. | None | one row per TenantId | `CreatedAt` |
+| `prompts` | One row per prompt configuration, with the name its versions are known by. | None | one row per PromptId | `CreatedAt` |
+| `prompt_versions` | One row per version of a prompt, carrying the version number a trace records. | None | one row per PromptVersionId | `CreatedAt` |
+
+{/* lwql-views-end */}
+
+### Tables intentionally left out
+
+A table off the catalog above is always a recorded decision, never an oversight: a coverage guard fails the build until every ClickHouse table is either catalogued or given a reason here:
+
+| Table | Reason |
+|-------|--------|
+| `lwql_api_key_tenant_map` | Access-control plumbing, not customer telemetry: holds key hashes the row policy reads to self-filter; the policy already scopes it, so exposing it would leak the isolation mechanism for no customer benefit. |
+| `goose_db_version` | The goose migration-version table, engine-internal tooling state, no tenant column at all. |
+| Any table ending in `_mv`, or naming a `.inner` target | Materialised-view internals: engine plumbing, not a table a caller would query; its data is already exposed through the table it feeds. |
+
+## Supported functions
+
+A query may call only the functions on the allowlist below. `GET /api/v1/query/schema` serves the same list under its `functions` field, so an agent can read it back at run time, and a `FUNCTION_NOT_ALLOWED` refusal carries it under `allowedFunctions` so a rejected query can be fixed without another round trip. Combinator forms of the listed aggregates, such as `countIf`, are also accepted.
+
+- `abs`, `addDays`, `addHours`, `addMinutes`, `addMonths`, `addQuarters`, `addSeconds`, `addWeeks`, `addYears`, `and`
+- `any`, `anyLast`, `argMax`, `argMin`, `arrayAll`, `arrayAvg`, `arrayConcat`, `arrayCount`, `arrayDistinct`, `arrayElement`
+- `arrayEnumerate`, `arrayExists`, `arrayFilter`, `arrayFirst`, `arrayFirstIndex`, `arrayJoin`, `arrayLast`, `arrayMap`, `arrayMax`, `arrayMin`
+- `arrayReverseSort`, `arraySlice`, `arraySort`, `arrayStringConcat`, `arraySum`, `arrayUniq`, `assumeNotNull`, `avg`, `caseWithExpression`, `caseWithoutExpression`
+- `CAST`, `ceil`, `ceiling`, `coalesce`, `concat`, `concatWithSeparator`, `count`, `date_trunc`, `dateDiff`, `dateTrunc`
+- `dense_rank`, `divide`, `empty`, `endsWith`, `equals`, `exists`, `exp`, `extract`, `extractAll`, `first_value`
+- `floor`, `formatDateTime`, `fromUnixTimestamp`, `globalIn`, `globalNotIn`, `greater`, `greaterOrEquals`, `greatest`, `groupArray`, `groupUniqArray`
+- `has`, `hasAll`, `hasAny`, `if`, `ifNull`, `ilike`, `in`, `indexOf`, `intDiv`, `intDivOrZero`
+- `isDistinctFrom`, `isNotDistinctFrom`, `isNotNull`, `isNull`, `isValidJSON`, `JSONExtract`, `JSONExtractArrayRaw`, `JSONExtractBool`, `JSONExtractFloat`, `JSONExtractInt`
+- `JSONExtractKeys`, `JSONExtractKeysAndValues`, `JSONExtractRaw`, `JSONExtractString`, `JSONExtractUInt`, `JSONHas`, `JSONLength`, `JSONType`, `lagInFrame`, `lambda`
+- `last_value`, `leadInFrame`, `least`, `left`, `length`, `lengthUTF8`, `less`, `lessOrEquals`, `like`, `ln`
+- `log`, `log10`, `log2`, `lower`, `lowerUTF8`, `map`, `mapContains`, `mapFilter`, `mapKeys`, `mapValues`
+- `match`, `max`, `median`, `medianExact`, `min`, `minus`, `modulo`, `moduloOrZero`, `multiIf`, `multiply`
+- `negate`, `not`, `notEmpty`, `notEquals`, `notILike`, `notIn`, `notLike`, `now`, `now64`, `nth_value`
+- `ntile`, `nullIf`, `or`, `plus`, `position`, `positionCaseInsensitive`, `pow`, `power`, `quantile`, `quantileExact`
+- `quantiles`, `quantilesExact`, `quantilesTDigest`, `quantilesTiming`, `quantileTDigest`, `quantileTiming`, `rank`, `replaceAll`, `replaceOne`, `replaceRegexpAll`
+- `replaceRegexpOne`, `right`, `round`, `row_number`, `sign`, `simpleJSONExtractBool`, `simpleJSONExtractFloat`, `simpleJSONExtractInt`, `simpleJSONExtractString`, `simpleJSONExtractUInt`
+- `simpleJSONHas`, `splitByChar`, `splitByString`, `sqrt`, `startsWith`, `stddevPop`, `stddevSamp`, `substring`, `substringUTF8`, `subtractDays`
+- `subtractHours`, `subtractMinutes`, `subtractMonths`, `subtractQuarters`, `subtractSeconds`, `subtractWeeks`, `subtractYears`, `sum`, `toBool`, `toDate`
+- `toDate32`, `toDate32OrDefault`, `toDate32OrNull`, `toDate32OrZero`, `toDateOrDefault`, `toDateOrNull`, `toDateOrZero`, `toDateTime`, `toDateTime64`, `toDateTime64OrDefault`
+- `toDateTime64OrNull`, `toDateTime64OrZero`, `toDateTimeOrDefault`, `toDateTimeOrNull`, `toDateTimeOrZero`, `today`, `toDayOfMonth`, `toDayOfWeek`, `toDayOfYear`, `toDecimal128`
+- `toDecimal128OrDefault`, `toDecimal128OrNull`, `toDecimal128OrZero`, `toDecimal256`, `toDecimal256OrDefault`, `toDecimal256OrNull`, `toDecimal256OrZero`, `toDecimal32`, `toDecimal32OrDefault`, `toDecimal32OrNull`
+- `toDecimal32OrZero`, `toDecimal64`, `toDecimal64OrDefault`, `toDecimal64OrNull`, `toDecimal64OrZero`, `toFloat32`, `toFloat32OrDefault`, `toFloat32OrNull`, `toFloat32OrZero`, `toFloat64`
+- `toFloat64OrDefault`, `toFloat64OrNull`, `toFloat64OrZero`, `toHour`, `toInt128`, `toInt128OrDefault`, `toInt128OrNull`, `toInt128OrZero`, `toInt16`, `toInt16OrDefault`
+- `toInt16OrNull`, `toInt16OrZero`, `toInt256`, `toInt256OrDefault`, `toInt256OrNull`, `toInt256OrZero`, `toInt32`, `toInt32OrDefault`, `toInt32OrNull`, `toInt32OrZero`
+- `toInt64`, `toInt64OrDefault`, `toInt64OrNull`, `toInt64OrZero`, `toInt8`, `toInt8OrDefault`, `toInt8OrNull`, `toInt8OrZero`, `toIntervalDay`, `toIntervalHour`
+- `toIntervalMinute`, `toIntervalMonth`, `toIntervalQuarter`, `toIntervalSecond`, `toIntervalWeek`, `toIntervalYear`, `toISOWeek`, `toLastDayOfMonth`, `toMinute`, `toMonday`
+- `toMonth`, `topK`, `toQuarter`, `toSecond`, `toStartOfDay`, `toStartOfFifteenMinutes`, `toStartOfFiveMinutes`, `toStartOfHour`, `toStartOfInterval`, `toStartOfISOWeek`
+- `toStartOfMinute`, `toStartOfMonth`, `toStartOfQuarter`, `toStartOfSecond`, `toStartOfTenMinutes`, `toStartOfWeek`, `toStartOfYear`, `toString`, `toTimeZone`, `toUInt128`
+- `toUInt128OrDefault`, `toUInt128OrNull`, `toUInt128OrZero`, `toUInt16`, `toUInt16OrDefault`, `toUInt16OrNull`, `toUInt16OrZero`, `toUInt256`, `toUInt256OrDefault`, `toUInt256OrNull`
+- `toUInt256OrZero`, `toUInt32`, `toUInt32OrDefault`, `toUInt32OrNull`, `toUInt32OrZero`, `toUInt64`, `toUInt64OrDefault`, `toUInt64OrNull`, `toUInt64OrZero`, `toUInt8`
+- `toUInt8OrDefault`, `toUInt8OrNull`, `toUInt8OrZero`, `toUnixTimestamp`, `toUUID`, `toUUIDOrDefault`, `toUUIDOrNull`, `toUUIDOrZero`, `toWeek`, `toYear`
+- `trim`, `trimBoth`, `trimLeft`, `trimRight`, `trunc`, `truncate`, `tuple`, `tupleElement`, `uniq`, `uniqCombined`
+- `uniqExact`, `upper`, `upperUTF8`, `varPop`, `varSamp`, `yesterday`
+
+## Response ceilings
+
+A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the query runs, so a large answer comes back as one page rather than a stream. To read the rest, page with `LIMIT`/`OFFSET` and an `ORDER BY`.
+
+A statement whose own `LIMIT` asks for more than 10,000 rows is refused with `LIMIT_TOO_HIGH` before it runs. When using `UNION`, every top-level branch must carry its own `LIMIT` clause of 10,000 rows or fewer, or the query is refused with `LIMIT_REQUIRED_PER_BRANCH`. A result whose body exceeds about 8,000,000 bytes is refused outright with `lwql_result_too_large`. Select fewer columns or a smaller `LIMIT` to bring it under the cap.
