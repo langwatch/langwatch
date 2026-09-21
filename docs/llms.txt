@@ -171,10 +171,13 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Platform
 
+- [Command Bar](https://langwatch.ai/docs/platform/command-bar.md): Press Cmd+K to open any page, jump to an entity by id, search by name, switch project or theme, and ask Langy.
+
 ### Administration
 
 - [Members and Teams](https://langwatch.ai/docs/platform/members-and-teams.md): Invite people to your organization, put them on teams, give them a role per team or per project, and remove their access.
 - [Access Control (RBAC)](https://langwatch.ai/docs/platform/rbac.md): Roles, permissions, custom roles and role bindings: who can do what in an organization, a team or a project.
+- [Single sign-on and provisioning](https://langwatch.ai/docs/platform/sso.md): Set up your identity provider, directory provisioning and sign-in policies in LangWatch.
 - [API Keys](https://langwatch.ai/docs/platform/api-keys.md): Create and manage API keys in LangWatch. Use personal keys for development and AI assistants, or service keys for CI/CD and automation.
 - [Audit Log](https://langwatch.ai/docs/platform/audit-log.md): Every change made through the LangWatch settings, API and AI Gateway, with who did it, from where, and what changed.
 - [Data Privacy](https://langwatch.ai/docs/platform/data-privacy.md): One policy that controls which trace content LangWatch stores, who can read it, and how personal data and secrets are redacted, set at the organization, department, team or project level.
@@ -183,7 +186,6 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [SCIM Provisioning](https://langwatch.ai/docs/platform/scim.md): Provision and deprovision LangWatch users from your identity provider (Okta, Entra ID and others) over SCIM 2.0.
 - [SCIM Groups & Role Mapping](https://langwatch.ai/docs/platform/scim-groups.md): Bind roles to the groups your identity provider pushes over SCIM, so every member of a group holds the same access.
 - [Model Providers](https://langwatch.ai/docs/platform/model-providers.md): Store the LLM credentials that LangWatch uses for evaluators, Workflows, the playground, Agent Testing and Langy once, at the organization, team or project scope.
-- [Command Bar](https://langwatch.ai/docs/platform/command-bar.md): Press Cmd+K to open any page, jump to an entity by id, search by name, switch project or theme, and ask Langy.
 
 ## Examples & Cookbooks
 
@@ -708,7 +710,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Ops Console
 
-- [Operations Console](https://langwatch.ai/docs/self-hosting/ops/overview.md): Monitor, manage, and debug your LangWatch event-sourcing pipeline from one interface
+- [Operations Console](https://langwatch.ai/docs/self-hosting/ops/overview.md): Run your LangWatch installation: inspect queues, recover processing and support identity or directory issues.
 - [Ops Dashboard](https://langwatch.ai/docs/self-hosting/ops/dashboard.md): Real-time pipeline health monitoring with throughput, latency, and error tracking
 - [Queue Management](https://langwatch.ai/docs/self-hosting/ops/queue-management.md): Manage error groups, blocked queues, dead letter queue redriving, and draining
 - [Projection Replay](https://langwatch.ai/docs/self-hosting/ops/projection-replay.md): Rebuild projection state by replaying events from ClickHouse

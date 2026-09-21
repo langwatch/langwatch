@@ -20,9 +20,8 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
-
+import { authorizeInResolver } from "~/server/app-layer/authz/permission-adapters";
 import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
-import { authorizeInResolver } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**

@@ -20,6 +20,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { LicenseHandler } from "../../../../../ee/licensing";
 import { TEST_PUBLIC_KEY } from "../../../../../ee/licensing/__tests__/fixtures/testKeys";
@@ -104,17 +105,19 @@ describe("License Router Integration", () => {
 
     // Grant admin user an org-scoped ADMIN RoleBinding so permission checks pass
     await cleanupTestRows(prisma, [
+      [
+        "grant",
+        { organizationId, principalType: "USER", principalId: adminUser.id },
+      ],
       ["roleBinding", { organizationId, userId: adminUser.id }],
     ]);
-    await prisma.roleBinding.create({
-      data: {
-        id: `rb-lic-admin-${nanoid(8)}`,
-        organizationId,
-        userId: adminUser.id,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organizationId,
-      },
+    await seedRoleBinding(prisma, {
+      id: `rb-lic-admin-${nanoid(8)}`,
+      organizationId,
+      userId: adminUser.id,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
     });
 
     // Create member user
@@ -145,17 +148,19 @@ describe("License Router Integration", () => {
 
     // Grant member an org-scoped MEMBER RoleBinding so organization:view checks pass
     await cleanupTestRows(prisma, [
+      [
+        "grant",
+        { organizationId, principalType: "USER", principalId: memberUser.id },
+      ],
       ["roleBinding", { organizationId, userId: memberUser.id }],
     ]);
-    await prisma.roleBinding.create({
-      data: {
-        id: `rb-lic-member-${nanoid(8)}`,
-        organizationId,
-        userId: memberUser.id,
-        role: TeamUserRole.MEMBER,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organizationId,
-      },
+    await seedRoleBinding(prisma, {
+      id: `rb-lic-member-${nanoid(8)}`,
+      organizationId,
+      userId: memberUser.id,
+      role: TeamUserRole.MEMBER,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
     });
 
     // Create admin caller
@@ -180,6 +185,7 @@ describe("License Router Integration", () => {
   afterAll(async () => {
     // Cleanup
     await cleanupTestRows(prisma, [
+      ["grant", { organizationId }],
       ["roleBinding", { organizationId }],
       ["organizationUser", { organizationId }],
       ["organization", { slug: testOrgSlug }],

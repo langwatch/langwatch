@@ -43,16 +43,15 @@
 import { Button, ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
+import {
+  builtinRolePermissions,
+  permissionSatisfiedBy,
+} from "@langwatch/authz";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, expect, vi } from "vitest";
-
 import { SAMPLE_CHOICE_KEY } from "~/components/governance/sample";
-import {
-  getOrganizationRolePermissions,
-  hasPermissionWithHierarchy,
-} from "~/server/api/rbac";
 
 const hoistedHarness = vi.hoisted(() => ({
   permissions: [] as string[],
@@ -78,7 +77,10 @@ export const harness = hoistedHarness;
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => {
   const holds = (permission: string) =>
-    hasPermissionWithHierarchy(hoistedHarness.permissions, permission);
+    permissionSatisfiedBy({
+      granted: new Set(hoistedHarness.permissions),
+      requested: permission,
+    });
   return {
     useOrganizationTeamProject: () => ({
       isLoading: false,
@@ -177,8 +179,7 @@ import InventoryPage from "../inventory";
 import { CONNECTED_SOURCES, REGISTERED_TOOLS } from "./inventoryFixtures";
 
 /** The real org-admin bag, not a hand-written list that could drift from it. */
-export const ORG_ADMIN_PERMISSIONS =
-  getOrganizationRolePermissions("ADMIN").slice();
+export const ORG_ADMIN_PERMISSIONS = [...builtinRolePermissions("org-admin")];
 
 export function renderScreen({
   at = "/governance/inventory",

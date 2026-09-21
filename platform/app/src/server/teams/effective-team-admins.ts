@@ -1,8 +1,4 @@
-import {
-  type Prisma,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "~/generated/prisma/client";
+import { type Prisma, RoleBindingScopeType } from "~/generated/prisma/client";
 
 /**
  * Who effectively administers a team.
@@ -19,11 +15,7 @@ import {
 type TxClient = Prisma.TransactionClient;
 
 /**
- * The principals holding a team's ADMIN bindings, split by kind.
- *
- * The one read every admin question in this module asks — a single
- * definition of "administers this team" that the last-admin invariant rests
- * on every caller agreeing with.
+ * The principals holding a team's live admin grants, split by kind.
  */
 async function readTeamAdminPrincipals({
   tx,
@@ -34,21 +26,25 @@ async function readTeamAdminPrincipals({
   organizationId: string;
   teamId: string;
 }): Promise<{ userIds: string[]; groupIds: string[] }> {
-  const adminBindings = await tx.roleBinding.findMany({
+  const adminGrants = await tx.grant.findMany({
     where: {
       organizationId,
       scopeType: RoleBindingScopeType.TEAM,
       scopeId: teamId,
-      role: TeamUserRole.ADMIN,
+      roleKey: "admin",
+      revokedAt: null,
+      principalType: { in: ["USER", "GROUP"] },
+      principalId: { not: null },
     },
-    select: { userId: true, groupId: true },
+    select: { principalType: true, principalId: true },
   });
 
   const userIds: string[] = [];
   const groupIds: string[] = [];
-  for (const binding of adminBindings) {
-    if (binding.userId) userIds.push(binding.userId);
-    if (binding.groupId) groupIds.push(binding.groupId);
+  for (const grant of adminGrants) {
+    if (grant.principalId === null) continue;
+    if (grant.principalType === "USER") userIds.push(grant.principalId);
+    if (grant.principalType === "GROUP") groupIds.push(grant.principalId);
   }
   return { userIds, groupIds };
 }

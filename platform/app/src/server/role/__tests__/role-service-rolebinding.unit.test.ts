@@ -1,5 +1,5 @@
+import { grantFactToRow } from "@langwatch/authz-server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import { UserNotTeamMemberError } from "../errors";
 import { RoleService } from "../role.service";
 
@@ -22,7 +22,10 @@ const mockPrisma = {
     // The personal-team guard runs before the assignment; a shared team here.
     findFirst: vi.fn().mockResolvedValue(null),
   },
-  roleBinding: {
+  grant: {
+    findMany: vi.fn().mockResolvedValue([]),
+  },
+  role: {
     findFirst: vi.fn(),
   },
   customRole: {
@@ -37,6 +40,22 @@ const mockPrisma = {
   $connect: vi.fn(),
 } as any;
 
+const teamMemberGrant = {
+  ...grantFactToRow({
+    organizationId: "org-1",
+    grant: {
+      grantId: "grant-team-1",
+      principal: { type: "user", id: "user-rolebinding-only" },
+      roleKey: "member",
+      legacyRole: "MEMBER",
+      scope: { type: "TEAM", id: "team-1" },
+      source: "grants-service",
+      occurredAtMs: 0,
+    },
+  }),
+  updatedAt: new Date(0),
+};
+
 describe("RoleService.assignRoleToUser", () => {
   let service: RoleService;
 
@@ -45,26 +64,28 @@ describe("RoleService.assignRoleToUser", () => {
     service = new RoleService(mockPrisma);
   });
 
-  describe("when user has RoleBinding but no TeamUser row", () => {
+  describe("when user has a team grant but no TeamUser row", () => {
     beforeEach(() => {
-      mockPrisma.customRole.findUnique.mockResolvedValue({
+      mockPrisma.role.findFirst.mockResolvedValue({
         id: "role-1",
         organizationId: "org-1",
         kind: "custom",
+        name: "Analyst",
+        description: null,
+        permissions: [],
+        occurredAt: new Date(0),
+        updatedAt: new Date(0),
       });
       mockPrisma.team.findUnique.mockResolvedValue({
         organizationId: "org-1",
       });
-      mockPrisma.roleBinding.findFirst.mockResolvedValue({
-        userId: "user-rolebinding-only",
-        role: TeamUserRole.MEMBER,
-      });
+      mockPrisma.grant.findMany.mockResolvedValue([teamMemberGrant]);
       mockPrisma.team.findUniqueOrThrow.mockResolvedValue({
         organizationId: "org-1",
       });
     });
 
-    it("allows role assignment via RoleBinding membership check", async () => {
+    it("allows role assignment via the grant membership check", async () => {
       await expect(
         service.assignRoleToUser({
           userId: "user-rolebinding-only",
@@ -75,7 +96,7 @@ describe("RoleService.assignRoleToUser", () => {
       ).resolves.toEqual({ success: true });
     });
 
-    it("queries roleBinding with team scope for membership", async () => {
+    it("queries grants with the user's team scope", async () => {
       await service.assignRoleToUser({
         userId: "user-rolebinding-only",
         teamId: "team-1",
@@ -83,28 +104,40 @@ describe("RoleService.assignRoleToUser", () => {
         actor: { type: "user" as const, id: "actor_1" },
       });
 
-      expect(mockPrisma.roleBinding.findFirst).toHaveBeenCalledWith({
-        where: {
-          userId: "user-rolebinding-only",
-          organizationId: "org-1",
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: "team-1",
-        },
-      });
+      expect(mockPrisma.grant.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            organizationId: "org-1",
+            AND: expect.arrayContaining([
+              expect.objectContaining({
+                principalType: "USER",
+                principalId: "user-rolebinding-only",
+                scopeType: "TEAM",
+                scopeId: "team-1",
+              }),
+            ]),
+          }),
+        }),
+      );
     });
   });
 
-  describe("when user has no RoleBinding for the team", () => {
+  describe("when user has no grant for the team", () => {
     beforeEach(() => {
-      mockPrisma.customRole.findUnique.mockResolvedValue({
+      mockPrisma.role.findFirst.mockResolvedValue({
         id: "role-1",
         organizationId: "org-1",
         kind: "custom",
+        name: "Analyst",
+        description: null,
+        permissions: [],
+        occurredAt: new Date(0),
+        updatedAt: new Date(0),
       });
       mockPrisma.team.findUnique.mockResolvedValue({
         organizationId: "org-1",
       });
-      mockPrisma.roleBinding.findFirst.mockResolvedValue(null);
+      mockPrisma.grant.findMany.mockResolvedValue([]);
     });
 
     it("throws UserNotTeamMemberError", async () => {

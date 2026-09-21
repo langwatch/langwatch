@@ -41,12 +41,9 @@ export class IdentitySecretHealMigration implements SystemMigration {
     "places they can be written during the migration, so a password changed " +
     "at any moment keeps working. Sign-in behavior does not change.";
   readonly requiresOperatorConfirmation = false;
-  // Follows the backfill it repairs after: nothing to heal on an
-  // installation where no user has latched.
-  readonly runsAutomaticallyOnSelfHosted = false;
-  // Paced with the backfill it repairs after, for the same reason: a user
-  // outside the backfill's cohort has nothing to heal.
-  readonly enrolledAutomatically = false;
+  // Follows the automatic backfill and repairs writes made during rollout.
+  readonly runsAutomaticallyOnSelfHosted = true;
+  readonly enrolledAutomatically = true;
 
   constructor(
     private readonly secrets: Pick<IdentitySecretCarryService, "carryForUser">,

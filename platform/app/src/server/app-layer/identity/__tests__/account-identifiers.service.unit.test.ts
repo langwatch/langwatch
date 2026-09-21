@@ -1,227 +1,276 @@
-import {
-  type AttachIdentifierCommandData,
-  type DetachIdentifierCommandData,
-  IDENTIFIER_ATTACHED_EVENT_TYPE,
-  type IdentifierFact,
-  type IdentityFact,
-  type MarkPrimaryCommandData,
-  normalizeIdentifierValue,
-} from "@langwatch/identity";
-import {
-  type IdentityHeadsRepository,
-  type IdentityVerificationRecord,
-  type IdentityVerificationRepository,
+import type { IdentifierFact, IdentityHeads } from "@langwatch/identity";
+import { reduceIdentity } from "@langwatch/identity";
+import type {
+  IdentityHeadsRepository,
   VerificationCeremonyService,
 } from "@langwatch/identity-server";
-import { describe, expect, it, vi } from "vitest";
+import { IdentityGuards, IdentityService } from "@langwatch/identity-server";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { AccountIdentifiersService } from "../account-identifiers.service";
 import {
-  AccountIdentifiersService,
-  type AccountIdentifierWrites,
-} from "../account-identifiers.service";
+  inMemoryIdentityReservations,
+  inMemoryIdentityUsers,
+} from "./support/identity-test-doubles";
 
-const USER_ID = "ana";
-const NOW = 1_800_000_000_000;
+/**
+ * Adding an address to an account, and what the surface is allowed to say
+ * about it.
+ *
+ * The guard and the reducer are the real ones; only the heads are in memory,
+ * so an assertion about what was appended is an assertion about what the
+ * pipeline would have carried.
+ *
+ * Spec: specs/identity/authentication-settings.feature
+ */
 
-class Heads implements IdentityHeadsRepository {
-  readonly identifiers = new Map<string, IdentifierFact>();
+const USER_ID = "user_sam";
 
-  constructor(
-    private readonly activeHolder: {
-      userId: string;
-      identifierId: string;
-    } | null = null,
-  ) {}
-
-  async findUserHashKey() {
-    return null;
-  }
-
-  async findHeads({ userId }: { userId: string }) {
-    return {
-      userId,
-      identifiers: Object.fromEntries(this.identifiers),
-    };
-  }
-
-  async hasFolded() {
-    return true;
-  }
-
-  async findActiveIdentifierByValue() {
-    return this.activeHolder;
-  }
-
-  async findIdentifier({
-    userId,
-    identifierId,
-  }: {
-    userId: string;
-    identifierId: string;
-  }) {
-    const identifier = this.identifiers.get(identifierId);
-    return identifier?.userId === userId ? identifier : null;
-  }
-
-  async findIdentifierIdForAccount() {
-    return null;
-  }
+function head(
+  overrides: Partial<IdentifierFact> & { identifierId: string },
+): IdentifierFact {
+  return {
+    userId: USER_ID,
+    provider: "email",
+    value: "sam@acme.test",
+    domain: "acme.test",
+    identifierHash: null,
+    accountId: null,
+    providerAccountId: null,
+    connectionId: null,
+    state: "VERIFIED",
+    verifiedAtMs: 1,
+    attachedAtMs: 1,
+    detachedAtMs: null,
+    ...overrides,
+  } as IdentifierFact;
 }
 
-class VerificationStore implements IdentityVerificationRepository {
-  readonly records = new Map<string, IdentityVerificationRecord>();
-
-  async replaceForIdentifier(record: IdentityVerificationRecord) {
-    this.records.set(record.identifierId, record);
-  }
-
-  async findByIdentifierId({ identifierId }: { identifierId: string }) {
-    return this.records.get(identifierId) ?? null;
-  }
-
-  async consume({
-    identifierId,
-    verificationId,
-  }: {
-    identifierId: string;
-    verificationId: string;
-  }) {
-    const record = this.records.get(identifierId);
-    if (record?.verificationId !== verificationId) {
-      return false;
-    }
-    this.records.delete(identifierId);
-    return true;
-  }
-}
-
-const fixture = ({
+function build({
+  heads = { userId: USER_ID, identifiers: {} } as IdentityHeads,
   holder = null,
 }: {
+  heads?: IdentityHeads;
   holder?: { userId: string; identifierId: string } | null;
-} = {}) => {
-  const heads = new Heads(holder);
-  const verificationStore = new VerificationStore();
-  const attachedInputs: AttachIdentifierCommandData[] = [];
-  const detachedInputs: DetachIdentifierCommandData[] = [];
-  const primaryInputs: MarkPrimaryCommandData[] = [];
-  const sent: Array<{ email: string; verificationUrl: string }> = [];
+} = {}) {
+  const state = { heads };
+  const sent: { email: string; verificationUrl: string }[] = [];
+  const appended: { type: string }[] = [];
 
-  const identity: AccountIdentifierWrites = {
-    attachIdentifier: async (input) => {
-      attachedInputs.push(input);
-      const identifierId = `identifier-${attachedInputs.length}`;
-      const value = normalizeIdentifierValue(input.value);
-      const fact: IdentityFact = {
-        type: IDENTIFIER_ATTACHED_EVENT_TYPE,
-        occurredAt: input.occurredAtMs,
-        data: {
-          identifierId,
-          userId: input.userId,
-          accountId: input.accountId,
-          provider: input.provider,
-          providerId: input.providerId,
-          issuer: input.issuer,
-          providerAccountId: input.providerAccountId,
-          value,
-          identifierHash: null,
-          domain: value.includes("@") ? (value.split("@")[1] ?? null) : null,
-          connectionId: null,
-          state: "ATTACHED",
-          actor: input.actor,
-        },
-      };
-      heads.identifiers.set(identifierId, {
-        ...fact.data,
-        verifiedAtMs: null,
-        attachedAtMs: input.occurredAtMs,
-        detachedAtMs: null,
-      });
-      return [fact];
-    },
-    detachIdentifier: async (input) => {
-      detachedInputs.push(input);
-      return [];
-    },
-    markPrimary: async (input) => {
-      primaryInputs.push(input);
-      return [];
-    },
+  const repository: IdentityHeadsRepository = {
+    findHeads: () => Promise.resolve(state.heads),
+    hasFolded: () => Promise.resolve(true),
+    findUserHashKey: () => Promise.resolve(null),
+    findActiveIdentifierByValue: () => Promise.resolve(holder),
+    findIdentifier: ({ identifierId }) =>
+      Promise.resolve(state.heads.identifiers[identifierId] ?? null),
+    findIdentifierIdForAccount: () => Promise.resolve(null),
   };
-  const ceremony = new VerificationCeremonyService(
-    verificationStore,
-    heads,
-    { verifyIdentifier: async () => [] },
-    { isLatched: async () => true, now: () => NOW },
+
+  const identity = new IdentityService(
+    new IdentityGuards(
+      repository,
+      inMemoryIdentityUsers(),
+      inMemoryIdentityReservations(),
+    ),
+    {
+      commit: ({ facts }: { facts: { type: string }[] }) => {
+        const stamped = facts.map((fact) => ({ ...fact, occurredAt: 1 }));
+        appended.push(...stamped);
+        for (const fact of stamped) {
+          state.heads = reduceIdentity({
+            heads: state.heads,
+            fact: fact as never,
+          });
+        }
+        return Promise.resolve(stamped);
+      },
+    } as never,
   );
+
+  const ceremony = {
+    mintEmailVerification: vi.fn().mockResolvedValue({
+      verificationId: "verif_1",
+      token: "tok_1",
+      expiresAtMs: 2,
+    }),
+  } as unknown as VerificationCeremonyService;
+
   const service = new AccountIdentifiersService({
-    heads,
+    heads: repository,
     identity,
     ceremony,
     deps: {
-      sendConfirmation: async (message) => {
-        sent.push(message);
+      sendConfirmation: (args) => {
+        sent.push(args);
+        return Promise.resolve();
       },
-      buildConfirmationUrl: ({ identifierId, verificationId, token }) =>
-        `https://example.com/confirm/${identifierId}/${verificationId}/${token}`,
-      newCommandId: vi.fn(() => "command-add"),
-      now: () => NOW,
+      buildConfirmationUrl: ({ token }) =>
+        `https://example.test/c?token=${token}`,
+      newCommandId: () => "cmd_1",
+      now: () => 1,
     },
   });
 
-  return { service, heads, attachedInputs, verificationStore, sent };
-};
+  return { service, appended, sent, ceremony, state };
+}
 
-describe("AccountIdentifiersService.addEmailIdentifier", () => {
-  /** @scenario "A newly added address is attached unverified, and only the ceremony verifies it" */
-  it("attaches an inert email identifier before minting and mailing its proof", async () => {
-    const subject = fixture();
+/**
+ * The refused command's code. Nothing has crossed a boundary here, so the
+ * error is the instance the guard threw and `code` is read straight off it.
+ */
+const codeOf = (run: Promise<unknown>): Promise<string | undefined> =>
+  run.then(
+    () => undefined,
+    (error: unknown) => (error as { code?: string }).code,
+  );
 
-    const added = await subject.service.addEmailIdentifier({
-      userId: USER_ID,
-      email: "Ana.New@Example.com",
-      codeChallenge: "challenge-from-this-browser",
-    });
-
-    expect(subject.heads.identifiers.get(added.identifierId)).toMatchObject({
-      provider: "email",
-      value: "ana.new@example.com",
-      state: "ATTACHED",
-      verifiedAtMs: null,
-    });
-    expect(subject.attachedInputs).toEqual([
-      expect.objectContaining({
-        userId: USER_ID,
-        accountId: null,
-        providerId: null,
-        issuer: null,
-        providerAccountId: null,
-        ceremony: { flow: "settings-add-address" },
-      }),
-    ]);
-    expect(subject.verificationStore.records.has(added.identifierId)).toBe(
-      true,
-    );
-    expect(subject.sent).toEqual([
-      expect.objectContaining({ email: "ana.new@example.com" }),
-    ]);
+describe("adding an address to an account", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  /** @scenario "An address another account holds is not refused at the door" */
-  it("still starts a proof ceremony when another account holds the address", async () => {
-    const subject = fixture({
-      holder: { userId: "olga", identifierId: "olga-primary" },
+  describe("given an address nobody holds", () => {
+    describe("when it is added", () => {
+      /** @scenario A newly added address is attached unverified, and only the ceremony verifies it */
+      it("attaches it unverified and appends no verification", async () => {
+        const { service, appended, state } = build();
+
+        const { identifierId } = await service.addEmailIdentifier({
+          userId: USER_ID,
+          email: "sam@other.test",
+          codeChallenge: "a".repeat(43),
+        });
+
+        expect(appended.map((fact) => fact.type)).toEqual([
+          "lw.identity.identifier_attached",
+        ]);
+        // Nothing has been proved about it yet, so nothing can be signed in
+        // with it and nothing can be recovered through it.
+        expect(state.heads.identifiers[identifierId]?.state).toBe("ATTACHED");
+      });
+
+      /** @scenario A newly added address is attached unverified, and only the ceremony verifies it */
+      it("sends the emailed half of the ceremony to the address itself", async () => {
+        const { service, sent, ceremony } = build();
+
+        await service.addEmailIdentifier({
+          userId: USER_ID,
+          email: "sam@other.test",
+          codeChallenge: "a".repeat(43),
+        });
+
+        expect(ceremony.mintEmailVerification).toHaveBeenCalledWith(
+          expect.objectContaining({ codeChallenge: "a".repeat(43) }),
+        );
+        expect(sent).toHaveLength(1);
+        expect(sent[0]!.email).toBe("sam@other.test");
+        expect(sent[0]!.verificationUrl).toContain("tok_1");
+      });
     });
+  });
 
-    await expect(
-      subject.service.addEmailIdentifier({
-        userId: USER_ID,
-        email: "held@example.com",
-        codeChallenge: "challenge-from-this-browser",
-      }),
-    ).resolves.toMatchObject({ identifierId: "identifier-1" });
+  describe("given the address is already live on this account", () => {
+    describe("when it is added again", () => {
+      /** @scenario Adding an address already on the account changes nothing */
+      it("creates no second identifier and says it is already there", async () => {
+        const { service, appended } = build({
+          heads: {
+            userId: USER_ID,
+            identifiers: { existing: head({ identifierId: "existing" }) },
+          },
+          holder: { userId: USER_ID, identifierId: "existing" },
+        });
 
-    expect(subject.attachedInputs).toHaveLength(1);
-    expect(subject.verificationStore.records.has("identifier-1")).toBe(true);
-    expect(subject.sent).toHaveLength(1);
+        const code = await codeOf(
+          service.addEmailIdentifier({
+            userId: USER_ID,
+            email: "sam@acme.test",
+            codeChallenge: "a".repeat(43),
+          }),
+        );
+
+        expect(code).toBe("identity_identifier_already_held");
+        expect(appended).toHaveLength(0);
+      });
+    });
+  });
+
+  describe("given another account already holds the address", () => {
+    describe("when it is added", () => {
+      /** @scenario An address another account holds is not refused at the door */
+      it("says nothing about who holds it, and attaches it unverified", async () => {
+        const built = build({
+          holder: { userId: "user_someone_else", identifierId: "theirs" },
+        });
+
+        const code = await codeOf(
+          built.service.addEmailIdentifier({
+            userId: USER_ID,
+            email: "sam@acme.test",
+            codeChallenge: "a".repeat(43),
+          }),
+        );
+
+        // No refusal at all. Refusing here would answer "does an account exist
+        // for this address" to anybody holding one, and an unverified
+        // identifier blocks nobody — so verification is where the uniqueness
+        // guard belongs, and where it is not an oracle.
+        expect(code).toBeUndefined();
+        expect(built.appended.map((fact) => fact.type)).toEqual([
+          "lw.identity.identifier_attached",
+        ]);
+      });
+    });
+  });
+
+  describe("given a mix of confirmed, unconfirmed and passkey identifiers", () => {
+    describe("when the list is read", () => {
+      /** @scenario Each email address says whether it has been confirmed */
+      it("says of each what it is, and what the guard would say about losing it", async () => {
+        const { service } = build({
+          heads: {
+            userId: USER_ID,
+            identifiers: {
+              confirmed: head({ identifierId: "confirmed", state: "PRIMARY" }),
+              pending: head({
+                identifierId: "pending",
+                value: "sam@other.test",
+                state: "ATTACHED",
+                verifiedAtMs: null,
+                attachedAtMs: 2,
+              }),
+              key: head({
+                identifierId: "key",
+                provider: "passkey",
+                value: null,
+                attachedAtMs: 3,
+              }),
+            },
+          },
+        });
+
+        const list = await service.listIdentifiers({ userId: USER_ID });
+        const byId = Object.fromEntries(
+          list.map((row) => [row.identifierId, row]),
+        );
+
+        expect(byId.confirmed?.confirmed).toBe(true);
+        expect(byId.confirmed?.isPrimary).toBe(true);
+        expect(byId.confirmed?.demotesFirst).toBe(true);
+        // Losing the only address would leave a passkey and nowhere to write.
+        expect(byId.confirmed?.removable).toBe(false);
+        expect(byId.confirmed?.refusalCode).toBe(
+          "identity_detach_strands_user",
+        );
+
+        expect(byId.pending?.confirmed).toBe(false);
+        expect(byId.pending?.resendable).toBe(true);
+        // It strands nobody, because nobody could have signed in with it.
+        expect(byId.pending?.removable).toBe(true);
+
+        // A passkey is never a thing to resend a link to.
+        expect(byId.key?.resendable).toBe(false);
+      });
+    });
   });
 });

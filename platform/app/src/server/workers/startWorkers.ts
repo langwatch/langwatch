@@ -724,6 +724,11 @@ export async function startWorkers(
     // which pushes signed frames to the relay. No in-process pool/executor to
     // boot; heartbeat recovery belongs to the direct liveness subscriber.
     //
+    // Break-glass expiry warnings, SSO domain re-proof and SCIM request log
+    // retention self-drive too, for the same reason: each is a scheduled
+    // process manager now, so the process wake worker and outbox own their
+    // interval and there is no boot call left for them here.
+    //
     // One-time in-place data migrations (ADR-092 stage B and successors) are
     // NOT booted here: they are a worker-only background loop like the
     // scheduler, so the app layer starts them and the App's graceful

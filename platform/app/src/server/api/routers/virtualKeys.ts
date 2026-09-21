@@ -19,6 +19,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
+import { authorizeInResolver } from "~/server/app-layer/authz/permission-adapters";
 import type { Session } from "~/server/auth";
 import { resolveApplicableBudgetsForDraftKey } from "~/server/gateway/applicableBudgets.service";
 import { GatewayUsageService } from "~/server/gateway/usage.service";
@@ -51,7 +52,6 @@ import { loadDirectBudgetsForKeys } from "~/server/gateway/virtualKeyDirectBudge
 import { startOfCurrentMonthUTC } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
 import { scopeAssignmentSchema } from "~/server/scopes/scope.types";
 import { OneTimeRevealService } from "~/server/secrets/oneTimeReveal.service";
-import { authorizeInResolver } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /** The session expressed in the shared actor vocabulary. */
@@ -274,13 +274,13 @@ export const virtualKeysRouter = createTRPCRouter({
       // destination, the exact boundary `create` will hold them to when
       // they submit; previewing a target's budgets must not be cheaper
       // than creating a key against it.
-      await assertActorCanManageAllScopes(
-        { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
-        input.scopes,
-      );
       await assertScopesBelongToOrg(
         ctx.prisma,
         input.organizationId,
+        input.scopes,
+      );
+      await assertActorCanManageAllScopes(
+        { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
         input.scopes,
       );
       await assertTraceProjectBelongsToOrg(
@@ -357,13 +357,13 @@ export const virtualKeysRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await assertActorCanManageAllScopes(
-        { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
-        input.scopes,
-      );
       await assertScopesBelongToOrg(
         ctx.prisma,
         input.organizationId,
+        input.scopes,
+      );
+      await assertActorCanManageAllScopes(
+        { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
         input.scopes,
       );
       await assertTraceProjectBelongsToOrg(
@@ -474,13 +474,13 @@ export const virtualKeysRouter = createTRPCRouter({
       // Re-scoping additionally needs manage on every NEW scope, so a key
       // can't be moved into a scope the caller doesn't control.
       if (input.scopes) {
-        await assertActorCanManageAllScopes(
-          { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
-          input.scopes,
-        );
         await assertScopesBelongToOrg(
           ctx.prisma,
           input.organizationId,
+          input.scopes,
+        );
+        await assertActorCanManageAllScopes(
+          { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
           input.scopes,
         );
       }

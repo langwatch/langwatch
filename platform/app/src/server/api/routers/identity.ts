@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   accountIdentifiers,
+  ssoTestArrival,
   verificationCeremony,
 } from "~/server/app-layer/identity/runtime";
 import { AuthRateLimitedError } from "~/server/auth/errors";
@@ -83,6 +84,32 @@ export const identityRouter = createTRPCRouter({
    * control down before anybody clicks, in the guard's own words. It is a
    * prediction, not the decision: `removeIdentifier` still asks the guard.
    */
+  /**
+   * Whether this session was opened through a connection that is not live
+   * yet — which is to say, whether the caller is an administrator part-way
+   * through proving their own single sign-on setup.
+   *
+   * ASKED OF THE SERVER, NOT OF THE BROWSER. The setup screen marks the
+   * callback URL it sends the provider to, so it can tell whose `?error=`
+   * landed on the page. That marker is set and read in the browser and can
+   * be typed by anybody, which makes it fine for choosing a card to render
+   * and useless as evidence. The account the sign-in left behind names the
+   * connection it came through, and the connection's own row says whether it
+   * is live; both are ours.
+   *
+   * Null for everybody else, including the administrator who tested their
+   * own organization's connection and is already a member of it.
+   */
+  myTestArrival: protectedProcedure
+    .input(z.object({}))
+    .noPermission({
+      reason:
+        "answers where the session user's own sign-in leaves them; the caller usually belongs to no organization yet, which is the condition being reported",
+    })
+    .query(({ ctx }) =>
+      ssoTestArrival().standingFor({ userId: ctx.session.user.id }),
+    ),
+
   myIdentifiers: protectedProcedure
     // An empty object rather than no input at all, like every sibling here.
     // A procedure with no declared input reaches the authz middleware as

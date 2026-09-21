@@ -235,6 +235,18 @@ export class TeamRestService {
     return this.repo.findProjectsInTeam({ teamId });
   }
 
+  async listMembers({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }) {
+    const team = await this.getById({ id, organizationId });
+    if (!team) throw new TeamNotFoundError(id);
+    return this.repo.listMembers({ organizationId, teamId: id });
+  }
+
   async create({
     organizationId,
     name,

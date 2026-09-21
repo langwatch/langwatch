@@ -38,18 +38,24 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    skipPermissionCheck:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      skipPermissionCheck:
+        () =>
+        async ({ ctx, next }: any) => {
+          ctx.permissionChecked = true;
+          return next();
+        },
+    };
+  },
+);
 
 const USER_ID = "user_1";
 const OWN_ORG_A = "org_own_a";

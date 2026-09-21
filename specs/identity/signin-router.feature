@@ -39,7 +39,31 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     And the value was normalized exactly as attach-time normalization does
     And the decision carries the reason code "domain_routed"
 
-  # RETIRED, and replaced by the four scenarios below (ADR-117, revision
+  @unit @regression
+  Scenario: Sign-up never reveals account existence on an SSO domain
+    Given "acme.com" is managed by an active or suspended SSO connection
+    When a signed-out visitor requests a sign-up verification link
+    Then registered, unconfirmed and unknown emails receive the same refusal "auth_direct_registration_unavailable"
+    And the response directs the visitor to their organization's sign-in method
+    And no account-existence lookup or verification email is sent
+
+  @unit @regression
+  Scenario: Sign-up never reveals account existence when managed SSO cannot route
+    Given "acme.com" is managed by an active SSO connection
+    And that connection is unlicensed or its provider is not configured
+    When a signed-out visitor requests a sign-up verification link
+    Then registered, unconfirmed and unknown emails receive the same refusal "auth_direct_registration_unavailable"
+    And no account-existence lookup or verification email is sent
+
+  @unit
+  Scenario: Sign-up still guides an existing account outside SSO domains
+    Given "home.net" is not managed by an SSO connection
+    And "sam@home.net" already has a confirmed account
+    When a signed-out visitor requests a sign-up verification link for "sam@home.net"
+    Then the response is "email_already_registered"
+    And no verification email is sent
+
+  # Outside SSO-managed domains, replaced by the four scenarios below (ADR-117, revision
   # 2026-08-25). The router used to answer a known address and an unknown one
   # identically, by construction. It no longer does, and the argument is in
   # the ADR: the sign-up door already answers "does this address have an
@@ -75,13 +99,12 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     And the decision never routes to sign-up with the reason code "identifier_unknown"
 
   @unit
-  Scenario: An account still waiting for identifier backfill keeps its way in
+  Scenario: An unlatched legacy account with a password offers password sign-in
     Given "home.net" belongs to no ACTIVE connection
-    And an existing account holds "legacy@home.net"
-    And that account's identifier backfill is not finalized
-    When "legacy@home.net" is submitted to the router
-    Then the decision offers the account's legacy sign-in method
-    And the decision never routes to sign-up with the reason code "identifier_unknown"
+    And the legacy account for "sam@home.net" has not completed identifier backfill and holds a password
+    When "sam@home.net" is submitted to the router
+    Then the decision offers the password with the reason code "account_methods"
+    And the decision never routes to sign-up
 
   @unit
   Scenario: The methods offered are the ones that account holds
@@ -201,10 +224,10 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
   # ── Self-hosted priority ───────────────────────────────────────────────
 
   @unit
-  Scenario: A sole ACTIVE connection auto-redirects before any email is asked
+  Scenario: A sole ACTIVE connection is selected before any email is asked
     Given a self-hosted installation with exactly one ACTIVE connection
     When the sign-in page is requested
-    Then the decision is an immediate redirect to that identity provider
+    Then the decision selects that identity provider for sign-in
     And the decision carries the reason code "sole_active_connection"
 
   @unit

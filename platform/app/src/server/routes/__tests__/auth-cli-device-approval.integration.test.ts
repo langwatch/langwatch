@@ -16,6 +16,7 @@
  *
  * Spec: specs/ai-gateway/governance/cli-login.feature
  */
+
 import type { Redis } from "ioredis";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -26,6 +27,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 
 import {
   publishDeviceCodeSettled,
@@ -150,6 +152,13 @@ describe("CLI device-approval stream", () => {
     await prisma.teamUser.create({
       data: { userId: USER_ID, teamId: TEAM_ID, role: "ADMIN" },
     });
+    await seedRoleBinding(prisma, {
+      organizationId: ORG_ID,
+      userId: USER_ID,
+      role: "ADMIN",
+      scopeType: "TEAM",
+      scopeId: TEAM_ID,
+    });
     await prisma.project.create({
       data: {
         id: PROJECT_ID,
@@ -164,6 +173,8 @@ describe("CLI device-approval stream", () => {
   });
 
   afterAll(async () => {
+    await prisma.grant.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } });
     await resetDeviceApprovalSubscriber().catch(() => {});
     await resetApp();
     await prisma.project

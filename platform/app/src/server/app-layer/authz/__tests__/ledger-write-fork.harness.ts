@@ -1,9 +1,6 @@
 /**
- * Shared fixtures for the grant writer's per-organization fork tests
- * (ADR-092 decision 4). The fork's two sides live in their own files —
- * `ledger-write-fork.legacy.unit.test.ts` for an organization the genesis
- * import has not reached, `ledger-write-fork.ledger.unit.test.ts` for one
- * past it — and both drive the writer through this harness.
+ * Shared fixtures for the grants ledger writer tests. The writer has one
+ * engine-backed path; migration parity is tested by the migration suite.
  *
  * Each test file mocks `../epoch` itself: vi.mock is per-file, so it cannot
  * live here.
@@ -47,15 +44,18 @@ export function recordNotFound(): Error {
 }
 
 export function harness({
-  onLedger,
   poll,
 }: {
-  onLedger: boolean;
   /** Defaults to a poll that never retries — one failed `check()` times out
    *  immediately. Override to exercise the read-your-writes retry loop. */
   poll?: { intervalMs: number; timeoutMs: number };
 }) {
   const sent: Array<{ verb: string; data: unknown }> = [];
+  const queryRaw = vi.fn().mockResolvedValue([
+    { userId: "user_sam", membershipStamp: "stamp_user_sam" },
+    { userId: "user_alice", membershipStamp: "stamp_user_alice" },
+    { userId: "user_admin", membershipStamp: "stamp_user_admin" },
+  ]);
   const db = {
     roleBinding: {
       findFirst: vi.fn().mockResolvedValue(null),
@@ -83,16 +83,24 @@ export function harness({
       // deleted can assert on it rather than on an absent property.
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
-      // A row the head already knows about, so a test that does not care
-      // about the stranded-row adoption path (`changeBindingRole`) keeps
-      // taking the ordinary `changeGrantRole` branch.
-      findFirst: vi.fn().mockResolvedValue({ id: "known" }),
+      findFirst: vi.fn().mockResolvedValue(null),
       findMany: vi.fn().mockResolvedValue([]),
+      count: vi.fn().mockResolvedValue(0),
+    },
+    organizationUser: {
+      findMany: vi
+        .fn()
+        .mockResolvedValue([
+          { userId: "user_sam", membershipStamp: "stamp_1" },
+        ]),
     },
     auditLog: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    $queryRaw: queryRaw,
+    $transaction: vi.fn(async (run: (tx: unknown) => unknown) =>
+      run({ $queryRaw: queryRaw }),
+    ),
   };
   const writer = new GrantsLedgerWriter(db as unknown as PrismaClient, {
-    onLedgerWrites: async () => onLedger,
     now: () => 1_700_000_000_000,
     poll: poll ?? { intervalMs: 0, timeoutMs: 0 },
     commands: async () => ({

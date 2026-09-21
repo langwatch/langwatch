@@ -1,6 +1,8 @@
 "use client";
 
 import { passkeyClient } from "@better-auth/passkey/client";
+import { ssoClient } from "@better-auth/sso/client";
+import { looksLikeSsoConnectionId } from "@langwatch/identity";
 import { twoFactorClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 import {
@@ -35,9 +37,15 @@ import { auth0BridgeConnectionOf } from "~/utils/auth0-bridge";
  * env first. One place decides, so a button that exists calling an endpoint
  * that does not cannot happen here either.
  *
+ * The single sign-on half is unconditional because its server half is: the
+ * plugin answers for providers in a table, and with no rows it answers "no
+ * such provider". What it buys is `signIn.sso({ providerId })`, which is how
+ * an administrator proves the connection they just registered carries a real
+ * sign-in — naming the connection outright rather than waiting for the
+ * per-organization routing flag that decides where everybody ELSE is sent.
  */
 const client = createAuthClient({
-  plugins: [passkeyClient(), twoFactorClient()],
+  plugins: [passkeyClient(), twoFactorClient(), ssoClient()],
 });
 
 export const authClient = client;
@@ -217,48 +225,29 @@ function isTwoStepChallenge(data: unknown): boolean {
   );
 }
 
+type SignInOptions = {
+  email?: string;
+  password?: string;
+  callbackUrl?: string;
+  redirect?: boolean;
+  loginHint?: string;
+};
+
+type SignInResult = {
+  error?: string;
+  code?: string;
+  status?: number;
+  ok?: boolean;
+  /** The remaining rate-limit window, when supplied by the server. */
+  retryAfterSeconds?: number;
+  /** A correct password still needs a second factor; no session exists yet. */
+  twoStepRequired?: boolean;
+};
+
 export const signIn = async (
   provider: string,
-  options?: {
-    email?: string;
-    password?: string;
-    callbackUrl?: string;
-    redirect?: boolean;
-    /**
-     * The address already typed on our screen, handed to a federated
-     * provider as OIDC `login_hint` so its own screen arrives prefilled —
-     * or, where the provider routes on it, skipped entirely. Nothing for
-     * the credential path, which carries the email in the body already.
-     */
-    loginHint?: string;
-  },
-): Promise<
-  | {
-      error?: string;
-      code?: string;
-      status?: number;
-      ok?: boolean;
-      /**
-       * Seconds to wait, when the refusal was a rate limit that said so. The
-       * header carries the real remaining window, and a screen that has it can
-       * say how long instead of guessing "a minute".
-       */
-      retryAfterSeconds?: number;
-      /**
-       * The password was right and there is a second factor still to answer.
-       *
-       * Not a failure and not a session: the two-factor plugin answers a
-       * correct credential for an enrolled account with a challenge instead of
-       * a cookie, and the caller has to ask for the code. Named here because
-       * this is the seam where the browser used to be sent to its callback on
-       * the strength of an answer that carried no session at all — which
-       * landed somebody who had just typed the right password back on the
-       * log-in screen with nothing said.
-       */
-      twoStepRequired?: boolean;
-    }
-  | undefined
-> => {
+  options?: SignInOptions,
+): Promise<SignInResult | undefined> => {
   // Same-origin guard on the post-login redirect target.
   const callbackURL = options?.callbackUrl
     ? safeRedirectTarget(options.callbackUrl)
@@ -266,76 +255,38 @@ export const signIn = async (
   const shouldRedirect = options?.redirect !== false;
 
   if (provider === "credentials" || provider === "email") {
-    // The rate limiter's remaining window rides a response header, which the
-    // result object does not carry. Read on the way past rather than inferred
-    // from the status, so a screen either knows the real wait or knows it does
-    // not know.
-    let retryAfterSeconds: number | undefined;
-    const result = await client.signIn.email({
-      email: options?.email ?? "",
-      password: options?.password ?? "",
-      callbackURL,
-      fetchOptions: {
-        onError: (context: { response?: { headers?: Headers } }) => {
-          const header = context.response?.headers?.get("X-Retry-After");
-          const seconds = header === null ? Number.NaN : Number(header);
-          if (Number.isFinite(seconds) && seconds > 0) {
-            retryAfterSeconds = seconds;
-          }
-        },
-      },
+    return signInWithCredentials(options, callbackURL, shouldRedirect);
+  }
+
+  // Organization connections are registered with the SSO plugin.
+  if (looksLikeSsoConnectionId(provider)) {
+    const result = await client.signIn.sso({
+      providerId: provider,
+      callbackURL: callbackURL ?? "/",
     });
     if (result.error) {
-      // `code` is what the screens map to wording; `error` stays the message
-      // for callers that only ever read it.
-      //
-      // The code may be ours rather than better-auth's: the auth route
-      // re-answers the refusals we can name in the handled-error contract
-      // (`server/better-auth/handled-errors.ts`), and that body carries the
-      // slug in `error` rather than in `code`. Reading the handled payload
-      // first is what keeps the screens working across the seam — and it is
-      // never `error.message`, which for a handled refusal IS the slug.
-      const handled = readHandledError(result.error);
       return {
-        error: result.error.message ?? "CredentialsSignin",
-        code: handled?.code ?? result.error.code,
+        error: result.error.message ?? "OAuthSignin",
+        code: result.error.code,
         status: result.error.status,
-        retryAfterSeconds,
         ok: false,
       };
     }
-    // An enrolled account gets a challenge rather than a session, and the
-    // answer says so in the body while looking like a success in every other
-    // respect. Navigating on it sends somebody who typed the RIGHT password to
-    // a page they hold no session for, which bounces them straight back to the
-    // door they just came through — so the caller is told instead, and the
-    // screen asks for the code.
-    if (isTwoStepChallenge(result.data)) {
-      return { ok: false, twoStepRequired: true };
-    }
-    // NextAuth compat: the caller expects signIn to navigate on success.
-    // BetterAuth's signIn.email returns a JSON result and does NOT auto-
-    // redirect the browser — the caller has to do it.
-    if (shouldRedirect) {
-      navigate(callbackURL ?? "/");
+    if (
+      shouldRedirect &&
+      result.data &&
+      typeof result.data === "object" &&
+      "url" in result.data
+    ) {
+      const url = (result.data as { url?: string }).url;
+      if (url) {
+        navigate(url);
+      }
     }
     return { ok: true };
   }
 
-  // Every provider goes through signIn.social, social (google, github,
-  // gitlab, microsoft) and generic-OAuth (see `PLAIN_OIDC_PROVIDERS` and the
-  // named entries beside it in `ee/sso/providers.ts`) alike: the social plugin
-  // and the generic-oauth plugin both honor the same providerId. BetterAuth
-  // handles the redirect to the provider URL itself when `disableRedirect`
-  // is unset.
-  //
-  // Normalize `azure-ad` to `microsoft` (BetterAuth's internal provider id)
-  // to match `linkAccount()` which does the same mapping. A bridge id
-  // (`auth0-google` and friends) is a BUTTON, not a provider: it dials plain
-  // `auth0` with the `connection` Auth0's own screen would have set, so the
-  // person picks their provider exactly once, on ours. Also honor
-  // `redirect: false` by passing `disableRedirect: true` so the caller can
-  // handle navigation itself.
+  // Auth0 bridge buttons choose a connection; Azure uses BetterAuth's provider id.
   const bridgeConnection = auth0BridgeConnectionOf(provider);
   const mappedProvider =
     bridgeConnection !== null
@@ -375,6 +326,47 @@ export const signIn = async (
   }
   return { ok: true };
 };
+
+async function signInWithCredentials(
+  options: SignInOptions | undefined,
+  callbackURL: string | undefined,
+  shouldRedirect: boolean,
+): Promise<SignInResult> {
+  // Retry timing is carried by the response header, not the auth result.
+  let retryAfterSeconds: number | undefined;
+  const result = await client.signIn.email({
+    email: options?.email ?? "",
+    password: options?.password ?? "",
+    callbackURL,
+    fetchOptions: {
+      onError: (context: { response?: { headers?: Headers } }) => {
+        const header = context.response?.headers?.get("X-Retry-After");
+        const seconds = header === null ? Number.NaN : Number(header);
+        if (Number.isFinite(seconds) && seconds > 0) {
+          retryAfterSeconds = seconds;
+        }
+      },
+    },
+  });
+  if (result.error) {
+    // Application refusals carry their code in the handled-error payload.
+    const handled = readHandledError(result.error);
+    return {
+      error: result.error.message ?? "CredentialsSignin",
+      code: handled?.code ?? result.error.code,
+      status: result.error.status,
+      retryAfterSeconds,
+      ok: false,
+    };
+  }
+  if (isTwoStepChallenge(result.data)) {
+    return { ok: false, twoStepRequired: true };
+  }
+  if (shouldRedirect) {
+    navigate(callbackURL ?? "/");
+  }
+  return { ok: true };
+}
 
 /**
  * Browser navigation. Exported as its own export so tests can spy on it
@@ -445,13 +437,7 @@ export const signOut = async (opts?: {
     if (!res.ok) throw new Error("Logout failed");
     return;
   }
-  // Navigate directly to the logout endpoint as a full page navigation.
-  // This guarantees the Set-Cookie headers are applied by the browser
-  // (no fetch/AJAX race conditions). The endpoint clears cookies and
-  // redirects to /auth/signin. We always go to /auth/signin (not /)
-  // because / renders client-side and in Auth0 mode the signin page
-  // auto-fires signIn("auth0") which silently re-authenticates via
-  // Google SSO before the user even sees the page.
+  // Full navigation applies the cleared cookies before reaching the signed-out page.
   navigate("/api/auth/logout");
 };
 

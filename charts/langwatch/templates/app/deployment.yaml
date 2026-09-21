@@ -363,12 +363,19 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.app.resources | nindent 12 }}
+          # 40 minutes (15s x 160). Serving starts only after the database
+          # migrations and the system-migration preflight finish, and that
+          # preflight is designed to take up to ~27 minutes before it gives up
+          # (25 passes, each waiting up to 60s for its queue work to settle,
+          # 5s between them). A budget shorter than the design turns a slow or
+          # non-converging preflight into CrashLoopBackOff, which hides the
+          # error the preflight would otherwise report by name.
           startupProbe:
             httpGet:
               path: /api/health
               port: http
-            failureThreshold: 30
-            periodSeconds: 10
+            failureThreshold: 160
+            periodSeconds: 15
           readinessProbe:
             httpGet:
               path: /api/health

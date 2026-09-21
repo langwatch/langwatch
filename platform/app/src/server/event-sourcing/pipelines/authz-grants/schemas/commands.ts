@@ -65,6 +65,11 @@ export const attachGrantEntrySchema = z
     /** Business time of the fact — a backfilled grant carries the legacy
      *  row's createdAt; it becomes the emitted event's `occurredAt`. */
     occurredAtMs: z.number().int().nonnegative(),
+    /** Current membership lifetime for a USER grant. Imported history omits
+     *  this field so replay keeps its pre-fence behavior. */
+    membershipStamp: z.string().min(1).optional(),
+    /** Only founder creation may use this while its transaction is open. */
+    membershipBootstrap: z.boolean().optional(),
   })
   // Same invariant the emitted event is held to — checked on the way IN so a
   // malformed batch is refused with the command that sent it, rather than
@@ -72,7 +77,23 @@ export const attachGrantEntrySchema = z
   .refine(grantShapeRefinement.check, {
     message: grantShapeRefinement.message,
     path: [...grantShapeRefinement.path],
-  });
+  })
+  .refine((grant) => !grant.membershipBootstrap || grant.membershipStamp, {
+    message: "membershipBootstrap requires membershipStamp",
+    path: ["membershipStamp"],
+  })
+  .refine(
+    (data) =>
+      !data.membershipBootstrap ||
+      (data.principal.type === "user" &&
+        data.roleKey === "admin" &&
+        (data.scope.type === "TEAM" || data.scope.type === "ORGANIZATION")),
+    {
+      message:
+        "membershipBootstrap is only valid for stamped USER ADMIN organization/team bindings",
+      path: ["membershipBootstrap"],
+    },
+  );
 export type AttachGrantEntry = z.infer<typeof attachGrantEntrySchema>;
 
 /**
@@ -84,7 +105,16 @@ export type AttachGrantEntry = z.infer<typeof attachGrantEntrySchema>;
  */
 export const attachGrantCommandDataSchema = commandDataSchema({
   grant: attachGrantEntrySchema,
-});
+}).refine(
+  (data) =>
+    !data.grant.membershipBootstrap ||
+    data.grant.scope.type !== "ORGANIZATION" ||
+    data.grant.scope.id === data.organizationId,
+  {
+    message: "organization bootstrap must target its tenant organization",
+    path: ["grant", "scope", "id"],
+  },
+);
 export type AttachGrantCommandData = z.infer<
   typeof attachGrantCommandDataSchema
 >;

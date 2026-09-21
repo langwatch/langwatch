@@ -159,6 +159,70 @@ describe("the signed-out auth surface's budgets", () => {
     });
   });
 
+  describe("given an address on an SSO domain", () => {
+    const decisions = [
+      {
+        reasonCode: "domain_routed",
+        outcome: "redirect_to_connection",
+      },
+      { reasonCode: "connection_suspended", outcome: "method_picker" },
+      {
+        reasonCode: "method_not_licensed",
+        outcome: "method_picker",
+        domainManaged: true,
+      },
+      {
+        reasonCode: "method_not_configured",
+        outcome: "method_picker",
+        domainManaged: true,
+      },
+    ];
+
+    /** @scenario "Sign-up never reveals account existence on an SSO domain" */
+    /** @scenario "Sign-up never reveals account existence when managed SSO cannot route" */
+    it.each(decisions)("hides account existence for $reasonCode", async ({
+      reasonCode,
+      outcome,
+      domainManaged,
+    }) => {
+      route.mockResolvedValue({
+        outcome,
+        methodSet: [],
+        reasonCode,
+        ...(domainManaged ? { domainManaged } : {}),
+      });
+      const caller = callerFrom("203.0.113.88");
+      for (const state of ["confirmed", "pending", "unknown"]) {
+        addressState.mockResolvedValue(state);
+        await expect(
+          caller.requestSignUpVerification({ email: "someone@acme.com" }),
+        ).rejects.toMatchObject({
+          code: "BAD_REQUEST",
+          cause: {
+            code: "auth_direct_registration_unavailable",
+            message: expect.stringContaining("identity provider"),
+          },
+        });
+      }
+      expect(addressState).not.toHaveBeenCalled();
+      expect(requestVerification).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Sign-up still guides an existing account outside SSO domains" */
+    it("preserves the existing-account response outside SSO domains", async () => {
+      addressState.mockResolvedValue("confirmed");
+      await expect(
+        callerFrom("203.0.113.89").requestSignUpVerification({
+          email: "someone@example.com",
+        }),
+      ).rejects.toMatchObject({ cause: { code: "email_already_registered" } });
+      expect(addressState).toHaveBeenCalledWith({
+        email: "someone@example.com",
+      });
+      expect(requestVerification).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given somebody asking for a sign-up confirmation link", () => {
     describe("when one caller asks again and again", () => {
       /** @scenario "Asking again and again for a confirmation link stops being answered" */
