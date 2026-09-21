@@ -111,6 +111,21 @@ describe("the model-providers read route", () => {
       expect(body.openai?.enabled).toBe(true);
     });
 
+    /** @scenario "Every provider entry carries the same keys, present or empty" */
+    it("always carries disabledByDefault and extraHeaders, so no caller presence-checks", async () => {
+      const { get } = mount({ getForProject: (async () => storedProviders()) as never });
+
+      const response = await get("/api/model-providers");
+
+      const body = (await response.json()) as Record<string, Record<string, unknown>>;
+      for (const [name, entry] of Object.entries(body)) {
+        expect(entry, name).toHaveProperty("disabledByDefault");
+        expect(entry, name).toHaveProperty("extraHeaders");
+        expect(typeof entry.disabledByDefault, name).toBe("boolean");
+        expect(Array.isArray(entry.extraHeaders), name).toBe(true);
+      }
+    });
+
     /** @scenario "GET /api/model-providers returns no credential value for any provider" */
     it("returns no stored credential value, and still names which are set", async () => {
       const { get } = mount({ getForProject: (async () => storedProviders()) as never });

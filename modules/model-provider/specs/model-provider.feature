@@ -26,3 +26,14 @@ Feature: Model Provider service
     Given a project is attached to a team and organization
     When the private repository lists providers for that project
     Then it may return providers attached at any of those scopes
+
+  # The response schema declares disabledByDefault and extraHeaders optional,
+  # so it cannot settle whether they are sent. Main sends both; this branch had
+  # stopped. A caller forced to presence-check every field cannot read the
+  # entry at all, so the handler always populates them — the schema stays
+  # optional, the answer does not.
+  @unit
+  Scenario: Every provider entry carries the same keys, present or empty
+    Given a project's model providers
+    When they are listed
+    Then every entry carries disabledByDefault and extraHeaders

@@ -31,6 +31,8 @@ type PublishedProvider = {
   customEmbeddingsModels: { id: string; label: string; type: string }[];
   models?: string[] | null;
   embeddingsModels?: string[] | null;
+  disabledByDefault?: boolean;
+  extraHeaders?: { key: string; value: string }[] | null;
 };
 
 export const modelProviderRest = defineRestRouter(ModelProviderApi)
@@ -120,6 +122,8 @@ function published(providers: Record<string, PublishedProvider>): Record<
     embeddingsModels: string[] | null;
     customModels: { modelId: string; displayName: string; mode: "chat" }[];
     customEmbeddingsModels: { modelId: string; displayName: string; mode: "embedding" }[];
+    disabledByDefault: boolean;
+    extraHeaders: { key: string; value: string }[];
   }
 > {
   return Object.fromEntries(
@@ -143,6 +147,10 @@ function published(providers: Record<string, PublishedProvider>): Record<
           displayName: model.label,
           mode: "embedding" as const,
         })),
+        // Always present, though the schema allows their absence: a caller that
+        // has to presence-check every field cannot read the entry at all.
+        disabledByDefault: provider.disabledByDefault ?? false,
+        extraHeaders: provider.extraHeaders ?? [],
       },
     ]),
   );
