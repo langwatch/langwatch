@@ -223,12 +223,12 @@ import { PrismaMfaEnrollmentRepository } from "./repositories/mfa-enrollment.pri
 import { PrismaMfaEnrollmentProjectionRepository } from "./repositories/mfa-enrollment-projection.prisma.repository";
 import { PrismaPasskeyRemovalRepository } from "./repositories/passkey-removal.prisma.repository";
 import { PrismaPriorSessionRepository } from "./repositories/prior-session.prisma.repository";
+import { PrismaSecretHealTenantSource } from "./repositories/secret-heal-tenant-source.prisma.repository";
 import { PrismaSignUpHealthRepository } from "./repositories/sign-up-health.prisma.repository";
 import {
   PrismaSignUpAccountDirectory,
   PrismaSignUpVerificationTokenStore,
 } from "./repositories/signup-verification.prisma.repository";
-import { PrismaSecretHealTenantSource } from "./repositories/secret-heal-tenant-source.prisma.repository";
 import { IdentitySecretHealMigration } from "./secret-heal.migration";
 import {
   PrismaSessionIdentifiers,
