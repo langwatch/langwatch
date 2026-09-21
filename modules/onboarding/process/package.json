@@ -20,7 +20,10 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/kernel": "workspace:*",
+    "@langwatch/langy-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/onboarding-contract": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",

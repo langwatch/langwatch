@@ -1,6 +1,17 @@
 export type { OnboardingServerConfig } from "./onboarding.config.ts";
 export { onboardingConfig } from "./onboarding.config.ts";
-export { onboardingTrpc } from "./onboarding.trpc.ts";
+export {
+  attachConversationInputSchema,
+  guidedPathInputSchema,
+  guidedStateOutputSchema,
+  guidedStateWithInstanceOutputSchema,
+  guidedStateWithVariantOutputSchema,
+  onboardingTrpc,
+  recordPathsInputSchema,
+  recordProviderInputSchema,
+  recordTourInputSchema,
+  recordVirtualKeyRevealInputSchema,
+} from "./onboarding.trpc.ts";
 export * from "./onboarding.api.ts";
 export * from "./onboarding.errors.ts";
 export * from "./onboarding-attribution.ts";

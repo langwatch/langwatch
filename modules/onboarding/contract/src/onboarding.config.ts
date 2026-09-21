@@ -11,6 +11,14 @@ export const onboardingConfig = Config.define((c) => ({
     key: c.env("POSTHOG_KEY", z.string().optional()),
     host: c.env("POSTHOG_HOST", z.string().optional()),
   },
+  /**
+   * The gateway URL an app on this instance points at, for the guided
+   * onboarding kickoff brief. Never read from `process.env` in module code.
+   */
+  gateway: {
+    publicUrl: c.env("LW_GATEWAY_PUBLIC_URL", z.string().optional()),
+    baseUrl: c.env("LW_GATEWAY_BASE_URL", z.string().optional()),
+  },
 }));
 
 export type OnboardingServerConfig = ConfigOf<typeof onboardingConfig>;
