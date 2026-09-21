@@ -2,12 +2,19 @@
 // (previously separate members of ScenarioApp)
 import { generate } from "@langwatch/ksuid";
 import type { Encryption } from "@langwatch/process-stores/members";
-import { ScenarioSecretsUnavailableError } from "@langwatch/scenario-contract";
+import {
+  ScenarioSecretsUnavailableError,
+  ScenarioSimulationWritesUnavailableError,
+} from "@langwatch/scenario-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
+import { SimulationClickHouseRepository } from "../repositories/clickhouse/simulation-clickhouse.repository.ts";
+import { SimulationExecutionRepository } from "../repositories/simulation-execution.repository.ts";
+import { SimulationService } from "../services/simulation.service.ts";
 import type {
   ScenarioClock,
   ScenarioId,
+  ScenarioReadOnlyClickHouse,
   ScenarioSecretCipher,
   ScenarioTestSuiteId,
 } from "./scenario.app.ts";
@@ -70,15 +77,89 @@ class UnavailableScenarioSecretCipher implements ScenarioSecretCipher {
 }
 
 /**
- * What this process hands `ScenarioApp` at boot, built from its own member
- * and three pure ports.
+ * The write half of the simulation pipeline, for a process that composed only
+ * the reads. Every dispatch refuses by name: the worker that drains the
+ * pipeline owns these, and a silent no-op would lose the run.
  */
-export function buildScenarioComposition(input: { encryption: Encryption | undefined }): {
+class ReadOnlySimulationExecution extends SimulationExecutionRepository {
+  queueRun(): Promise<never> {
+    return this.refuse("queue a simulation run");
+  }
+  startRun(): Promise<never> {
+    return this.refuse("start a simulation run");
+  }
+  messageSnapshot(): Promise<never> {
+    return this.refuse("record a simulation message");
+  }
+  textMessageStart(): Promise<never> {
+    return this.refuse("record a message start");
+  }
+  textMessageEnd(): Promise<never> {
+    return this.refuse("record a message end");
+  }
+  finishRun(): Promise<never> {
+    return this.refuse("finish a simulation run");
+  }
+  recordEvaluations(): Promise<never> {
+    return this.refuse("record a simulation run's evaluator results");
+  }
+  cancelRun(): Promise<never> {
+    return this.refuse("cancel a simulation run");
+  }
+  deleteRun(): Promise<never> {
+    return this.refuse("delete a simulation run");
+  }
+  recordAgentInstance(): Promise<never> {
+    return this.refuse("record the agent instance that served a simulation run");
+  }
+
+  private refuse(capability: string): Promise<never> {
+    return Promise.reject(new ScenarioSimulationWritesUnavailableError(capability));
+  }
+}
+
+/**
+ * Adapts the process's ONE routing `clickhouse` member to the per-tenant
+ * session the simulation repository was written against.
+ */
+class ScenarioClickHouseSession {
+  constructor(
+    private readonly clickhouse: ScenarioReadOnlyClickHouse,
+    private readonly tenantId: string,
+  ) {}
+
+  async query(input: {
+    query: string;
+    query_params: Record<string, unknown>;
+    format: "JSONEachRow";
+  }): Promise<{ json<Result>(): Promise<Result[]> }> {
+    const { rows } = await this.clickhouse.query<unknown>({
+      tenantId: this.tenantId,
+      sql: input.query,
+      params: input.query_params,
+    });
+
+    return { json: <Result>() => Promise.resolve(rows as Result[]) };
+  }
+}
+
+/**
+ * What this process hands `ScenarioApp` at boot, built from its own members
+ * and three pure ports. `simulations` is the reads the ClickHouse member
+ * makes derivable — absent only where the deployment composed no ClickHouse.
+ */
+export function buildScenarioComposition(input: {
+  encryption: Encryption | undefined;
+  clickhouse: ScenarioReadOnlyClickHouse | undefined;
+}): {
   ids: ScenarioId;
   testSuiteIds: ScenarioTestSuiteId;
   clock: ScenarioClock;
   secretCipher: ScenarioSecretCipher;
+  simulations: SimulationService | undefined;
 } {
+  const { clickhouse } = input;
+
   return {
     ids: new KsuidScenarioId(),
     testSuiteIds: new KsuidScenarioTestSuiteId(),
@@ -86,5 +167,13 @@ export function buildScenarioComposition(input: { encryption: Encryption | undef
     secretCipher: input.encryption
       ? new ApiScenarioSecretCipher(input.encryption)
       : new UnavailableScenarioSecretCipher(),
+    simulations: clickhouse
+      ? SimulationService.create(
+          SimulationClickHouseRepository.create((tenantId) =>
+            Promise.resolve(new ScenarioClickHouseSession(clickhouse, tenantId)),
+          ),
+          new ReadOnlySimulationExecution(),
+        )
+      : void 0,
   };
 }

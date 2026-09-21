@@ -200,12 +200,13 @@ export class ExperimentApp implements ExperimentApi {
     /** The tier-effective row bound an execution's dataset must fit under. */
     entitlement: EntitlementApi,
   };
-  static readonly reads = reads("prisma", "clickhouse", "logger");
+  static readonly reads = reads("prisma", "clickhouse", "redis", "logger");
 
   static create(setup: ExperimentSetup): ExperimentApp {
     const built = buildExperimentInfrastructure({
       prisma: setup.members.prisma,
       clickhouse: setup.members.clickhouse,
+      redis: setup.members.redis,
       logger: setup.members.logger,
       dependencies: setup.dependencies,
     });

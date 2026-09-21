@@ -27,6 +27,7 @@ import { ExperimentDspyRetentionRepository } from "../repositories/experiment-ds
 import { PrismaExperimentPeopleRepository } from "../repositories/prisma/prisma.experiment-people.repository.ts";
 import { PrismaExperimentWorkflowVersionRepository } from "../repositories/prisma/prisma.experiment-workflow-version.repository.ts";
 import { PrismaExperimentRepository } from "../repositories/prisma/prisma.experiment.repository.ts";
+import { RedisExperimentRunProgressRepository } from "../repositories/redis/redis.experiment-run-progress.repository.ts";
 import type {
   ExecutionDataServices,
   ExperimentWorkflowDsl,
@@ -236,6 +237,8 @@ function monitorCascade(monitors: MonitorApi): ExperimentMonitorCascade {
 export function buildExperimentInfrastructure(input: {
   prisma: ProcessMembers["prisma"];
   clickhouse: ClickHouseQueryClient;
+  /** Where a run's progress is written and polled; shared across replicas. */
+  redis: ProcessMembers["redis"] | undefined;
   logger: Logger;
   dependencies: {
     workflows: WorkflowApi;
@@ -251,7 +254,7 @@ export function buildExperimentInfrastructure(input: {
     entitlement: EntitlementApi;
   };
 }): Omit<ExperimentAppDependencies, "runLookup"> {
-  const { prisma, clickhouse, logger, dependencies } = input;
+  const { prisma, clickhouse, redis, logger, dependencies } = input;
   const resolveClient = (tenantId: string) =>
     Promise.resolve(new ClickHouseMemberSession(clickhouse, tenantId));
   const runHistoryTelemetry = LoggedExperimentRunHistoryTelemetry.create(logger);
@@ -293,7 +296,10 @@ export function buildExperimentInfrastructure(input: {
   };
   const runLoop: ExperimentV3RunLoop = {
     ports: null,
-    progress: null,
+    // The READ half, derivable from the deployment's own Redis: a poll of a
+    // run this process did not start is still this process's to answer.
+    // `ports` stays null — starting a run belongs to the worker.
+    progress: redis ? RedisExperimentRunProgressRepository.create({ redis }) : null,
     services,
     // The orchestrator's own collaborator, server-private to the workflow
     // module. This process composes no run loop, so nothing behind it is

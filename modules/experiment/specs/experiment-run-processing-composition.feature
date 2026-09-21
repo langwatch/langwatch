@@ -58,3 +58,27 @@ Feature: Composing durable experiment-run processing
     Given a worker graph composed with no experiment capability passed in
     When the graph is composed
     Then the experiment feature is mounted anyway, built from this process's own substrate
+
+  # Measured against main on 2026-09-21: GET /api/experiments/runs/{runId}
+  # and its /results twin answered an unattributed 503 on this branch and a
+  # plain 404 on main. Both only READ a run's progress, but the guard they
+  # went through demanded the write-side run loop as well.
+  @unit
+  Scenario: Polling a run does not need the run loop that starts one
+    Given a process that composed the progress store but no run loop
+    When a caller polls a run
+    Then the progress store answers the poll
+    But starting a run is still refused by name
+
+  @unit
+  Scenario: Run progress is derived from the deployment's own Redis
+    Given a process that reads a redis member
+    When its experiment infrastructure is built
+    Then the run-progress store is composed from that member
+    And a process with no redis member composes none
+
+  @unit
+  Scenario: A read with no progress store refuses by name
+    Given a process that composed no progress store
+    When a caller polls a run
+    Then the read is refused by name rather than crashing

@@ -162,7 +162,7 @@ const saveWorkbenchStateBodySchema = z.object({
   commitMessage: z.string().optional(),
 });
 
-/** The run loop, or the refusal a process without one owes the caller. */
+/** The run loop, or the refusal a process without one owes the caller. Starting a run needs both halves. */
 export function runLoopOf(run: ExperimentV3RunLoop): {
   ports: ExperimentRunCollaborators;
   progress: ExperimentRunProgressRepository;
@@ -171,6 +171,17 @@ export function runLoopOf(run: ExperimentV3RunLoop): {
     throw new ExperimentRunLoopUnavailableError("experiment run loop");
   }
   return { ports: run.ports, progress: run.progress };
+}
+
+/**
+ * Where a run's progress is READ from. Only the progress half: a process that
+ * composes the store but starts no runs of its own still answers a poll, and
+ * gating that read on `ports` made every reader of a run a 503.
+ */
+export function runProgressOf(run: ExperimentV3RunLoop): ExperimentRunProgressRepository {
+  if (!run.progress) throw new ExperimentRunLoopUnavailableError("experiment run progress store");
+
+  return run.progress;
 }
 
 export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
@@ -422,7 +433,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .handle(async ({ app, input, scope }) => {
     const { runId } = input;
 
-    const { progress } = runLoopOf(app.run());
+    const progress = runProgressOf(app.run());
 
     const runState = await progress.findRunState(runId);
 
@@ -522,7 +533,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .handle(async ({ app, input, scope }) => {
     const { runId } = input;
 
-    const { progress } = runLoopOf(app.run());
+    const progress = runProgressOf(app.run());
     const experiments = app.experiments();
 
     const runState = await progress.findRunState(runId);

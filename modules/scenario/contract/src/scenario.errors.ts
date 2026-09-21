@@ -262,3 +262,21 @@ export class ScenarioGenerationTimedOutError extends HandledError {
     });
   }
 }
+
+/**
+ * A simulation write reached a process that composed only the reads: the
+ * execution side belongs to the worker that drains the pipeline. Named
+ * rather than a bare crash, so the caller is told which half is missing.
+ */
+export class ScenarioSimulationWritesUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor(capability: string) {
+    super(
+      "service_unavailable",
+      `This deployment cannot ${capability}, because it composes simulation reads only.`,
+      { httpStatus: 503, fault: "platform" },
+    );
+    this.name = "ScenarioSimulationWritesUnavailableError";
+  }
+}

@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 
 import type { AgentApi } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import {
   bindRestMiddleware,
   createRestRuntime,
@@ -20,13 +21,12 @@ import {
   type ScenarioTabRegistry,
   type SimulationService,
 } from "@langwatch/scenario-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import type { ScenarioBroadcast } from "../../app/scenario.app.ts";
+import type { ScenarioBroadcast, ScenarioReadOnlyClickHouse } from "../../app/scenario.app.ts";
 import { ScenarioApp } from "../../app/scenario.app.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
 import type { AgentTestService } from "../../services/agent-test.service.ts";
@@ -73,6 +73,7 @@ export function createScenarioRestTestApp(
       traces: createApiFixture<TraceApi>(options.traces, "Trace API"),
     },
     members: {
+      clickhouse: createApiFixture<ScenarioReadOnlyClickHouse>(),
       agentTesting: createApiFixture<AgentTestService>(),
       simulations,
       scenarioExecution: createApiFixture<ScenarioExecutionService>(),

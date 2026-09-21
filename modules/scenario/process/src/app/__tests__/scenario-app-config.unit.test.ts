@@ -6,6 +6,7 @@
 import { EventEmitter } from "node:events";
 
 import type { AgentApi } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { ResourceOwnership } from "@langwatch/kernel";
@@ -18,7 +19,6 @@ import {
   type ScenarioTabRegistry,
   type SimulationService,
 } from "@langwatch/scenario-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
@@ -27,7 +27,7 @@ import { MemoryScenarioRepositories } from "../../repositories/memory/memory.sce
 import type { AgentTestService } from "../../services/agent-test.service.ts";
 import type { ResultAtomsService } from "../../services/result-atoms.service.ts";
 import type { RunConfigurationsService } from "../../services/run-configurations.service.ts";
-import { ScenarioApp } from "../scenario.app.ts";
+import { ScenarioApp, type ScenarioReadOnlyClickHouse } from "../scenario.app.ts";
 
 function buildProductionApp(publicBaseUrl: string | undefined, emitter = new EventEmitter()) {
   return ScenarioApp.create({
@@ -51,6 +51,7 @@ function buildProductionApp(publicBaseUrl: string | undefined, emitter = new Eve
         encrypt: (value: string) => value,
         decrypt: (value: string) => value,
       }),
+      clickhouse: createApiFixture<ScenarioReadOnlyClickHouse>(),
       agentTesting: createApiFixture<AgentTestService>(),
       simulations: createApiFixture<SimulationService>(),
       scenarioExecution: createApiFixture<ScenarioExecutionService>(),

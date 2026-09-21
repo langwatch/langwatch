@@ -195,7 +195,16 @@ export const scenarioAppDependencyTokens = {
  * module depends on contracts. `publicBaseUrl` is the process's own fact,
  * absent where the deployment named no `BASE_HOST`.
  */
+export type ScenarioReadOnlyClickHouse = Readonly<{
+  query<Row>(input: {
+    tenantId: string;
+    sql: string;
+    params?: Record<string, unknown>;
+  }): Promise<{ rows: Row[] }>;
+}>;
+
 type ScenarioProcessMembers = Readonly<{
+  clickhouse: ScenarioReadOnlyClickHouse;
   encryption: Readonly<{ encrypt(plaintext: string): string; decrypt(ciphertext: string): string }>;
   rateLimiter: Readonly<{
     check(
@@ -217,8 +226,8 @@ type ScenarioAppMembers = ScenarioProcessMembers &
 export class ScenarioApp implements ScenarioApi {
   static readonly contract = ScenarioApi;
   static readonly dependencies = scenarioAppDependencyTokens;
-  /** All three names are from the process's vocabulary; boot refuses by name. */
-  static readonly reads = ["encryption", "rateLimiter", "publicBaseUrl"] as const;
+  /** Every name is from the process's vocabulary; boot refuses by name. */
+  static readonly reads = ["clickhouse", "encryption", "rateLimiter", "publicBaseUrl"] as const;
 
   static create(
     setup: FeatureSetup<
@@ -228,12 +237,17 @@ export class ScenarioApp implements ScenarioApi {
       ScenarioRepositories
     >,
   ): ScenarioApp {
-    const { ids, testSuiteIds, clock, secretCipher } = buildScenarioComposition({
+    const composed = buildScenarioComposition({
       encryption: setup.members.encryption,
+      clickhouse: setup.members.clickhouse,
     });
+    const { ids, testSuiteIds, clock, secretCipher } = composed;
+    // A process that composes its own whole simulation service still wins;
+    // otherwise the module builds the reads its own ClickHouse member derives.
+    const simulations = setup.members.simulations ?? composed.simulations;
     const scenarios = ScenarioService.create({
       repository: setup.repositories.scenarios,
-      simulations: setup.members.simulations,
+      simulations,
       ids,
       testSuiteIds,
       clock,
@@ -244,13 +258,13 @@ export class ScenarioApp implements ScenarioApi {
       projects: setup.dependencies.projects,
       rateLimiter: setup.members.rateLimiter,
     });
-    const exports = ScenarioRunExportService.create(setup.members.simulations);
+    const exports = ScenarioRunExportService.create(simulations);
 
     return new ScenarioApp({
       agentTesting: setup.members.agentTesting,
       connectedTargets: ConnectedTargetService.create(setup.dependencies.agents),
       scenarios,
-      simulations: setup.members.simulations,
+      simulations,
       scenarioExecution: setup.members.scenarioExecution,
       scenarioTabs: setup.members.scenarioTabs,
       users: setup.dependencies.users,
@@ -269,7 +283,7 @@ export class ScenarioApp implements ScenarioApi {
         presence: setup.dependencies.presence,
       }),
       events: ScenarioEventService.create({
-        simulations: setup.members.simulations,
+        simulations,
         scenarioTabs: setup.members.scenarioTabs,
         broadcast: setup.members.broadcast,
         traces: setup.dependencies.traces,

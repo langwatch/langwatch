@@ -1,4 +1,5 @@
 import type { AgentApi } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { ResourceOwnership } from "@langwatch/kernel";
@@ -19,7 +20,6 @@ import type {
   SimulationService,
 } from "@langwatch/scenario-contract";
 import { ScenarioSimulationsUnavailableError } from "@langwatch/scenario-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
@@ -28,7 +28,7 @@ import type { ScenarioRepository } from "../../repositories/scenario.repository.
 import type { AgentTestService } from "../../services/agent-test.service.ts";
 import type { ResultAtomsService } from "../../services/result-atoms.service.ts";
 import type { RunConfigurationsService } from "../../services/run-configurations.service.ts";
-import { ScenarioApp } from "../scenario.app.ts";
+import { ScenarioApp, type ScenarioReadOnlyClickHouse } from "../scenario.app.ts";
 
 function harness() {
   const commands: SimulationQueueRun[] = [];
@@ -60,6 +60,7 @@ function harness() {
     // missing property, which is the loud failure we want.
     members: {
       publicBaseUrl: "https://langwatch.test",
+      clickhouse: createApiFixture<ScenarioReadOnlyClickHouse>(),
       agentTesting: createApiFixture<AgentTestService>(),
       simulations: simulations as SimulationService,
       scenarioExecution: {} as ScenarioExecutionService,
@@ -332,11 +333,8 @@ describe("ScenarioApp.queueSimulationRun", () => {
 describe("ScenarioApp.getRunDataForAllSuites", () => {
   describe("given a process that composed no simulation reads", () => {
     it("refuses the read by name instead of crashing on the missing member", async () => {
-      // `members.simulations` is typed as always present, but the
-      // composition that actually supplies it for every process is still
-      // open work (scenario-composition-green handover, item 2). This
-      // constructs the app the way that gap reaches it at runtime: the type
-      // says `SimulationService`, the value is `undefined`.
+      // Neither the member nor the ClickHouse the module would derive it
+      // from: the only shape that still owes the caller a refusal.
       const app = ScenarioApp.create({
         repositories: { scenarios: {} as ScenarioRepository },
         dependencies: {
@@ -354,6 +352,9 @@ describe("ScenarioApp.getRunDataForAllSuites", () => {
         secrets: {} as never,
         members: {
           publicBaseUrl: undefined,
+          // No ClickHouse either: the refusal is what a deployment that
+          // composed neither the member nor the store it derives from owes.
+          clickhouse: undefined as never,
           agentTesting: createApiFixture<AgentTestService>(),
           simulations: undefined as never,
           scenarioExecution: {} as ScenarioExecutionService,
@@ -376,5 +377,58 @@ describe("ScenarioApp.getRunDataForAllSuites", () => {
         app.getRunDataForAllSuites({ projectId: "project-1", limit: 20 }),
       ).rejects.toBeInstanceOf(ScenarioSimulationsUnavailableError);
     });
+  });
+});
+
+describe("given a process that supplies no simulations member but does read ClickHouse", () => {
+  /** @scenario "Simulation reads are derived from the deployment's own ClickHouse" */
+  it("serves the read from ClickHouse instead of refusing", async () => {
+    const asked: { tenantId: string }[] = [];
+    const app = ScenarioApp.create({
+      repositories: { scenarios: {} as ScenarioRepository },
+      dependencies: {
+        agents: createApiFixture<AgentApi>(),
+        users: createApiFixture<UserApi>(),
+        projects: createApiFixture<ProjectApi>(),
+        plans: createApiFixture<EntitlementApi>(),
+        modelProviders: createApiFixture<ModelProviderApi>(),
+        presence: createApiFixture<PresenceApi>(),
+        auditLog: createApiFixture<AuditLogApi>(),
+        traces: createApiFixture<TraceApi>(),
+      },
+      config: undefined,
+      resources: {} as ResourceOwnership,
+      secrets: {} as never,
+      members: {
+        publicBaseUrl: undefined,
+        clickhouse: {
+          query: <Row>(input: { tenantId: string }) => {
+            asked.push({ tenantId: input.tenantId });
+
+            return Promise.resolve({ rows: [] as Row[] });
+          },
+        },
+        agentTesting: createApiFixture<AgentTestService>(),
+        simulations: undefined as never,
+        scenarioExecution: {} as ScenarioExecutionService,
+        scenarioTabs: {} as ScenarioTabRegistry,
+        resultAtoms: {} as ResultAtomsService,
+        runConfigurations: {} as RunConfigurationsService,
+        encryption: createApiFixture<Encryption>(),
+        rateLimiter: { check: async () => ({ allowed: true }) },
+        broadcast: {
+          getTenantEmitter: () => {
+            throw new Error("this read subscribes to nothing");
+          },
+          broadcastToTenant: async () => {},
+          broadcastToTenantRateLimited: async () => {},
+        },
+      },
+    });
+
+    await expect(
+      app.getRunDataForAllSuites({ projectId: "project-1", limit: 20 }),
+    ).resolves.toBeDefined();
+    expect(asked).toContainEqual({ tenantId: "project-1" });
   });
 });
