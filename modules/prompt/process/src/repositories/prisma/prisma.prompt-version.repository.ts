@@ -1,3 +1,4 @@
+import { uniqueConstraintTargets } from "@langwatch/prisma-client";
 import type {
   LlmPromptConfig,
   LlmPromptConfigVersion,
@@ -7,6 +8,8 @@ import type {
 } from "@langwatch/prisma-client/generated";
 import {
   NotFoundError,
+  PromptNotFoundError,
+  PromptVersionConflictError,
   type SchemaVersion,
   getVersionValidator,
   parseRuntimeParameters,
@@ -243,23 +246,31 @@ export class PrismaLlmConfigVersionsRepository extends LlmConfigVersionsReposito
     });
 
     if (!version) {
-      throw new Error(`Version ${id} not found.`);
+      throw new PromptNotFoundError(`Version ${id} not found.`);
     }
 
-    const newVersion = await this.createVersion({
-      versionData: {
-        authorId,
-        projectId: version.projectId,
-        configId: version.configId,
-        commitMessage: `Restore from version ${version.version}`,
-        schemaVersion: version.schemaVersion as SchemaVersion,
-        configData: version.configData as LlmConfigVersionDTO["configData"],
-        runtimeParameters: parseRuntimeParameters(version.runtimeParameters),
-      },
-      organizationId,
-    });
+    try {
+      return await this.createVersion({
+        versionData: {
+          authorId,
+          projectId: version.projectId,
+          configId: version.configId,
+          commitMessage: `Restore from version ${version.version}`,
+          schemaVersion: version.schemaVersion as SchemaVersion,
+          configData: version.configData as LlmConfigVersionDTO["configData"],
+          runtimeParameters: parseRuntimeParameters(version.runtimeParameters),
+        },
+        organizationId,
+      });
+    } catch (error) {
+      // The uniqueness on (configId, version) lives here, so the refusal is
+      // named here too rather than reaching the boundary as a database failure.
+      if (uniqueConstraintTargets(error).some((target) => target.includes("version"))) {
+        throw new PromptVersionConflictError();
+      }
 
-    return newVersion;
+      throw error;
+    }
   }
 
   generateVersionId(): string {

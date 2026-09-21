@@ -26,6 +26,7 @@ function makeMockPrisma(overrides: Record<string, unknown> = {}) {
 describe("PrismaPromptTagAssignmentRepository", () => {
   describe("assignTag()", () => {
     describe("when version does not belong to the prompt", () => {
+      /** @scenario "An invalid tag assignment is refused by name" */
       it("throws a validation error", async () => {
         const { prisma, versionFindFirst } = makeMockPrisma();
         versionFindFirst.mockResolvedValue(null);
@@ -39,8 +40,10 @@ describe("PrismaPromptTagAssignmentRepository", () => {
             projectId: "project-1",
           }),
         ).rejects.toThrow(
+          // The stable code, not the class name: this refusal is handled, and
+          // the code is what a caller reads off the wire.
           expect.objectContaining({
-            name: "TagValidationError",
+            code: "prompt_tag_invalid",
             message: expect.stringContaining("Version does not belong to this prompt config"),
           }),
         );

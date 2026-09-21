@@ -1931,6 +1931,13 @@ const presentations = {
     describe: () =>
       "That single sign-on connection isn't one of this organization's. Reload to see the current connections.",
   },
+  prompt_version_conflict: {
+    // Two writes landed on the same version number. Nothing the customer got
+    // wrong, so the copy says what to do rather than what failed.
+    title: "That version already exists",
+    describe: () =>
+      "Another change to this prompt landed first. Reload the prompt and restore the version again.",
+  },
   scim_protocol_refusal: {
     // A provisioning tool reads this, not a person: the refusal comes back at
     // the status SCIM names, and the detail is the protocol's own sentence.

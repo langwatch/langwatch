@@ -6,12 +6,13 @@
 import type { PromptTag } from "@langwatch/prompt-contract";
 import type { TimeInput } from "@langwatch/time";
 
-export class TagValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "TagValidationError";
-  }
-}
+/**
+ * An invalid tag or tag/version pairing. The contract's own refusal, re-exported
+ * under the name this repository's callers already use: a plain Error here
+ * reached the boundary unattributed, so `PUT /api/prompts/{id}/tags/{tag}`
+ * answered 500 where it owed the caller a named 4xx.
+ */
+export { PromptTagInvalidError as TagValidationError } from "@langwatch/prompt-contract";
 
 /** A stored assignment row. */
 export type PromptTagAssignmentRow = {

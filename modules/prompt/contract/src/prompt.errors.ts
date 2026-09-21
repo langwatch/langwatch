@@ -79,6 +79,24 @@ export class PromptHandleTakenError extends HandledError {
     this.name = "PromptHandleTakenError";
   }
 }
+/**
+ * A version number this prompt already has. Raised by persistence, where the
+ * uniqueness on (configId, version) actually lives — a raw constraint error
+ * reached the boundary as an unattributed 500, where a restore owes the
+ * caller a conflict it can act on.
+ */
+export class PromptVersionConflictError extends HandledError {
+  declare readonly code: "prompt_version_conflict";
+
+  constructor() {
+    super("prompt_version_conflict", "That prompt version already exists", {
+      httpStatus: 409,
+      fault: "customer",
+    });
+    this.name = "PromptVersionConflictError";
+  }
+}
+
 export class PromptHandleGenerationError extends Error {
   readonly code = "prompt_handle_generation_failed";
   constructor(message: string) {
