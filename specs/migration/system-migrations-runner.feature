@@ -74,9 +74,24 @@ Feature: Running system migrations across organizations
     When those events and application events are queued concurrently
     Then the preflight uses the canonical queue and its aggregate locks
     And it dispatches only groups registered by that preflight
-    And pending, delayed, blocked, or failed work in those groups prevents startup
+    And pending, delayed, blocked, or failed work the preflight itself caused in those groups prevents startup
     And worker-scoped durable subscribers run for the preflight events
     And schedulers, process-manager consumers, and general workers do not start
+
+  # A group's error marker has no expiry and is cleared only by a later success
+  # on that same group, so a failure ordinary traffic left before the upgrade —
+  # or one an earlier, crashed preflight left — would otherwise refuse every
+  # boot that followed, on every replica, forever. A group already wedged when
+  # the preflight adopted it was wedged under the previous release, and
+  # refusing to start fixes none of it.
+  @integration
+  Scenario: A group wedged before the preflight does not refuse startup
+    Given a group blocked with a failure from before the preflight adopted it
+    When the preflight settles its pass
+    Then that group neither holds the barrier open nor prevents startup
+    And it stays blocked, reported for operator triage
+    But a failure produced by the preflight's own work still prevents startup
+    And the refusal names the groups it refuses for, not a count of them
 
   @unit
   Scenario: A recurring reconciliation does not loop forever
