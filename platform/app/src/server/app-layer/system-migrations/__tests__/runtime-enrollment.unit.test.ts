@@ -106,6 +106,7 @@ import {
   IDENTITY_CONNECTION_GRANDFATHER_MIGRATION_NAME,
   IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
 } from "../../identity/migration-name";
+import { IDENTITY_SECRET_HEAL_MIGRATION_NAME } from "../../identity/secret-heal.migration";
 import { RedisMigrationLeaseRepository } from "../repositories/migration-lease.redis.repository";
 import {
   migrationPassCohort,
@@ -280,6 +281,55 @@ describe("migrationPassCohort on cloud", () => {
       // "all" did not widen anything and "none" did not narrow anything:
       // the cohort still came from the enrollment table.
       expect(stubs.enrollmentFindMany).toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given a full pass over both legs", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe("when one user migration declares its own candidate tenants", () => {
+    /** @scenario "A migration that declares its own tenants keeps them" */
+    it("visits the declared tenants for it and only the tenants with work left for the rest", async () => {
+      stubs.enrollmentFindMany.mockResolvedValue([]);
+
+      await runSystemMigrationPass();
+
+      const queries = stubs.secretHealQueryRaw.mock.calls.map(
+        ([strings, ...values]: [TemplateStringsArray, ...unknown[]]) => ({
+          sql: strings.join(" "),
+          values,
+        }),
+      );
+      // The heal's own source asks about drifted credentials and nothing
+      // else: narrowing it by migration state would empty it, because the
+      // heal never finalizes anyone.
+      const declared = queries.filter((query) =>
+        query.sql.includes("AccountCredential"),
+      );
+      const narrowed = queries.filter((query) =>
+        query.sql.includes("SystemMigrationTenantState"),
+      );
+      expect(declared).toHaveLength(1);
+      // One narrowed walk per leg: organizations, then the users the
+      // backfill bucket is driven over.
+      expect(narrowed).toHaveLength(2);
+
+      const askedAbout = narrowed.flatMap((query) =>
+        query.values.filter(Array.isArray).flat(),
+      );
+      expect(askedAbout).toContain(AUTHZ_ENGINE_MIGRATION_NAME);
+      expect(askedAbout).toContain(
+        IDENTITY_CONNECTION_GRANDFATHER_MIGRATION_NAME,
+      );
+      expect(askedAbout).toContain(IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME);
+      expect(askedAbout).not.toContain(IDENTITY_SECRET_HEAL_MIGRATION_NAME);
+
+      // The unnarrowed table walks are what the pass used to do.
+      expect(stubs.organizationFindMany).not.toHaveBeenCalled();
+      expect(stubs.userFindMany).not.toHaveBeenCalled();
     });
   });
 });

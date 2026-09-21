@@ -63,10 +63,12 @@ export async function runSystemMigrationsToQuiescence({
   awaitPassEffects?: () => Promise<void>;
 } = {}): Promise<MigrationPassSummary> {
   let contendedPasses = 0;
+  let leaseGranted = false;
 
   for (let pass = 1; pass <= MAX_PASSES; pass++) {
     signal.throwIfAborted();
     const summary = await runMigrationPass({ pass, redis, signal });
+    leaseGranted ||= claimWasGranted(summary);
 
     signal.throwIfAborted();
 
@@ -80,7 +82,9 @@ export async function runSystemMigrationsToQuiescence({
       return summary;
     }
 
-    contendedPasses = settledExceptForPeers(summary) ? contendedPasses + 1 : 0;
+    contendedPasses = settledExceptForPeers({ summary, leaseGranted })
+      ? contendedPasses + 1
+      : 0;
     if (contendedPasses >= MAX_CONTENDED_PASSES) {
       logger.warn(
         { summary, passes: pass },
@@ -89,7 +93,10 @@ export async function runSystemMigrationsToQuiescence({
       return summary;
     }
 
-    logger.info({ summary, pass }, continuingBecause(summary));
+    logger.info(
+      { summary, pass },
+      continuingBecause({ summary, leaseGranted }),
+    );
 
     await waitForNextPass({ pass, signal });
   }
@@ -138,13 +145,20 @@ async function settlePassEffects({
   }
 }
 
-function continuingBecause(summary: MigrationPassSummary): string {
+function continuingBecause({
+  summary,
+  leaseGranted,
+}: {
+  summary: MigrationPassSummary;
+  leaseGranted: boolean;
+}): string {
   if (summary.advanced > 0) {
     return "system migration pass advanced the fleet; another pass follows";
   }
-  return summary.claimed === summary.tenantsSeen
-    ? "every tenant was claimed by another process, which is also what an unreachable Redis looks like; this pass learned nothing, so the preflight keeps trying"
-    : "a peer holds some of the fleet; the preflight gives it a few passes before starting without those tenants";
+  if (summary.claimed === summary.tenantsSeen && !leaseGranted) {
+    return "every tenant was claimed by another process and no claim has been granted yet, which is also what an unreachable Redis looks like; this pass learned nothing, so the preflight keeps trying";
+  }
+  return "a peer holds some of the fleet; the preflight gives it a few passes before starting without those tenants";
 }
 
 function converged(summary: MigrationPassSummary): boolean {
@@ -157,14 +171,20 @@ function converged(summary: MigrationPassSummary): boolean {
  * read belong to a peer — the ordinary shape of several replicas booting at
  * once.
  *
- * A pass shut out of the WHOLE fleet is excluded and never counts, however
- * many times it repeats. `lease.acquire` fails safe to "held" on any Redis
- * error, so total contention is also exactly what an unreachable Redis looks
- * like, and a process that learned nothing at all about any tenant has no
- * grounds to call anything settled. Seeing most of the fleet and being shut
- * out of part of it is a different fact: this process has finished its own
- * work, and the tenants it could not claim are being driven by the peer
- * holding them.
+ * Being shut out of the WHOLE fleet counts only once Redis has been seen to
+ * grant this process a claim (`claimWasGranted`). `lease.acquire` fails safe
+ * to "held" on any Redis error, so total contention is also exactly what an
+ * unreachable Redis looks like, and a process that has never once been handed
+ * a tenant has no grounds to call anything settled. That used to be the same
+ * thing as "shut out of everything", because a pass enumerated every tenant
+ * in the installation and a peer could not plausibly hold all sixteen
+ * thousand. A pass now enumerates only the tenants with work left, which on a
+ * settled fleet is a handful, and a dozen replicas booting together can
+ * genuinely hold every one of them - so the evidence has to be named rather
+ * than inferred from the size of the shut-out. Seeing most of the fleet and
+ * being shut out of part of it is the same fact it always was: this process
+ * has finished its own work, and the tenants it could not claim are being
+ * driven by the peer holding them.
  *
  * Starting is safe for those tenants either way. An unfinished tenant's
  * migration gate stays closed and it is served on the legacy path, which is
@@ -172,9 +192,30 @@ function converged(summary: MigrationPassSummary): boolean {
  * holding the claims dies before finishing, the worker's re-drive cadence
  * picks them up without another deploy.
  */
-function settledExceptForPeers(summary: MigrationPassSummary): boolean {
+function settledExceptForPeers({
+  summary,
+  leaseGranted,
+}: {
+  summary: MigrationPassSummary;
+  leaseGranted: boolean;
+}): boolean {
   if (summary.advanced > 0 || summary.claimed === 0) return false;
-  return summary.claimed < summary.tenantsSeen;
+  if (summary.claimed < summary.tenantsSeen) return true;
+  return leaseGranted;
+}
+
+/**
+ * Did Redis hand THIS process a claim on this pass? A tenant the pass saw
+ * and did not count as claimed is one `lease.acquire` answered true for, and
+ * `acquire` fails safe to "held" on every Redis error - so a single such
+ * tenant is positive proof the lease store is reachable and answering.
+ *
+ * It is the fact the total-shut-out exclusion above was standing in for.
+ * A pass with nothing to enumerate proves nothing either way, which is why
+ * the test is `tenantsSeen > claimed` and not `claimed === 0`.
+ */
+function claimWasGranted(summary: MigrationPassSummary): boolean {
+  return summary.tenantsSeen > summary.claimed;
 }
 
 async function waitForNextPass({

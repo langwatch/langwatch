@@ -11,7 +11,9 @@ export type { TenantSource } from "./tenant-source";
 export {
   isTerminalTenantStatus,
   type MigrationPassSummary,
+  TENANT_MIGRATION_STATUSES,
   type TenantMigrationOutcome,
   type TenantMigrationRecord,
   type TenantMigrationStatus,
+  TERMINAL_TENANT_STATUSES,
 } from "./types";

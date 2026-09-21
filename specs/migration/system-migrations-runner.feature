@@ -50,6 +50,59 @@ Feature: Running system migrations across organizations
     When a later pass runs
     Then it is skipped
 
+  # ═══ Who a pass visits at all ═════════════════════════════════════════
+  # Being skipped is not free. A skip is a claim taken, a state row read per
+  # migration and a claim released, and a fleet whose tenants have almost all
+  # finished pays that for every one of them on every pass, on every replica,
+  # before any of them may serve. A tenant that has finished EVERY migration a
+  # pass would drive over it has nothing left to do ever, so the pass does not
+  # enumerate it — while anything short of that is enumerated exactly as
+  # before, and what then happens to it is still the runner's decision.
+
+  @integration
+  Scenario: A tenant that has finished every migration a pass drives is not visited again
+    Given "org_acme" is finalized for every migration the pass drives
+    When a pass runs
+    Then it is not visited at all
+
+  @integration
+  Scenario: A tenant with one of a pass's migrations still to finish is visited
+    Given "org_acme" is finalized for one migration and parked for another
+    When a pass runs
+    Then it is visited
+
+  @integration
+  Scenario: A tenant no pass has ever touched is visited
+    Given "org_acme" has no record for any migration
+    When a pass runs
+    Then it is visited
+
+  @integration
+  Scenario: A tenant an operator rolled back is not visited again
+    Given "org_acme" is rolled back for every migration the pass drives
+    When a pass runs
+    Then it is not visited at all
+
+  @unit
+  Scenario: A pass with no migrations to drive visits nobody
+    Given an installation that runs none of the registered migrations
+    When a pass runs
+    Then no tenant is enumerated
+
+  @unit
+  Scenario: A migration that declares its own tenants keeps them
+    Given a migration that declares its own candidate tenants
+    And another migration driven over every tenant
+    When a pass runs
+    Then the declaring migration is driven over the tenants it declared
+    And the other is driven over the tenants with work left for it
+
+  @unit
+  Scenario: A pass may ask which tenants have work left across the whole installation
+    Given the question a tenant source asks is the tenant list itself
+    When the multitenancy guard reads it
+    Then it is admitted rather than refusing the pass
+
   # ═══ Converging ═══════════════════════════════════════════════════════
   # One pass is never enough on its own: a pass cannot observe its own
   # events, so an organization it adopts reads as held and only a LATER pass
@@ -152,6 +205,24 @@ Feature: Running system migrations across organizations
     When the same shape repeats pass after pass
     Then the run ends and runtime processes start
     And it says it is starting rather than waiting on a peer
+
+  # A pass now enumerates only the tenants with work left, so on a settled
+  # fleet that is a handful and a dozen replicas booting together can hold
+  # every one of them. "Shut out of everything" is therefore no longer proof
+  # of a broken lease store, and the proof has to be named instead: a tenant
+  # this process claimed is one Redis answered for, because a claim fails safe
+  # to "held" on every error.
+  @unit
+  Scenario: A shut-out from the last remaining tenants settles once a claim has been granted
+    Given an earlier pass claimed a tenant of its own
+    When every later pass finds the few remaining tenants held by a peer
+    Then the run ends and runtime processes start
+
+  @unit
+  Scenario: A process never granted a claim keeps trying rather than settling
+    Given no pass has ever been granted a claim
+    When every pass finds every tenant held
+    Then the preflight fails rather than starting
 
   @unit
   Scenario: A momentary overlap with a peer is still waited out

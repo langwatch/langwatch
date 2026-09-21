@@ -108,6 +108,56 @@ describe("runSystemMigrationsToQuiescence", () => {
     expect(stubs.runPass).toHaveBeenCalledTimes(3);
   });
 
+  describe("given a pass enumerates only the tenants with work left", () => {
+    describe("when a peer holds every one of the few that remain", () => {
+      /** @scenario "A shut-out from the last remaining tenants settles once a claim has been granted" */
+      it("starts, because a claim this process was granted proves the lease store answers", async () => {
+        // The first pass claimed 35 of the 40 tenants that still had work.
+        // Redis therefore answers — `acquire` fails safe to "held" on every
+        // error — and the four stragglers a peer holds after that are the
+        // ordinary rolling-deploy shape, not a broken lease store.
+        stubs.runPass
+          .mockResolvedValueOnce({
+            ...summaryOf({ advanced: 3 }),
+            tenantsSeen: 40,
+            claimed: 5,
+          })
+          .mockResolvedValue({
+            ...summaryOf({ advanced: 0 }),
+            tenantsSeen: 4,
+            claimed: 4,
+          });
+
+        const run = runSystemMigrationsToQuiescence();
+        await vi.runAllTimersAsync();
+
+        await expect(run).resolves.toMatchObject({ claimed: 4 });
+        expect(stubs.runPass).toHaveBeenCalledTimes(4);
+        expect(stubs.error).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when no pass has ever been granted a claim", () => {
+      /** @scenario "A process never granted a claim keeps trying rather than settling" */
+      it("keeps trying and fails the preflight rather than calling a total shut-out settled", async () => {
+        stubs.runPass.mockResolvedValue({
+          ...summaryOf({ advanced: 0 }),
+          tenantsSeen: 4,
+          claimed: 4,
+        });
+
+        const run = runSystemMigrationsToQuiescence();
+        const rejected = expect(run).rejects.toBeInstanceOf(
+          SystemMigrationPreflightError,
+        );
+        await vi.runAllTimersAsync();
+
+        await rejected;
+        expect(stubs.runPass).toHaveBeenCalledTimes(25);
+      });
+    });
+  });
+
   /** @scenario A peer's claims do not keep this process from starting */
   it("starts once it has nothing of its own left, however long a peer holds the rest", async () => {
     // Every replica runs this preflight, so on a rolling deploy each reads
