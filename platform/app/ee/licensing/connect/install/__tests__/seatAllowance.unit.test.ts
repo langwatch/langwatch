@@ -31,14 +31,11 @@ const { connectEnabled } = vi.hoisted(() => ({
 }));
 
 vi.mock("../connectConfig", () => ({
-  readConnectConfig: () =>
-    connectEnabled.current
-      ? {
-          enabled: true,
-          gatewayEndpoint: "https://gateway.example.test",
-          licenseEndpoint: "https://connect.example.test",
-        }
-      : { enabled: false },
+  readConnectConfig: () => ({
+    permitted: connectEnabled.current,
+    gatewayEndpoint: "https://gateway.example.test",
+    licenseEndpoint: "https://connect.example.test",
+  }),
 }));
 
 import { LicenseHandler } from "../../../licenseHandler";

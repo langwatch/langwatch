@@ -5,11 +5,11 @@ sidebarTitle: Connect
 keywords: connect, hosted services, self-hosted, license sync, seats, instant evals judge, managed models, metered usage
 ---
 
-Connect is a deployment switch that opens one outbound connection from a licensed self-hosted install to LangWatch, for two hosted services: the Instant Evals judge and managed models. Everything else keeps running on your own infrastructure.
+Connect opens one outbound connection from a licensed self-hosted install to LangWatch, for two hosted services: the Instant Evals judge and managed models. Everything else keeps running on your own infrastructure.
 
-Each hosted service starts off. An organization admin switches on the ones they want in **Settings → Connect**, and the same page shows what has been spent, the cap the install stops at, and the credit that is left.
+Your license decides what this install may call. A license that names a hosted service can reach it; a license that names none reaches nothing, and there is no setting that changes that. An install on an offline license opens no connection to LangWatch, and you can check that against the license itself rather than against a configuration file.
 
-Connect is off unless an operator turns it on. An install that upgrades and changes no value opens no connection to LangWatch.
+A service your license names is on. An organization admin switches off the ones they do not want in **Settings → Connect**, and the same page shows what has been spent, the cap the install stops at, and the credit that is left.
 
 <Info>
 **Also check:** [Editions and licensing](/self-hosting/licensing), [Instant Evals](/features/instant-evals/overview), [Environment variables](/self-hosting/configuration/environment-variables).
@@ -23,21 +23,20 @@ Each service states what it sends before you switch it on. Your traces, datasets
 |---|---|
 | Instant Evals | The judged text and the questions asked about it. LangWatch judges them and does not keep them. |
 | Managed models | The prompts and completions of the calls you route to a `langwatch/` model. |
-| License sync, with Connect on | The license token, the instance id, the app version, and two counts: members and lite members. No organization name. |
+| License sync, on a license naming a hosted service | The license token, the instance id, the app version, and two counts: members and lite members. No organization name. |
 
-The daily usage statistics post keeps the payload it always had and travels to the connect host while Connect is on. `DISABLE_USAGE_STATS=true` still turns it off, as before.
+The daily usage statistics post keeps the payload it always had. It travels to the connect host once your license names a hosted service, and to the app host it has always used before that. `DISABLE_USAGE_STATS=true` still turns it off, as before.
 
-## Turn Connect on
+## Get a license that includes them
 
-You need a license whose terms include the hosted services you want. Ask LangWatch for one before you switch anything on.
+You need a license whose terms include the hosted services you want. Ask LangWatch for one, paste it on the License page, and the services it names are on.
 
-On Helm, set the switch. The endpoints default to LangWatch's own hosts, so you name them only when LangWatch gave you different ones.
+The endpoints default to LangWatch's own hosts, so you name them only when LangWatch gave you different ones. A default install sets none of these.
 
 ```yaml
 app:
   connect:
-    enabled: true
-    # Both optional, shown here as the values they default to.
+    # Every value here is optional. Set none of them and the license decides.
     gatewayEndpoint: "https://gateway.langwatch.ai"
     licenseEndpoint: "https://connect.langwatch.ai"
     # Set this only when you have a reason to name the identity yourself.
@@ -48,10 +47,11 @@ The chart writes these as environment variables on the app and the workers. Set 
 
 | Variable | Default | What it does |
 |---|---|---|
-| `LANGWATCH_CONNECT_ENABLED` | off | Turns Connect on. With it off, the install reads none of the variables below and opens no connection to LangWatch. |
+| `LANGWATCH_CONNECT_DISABLED` | off | Switches hosted services and usage reporting off entirely. With it on, the install builds no client and opens no connection to LangWatch, whatever its license says. |
 | `LANGWATCH_CONNECT_GATEWAY_ENDPOINT` | `https://gateway.langwatch.ai` | Where hosted services are called. |
 | `LANGWATCH_CONNECT_LICENSE_ENDPOINT` | `https://connect.langwatch.ai` | Where the daily license sync goes. |
 | `LANGWATCH_CONNECT_INSTANCE_ID` | the id of the organization whose license is used | The identity this install presents on both hosts. |
+| `SERVICE_VERSION` | the app image tag | The release this install reports. The chart sets it for you. |
 
 Both endpoints must be `https`; plain `http` is accepted for a loopback host only, for a developer running both sides on one machine. Restart the app and the workers after changing any of them.
 
@@ -132,13 +132,15 @@ Your own providers are untouched: a model spelled without the prefix goes to you
 
 ## Air-gapped installs
 
-With Connect off, which is the default, the install opens no connection to LangWatch: no sync, no hosted service, and the licensed seat count is enforced as a hard cap. Upgrading to a release that carries Connect changes none of that until an operator sets `app.connect.enabled`.
+An install whose license names no hosted service opens no connection to LangWatch: no sync, no hosted service, and the licensed seat count is enforced as a hard cap. Upgrading to a release that carries Connect changes none of that, and the license blob is where you check it: decode the license and look for `connectServices`. A license without that field, which is every license issued before this release, reaches nothing.
+
+For an install that must prove the absence rather than derive it, set `app.connect.disabled: true` (or `LANGWATCH_CONNECT_DISABLED=true`). It refuses every hosted call and the usage report as well, whatever the license says.
 
 ## Errors an admin can meet
 
 | Code | What it means | What to do |
 |---|---|---|
-| `connect_disabled` | Connect is off in the deployment configuration. | Set `app.connect.enabled` (or `LANGWATCH_CONNECT_ENABLED`) and restart. |
+| `connect_disabled` | An operator switched Connect off in the deployment configuration. | Remove `app.connect.disabled` (or `LANGWATCH_CONNECT_DISABLED`) and restart. |
 | `connect_unreachable` | The install could not reach LangWatch. | The message names the host and port an outbound rule has to allow. |
 | `connect_license_not_registered` | LangWatch has no record of this license for hosted services. | Contact LangWatch to have hosted services set up for your license. |
 | `connect_license_revoked` | The license is no longer active. | Contact LangWatch for a new license. |

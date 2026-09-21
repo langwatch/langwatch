@@ -46,10 +46,10 @@ afterEach(async () => {
 describe("given an install that sets nothing", () => {
   describe("when the deployment picks a classifier", () => {
     /** @scenario "An install that sets nothing new keeps the classifier it had" */
-    it("gets the classifier for an install with no judge key, and calls nothing", () => {
-      expect(isInstantEvalClassifierConfigured()).toBe(false);
+    it("builds the hosted classifier and calls nothing until an organization is entitled", () => {
+      expect(isInstantEvalClassifierConfigured()).toBe(true);
       expect(getInstantEvalClassifier()).toBeInstanceOf(
-        NullInstantEvalClassifier,
+        ConnectInstantEvalClassifier,
       );
       expect(fetchSpy).not.toHaveBeenCalled();
     });
@@ -59,9 +59,8 @@ describe("given an install that sets nothing", () => {
 describe("given an install with its own judge key", () => {
   describe("when the deployment picks a classifier", () => {
     /** @scenario "An install with its own judge key keeps using it" */
-    it("judges with that key even where Connect is switched on", () => {
+    it("judges with that key rather than through the hosted service", () => {
       env.JEV_API_KEY = "a key of this install's own";
-      env.LANGWATCH_CONNECT_ENABLED = true;
 
       expect(getInstantEvalClassifier()).toBeInstanceOf(
         JevInstantEvalClassifier,
@@ -78,15 +77,16 @@ describe("given an install with its own judge key", () => {
   });
 });
 
-describe("given an install with Connect switched on and no judge key", () => {
+describe("given an install with Connect switched off for an audit", () => {
   describe("when the deployment picks a classifier", () => {
-    it("judges through the hosted service", () => {
-      env.LANGWATCH_CONNECT_ENABLED = true;
+    it("judges nothing and calls nothing", () => {
+      env.LANGWATCH_CONNECT_DISABLED = true;
 
-      expect(isInstantEvalClassifierConfigured()).toBe(true);
+      expect(isInstantEvalClassifierConfigured()).toBe(false);
       expect(getInstantEvalClassifier()).toBeInstanceOf(
-        ConnectInstantEvalClassifier,
+        NullInstantEvalClassifier,
       );
+      expect(fetchSpy).not.toHaveBeenCalled();
     });
   });
 });
@@ -96,7 +96,6 @@ describe("given an install that asked for no classifier at all", () => {
     it("takes that over both a judge key and Connect", () => {
       env.INSTANT_EVAL_CLASSIFIER = "null";
       env.JEV_API_KEY = "a key of this install's own";
-      env.LANGWATCH_CONNECT_ENABLED = true;
 
       expect(isInstantEvalClassifierConfigured()).toBe(false);
       expect(getInstantEvalClassifier()).toBeInstanceOf(

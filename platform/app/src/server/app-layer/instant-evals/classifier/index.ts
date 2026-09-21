@@ -65,7 +65,10 @@ let cached: InstantEvalClassifier | undefined;
 export function isInstantEvalClassifierConfigured(): boolean {
   if (env.INSTANT_EVAL_CLASSIFIER === "null") return false;
   if (env.JEV_API_KEY) return true;
-  return readConnectConfig().enabled;
+  // The Connect classifier answers per organization, and an organization
+  // whose license names no hosted judging skips every question. Whether it can
+  // judge for anyone is decided there, not here.
+  return readConnectConfig().permitted;
 }
 
 /**
@@ -104,7 +107,7 @@ function createInstantEvalClassifier(): InstantEvalClassifier {
   const apiKey = env.JEV_API_KEY;
   if (!apiKey) {
     const config = readConnectConfig();
-    if (config.enabled) {
+    if (config.permitted) {
       return new ConnectInstantEvalClassifier({ prisma, config });
     }
     logger.info(

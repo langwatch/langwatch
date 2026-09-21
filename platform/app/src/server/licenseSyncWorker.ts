@@ -11,9 +11,11 @@
  * (`usageStatsWorker`). This sync carries no statistics, no organization name
  * and no hostname, and it runs whether or not statistics are switched off.
  *
- * Nothing runs at all unless an operator switched Connect on: with it off the
- * start function returns before a client is built, a credential is resolved or
- * a connection is opened.
+ * Nothing runs at all unless a license on this install names a hosted service.
+ * An install on an offline license builds no client, resolves no credential
+ * and opens no connection, and an operator proves that from the license blob
+ * rather than from a deployment variable. `LANGWATCH_CONNECT_DISABLED` stops
+ * it as well.
  *
  * @see ~/../ee/licensing/connect/install/connectLicenseClient.ts
  * @see specs/self-hosting/connected-services/license-sync.feature
@@ -24,6 +26,7 @@ import {
   readConnectConfig,
 } from "@ee/licensing/connect/install/connectConfig";
 import { resolveConnectCredential } from "@ee/licensing/connect/install/connectCredential";
+import { licenseConnectServices } from "@ee/licensing/connect/install/connectEntitlement";
 import {
   type ConnectLicenseClient,
   getConnectLicenseClient,
@@ -103,7 +106,7 @@ export async function syncLicensesForAllOrganizations(
   deps: LicenseSyncDependencies = {},
 ): Promise<void> {
   const config = deps.config ?? readConnectConfig();
-  if (!config.enabled) return;
+  if (!config.permitted) return;
 
   const prisma = deps.prisma ?? defaultPrisma;
   const client = deps.client ?? getConnectLicenseClient(config.licenseEndpoint);
@@ -126,16 +129,22 @@ export async function syncLicensesForAllOrganizations(
 }
 
 /**
- * The organizations with a license to sync: their own, or the instance-wide
- * one an operator set for the whole deployment.
+ * The organizations whose license names a hosted service: their own, or the
+ * instance-wide one an operator set for the whole deployment.
+ *
+ * A license that names none is not synced, which is how an install on an
+ * offline license makes no call.
  */
 async function organizationsToSync(prisma: PrismaClient): Promise<string[]> {
   const organizations = await prisma.organization.findMany({
     select: { id: true, license: true },
   });
   return organizations
-    .filter((organization) =>
-      Boolean(organization.license ?? env.LANGWATCH_LICENSE_KEY),
+    .filter(
+      (organization) =>
+        licenseConnectServices({
+          licenseKey: organization.license ?? env.LANGWATCH_LICENSE_KEY ?? null,
+        }).length > 0,
     )
     .map((organization) => organization.id);
 }
@@ -357,16 +366,18 @@ function nowOf(deps: LicenseSyncDependencies): Date {
 /**
  * The interval loop that runs the sync once a day.
  *
- * Returns nothing when Connect is off, which is the whole of the offline
- * guarantee here: no client, no credential and no connection for an install
- * that set none of the Connect variables.
+ * The loop starts whenever Connect is permitted, and each pass decides for
+ * itself which organizations are entitled. An install whose licenses name no
+ * hosted service walks an empty list and opens no connection, and a license
+ * pasted while the process runs is picked up on the next pass rather than at
+ * the next restart.
  */
 export function startLicenseSyncWorker(
   deps: LicenseSyncDependencies = {},
 ): LicenseSyncWorkerHandle | undefined {
   const config = deps.config ?? readConnectConfig();
-  if (!config.enabled) {
-    logger.debug("connect is off, skipping the license sync worker");
+  if (!config.permitted) {
+    logger.debug("connect is switched off, skipping the license sync worker");
     return undefined;
   }
 

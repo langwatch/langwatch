@@ -265,43 +265,89 @@ describe("a license minted by main before this change", () => {
  */
 describe("an install upgraded with no Connect configuration", () => {
   const CONNECT_VARIABLES = [
-    "LANGWATCH_CONNECT_ENABLED",
+    "LANGWATCH_CONNECT_DISABLED",
     "LANGWATCH_CONNECT_GATEWAY_ENDPOINT",
     "LANGWATCH_CONNECT_LICENSE_ENDPOINT",
     "LANGWATCH_CONNECT_INSTANCE_ID",
   ] as const;
 
   describe("when its environment is parsed", () => {
-    it("parses with every Connect variable absent, and resolves them all to off", async () => {
+    it("parses with every Connect variable absent, none of them required", async () => {
       for (const name of CONNECT_VARIABLES) {
         expect(process.env[name]).toBeUndefined();
       }
 
       const { env } = await import("~/env.mjs");
 
-      expect(env.LANGWATCH_CONNECT_ENABLED).toBe(false);
+      expect(env.LANGWATCH_CONNECT_DISABLED).toBe(false);
       expect(env.LANGWATCH_CONNECT_GATEWAY_ENDPOINT).toBeUndefined();
       expect(env.LANGWATCH_CONNECT_LICENSE_ENDPOINT).toBeUndefined();
       expect(env.LANGWATCH_CONNECT_INSTANCE_ID).toBeUndefined();
     });
   });
 
+  describe("when the license minted by main is read for an entitlement", () => {
+    /** @scenario "An install on an offline license keeps its telemetry destination" */
+    it("names no hosted service, so no path builds a client", async () => {
+      vi.resetModules();
+      vi.doMock("~/env.mjs", () => ({ env: {} }));
+
+      const { licenseConnectServices } = await import(
+        "@ee/licensing/connect/install/connectEntitlement"
+      );
+
+      expect(
+        licenseConnectServices({
+          licenseKey: fixture.licenseKey,
+          publicKey: fixture.publicKey,
+          now: NOW,
+        }),
+      ).toEqual([]);
+
+      vi.doUnmock("~/env.mjs");
+    });
+  });
+
   describe("when its daily jobs run", () => {
     /** @scenario "An install with Connect disabled sends no sync" */
-    it("starts no sync worker and posts its statistics where it always did", async () => {
+    it("syncs nothing and posts its statistics where it always did", async () => {
       vi.resetModules();
       vi.doMock("~/env.mjs", () => ({ env: { NODE_ENV: "test" } }));
       vi.doMock("~/server/db", () => ({ prisma: {} }));
 
-      const { startLicenseSyncWorker } = await import(
+      const { syncLicensesForAllOrganizations } = await import(
         "~/server/licenseSyncWorker"
       );
       const { usageStatsEndpoint, USAGE_STATS_APP_HOST_URL } = await import(
         "~/server/usageStatsWorker"
       );
 
-      expect(startLicenseSyncWorker()).toBeUndefined();
-      expect(usageStatsEndpoint()).toBe(USAGE_STATS_APP_HOST_URL);
+      // The offline install's own database: one organization, holding the
+      // license main minted, which names no hosted service. A pass over it
+      // reaches the client for no organization at all.
+      const client = {
+        syncLicense: vi.fn(async () => {
+          throw new Error("an offline install synced its license");
+        }),
+      };
+      await syncLicensesForAllOrganizations({
+        prisma: {
+          organization: {
+            findMany: async () => [{ id: ORG, license: fixture.licenseKey }],
+          },
+        } as never,
+        client: client as never,
+      });
+      expect(client.syncLicense).not.toHaveBeenCalled();
+
+      // The destination does not move under an operator who changed nothing:
+      // an install with no entitled license keeps posting to the app host it
+      // has always posted to.
+      await expect(
+        usageStatsEndpoint({
+          organization: { findMany: async () => [] },
+        } as never),
+      ).resolves.toBe(USAGE_STATS_APP_HOST_URL);
       expect(USAGE_STATS_APP_HOST_URL).toBe(
         "https://app.langwatch.ai/api/track_usage",
       );
@@ -314,7 +360,7 @@ describe("an install upgraded with no Connect configuration", () => {
 
   describe("when it judges an eval function", () => {
     /** @scenario "An install that sets nothing new keeps the classifier it had" */
-    it("uses the classifier for an install with no judge key, and calls nothing", async () => {
+    it("skips every judgement and calls nothing", async () => {
       const globalFetch = vi.fn(() => {
         throw new Error("an install with nothing configured called out");
       });
@@ -326,15 +372,26 @@ describe("an install upgraded with no Connect configuration", () => {
       // Stated rather than inherited: the deployment here is one with no judge
       // key and no Connect configuration, whatever this machine's own .env has.
       vi.doMock("~/env.mjs", () => ({ env: { NODE_ENV: "test" } }));
-      vi.doMock("~/server/db", () => ({ prisma: {} }));
+      // The database of an offline install: one organization, holding the
+      // license main minted, which names no hosted service.
+      vi.doMock("~/server/db", () => ({
+        prisma: {
+          project: {
+            findUnique: async () => ({ team: { organizationId: ORG } }),
+          },
+          organization: {
+            findUnique: async () => ({
+              license: fixture.licenseKey,
+              connectServicesDisabled: [],
+            }),
+          },
+        },
+      }));
       vi.doMock("undici", async (importOriginal) => ({
         ...(await importOriginal<typeof import("undici")>()),
         fetch: undiciFetch,
       }));
 
-      const { NullInstantEvalClassifier } = await import(
-        "~/server/app-layer/instant-evals/classifier/null.client"
-      );
       const { getInstantEvalClassifier, resetInstantEvalClassifier } =
         await import("~/server/app-layer/instant-evals/classifier");
 
@@ -348,7 +405,6 @@ describe("an install upgraded with no Connect configuration", () => {
       });
       await resetInstantEvalClassifier();
 
-      expect(classifier).toBeInstanceOf(NullInstantEvalClassifier);
       expect(judgement.skippedReason).toBe("classifier_not_configured");
       expect(globalFetch).not.toHaveBeenCalled();
       expect(undiciFetch).not.toHaveBeenCalled();

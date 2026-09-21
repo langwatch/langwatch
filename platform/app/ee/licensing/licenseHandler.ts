@@ -198,7 +198,7 @@ export class LicenseHandler {
     licenseKey: string;
     lease: unknown;
   }): PlanInfo {
-    if (!readConnectConfig().enabled) {
+    if (!readConnectConfig().permitted) {
       return plan;
     }
 

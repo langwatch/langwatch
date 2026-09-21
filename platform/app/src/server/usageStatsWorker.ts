@@ -15,8 +15,10 @@
  */
 
 import { readConnectConfig } from "@ee/licensing/connect/install/connectConfig";
+import { installIsEntitled } from "@ee/licensing/connect/install/connectEntitlement";
 import { createLogger } from "@langwatch/observability";
 import { env } from "~/env.mjs";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { collectUsageStats } from "~/server/collectUsageStats";
 import { prisma } from "~/server/db";
 import {
@@ -37,12 +39,21 @@ export interface UsageStatsWorkerHandle {
 export const USAGE_STATS_APP_HOST_URL =
   "https://app.langwatch.ai/api/track_usage";
 
-/** The one host a connected install talks to, the app host otherwise. */
-export function usageStatsEndpoint(): string {
-  const config = readConnectConfig();
-  return config.enabled
-    ? `${config.licenseEndpoint}/v1/stats`
-    : USAGE_STATS_APP_HOST_URL;
+/**
+ * The one host a connected install talks to, the app host otherwise.
+ *
+ * An install whose license names a hosted service already talks to the connect
+ * host for its license sync, so its statistics go there too and one host
+ * answers everything it sends. An install on an offline license keeps posting
+ * where it always has, which is the upgrade guarantee: the destination does
+ * not move under an operator who changed nothing.
+ */
+export async function usageStatsEndpoint(
+  prismaClient: PrismaClient = prisma,
+): Promise<string> {
+  const connected = await installIsEntitled({ prisma: prismaClient });
+  if (!connected) return USAGE_STATS_APP_HOST_URL;
+  return `${readConnectConfig().licenseEndpoint}/v1/stats`;
 }
 
 async function sendUsageStatsForAllOrganizations(): Promise<void> {
@@ -57,7 +68,7 @@ async function sendUsageStatsForAllOrganizations(): Promise<void> {
 
   // Default to self-hosted if not specified — mirrors the old worker.
   const installMethod = process.env.INSTALL_METHOD ?? "self-hosted";
-  const endpoint = usageStatsEndpoint();
+  const endpoint = await usageStatsEndpoint();
 
   for (const organization of organizations) {
     const instanceId = `${organization.name}__${organization.id}`;

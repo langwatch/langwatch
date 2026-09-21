@@ -108,7 +108,7 @@ function ConnectedOrganization({
 function DeploymentOff() {
   return (
     <SettingsSection
-      title="Connect is switched off for this deployment"
+      title="Hosted services are switched off for this deployment"
       testId="connect-deployment-off"
     >
       <VStack width="full" align="start" gap={2}>
@@ -116,10 +116,10 @@ function DeploymentOff() {
           Nothing is sent to LangWatch from this install.
         </Text>
         <Text fontSize="sm" color="fg.muted">
-          To offer hosted services here, set app.connect.enabled to true in your
-          Helm values, or set LANGWATCH_CONNECT_ENABLED to true in the
-          environment, then restart LangWatch. Every service still starts
-          switched off until someone switches it on from this page.
+          To use hosted services here, remove app.connect.disabled from your
+          Helm values, or unset LANGWATCH_CONNECT_DISABLED in the environment,
+          then restart LangWatch. What this install may call is then decided by
+          its license.
         </Text>
       </VStack>
     </SettingsSection>

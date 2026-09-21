@@ -1,10 +1,9 @@
 /**
  * Managed models on the install's side and on LangWatch Cloud's.
  *
- * The install: the LangWatch provider slot is added only where an operator
- * switched Connect on for the deployment and an admin switched the service on
- * for the organization, and the license token reaches it without ever being
- * written to a provider row.
+ * The install: the LangWatch provider slot is added only where the license
+ * names managed models and no administrator switched it off, and the license
+ * token reaches it without ever being written to a provider row.
  *
  * LangWatch Cloud: the chain a license's managed key dispatches to is the
  * platform's own environment keys, and only while the license is entitled.
@@ -18,14 +17,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 
 const config = vi.hoisted(() => ({
-  current: { enabled: false } as ConnectConfig,
+  current: { permitted: false } as unknown as ConnectConfig,
 }));
 const credential = vi.hoisted(() => ({
   current: null as ConnectCredential | null,
 }));
+/**
+ * What the organization's license names, less what an administrator switched
+ * off. Stood in for here: how that answer is reached has its own suite, and
+ * what this one pins is which answer builds a provider slot.
+ */
+const enabledServices = vi.hoisted(() => ({ current: [] as string[] }));
 
 vi.mock("@ee/licensing/connect/install/connectConfig", () => ({
   readConnectConfig: () => config.current,
+}));
+vi.mock("@ee/licensing/connect/install/connectEntitlement", () => ({
+  connectServiceEnabled: async ({ service }: { service: string }) =>
+    enabledServices.current.includes(service),
 }));
 vi.mock("@ee/licensing/connect/install/connectCredential", () => ({
   resolveConnectCredential: async () => credential.current,
@@ -36,17 +45,15 @@ const { connectLangWatchProviderSlot, platformSharedModelProviders } =
 const { computeConfigETag } = await import("../configETag");
 
 const CONNECT_ON: ConnectConfig = {
-  enabled: true,
+  permitted: true,
   gatewayEndpoint: "https://gateway.langwatch.ai",
   licenseEndpoint: "https://connect.langwatch.ai",
 };
 const LICENSE_TOKEN = `lwl_${"a".repeat(64)}`;
 
-function prismaWithServices(connectServices: string[]): PrismaClient {
+function prismaWithServices(enabled: string[]): PrismaClient {
+  enabledServices.current = enabled;
   return {
-    organization: {
-      findUnique: async () => ({ connectServices }),
-    },
     modelProvider: { findMany: async () => [] },
   } as unknown as PrismaClient;
 }
@@ -60,7 +67,7 @@ describe("the LangWatch provider slot an install adds", () => {
     };
   });
 
-  describe("given Connect is on and the organization switched managed models on", () => {
+  describe("given a license naming managed models that nobody switched off", () => {
     /** @scenario The install adds the LangWatch provider only when Connect and the service are on */
     it("carries the license token, the instance id and the gateway endpoint", async () => {
       const slot = await connectLangWatchProviderSlot({
@@ -84,9 +91,9 @@ describe("the LangWatch provider slot an install adds", () => {
     });
   });
 
-  describe("when Connect is off for the deployment", () => {
-    it("adds nothing, whatever the organization switched on", async () => {
-      config.current = { enabled: false };
+  describe("when Connect is switched off for the deployment", () => {
+    it("adds nothing, whatever the license names", async () => {
+      config.current = { permitted: false } as unknown as ConnectConfig;
 
       expect(
         await connectLangWatchProviderSlot({
@@ -98,7 +105,7 @@ describe("the LangWatch provider slot an install adds", () => {
     });
   });
 
-  describe("when the organization has not switched managed models on", () => {
+  describe("when the license names no managed models", () => {
     it("adds nothing", async () => {
       expect(
         await connectLangWatchProviderSlot({

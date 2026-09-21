@@ -1098,17 +1098,17 @@ model Team {
 }
 
 model Organization {
-  id                     String               @id @default(nanoid())
-  name                   String
-  phoneNumber            String?
-  slug                   String               @unique
-  members                OrganizationUser[]
-  teams                  Team[]
-  webhookEndpoints       WebhookEndpoint[]
-  createdAt              DateTime             @default(now())
-  updatedAt              DateTime             @default(now()) @updatedAt
-  OrganizationInvite     OrganizationInvite[]
-  usageSpendingMaxLimit  Int?
+  id                         String               @id @default(nanoid())
+  name                       String
+  phoneNumber                String?
+  slug                       String               @unique
+  members                    OrganizationUser[]
+  teams                      Team[]
+  webhookEndpoints           WebhookEndpoint[]
+  createdAt                  DateTime             @default(now())
+  updatedAt                  DateTime             @default(now()) @updatedAt
+  OrganizationInvite         OrganizationInvite[]
+  usageSpendingMaxLimit      Int?
   /// Phase 8 - admin-configurable max lifetime for CLI device-flow
   /// sessions, in days. 0 = unbounded (default, mirrors GitHub CLI /
   /// gh-style flows). Companies that need finite session lifetime
@@ -1117,23 +1117,23 @@ model Organization {
   /// endpoint rejects refresh attempts where now - issued_at exceeds
   /// this value, regardless of the underlying refresh-token TTL.
   /// Spec: specs/ai-governance/sessions/session-ttl.feature.
-  maxSessionDurationDays Int                  @default(0)
+  maxSessionDurationDays     Int                  @default(0)
   /// Every member of this organization can prove a second factor (D06). A
   /// MEMBERSHIP CONDITION, not a session policy: it is asked when a member
   /// reaches this organization's data, it holds the ones who cannot prove
   /// one at an enrollment gate for THIS organization alone, and it ends no
   /// session, ever. Turning it on signs nobody out.
   /// Spec: specs/identity/mfa-and-session-shape.feature.
-  mfaRequired            Boolean              @default(false)
+  mfaRequired                Boolean              @default(false)
   /// How many consecutive failed sign-ins lock an account (GAC-09).
   /// 0 = never lock, which is the default and what every organization that
   /// has not asked for this keeps. Counts EVERY credential together - a
   /// password, a one-time code, a backup code, a passkey - because five per
   /// factor hands an attacker one budget per factor.
   /// Spec: specs/identity/org-account-lockout.feature.
-  lockoutAfterFailedAttempts Int               @default(0)
+  lockoutAfterFailedAttempts Int                  @default(0)
   /// How long a lock lasts, in minutes. Ignored while the threshold is 0.
-  lockoutMinutes         Int                  @default(30)
+  lockoutMinutes             Int                  @default(30)
   /// How long a BROWSER session may sit idle before it ends, in minutes
   /// (GAC-10). 0 = no idle timeout. Activity rolls the window, which is the
   /// "refreshed every hour" half of the control.
@@ -1146,25 +1146,25 @@ model Organization {
   /// is enforced when the CLI refreshes. Two surfaces, two lifetimes, two
   /// decisions an administrator makes separately.
   /// Spec: specs/identity/org-session-lifetime.feature.
-  sessionIdleTimeoutMinutes Int                @default(1440)
+  sessionIdleTimeoutMinutes  Int                  @default(1440)
   /// The ceiling on a browser session from the moment it was minted, in
   /// minutes, which no amount of activity extends. 0 = no ceiling, the
   /// default. Offered beside the idle timeout because a session kept alive
   /// forever by a polling page is not really bounded.
-  sessionMaxLifetimeMinutes Int                @default(0)
-  signupData             Json?
-  signedDPA              Boolean              @default(false)
-  elasticsearchNodeUrl   String?
-  elasticsearchApiKey    String?
-  useCustomElasticsearch Boolean              @default(false)
-  s3Endpoint             String?
-  s3AccessKeyId          String?
-  s3SecretAccessKey      String?
-  s3Bucket               String?
-  useCustomS3            Boolean              @default(false)
-  sentPlanLimitAlert     DateTime?
-  ssoDomain              String?              @unique
-  ssoProvider            String?
+  sessionMaxLifetimeMinutes  Int                  @default(0)
+  signupData                 Json?
+  signedDPA                  Boolean              @default(false)
+  elasticsearchNodeUrl       String?
+  elasticsearchApiKey        String?
+  useCustomElasticsearch     Boolean              @default(false)
+  s3Endpoint                 String?
+  s3AccessKeyId              String?
+  s3SecretAccessKey          String?
+  s3Bucket                   String?
+  useCustomS3                Boolean              @default(false)
+  sentPlanLimitAlert         DateTime?
+  ssoDomain                  String?              @unique
+  ssoProvider                String?
   /// How colleagues on a matching domain get in (D12, ADR-117):
   /// `off` (invisible to them entirely) | `request` (they ask, an admin
   /// approves) | `auto` (a verified colleague walks straight in).
@@ -1173,31 +1173,31 @@ model Organization {
   /// a default and never inferred - an administrator turns it on, names the
   /// domain in `joinDomains` while doing it, and the licence gate holds that
   /// value while letting `request` through.
-  domainJoin             String               @default("request")
+  domainJoin                 String               @default("request")
   /// The domains an administrator NAMED when turning automatic joining on.
   /// Empty means automatic joining admits nobody whatever `domainJoin` says -
   /// which is what keeps a setting left on from admitting a domain nobody
   /// ever agreed to.
-  joinDomains            String[]
-  presenceEnabled        Boolean              @default(true)
+  joinDomains                String[]
+  presenceEnabled            Boolean              @default(true)
   /// Org-level trace-sharing kill switch. Off = trace share links cannot be
   /// created in ANY project of this org, and existing links stop resolving —
   /// the org toggle is the global switch, the per-project
   /// `Project.traceSharingEnabled` scopes the kill to a single project (mirrors
   /// `presenceEnabled`). Effective sharing = org AND project. ADR-039.
-  traceSharingEnabled    Boolean              @default(true)
+  traceSharingEnabled        Boolean              @default(true)
   /// Org-configurable contact surfaced to users in CLI "contact your
   /// admin" messages and the in-app budget-exceeded banner. Free text:
   /// accepts an email, a URL (internal ticketing system), or any other
   /// instruction. When null, callers fall back to the first ADMIN
   /// member's email (`resolveSupportContact` helper).
-  supportContact         String?
+  supportContact             String?
   /// Signup intent, editable later as the org "Primary use" setting.
   /// AGENT_GOVERNANCE lands "/" on /me, LLM_OPS on the project home.
   /// NULL means intent unset (every pre-fork org and any org created
   /// outside onboarding) — the home resolver keeps legacy behavior.
   /// ADR-038.
-  primaryIntent          OrganizationIntent?
+  primaryIntent              OrganizationIntent?
 
   promoCode              String?
   stripeCustomerId       String?                        @unique
@@ -1219,11 +1219,14 @@ model Organization {
   /// A customer that runs LangWatch self-hosted. The hosted usage, budgets and
   /// invoices of its connected installs attach to this organization (ADR-139).
   selfHostedCustomer     Boolean                        @default(false)
-  /// LangWatch-hosted services this organization has switched on, named the
-  /// way its license names them ("instant_evals"). Empty is the default and
-  /// the whole opt-in: with nothing here an install sends nothing, whatever
-  /// its license is entitled to (ADR-139).
-  connectServices        String[]                       @default([])
+  /// LangWatch-hosted services this organization has switched OFF, named the
+  /// way its license names them ("instant_evals"). A service the license is
+  /// entitled to is on unless it is listed here, so a customer who bought
+  /// hosted judging gets it without finding a settings page first, and an
+  /// administrator who switched one off keeps it off across license changes
+  /// (ADR-139, section 2). A license that names no service reaches nothing,
+  /// whatever this column holds.
+  connectServicesDisabled String[]                      @default([])
   /// The signed lease the last successful license sync answered with (ADR-139,
   /// section 6). Written only after it verified against the public key the
   /// install embeds, for this license and this install, so a lease that was
@@ -1271,11 +1274,11 @@ enum IssuedLicenseSource {
 /// SHA-256 of that token, so read access to this table is not credential
 /// access. Status is derived: revoked, superseded, past `expiresAt`, else active.
 model IssuedLicense {
-  id             String       @id @default(nanoid())
+  id             String        @id @default(nanoid())
   /// The `licenseId` inside the signed license (`lic-<uuid>`).
-  licenseId      String       @unique
+  licenseId      String        @unique
   /// SHA-256 of the `lwl_` token. Looked up on every credential resolution.
-  tokenHash      String       @unique
+  tokenHash      String        @unique
   /// The customer organization on LangWatch Cloud. Null for a license that is
   /// recorded but not linked to a customer yet, such as a self-serve purchase:
   /// it resolves to nothing until an operator links it.
@@ -1300,27 +1303,27 @@ model IssuedLicense {
   revokedReason String?
 
   /// Set when the install first presents the license that replaced this one.
-  supersededAt DateTime?
+  supersededAt           DateTime?
   /// The id of the IssuedLicense this one replaces, when it was reissued. A
   /// plain column ref (relationMode="prisma" cannot declare a self-relation on
   /// Postgres); the registry service validates it. Unique, so a license is
   /// replaced by one license at most.
-  replacesId   String?   @unique
+  replacesId             String?   @unique
   /// A reissued license waiting to be delivered over sync, encrypted. Erased
   /// when the install first presents it. The only license text the registry holds.
-  pendingDeliveryLicense String? @db.Text
+  pendingDeliveryLicense String?   @db.Text
 
   /// Hosted services this license may call, such as `instant_evals`.
-  services             String[] @default([])
+  services             String[]  @default([])
   /// Seats the install may go over by. Null means a fifth of `maxMembers`, rounded up.
   seatOverageAllowance Int?
   /// The annual rate of one seat, in cents of `seatCurrency`. Needed to prorate added seats.
   seatRateCents        Int?
   seatCurrency         Currency?
   /// The prepaid usage commit for the term, in USD cents.
-  commitUsdCents       Int      @default(0)
+  commitUsdCents       Int       @default(0)
   /// Whether usage may continue past the commit, up to `overageMaxUsdCents`.
-  overageEnabled       Boolean  @default(false)
+  overageEnabled       Boolean   @default(false)
   overageMaxUsdCents   Int?
 
   /// The install this license is bound to. Set on first use, cleared by an operator.
@@ -1352,10 +1355,10 @@ model IssuedLicense {
 /// a customer that adds seats for a week pays for them even if the install
 /// drops back before the quarter ends.
 model LicenseSeatReport {
-  id String @id @default(nanoid())
+  id              String   @id @default(nanoid())
   /// The `IssuedLicense` row. A plain column ref, like `replacesId`:
   /// relationMode="prisma" carries no foreign keys.
-  licenseId String
+  licenseId       String
   /// Start of the term quarter, counted in three-month steps from the
   /// license's own `issuedAt` rather than from the calendar year.
   quarterStartsAt DateTime
@@ -1387,10 +1390,10 @@ model ConnectedBillingAccount {
   usageSubscriptionId     String?
   usageSubscriptionItemId String?
 
-  termStartsAt DateTime
-  termEndsAt   DateTime
+  termStartsAt   DateTime
+  termEndsAt     DateTime
   /// Prepaid usage for the term, in USD cents. The credit grants add up to it.
-  commitUsdCents Int @default(0)
+  commitUsdCents Int      @default(0)
 
   /// The seat contract, which may be in another currency than hosted usage.
   seatCurrency  Currency
@@ -1427,10 +1430,10 @@ enum ConnectedCreditGrantKind {
 /// Kept here so a grant is created once per reason and the backoffice can show
 /// what the customer holds without asking the provider.
 model ConnectedCreditGrant {
-  id String @id @default(nanoid())
+  id                  String                   @id @default(nanoid())
   /// The `ConnectedBillingAccount` row. A plain column ref, like
   /// `LicenseSeatReport.licenseId`: relationMode="prisma" carries no foreign keys.
-  accountId String
+  accountId           String
   /// The grant at the payment provider. Unique, so a retry records one row.
   stripeCreditGrantId String                   @unique
   amountUsdCents      Int
@@ -1438,9 +1441,9 @@ model ConnectedCreditGrant {
   /// The term this credit was granted for, and when the provider lets it lapse:
   /// after the last invoice of that term has been finalized, never on the day
   /// the term ends.
-  termEndsAt DateTime
-  expiresAt  DateTime
-  createdAt  DateTime @default(now())
+  termEndsAt          DateTime
+  expiresAt           DateTime
+  createdAt           DateTime                 @default(now())
 
   @@index([accountId])
 }
@@ -1458,7 +1461,7 @@ enum ConnectedInvoiceKind {
 /// An invoice LangWatch raised for a connected customer, as the backoffice
 /// reads it and as roll-forward decides whether it already acted on one.
 model ConnectedInvoice {
-  id String @id @default(nanoid())
+  id              String               @id @default(nanoid())
   /// The `ConnectedBillingAccount` row, as a plain column ref.
   accountId       String
   stripeInvoiceId String               @unique
@@ -1474,8 +1477,8 @@ model ConnectedInvoice {
   /// Which quarter a seat true-up invoice settles.
   quarterStartsAt DateTime?
   termStartsAt    DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @default(now()) @updatedAt
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @default(now()) @updatedAt
 
   @@index([accountId])
 }
@@ -1598,13 +1601,13 @@ model ScimExternalId {
 model ScimUserResource {
   organizationId String
   userId         String
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   userName       String
   name           String?
-  active         Boolean  @default(true)
+  active         Boolean   @default(true)
   deletedAt      DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @default(now()) @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @default(now()) @updatedAt
 
   @@id([organizationId, userId])
   /// Live nonblank names have a normalized partial unique index in 20260918171008_scim_user_resources.
@@ -6056,20 +6059,20 @@ model SystemMigrationEnrollment {
 /// is no platform user to key on and a user-deletion event can never fire for
 /// them.
 model DiscoveredPerson {
-  id              String    @id @default(nanoid())
-  organizationId  String
+  id                 String    @id @default(nanoid())
+  organizationId     String
   /// "anthropic" | "openai" | "databricks" | ... - the provider that named them.
-  provider        String
+  provider           String
   /// What the provider calls them, verbatim. The join key onto the money rows'
   /// RawActorId. Replaced by a deterministic pseudonym on erasure, which keeps
   /// the row addressable for spend attribution without keeping the identifier.
-  rawActorId      String
+  rawActorId         String
   /// Name or email text as seen. Pseudonymized alongside rawActorId on erasure.
-  displayText     String
+  displayText        String
   /// person | service_account - determined deterministically per ADR-128 §10
   /// (a bare UUID in Databricks `executed_by` is a service account, never an
   /// agent), never guessed from the shape of a name.
-  kind            String
+  kind               String
   /// The department the provider's directory filed this person under, verbatim.
   /// An OBSERVATION, not the `Department` entity: it is free text a tenant owns
   /// on their side, it exists for people who hold no LangWatch account, and
@@ -6078,9 +6081,9 @@ model DiscoveredPerson {
   /// Null means no directory has named one - never "no department", because a
   /// blank field in the tenant's directory and a person no directory lists are
   /// the same null here.
-  department      String?
-  firstSeenAt     DateTime
-  lastSeenAt      DateTime
+  department         String?
+  firstSeenAt        DateTime
+  lastSeenAt         DateTime
   /// Set when this row's identity has been erased. The row survives so its
   /// spend stays attributable to *someone*; the identifier does not.
   erasedAt           DateTime?
@@ -6101,11 +6104,11 @@ model DiscoveredPerson {
   /// identity because evidence pointed at two candidates, or contradicted an
   /// existing link. Stored HERE rather than on the suggestion rows, because a
   /// halt on auto-linking that a recompute or a restart clears is not a halt.
-  suspendedAt     DateTime?
+  suspendedAt        DateTime?
   /// What tripped the suspension, for the human who reviews it.
-  suspendedReason String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @default(now()) @updatedAt
+  suspendedReason    String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @default(now()) @updatedAt
 
   @@unique([organizationId, provider, rawActorId])
   // The identity screens list an organization's people newest-seen first.
@@ -6273,20 +6276,20 @@ model IdentityMatchSuggestion {
 /// after it, so a call that failed halfway is retried without inventing a
 /// second invoice. The unique pair keeps one quarter to one decision.
 model ConnectedSeatTrueUp {
-  id String @id @default(nanoid())
+  id              String                   @id @default(nanoid())
   /// The `IssuedLicense` row. A plain column ref, like `LicenseSeatReport`:
   /// relationMode="prisma" carries no foreign keys.
-  licenseId String
+  licenseId       String
   /// Start of the term quarter, counted in three-month steps from the
   /// license's own `issuedAt`.
   quarterStartsAt DateTime
   /// The highest seat count the license reported in that quarter.
-  peakSeats Int
+  peakSeats       Int
   /// The peak minus the seats already invoiced for this term.
-  addedSeats Int
+  addedSeats      Int
   /// The prorated amount, in cents of `currency`. Zero when nothing is owed.
-  amountCents Int
-  currency    Currency
+  amountCents     Int
+  currency        Currency
   /// The one-off invoice the added seats were billed on.
   stripeInvoiceId String?
   state           ConnectedSeatTrueUpState
@@ -6318,12 +6321,12 @@ enum ConnectedSeatTrueUpState {
 /// section 7). One row per account per month keeps the statement to one send,
 /// whatever runs the tick.
 model ConnectedStatement {
-  id String @id @default(nanoid())
+  id        String   @id @default(nanoid())
   /// The `ConnectedBillingAccount` row. A plain column ref.
   accountId String
   /// First day of the month the statement covers, in UTC.
-  month  DateTime
-  sentAt DateTime
+  month     DateTime
+  sentAt    DateTime
 
   @@unique([accountId, month])
   @@index([accountId])

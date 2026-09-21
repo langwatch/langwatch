@@ -422,10 +422,12 @@ export function createEnvConfig() {
       // ADR-027: instance-level license, bootstraps + recovers SSO on
       // self-hosted deployments without requiring an in-DB org license.
       LANGWATCH_LICENSE_KEY: z.string().optional(),
-      // ADR-139: whether this install may call LangWatch-hosted services with
-      // the license it already holds. Off unless an operator says otherwise,
-      // and with it off nothing below is read and no outbound call is made.
-      LANGWATCH_CONNECT_ENABLED: z.boolean().optional(),
+      // ADR-139: the escape hatch that switches LangWatch-hosted services and
+      // usage telemetry off for this install. What a deployment may call is
+      // otherwise decided by the license it holds, not by a variable: a
+      // license naming no hosted service reaches nothing. Set this and nothing
+      // below is read and no outbound call is made at all.
+      LANGWATCH_CONNECT_DISABLED: z.boolean().optional(),
       // Both endpoints are origins, and both have a default in
       // `ee/licensing/connect/install/connectConfig.ts`.
       LANGWATCH_CONNECT_GATEWAY_ENDPOINT: connectEndpointSchema(
@@ -434,8 +436,8 @@ export function createEnvConfig() {
       LANGWATCH_CONNECT_LICENSE_ENDPOINT: connectEndpointSchema(
         "LANGWATCH_CONNECT_LICENSE_ENDPOINT",
       ),
-      // Overrides the identity this install presents. The default is the
-      // organization id whose license is used, which survives restarts,
+      // Overrides the identity this install presents. The default is minted
+      // once and kept in this install's own database, so it survives restarts,
       // backups and hostname changes.
       LANGWATCH_CONNECT_INSTANCE_ID: z.string().optional(),
       // ADR-117 §7: the one flag covering the identifier-first router (D03)
@@ -871,9 +873,9 @@ export function createEnvConfig() {
       TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES:
         process.env.TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES,
       LANGWATCH_LICENSE_KEY: process.env.LANGWATCH_LICENSE_KEY,
-      LANGWATCH_CONNECT_ENABLED:
-        process.env.LANGWATCH_CONNECT_ENABLED === "1" ||
-        process.env.LANGWATCH_CONNECT_ENABLED?.toLowerCase() === "true",
+      LANGWATCH_CONNECT_DISABLED:
+        process.env.LANGWATCH_CONNECT_DISABLED === "1" ||
+        process.env.LANGWATCH_CONNECT_DISABLED?.toLowerCase() === "true",
       // Blank means unset, so a templated deployment line with no value keeps
       // the default rather than failing the URL check.
       LANGWATCH_CONNECT_GATEWAY_ENDPOINT:

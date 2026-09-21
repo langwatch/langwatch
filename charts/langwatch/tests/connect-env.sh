@@ -4,15 +4,15 @@
 #
 # The upgrade guarantee for ADR-139 is a claim about absence: an install that
 # upgrades and changes no value must carry no LANGWATCH_CONNECT_ variable at
-# all, so nothing in the app can decide to call LangWatch. Absence is exactly
-# what a template's source does not show: an `{{- if }}` that is wrong emits
-# the block anyway and nothing in the chart complains, so it is pinned on the
-# render.
+# all, so what it calls is decided by its license and by nothing in this chart.
+# Absence is exactly what a template's source does not show: an `{{- if }}`
+# that is wrong emits the block anyway and nothing in the chart complains, so
+# it is pinned on the render.
 #
-# The second posture is the operator who does switch it on. Then the app AND
-# the workers have to agree: the workers judge too, and an app that can reach
-# hosted services beside a worker that cannot makes the same query behave
-# differently depending on which one ran it.
+# The second posture is the operator who switches Connect off for an audit.
+# Then the app AND the workers have to agree: the workers judge too, and an app
+# that can reach hosted services beside a worker that cannot makes the same
+# query behave differently depending on which one ran it.
 #
 # Each test carries a plain "# Verifies:" line naming what it pins.
 #
@@ -87,15 +87,15 @@ $(cat "$err")"
   fi
 }
 
-# Verifies: switching Connect on emits the flag on app AND workers, and no
+# Verifies: switching Connect off emits the flag on app AND workers, and no
 # endpoint the operator did not name
-test_enabled_emits_the_flag_only() {
-  local out="${TMPDIR:-/tmp}/connect-on.yaml"
-  local err="${TMPDIR:-/tmp}/connect-on.err"
+test_disabled_emits_the_flag_only() {
+  local out="${TMPDIR:-/tmp}/connect-off.yaml"
+  local err="${TMPDIR:-/tmp}/connect-off.err"
   if ! render_to "$out" "$err" t \
       --set autogen.enabled=true \
-      --set app.connect.enabled=true; then
-    fail "enabled-render" "render with Connect on failed:
+      --set app.connect.disabled=true; then
+    fail "disabled-render" "render with Connect off failed:
 $(cat "$err")"
     return
   fi
@@ -104,30 +104,30 @@ $(cat "$err")"
   for workload in "${WORKLOADS[@]}"; do
     names="$(env_names_in "$out" "$workload")"
     if [[ -z "$names" ]]; then
-      fail "enabled-empty-$workload" \
+      fail "disabled-empty-$workload" \
         "no env vars found for $workload, did the Source path change?"
       continue
     fi
-    if ! has_env "$names" "LANGWATCH_CONNECT_ENABLED"; then
-      fail "enabled-missing-$workload" \
-        "$workload does not emit LANGWATCH_CONNECT_ENABLED. The workers judge eval functions too; a worker that cannot reach hosted services skips every judgement the app would have answered."
+    if ! has_env "$names" "LANGWATCH_CONNECT_DISABLED"; then
+      fail "disabled-missing-$workload" \
+        "$workload does not emit LANGWATCH_CONNECT_DISABLED. The workers judge eval functions and send the usage report; a worker that still calls LangWatch beside an app that does not is the audit finding this switch exists to prevent."
     fi
     local named
     for named in LANGWATCH_CONNECT_GATEWAY_ENDPOINT \
                  LANGWATCH_CONNECT_LICENSE_ENDPOINT \
                  LANGWATCH_CONNECT_INSTANCE_ID; do
       if has_env "$names" "$named"; then
-        fail "enabled-extra-$workload-$named" \
+        fail "disabled-extra-$workload-$named" \
           "$workload emits $named although the operator named no value. An empty value there is not the published default; it is an empty string the app would have to defend against."
       fi
     done
   done
 
   local flag
-  flag="$(env_value_of "$out" "LANGWATCH_CONNECT_ENABLED")"
+  flag="$(env_value_of "$out" "LANGWATCH_CONNECT_DISABLED")"
   if [[ "$flag" != "true" ]]; then
-    fail "enabled-value" \
-      "LANGWATCH_CONNECT_ENABLED is '${flag:-<empty>}', expected 'true'."
+    fail "disabled-value" \
+      "LANGWATCH_CONNECT_DISABLED is '${flag:-<empty>}', expected 'true'."
   fi
 }
 
@@ -137,7 +137,6 @@ test_named_endpoints_are_carried() {
   local err="${TMPDIR:-/tmp}/connect-endpoints.err"
   if ! render_to "$out" "$err" t \
       --set autogen.enabled=true \
-      --set app.connect.enabled=true \
       --set app.connect.gatewayEndpoint=https://gateway.example.test \
       --set app.connect.licenseEndpoint=https://connect.example.test \
       --set app.connect.instanceId=instance-of-record; then
@@ -169,29 +168,30 @@ $(cat "$err")"
   done
 }
 
-# Verifies: endpoints named while Connect stays off emit nothing
-test_endpoints_without_enabled_emit_nothing() {
-  local out="${TMPDIR:-/tmp}/connect-off-endpoints.yaml"
-  local err="${TMPDIR:-/tmp}/connect-off-endpoints.err"
-  if ! render_to "$out" "$err" t \
-      --set autogen.enabled=true \
-      --set app.connect.gatewayEndpoint=https://gateway.example.test \
-      --set app.connect.instanceId=instance-of-record; then
-    fail "off-endpoints-render" "render failed:
+# Verifies: the version this install reports is emitted on every render
+test_version_is_always_emitted() {
+  local out="${TMPDIR:-/tmp}/connect-version.yaml"
+  local err="${TMPDIR:-/tmp}/connect-version.err"
+  if ! render_to "$out" "$err" t --set autogen.enabled=true; then
+    fail "version-render" "default render failed:
 $(cat "$err")"
     return
   fi
 
-  if grep -q 'LANGWATCH_CONNECT_' "$out"; then
-    fail "off-endpoints-emitted" \
-      "naming an endpoint emitted LANGWATCH_CONNECT_ variables although app.connect.enabled is false. The switch is what decides, so a value left behind from an experiment must not turn hosted services back on."
-  fi
+  local workload names
+  for workload in "${WORKLOADS[@]}"; do
+    names="$(env_names_in "$out" "$workload")"
+    if ! has_env "$names" "SERVICE_VERSION"; then
+      fail "version-missing-$workload" \
+        "$workload does not emit SERVICE_VERSION. Both the license sync and the usage report name the release this install runs, and an install that reports 'unknown' cannot be told apart from one that never upgraded."
+    fi
+  done
 }
 
 test_default_emits_nothing
-test_enabled_emits_the_flag_only
+test_disabled_emits_the_flag_only
 test_named_endpoints_are_carried
-test_endpoints_without_enabled_emit_nothing
+test_version_is_always_emitted
 
 if [[ $failures -gt 0 ]]; then
   echo
@@ -199,4 +199,4 @@ if [[ $failures -gt 0 ]]; then
   exit 1
 fi
 
-echo "PASS: all 4 Connect postures pinned: (1) a default render carries no LANGWATCH_CONNECT_ variable; (2) switching Connect on emits the flag on app and workers and no endpoint the operator did not name; (3) named endpoints and instance id are carried to both workloads; (4) endpoints named while Connect stays off emit nothing"
+echo "PASS: all 4 Connect postures pinned: (1) a default render carries no LANGWATCH_CONNECT_ variable; (2) switching Connect off emits the flag on app and workers and no endpoint the operator did not name; (3) named endpoints and instance id are carried to both workloads; (4) SERVICE_VERSION is emitted on every render"

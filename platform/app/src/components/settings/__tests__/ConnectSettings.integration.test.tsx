@@ -1,11 +1,11 @@
 /**
  * @vitest-environment jsdom
  *
- * Settings, Connect is where an administrator of a self-hosted install decides
- * which LangWatch-hosted services it may call. Nothing is sent until they
- * switch one on, so the page has to state what leaves the install before the
- * switch is touched, refuse the decision to anyone without organization
- * management rights, and show the spend those services are charged against.
+ * Settings, Connect is where an administrator of a self-hosted install sees
+ * which LangWatch-hosted services its license names and switches off any they
+ * do not want. A service the license names is on, so the page has to state
+ * what leaves the install for each one, refuse the decision to anyone without
+ * organization management rights, and show the spend they are charged against.
  *
  * Spec: specs/self-hosting/connected-services/connect-settings.feature
  */
@@ -111,7 +111,7 @@ const connectedStatus = (overrides: Record<string, unknown> = {}) => ({
   deployment: "on",
   gatewayHost: "gateway.langwatch.ai",
   licensed: true,
-  enabledServices: [] as string[],
+  enabledServices: ["instant_evals"] as string[],
   entitledServices: ["instant_evals"],
   usage: {
     services: ["instant_evals"],
@@ -146,18 +146,25 @@ describe("<ConnectSettings />", () => {
 
   afterEach(cleanup);
 
-  describe("given a licensed install with Connect enabled", () => {
-    /** @scenario Every hosted service starts switched off */
-    it("lists Instant Evals as available, switched off, and asks the host for nothing", () => {
+  describe("given a licensed install whose license names Instant Evals", () => {
+    /** @scenario A service the license names is on without anyone switching it on */
+    it("lists Instant Evals as on, and asks the host for nothing", () => {
       renderSettings(connectedStatus());
 
       expect(screen.getByText("Instant Evals")).toBeDefined();
-      expect(screen.getByText("Available, switched off")).toBeDefined();
-      expect(switchInput().checked).toBe(false);
+      expect(screen.getByText("On")).toBeDefined();
+      expect(switchInput().checked).toBe(true);
       expect(setServiceMutate).not.toHaveBeenCalled();
     });
 
-    /** @scenario The page states what leaves the install before a service is switched on */
+    it("says a service the admin switched off is available and switched off", () => {
+      renderSettings(connectedStatus({ enabledServices: [] }));
+
+      expect(screen.getByText("Available, switched off")).toBeDefined();
+      expect(switchInput().checked).toBe(false);
+    });
+
+    /** @scenario The page states what leaves the install for each service */
     it("states what is sent, that it is not stored, and what is never sent", () => {
       renderSettings(connectedStatus());
 
@@ -173,9 +180,9 @@ describe("<ConnectSettings />", () => {
       ).toBeDefined();
     });
 
-    describe("when an admin switches Instant Evals on", () => {
-      /** @scenario Switching a service on is an admin decision that is recorded */
-      it("asks the organization to switch the service on and reloads its state", async () => {
+    describe("when an admin switches Instant Evals off", () => {
+      /** @scenario Switching a service off is an admin decision that is recorded */
+      it("asks the organization to switch the service off and reloads its state", async () => {
         renderSettings(connectedStatus());
 
         fireEvent.click(switchInput());
@@ -184,7 +191,7 @@ describe("<ConnectSettings />", () => {
           expect(setServiceMutate).toHaveBeenCalledWith({
             organizationId: "org-acme",
             service: "instant_evals",
-            enabled: true,
+            enabled: false,
           });
         });
         expect(refetchMock).toHaveBeenCalled();
@@ -300,13 +307,15 @@ describe("<ConnectSettings />", () => {
     });
   });
 
-  describe("given Connect is switched off for the deployment", () => {
-    /** @scenario The page explains a deployment with Connect switched off */
-    it("explains that nothing is sent and what switches it on", () => {
+  describe("given an operator who switched Connect off for the deployment", () => {
+    /** @scenario The page explains a deployment where an operator switched Connect off */
+    it("explains that nothing is sent and what switches it back on", () => {
       renderSettings({ deployment: "off" });
 
       expect(
-        screen.getByText("Connect is switched off for this deployment"),
+        screen.getByText(
+          "Hosted services are switched off for this deployment",
+        ),
       ).toBeDefined();
       expect(
         screen.getByText(/Nothing is sent to LangWatch from this install/),

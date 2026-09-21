@@ -4,19 +4,18 @@
  * The install has no judge key of its own, so the judgement happens on
  * LangWatch and the install pays for it against the budget its license
  * carries. What leaves the install is the text being judged and the questions
- * asked about it, and only once an organization admin has switched the service
- * on for that organization.
+ * asked about it, and only for an organization whose license names the service
+ * and whose administrator has not switched it off.
  *
- * An organization that has not switched it on gets the same answer as a
- * deployment with nothing configured: every question skipped, nothing sent.
- * That is the difference between a feature that is unavailable and a query
- * that fails, and it is what lets the whole surface exist on an install that
- * never opts in.
+ * An organization without it gets the same answer as a deployment with nothing
+ * configured: every question skipped, nothing sent. That is the difference
+ * between a feature that is unavailable and a query that fails, and it is what
+ * lets the whole surface exist on an install that is not entitled.
  *
- * The opt-in and the credential are read per project and held for
+ * The entitlement and the credential are read per project and held for
  * {@link STATE_TTL_MS}. A run judges thousands of texts, so reading the row
  * per text would turn one query into thousands of database reads; holding it
- * for the life of the process would make switching a service on need a
+ * for the life of the process would make switching a service off need a
  * restart.
  *
  * @see ~/server/app-layer/instant-evals/classifier/classifier.ts
@@ -34,8 +33,9 @@ import {
 } from "~/server/app-layer/instant-evals/classifier/classifier";
 import { INSTANT_EVAL_PRICING } from "~/server/app-layer/instant-evals/classifier/pricing";
 import { INSTANT_EVAL_CLASSIFIER_LIMITS } from "~/server/app-layer/instant-evals/classifier/token-budget";
-import type { ConnectConfigOn } from "./connectConfig";
+import type { ConnectConfig } from "./connectConfig";
 import { resolveConnectCredential } from "./connectCredential";
+import { connectServiceEnabled } from "./connectEntitlement";
 import {
   type ConnectGatewayClient,
   getConnectGatewayClient,
@@ -76,7 +76,7 @@ const MAX_CACHED = 5_000;
 
 export interface ConnectInstantEvalClassifierOptions {
   readonly prisma: PrismaClient;
-  readonly config: ConnectConfigOn;
+  readonly config: ConnectConfig;
   /** Injected by suites; the process's shared client otherwise. */
   readonly client?: ConnectGatewayClient;
   readonly now?: () => number;
@@ -196,13 +196,11 @@ export class ConnectInstantEvalClassifier implements InstantEvalClassifier {
     organizationId: string,
   ): Promise<ProjectConnectState> {
     const { prisma } = this.options;
-    const organization = await prisma.organization.findUnique({
-      where: { id: organizationId },
-      select: { connectServices: true },
+    const isServiceOn = await connectServiceEnabled({
+      prisma,
+      organizationId,
+      service: CONNECT_INSTANT_EVALS_SERVICE,
     });
-    const isServiceOn = Boolean(
-      organization?.connectServices.includes(CONNECT_INSTANT_EVALS_SERVICE),
-    );
     if (!isServiceOn) return { isServiceOn: false, credential: null };
 
     return {

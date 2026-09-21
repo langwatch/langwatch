@@ -18,6 +18,7 @@
 
 import { readConnectConfig } from "@ee/licensing/connect/install/connectConfig";
 import { resolveConnectCredential } from "@ee/licensing/connect/install/connectCredential";
+import { connectServiceEnabled } from "@ee/licensing/connect/install/connectEntitlement";
 import type { ModelProvider, PrismaClient } from "~/generated/prisma/client";
 import { modelProviders } from "../modelProviders/registry";
 import type { ProviderSlot } from "./config.materialiser";
@@ -52,13 +53,14 @@ export async function connectLangWatchProviderSlot({
   slot: string;
 }): Promise<ProviderSlot | null> {
   const config = readConnectConfig();
-  if (!config.enabled) return null;
+  if (!config.permitted) return null;
 
-  const organization = await prisma.organization.findUnique({
-    where: { id: organizationId },
-    select: { connectServices: true },
+  const enabled = await connectServiceEnabled({
+    prisma,
+    organizationId,
+    service: MANAGED_MODELS,
   });
-  if (!organization?.connectServices.includes(MANAGED_MODELS)) return null;
+  if (!enabled) return null;
 
   const credential = await resolveConnectCredential({
     prisma,

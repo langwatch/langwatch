@@ -20,20 +20,27 @@ vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({}),
 }));
 
-const { connectEnabled, statsDisabled } = vi.hoisted(() => ({
+const { connectEnabled, statsDisabled, entitled } = vi.hoisted(() => ({
   connectEnabled: { current: true },
   statsDisabled: { current: false },
+  entitled: { current: true },
 }));
 
 vi.mock("@ee/licensing/connect/install/connectConfig", () => ({
-  readConnectConfig: () =>
-    connectEnabled.current
-      ? {
-          enabled: true,
-          gatewayEndpoint: "https://gateway.langwatch.ai",
-          licenseEndpoint: "https://connect.langwatch.ai",
-        }
-      : { enabled: false },
+  readConnectConfig: () => ({
+    permitted: connectEnabled.current,
+    gatewayEndpoint: "https://gateway.langwatch.ai",
+    licenseEndpoint: "https://connect.langwatch.ai",
+  }),
+}));
+
+// Whether any license on this install names a hosted service. Read out of the
+// signed blob in the real thing, which has its own suite; what this one pins
+// is which host the two daily jobs choose once that answer is known.
+vi.mock("@ee/licensing/connect/install/connectEntitlement", () => ({
+  installIsEntitled: async () => connectEnabled.current && entitled.current,
+  licenseConnectServices: () =>
+    connectEnabled.current && entitled.current ? ["instant_evals"] : [],
 }));
 
 vi.mock("~/env.mjs", () => ({
@@ -55,13 +62,14 @@ import {
 beforeEach(() => {
   connectEnabled.current = true;
   statsDisabled.current = false;
+  entitled.current = true;
 });
 
-describe("given an install with Connect switched on", () => {
+describe("given an install whose license names a hosted service", () => {
   describe("when the daily jobs run", () => {
     /** @scenario "Product statistics go to the connect host, not the app host" */
-    it("posts the statistics to the connect host", () => {
-      expect(usageStatsEndpoint()).toBe(
+    it("posts the statistics to the connect host", async () => {
+      await expect(usageStatsEndpoint()).resolves.toBe(
         "https://connect.langwatch.ai/v1/stats",
       );
     });
@@ -81,14 +89,29 @@ describe("given an install with Connect switched on", () => {
   });
 });
 
-describe("given an install with Connect switched off", () => {
+describe("given an install with Connect switched off for an audit", () => {
   describe("when the daily jobs run", () => {
     /** @scenario "An install with Connect disabled sends no sync" */
-    it("posts the statistics where it always did, and syncs nothing", () => {
+    it("posts the statistics where it always did, and syncs nothing", async () => {
       connectEnabled.current = false;
 
-      expect(usageStatsEndpoint()).toBe(USAGE_STATS_APP_HOST_URL);
+      await expect(usageStatsEndpoint()).resolves.toBe(
+        USAGE_STATS_APP_HOST_URL,
+      );
       expect(startLicenseSyncWorker()).toBeUndefined();
+    });
+  });
+});
+
+describe("given an install on an offline license", () => {
+  describe("when the daily jobs run", () => {
+    /** @scenario "An install on an offline license keeps its telemetry destination" */
+    it("posts the statistics where it always did", async () => {
+      entitled.current = false;
+
+      await expect(usageStatsEndpoint()).resolves.toBe(
+        USAGE_STATS_APP_HOST_URL,
+      );
     });
   });
 });

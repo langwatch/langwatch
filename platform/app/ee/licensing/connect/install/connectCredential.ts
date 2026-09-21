@@ -18,6 +18,7 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import { licenseTokenFromKey } from "../../licenseToken";
 import { readConnectConfig } from "./connectConfig";
 import type { ConnectCredential } from "./connectTransport";
+import { installInstanceId } from "./installedLease";
 
 export async function resolveConnectCredential({
   prisma,
@@ -35,10 +36,10 @@ export async function resolveConnectCredential({
   const licenseKey = organization.license ?? env.LANGWATCH_LICENSE_KEY ?? null;
   if (!licenseKey) return null;
 
+  if (!readConnectConfig().permitted) return null;
+
   const token = licenseTokenFromKey(licenseKey);
   if (!token) return null;
 
-  const config = readConnectConfig();
-  const override = config.enabled ? config.instanceIdOverride : undefined;
-  return { token, instanceId: override ?? organizationId };
+  return { token, instanceId: installInstanceId(organizationId) };
 }

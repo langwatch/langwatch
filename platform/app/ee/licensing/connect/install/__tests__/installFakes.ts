@@ -28,13 +28,22 @@ export const STRANGER_KEYS = makeKeyPair();
 export const NOW = new Date("2026-09-19T12:00:00.000Z");
 export const ORGANIZATION_ID = "org_connected";
 
-/** A license for 50 full member seats, signed by the LangWatch key pair. */
+/**
+ * A license for 50 full member seats, signed by the LangWatch key pair. It
+ * names both hosted services by default, because most suites here are about
+ * what a connected install does; a suite about an offline install passes
+ * `connectServices: []`.
+ */
 export function mintLicense({
   maxMembers = 50,
   privateKey = LANGWATCH_KEYS.privateKey,
+  connectServices = ["instant_evals", "managed_models"],
+  expiresAt = new Date("2027-09-19T12:00:00.000Z"),
 }: {
   maxMembers?: number;
   privateKey?: string;
+  connectServices?: readonly string[];
+  expiresAt?: Date;
 } = {}) {
   return generateLicenseKey({
     organizationName: "ACME",
@@ -42,13 +51,17 @@ export function mintLicense({
     planType: "ENTERPRISE",
     maxMembers,
     maxMembersLite: 10,
-    expiresAt: new Date("2027-09-19T12:00:00.000Z"),
+    expiresAt,
+    connectServices,
     privateKey,
     now: NOW,
   });
 }
 
 export const LICENSE = mintLicense();
+
+/** A license that names no hosted service: what an offline customer holds. */
+export const OFFLINE_LICENSE = mintLicense({ connectServices: [] });
 
 export function credentialOf(
   licenseKey: string,

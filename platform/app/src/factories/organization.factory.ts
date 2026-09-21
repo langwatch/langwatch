@@ -42,7 +42,7 @@ export const organizationFactory = Factory.define<
   licenseExpiresAt: null,
   licenseLastValidatedAt: null,
   selfHostedCustomer: false,
-  connectServices: [],
+  connectServicesDisabled: [],
   connectLease: null,
   connectLastSyncAt: null,
   connectLastSyncError: null,

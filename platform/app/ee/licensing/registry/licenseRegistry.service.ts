@@ -78,6 +78,10 @@ export class LicenseRegistryService {
       maxMembersLite: input.maxMembersLite,
       maxMessagesPerMonth: input.maxMessagesPerMonth,
       expiresAt: input.expiresAt,
+      // Signed into the license so the install reads its own entitlement
+      // without a call. The registry row stays the authority the hosted routes
+      // check, so a revoked service stops working before the license expires.
+      connectServices: terms.services ?? [],
       privateKey,
       now: this.now(),
     });
@@ -213,6 +217,7 @@ export class LicenseRegistryService {
       maxMembersLite: input.maxMembersLite ?? current.maxMembersLite,
       maxMessagesPerMonth: input.maxMessagesPerMonth,
       expiresAt: input.expiresAt,
+      connectServices: current.services,
       privateKey,
       now: this.now(),
     });

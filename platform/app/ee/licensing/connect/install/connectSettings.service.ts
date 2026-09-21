@@ -23,6 +23,7 @@ import {
 import type { LeaseState } from "../lease";
 import { type ConnectConfig, readConnectConfig } from "./connectConfig";
 import { resolveConnectCredential } from "./connectCredential";
+import { licenseConnectServices } from "./connectEntitlement";
 import { ConnectDisabledError } from "./connectErrors";
 import {
   type ConnectGatewayClient,
@@ -83,16 +84,22 @@ export class ConnectSettingsService {
 
   async status(organizationId: string): Promise<ConnectStatus> {
     const config = this.config();
-    if (!config.enabled) return { deployment: "off" };
+    if (!config.permitted) return { deployment: "off" };
 
     const [credential, organization] = await Promise.all([
       this.credentialOf(organizationId),
       this.organizationOf(organizationId),
     ]);
+    const entitled = licenseConnectServices({
+      licenseKey: organization?.license ?? null,
+      publicKey: this.deps.publicKey ?? PUBLIC_KEY,
+      ...(this.deps.now ? { now: this.deps.now() } : {}),
+    });
+    const disabled = new Set(organization?.connectServicesDisabled ?? []);
     const base = {
       deployment: "on",
       gatewayHost: new URL(config.gatewayEndpoint).host,
-      enabledServices: organization?.connectServices ?? [],
+      enabledServices: entitled.filter((service) => !disabled.has(service)),
       sync: this.syncOf({ organizationId, organization }),
     } as const;
 
@@ -147,16 +154,28 @@ export class ConnectSettingsService {
       }
     }
 
-    const current = await this.enabledServicesOf(organizationId);
-    const next = enabled
-      ? [...new Set([...current, service])]
-      : current.filter((name) => name !== service);
+    // The column records refusals, so switching a service on removes a row
+    // rather than adding one and an entitled service needs no row at all.
+    const organization = await this.organizationOf(organizationId);
+    const current = organization?.connectServicesDisabled ?? [];
+    const nextDisabled = enabled
+      ? current.filter((name) => name !== service)
+      : [...new Set([...current, service])];
 
     await this.deps.prisma.organization.update({
       where: { id: organizationId },
-      data: { connectServices: next },
+      data: { connectServicesDisabled: nextDisabled },
     });
-    return { enabledServices: next };
+
+    const entitled = licenseConnectServices({
+      licenseKey: organization?.license ?? null,
+      publicKey: this.deps.publicKey ?? PUBLIC_KEY,
+      ...(this.deps.now ? { now: this.deps.now() } : {}),
+    });
+    const refused = new Set(nextDisabled);
+    return {
+      enabledServices: entitled.filter((name) => !refused.has(name)),
+    };
   }
 
   async setCap({
@@ -176,7 +195,7 @@ export class ConnectSettingsService {
     credential: ConnectCredential;
   }> {
     const config = this.config();
-    if (!config.enabled) throw new ConnectDisabledError();
+    if (!config.permitted) throw new ConnectDisabledError();
 
     const credential = await this.credentialOf(organizationId);
     if (!credential) throw new ConnectLicenseRequiredError();
@@ -201,18 +220,13 @@ export class ConnectSettingsService {
     });
   }
 
-  private async enabledServicesOf(organizationId: string): Promise<string[]> {
-    const organization = await this.organizationOf(organizationId);
-    return organization?.connectServices ?? [];
-  }
-
   private async organizationOf(
     organizationId: string,
   ): Promise<ConnectOrganizationRow | null> {
     return await this.deps.prisma.organization.findUnique({
       where: { id: organizationId },
       select: {
-        connectServices: true,
+        connectServicesDisabled: true,
         license: true,
         connectLease: true,
         connectLastSyncAt: true,
@@ -265,7 +279,7 @@ export class ConnectSettingsService {
 }
 
 interface ConnectOrganizationRow {
-  connectServices: string[];
+  connectServicesDisabled: string[];
   license: string | null;
   connectLease: unknown;
   connectLastSyncAt: Date | null;

@@ -44,19 +44,26 @@ vi.mock("~/utils/posthogErrorCapture", () => ({
   withScope: async (run: (scope: unknown) => Promise<void>) => await run({}),
 }));
 
-const { connectEnabled } = vi.hoisted(() => ({
+const { connectEnabled, entitled } = vi.hoisted(() => ({
   connectEnabled: { current: true },
+  entitled: { current: true },
 }));
 
 vi.mock("@ee/licensing/connect/install/connectConfig", () => ({
-  readConnectConfig: () =>
-    connectEnabled.current
-      ? {
-          enabled: true,
-          gatewayEndpoint: "https://gateway.example.test",
-          licenseEndpoint: "https://connect.example.test",
-        }
-      : { enabled: false },
+  readConnectConfig: () => ({
+    permitted: connectEnabled.current,
+    gatewayEndpoint: "https://gateway.example.test",
+    licenseEndpoint: "https://connect.example.test",
+  }),
+}));
+
+// Which licenses name a hosted service is read out of the signed blob, and
+// that has its own suite. Here every license in the fixture rows is entitled
+// unless a test says otherwise, so what is pinned is what the sync does with
+// the organizations it was given.
+vi.mock("@ee/licensing/connect/install/connectEntitlement", () => ({
+  licenseConnectServices: ({ licenseKey }: { licenseKey: string | null }) =>
+    licenseKey && entitled.current ? ["instant_evals"] : [],
 }));
 
 import {

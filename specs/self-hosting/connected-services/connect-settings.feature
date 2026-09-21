@@ -1,14 +1,16 @@
 Feature: Connect on a self-hosted install
-  A self-hosted install with a connected license can use LangWatch-hosted
-  services. Nothing is sent until an admin switches a service on, and the page
-  where they do it states exactly what leaves the install for that service.
+  A self-hosted install can use the LangWatch-hosted services its license
+  names, and no others. There is no deployment switch that grants one: an
+  install on an offline license reaches nothing, and an operator proves that
+  from the license blob. Each entitled service is on, the page states exactly
+  what leaves the install for it, and an admin can switch any of them off.
 
   As an admin of a self-hosted install
-  I want to choose which hosted services my install may call, knowing what each one sends
+  I want to know which hosted services my install calls and what each one sends
   So that no data leaves my install without my decision
 
   Background:
-    Given a self-hosted install with Connect enabled in its deployment configuration
+    Given a self-hosted install whose deployment configuration names no Connect variable
     And an organization with a valid license that LangWatch has registered with "instant_evals" entitled
 
   # ============================================================================
@@ -16,23 +18,42 @@ Feature: Connect on a self-hosted install
   # ============================================================================
 
   @integration
-  Scenario: Every hosted service starts switched off
+  Scenario: A service the license names is on without anyone switching it on
     When an admin opens Settings, Connect for the first time
-    Then "Instant Evals" is listed as available and switched off
-    And no request has been sent to the hosted services host
+    Then "Instant Evals" is listed as included in the license and switched on
+
+  @unit
+  Scenario: A license that names no hosted service reaches nothing
+    Given the license names no hosted service
+    When the install resolves what it may call
+    Then no hosted service is named
+    And no client is built and no request is sent to either LangWatch host
+
+  @unit
+  Scenario: An install on an offline license keeps its telemetry destination
+    Given the license names no hosted service
+    When the daily jobs run
+    Then the product statistics are posted to the app host they have always been posted to
+    And no license sync is sent
 
   @integration
-  Scenario: The page states what leaves the install before a service is switched on
+  Scenario: The page states what leaves the install for each service
     When an admin opens Settings, Connect
     Then the "Instant Evals" entry states that the judged text and the questions asked about it are sent to LangWatch
     And it states that they are not stored
     And it states that traces, prompts and datasets are never sent
 
   @integration
-  Scenario: Switching a service on is an admin decision that is recorded
-    When an admin switches "Instant Evals" on
-    Then the service is on for the organization
-    And the audit log records who switched it on and when
+  Scenario: Switching a service off is an admin decision that is recorded
+    When an admin switches "Instant Evals" off
+    Then the service is off for the organization
+    And the audit log records who switched it off and when
+
+  @unit
+  Scenario: A service switched off stays off when the license is reissued
+    Given an admin switched "Instant Evals" off
+    When the license is reissued with the same entitlement
+    Then "Instant Evals" is still off
 
   @integration
   Scenario: A member who is not an admin cannot switch a service on
@@ -48,10 +69,10 @@ Feature: Connect on a self-hosted install
     And it cannot be switched on
 
   @integration
-  Scenario: The page explains a deployment with Connect switched off
-    Given a self-hosted install with Connect disabled in its deployment configuration
+  Scenario: The page explains a deployment where an operator switched Connect off
+    Given a self-hosted install whose deployment configuration sets the Connect off switch
     When an admin opens Settings, Connect
-    Then the page says Connect is switched off for this deployment
+    Then the page says hosted services are switched off for this deployment
     And it says nothing is sent to LangWatch from this install
 
   @unit
@@ -68,10 +89,11 @@ Feature: Connect on a self-hosted install
 
   @unit
   Scenario: Connect disabled in the deployment configuration sends nothing
-    Given a self-hosted install with Connect disabled in its deployment configuration
+    Given a self-hosted install whose deployment configuration sets the Connect off switch
     When an admin reads the Connect settings
-    Then the settings say that Connect is off for this deployment
+    Then the settings say that hosted services are off for this deployment
     And no request is sent to either LangWatch host
+    And the entitlement the license names is refused, because the switch only ever refuses
 
   @unit
   Scenario: A Connect endpoint must be https unless it is a loopback host

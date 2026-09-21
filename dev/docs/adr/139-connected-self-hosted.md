@@ -458,22 +458,40 @@ contract budget as Instant Evals.
 The install side lives in `platform/app/ee/licensing/connect/install/`. Four
 decisions:
 
-**Which classifier judges.** Three in order: the install's own `JEV_API_KEY`,
-then Connect when `LANGWATCH_CONNECT_ENABLED` is set, then the null classifier.
-An install that configured a judge of its own keeps judging with it and sends
-nothing to LangWatch, whatever else is switched on.
+**What decides that hosted services are reachable.** The license, and nothing
+else. `LicenseData.connectServices` is signed into the license and read by
+`connectEntitlement.ts`: a license that names a service can reach it, and one
+that names none reaches nothing. There is no variable that turns the second
+into the first, which is what lets an air-gapped operator prove the claim from
+the license blob rather than from a deployment file. The registry row stays the
+authority the hosted routes check, so a service revoked mid-term stops working
+without waiting for the license to expire.
 
-**Which organization may judge through it.** Hosted judging is switched on per
-organization, stored in `Organization.connectServices` and empty by default, so
-one organization on a shared install can use it while another does not. The
-access gate (`src/server/app-layer/instant-evals/access.ts`) already resolves
-the project's organization for the feature flag, so it asks the classifier
-whether it can judge for that organization: one that has not switched the
-service on sees the eval functions published as unavailable rather than queries
-whose judged columns all come back null. The opt-in and the credential are held
-per project and per organization for 30 seconds, so a run of ten thousand
-judgements reads the row once and an admin's decision takes effect without a
-restart.
+`LANGWATCH_CONNECT_DISABLED` (Helm `app.connect.disabled`) is the escape hatch
+an audit asks for. It only ever refuses: with it set, this install builds no
+client and makes no outbound call, whatever its license says. The old
+`LANGWATCH_CONNECT_ENABLED` is gone. It made the connected path a side path,
+and its absence was doing the work the license should have been doing.
+
+**Which classifier judges.** Three in order: the install's own `JEV_API_KEY`,
+then the Connect classifier, then the null classifier where an operator
+switched Connect off. An install that configured a judge of its own keeps
+judging with it and sends nothing to LangWatch. The Connect classifier answers
+per organization, so an install where no license names hosted judging builds
+the classifier and skips every question without opening a connection.
+
+**Which organization may judge through it.** A service its license names is on
+unless an administrator switched it off. `Organization.connectServicesDisabled`
+records the refusals rather than the approvals, so a customer who bought hosted
+judging has it working before anyone finds a settings page, and a service
+switched off stays off when the license is reissued. The access gate
+(`src/server/app-layer/instant-evals/access.ts`) already resolves the project's
+organization for the feature flag, so it asks the classifier whether it can
+judge for that organization: one with no entitlement sees the eval functions
+published as unavailable rather than queries whose judged columns all come back
+null. The answer and the credential are held per project and per organization
+for 30 seconds, so a run of ten thousand judgements reads the row once and an
+admin's decision takes effect without a restart.
 
 **What identifies the install.** The instance id is the organization id of the
 organization whose license is used, unless `LANGWATCH_CONNECT_INSTANCE_ID`
@@ -500,11 +518,14 @@ the test that pins it.
 | The embedded production public key is unchanged. | same file, "is still verified against the production public key main shipped" |
 | With no `connect.*` value set, seat enforcement is the same hard cap: the seat past the licensed count is refused, the one within it is admitted. | same file, "keeps the hard seat cap" and "keeps admitting a seat within the licensed count" |
 | Validating and enforcing an offline license makes no network call and never reads the registry. | same file, "makes no network call and never reads the registry": `fetch` is stubbed to throw, and the database stub throws on any model but `Organization` |
-| No new required environment variable or Helm value. `connect.enabled` defaults to off, and every `LANGWATCH_CONNECT_*` variable is optional. | `offlineLicenseCompat.unit.test.ts`, "parses with every Connect variable absent, and resolves them all to off" |
-| With no `LANGWATCH_CONNECT_*` set and no judge key, the deployment gets the null classifier and neither `fetch` nor undici is called. | same file, "uses the classifier for an install with no judge key, and calls nothing" |
+| No new required environment variable or Helm value. Every `LANGWATCH_CONNECT_*` variable is optional, and the one that exists only refuses. | `offlineLicenseCompat.unit.test.ts`, "parses with every Connect variable absent, none of them required" |
+| A license minted before this change names no hosted service, so no outbound path builds a client. | same file, "names no hosted service, so no path builds a client" |
+| With no judge key and a license naming no hosted service, every judgement is skipped and neither `fetch` nor undici is called. | same file, "skips every judgement and calls nothing" |
+| A pass of the license sync over an install holding that license reaches the client for no organization at all. | same file, "syncs nothing and posts its statistics where it always did" |
+| The product statistics keep their destination: an install with no entitled license posts to `app.langwatch.ai/api/track_usage`, as it always has. | same file, and `usageStatsHost.unit.test.ts`, "given an install on an offline license" |
 | A chart render that changes no value carries no `LANGWATCH_CONNECT_` variable at all. | `charts/langwatch/tests/connect-env.sh` |
 | The migration is additive and needs only the normal `prisma migrate deploy`: one enum, one empty table, one column with a default. | `20260919120000_issued_license_registry`, replayed on a scratch database |
-| The usage statistics worker behaves as before and `/api/track_usage` stays. | `track-usage-security.integration.test.ts` stays green; the worker only gains a separate sync when Connect is enabled |
+| The usage statistics worker behaves as before and `/api/track_usage` stays. | `track-usage-security.integration.test.ts` stays green; the destination moves to the connect host only for an install whose license names a hosted service |
 | The license page of an install is unchanged. The one control removed, "New License", was only ever rendered on LangWatch Cloud. | `LicenseStatus.integration.test.tsx` |
 
 The registry and the token derivation exist only on the issuing and the hosted
@@ -527,9 +548,10 @@ side. `validateLicense`, `LicenseHandler` and the seat guard import neither.
 | Kind | Name |
 |---|---|
 | Env (Cloud) | `LANGWATCH_LICENSE_PRIVATE_KEY`, `STRIPE_SECRET_KEY` |
-| Env (install) | `LANGWATCH_CONNECT_ENABLED`, `LANGWATCH_CONNECT_LICENSE_ENDPOINT`, `LANGWATCH_CONNECT_GATEWAY_ENDPOINT`, `LANGWATCH_CONNECT_INSTANCE_ID`, `DISABLE_USAGE_STATS`, `HTTPS_PROXY` |
-| Helm | `app.connect.enabled`, `app.connect.licenseEndpoint`, `app.connect.gatewayEndpoint`, `app.connect.instanceId` |
-| Install opt-in | `Organization.connectServices` (empty by default) |
+| Env (install) | `LANGWATCH_CONNECT_DISABLED`, `LANGWATCH_CONNECT_LICENSE_ENDPOINT`, `LANGWATCH_CONNECT_GATEWAY_ENDPOINT`, `LANGWATCH_CONNECT_INSTANCE_ID`, `DISABLE_USAGE_STATS`, `SERVICE_VERSION`, `HTTPS_PROXY` |
+| Helm | `app.connect.disabled`, `app.connect.licenseEndpoint`, `app.connect.gatewayEndpoint`, `app.connect.instanceId` |
+| Entitlement | `LicenseData.connectServices`, signed into the license |
+| Install opt-out | `Organization.connectServicesDisabled` (empty by default, so an entitled service is on) |
 | Gateway host | `POST /v1/instant-evals/classify`, `GET /v1/usage`, `PUT /v1/budget` |
 | Control plane, gateway only | `POST /api/internal/gateway/connect/:operation` (HMAC signed) |
 | Connect host | `POST /v1/license/sync`, `POST /v1/stats` |

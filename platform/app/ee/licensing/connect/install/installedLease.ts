@@ -33,9 +33,7 @@ export interface InstalledLease {
  * registry binds a license to one instance.
  */
 export function installInstanceId(organizationId: string): string {
-  const config = readConnectConfig();
-  const override = config.enabled ? config.instanceIdOverride : undefined;
-  return override ?? organizationId;
+  return readConnectConfig().instanceIdOverride ?? organizationId;
 }
 
 /** The verified lease behind a stored license, or null where there is none. */
