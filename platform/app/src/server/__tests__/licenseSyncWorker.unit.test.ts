@@ -11,13 +11,13 @@
 
 import {
   credentialOf,
+  INSTANCE_ID,
+  instanceIdentityTable,
   LANGWATCH_KEYS,
   LICENSE,
   leaseFor,
   mintLicense,
   NOW,
-  INSTANCE_ID,
-  instanceIdentityTable,
   ORGANIZATION_ID,
   STRANGER_KEYS,
   tamperedLease,
