@@ -1,32 +1,6 @@
 /** @vitest-environment node */
 
-/**
- * Two halves of one rule: the engine gate must stay importable from the
- * browser, and the observability it gives up to do so must be handed back by
- * the server.
- *
- * `rbac.ts` imports the gate, and the browser imports `rbac.ts` for the
- * permission-matching functions the UI gates on (`useOrganizationTeamProject`,
- * the settings permission picker). So whatever the gate imports, the client
- * bundle gets.
- *
- * What breaks is not "a Node package" in general — it is a module that RUNS
- * something at import time. `prom-client` calls `register.removeSingleMetric`
- * as a side effect of being imported, which reaches `process`; every chunk
- * then dies on `process is not defined` and the app never mounts. That
- * happened here, and it passed typecheck, lint and the whole unit suite on the
- * way through, because none of those load a browser.
- *
- * `@langwatch/observability` is deliberately NOT on the list: the cached-flag
- * helper in this same graph constructs a logger at module scope and has done
- * on main for as long as the file has existed, with the client build green —
- * pino defers touching `process.stdout` until something actually logs.
- *
- * The gate therefore ships with a no-op failure reporter. A no-op nobody
- * replaces is the other failure — a reopened legacy-fallback window with
- * nothing said about it — so the last test pins that the composition installs
- * the real one.
- */
+/** Compatibility state reads keep import-time metrics in server composition. */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";

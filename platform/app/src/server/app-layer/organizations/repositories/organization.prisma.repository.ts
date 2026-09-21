@@ -2,6 +2,7 @@ import type { LedgerActor } from "@langwatch/actor";
 import { ledgerActorFor } from "@langwatch/actor";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
 import type { User } from "~/generated/prisma/client";
 import {
   type Currency,
@@ -18,6 +19,8 @@ import {
   grantsLedgerWriter,
   type LedgerBindingAttach,
 } from "~/server/app-layer/authz/ledger";
+import { GrantsAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.grants.repository";
+import { liveRoles } from "~/server/app-layer/authz/repositories/live-rows";
 import { findSharedTeamIds } from "~/server/role-bindings/personal-team-scope";
 import { projectAdminUserIdsWithoutDirectRole } from "~/server/teams/effective-team-admins";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -38,10 +41,10 @@ import {
   TeamMembershipNotFoundError,
   TeamNotFoundError,
 } from "../../teams/team.service";
+import { lockActiveAdmins } from "../active-admin-lock";
 import {
   CannotDemoteLastAdminError,
   CannotDisableLastAdminError,
-  CannotRemoveLastAdminError,
   MemberNotFoundError,
   OrganizationSlugTakenError,
 } from "../errors";
@@ -51,7 +54,6 @@ import type {
   CreateAndAssignInput,
   CreateAndAssignResult,
   CreateForProvisioningInput,
-  DeleteMemberInput,
   EnrichedAuditLog,
   FullyLoadedOrganization,
   MemberTeamBinding,
@@ -69,6 +71,8 @@ import type {
   UpdateTeamMemberRoleInput,
 } from "./organization.repository";
 
+const logger = createLogger("langwatch:organizations:repository");
+
 /**
  * The team's name for a refusal or a report, both of which are read by somebody
  * who knows the team by its name and not by its id.
@@ -85,40 +89,6 @@ async function teamNameFor({
     select: { name: true },
   });
   return team?.name ?? null;
-}
-
-/**
- * The organization's active administrators, locked for the rest of the
- * transaction.
- *
- * A plain count is a read-then-write race: two transactions each removing a
- * DIFFERENT admin both count two, both pass their guard, and both commit,
- * leaving an organization nobody can sign in to and no way back from inside
- * the product. `FOR UPDATE` makes the second caller wait for the first to
- * commit and then re-read the set, so it sees the single remaining admin and
- * refuses.
- */
-async function lockActiveAdmins({
-  tx,
-  organizationId,
-}: {
-  tx: Prisma.TransactionClient;
-  organizationId: string;
-}): Promise<Array<{ userId: string }>> {
-  // `role::text` rather than a cast to the enum type: the type name would have
-  // to be schema-qualified to be safe, and the comparison runs over one
-  // organization's memberships either way.
-  // `ORDER BY` fixes the order rows are locked in, so two callers racing over
-  // the same set queue behind each other instead of deadlocking on a
-  // half-acquired one.
-  return tx.$queryRaw<Array<{ userId: string }>>`
-    SELECT "userId" FROM "OrganizationUser"
-    WHERE "organizationId" = ${organizationId}
-      AND "role"::text = ${OrganizationUserRole.ADMIN}
-      AND "disabledAt" IS NULL
-    ORDER BY "userId"
-    FOR UPDATE
-  `;
 }
 
 /** A credential-bearing settings value encrypted at rest; cleared values store null. */
@@ -222,6 +192,87 @@ function namesSlug(target: unknown): boolean {
   return typeof target === "string" && target.includes("slug");
 }
 
+type FounderBootstrap = {
+  organization: { id: string; name: string };
+  team: { id: string; slug: string; name: string };
+  membershipStamp: string;
+};
+
+async function createFounderBootstrap(
+  prisma: PrismaClient,
+  input: CreateAndAssignInput,
+): Promise<FounderBootstrap> {
+  const pendingDisabledAt = new Date();
+  return prisma.$transaction(
+    async (tx) => {
+      const organization = await tx.organization.create({
+        data: {
+          id: input.orgId,
+          name: input.orgName,
+          slug: input.orgSlug,
+          phoneNumber: input.phoneNumber,
+          signupData: input.signUpData as Prisma.InputJsonValue | undefined,
+          primaryIntent: input.primaryIntent ?? null,
+          pricingModel: input.pricingModel,
+        },
+      });
+      const membership = await tx.organizationUser.create({
+        data: {
+          userId: input.userId,
+          organizationId: organization.id,
+          role: "ADMIN",
+          disabledAt: pendingDisabledAt,
+        },
+      });
+      const team = await tx.team.create({
+        data: {
+          id: input.teamId,
+          name: input.orgName,
+          slug: input.teamSlug,
+          organizationId: organization.id,
+        },
+      });
+      return {
+        organization: { id: organization.id, name: organization.name },
+        team: { id: team.id, slug: team.slug, name: team.name },
+        membershipStamp: membership.membershipStamp,
+      };
+    },
+    { maxWait: 10_000, timeout: 30_000 },
+  );
+}
+
+function founderBindings({
+  input,
+  created,
+}: {
+  input: CreateAndAssignInput;
+  created: FounderBootstrap;
+}): LedgerBindingAttach[] {
+  return [
+    {
+      bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+      principal: { userId: input.userId },
+      role: TeamUserRole.ADMIN,
+      customRoleId: null,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: created.organization.id,
+      membershipStamp: created.membershipStamp,
+      membershipBootstrap: true,
+    },
+    {
+      bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+      principal: { userId: input.userId },
+      role: TeamUserRole.ADMIN,
+      customRoleId: null,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: created.team.id,
+      membershipStamp: created.membershipStamp,
+      membershipBootstrap: true,
+    },
+  ];
+}
+
 /**
  * Point a member's binding on one scope at a role without replacing the row
  * — an UPDATE, never a delete-then-recreate, which would change its id
@@ -250,11 +301,9 @@ async function planUserScopeBinding({
   role: TeamUserRole;
   customRoleId: string | null;
 }): Promise<ScopeBindingPlan> {
-  const rows = await tx.roleBinding.findMany({
-    where: { organizationId, userId, scopeType, scopeId },
-    // id breaks createdAt ties so the same row is kept on every execution
-    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-    select: { id: true },
+  const rows = await new GrantsAccessListingRepository(tx).findBindingRows({
+    organizationId,
+    where: { principalType: "USER", principalId: userId, scopeType, scopeId },
   });
   const [keep, ...extras] = rows;
   const revokeIds = extras.map((row) => row.id);
@@ -341,10 +390,13 @@ async function emitScopeBindingPlans({
 }
 
 export class PrismaOrganizationRepository implements OrganizationRepository {
+  readonly #accessListing: GrantsAccessListingRepository;
   constructor(
     private readonly prisma: PrismaClient,
     private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
-  ) {}
+  ) {
+    this.#accessListing = new GrantsAccessListingRepository(prisma);
+  }
 
   getClient(): PrismaClient {
     return this.prisma;
@@ -554,73 +606,55 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
   async createAndAssign(
     input: CreateAndAssignInput,
   ): Promise<CreateAndAssignResult> {
-    const created = await this.prisma.$transaction(async (tx) => {
-      const organization = await tx.organization.create({
-        data: {
-          id: input.orgId,
-          name: input.orgName,
-          slug: input.orgSlug,
-          phoneNumber: input.phoneNumber,
-          signupData: input.signUpData as Prisma.InputJsonValue | undefined,
-          primaryIntent: input.primaryIntent ?? null,
-          pricingModel: input.pricingModel,
-        },
-      });
+    const created = await createFounderBootstrap(this.prisma, input);
 
-      await tx.organizationUser.create({
-        data: {
+    try {
+      // The event store resolves the tenant through the committed organization
+      // row. Keep the founder membership disabled while the two grants make
+      // their round trip, so committing this first cannot expose access.
+      await this.writer.attachBindings({
+        organizationId: created.organization.id,
+        bindings: founderBindings({ input, created }),
+        actor: ledgerActorFor({
           userId: input.userId,
-          organizationId: organization.id,
-          role: "ADMIN",
-        },
+          fallback: "organizationService",
+        }),
+        onDuplicate: "skip",
+        requireProjection: true,
       });
 
-      const team = await tx.team.create({
-        data: {
-          id: input.teamId,
-          name: input.orgName,
-          slug: input.teamSlug,
-          organizationId: organization.id,
+      await this.prisma.organizationUser.update({
+        where: {
+          userId_organizationId: {
+            userId: input.userId,
+            organizationId: created.organization.id,
+          },
         },
+        data: { disabledAt: null },
       });
-
-      return {
-        organization: { id: organization.id, name: organization.name },
-        team: { id: team.id, slug: team.slug, name: team.name },
-      };
-    });
-
-    // The organization, its membership row and its first team are not grant
-    // facts; the founder's two ADMIN grants are, so they are emitted once the
-    // scopes they point at exist.
-    await this.writer.attachBindings({
-      organizationId: created.organization.id,
-      bindings: [
-        {
-          bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          principal: { userId: input.userId },
-          role: TeamUserRole.ADMIN,
-          customRoleId: null,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: created.organization.id,
+    } catch (error) {
+      // A queued append may outlive this request. Delete the committed
+      // bootstrap rows now; any late projection then targets a never-reused
+      // organization and cannot authorize the user.
+      await this.deleteProvisionedOrganization(created.organization.id).catch(
+        (cleanupError: unknown) => {
+          logger.error(
+            {
+              organizationId: created.organization.id,
+              userId: input.userId,
+              error: cleanupError,
+            },
+            "failed to clean up an incomplete founder organization",
+          );
         },
-        {
-          bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          principal: { userId: input.userId },
-          role: TeamUserRole.ADMIN,
-          customRoleId: null,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: created.team.id,
-        },
-      ],
-      actor: ledgerActorFor({
-        userId: input.userId,
-        fallback: "organizationService",
-      }),
-      onDuplicate: "skip",
-    });
+      );
+      throw error;
+    }
 
-    return created;
+    return {
+      organization: created.organization,
+      team: created.team,
+    };
   }
 
   async createForProvisioning(
@@ -696,6 +730,10 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       }),
       this.prisma.apiKey.deleteMany({ where: { organizationId } }),
       this.prisma.promptTag.deleteMany({ where: { organizationId } }),
+      this.prisma.teamUser.deleteMany({
+        where: { team: { organizationId } },
+      }),
+      this.prisma.organizationUser.deleteMany({ where: { organizationId } }),
       this.prisma.team.deleteMany({ where: { organizationId } }),
       this.prisma.organization.deleteMany({ where: { id: organizationId } }),
     ]);
@@ -759,11 +797,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
             archivedAt: null,
           },
           include: {
-            members: {
-              include: {
-                assignedRole: true,
-              },
-            },
+            members: true,
             projects: {
               where: {
                 archivedAt: null,
@@ -817,7 +851,6 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
                   where: { team: { archivedAt: null } },
                   include: {
                     team: true,
-                    assignedRole: true,
                   },
                 },
               },
@@ -859,7 +892,6 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
               where: { team: { archivedAt: null } },
               include: {
                 team: true,
-                assignedRole: true,
               },
             },
           },
@@ -944,20 +976,9 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     userId: string;
   }): Promise<MemberTeamBinding[]> {
     const { organizationId, userId } = params;
-    const bindings = await this.prisma.roleBinding.findMany({
-      where: {
-        organizationId,
-        userId,
-        scopeType: RoleBindingScopeType.TEAM,
-      },
-      select: {
-        scopeId: true,
-        role: true,
-        customRoleId: true,
-        customRole: { select: { name: true } },
-      },
-      orderBy: { createdAt: "asc" },
-    });
+    const bindings = (
+      await this.#accessListing.findUserBindings({ organizationId, userId })
+    ).filter((binding) => binding.scopeType === RoleBindingScopeType.TEAM);
     if (bindings.length === 0) return [];
 
     const teams = await this.prisma.team.findMany({
@@ -1016,231 +1037,6 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         ...profileSettingsData(input),
         ...storageSettingsData(input),
       },
-    });
-  }
-
-  /**
-   * Removes a membership, and the personal workspace that came with it.
-   *
-   * `PERSONAL_TEAM_ARCHIVE_REFUSAL` is the sentence an admin gets when they try
-   * to archive a personal workspace directly, and it tells them these
-   * workspaces "disappear with the member's access to the organization". That
-   * was not true: the membership and its role bindings went, and the personal
-   * team and project stayed behind owned by somebody who is no longer a member,
-   * still holding their one slot per (organization, owner). So the refusal
-   * pointed at a cleanup that never happened, and an admin asking how to get
-   * rid of one had no answer at all.
-   *
-   * Archived, not deleted, for the same reason every other project is: the work
-   * is still the work. `PersonalWorkspaceService.ensure()` reactivates this
-   * exact pair if the person is invited back, which is what keeps archiving here
-   * from bricking that slot.
-   */
-  async deleteMember(input: DeleteMemberInput): Promise<void> {
-    const { organizationId, userId, actingUserId } = input;
-    const actor = ledgerActorFor({
-      userId: actingUserId,
-      fallback: "organizationService",
-    });
-    const revokeTheirGrants = () =>
-      this.writer.revokeBindingsWhere({
-        organizationId,
-        where: { userId },
-        actor,
-        reason: "organization membership removed",
-      });
-
-    const member = await this.prisma.organizationUser.findUnique({
-      where: { userId_organizationId: { userId, organizationId } },
-      select: { role: true, disabledAt: true },
-    });
-
-    if (!member) {
-      // The membership is already gone, which is also what a retry of a
-      // removal that died between the two writes below sees. Revoking again
-      // is a no-op when the first attempt finished and the repair when it did
-      // not, so the retry can still reach grants the seat no longer names —
-      // refusing outright left them orphaned, and a re-invite reactivated
-      // them.
-      await revokeTheirGrants();
-      throw new MemberNotFoundError(userId);
-    }
-
-    await this.assertRemovalKeepsAnActiveAdmin({ organizationId, member });
-
-    // Snapshotted before the revoke below so a refusal inside the
-    // transaction — the locked re-check is the one two concurrent removals
-    // of the last two admins can actually trip, the advisory check above
-    // passes for both — can put back exactly what this call is about to take
-    // away, rather than leaving a member who keeps their seat and loses
-    // every grant it should carry.
-    const grantsBeforeRevoke = await this.prisma.roleBinding.findMany({
-      where: { organizationId, userId },
-      select: {
-        id: true,
-        role: true,
-        customRoleId: true,
-        scopeType: true,
-        scopeId: true,
-      },
-    });
-
-    // Grants go before the membership, not after. A ledger append cannot join
-    // the Prisma transaction, so one of the two writes is always exposed to a
-    // crash: this order leaves a member who still holds their seat and none of
-    // their grants (less access, and the retry converges), where the other
-    // order left grants nobody could reach any more.
-    await revokeTheirGrants();
-
-    try {
-      await this.prisma.$transaction(async (tx) => {
-        await this.deleteMembershipRow({ tx, organizationId, userId });
-        await this.archivePersonalWorkspaces({ tx, organizationId, userId });
-      });
-    } catch (error) {
-      // The locked re-check inside `deleteMembershipRow` refused this
-      // removal — a concurrent removal of the organization's other admin
-      // committed first. The grants above are already gone by then, so
-      // without this the survivor keeps their seat and holds nothing. Put
-      // back exactly the rows just revoked.
-      if (grantsBeforeRevoke.length > 0) {
-        await this.writer.attachBindings({
-          organizationId,
-          bindings: grantsBeforeRevoke.map((binding) => ({
-            bindingId: binding.id,
-            principal: { userId },
-            role: binding.role,
-            customRoleId: binding.customRoleId,
-            scopeType: binding.scopeType,
-            scopeId: binding.scopeId,
-          })),
-          actor,
-          onDuplicate: "skip",
-        });
-      }
-      throw error;
-    }
-  }
-
-  /**
-   * Same guard as disabling or demoting the last admin, and the only
-   * irreversible one of the three: an organization with no admin who can
-   * sign in cannot be recovered from inside the product. Read ahead of the
-   * revocation as well as inside the removal transaction, so a refusal never
-   * strips the last admin's grants on its way to saying no; the locked read
-   * inside the transaction is still the authority.
-   */
-  private async assertRemovalKeepsAnActiveAdmin({
-    organizationId,
-    member,
-  }: {
-    organizationId: string;
-    member: { role: OrganizationUserRole; disabledAt: Date | null };
-  }): Promise<void> {
-    if (
-      member.role !== OrganizationUserRole.ADMIN ||
-      member.disabledAt !== null
-    ) {
-      return;
-    }
-    const activeAdmins = await this.prisma.organizationUser.count({
-      where: {
-        organizationId,
-        role: OrganizationUserRole.ADMIN,
-        disabledAt: null,
-      },
-    });
-    if (activeAdmins <= 1) {
-      throw new CannotRemoveLastAdminError();
-    }
-  }
-
-  /**
-   * The membership delete itself, re-guarded under the transaction: the
-   * pre-transaction reads are advisory, this locked read is the authority.
-   */
-  private async deleteMembershipRow({
-    tx,
-    organizationId,
-    userId,
-  }: {
-    tx: Prisma.TransactionClient;
-    organizationId: string;
-    userId: string;
-  }): Promise<void> {
-    const stillAMember = await tx.organizationUser.findUnique({
-      where: { userId_organizationId: { userId, organizationId } },
-      select: { role: true, disabledAt: true },
-    });
-
-    if (!stillAMember) {
-      throw new MemberNotFoundError(userId);
-    }
-
-    if (
-      stillAMember.role === OrganizationUserRole.ADMIN &&
-      stillAMember.disabledAt === null
-    ) {
-      const activeAdmins = await lockActiveAdmins({ tx, organizationId });
-
-      if (activeAdmins.length <= 1) {
-        throw new CannotRemoveLastAdminError();
-      }
-    }
-
-    await tx.organizationUser.delete({
-      where: {
-        userId_organizationId: {
-          userId,
-          organizationId,
-        },
-      },
-    });
-  }
-
-  /**
-   * Archives the removed member's personal team and project, on the same
-   * terms `PersonalWorkspaceService.ensure()` reactivates them.
-   */
-  private async archivePersonalWorkspaces({
-    tx,
-    organizationId,
-    userId,
-  }: {
-    tx: Prisma.TransactionClient;
-    organizationId: string;
-    userId: string;
-  }): Promise<void> {
-    const archivedAt = new Date();
-    const personalTeams = await tx.team.findMany({
-      where: {
-        organizationId,
-        ownerUserId: userId,
-        isPersonal: true,
-        archivedAt: null,
-      },
-      select: { id: true },
-    });
-    if (personalTeams.length === 0) return;
-
-    const personalTeamIds = personalTeams.map((team) => team.id);
-    // `isPersonal` on the same terms the reactivation reads it, so the two
-    // sides move the same rows. A personal team holds nothing else today
-    // (creating a project in one, or moving one into it, is refused), and the
-    // flag mirrors the team's, so this narrows nothing away; it keeps the pair
-    // symmetric if that ever slips, since archiving what the revival would
-    // not return is the failure with no way back.
-    await tx.project.updateMany({
-      where: {
-        teamId: { in: personalTeamIds },
-        isPersonal: true,
-        archivedAt: null,
-      },
-      data: { archivedAt },
-    });
-    await tx.team.updateMany({
-      where: { id: { in: personalTeamIds } },
-      data: { archivedAt },
     });
   }
 
@@ -1360,14 +1156,16 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         );
       } else {
         // EXTERNAL (Lite Member) users have no org-level grant
-        const orgRows = await tx.roleBinding.findMany({
+        const orgRows = await new GrantsAccessListingRepository(
+          tx,
+        ).findBindingRows({
+          organizationId,
           where: {
-            organizationId,
-            userId,
+            principalType: "USER",
+            principalId: userId,
             scopeType: RoleBindingScopeType.ORGANIZATION,
             scopeId: organizationId,
           },
-          select: { id: true },
         });
         plans.push({ revokeIds: orgRows.map((row) => row.id) });
       }
@@ -1382,17 +1180,15 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         organizationId,
       });
 
-      const currentMemberships = await tx.roleBinding.findMany({
+      const currentMemberships = await new GrantsAccessListingRepository(
+        tx,
+      ).findBindingRows({
+        organizationId,
         where: {
-          organizationId,
-          userId,
+          principalType: "USER",
+          principalId: userId,
           scopeType: RoleBindingScopeType.TEAM,
           scopeId: { in: organizationTeamIds },
-        },
-        select: {
-          scopeId: true,
-          role: true,
-          customRoleId: true,
         },
       });
       const currentMembershipByTeamId = new Map(
@@ -1440,7 +1236,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         }
 
         if (updateIsCustomRole && teamRoleUpdate.customRoleId) {
-          const customRole = await tx.customRole.findUnique({
+          const customRole = await liveRoles(tx).findFirst({
             where: { id: teamRoleUpdate.customRoleId },
             select: { organizationId: true, kind: true },
           });
@@ -1522,18 +1318,20 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       // with the correction on the partial unique index. Left alone on the
       // way back up: an upgrade grants nothing on its own.
       if (role === OrganizationUserRole.EXTERNAL) {
-        const projectRows = await tx.roleBinding.findMany({
-          where: {
+        const projectRows = (
+          await new GrantsAccessListingRepository(tx).findBindingRows({
             organizationId,
-            userId,
-            scopeType: RoleBindingScopeType.PROJECT,
-            OR: [
-              { role: { not: TeamUserRole.VIEWER } },
-              { customRoleId: { not: null } },
-            ],
-          },
-          select: { scopeId: true },
-        });
+            where: {
+              principalType: "USER",
+              principalId: userId,
+              scopeType: RoleBindingScopeType.PROJECT,
+            },
+          })
+        ).filter(
+          (binding) =>
+            binding.role !== TeamUserRole.VIEWER ||
+            binding.customRoleId !== null,
+        );
         if (projectRows.length > 0) {
           const sharedProjects = await tx.project.findMany({
             where: {
@@ -1617,7 +1415,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         if (!team) {
           throw new TeamNotFoundError(teamId);
         }
-        const customRole = await tx.customRole.findUnique({
+        const customRole = await liveRoles(tx).findFirst({
           where: { id: storedCustomRoleId },
           select: { organizationId: true, permissions: true, kind: true },
         });
@@ -1641,14 +1439,16 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           throw new LiteMemberViewerOnlyError(team.name);
         }
 
-        const targetUserBinding = await tx.roleBinding.findFirst({
+        const [targetUserBinding] = await new GrantsAccessListingRepository(
+          tx,
+        ).findBindingRows({
+          organizationId: team.organizationId,
           where: {
-            organizationId: team.organizationId,
+            principalType: "USER",
+            principalId: userId,
             scopeType: RoleBindingScopeType.TEAM,
             scopeId: teamId,
-            userId,
           },
-          select: { role: true },
         });
 
         if (!targetUserBinding) {
@@ -1722,14 +1522,16 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           }
         }
 
-        const targetUserBinding = await tx.roleBinding.findFirst({
+        const [targetUserBinding] = await new GrantsAccessListingRepository(
+          tx,
+        ).findBindingRows({
+          organizationId: team.organizationId,
           where: {
-            organizationId: team.organizationId,
+            principalType: "USER",
+            principalId: userId,
             scopeType: RoleBindingScopeType.TEAM,
             scopeId: teamId,
-            userId,
           },
-          select: { role: true },
         });
 
         if (!targetUserBinding) {
@@ -1911,6 +1713,11 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       // could in principle add their own target tracking later.
       const isGateway = log.action.startsWith("gateway.");
       return {
+        source: auditSourceOf({
+          action: log.action,
+          metadata: log.metadata,
+          isGateway,
+        }),
         id: log.id,
         createdAt: log.createdAt,
         userId: log.userId,
@@ -1924,7 +1731,6 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         args: isGateway ? { before: log.before, after: log.after } : log.args,
         user: log.userId ? (userMap.get(log.userId) ?? null) : null,
         project: log.projectId ? (projectMap.get(log.projectId) ?? null) : null,
-        source: isGateway ? "gateway" : "platform",
         targetKind: log.targetKind,
         targetId: log.targetId,
         before: log.before,
@@ -1934,4 +1740,40 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
 
     return { auditLogs, totalCount };
   }
+}
+
+/**
+ * Which system wrote an audit row (ADR-122).
+ *
+ * A grants row the customer's directory authored carries `source: "scim"` in
+ * its metadata — the same stamp the grant fact carries — and its `userId` is
+ * null, because the actor is `system:scim` and system actors have no user to
+ * name. Left as "platform" it renders as a change with no author, which is
+ * the reading that sends an administrator hunting for a person who does not
+ * exist. Naming the directory is what tells it apart from a change somebody
+ * made by hand.
+ *
+ * Exported so the reconciliation surfaces and this page cannot disagree about
+ * what counts as directory-authored.
+ */
+export function auditSourceOf({
+  action,
+  metadata,
+  isGateway,
+}: {
+  action: string;
+  metadata: unknown;
+  isGateway: boolean;
+}): "platform" | "gateway" | "directory" {
+  if (isGateway) return "gateway";
+  const source =
+    typeof metadata === "object" && metadata !== null
+      ? (metadata as Record<string, unknown>).source
+      : undefined;
+  // Both halves are required: the stamp says the directory authored it, and
+  // the action prefix says it is a membership change rather than something
+  // else that happens to carry the word.
+  return source === "scim" && action.startsWith("authz.grants.")
+    ? "directory"
+    : "platform";
 }

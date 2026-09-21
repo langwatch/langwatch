@@ -805,6 +805,58 @@ describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
   });
 });
 
+describe("guardProjectId — SCOPED_MODELS (SsoConnectionReproofCursor)", () => {
+  it("allows the sweep to create cursors for named connections", async () => {
+    await expect(
+      runGuard({
+        model: "SsoConnectionReproofCursor",
+        action: "createMany",
+        args: {
+          data: [
+            {
+              connectionId: "ssoc_acme",
+              lastReproofAt: new Date("2026-08-28T12:00:00Z"),
+            },
+          ],
+        },
+      }),
+    ).resolves.toBe("ok");
+  });
+
+  it("allows the sweep to advance only named connections", async () => {
+    await expect(
+      runGuard({
+        model: "SsoConnectionReproofCursor",
+        action: "updateMany",
+        args: {
+          where: { connectionId: { in: ["ssoc_acme"] } },
+          data: { lastReproofAt: new Date("2026-08-28T12:00:00Z") },
+        },
+      }),
+    ).resolves.toBe("ok");
+  });
+
+  it("refuses a cursor query with no parent connection", async () => {
+    await expect(
+      runGuard({
+        model: "SsoConnectionReproofCursor",
+        action: "findMany",
+        args: { where: {} },
+      }),
+    ).rejects.toThrow(/requires a connectionId/);
+  });
+
+  it("refuses a cursor created without its parent connection", async () => {
+    await expect(
+      runGuard({
+        model: "SsoConnectionReproofCursor",
+        action: "create",
+        args: { data: { lastReproofAt: new Date("2026-08-28T12:00:00Z") } },
+      }),
+    ).rejects.toThrow(/create requires a connectionId/);
+  });
+});
+
 describe("guardProjectId — raw queries (queryRaw / executeRaw)", () => {
   describe("when a raw query carries a tenancy predicate", () => {
     it("does NOT throw — projectId in the SQL is the tenancy proof", async () => {

@@ -536,3 +536,91 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     When better-auth reads their account
     Then the row carries the stored issuer
     And never the synthetic form built from the provider id
+
+  # ---------------------------------------------------------------------------
+  # Transactions - what the adapter can promise, and what it must not
+  # ---------------------------------------------------------------------------
+  #
+  # The adapter left `transaction` unset, which handed better-auth the
+  # factory's as-is passthrough. That preserved the stock adapter's behaviour
+  # exactly, and it was the right call while nothing asked for more.
+  #
+  # `@better-auth/sso` asks for more. It refuses to run `resolveUser` at all
+  # unless the adapter declares a native `transaction`, and `resolveUser` is
+  # the seam that makes `trustEmailVerified` defensible - it is where a
+  # connection's proved domains are checked before better-auth links an
+  # asserted address onto an existing account. So the two could not both be
+  # true, and single sign-on refused every sign-in with
+  # `SSO_USER_RESOLUTION_REQUIRES_NATIVE_TRANSACTIONS` before reaching the
+  # identity provider at all.
+  #
+  # WHAT THE TRANSACTION IS FOR, precisely. The plugin locks the SsoProvider
+  # row for the length of the link by issuing a no-op update against it, then
+  # checks the provider's identity boundary has not moved underneath the
+  # ceremony. A row lock only holds inside a transaction, so a passthrough
+  # does not merely forgo atomicity - it silently removes that check's
+  # meaning, and a provider re-pointed mid-link would pass it.
+  #
+  # WHAT IT CANNOT SPAN, and why that is honest rather than a gap. The two
+  # branches live in different databases: the legacy branch and SsoProvider
+  # are Postgres, the identity branch's facts are appended to the event store.
+  # No transaction can cover both. The adapter therefore promises a REAL
+  # Postgres transaction and promises nothing across the branches - which is
+  # what the plugin actually needs, because the row it locks is a Postgres
+  # row. The identity branch keeps the guarantee event sourcing offers
+  # instead: a command is atomic at its append, and replaying it is
+  # idempotent.
+
+  @unit
+  Scenario: The adapter declares native transaction support
+    Given the identity storage adapter
+    When a plugin asks whether it supports native transactions
+    Then it says yes
+    # `resolveUser` is refused outright otherwise, and with it every single
+    # sign-in. The declaration has to be true, not merely present - the
+    # scenarios below are what make it so.
+
+  @integration
+  Scenario: Work inside a transaction commits together
+    Given a transaction against the identity storage adapter
+    When two Postgres-backed writes are made inside it and the callback returns
+    Then both writes are visible afterwards
+
+  @integration
+  Scenario: Work inside a transaction rolls back together
+    Given a transaction against the identity storage adapter
+    When a Postgres-backed write is made inside it and the callback then throws
+    Then that write is not visible afterwards
+    And the error reaches the caller unchanged
+    # A transaction that swallowed the failure would commit half a ceremony
+    # and report success, which is worse than not having one.
+
+  @integration
+  Scenario: A provider row locked for a link holds until the link finishes
+    Given a single sign-on connection whose provider row is locked inside a transaction
+    When a second link for the same provider tries to lock that row
+    Then the second waits until the first transaction finishes
+    # THE POINT OF THE WHOLE FEATURE. If this serialises, the plugin's
+    # boundary check means what it says; if it does not, two callbacks
+    # interleave and the check passes for a provider that moved. A test that
+    # only asserts the refusal stopped firing proves nothing about this.
+
+  @integration
+  Scenario: A sign-in through a connection completes
+    Given a verified single sign-on connection
+    When somebody signs in through it
+    Then they are signed in
+    And the sign-in is not refused for the adapter lacking transactions
+    # Regression: single sign-on shipped with `resolveUser` configured and an
+    # adapter that declared no transaction, so this had never once succeeded.
+
+  @unit
+  Scenario: The transaction does not claim to span the event store
+    Given a transaction against the identity storage adapter
+    When a fact is appended on the identity branch inside it and the callback then throws
+    Then the Postgres writes are rolled back
+    And the appended fact is not
+    # Stated as a scenario rather than left to a comment, because somebody
+    # will eventually read "native transaction support" as a promise it
+    # cannot keep. The branches are in different databases. What keeps this
+    # sound is that the append is atomic and idempotent on its own.

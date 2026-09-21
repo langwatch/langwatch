@@ -39,7 +39,6 @@ import {
   timeseriesSeriesInput,
 } from "~/server/analytics/registry";
 import { sharedFiltersInputSchema } from "~/server/analytics/types";
-import { isDemoProject } from "~/server/api/rbac";
 import {
   createServiceApp,
   handlerManagedAuth,
@@ -52,6 +51,7 @@ import {
   type UnifiedAuthVariables,
 } from "~/server/api-key/auth-middleware";
 import { getApp, tryGetApp } from "~/server/app-layer/app";
+import { isDemoProject } from "~/server/app-layer/authz/permission-adapters";
 import type { DspyStepData } from "~/server/app-layer/dspy-steps/types";
 import {
   predefinedEventsSchemas,

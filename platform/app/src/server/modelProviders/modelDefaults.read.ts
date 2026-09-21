@@ -2,14 +2,13 @@ import type {
   ModelDefaultScopeType,
   PrismaClient,
 } from "~/generated/prisma/client";
+import { batchScopePermissions } from "~/server/app-layer/authz/permission-adapters";
 import {
   probeOrganizationPermission,
   probeProjectPermission,
   probeTeamPermission,
 } from "~/server/app-layer/permissions/imperative";
-
 import type { Session } from "~/server/auth";
-import { batchScopePermissions } from "../api/rbac";
 import {
   allFeatures,
   featureByKey,

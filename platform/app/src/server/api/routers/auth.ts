@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
-import { normalizeIdentifierValue } from "@langwatch/identity";
+import {
+  isOrganizationManagedDecision,
+  normalizeIdentifierValue,
+} from "@langwatch/identity";
 import { getSessionCookie } from "better-auth/cookies";
 import { z } from "zod";
 import type { PriorSession } from "~/server/app-layer/identity/prior-session.service";
@@ -11,6 +14,7 @@ import {
 } from "~/server/app-layer/identity/runtime";
 import {
   AuthRateLimitedError,
+  DirectRegistrationUnavailableError,
   NoAddressToConfirmError,
 } from "~/server/auth/errors";
 import { getAuthRateLimitClientIp } from "~/server/auth/rate-limit-client-ip";
@@ -212,6 +216,11 @@ export const authRouter = createTRPCRouter({
         throw new AuthRateLimitedError({
           retryAfterSeconds: secondsUntil(limit.resetAt),
         });
+      }
+
+      const decision = await signInRouter().route({ identifier: input.email });
+      if (isOrganizationManagedDecision(decision)) {
+        throw new DirectRegistrationUnavailableError();
       }
 
       const verification = signUpVerification();

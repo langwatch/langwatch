@@ -208,7 +208,7 @@ describe("given a deployment that offers passkeys", () => {
         error: onError.mock.calls[0]?.[0],
         fallbackTitle: "Could not use a passkey",
       });
-      expect(copy.title).toBe("We couldn't use that passkey");
+      expect(copy.title).toBe("That passkey isn't one we recognize");
       expect(copy.description).not.toBe(UNKNOWN_ERROR_PRESENTATION.description);
       expect(navigateMock).not.toHaveBeenCalled();
     });
@@ -316,7 +316,7 @@ describe("given a deployment that offers passkeys", () => {
         error: onError.mock.calls[0]?.[0],
         fallbackTitle: "Could not use a passkey",
       });
-      expect(copy.title).toBe("We couldn't use that passkey");
+      expect(copy.title).toBe("That passkey isn't one we recognize");
     });
   });
 

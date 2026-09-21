@@ -1,4 +1,5 @@
 import {
+  DEFAULT_SSO_ARRIVAL_POLICY,
   identifierProviderFor,
   type LinkProposalReason,
   normalizeIdentifierValue,
@@ -121,7 +122,7 @@ export class SignInLinkEvidence {
         subject: providerAccountId,
         email: asserted.email,
         emailVerified: asserted.emailVerified,
-        allowsJit: false,
+        arrivalPolicy: DEFAULT_SSO_ARRIVAL_POLICY,
       },
       candidates: [
         {

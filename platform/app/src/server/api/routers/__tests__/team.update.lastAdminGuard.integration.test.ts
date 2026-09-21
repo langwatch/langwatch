@@ -176,6 +176,15 @@ describe("given a team whose only admin is one of its members", () => {
           scopeId: fixture.onlyAdminTeamId,
         },
       });
+      await prisma.grant.deleteMany({
+        where: {
+          organizationId: fixture.organizationId,
+          principalType: "USER",
+          principalId: fixture.soloUserId,
+          scopeType: "TEAM",
+          scopeId: fixture.onlyAdminTeamId,
+        },
+      });
 
       await expect(
         saveTeam([

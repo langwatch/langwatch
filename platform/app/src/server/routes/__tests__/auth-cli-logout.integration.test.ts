@@ -31,6 +31,8 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 
 import { app } from "../auth-cli";
 
@@ -142,7 +144,10 @@ describe("POST /api/auth/cli/logout", () => {
     // The route reads its connection off the App, so the App has to carry the
     // container's (ADR-093).
     await resetApp();
-    globalForApp.__langwatch_app = createTestApp({ redis: redisConnection });
+    globalForApp.__langwatch_app = createTestApp({
+      redis: redisConnection,
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
+    });
   }, 60_000);
 
   afterAll(async () => {
@@ -230,14 +235,12 @@ describe("POST /api/auth/cli/logout", () => {
       await prisma.organizationUser.create({
         data: { organizationId: ORG_ID, userId: USER_ID, role: "ADMIN" },
       });
-      await prisma.roleBinding.create({
-        data: {
-          organizationId: ORG_ID,
-          userId: USER_ID,
-          role: "ADMIN",
-          scopeType: "ORGANIZATION",
-          scopeId: ORG_ID,
-        },
+      await seedRoleBinding(prisma, {
+        organizationId: ORG_ID,
+        userId: USER_ID,
+        role: "ADMIN",
+        scopeType: "ORGANIZATION",
+        scopeId: ORG_ID,
       });
       await new PersonalWorkspaceService(prisma).ensure({
         userId: USER_ID,
@@ -247,6 +250,9 @@ describe("POST /api/auth/cli/logout", () => {
 
     afterAll(async () => {
       await prisma.roleBinding
+        .deleteMany({ where: { organizationId: ORG_ID } })
+        .catch(() => undefined);
+      await prisma.grant
         .deleteMany({ where: { organizationId: ORG_ID } })
         .catch(() => undefined);
       await prisma.apiKey

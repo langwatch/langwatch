@@ -27,7 +27,10 @@ import { PrismaGithubPullRequestsRepository } from "~/server/app-layer/github/re
 import { createTestApp } from "~/server/app-layer/presets";
 import { NullGithubPullRequestLookup } from "~/server/app-layer/traces/session-groups.pull-request-link";
 import { prisma } from "~/server/db";
-import type { PullRequestUsageV1Fixture } from "./pullRequestUsageV1Harness";
+import {
+  authzTestEventSourcing,
+  type PullRequestUsageV1Fixture,
+} from "./pullRequestUsageV1Harness";
 
 /**
  * A sessions store answering one static session per project asked about.
@@ -97,6 +100,7 @@ export function installPullRequestUsageTestAppForTenants({
     sessionEvents: nullSessionEvents,
   });
   globalForApp.__langwatch_app = createTestApp({
+    _eventSourcing: authzTestEventSourcing,
     codingAgents: {
       sessions,
       // The REST surface under test never reads it; the App's shape does.

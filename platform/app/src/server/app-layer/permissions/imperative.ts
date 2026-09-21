@@ -8,11 +8,7 @@
  *   raw id cannot be reached by a path that skipped the check.
  * - `probe*` answers a boolean, for the call sites that genuinely branch
  *   (custom refusal bodies, capability discovery). The name says the caller
- *   owns what happens on `false`, and it is deliberately NOT `has*Permission`:
- *   the legacy `has{Project,Team,Organization}Permission` twins still live in
- *   `server/api/rbac.ts` for the tRPC routers not yet migrated off them, and a
- *   new `has*` here would be a name collision a test mock could bind the wrong
- *   one of. Those twins are being retired; new code uses this facade.
+ *   owns what happens on `false`.
  *
  * The decision resolves through the App the request context carries
  * (`ctx.app`, injected by the tRPC and Hono context factories) or the

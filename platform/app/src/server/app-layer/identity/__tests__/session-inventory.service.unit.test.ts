@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
-  type SessionCachePort,
   SessionInventoryService,
   SessionIsCurrentError,
   type SessionRecord,
   type SessionRecordsPort,
 } from "../session-inventory.service";
+import {
+  type SessionRevocationCachePort,
+  type SessionRevocationRecordsPort,
+  SessionRevocationService,
+} from "../session-revocation.service";
 
 const session = ({
   id,
@@ -31,32 +35,68 @@ const inventoryOver = (
 ) => {
   const rows = new Map(initial.map((row) => [row.id, row]));
   const droppedTokens: string[] = [];
+  const rowsFor = (userId: string) =>
+    [...rows.values()].filter((row) => row.userId === userId);
 
-  const records: SessionRecordsPort = {
+  const records: SessionRecordsPort & SessionRevocationRecordsPort = {
     listForUser: async ({ userId }) =>
       [...rows.values()].filter((row) => row.userId === userId),
     listForIdentifier: async ({ userId, identifierId }) =>
       [...rows.values()].filter(
         (row) => row.userId === userId && row.identifierId === identifierId,
       ),
-    deleteByIds: async ({ ids }) => {
+    findTokensForUser: async ({ userId }) =>
+      rowsFor(userId).map((row) => row.sessionToken),
+    findTokensForUserExcept: async ({ userId, keepSessionId }) =>
+      rowsFor(userId)
+        .filter((row) => row.id !== keepSessionId)
+        .map((row) => row.sessionToken),
+    findTokenForSession: async ({ sessionId }) =>
+      rows.get(sessionId)?.sessionToken ?? null,
+    findForIdentifier: async ({ userId, identifierId }) =>
+      rowsFor(userId)
+        .filter((row) => row.identifierId === identifierId)
+        .map(({ id, sessionToken }) => ({ id, sessionToken })),
+    deleteAllForUser: async ({ userId }) => {
       let ended = 0;
-      for (const id of ids) {
-        if (rows.delete(id)) {
-          ended += 1;
-        }
+      for (const row of rowsFor(userId)) {
+        if (rows.delete(row.id)) ended += 1;
       }
       return ended;
     },
+    deleteForUserExcept: async ({ userId, keepSessionId }) => {
+      let ended = 0;
+      for (const row of rowsFor(userId)) {
+        if (row.id !== keepSessionId && rows.delete(row.id)) ended += 1;
+      }
+      return ended;
+    },
+    deleteByIds: async ({ ids }) => {
+      let ended = 0;
+      for (const id of ids) {
+        if (rows.delete(id)) ended += 1;
+      }
+      return ended;
+    },
+    deleteByToken: async ({ token }) => {
+      const row = [...rows.values()].find(
+        (candidate) => candidate.sessionToken === token,
+      );
+      return row && rows.delete(row.id) ? 1 : 0;
+    },
   };
-  const cache: SessionCachePort = {
-    dropTokens: async ({ tokens }) => {
+  const cache: SessionRevocationCachePort = {
+    readIndex: async () => null,
+    writeIndex: async () => undefined,
+    dropIndex: async () => undefined,
+    dropSessions: async ({ tokens }) => {
       droppedTokens.push(...tokens);
     },
   };
+  const revocation = new SessionRevocationService({ records, cache });
 
   return {
-    service: new SessionInventoryService({ records, cache }),
+    service: new SessionInventoryService({ records, revocation }),
     droppedTokens,
     liveSessionIds: () => [...rows.keys()],
   };

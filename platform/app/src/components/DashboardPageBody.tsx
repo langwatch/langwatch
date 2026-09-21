@@ -14,6 +14,9 @@ import { useEffect } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { OrganizationUserRole } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
+import { TeamAccessWaiting } from "../features/auth/components/team-access-waiting";
+import { OrganizationMfaGate } from "../features/mfa/components/OrganizationMfaGate";
+import { useOrganizationMfaGate } from "../features/mfa/hooks/useOrganizationMfaGate";
 import { GlobalTraceV2DrawerMount } from "../features/traces-v2/components/GlobalTraceV2DrawerMount";
 import {
   useOrganizationTeamProject,
@@ -28,6 +31,8 @@ import { trackEvent } from "../utils/tracking";
 import { AnnouncementBanner } from "./AnnouncementBanner";
 import { CurrentDrawer } from "./CurrentDrawer";
 import { AdminViewingAsBanner } from "./governance/AdminViewingAsBanner";
+import { JoinYourTeamTakeover } from "./JoinYourTeamTakeover";
+import { SecureAccountNudge } from "./me/SecureAccountNudge";
 import { SavedViewsBar } from "./SavedViewsBar";
 import { GlobalUpgradeModal } from "./UpgradeModal";
 import { Link } from "./ui/link";
@@ -133,6 +138,15 @@ export const DashboardPageBody = ({
   // leaves DEMO_PROJECT_SLUG undefined, and `===` against an equally-undefined
   // `project?.slug` would otherwise read as a match on any route that hasn't
   // resolved a project yet.
+  // The organization's membership condition (D06), asked on the way into ITS
+  // data and nowhere else. A personal-scope route is never held: the
+  // requirement belongs to the organization that set it, and nobody's own
+  // workspace is stranded by their employer's decision.
+  const mfaGate = useOrganizationMfaGate({
+    organizationId: organization?.id,
+    isPersonalScope: isPersonalScopeRoute,
+  });
+
   const isDemoProject =
     !!publicEnv.data?.DEMO_PROJECT_SLUG &&
     publicEnv.data.DEMO_PROJECT_SLUG === project?.slug;
@@ -283,6 +297,11 @@ export const DashboardPageBody = ({
 
         <AnnouncementBanner />
 
+        <JoinYourTeamTakeover
+          currentOrganizationId={organization?.id}
+          fallback={publicPage ? null : <SecureAccountNudge />}
+        />
+
         {adminViewingAs && (
           <AdminViewingAsBanner workspaceLabel={adminViewingAs.label} />
         )}
@@ -350,7 +369,19 @@ export const DashboardPageBody = ({
         /[project]/traces where TracesPage already mounts it. */}
       <GlobalTraceV2DrawerMount />
 
-      {userIsPartOfTeam ? (
+      {mfaGate.outcome.held ? (
+        // The enrollment gate (D06). Here rather than in each shell because
+        // this is the one interior every shell renders, so the gate cannot be
+        // reachable through a nav mode somebody forgot to wire. It swaps the
+        // BODY and leaves the chrome: the organization switcher above it is
+        // how somebody reaches everything they are not held out of, and
+        // nothing about their session has changed.
+        <OrganizationMfaGate
+          organizationName={mfaGate.outcome.organizationName}
+          offerPasskey={mfaGate.outcome.offerPasskey}
+          onEnrolled={mfaGate.refresh}
+        />
+      ) : userIsPartOfTeam ? (
         // Page body absorbs leftover vertical space inside the
         // scrollable VStack. Without `flex: 1` + `minHeight: 0`,
         // pages that use `height="full"` interpret it as "100%
@@ -387,30 +418,10 @@ export const DashboardPageBody = ({
           </ErrorBoundary>
         </Box>
       ) : (
-        <Alert.Root
-          status="warning"
-          width="full"
-          border="1px solid"
-          borderColor="colorPalette.muted"
-          marginX={4}
-          marginTop={3}
-          borderRadius="lg"
-          maxWidth="calc(100% - 22px)"
-        >
-          <Alert.Indicator />
-          <Alert.Content>
-            <HStack width="full" gap={4}>
-              <Text flex={1}>
-                You are not part of any team in this organization. Ask your
-                administrator to add you, or{" "}
-                <Link href="/" textDecoration="underline">
-                  go back to your home page
-                </Link>
-                .
-              </Text>
-            </HStack>
-          </Alert.Content>
-        </Alert.Root>
+        <TeamAccessWaiting
+          organizationName={organization?.name ?? "your organization"}
+          onCheckAccess={() => router.reload()}
+        />
       )}
       <GlobalUpgradeModal />
     </VStack>

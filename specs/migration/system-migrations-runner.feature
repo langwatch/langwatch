@@ -74,9 +74,24 @@ Feature: Running system migrations across organizations
     When those events and application events are queued concurrently
     Then the preflight uses the canonical queue and its aggregate locks
     And it dispatches only groups registered by that preflight
-    And pending, delayed, blocked, or failed work in those groups prevents startup
+    And pending, delayed, blocked, or failed work the preflight itself caused in those groups prevents startup
     And worker-scoped durable subscribers run for the preflight events
     And schedulers, process-manager consumers, and general workers do not start
+
+  # A group's error marker has no expiry and is cleared only by a later success
+  # on that same group, so a failure ordinary traffic left before the upgrade —
+  # or one an earlier, crashed preflight left — would otherwise refuse every
+  # boot that followed, on every replica, forever. A group already wedged when
+  # the preflight adopted it was wedged under the previous release, and
+  # refusing to start fixes none of it.
+  @integration
+  Scenario: A group wedged before the preflight does not refuse startup
+    Given a group blocked with a failure from before the preflight adopted it
+    When the preflight settles its pass
+    Then that group neither holds the barrier open nor prevents startup
+    And it stays blocked, reported for operator triage
+    But a failure produced by the preflight's own work still prevents startup
+    And the refusal names the groups it refuses for, not a count of them
 
   @unit
   Scenario: A recurring reconciliation does not loop forever
@@ -86,11 +101,12 @@ Feature: Running system migrations across organizations
     And being re-proved into the same state does not count as progress
 
   @unit
-  Scenario: A finite held migration prevents startup
-    Given a finite migration remains held after its pass, with nothing advancing
+  Scenario: A held migration stays on the legacy path without preventing startup
+    Given a migration remains held after its pass, with nothing advancing
     When the app starts
-    Then the preflight fails
-    And runtime processes do not start
+    Then it is re-proved once and the run ends
+    And being re-proved into the same state does not count as progress
+    And its migration gate stays closed on the legacy path
 
   @unit
   Scenario: One tenant's parked migration does not stop the fleet starting
@@ -135,17 +151,65 @@ Feature: Running system migrations across organizations
     And runtime processes do not start
     And the next start retries the pass
 
-  # PR1 keeps the staff-configured Auth0 route as the compatibility path. Its
-  # stored domain is not proof that the customer controls that domain, so D04
-  # stays outside the shared registry until PR2 can register the proof-aware
-  # migration. The registry is shared by prestart, ordinary, targeted and
-  # enrollment paths, which keeps the unproved migration out of all four.
+  # ═══ Re-driving after startup ═════════════════════════════════════════
+  # The preflight converges once and then stops. Every stored status but
+  # `finalized` and `rolled_back` is re-entrant, so a tenant that parks an
+  # hour into a worker's life heals on the very next pass — except that on a
+  # fleet which stays up there WAS no next pass, only the next deploy or an
+  # operator clicking "run a pass". So a worker carries a cadence of its own,
+  # driving the same pass the preflight and that click drive. It converges on
+  # nothing and reads no progress count, so a tenant that parks again every
+  # time costs one attempt per cadence and wedges nothing.
+
   @unit
-  Scenario: PR1 does not run the unproved SSO grandfather migration
+  Scenario: A worker re-drives a parked tenant without being asked
+    Given a tenant parked after startup had already finished
+    When the worker's re-drive cadence comes round
+    Then a pass runs and attempts that tenant again
+    And a tenant that parks again is simply attempted again next time
+
+  @unit
+  Scenario: A recurring reconciliation keeps running on a long-lived worker
+    Given a migration whose held outcome is recurring reconciliation
+    When the worker's re-drive cadence comes round
+    Then its tenants are re-proved again
+
+  @unit
+  Scenario: A fleet with nothing to re-drive does not sweep
+    Given every tenant is finalized or pinned to its legacy path
+    When the worker's re-drive cadence comes round
+    Then the stored state is asked whether anything could still move
+    And no pass runs
+
+  @unit
+  Scenario: Only a worker re-drives
+    Given a process that does not run the worker stack
+    When it starts
+    Then it never drives a migration pass of its own
+
+  @unit
+  Scenario: A re-drive that fails does not end the cadence
+    Given a pass that fails outright after startup
+    When the cadence comes round again
+    Then another pass is attempted
+
+  # D04 records the configured legacy route WITHOUT treating the old domain
+  # string as ownership evidence, which is what let it join the shared
+  # registry: existing sign-in stays compatible, while activation, linking and
+  # new-person trust still demand qualified proof. The registry is shared by
+  # the prestart, ordinary, targeted and enrollment paths, so declaring it here
+  # declares it for all four.
+  #
+  # This scenario used to say the opposite — that D04 stayed out of the
+  # registry until a later change — and it went on saying it after the
+  # registration landed. The test bound to it had been updated to assert the
+  # registration, so the pair read green while the words asserted the reverse.
+  @unit
+  Scenario: The D04 connection grandfather migration is declared in the shared registry
     Given an organization has a staff-configured legacy SSO domain
-    When any system migration entry point reads the PR1 registry
-    Then the D04 connection grandfather migration is not declared or run
-    And the legacy SSO route remains unchanged
+    When any system migration entry point reads the registry
+    Then the D04 connection grandfather migration is declared alongside the authorization engine migration
+    And the legacy SSO route is recorded without being treated as proof of ownership
 
   # ═══ Automatic enrollment ═════════════════════════════════════════════
   # Enrollment paces a rollout while it is happening. A finished rollout has

@@ -165,6 +165,11 @@ describe("Langy process manager and outbox with Postgres", () => {
       store,
       // Generated from the declared intents, schema validation included.
       handlers: buildIntentHandlers(definition.config),
+      // The outbox table is shared across every process manager. Without
+      // this, a concurrently-running domain's due intents (e.g. join
+      // notifications) get leased here too and retry-churn for lack of a
+      // handler, per the class doc on `processNames`.
+      processNames: [LANGY_CONVERSATION_PROCESS_NAME],
     });
     // The generated subscriber commits against real wall time, so the
     // dispatch window must be read against the same clock.

@@ -4,13 +4,9 @@
  * Everything else imports the composed instances from here; nothing else
  * constructs an AuthzService or a grants repository.
  *
- * Only server-only modules may import this file. Its graph reaches
- * `~/server/db`, redis and the EE audit writer at module scope — so a
- * runtime import from rbac.ts (whose enums client code imports) puts Prisma
- * in the browser bundle, where the t3-env client guard throws at module
- * load. The shadow service composes per call in `./shadow.ts` for exactly
- * this reason; the reverse-boundary guard in
- * `src/server/__tests__/frontend-boundary.unit.test.ts` walks the graph.
+ * Only server-only modules may import this file. Its graph reaches the app
+ * database and other server dependencies at module scope, so browser-facing
+ * permission helpers compose from their caller's Prisma handle instead.
  *
  * Every environment read the engine's services need is a closure passed from
  * here: the packages read no env of their own.
@@ -27,23 +23,15 @@ import { demoProjectId } from "./demo-project";
 import { bumpAuthzEpoch, getAuthzEpoch } from "./epoch";
 import { grantsLedgerWriter } from "./ledger";
 import { LedgerAuthzGrantsRepository } from "./repositories/authz-grants.ledger.repository";
-import { CutoverAwareAuthzReadRepository } from "./repositories/authz-read.cutover.repository";
+import { GrantsAuthzReadRepository } from "./repositories/authz-read.grants.repository";
 
 /**
- * COLLECT policies over the read repository, which since delivery-plan PR 3
- * is per-organization: a cut-over organization collects from the grants
- * ledger's own projection, everyone else from the compat heads, decided per
- * call by the cutover gate.
- *
- * This instance lives for the whole process, and the routed repository pins
- * its head decision per instance — which is only safe because EVERY gated
- * read the collector performs goes through `beginPass()`, a fresh instance
- * per snapshot (binding tier and resource tier alike). A gated read taken on
- * this instance directly would pin its organization's head until the pod
- * restarted, and the rollback lever would stop working for it.
+ * COLLECT policies over the grants projection. Migration status remains
+ * available to the migration runner and compatibility writes, while runtime
+ * authorization decisions use one head consistently.
  */
 export const authzCollector = new AuthzCollectorService(
-  new CutoverAwareAuthzReadRepository(prisma),
+  new GrantsAuthzReadRepository(prisma),
 );
 
 /**

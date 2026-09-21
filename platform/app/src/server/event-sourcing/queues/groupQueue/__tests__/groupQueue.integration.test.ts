@@ -244,7 +244,90 @@ describe.skipIf(!hasTestcontainers)(
       );
 
       await expect(queue.waitUntilPreflightIdle()).rejects.toThrow(
-        "failed and 0 blocked",
+        "failed: owned",
+      );
+    });
+
+    /** @scenario "A group wedged before the preflight does not refuse startup" */
+    it("settles past a group that was already blocked when the preflight adopted it", async () => {
+      const name = `{test/gqmain/${crypto.randomUUID().slice(0, 8)}}`;
+      const processed: string[] = [];
+      const definition = createQueueDefinition({
+        name,
+        process: async (payload) => {
+          processed.push(payload.groupId);
+        },
+      });
+      // The wedge the previous release left: blocked, its failed job restaged,
+      // and an error hash that nothing but a later success ever clears.
+      await redis.sadd(`${name}:gq:blocked`, "wedged");
+      await redis.hset(
+        `${name}:gq:group:wedged:error`,
+        "message",
+        "failed under the previous release",
+        "timestamp",
+        "1",
+      );
+      await redis.zadd(`${name}:gq:group:wedged:jobs`, 1, "stale-job");
+
+      const preflight = new GroupQueueProcessor(definition, redis, {
+        dispatchGroupAllowListKey: `${name}:gq:test-allow-list`,
+      });
+      queues.push(preflight);
+      await preflight.registerPreflightGroups(() => ["wedged"]);
+      await preflight.send({ id: "owned", groupId: "owned", value: "x" });
+
+      await expect(preflight.waitUntilPreflightIdle()).resolves.toBeUndefined();
+      expect(processed).toEqual(["owned"]);
+      // Booting past it is not triaging it: the group stays exactly as wedged.
+      expect(await redis.sismember(`${name}:gq:blocked`, "wedged")).toBe(1);
+      expect(await redis.zcard(`${name}:gq:group:wedged:jobs`)).toBe(1);
+    });
+
+    it("refuses when a group the preflight adopted clean fails under it", async () => {
+      const name = `{test/gqmain/${crypto.randomUUID().slice(0, 8)}}`;
+      const definition = createQueueDefinition({
+        name,
+        process: async () => {},
+      });
+      const preflight = new GroupQueueProcessor(definition, redis, {
+        dispatchGroupAllowListKey: `${name}:gq:test-allow-list`,
+      });
+      queues.push(preflight);
+
+      await preflight.registerPreflightGroups(() => ["doomed"]);
+      await redis.hset(
+        `${name}:gq:group:doomed:error`,
+        "message",
+        "boom",
+        "timestamp",
+        "99",
+      );
+
+      await expect(preflight.waitUntilPreflightIdle()).rejects.toThrow(
+        "failed: doomed",
+      );
+    });
+
+    it("distinguishes a stale error key from a failure under the preflight on the same group", async () => {
+      const name = `{test/gqmain/${crypto.randomUUID().slice(0, 8)}}`;
+      const errorKey = `${name}:gq:group:stale:error`;
+      const definition = createQueueDefinition({
+        name,
+        process: async () => {},
+      });
+      const preflight = new GroupQueueProcessor(definition, redis, {
+        dispatchGroupAllowListKey: `${name}:gq:test-allow-list`,
+      });
+      queues.push(preflight);
+
+      await redis.hset(errorKey, "message", "old", "timestamp", "1");
+      await preflight.registerPreflightGroups(() => ["stale"]);
+      await expect(preflight.waitUntilPreflightIdle()).resolves.toBeUndefined();
+
+      await redis.hset(errorKey, "message", "new", "timestamp", "2");
+      await expect(preflight.waitUntilPreflightIdle()).rejects.toThrow(
+        "failed: stale",
       );
     });
 

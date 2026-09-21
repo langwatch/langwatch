@@ -22,21 +22,27 @@ vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    resolveProjectPermission: vi.fn(
-      async (_ctx: unknown, _projectId: string, permission: string) => {
-        seenPermissions.push(permission);
-        return {
-          permitted: !denied.has(permission),
-          organizationRole: "MEMBER",
-        };
-      },
-    ),
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      resolveProjectPermission: vi.fn(
+        async (_ctx: unknown, _projectId: string, permission: string) => {
+          seenPermissions.push(permission);
+          return {
+            permitted: !denied.has(permission),
+            organizationRole: "MEMBER",
+          };
+        },
+      ),
+    };
+  },
+);
 
 const readSpendEventsPage = vi.hoisted(() => vi.fn());
 

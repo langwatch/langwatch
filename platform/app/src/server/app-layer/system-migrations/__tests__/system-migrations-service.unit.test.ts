@@ -13,6 +13,7 @@ import {
 import {
   type SystemMigrationEnrollmentStore,
   SystemMigrationsService,
+  type SystemMigrationTarget,
 } from "../system-migrations.service";
 
 const MIGRATION = "team-user-backfill";
@@ -79,12 +80,7 @@ function enrollmentStoreStub() {
 
 function targetedPassStub() {
   return vi
-    .fn<
-      (args: {
-        organizationId: string;
-        migrationName: string;
-      }) => Promise<MigrationPassSummary>
-    >()
+    .fn<(args: SystemMigrationTarget) => Promise<MigrationPassSummary>>()
     .mockResolvedValue({
       tenantsSeen: 1,
       finalized: 1,

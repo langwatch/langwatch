@@ -8,6 +8,7 @@
  * Before the RoleBinding-aware check, such a delete slipped past the in-use
  * guard and failed (or dangled) at the storage layer instead of being named.
  */
+
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -21,8 +22,12 @@ import { prisma } from "~/server/db";
 import { RoleService } from "~/server/role";
 import { RoleInUseError } from "~/server/role/errors";
 import { RoleRepository } from "~/server/role/repositories/role.repository";
+import { seedCustomRole, seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { KSUID_RESOURCES } from "~/utils/constants";
+
+wireDefaultTestApp();
 
 describe("RoleService.deleteRole, given a role referenced by role bindings", () => {
   const ns = `role-delete-${nanoid(8)}`;
@@ -49,26 +54,22 @@ describe("RoleService.deleteRole, given a role referenced by role bindings", () 
       },
     });
 
-    const boundRole = await prisma.customRole.create({
-      data: {
-        name: `bound-role-${ns}`,
-        organizationId: testOrganization.id,
-        permissions: ["project:view"],
-        kind: "custom",
-      },
+    const boundRole = await seedCustomRole(prisma, {
+      name: `bound-role-${ns}`,
+      organizationId: testOrganization.id,
+      permissions: ["project:view"],
+      kind: "custom",
     });
     boundRoleId = boundRole.id;
 
-    await prisma.roleBinding.create({
-      data: {
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId: testOrganization.id,
-        userId,
-        role: TeamUserRole.CUSTOM,
-        customRoleId: boundRoleId,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: testOrganization.id,
-      },
+    await seedRoleBinding(prisma, {
+      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+      organizationId: testOrganization.id,
+      userId,
+      role: TeamUserRole.CUSTOM,
+      customRoleId: boundRoleId,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: testOrganization.id,
     });
   });
 
@@ -78,7 +79,9 @@ describe("RoleService.deleteRole, given a role referenced by role bindings", () 
     // the real setup failure in the report.
     if (!testOrganization?.id) return;
     await cleanupTestRows(prisma, [
+      ["grant", { organizationId: testOrganization.id }],
       ["roleBinding", { organizationId: testOrganization.id }],
+      ["role", { organizationId: testOrganization.id }],
       ["customRole", { organizationId: testOrganization.id }],
       ["organizationUser", { organizationId: testOrganization.id }],
       ...(userId ? ([["user", { id: userId }]] as const) : []),
@@ -146,25 +149,21 @@ describe("RoleService.deleteRole, given a role referenced by role bindings", () 
     const foreignOrganization = await prisma.organization.create({
       data: { name: "Foreign Org", slug: `--test-foreign-${ns}` },
     });
-    const role = await prisma.customRole.create({
-      data: {
-        name: `cross-org-role-${ns}`,
-        organizationId: testOrganization.id,
-        permissions: ["project:view"],
-        kind: "custom",
-      },
+    const role = await seedCustomRole(prisma, {
+      name: `cross-org-role-${ns}`,
+      organizationId: testOrganization.id,
+      permissions: ["project:view"],
+      kind: "custom",
     });
     const bindingId = generate(KSUID_RESOURCES.ROLE_BINDING).toString();
-    await prisma.roleBinding.create({
-      data: {
-        id: bindingId,
-        organizationId: foreignOrganization.id,
-        userId,
-        role: TeamUserRole.CUSTOM,
-        customRoleId: role.id,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: foreignOrganization.id,
-      },
+    await seedRoleBinding(prisma, {
+      id: bindingId,
+      organizationId: foreignOrganization.id,
+      userId,
+      role: TeamUserRole.CUSTOM,
+      customRoleId: role.id,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: foreignOrganization.id,
     });
 
     try {
@@ -191,13 +190,11 @@ describe("RoleService.deleteRole, given a role referenced by role bindings", () 
   });
 
   it("still deletes a role nothing references", async () => {
-    const unboundRole = await prisma.customRole.create({
-      data: {
-        name: `unbound-role-${ns}`,
-        organizationId: testOrganization.id,
-        permissions: ["project:view"],
-        kind: "custom",
-      },
+    const unboundRole = await seedCustomRole(prisma, {
+      name: `unbound-role-${ns}`,
+      organizationId: testOrganization.id,
+      permissions: ["project:view"],
+      kind: "custom",
     });
 
     const service = new RoleService(prisma);
