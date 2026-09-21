@@ -78,9 +78,8 @@ export async function installInstanceId(prisma: PrismaClient): Promise<string> {
  * The identity this install already holds, or null where it has never minted
  * one.
  *
- * What a reader asks for. A lease can only exist after a sync, and a sync only
- * happens after the identity was minted, so a path that is only checking a
- * lease has nothing to gain from minting one and no business writing to the
+ * What a reader asks for. A path that only reports where the install stands
+ * has nothing to gain from minting an identity and no business writing to the
  * database.
  */
 export async function readInstanceId(

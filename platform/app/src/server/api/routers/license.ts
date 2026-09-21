@@ -7,6 +7,7 @@ import { z } from "zod";
 import { env } from "~/env.mjs";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { prisma } from "~/server/db";
+import { syncLicenseNow } from "~/server/licenseSyncWorker";
 import { getLicenseHandler } from "~/server/subscriptionHandler";
 import type { LicenseStatus } from "../../../../ee/licensing";
 import { licenseValidationError } from "../../../../ee/licensing/errors";
@@ -142,6 +143,22 @@ export const licenseRouter = createTRPCRouter({
       if (!result.success) throw licenseValidationError(result.error);
 
       return { success: true, planInfo: result.planInfo };
+    }),
+
+  /**
+   * Syncs the license with LangWatch now, so a seat change or a renewal made
+   * on the registry reaches this install without waiting for the daily pass.
+   * Answers with what changed; a refusal from the host is thrown as its code.
+   */
+  refresh: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string().min(1),
+      }),
+    )
+    .permission("organization:manage")
+    .mutation(async ({ input }) => {
+      return await syncLicenseNow({ organizationId: input.organizationId });
     }),
 
   /**

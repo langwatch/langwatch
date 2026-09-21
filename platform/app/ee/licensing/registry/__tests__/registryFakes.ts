@@ -7,12 +7,9 @@ import type {
   CustomerOrganizationPort,
   IssuedLicenseRecord,
   IssuedLicenseRepository,
+  SeatChangeBillingOutcome,
+  SeatChangeBillingPort,
 } from "../issuedLicense";
-import type {
-  LicenseSeatQuarterKey,
-  LicenseSeatReportRecord,
-  LicenseSeatReportRepository,
-} from "../seatReports";
 
 export class InMemoryIssuedLicenseRepository
   implements IssuedLicenseRepository
@@ -151,65 +148,6 @@ export class InMemoryIssuedLicenseRepository
   }
 }
 
-export class InMemoryLicenseSeatReports implements LicenseSeatReportRepository {
-  rows: LicenseSeatReportRecord[] = [];
-  private sequence = 0;
-
-  // Raises the peak the way the `GREATEST` upsert does, so a later, lower
-  // report leaves the quarter's figure alone.
-  async recordPeak({
-    licenseId,
-    quarterStartsAt,
-    members,
-    membersLite,
-    at,
-  }: {
-    licenseId: string;
-    quarterStartsAt: Date;
-    members: number;
-    membersLite: number;
-    at: Date;
-  }) {
-    const existing = this.rows.find(
-      (row) =>
-        row.licenseId === licenseId &&
-        row.quarterStartsAt.getTime() === quarterStartsAt.getTime(),
-    );
-    if (existing) {
-      existing.peakMembers = Math.max(existing.peakMembers, members);
-      existing.peakMembersLite = Math.max(
-        existing.peakMembersLite,
-        membersLite,
-      );
-      existing.lastReportedAt = at;
-      return { ...existing };
-    }
-    const row: LicenseSeatReportRecord = {
-      id: `lsr_${++this.sequence}`,
-      licenseId,
-      quarterStartsAt,
-      peakMembers: members,
-      peakMembersLite: membersLite,
-      firstReportedAt: at,
-      lastReportedAt: at,
-    };
-    this.rows.push(row);
-    return { ...row };
-  }
-
-  async findByQuarters(keys: LicenseSeatQuarterKey[]) {
-    return this.rows
-      .filter((row) =>
-        keys.some(
-          (key) =>
-            key.licenseId === row.licenseId &&
-            key.quarterStartsAt.getTime() === row.quarterStartsAt.getTime(),
-        ),
-      )
-      .map((row) => ({ ...row }));
-  }
-}
-
 export class InMemoryCustomerOrganizations implements CustomerOrganizationPort {
   organizations = new Map<
     string,
@@ -237,6 +175,18 @@ export class InMemoryCustomerOrganizations implements CustomerOrganizationPort {
   async markSelfHostedCustomer(id: string) {
     const organization = this.organizations.get(id);
     if (organization) organization.selfHostedCustomer = true;
+  }
+}
+
+export class RecordingSeatBilling implements SeatChangeBillingPort {
+  invoiced: Parameters<SeatChangeBillingPort["invoiceAddedSeats"]>[0][] = [];
+  answer: SeatChangeBillingOutcome = "invoiced";
+
+  async invoiceAddedSeats(
+    params: Parameters<SeatChangeBillingPort["invoiceAddedSeats"]>[0],
+  ) {
+    this.invoiced.push(params);
+    return this.answer;
   }
 }
 

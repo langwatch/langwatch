@@ -3,24 +3,20 @@ import { HStack, Text, VStack } from "@chakra-ui/react";
 import { SettingsSection } from "~/components/settings/SettingsSection";
 import { resolveErrorCopy } from "~/features/errors";
 
-import {
-  type ConnectEnabledView,
-  formatPeriodStart,
-  type SeatLeaseView,
-} from "./connectStatus";
+import { type ConnectEnabledView, formatPeriodStart } from "./connectStatus";
 
 interface ConnectSyncSectionProps {
   status: ConnectEnabledView;
 }
 
 /**
- * Where the daily license sync stands, and what the lease it brought back
- * allows.
+ * Where the daily license sync stands.
  *
- * Every member sees this, not only admins: the answer to "why was I refused a
- * seat" and "why did judging stop" lives here, and neither question is
- * privileged. A failure is shown from the first one, so an outbound rule can
- * be fixed long before the allowance runs out.
+ * Every member sees this, not only admins: the answer to "why did judging
+ * stop" lives here, and that question is not privileged. A failure is shown
+ * from the first one, so an outbound rule can be fixed before a seat change
+ * or a renewal is waiting on the sync. Running the sync by hand is on the
+ * License page, beside the seats it changes.
  *
  * Spec: specs/self-hosting/connected-services/license-sync.feature
  */
@@ -36,7 +32,7 @@ export function ConnectSyncSection({ status }: ConnectSyncSectionProps) {
   return (
     <SettingsSection
       title="License sync"
-      description="Once a day this install reports its seats in use to LangWatch and receives what your license allows."
+      description="Once a day this install reports its seats in use to LangWatch and picks up a reissued license when one is waiting."
       testId="connect-sync"
     >
       <VStack width="full" align="stretch" gap={4}>
@@ -47,7 +43,6 @@ export function ConnectSyncSection({ status }: ConnectSyncSectionProps) {
               formatPeriodStart(sync.lastSyncAt) ?? "It has not synced yet"
             }
           />
-          <SeatAllowance lease={sync.lease} />
         </HStack>
         {copy ? (
           <VStack
@@ -69,53 +64,9 @@ export function ConnectSyncSection({ status }: ConnectSyncSectionProps) {
             ) : null}
           </VStack>
         ) : null}
-        <LeaseNote lease={sync.lease} />
       </VStack>
     </SettingsSection>
   );
-}
-
-function SeatAllowance({ lease }: { lease: SeatLeaseView | null }) {
-  if (!lease || lease.state === "expired") {
-    return (
-      <Figure
-        label="Seats over your license"
-        value="None, the licensed count"
-      />
-    );
-  }
-  return (
-    <Figure
-      label="Seats over your license"
-      value={`${lease.seatOverageAllowance} extra`}
-    />
-  );
-}
-
-/** Said only while there is something an administrator has to act on. */
-function LeaseNote({ lease }: { lease: SeatLeaseView | null }) {
-  if (!lease) return null;
-
-  if (lease.state === "warning") {
-    const day = formatPeriodStart(lease.validUntil);
-    return (
-      <Text fontSize="sm" color="fg.muted" data-testid="connect-lease-warning">
-        Sync has been failing for a while. The extra seats will be withdrawn on{" "}
-        {day}, and this install goes back to the seats your license covers.
-      </Text>
-    );
-  }
-
-  if (lease.state === "expired") {
-    return (
-      <Text fontSize="sm" color="fg.muted" data-testid="connect-lease-expired">
-        The extra seats were withdrawn on {formatPeriodStart(lease.validUntil)}.
-        They come back on the next successful sync.
-      </Text>
-    );
-  }
-
-  return null;
 }
 
 function Figure({ label, value }: { label: string; value: string }) {

@@ -8,8 +8,8 @@ import {
   InMemoryConnectManagedKeys,
   InMemoryCustomerOrganizations,
   InMemoryIssuedLicenseRepository,
-  InMemoryLicenseSeatReports,
   RecordingContractBudgets,
+  RecordingSeatBilling,
 } from "../registryFakes";
 
 export const NOW = new Date("2026-09-19T12:00:00.000Z");
@@ -38,16 +38,16 @@ export function buildService({
   signing?: "configured" | "unconfigured";
 } = {}) {
   const repository = new InMemoryIssuedLicenseRepository(NOW);
-  const seatReports = new InMemoryLicenseSeatReports();
   const organizations = new InMemoryCustomerOrganizations();
   const managedKeys = new InMemoryConnectManagedKeys();
   const contractBudgets = new RecordingContractBudgets();
+  const seatBilling = new RecordingSeatBilling();
   const service = new LicenseRegistryService({
     repository,
-    seatReports,
     organizations,
     managedKeys,
     contractBudgets,
+    seatBilling,
     signingKey: () =>
       signing === "configured" ? langwatchKeys.privateKey : undefined,
     publicKey: langwatchKeys.publicKey,
@@ -57,10 +57,10 @@ export function buildService({
   return {
     service,
     repository,
-    seatReports,
     organizations,
     managedKeys,
     contractBudgets,
+    seatBilling,
   };
 }
 

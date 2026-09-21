@@ -60,7 +60,7 @@ const WHY_PUBLIC =
  *
  * Headers: `Authorization: Bearer lwl_<64 hex>`, `X-LangWatch-Instance: <id>`.
  * Body: `{version, seats: {members, liteMembers}}` and nothing else.
- * Answers `{lease, license?}`.
+ * Answers `{services, license?}`.
  */
 secured
   .access(publicEndpoint(WHY_PUBLIC))
@@ -75,7 +75,7 @@ secured
       });
       if (!result.ok) return refuse(c, result.code);
       return c.json({
-        lease: result.lease,
+        services: result.services,
         ...(result.license ? { license: result.license } : {}),
       });
     },

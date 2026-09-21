@@ -259,10 +259,10 @@ describe("LicenseRegistryService", () => {
       it("reads as expired without the row having been edited", async () => {
         const later = new LicenseRegistryService({
           repository: context.repository,
-          seatReports: context.seatReports,
           organizations: context.organizations,
           managedKeys: context.managedKeys,
           contractBudgets: context.contractBudgets,
+          seatBilling: context.seatBilling,
           signingKey: () => langwatchKeys.privateKey,
           publicKey: langwatchKeys.publicKey,
           encrypt: (plain) => plain,
@@ -277,10 +277,10 @@ describe("LicenseRegistryService", () => {
       it("can still be reissued, which is how a lapsed license is renewed", async () => {
         const later = new LicenseRegistryService({
           repository: context.repository,
-          seatReports: context.seatReports,
           organizations: context.organizations,
           managedKeys: context.managedKeys,
           contractBudgets: context.contractBudgets,
+          seatBilling: context.seatBilling,
           signingKey: () => langwatchKeys.privateKey,
           publicKey: langwatchKeys.publicKey,
           encrypt: (plain) => plain,
@@ -379,11 +379,10 @@ describe("LicenseRegistryService", () => {
 
     describe("when an operator sets the commercial terms", () => {
       /** @scenario Commercial terms are set on the registry row */
-      it("records the allowance, seat rate, commit, overage switch and maximum", async () => {
+      it("records the seat rate, commit, overage switch and maximum", async () => {
         const updated = await context.service.updateTerms({
           id: licenseId,
           operatorId: OPERATOR,
-          seatOverageAllowance: 5,
           seatRateCents: 60_000,
           seatCurrency: "USD",
           commitUsdCents: 100_000,
@@ -392,8 +391,6 @@ describe("LicenseRegistryService", () => {
         });
 
         expect(updated).toMatchObject({
-          seatOverageAllowance: 5,
-          effectiveSeatOverageAllowance: 5,
           seatRateCents: 60_000,
           seatCurrency: "USD",
           commitUsdCents: 100_000,

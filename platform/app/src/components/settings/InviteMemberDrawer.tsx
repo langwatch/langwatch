@@ -9,7 +9,6 @@ import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { api } from "../../utils/api";
 import { AddMembersForm } from "../AddMembersForm";
 import { Drawer } from "../ui/drawer";
-import { SeatOverLicenseNotice } from "./SeatOverLicenseNotice";
 
 /**
  * Invite teammates from a URL-routed drawer (see drawers.md) instead of a
@@ -78,12 +77,6 @@ export function InviteMemberDrawer({
           <Drawer.CloseTrigger onClick={closeDrawer} />
         </Drawer.Header>
         <Drawer.Body>
-          {organization && (
-            <SeatOverLicenseNotice
-              organizationId={organization.id}
-              activePlan={activePlan.data}
-            />
-          )}
           {organization && (
             <AddMembersForm
               teamOptions={teamOptions}

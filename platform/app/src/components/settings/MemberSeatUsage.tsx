@@ -1,10 +1,9 @@
-import { SimpleGrid, Text, VStack } from "@chakra-ui/react";
+import { SimpleGrid, VStack } from "@chakra-ui/react";
 
 import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import { LIMIT_TYPE_DISPLAY_LABELS } from "../../server/license-enforcement/constants";
 import { api } from "../../utils/api";
 import { ResourceLimitRow } from "../license/ResourceLimitRow";
-import { readSeatOverage, seatOverageSentence } from "./seatOverage";
 
 /**
  * Where the organization stands on each kind of seat, on the page where seats
@@ -17,12 +16,7 @@ import { readSeatOverage, seatOverageSentence } from "./seatOverage";
  * save. Same counts and the same row component as the usage page, so the two
  * never disagree.
  *
- * A connected install can be over its licensed seats on purpose, within the
- * allowance its lease carries, and those seats cost money at the next
- * quarterly true-up. That is said here rather than left for the invoice.
- *
  * Spec: specs/licensing/seat-reconciliation.feature
- * Spec: specs/self-hosting/connected-services/license-sync.feature
  */
 export function MemberSeatUsage({
   organizationId,
@@ -38,11 +32,6 @@ export function MemberSeatUsage({
 
   if (!usage.data) return null;
 
-  const overage = readSeatOverage({
-    plan: activePlan,
-    membersCount: usage.data.membersCount,
-  });
-
   return (
     <VStack width="full" maxWidth="2xl" align="stretch" gap={2}>
       <SimpleGrid columns={{ base: 1, md: 2 }} gap={3} width="full">
@@ -57,11 +46,6 @@ export function MemberSeatUsage({
           max={activePlan.maxMembersLite}
         />
       </SimpleGrid>
-      {overage ? (
-        <Text fontSize="sm" color="fg.muted" data-testid="seat-overage">
-          {seatOverageSentence(overage)}
-        </Text>
-      ) : null}
     </VStack>
   );
 }

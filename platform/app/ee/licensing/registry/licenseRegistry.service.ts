@@ -29,17 +29,17 @@ import {
   LicenseSigningNotConfiguredError,
 } from "./errors";
 import {
-  type IssuedLicenseBrowseView,
   type IssuedLicenseRecord,
   type IssuedLicenseSource,
   type IssuedLicenseView,
   type LicenseCustomer,
   type LicenseRegistryDependencies,
   type LicenseTermsInput,
+  type SeatChangeBillingOutcome,
   statusOfIssuedLicense,
 } from "./issuedLicense";
 import { createIssuedLicenseRow, isUniqueViolation } from "./issuedLicenseRows";
-import { browseIssuedLicenses, issuedLicenseView } from "./issuedLicenseViews";
+import { issuedLicenseView } from "./issuedLicenseViews";
 import { resolveLicenseCustomer } from "./licenseCustomers";
 import { retireManagedKeyOf, syncContractBudgetOf } from "./licenseSideEffects";
 import { resolveLicenseTerms } from "./licenseTerms";
@@ -201,13 +201,85 @@ export class LicenseRegistryService {
     expiresAt: Date;
     operatorId: string;
   }): Promise<{ licenseKey: string; license: IssuedLicenseView }> {
-    const privateKey = this.requireSigningKey();
     const current = await this.requireRow(input.id);
     const status = statusOfIssuedLicense(current, this.now());
     // Expired is allowed: renewing after a lapse is the common renewal.
     if (status === "revoked" || status === "superseded") {
       throw new IssuedLicenseNotActiveError(status);
     }
+    const row = await this.signReplacement({ current, ...input });
+    return { licenseKey: row.licenseKey, license: this.toView(row.row) };
+  }
+
+  /**
+   * Changes the seats of a running license: a replacement is signed for the
+   * same term, and the install picks it up on its next sync or when an admin
+   * presses refresh. Seats that went up are invoiced prorated to the end of
+   * the term; seats that went down are not credited.
+   *
+   * Only an active license can change seats mid-term. A lapsed one is renewed
+   * through `reissue`, where the new term's seats go on the annual invoice.
+   */
+  async changeSeats(input: {
+    id: string;
+    maxMembers: number;
+    operatorId: string;
+  }): Promise<{
+    licenseKey: string;
+    license: IssuedLicenseView;
+    previousMaxMembers: number;
+    billing: SeatChangeBillingOutcome;
+  }> {
+    const current = await this.requireRow(input.id);
+    const status = statusOfIssuedLicense(current, this.now());
+    if (status !== "active") throw new IssuedLicenseNotActiveError(status);
+
+    const { licenseKey, row } = await this.signReplacement({
+      current,
+      maxMembers: input.maxMembers,
+      expiresAt: current.expiresAt,
+      operatorId: input.operatorId,
+    });
+
+    // The license is signed and recorded before anything is invoiced, so a
+    // billing failure leaves a customer with seats and an intent row to retry,
+    // never an invoice for seats they never got.
+    const billing =
+      row.organizationId && input.maxMembers > current.maxMembers
+        ? await this.deps.seatBilling.invoiceAddedSeats({
+            organizationId: row.organizationId,
+            licenseRowId: row.id,
+            previousSeats: current.maxMembers,
+            seats: input.maxMembers,
+            operatorId: input.operatorId,
+          })
+        : "nothing_to_invoice";
+
+    return {
+      licenseKey,
+      license: this.toView(row),
+      previousMaxMembers: current.maxMembers,
+      billing,
+    };
+  }
+
+  /**
+   * Signs a replacement for `current` and records it as waiting for delivery.
+   * The replaced license stays valid until the install presents the new one,
+   * because it is what authenticates the sync that delivers it, and the new
+   * license inherits the instance binding so a reissued license that leaks
+   * cannot be bound by another install first.
+   */
+  private async signReplacement(input: {
+    current: IssuedLicenseRecord;
+    maxMembers?: number;
+    maxMembersLite?: number;
+    maxMessagesPerMonth?: number;
+    expiresAt: Date;
+    operatorId: string;
+  }): Promise<{ licenseKey: string; row: IssuedLicenseRecord }> {
+    const privateKey = this.requireSigningKey();
+    const { current } = input;
 
     const { licenseKey } = generateLicenseKey({
       organizationName: current.organizationName,
@@ -233,7 +305,6 @@ export class LicenseRegistryService {
           replacesId: current.id,
           pendingDeliveryLicense: this.deps.encrypt(licenseKey),
           services: current.services,
-          seatOverageAllowance: current.seatOverageAllowance,
           seatRateCents: current.seatRateCents,
           seatCurrency: current.seatCurrency,
           commitUsdCents: current.commitUsdCents,
@@ -248,7 +319,7 @@ export class LicenseRegistryService {
       if (isUniqueViolation(error)) throw new LicenseAlreadyReissuedError();
       throw error;
     }
-    return { licenseKey, license: this.toView(row) };
+    return { licenseKey, row };
   }
 
   async resetInstanceBinding(input: {
@@ -316,29 +387,17 @@ export class LicenseRegistryService {
     return this.toView(updated);
   }
 
-  async getById(input: { id: string }): Promise<IssuedLicenseBrowseView> {
-    const [license] = await this.browseRows([await this.requireRow(input.id)]);
-    if (!license) throw new IssuedLicenseNotFoundError();
-    return license;
+  async getById(input: { id: string }): Promise<IssuedLicenseView> {
+    return this.toView(await this.requireRow(input.id));
   }
 
   async getAll(input: {
     page: number;
     pageSize: number;
     search?: string;
-  }): Promise<{ licenses: IssuedLicenseBrowseView[]; total: number }> {
+  }): Promise<{ licenses: IssuedLicenseView[]; total: number }> {
     const { rows, total } = await this.deps.repository.findAll(input);
-    return { licenses: await this.browseRows(rows), total };
-  }
-
-  private browseRows(
-    rows: IssuedLicenseRecord[],
-  ): Promise<IssuedLicenseBrowseView[]> {
-    return browseIssuedLicenses({
-      rows,
-      seatReports: this.deps.seatReports,
-      now: this.now(),
-    });
+    return { licenses: rows.map((row) => this.toView(row)), total };
   }
 
   private toView(row: IssuedLicenseRecord): IssuedLicenseView {

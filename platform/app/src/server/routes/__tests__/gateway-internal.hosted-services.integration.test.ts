@@ -26,7 +26,6 @@ import { PrismaConnectManagedKeys } from "@ee/licensing/registry/connectManagedK
 import {
   PrismaCustomerOrganizations,
   PrismaIssuedLicenseRepository,
-  PrismaLicenseSeatReports,
 } from "@ee/licensing/registry/issuedLicense.prisma";
 import { LicenseRegistryService } from "@ee/licensing/registry/licenseRegistry.service";
 import { nanoid } from "nanoid";
@@ -125,7 +124,7 @@ describe("hosted services on the gateway's control plane route (real PG)", () =>
   const previous: Record<string, string | undefined> = {};
   const registry = new LicenseRegistryService({
     repository: new PrismaIssuedLicenseRepository(prisma),
-    seatReports: new PrismaLicenseSeatReports(prisma),
+    seatBilling: { invoiceAddedSeats: async () => "not_onboarded" },
     organizations: new PrismaCustomerOrganizations(prisma),
     managedKeys: new PrismaConnectManagedKeys(prisma),
     contractBudgets: createContractBudgetService(prisma),

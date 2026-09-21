@@ -20,7 +20,6 @@ import {
   ConnectLicenseRequiredError,
   ConnectServiceNotEntitledError,
 } from "../errors";
-import type { LeaseState } from "../lease";
 import { type ConnectConfig, readConnectConfig } from "./connectConfig";
 import { resolveConnectCredential } from "./connectCredential";
 import { licenseConnectServices } from "./connectEntitlement";
@@ -31,8 +30,6 @@ import {
   getConnectGatewayClient,
 } from "./connectGatewayClient";
 import type { ConnectCredential } from "./connectTransport";
-import { readInstalledLease } from "./installedLease";
-import { readInstanceId } from "./instanceIdentity";
 
 /** What a refused read came back as, for the page to render. */
 export interface ConnectRefusal {
@@ -40,19 +37,10 @@ export interface ConnectRefusal {
   readonly meta?: unknown;
 }
 
-/** The lease the last sync left, as the page reads it. */
-export interface ConnectLeaseView {
-  readonly seatOverageAllowance: number;
-  readonly warnAfter: string;
-  readonly validUntil: string;
-  readonly state: LeaseState;
-}
-
 /** Where the daily license sync stands (ADR-141, section 6). */
 export interface ConnectSyncView {
   readonly lastSyncAt: string | null;
   readonly lastError: { readonly code: string } | null;
-  readonly lease: ConnectLeaseView | null;
 }
 
 export type ConnectStatus =
@@ -101,7 +89,7 @@ export class ConnectSettingsService {
       deployment: "on",
       gatewayHost: new URL(config.gatewayEndpoint).host,
       enabledServices: entitled.filter((service) => !disabled.has(service)),
-      sync: await this.syncOf(organization),
+      sync: syncOf(organization),
     } as const;
 
     if (!credential) {
@@ -229,62 +217,26 @@ export class ConnectSettingsService {
       select: {
         connectServicesDisabled: true,
         license: true,
-        connectLease: true,
         connectLastSyncAt: true,
         connectLastSyncError: true,
       },
     });
-  }
-
-  /**
-   * Where the daily sync stands, for the page to say so.
-   *
-   * The lease is read through the same check the plan reads it through, so
-   * what the page shows and what the seat guard enforces can not disagree. An
-   * expired lease is still reported, because "the allowance was withdrawn on
-   * this day" is the answer an admin is looking for.
-   */
-  private async syncOf(
-    organization: ConnectOrganizationRow | null,
-  ): Promise<ConnectSyncView> {
-    const licenseKey = organization?.license ?? null;
-    // Read, never mint: opening a settings page is not a reason to give this
-    // install an identity it has not needed yet.
-    const instanceId = licenseKey
-      ? await readInstanceId(this.deps.prisma)
-      : null;
-    const installed =
-      licenseKey && instanceId
-        ? readInstalledLease({
-            licenseKey,
-            lease: organization?.connectLease,
-            instanceId,
-            publicKey: this.deps.publicKey ?? PUBLIC_KEY,
-            now: this.deps.now?.() ?? new Date(),
-          })
-        : null;
-
-    return {
-      lastSyncAt: organization?.connectLastSyncAt?.toISOString() ?? null,
-      lastError: organization?.connectLastSyncError
-        ? { code: organization.connectLastSyncError }
-        : null,
-      lease: installed
-        ? {
-            seatOverageAllowance: installed.payload.seatOverageAllowance,
-            warnAfter: installed.payload.warnAfter,
-            validUntil: installed.payload.validUntil,
-            state: installed.state,
-          }
-        : null,
-    };
   }
 }
 
 interface ConnectOrganizationRow {
   connectServicesDisabled: string[];
   license: string | null;
-  connectLease: unknown;
   connectLastSyncAt: Date | null;
   connectLastSyncError: string | null;
+}
+
+/** Where the daily sync stands, for the page to say so. */
+function syncOf(organization: ConnectOrganizationRow | null): ConnectSyncView {
+  return {
+    lastSyncAt: organization?.connectLastSyncAt?.toISOString() ?? null,
+    lastError: organization?.connectLastSyncError
+      ? { code: organization.connectLastSyncError }
+      : null,
+  };
 }

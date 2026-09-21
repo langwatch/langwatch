@@ -59,16 +59,12 @@ const NOW = new Date("2026-09-19T12:00:00.000Z");
  * Any other model, the registry included, throws on access, which is how this
  * test proves the offline path never looks at the registry.
  */
-function offlinePrisma(
-  licenseKey: string | null,
-  connectLease: unknown = null,
-) {
+function offlinePrisma(licenseKey: string | null) {
   const organization = {
     findUnique: vi.fn(async () => ({
       id: ORG,
       name: "ACME Offline",
       license: licenseKey,
-      connectLease,
     })),
   };
   return new Proxy(
@@ -167,25 +163,10 @@ describe("a license minted by main before this change", () => {
       expect(plan.maxMembersLite).toBe(fixture.expected.plan.maxMembersLite);
     });
 
-    it("carries no allowance and reads no lease", async () => {
-      // A lease on the row is not enough on its own. This license names no
-      // hosted service, so it never synced, so nothing in that column can be
-      // a lease LangWatch signed for it: the plan is the plain licensed one
-      // and no other table is read to decide that.
-      const withLease = new LicenseHandler({
-        prisma: offlinePrisma(fixture.licenseKey, {
-          payload: { seatOverageAllowance: 500 },
-          signature: "whatever",
-        }),
-        publicKey: fixture.publicKey,
-        repository: repositoryWith(0),
-      });
-
-      const plan = await withLease.getSelfHostedPlan(ORG);
+    it("resolves the seat count signed into the license and no other table", async () => {
+      const plan = await handler(0).getSelfHostedPlan(ORG);
 
       expect(plan.maxMembers).toBe(fixture.expected.plan.maxMembers);
-      expect(plan.licensedMembers).toBeUndefined();
-      expect(plan.seatOverageAllowance).toBeUndefined();
     });
 
     it("reports the same license status", async () => {
@@ -429,7 +410,7 @@ describe("an install upgraded with no Connect configuration", () => {
 /**
  * Everything that runs inside an install: reading and verifying its license,
  * and enforcing the numbers that license sold. `connect/install` is on this
- * list because it too runs inside the install, on the lease a sync left there.
+ * list because it too runs inside the install, on the license a sync left there.
  */
 const OFFLINE_LICENSE_DIRECTORIES = [
   "../",

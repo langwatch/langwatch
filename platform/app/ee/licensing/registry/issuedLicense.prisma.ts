@@ -11,11 +11,6 @@ import type {
   IssuedLicenseRecord,
   IssuedLicenseRepository,
 } from "./issuedLicense";
-import type {
-  LicenseSeatQuarterKey,
-  LicenseSeatReportRecord,
-  LicenseSeatReportRepository,
-} from "./seatReports";
 
 /**
  * A transaction client carries the same model methods, so a caller that needs
@@ -158,71 +153,6 @@ export class PrismaIssuedLicenseRepository implements IssuedLicenseRepository {
          AND "expiresAt" > ${requires.activeAt}
     `;
     return updated === 1;
-  }
-}
-
-export class PrismaLicenseSeatReports implements LicenseSeatReportRepository {
-  constructor(private readonly prisma: RegistryClient) {}
-
-  /**
-   * One statement, so two syncs arriving together cannot each read the old
-   * peak and write the lower of the two figures back. `GREATEST` is what makes
-   * the write idempotent: replaying a day's report changes nothing.
-   */
-  async recordPeak({
-    licenseId,
-    quarterStartsAt,
-    members,
-    membersLite,
-    at,
-  }: {
-    licenseId: string;
-    quarterStartsAt: Date;
-    members: number;
-    membersLite: number;
-    at: Date;
-  }): Promise<LicenseSeatReportRecord> {
-    const rows = await this.prisma.$queryRaw<LicenseSeatReportRecord[]>`
-      -- @tenancy: scoped by "licenseId", the IssuedLicense row the presented
-      -- license token has just resolved to; that row is what names the customer
-      -- and this table carries no organizationId of its own.
-      INSERT INTO "LicenseSeatReport" (
-        "id", "licenseId", "quarterStartsAt", "peakMembers", "peakMembersLite",
-        "firstReportedAt", "lastReportedAt"
-      )
-      VALUES (
-        ${nanoid()}, ${licenseId}, ${quarterStartsAt}, ${members}, ${membersLite},
-        ${at}, ${at}
-      )
-      ON CONFLICT ("licenseId", "quarterStartsAt") DO UPDATE SET
-        "peakMembers" = GREATEST(
-          "LicenseSeatReport"."peakMembers", EXCLUDED."peakMembers"
-        ),
-        "peakMembersLite" = GREATEST(
-          "LicenseSeatReport"."peakMembersLite", EXCLUDED."peakMembersLite"
-        ),
-        "lastReportedAt" = EXCLUDED."lastReportedAt"
-      RETURNING *
-    `;
-    const report = rows[0];
-    if (!report) {
-      throw new Error(`no seat report written for license ${licenseId}`);
-    }
-    return report;
-  }
-
-  async findByQuarters(
-    keys: LicenseSeatQuarterKey[],
-  ): Promise<LicenseSeatReportRecord[]> {
-    if (keys.length === 0) return [];
-    return this.prisma.licenseSeatReport.findMany({
-      where: {
-        OR: keys.map(({ licenseId, quarterStartsAt }) => ({
-          licenseId,
-          quarterStartsAt,
-        })),
-      },
-    });
   }
 }
 

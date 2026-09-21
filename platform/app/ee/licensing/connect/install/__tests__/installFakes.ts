@@ -1,7 +1,6 @@
 /**
  * What the install side's suites need to stand in for LangWatch: a key pair to
- * sign with, a license minted with it, and leases in each of the three states
- * a clock can put them in.
+ * sign with, and a license minted with it.
  *
  * The key pair is generated per run rather than checked in, so nothing here
  * can be mistaken for a credential.
@@ -11,7 +10,6 @@ import { generateKeyPairSync } from "node:crypto";
 
 import { generateLicenseKey } from "../../../licenseGenerationService";
 import { licenseTokenFromKey } from "../../../licenseToken";
-import { issueLease, type SignedLease } from "../../lease";
 import type { ConnectCredential } from "../connectTransport";
 
 export function makeKeyPair() {
@@ -40,7 +38,7 @@ export const INSTANCE_ID = "3f1c2b40-9a7e-4f2a-8f4c-6b1f0c2d9e77";
  *
  * Suites spread this into their fake Prisma client, so a call that reaches for
  * the identity gets the same one every time rather than minting a fresh UUID
- * that the lease it is about to verify was never signed for.
+ * the fixture credential was never built for.
  */
 export function instanceIdentityTable(instanceId: string = INSTANCE_ID) {
   return {
@@ -96,36 +94,4 @@ export function credentialOf(
   const token = licenseTokenFromKey(licenseKey);
   if (!token) throw new Error("the fixture license has no token");
   return { token, instanceId };
-}
-
-/** A lease LangWatch signed for this license and this install. */
-export function leaseFor({
-  licenseId = LICENSE.licenseData.licenseId,
-  instanceId = INSTANCE_ID,
-  seatOverageAllowance = 5,
-  issuedAt = NOW,
-  privateKey = LANGWATCH_KEYS.privateKey,
-}: {
-  licenseId?: string;
-  instanceId?: string;
-  seatOverageAllowance?: number;
-  issuedAt?: Date;
-  privateKey?: string;
-} = {}): SignedLease {
-  return issueLease({
-    licenseId,
-    instanceId,
-    services: ["instant_evals"],
-    seatOverageAllowance,
-    privateKey,
-    now: issuedAt,
-  });
-}
-
-/** The same lease with its allowance edited after signing. */
-export function tamperedLease(lease: SignedLease): SignedLease {
-  return {
-    ...lease,
-    payload: { ...lease.payload, seatOverageAllowance: 5000 },
-  };
 }

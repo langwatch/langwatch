@@ -53,7 +53,6 @@ export async function createIssuedLicenseRow({
       replacesId: null,
       pendingDeliveryLicense: null,
       services: [],
-      seatOverageAllowance: null,
       seatRateCents: null,
       seatCurrency: null,
       commitUsdCents: 0,

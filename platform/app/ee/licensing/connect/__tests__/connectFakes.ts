@@ -43,7 +43,6 @@ export function license(
     reportedMembers: null,
     reportedMembersLite: null,
     services: ["instant_evals"],
-    seatOverageAllowance: null,
     seatRateCents: null,
     seatCurrency: null,
     commitUsdCents: 100_000,

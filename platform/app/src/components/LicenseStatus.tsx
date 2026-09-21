@@ -34,18 +34,25 @@ export function LicenseStatus({ organizationId }: LicenseStatusProps) {
     },
   );
 
-  const { upload, activate, remove, isUploading, isRemoving } =
-    useLicenseActions({
-      organizationId,
-      onUploadSuccess: () => {
-        setLicenseKey("");
-        setActivationCode("");
-        void refetch();
-      },
-      onRemoveSuccess: () => {
-        void refetch();
-      },
-    });
+  const {
+    upload,
+    activate,
+    remove,
+    refresh,
+    isUploading,
+    isRemoving,
+    isRefreshing,
+  } = useLicenseActions({
+    organizationId,
+    onUploadSuccess: () => {
+      setLicenseKey("");
+      setActivationCode("");
+      void refetch();
+    },
+    onRemoveSuccess: () => {
+      void refetch();
+    },
+  });
 
   const handleCodeActivate = () => {
     const code = activationCode.trim();
@@ -103,6 +110,8 @@ export function LicenseStatus({ organizationId }: LicenseStatusProps) {
         status={status}
         onRemove={remove}
         isRemoving={isRemoving}
+        onRefresh={refresh}
+        isRefreshing={isRefreshing}
       />
     </VStack>
   );

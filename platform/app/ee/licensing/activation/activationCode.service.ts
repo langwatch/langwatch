@@ -95,7 +95,7 @@ export interface LicenseMinterPort {
   }): Promise<{ licenseKey: string; license: { id: string } }>;
 }
 
-/** The services a license may name, which are the ones the lease knows. */
+/** The services a license may name, which are the ones the install knows. */
 function entitledServices(services: string[]): ConnectService[] {
   return services.filter((service): service is ConnectService =>
     (CONNECT_SERVICES as readonly string[]).includes(service),

@@ -3,20 +3,18 @@
  * (ADR-141, section 6).
  *
  * One route. The install reports the version it runs and the two seat counts
- * in use, and LangWatch answers with a signed lease, plus a reissued license
- * when one is waiting. Nothing else is sent: no organization name, no
- * hostname, no user data and no product statistics, which are a separate and
- * optional post.
+ * in use, and LangWatch answers with the services the license is entitled to,
+ * plus a reissued license when one is waiting. Nothing else is sent: no
+ * organization name, no hostname, no user data and no product statistics,
+ * which are a separate and optional post.
  *
  * @see ./connectTransport.ts, how a call is made and how a refusal is named
- * @see ../lease.ts, the lease this answers with
  * @see ../../../../../specs/self-hosting/connected-services/license-sync.feature
  */
 
 import type { Dispatcher } from "undici";
 import { z } from "zod";
 
-import { type SignedLease, signedLeaseSchema } from "../lease";
 import { type ConnectCredential, ConnectHttp } from "./connectTransport";
 
 /** The seats in use, as the install counts them. */
@@ -26,13 +24,14 @@ export interface LicenseSeatCounts {
 }
 
 const syncAnswerSchema = z.object({
-  lease: signedLeaseSchema,
+  services: z.array(z.string()),
   /** A reissued license waiting for this install, sent until it is presented. */
   license: z.string().optional(),
 });
 
 export interface LicenseSyncAnswer {
-  readonly lease: SignedLease;
+  /** The hosted services the registry has the license entitled to. */
+  readonly services: string[];
   readonly license?: string;
 }
 
@@ -119,7 +118,7 @@ export class ConnectLicenseClient {
       ...(signal ? { signal } : {}),
     });
     return {
-      lease: answer.lease,
+      services: answer.services,
       ...(answer.license ? { license: answer.license } : {}),
     };
   }

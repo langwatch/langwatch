@@ -7,7 +7,6 @@
  */
 
 import type { ConnectService } from "../connect/services";
-import type { LicenseSeatReportRepository } from "./seatReports";
 
 export type IssuedLicenseSource =
   | "BACKOFFICE"
@@ -39,7 +38,6 @@ export interface IssuedLicenseRecord {
   replacesId: string | null;
   pendingDeliveryLicense: string | null;
   services: string[];
-  seatOverageAllowance: number | null;
   seatRateCents: number | null;
   seatCurrency: SeatCurrency | null;
   commitUsdCents: number;
@@ -71,23 +69,8 @@ export type IssuedLicenseView = Omit<
   "pendingDeliveryLicense"
 > & {
   status: IssuedLicenseStatus;
-  /** The allowance in force: the override, or a fifth of the seats rounded up. */
-  effectiveSeatOverageAllowance: number;
   /** Whether a reissued license is waiting to be delivered to its install. */
   hasPendingDelivery: boolean;
-};
-
-/**
- * A row on the licenses screen, which also shows what the install reported in
- * the term quarter now running. Reading that costs a second query, so only the
- * list and the detail carry it; a write answers with the row alone.
- */
-export type IssuedLicenseBrowseView = IssuedLicenseView & {
-  currentQuarterSeats: {
-    quarterStartsAt: Date;
-    peakMembers: number;
-    peakMembersLite: number;
-  } | null;
 };
 
 export interface IssuedLicenseRepository {
@@ -174,13 +157,35 @@ export interface ContractBudgetSyncPort {
   sync(params: { organizationId: string; operatorId: string }): Promise<void>;
 }
 
+/**
+ * What a mid-term seat change owes: seats added on a license are invoiced
+ * prorated to the end of the term, by the connected billing service. The
+ * registry only names the change; billing decides the amount and keeps the
+ * invoice from being raised twice.
+ */
+export type SeatChangeBillingOutcome =
+  | "invoiced"
+  | "nothing_to_invoice"
+  | "not_onboarded";
+
+export interface SeatChangeBillingPort {
+  invoiceAddedSeats(params: {
+    organizationId: string;
+    /** The reissued `IssuedLicense` row the new seat count is signed into. */
+    licenseRowId: string;
+    previousSeats: number;
+    seats: number;
+    operatorId: string;
+  }): Promise<SeatChangeBillingOutcome>;
+}
+
 export interface LicenseRegistryDependencies {
   repository: IssuedLicenseRepository;
-  /** What the licenses screen reads for the quarter now running. */
-  seatReports: LicenseSeatReportRepository;
   organizations: CustomerOrganizationPort;
   managedKeys: ConnectManagedKeyPort;
   contractBudgets: ContractBudgetSyncPort;
+  /** Invoices the seats a mid-term seat change added. */
+  seatBilling: SeatChangeBillingPort;
   /** The signing key from the server secret, or undefined when none is set. */
   signingKey: () => string | undefined;
   /** The key licenses are verified against. */
@@ -197,20 +202,11 @@ export type LicenseCustomer =
 
 export interface LicenseTermsInput {
   services?: ConnectService[];
-  /** Null clears the override, so the default applies again. */
-  seatOverageAllowance?: number | null;
   seatRateCents?: number | null;
   seatCurrency?: SeatCurrency | null;
   commitUsdCents?: number;
   overageEnabled?: boolean;
   overageMaxUsdCents?: number | null;
-}
-
-/** A fifth of the licensed seats, rounded up. */
-const DEFAULT_ALLOWANCE_DIVISOR = 5;
-
-export function defaultSeatOverageAllowance(maxMembers: number): number {
-  return Math.ceil(maxMembers / DEFAULT_ALLOWANCE_DIVISOR);
 }
 
 /** Revoked wins over superseded, which wins over the term. */

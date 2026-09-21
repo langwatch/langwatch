@@ -38,8 +38,10 @@ vi.mock("../license/useLicenseActions", () => ({
   useLicenseActions: () => ({
     upload: vi.fn(),
     remove: vi.fn(),
+    refresh: vi.fn(),
     isUploading: false,
     isRemoving: false,
+    isRefreshing: false,
   }),
 }));
 
@@ -72,6 +74,18 @@ const unsignedStatus: LicenseStatusPayload = {
   expired: false,
 };
 
+const validStatus = (connected: boolean): LicenseStatusPayload => ({
+  hasLicense: true,
+  valid: true,
+  plan: "ENTERPRISE",
+  planName: "Enterprise",
+  expiresAt: "2030-01-01T00:00:00Z",
+  organizationName: "Acme Corp",
+  connected,
+  ...resourceCounts,
+  currentMembers: 3,
+});
+
 const renderWith = (status: LicenseStatusPayload) => {
   statusResult.current = status;
   render(<LicenseStatus organizationId="org-123" />, { wrapper: Wrapper });
@@ -101,6 +115,23 @@ describe("LicenseStatus", () => {
       expect(
         screen.getByText(/3 members are over the seats your license covers/i),
       ).toBeDefined();
+    });
+  });
+
+  describe("given a license that names a hosted service", () => {
+    it("offers to refresh it", () => {
+      renderWith(validStatus(true));
+
+      expect(screen.getByTestId("refresh-license")).toBeDefined();
+    });
+  });
+
+  describe("given an offline license, or a deployment with Connect disabled", () => {
+    /** @scenario Refresh is offered on a connected license only */
+    it("shows no refresh button", () => {
+      renderWith(validStatus(false));
+
+      expect(screen.queryByTestId("refresh-license")).toBeNull();
     });
   });
 

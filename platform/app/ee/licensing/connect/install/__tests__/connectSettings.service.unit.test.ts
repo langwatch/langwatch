@@ -18,13 +18,10 @@ import type {
 import { ConnectSettingsService } from "../connectSettings.service";
 import { resetInstanceIdentity } from "../instanceIdentity";
 import {
-  INSTANCE_ID,
   instanceIdentityTable,
   LANGWATCH_KEYS,
-  leaseFor,
   mintLicense,
   NOW,
-  tamperedLease,
 } from "./installFakes";
 
 // The configuration is stated per test, so what the ambient environment holds
@@ -82,7 +79,6 @@ const USAGE: ConnectUsage = {
 interface Row {
   connectServicesDisabled: string[];
   license: string | null;
-  connectLease?: unknown;
   connectLastSyncAt?: Date | null;
   connectLastSyncError?: string | null;
 }
@@ -96,7 +92,6 @@ function storeWith(row: Row) {
         findUnique: vi.fn(async () => ({
           connectServicesDisabled: row.connectServicesDisabled,
           license: row.license,
-          connectLease: row.connectLease ?? null,
           connectLastSyncAt: row.connectLastSyncAt ?? null,
           connectLastSyncError: row.connectLastSyncError ?? null,
         })),
@@ -143,16 +138,6 @@ function serviceOver({
       now: () => now ?? NOW,
     }),
   };
-}
-
-/** A lease LangWatch signed for the license and the install above. */
-function leaseOfRecord(issuedAt: Date = NOW) {
-  return leaseFor({
-    licenseId: LICENSE_ID,
-    instanceId: INSTANCE_ID,
-    seatOverageAllowance: 10,
-    issuedAt,
-  });
 }
 
 function syncOf(status: Awaited<ReturnType<ConnectSettingsService["status"]>>) {
@@ -344,12 +329,11 @@ describe("given an install whose license syncs", () => {
 
   describe("when the last sync succeeded", () => {
     /** @scenario "A failing sync is visible from the first failure" */
-    it("reports when it succeeded, no failure, and the current lease", async () => {
+    it("reports when it succeeded and no failure", async () => {
       const { service } = serviceOver({
         row: {
           connectServicesDisabled: [],
           license: LICENSE_KEY,
-          connectLease: leaseOfRecord(),
           connectLastSyncAt: SYNCED_AT,
         },
       });
@@ -357,12 +341,6 @@ describe("given an install whose license syncs", () => {
       expect(syncOf(await service.status(ORGANIZATION))).toEqual({
         lastSyncAt: SYNCED_AT.toISOString(),
         lastError: null,
-        lease: {
-          seatOverageAllowance: 10,
-          warnAfter: "2026-10-03T12:00:00.000Z",
-          validUntil: "2026-10-19T12:00:00.000Z",
-          state: "fresh",
-        },
       });
     });
   });
@@ -374,7 +352,6 @@ describe("given an install whose license syncs", () => {
         row: {
           connectServicesDisabled: [],
           license: LICENSE_KEY,
-          connectLease: leaseOfRecord(),
           connectLastSyncAt: SYNCED_AT,
           connectLastSyncError: "connect_unreachable",
         },
@@ -384,48 +361,6 @@ describe("given an install whose license syncs", () => {
         lastSyncAt: SYNCED_AT.toISOString(),
         lastError: { code: "connect_unreachable" },
       });
-    });
-  });
-
-  describe("when the lease is past the day admins are warned", () => {
-    /** @scenario "Between day 14 and day 30 the allowance is kept and admins are warned" */
-    it("reports it as warning, with the day the allowance will be withdrawn", async () => {
-      const issuedAt = new Date("2026-09-01T12:00:00.000Z");
-      const { service } = serviceOver({
-        row: { connectServicesDisabled: [], license: LICENSE_KEY },
-        now: new Date("2026-09-20T12:00:00.000Z"),
-      });
-      const withLease = serviceOver({
-        row: {
-          connectServicesDisabled: [],
-          license: LICENSE_KEY,
-          connectLease: leaseOfRecord(issuedAt),
-        },
-        now: new Date("2026-09-20T12:00:00.000Z"),
-      });
-
-      expect(syncOf(await service.status(ORGANIZATION))?.lease).toBeNull();
-      expect(
-        syncOf(await withLease.service.status(ORGANIZATION))?.lease,
-      ).toMatchObject({
-        state: "warning",
-        validUntil: "2026-10-01T12:00:00.000Z",
-      });
-    });
-  });
-
-  describe("when the lease was edited after signing", () => {
-    /** @scenario "A lease that was tampered with is ignored" */
-    it("reports no lease at all", async () => {
-      const { service } = serviceOver({
-        row: {
-          connectServicesDisabled: [],
-          license: LICENSE_KEY,
-          connectLease: tamperedLease(leaseOfRecord()),
-        },
-      });
-
-      expect(syncOf(await service.status(ORGANIZATION))?.lease).toBeNull();
     });
   });
 });

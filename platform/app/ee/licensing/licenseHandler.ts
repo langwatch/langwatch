@@ -7,13 +7,7 @@ import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
   RETENTION_CATEGORIES,
 } from "../../src/server/data-retention/retentionPolicy.schema";
-import { readConnectConfig } from "./connect/install/connectConfig";
 import { licenseConnectServices } from "./connect/install/connectEntitlement";
-import {
-  readInstalledLease,
-  seatAllowanceOf,
-} from "./connect/install/installedLease";
-import { readInstanceId } from "./connect/install/instanceIdentity";
 import { PUBLIC_KEY, UNLIMITED_PLAN } from "./constants";
 import { resolvePlanDefaults } from "./defaults";
 import { OrganizationNotFoundError } from "./errors";
@@ -151,13 +145,12 @@ export class LicenseHandler {
    * so an unreadable or tampered key resolves to the baseline, exactly like no
    * license at all.
    *
-   * A connected install can hold a signed lease on top, and then the seats it
-   * may fill are the licensed count plus the allowance LangWatch signed. See
-   * {@link LicenseHandler.withSeatAllowance}.
+   * The seat count is the one signed into the license and nothing more. A
+   * connected customer that needs more seats has the license reissued with
+   * the new count and picks it up over sync (ADR-141, section 6).
    */
   async getSelfHostedPlan(organizationId: string): Promise<PlanInfo> {
-    const organization = await this.readOrganizationLicense(organizationId);
-    const licenseKey = organization?.license ?? null;
+    const licenseKey = await this.readStoredLicense(organizationId);
 
     if (!licenseKey) {
       return UNLIMITED_PLAN;
@@ -169,93 +162,18 @@ export class LicenseHandler {
       return UNLIMITED_PLAN;
     }
 
-    return await this.withSeatAllowance({
-      plan: mapToPlanInfo(signedLicense.data),
-      licenseKey,
-      lease: organization?.connectLease,
-    });
-  }
-
-  /**
-   * The plan a current lease widens, and the plain licensed plan otherwise
-   * (ADR-141, section 6).
-   *
-   * `maxMembers` carries the widened count because that is what every caller
-   * of the seat guard already enforces, and the licensed count travels beside
-   * it so the members page and the invitation can say how many seats will be
-   * invoiced at the next quarterly true-up. With Connect off, no lease, a
-   * lease we did not sign, one naming another license or another install, or
-   * one past its 30 days, this is the plan main resolves.
-   */
-  private async withSeatAllowance({
-    plan,
-    licenseKey,
-    lease,
-  }: {
-    plan: PlanInfo;
-    licenseKey: string;
-    lease: unknown;
-  }): Promise<PlanInfo> {
-    // No lease, no read: an install that never synced holds nothing here, and
-    // resolving a plan is not a reason to touch another table.
-    if (lease === null || lease === undefined) return plan;
-    if (!readConnectConfig().permitted) {
-      return plan;
-    }
-
-    // Decided from the license blob, before anything is read. A license that
-    // names no hosted service never synced, so whatever sits in the lease
-    // column cannot be one LangWatch signed for it, and an offline install
-    // resolves its plan without a second query.
-    if (
-      licenseConnectServices({ licenseKey, publicKey: this.publicKey })
-        .length === 0
-    ) {
-      return plan;
-    }
-
-    // Read, never mint. A lease exists only after a sync, and a sync only after
-    // the identity was minted, so an install with no identity has no lease that
-    // could apply and this path never writes.
-    const instanceId = await readInstanceId(this.prisma);
-    if (!instanceId) return plan;
-
-    const allowance = seatAllowanceOf(
-      readInstalledLease({
-        licenseKey,
-        lease,
-        instanceId,
-        publicKey: this.publicKey,
-        now: new Date(),
-      }),
-    );
-    if (allowance <= 0) {
-      return plan;
-    }
-
-    return {
-      ...plan,
-      maxMembers: plan.maxMembers + allowance,
-      licensedMembers: plan.maxMembers,
-      seatOverageAllowance: allowance,
-    };
+    return mapToPlanInfo(signedLicense.data);
   }
 
   private async readStoredLicense(
     organizationId: string,
   ): Promise<string | null> {
-    const organization = await this.readOrganizationLicense(organizationId);
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { license: true },
+    });
 
     return organization?.license ?? null;
-  }
-
-  private async readOrganizationLicense(
-    organizationId: string,
-  ): Promise<{ license: string | null; connectLease?: unknown } | null> {
-    return await this.prisma.organization.findUnique({
-      where: { id: organizationId },
-      select: { license: true, connectLease: true },
-    });
   }
 
   /**
@@ -391,6 +309,9 @@ export class LicenseHandler {
         planName: licenseData.plan.name,
         expiresAt: licenseData.expiresAt,
         organizationName: licenseData.organizationName,
+        connected:
+          licenseConnectServices({ licenseKey, publicKey: this.publicKey })
+            .length > 0,
         ...resourceCounts,
       };
     }

@@ -13,7 +13,6 @@ import { PrismaConnectManagedKeys } from "@ee/licensing/registry/connectManagedK
 import {
   PrismaCustomerOrganizations,
   PrismaIssuedLicenseRepository,
-  PrismaLicenseSeatReports,
 } from "@ee/licensing/registry/issuedLicense.prisma";
 import { LicenseRegistryService } from "@ee/licensing/registry/licenseRegistry.service";
 import { nanoid } from "nanoid";
@@ -39,10 +38,10 @@ export function licenseTokenHarness() {
 
   const registry = new LicenseRegistryService({
     repository: new PrismaIssuedLicenseRepository(prisma),
-    seatReports: new PrismaLicenseSeatReports(prisma),
     organizations: new PrismaCustomerOrganizations(prisma),
     managedKeys: new PrismaConnectManagedKeys(prisma),
     contractBudgets: { sync: async () => undefined },
+    seatBilling: { invoiceAddedSeats: async () => "not_onboarded" },
     signingKey: () => privateKey,
     publicKey,
     encrypt: (plain) => `enc:${plain.length}`,

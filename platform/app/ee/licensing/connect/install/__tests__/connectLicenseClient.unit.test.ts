@@ -13,11 +13,11 @@ import { MockAgent } from "undici";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { ConnectLicenseClient } from "../connectLicenseClient";
-import { credentialOf, LICENSE, leaseFor } from "./installFakes";
+import { credentialOf, LICENSE } from "./installFakes";
 
 const ENDPOINT = "https://connect.example.test";
 const CREDENTIAL = credentialOf(LICENSE.licenseKey);
-const LEASE = leaseFor();
+const SERVICES = ["instant_evals"];
 
 let agent: MockAgent;
 
@@ -60,7 +60,7 @@ describe("given a connect host that answers", () => {
         .reply(200, (options) => {
           sentHeaders = options.headers as Record<string, string>;
           sentBody = String(options.body);
-          return { lease: LEASE };
+          return { services: SERVICES };
         });
 
       await sync();
@@ -81,7 +81,7 @@ describe("given a connect host that answers", () => {
         .intercept({ path: "/v1/license/sync", method: "POST" })
         .reply(200, (options) => {
           sentBody = String(options.body);
-          return { lease: LEASE };
+          return { services: SERVICES };
         });
 
       await sync();
@@ -92,15 +92,15 @@ describe("given a connect host that answers", () => {
       ]);
     });
 
-    it("reads the signed lease back as it was sent", async () => {
+    it("reads the entitled services back as they were sent", async () => {
       agent
         .get(ENDPOINT)
         .intercept({ path: "/v1/license/sync", method: "POST" })
-        .reply(200, { lease: LEASE });
+        .reply(200, { services: SERVICES });
 
       const answer = await sync();
 
-      expect(answer.lease).toEqual(LEASE);
+      expect(answer.services).toEqual(SERVICES);
       expect(answer.license).toBeUndefined();
     });
 
@@ -108,7 +108,7 @@ describe("given a connect host that answers", () => {
       agent
         .get(ENDPOINT)
         .intercept({ path: "/v1/license/sync", method: "POST" })
-        .reply(200, { lease: LEASE, license: "lw-reissued-key" });
+        .reply(200, { services: SERVICES, license: "lw-reissued-key" });
 
       const answer = await sync();
 
@@ -149,7 +149,7 @@ describe("given a connect host that refuses", () => {
       agent
         .get(ENDPOINT)
         .intercept({ path: "/v1/license/sync", method: "POST" })
-        .reply(200, { lease: { payload: { licenseId: "lic-1" } } });
+        .reply(200, { services: "instant_evals" });
 
       await expect(sync()).rejects.toMatchObject({
         code: "hosted_service_unavailable",

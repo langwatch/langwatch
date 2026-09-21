@@ -9,6 +9,7 @@ import { env } from "~/env.mjs";
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import { rateLimit } from "~/server/rateLimit";
 import { decrypt, encrypt } from "~/utils/encryption";
+import { createSeatChangeBilling } from "../../billing/connected/seatChange.prisma";
 import { PrismaActivationCodes } from "../activation/activationCode.prisma";
 import { ActivationCodeService } from "../activation/activationCode.service";
 import { createContractBudgetService } from "../connect/connect.prisma";
@@ -18,7 +19,6 @@ import { PrismaConnectManagedKeys } from "./connectManagedKey.prisma";
 import {
   PrismaCustomerOrganizations,
   PrismaIssuedLicenseRepository,
-  PrismaLicenseSeatReports,
 } from "./issuedLicense.prisma";
 import { LicenseRegistryService } from "./licenseRegistry.service";
 import { LicenseSyncService } from "./licenseSync.service";
@@ -31,7 +31,7 @@ const SYNCS_PER_DAY = 48;
 const ONE_DAY_SECONDS = 24 * 60 * 60;
 
 /**
- * The key licenses and leases are signed with, read on every call so a rotated
+ * The key licenses are signed with, read on every call so a rotated
  * secret needs no rebuild of the service. `process.env` comes first because
  * `env` captured its value when the module was first imported.
  */
@@ -44,10 +44,10 @@ export function createLicenseRegistryService(
 ): LicenseRegistryService {
   return new LicenseRegistryService({
     repository: new PrismaIssuedLicenseRepository(prisma),
-    seatReports: new PrismaLicenseSeatReports(prisma),
     organizations: new PrismaCustomerOrganizations(prisma),
     managedKeys: new PrismaConnectManagedKeys(prisma),
     contractBudgets: createContractBudgetService(prisma),
+    seatBilling: createSeatChangeBilling(prisma),
     signingKey: licenseSigningKey,
     publicKey: PUBLIC_KEY,
     encrypt,
@@ -69,7 +69,6 @@ export function createLicenseRecorderService(
   };
   return new LicenseRegistryService({
     repository: new PrismaIssuedLicenseRepository(tx),
-    seatReports: new PrismaLicenseSeatReports(tx),
     organizations: new PrismaCustomerOrganizations(tx),
     managedKeys: {
       provision: outOfScope,
@@ -77,6 +76,7 @@ export function createLicenseRecorderService(
       invalidate: outOfScope,
     },
     contractBudgets: { sync: outOfScope },
+    seatBilling: { invoiceAddedSeats: outOfScope },
     signingKey: licenseSigningKey,
     publicKey: PUBLIC_KEY,
     encrypt,
@@ -130,7 +130,6 @@ export function createLicenseSyncService(
   return new LicenseSyncService({
     credentials: createConnectCredentialService(prisma),
     repository: new PrismaIssuedLicenseRepository(prisma),
-    seatReports: new PrismaLicenseSeatReports(prisma),
     managedKeys: new PrismaConnectManagedKeys(prisma),
     rateLimit: {
       allow: async ({ licenseRowId }) =>
@@ -142,7 +141,6 @@ export function createLicenseSyncService(
           })
         ).allowed,
     },
-    signingKey: licenseSigningKey,
     decrypt,
     systemActorId: SYSTEM_ACTORS.connectLicense,
   });

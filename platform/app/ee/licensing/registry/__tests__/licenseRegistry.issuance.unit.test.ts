@@ -109,19 +109,6 @@ describe("LicenseRegistryService", () => {
         expect(context.repository.rows).toHaveLength(0);
       });
     });
-
-    describe("when no allowance is set on a license for 52 seats", () => {
-      /** @scenario The seat overage allowance defaults to a fifth of the seats, rounded up */
-      it("reports an effective allowance of 11", async () => {
-        const { license } = await context.service.issue({
-          ...issueInput(acme),
-          maxMembers: 52,
-        });
-
-        expect(license.seatOverageAllowance).toBeNull();
-        expect(license.effectiveSeatOverageAllowance).toBe(11);
-      });
-    });
   });
 
   describe("given marking the customer as a self-hosted customer fails", () => {

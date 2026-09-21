@@ -1289,11 +1289,12 @@ const presentations = {
   },
   license_sync_failed: {
     // The reader is the administrator of a self-hosted install, in Settings,
-    // Connect. The daily sync runs on its own, so there is nothing to retry by
-    // hand; what they need to know is that seats keep working meanwhile.
-    title: "The daily license sync did not complete",
+    // Connect or on the License page. The daily sync runs on its own and the
+    // License page can run it now; what they need to know is that the license
+    // they hold keeps working meanwhile.
+    title: "The license sync did not complete",
     describe: () =>
-      "It runs again in a day. Your seats are unchanged until the current lease runs out.",
+      "It runs again in a day, or now from the License page. Your license and its seats are unchanged.",
   },
   license_signing_key_not_pem: {
     title: "The signing key on the server isn't a private key",

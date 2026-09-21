@@ -142,6 +142,12 @@ type ValidLicenseStatus = {
   planName: string;
   expiresAt: string;
   organizationName: string;
+  /**
+   * True when the license names a hosted service and the deployment permits
+   * Connect, so this install syncs the license with LangWatch and an admin can
+   * refresh it on demand (ADR-141, section 6).
+   */
+  connected: boolean;
 } & LicenseResourceLimits;
 
 export type LicenseStatus =

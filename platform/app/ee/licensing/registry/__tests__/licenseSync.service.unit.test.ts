@@ -1,10 +1,5 @@
 import { generateKeyPairSync } from "node:crypto";
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  LEASE_VALID_DAYS,
-  LEASE_WARN_AFTER_DAYS,
-  verifyLease,
-} from "../../connect/lease";
 import { licenseTokenFromKey } from "../../licenseToken";
 import { ConnectCredentialService } from "../connectCredential.service";
 import { LicenseRegistryService } from "../licenseRegistry.service";
@@ -13,8 +8,8 @@ import {
   InMemoryConnectManagedKeys,
   InMemoryCustomerOrganizations,
   InMemoryIssuedLicenseRepository,
-  InMemoryLicenseSeatReports,
   RecordingContractBudgets,
+  RecordingSeatBilling,
 } from "./registryFakes";
 
 const NOW = new Date("2026-09-19T12:00:00.000Z");
@@ -22,7 +17,6 @@ const NEXT_YEAR = new Date("2027-09-19T12:00:00.000Z");
 const OPERATOR = "user_operator";
 const SYSTEM = "system:connect-license";
 const INSTANCE = "org_install";
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", {
   modulusLength: 2048,
@@ -38,15 +32,14 @@ function build({ syncsAllowed = Number.POSITIVE_INFINITY } = {}) {
   let now = NOW;
   let syncs = 0;
   const repository = new InMemoryIssuedLicenseRepository(NOW);
-  const seatReports = new InMemoryLicenseSeatReports();
   const organizations = new InMemoryCustomerOrganizations();
   const managedKeys = new InMemoryConnectManagedKeys();
   const registry = new LicenseRegistryService({
     repository,
-    seatReports,
     organizations,
     managedKeys,
     contractBudgets: new RecordingContractBudgets(),
+    seatBilling: new RecordingSeatBilling(),
     signingKey: () => privateKey,
     publicKey,
     encrypt,
@@ -60,17 +53,14 @@ function build({ syncsAllowed = Number.POSITIVE_INFINITY } = {}) {
       now: () => now,
     }),
     repository,
-    seatReports,
     managedKeys,
     rateLimit: { allow: async () => ++syncs <= syncsAllowed },
-    signingKey: () => privateKey,
     decrypt,
     systemActorId: SYSTEM,
     now: () => now,
   });
   return {
     repository,
-    seatReports,
     organizations,
     managedKeys,
     registry,
@@ -117,28 +107,18 @@ describe("LicenseSyncService", () => {
 
   describe("given an active license registered to a customer", () => {
     describe("when the install syncs reporting the seats in use", () => {
-      it("records the report and answers with a lease for this license and instance", async () => {
+      /** @scenario A sync records the reported seats and answers with the entitled services */
+      it("records the report and answers with the services the license is entitled to", async () => {
         const license = await issue();
+        await context.registry.updateTerms({
+          id: license.id,
+          operatorId: OPERATOR,
+          services: ["instant_evals"],
+        });
 
         const result = await syncWith(license.token, seatsBody(53, 4));
 
-        if (!result.ok) throw new Error(`refused: ${result.code}`);
-        const payload = verifyLease({
-          lease: result.lease,
-          publicKey,
-          licenseId: license.licenseId,
-          instanceId: INSTANCE,
-        });
-        expect(payload).toMatchObject({
-          seatOverageAllowance: 10,
-          issuedAt: NOW.toISOString(),
-          warnAfter: new Date(
-            NOW.getTime() + LEASE_WARN_AFTER_DAYS * DAY_MS,
-          ).toISOString(),
-          validUntil: new Date(
-            NOW.getTime() + LEASE_VALID_DAYS * DAY_MS,
-          ).toISOString(),
-        });
+        expect(result).toEqual({ ok: true, services: ["instant_evals"] });
         expect(await context.repository.findById(license.id)).toMatchObject({
           lastSyncAt: NOW,
           lastSyncVersion: "1.42.0",
@@ -147,72 +127,19 @@ describe("LicenseSyncService", () => {
         });
       });
 
-      it("carries the services the license is entitled to", async () => {
-        const license = await issue();
-        await context.registry.updateTerms({
-          id: license.id,
-          operatorId: OPERATOR,
-          services: ["instant_evals"],
-        });
-
-        const result = await syncWith(license.token, seatsBody(1));
-
-        if (!result.ok) throw new Error(`refused: ${result.code}`);
-        expect(result.lease.payload.services).toEqual(["instant_evals"]);
-      });
-
-      it("answers with the allowance an operator set on the row", async () => {
-        const license = await issue();
-        await context.registry.updateTerms({
-          id: license.id,
-          operatorId: OPERATOR,
-          seatOverageAllowance: 3,
-        });
-
-        const result = await syncWith(license.token, seatsBody(1));
-
-        if (!result.ok) throw new Error(`refused: ${result.code}`);
-        expect(result.lease.payload.seatOverageAllowance).toBe(3);
-      });
-    });
-
-    describe("when the install reports a lower count later in the same quarter", () => {
-      /** @scenario The highest seat count of the quarter is what is kept for billing */
-      it("keeps the highest figure of that quarter", async () => {
+      /** @scenario The last report replaces the one before it */
+      it("keeps the latest report, whichever way the count moved", async () => {
         const license = await issue();
 
         await syncWith(license.token, seatsBody(53, 7));
         context.travelTo(new Date("2026-10-20T12:00:00.000Z"));
         await syncWith(license.token, seatsBody(51, 2));
 
-        expect(context.seatReports.rows).toMatchObject([
-          {
-            licenseId: license.id,
-            quarterStartsAt: NOW,
-            peakMembers: 53,
-            peakMembersLite: 7,
-            firstReportedAt: NOW,
-            lastReportedAt: new Date("2026-10-20T12:00:00.000Z"),
-          },
-        ]);
-      });
-
-      it("opens a new row once the term quarter turns over", async () => {
-        const license = await issue();
-
-        await syncWith(license.token, seatsBody(53));
-        context.travelTo(new Date("2026-12-19T12:00:00.000Z"));
-        await syncWith(license.token, seatsBody(51));
-
-        expect(
-          context.seatReports.rows.map((row) => [
-            row.quarterStartsAt.toISOString(),
-            row.peakMembers,
-          ]),
-        ).toEqual([
-          ["2026-09-19T12:00:00.000Z", 53],
-          ["2026-12-19T12:00:00.000Z", 51],
-        ]);
+        expect(await context.repository.findById(license.id)).toMatchObject({
+          lastSyncAt: new Date("2026-10-20T12:00:00.000Z"),
+          reportedMembers: 51,
+          reportedMembersLite: 2,
+        });
       });
     });
 
@@ -228,7 +155,6 @@ describe("LicenseSyncService", () => {
 
         expect(first.ok).toBe(true);
         expect(second).toEqual({ ok: false, code: "rate_limited" });
-        expect(context.seatReports.rows[0]?.peakMembers).toBe(53);
         expect(
           (await context.repository.findById(license.id))?.reportedMembers,
         ).toBe(53);
@@ -257,7 +183,6 @@ describe("LicenseSyncService", () => {
         expect(refusals).toEqual(
           refusals.map(() => ({ ok: false, code: "validation_error" })),
         );
-        expect(context.seatReports.rows).toEqual([]);
         expect(
           (await context.repository.findById(license.id))?.lastSyncAt,
         ).toBeNull();
@@ -314,8 +239,12 @@ describe("LicenseSyncService", () => {
           { ok: false, code: "connect_license_expired" },
           { ok: false, code: "connect_instance_required" },
         ]);
-        expect(context.seatReports.rows).toHaveLength(1);
-        expect(context.seatReports.rows[0]?.licenseId).toBe(bound.id);
+        expect(
+          (await context.repository.findById(revoked.id))?.lastSyncAt,
+        ).toBeNull();
+        expect(
+          (await context.repository.findById(expired.id))?.lastSyncAt,
+        ).toBeNull();
       });
     });
   });

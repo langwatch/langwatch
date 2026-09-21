@@ -1,37 +1,28 @@
 /**
  * The control plane end of a license sync (ADR-141, section 6).
  *
- * A connected install posts its version and its two seat counts once a day and
- * gets a signed lease back. The lease is what lets it go over its licensed
- * seats by the agreed allowance, and it expires, so an install that stops
- * syncing falls back to the hard cap on dates LangWatch signed.
- *
- * The same call is how a reissued license reaches an install: the replacement
- * is held encrypted on the registry until the install presents it, and
- * presenting it is what retires the license it replaced.
+ * A connected install posts its version and its two seat counts once a day,
+ * or when an admin presses refresh, and gets back the services its license is
+ * entitled to and, when one is waiting, the signed license that replaces the
+ * one it holds. That is how a seat change or a renewal reaches an install:
+ * the replacement is held encrypted on the registry until the install
+ * presents it, and presenting it is what retires the license it replaced.
  *
  * Refusals use the codes the gateway already uses, because one piece of copy
  * covers both hosts. A refused sync records nothing.
  */
 
 import { z } from "zod";
-import { issueLease, type SignedLease } from "../connect/lease";
 import { CONNECT_SERVICES, type ConnectService } from "../connect/services";
 import {
   CONNECT_CREDENTIAL_REFUSALS,
   type ConnectCredentialResolution,
 } from "./connectCredential.service";
-import { LicenseSigningNotConfiguredError } from "./errors";
-import {
-  type ConnectManagedKeyPort,
-  defaultSeatOverageAllowance,
-  type IssuedLicenseRecord,
-  type IssuedLicenseRepository,
+import type {
+  ConnectManagedKeyPort,
+  IssuedLicenseRecord,
+  IssuedLicenseRepository,
 } from "./issuedLicense";
-import {
-  type LicenseSeatReportRepository,
-  licenseTermQuarterStart,
-} from "./seatReports";
 
 /**
  * Exactly what a sync may carry: the version and the two seat counts. No
@@ -70,7 +61,8 @@ export type LicenseSyncRefusalCode = keyof typeof LICENSE_SYNC_REFUSALS;
 export type LicenseSyncResult =
   | {
       ok: true;
-      lease: SignedLease;
+      /** The hosted services the license is entitled to, as the registry has them. */
+      services: ConnectService[];
       /** A reissued license waiting for this install, sent until it presents it. */
       license?: string;
     }
@@ -92,11 +84,8 @@ export interface ConnectCredentialResolverPort {
 export interface LicenseSyncDependencies {
   credentials: ConnectCredentialResolverPort;
   repository: IssuedLicenseRepository;
-  seatReports: LicenseSeatReportRepository;
   managedKeys: ConnectManagedKeyPort;
   rateLimit: LicenseSyncRateLimitPort;
-  /** The signing key from the server secret, or undefined when none is set. */
-  signingKey: () => string | undefined;
   /** Decrypts a license held for delivery. */
   decrypt: (cipher: string) => string;
   /** Attributed as the actor when a replaced license's managed key is ended. */
@@ -129,10 +118,6 @@ export class LicenseSyncService {
     if (!(await this.deps.rateLimit.allow({ licenseRowId: row.id }))) {
       return { ok: false, code: "rate_limited" };
     }
-    const privateKey = this.deps.signingKey();
-    if (!privateKey || privateKey.trim() === "") {
-      throw new LicenseSigningNotConfiguredError();
-    }
 
     await this.record({
       row,
@@ -144,21 +129,12 @@ export class LicenseSyncService {
 
     return {
       ok: true,
-      lease: issueLease({
-        licenseId: row.licenseId,
-        instanceId: row.instanceId,
-        services: entitledServices(row.services),
-        seatOverageAllowance:
-          row.seatOverageAllowance ??
-          defaultSeatOverageAllowance(row.maxMembers),
-        privateKey,
-        now: this.now(),
-      }),
+      services: entitledServices(row.services),
       ...(license ? { license } : {}),
     };
   }
 
-  /** The last report on the row, and the peak of the term quarter it falls in. */
+  /** The last report on the row: when, from which version, and the seats in use. */
   private async record({
     row,
     seats,
@@ -168,19 +144,11 @@ export class LicenseSyncService {
     seats: LicenseSyncBody["seats"];
     version: string;
   }): Promise<void> {
-    const now = this.now();
     await this.deps.repository.update(row.id, {
-      lastSyncAt: now,
+      lastSyncAt: this.now(),
       lastSyncVersion: version,
       reportedMembers: seats.members,
       reportedMembersLite: seats.liteMembers,
-    });
-    await this.deps.seatReports.recordPeak({
-      licenseId: row.id,
-      quarterStartsAt: licenseTermQuarterStart({ issuedAt: row.issuedAt, now }),
-      members: seats.members,
-      membersLite: seats.liteMembers,
-      at: now,
     });
   }
 
@@ -217,7 +185,7 @@ export class LicenseSyncService {
   }
 }
 
-/** The services the lease may name, which are the ones the lease schema knows. */
+/** The services the answer may name, which are the ones the install knows. */
 function entitledServices(services: string[]): ConnectService[] {
   return services.filter((service): service is ConnectService =>
     (CONNECT_SERVICES as readonly string[]).includes(service),

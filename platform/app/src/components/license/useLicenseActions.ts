@@ -88,6 +88,34 @@ export function useLicenseActions({
       showErrorToast({ error, fallbackTitle: "Couldn't remove license" }),
   });
 
+  // A refresh syncs the license with LangWatch now, so a seat change made on
+  // the registry lands without waiting for the daily pass. The answer says
+  // whether anything changed, and a changed license moves the plan the same
+  // way an activation does.
+  const refreshMutation = api.license.refresh.useMutation({
+    onSuccess: (result) => {
+      if (result.outcome === "updated") {
+        toaster.create({
+          title: "License updated",
+          description: `Your license now covers ${result.maxMembers} ${
+            result.maxMembers === 1 ? "seat" : "seats"
+          }.`,
+          type: "success",
+        });
+        onUploadSuccess();
+        refreshPlanDerivedState();
+        return;
+      }
+      toaster.create({
+        title: "Your license is up to date",
+        description: "LangWatch has no newer license for this install.",
+        type: "info",
+      });
+    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't refresh license" }),
+  });
+
   const upload = (licenseKey: string) => {
     uploadMutation.mutate({ organizationId, licenseKey });
   };
@@ -100,11 +128,17 @@ export function useLicenseActions({
     removeMutation.mutate({ organizationId });
   };
 
+  const refresh = () => {
+    refreshMutation.mutate({ organizationId });
+  };
+
   return {
     upload,
     activate,
     remove,
+    refresh,
     isUploading: uploadMutation.isPending || activateMutation.isPending,
     isRemoving: removeMutation.isPending,
+    isRefreshing: refreshMutation.isPending,
   };
 }

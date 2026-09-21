@@ -1,9 +1,9 @@
 /**
- * The daily license sync of a connected install.
+ * The license sync of a connected install, daily and on demand.
  *
- * Driven through a fake connect host and a fake clock: what the install sends,
- * what it keeps of the answer, and what it does when the answer, the license
- * in it, or the host itself cannot be trusted.
+ * Driven through a fake connect host: what the install sends, what it keeps
+ * of the answer, what an admin pressing refresh is told, and what it does
+ * when the answer, the license in it, or the host itself cannot be trusted.
  *
  * @see ../licenseSyncWorker.ts
  * @see specs/self-hosting/connected-services/license-sync.feature
@@ -15,13 +15,13 @@ import {
   instanceIdentityTable,
   LANGWATCH_KEYS,
   LICENSE,
-  leaseFor,
   mintLicense,
   NOW,
   ORGANIZATION_ID,
   STRANGER_KEYS,
-  tamperedLease,
 } from "@ee/licensing/connect/install/__tests__/installFakes";
+import { ConnectUnreachableError } from "@ee/licensing/connect/install/connectErrors";
+import { handledErrorFromHerr } from "@langwatch/handled-error";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ILicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
 
@@ -71,13 +71,13 @@ vi.mock("@ee/licensing/connect/install/connectEntitlement", () => ({
 import {
   readInstallVersion,
   startLicenseSyncWorker,
+  syncLicenseNow,
   syncLicensesForAllOrganizations,
 } from "../licenseSyncWorker";
 
-const LEASE = leaseFor({ seatOverageAllowance: 5 });
+const SERVICES = ["instant_evals"];
 
 interface Updated {
-  connectLease?: unknown;
   connectLastSyncAt?: Date;
   connectLastSyncError?: string | null;
   license?: string;
@@ -104,9 +104,8 @@ function fakePrisma({ license = LICENSE.licenseKey as string | null } = {}) {
           return {};
         }),
       },
-      // The credential now carries the install's own identity rather than an
-      // organization id, so a sync reaches for this table. Held at the fixture
-      // id, because the leases these tests verify were signed for it.
+      // The credential carries the install's own identity rather than an
+      // organization id, so a sync reaches for this table.
       instanceIdentity: instanceIdentityTable(),
     } as never,
   };
@@ -125,7 +124,7 @@ function fakeRepository(
 }
 
 /** A connect host that answers each sync in turn. */
-function fakeClient(...answers: { lease: unknown; license?: string }[]) {
+function fakeClient(...answers: { services: string[]; license?: string }[]) {
   const sent: unknown[] = [];
   let call = 0;
   return {
@@ -151,6 +150,12 @@ function refusingClient(error: unknown) {
   } as never;
 }
 
+const common = {
+  publicKey: LANGWATCH_KEYS.publicKey,
+  version: "3.17.0",
+  now: () => NOW,
+};
+
 function run({
   prisma,
   client,
@@ -164,14 +169,29 @@ function run({
     prisma: prisma.client,
     client,
     repository,
-    publicKey: LANGWATCH_KEYS.publicKey,
-    version: "3.17.0",
-    now: () => NOW,
+    ...common,
+  });
+}
+
+function refresh({
+  prisma,
+  client,
+}: {
+  prisma: ReturnType<typeof fakePrisma>;
+  client: ReturnType<typeof fakeClient>["client"];
+}) {
+  return syncLicenseNow({
+    organizationId: ORGANIZATION_ID,
+    prisma: prisma.client,
+    client,
+    repository: fakeRepository(),
+    ...common,
   });
 }
 
 beforeEach(() => {
   connectEnabled.current = true;
+  entitled.current = true;
 });
 
 describe("given a connected install with a registered license", () => {
@@ -179,7 +199,7 @@ describe("given a connected install with a registered license", () => {
     /** @scenario "The sync sends the fixed license payload and nothing else" */
     it("sends the token, the instance id, the version and the seats in use", async () => {
       const prisma = fakePrisma();
-      const host = fakeClient({ lease: LEASE });
+      const host = fakeClient({ services: SERVICES });
 
       await run({ prisma, client: host.client });
 
@@ -194,89 +214,72 @@ describe("given a connected install with a registered license", () => {
       });
     });
 
-    /** @scenario "A lease with a valid signature is applied" */
-    it("stores the lease, its allowance and the services it names", async () => {
+    /** @scenario "The instance id on sync is the one the gateway sees" */
+    it("presents the minted instance identity, carrying no organization name or id", async () => {
+      const prisma = fakePrisma();
+      const host = fakeClient({ services: SERVICES });
+
+      await run({ prisma, client: host.client });
+
+      const sent = host.sent[0] as { credential: { instanceId: string } };
+      expect(sent.credential.instanceId).toBe(INSTANCE_ID);
+      expect(sent.credential.instanceId).toBe(
+        credentialOf(LICENSE.licenseKey).instanceId,
+      );
+      expect(sent.credential.instanceId).not.toContain("ACME");
+      expect(sent.credential.instanceId).not.toContain(ORGANIZATION_ID);
+    });
+
+    /** @scenario "A sync records the reported seats and answers with the entitled services" */
+    it("records when it succeeded and clears any earlier failure", async () => {
       const prisma = fakePrisma();
 
-      await run({ prisma, client: fakeClient({ lease: LEASE }).client });
+      await run({ prisma, client: fakeClient({ services: SERVICES }).client });
 
       const written = prisma.updates.at(-1);
-      expect(written?.connectLease).toEqual(LEASE);
       expect(written?.connectLastSyncAt).toEqual(NOW);
       expect(written?.connectLastSyncError).toBeNull();
-      expect(LEASE.payload.seatOverageAllowance).toBe(5);
-      expect(LEASE.payload.services).toEqual(["instant_evals"]);
-    });
-  });
-
-  describe("when a lease was edited after signing", () => {
-    /** @scenario "A lease that was tampered with is ignored" */
-    it("keeps the sync time but stores no lease, so the previous one stays", async () => {
-      const prisma = fakePrisma();
-
-      await run({
-        prisma,
-        client: fakeClient({ lease: tamperedLease(LEASE) }).client,
-      });
-
-      const written = prisma.updates.at(-1);
-      expect(written).not.toHaveProperty("connectLease");
-      expect(written?.connectLastSyncError).toBeNull();
-    });
-  });
-
-  describe("when a lease names another license", () => {
-    /** @scenario "A lease for another license or another instance is ignored" */
-    it("stores no lease", async () => {
-      const prisma = fakePrisma();
-      const other = mintLicense({ maxMembers: 999 });
-
-      await run({
-        prisma,
-        client: fakeClient({
-          lease: leaseFor({ licenseId: other.licenseData.licenseId }),
-        }).client,
-      });
-
-      expect(prisma.updates.at(-1)).not.toHaveProperty("connectLease");
-    });
-  });
-
-  describe("when a stranger signed the lease", () => {
-    /** @scenario "A lease that was tampered with is ignored" */
-    it("stores no lease", async () => {
-      const prisma = fakePrisma();
-
-      await run({
-        prisma,
-        client: fakeClient({
-          lease: leaseFor({ privateKey: STRANGER_KEYS.privateKey }),
-        }).client,
-      });
-
-      expect(prisma.updates.at(-1)).not.toHaveProperty("connectLease");
     });
   });
 });
 
 describe("given a license LangWatch reissued", () => {
-  describe("when the answer carries it", () => {
+  describe("when the daily sync carries it", () => {
+    /** @scenario "A reissued license arrives over sync and is applied" */
     it("stores it and syncs again with the new token", async () => {
       const prisma = fakePrisma();
       const reissued = mintLicense({ maxMembers: 80 });
-      const renewedLease = leaseFor({
-        licenseId: reissued.licenseData.licenseId,
-      });
       const host = fakeClient(
-        { lease: LEASE, license: reissued.licenseKey },
-        { lease: renewedLease },
+        { services: SERVICES, license: reissued.licenseKey },
+        { services: SERVICES },
       );
 
       await run({ prisma, client: host.client });
 
       expect(prisma.storedLicense).toBe(reissued.licenseKey);
       expect(host.sent).toHaveLength(2);
-      expect(prisma.updates.at(-1)?.connectLease).toEqual(renewedLease);
+      expect(prisma.updates.at(-1)?.connectLastSyncAt).toEqual(NOW);
+    });
+  });
+
+  describe("when an admin presses refresh", () => {
+    /** @scenario "An admin refreshes the license and gets the new seat count" */
+    it("applies it now and answers with the new seat count", async () => {
+      const prisma = fakePrisma();
+      const reissued = mintLicense({ maxMembers: 80 });
+      const host = fakeClient(
+        { services: SERVICES, license: reissued.licenseKey },
+        { services: SERVICES },
+      );
+
+      const result = await refresh({ prisma, client: host.client });
+
+      expect(result).toEqual({
+        outcome: "updated",
+        maxMembers: 80,
+        expiresAt: reissued.licenseData.expiresAt,
+      });
+      expect(prisma.storedLicense).toBe(reissued.licenseKey);
     });
   });
 
@@ -291,7 +294,8 @@ describe("given a license LangWatch reissued", () => {
 
       await run({
         prisma,
-        client: fakeClient({ lease: LEASE, license: forged.licenseKey }).client,
+        client: fakeClient({ services: SERVICES, license: forged.licenseKey })
+          .client,
       });
 
       expect(prisma.storedLicense).toBe(LICENSE.licenseKey);
@@ -299,17 +303,48 @@ describe("given a license LangWatch reissued", () => {
         "license_key_invalid",
       );
     });
+
+    it("tells an admin who pressed refresh that the license was refused", async () => {
+      const prisma = fakePrisma();
+      const forged = mintLicense({
+        maxMembers: 5000,
+        privateKey: STRANGER_KEYS.privateKey,
+      });
+
+      await expect(
+        refresh({
+          prisma,
+          client: fakeClient({ services: SERVICES, license: forged.licenseKey })
+            .client,
+        }),
+      ).rejects.toMatchObject({ code: "license_key_invalid" });
+      expect(prisma.storedLicense).toBe(LICENSE.licenseKey);
+    });
+  });
+});
+
+describe("given nothing new on the registry", () => {
+  describe("when an admin presses refresh", () => {
+    /** @scenario "An admin refreshes a license that is already current" */
+    it("says the license is unchanged and records the sync", async () => {
+      const prisma = fakePrisma();
+
+      const result = await refresh({
+        prisma,
+        client: fakeClient({ services: SERVICES }).client,
+      });
+
+      expect(result).toEqual({ outcome: "unchanged" });
+      expect(prisma.updates.at(-1)?.connectLastSyncAt).toEqual(NOW);
+    });
   });
 });
 
 describe("given a connect host that refuses", () => {
   describe("when it names the refusal", () => {
     /** @scenario "A failing sync is visible from the first failure" */
-    it("records the code the host named and keeps the lease in place", async () => {
+    it("records the code the host named and keeps the license in place", async () => {
       const prisma = fakePrisma();
-      const { ConnectUnreachableError } = await import(
-        "@ee/licensing/connect/install/connectErrors"
-      );
 
       await run({
         prisma,
@@ -324,8 +359,27 @@ describe("given a connect host that refuses", () => {
       expect(prisma.updates.at(-1)?.connectLastSyncError).toBe(
         "connect_unreachable",
       );
-      expect(prisma.updates.at(-1)).not.toHaveProperty("connectLease");
       expect(prisma.updates.at(-1)).not.toHaveProperty("connectLastSyncAt");
+      expect(prisma.storedLicense).toBe(LICENSE.licenseKey);
+    });
+
+    /** @scenario "A refresh that the registry rate limits is refused with its code" */
+    it("hands an admin who pressed refresh the code, after recording it", async () => {
+      const prisma = fakePrisma();
+      // The transport turns the registry's envelope into this same error.
+      const rateLimited = handledErrorFromHerr(
+        {
+          code: "rate_limited",
+          message: "this license has synced too many times today",
+          fault: "customer",
+        },
+        { httpStatus: 429 },
+      );
+
+      await expect(
+        refresh({ prisma, client: refusingClient(rateLimited) }),
+      ).rejects.toMatchObject({ code: "rate_limited" });
+      expect(prisma.updates.at(-1)?.connectLastSyncError).toBe("rate_limited");
     });
   });
 
@@ -350,21 +404,32 @@ describe("given an install with nothing to sync", () => {
     /** @scenario "An install without a license sends no sync" */
     it("sends nothing", async () => {
       const prisma = fakePrisma({ license: null });
-      const host = fakeClient({ lease: LEASE });
+      const host = fakeClient({ services: SERVICES });
 
       await run({ prisma, client: host.client });
 
       expect(host.sent).toHaveLength(0);
       expect(prisma.updates).toHaveLength(0);
     });
+
+    /** @scenario "Refresh is offered on a connected license only" */
+    it("refuses a refresh, because there is no connected license to refresh", async () => {
+      const prisma = fakePrisma({ license: null });
+      const host = fakeClient({ services: SERVICES });
+
+      await expect(
+        refresh({ prisma, client: host.client }),
+      ).rejects.toMatchObject({ code: "connect_license_required" });
+      expect(host.sent).toHaveLength(0);
+    });
   });
 
   describe("when Connect is switched off for the deployment", () => {
     /** @scenario "An install with Connect disabled sends no sync" */
-    it("sends nothing and starts no worker", async () => {
+    it("sends nothing, starts no worker and refuses a refresh", async () => {
       connectEnabled.current = false;
       const prisma = fakePrisma();
-      const host = fakeClient({ lease: LEASE });
+      const host = fakeClient({ services: SERVICES });
 
       await syncLicensesForAllOrganizations({
         prisma: prisma.client,
@@ -374,6 +439,9 @@ describe("given an install with nothing to sync", () => {
 
       expect(host.sent).toHaveLength(0);
       expect(startLicenseSyncWorker()).toBeUndefined();
+      await expect(
+        refresh({ prisma, client: host.client }),
+      ).rejects.toMatchObject({ code: "connect_disabled" });
     });
   });
 });

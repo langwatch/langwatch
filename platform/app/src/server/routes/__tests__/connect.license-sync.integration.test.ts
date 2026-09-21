@@ -2,20 +2,18 @@
  * @vitest-environment node
  *
  * The connect host's license sync against real Postgres: a registered license
- * posts its seats, the row and the quarter's peak are written, and the answer
- * carries a lease the install can verify with the public key it embeds.
+ * posts its seats, the row records them, and the answer carries the services
+ * the license is entitled to and a reissued license when one is waiting.
  *
  * Spec: specs/self-hosting/connected-services/license-sync.feature
  */
 
 import { generateKeyPairSync } from "node:crypto";
-import { verifyLease } from "@ee/licensing/connect/lease";
 import { licenseTokenFromKey } from "@ee/licensing/licenseToken";
 import { PrismaConnectManagedKeys } from "@ee/licensing/registry/connectManagedKey.prisma";
 import {
   PrismaCustomerOrganizations,
   PrismaIssuedLicenseRepository,
-  PrismaLicenseSeatReports,
 } from "@ee/licensing/registry/issuedLicense.prisma";
 import { LicenseRegistryService } from "@ee/licensing/registry/licenseRegistry.service";
 import { validateLicense } from "@ee/licensing/validation";
@@ -68,10 +66,10 @@ describe("POST /api/connect/v1/license/sync (real PG)", () => {
   const organizationIds: string[] = [];
   const registry = new LicenseRegistryService({
     repository: new PrismaIssuedLicenseRepository(prisma),
-    seatReports: new PrismaLicenseSeatReports(prisma),
     organizations: new PrismaCustomerOrganizations(prisma),
     managedKeys: new PrismaConnectManagedKeys(prisma),
     contractBudgets: { sync: async () => undefined },
+    seatBilling: { invoiceAddedSeats: async () => "not_onboarded" },
     signingKey: () => privateKey,
     publicKey,
     // The app's own encryption, because the route decrypts a held license with
@@ -116,13 +114,6 @@ describe("POST /api/connect/v1/license/sync (real PG)", () => {
       process.env.LANGWATCH_LICENSE_PRIVATE_KEY = previousKey;
     }
     const inOrganizations = { organizationId: { in: organizationIds } };
-    const licenses = await prisma.issuedLicense.findMany({
-      where: inOrganizations,
-      select: { id: true },
-    });
-    await prisma.licenseSeatReport.deleteMany({
-      where: { licenseId: { in: licenses.map((license) => license.id) } },
-    });
     await prisma.issuedLicense.deleteMany({ where: inOrganizations });
     await prisma.gatewayChangeEvent.deleteMany({ where: inOrganizations });
     const keys = await prisma.virtualKey.findMany({
@@ -145,9 +136,14 @@ describe("POST /api/connect/v1/license/sync (real PG)", () => {
 
   describe("given an active license registered to a customer", () => {
     describe("when the install syncs reporting the seats in use", () => {
-      /** @scenario A sync records the reported seats and answers with a lease */
-      it("records the seats and the time, and answers with a signed lease", async () => {
+      /** @scenario A sync records the reported seats and answers with the entitled services */
+      it("records the seats and the time, and answers with the entitled services", async () => {
         const license = await issue();
+        await registry.updateTerms({
+          id: license.id,
+          operatorId: USER_ID,
+          services: ["instant_evals"],
+        });
 
         const res = await sync({
           token: license.token,
@@ -155,25 +151,7 @@ describe("POST /api/connect/v1/license/sync (real PG)", () => {
         });
 
         expect(res.status).toBe(200);
-        const { lease } = (await res.json()) as { lease: unknown };
-        const payload = verifyLease({
-          lease,
-          publicKey,
-          licenseId: license.licenseId,
-          instanceId: INSTANCE,
-        });
-        if (!payload)
-          throw new Error("expected a lease this install can trust");
-        expect(payload.seatOverageAllowance).toBe(10);
-        const warnAfterDays =
-          (new Date(payload.warnAfter).getTime() -
-            new Date(payload.issuedAt).getTime()) /
-          (24 * 60 * 60 * 1000);
-        const validDays =
-          (new Date(payload.validUntil).getTime() -
-            new Date(payload.issuedAt).getTime()) /
-          (24 * 60 * 60 * 1000);
-        expect([warnAfterDays, validDays]).toEqual([14, 30]);
+        expect(await res.json()).toEqual({ services: ["instant_evals"] });
 
         const row = await prisma.issuedLicense.findUnique({
           where: { id: license.id },
@@ -184,14 +162,10 @@ describe("POST /api/connect/v1/license/sync (real PG)", () => {
           reportedMembersLite: 2,
         });
         expect(row?.lastSyncAt).toBeInstanceOf(Date);
-        expect(
-          await prisma.licenseSeatReport.findMany({
-            where: { licenseId: license.id },
-          }),
-        ).toMatchObject([{ peakMembers: 53, peakMembersLite: 2 }]);
       });
 
-      it("keeps the quarter at its peak when a later report is lower", async () => {
+      /** @scenario The last report replaces the one before it */
+      it("keeps the latest report when a later one is lower", async () => {
         const license = await issue();
 
         await sync({
@@ -204,10 +178,8 @@ describe("POST /api/connect/v1/license/sync (real PG)", () => {
         });
 
         expect(
-          await prisma.licenseSeatReport.findMany({
-            where: { licenseId: license.id },
-          }),
-        ).toMatchObject([{ peakMembers: 53 }]);
+          await prisma.issuedLicense.findUnique({ where: { id: license.id } }),
+        ).toMatchObject({ reportedMembers: 51 });
       });
     });
 
@@ -259,10 +231,8 @@ describe("POST /api/connect/v1/license/sync (real PG)", () => {
           expect(text).not.toContain("73");
         }
         expect(
-          await prisma.licenseSeatReport.findMany({
-            where: { licenseId: license.id },
-          }),
-        ).toMatchObject([{ peakMembers: 1 }]);
+          await prisma.issuedLicense.findUnique({ where: { id: license.id } }),
+        ).toMatchObject({ reportedMembers: 1 });
       });
     });
   });
