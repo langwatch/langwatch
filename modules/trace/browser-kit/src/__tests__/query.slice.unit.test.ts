@@ -1,7 +1,7 @@
 import { analyzeOrGroups } from "@langwatch/trace-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { useFilterStore } from "../filter.store.ts";
+import { useFilterStore } from "../explorer.store.ts";
 
 const TRANSLATION = {
   projectId: "proj_test",

@@ -22,9 +22,9 @@ interface RowCheckboxProps {
 }
 
 const RowCheckbox: React.FC<RowCheckboxProps> = ({ traceIds: candidateTraceIds, ariaLabel }) => {
-  const traceIdSet = useSelectionStore((s) => s.traceIds);
-  const mode = useSelectionStore((s) => s.mode);
-  const setMany = useSelectionStore((s) => s.setMany);
+  const traceIdSet = useSelectionStore((s) => s.selection.traceIds);
+  const mode = useSelectionStore((s) => s.selection.mode);
+  const setMany = useSelectionStore((s) => s.setSelectedMany);
 
   // A loading row renders a skeleton instead of this checkbox, so a placeholder
   // id reaching here means the row tree got ahead of the loading flag. Dropping

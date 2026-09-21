@@ -1,10 +1,8 @@
 import { readUiStorage, writeUiStorage } from "@langwatch/browser-host/storage";
 import { nowInstant } from "@langwatch/time";
-import { useMemo } from "react";
-import { create, type StateCreator } from "zustand";
-import { useShallow } from "zustand/react/shallow";
+import type { StateCreator } from "zustand";
 
-import { getCurrentFilterText, useFilterStore } from "./filter.store.ts";
+import type { ExplorerStore } from "./explorer.store.ts";
 import {
   LENS_CAPABILITIES,
   reconcileAddons,
@@ -53,24 +51,6 @@ export function getEffectiveLens(state: {
   };
 }
 
-/**
- * The effective lens as a stable subscription: the slices are compared
- * shallowly and the derived object is memoised, so the store snapshot
- * settles instead of re-rendering the table forever.
- */
-export function useEffectiveLens(): LensConfig | null {
-  const slices = useViewStore(
-    useShallow((state) => ({
-      allLenses: state.allLenses,
-      activeLensId: state.activeLensId,
-      sort: state.sort,
-      grouping: state.grouping,
-      columnOrder: state.columnOrder,
-    })),
-  );
-  return useMemo(() => getEffectiveLens(slices), [slices]);
-}
-
 export function rowKindForGrouping(grouping: GroupingMode): RowKind {
   if (grouping === "by-conversation") return "conversation";
   if (grouping === "flat") return "trace";
@@ -103,7 +83,7 @@ export interface LensDraftInput {
   filterText: string;
 }
 
-interface ViewState {
+export interface ViewSlice {
   activeLensId: string;
   allLenses: LensConfig[];
   sort: SortConfig;
@@ -500,27 +480,22 @@ function clearDraftFor(
 }
 
 /**
- * Push a lens's saved filter into the filter store. Imperative one-way write —
- * viewStore never subscribes to filterStore.
- */
-function applyFilterTextFromLens(text: string): void {
-  useFilterStore.getState().setFilterFromLens(text);
-}
-
-/**
  * Drop the trace list's keyset cursors whenever the sort that minted them changes.
+ * Imperative one-way write: the view slice never subscribes to the query slice.
  */
 function dropKeysetCursorsIfSortChanged({
+  get,
   previous,
   next,
 }: {
+  get: () => ExplorerStore;
   previous: SortConfig;
   next: SortConfig;
 }): void {
   if (previous.columnId === next.columnId && previous.direction === next.direction) {
     return;
   }
-  useFilterStore.getState().resetPagination();
+  get().resetPagination();
 }
 
 const initialDismissedBuiltIns = loadDismissedBuiltInIds();
@@ -539,7 +514,7 @@ const initialDrafts = loadDrafts();
 const initialActiveLens = initialLenses.find((l) => l.id === initialActiveLensId);
 const initialActiveDraft = initialDrafts.get(initialActiveLensId);
 
-export const useViewStore = create<ViewState>((set, get) => ({
+export const createViewSlice: StateCreator<ExplorerStore, [], [], ViewSlice> = (set, get) => ({
   activeLensId: initialActiveLensId,
   allLenses: initialLenses,
   sort: initialActiveDraft?.sort ?? initialActiveLens?.sort ?? DEFAULT_SORT,
@@ -550,17 +525,17 @@ export const useViewStore = create<ViewState>((set, get) => ({
   ...viewShapeActions(set, get),
   ...lensLibraryActions(set, get),
   ...lensLifecycleActions(set, get),
-}));
+});
 
-type ViewSet = Parameters<StateCreator<ViewState>>[0];
-type ViewGet = Parameters<StateCreator<ViewState>>[1];
+type ViewSet = Parameters<StateCreator<ExplorerStore, [], [], ViewSlice>>[0];
+type ViewGet = Parameters<StateCreator<ExplorerStore, [], [], ViewSlice>>[1];
 
 /** How the current view is shaped: which lens, its sort, grouping, columns and filter. */
 function viewShapeActions(
   set: ViewSet,
   get: ViewGet,
 ): Pick<
-  ViewState,
+  ViewSlice,
   | "selectLens"
   | "setSort"
   | "setGrouping"
@@ -578,7 +553,7 @@ function viewShapeActions(
     // lens is built-in or custom. The "unsaved" dot on the lens tab keys off
     // `isDraft(lensId)`, so showing it for built-ins requires tracking those drafts too.
     setSort: (sort) => {
-      dropKeysetCursorsIfSortChanged({ previous: get().sort, next: sort });
+      dropKeysetCursorsIfSortChanged({ get, previous: get().sort, next: sort });
       set((s) => ({
         sort,
         draftState: setDraft(s.draftState, s.activeLensId, { sort }),
@@ -596,7 +571,7 @@ function viewShapeActions(
       // the user ever touching a header: a grouped RowKind can't order by
       // `time` (nor `spans`/`ttft`/`size`), so those all land on `count`. That
       // is a sort change like any other, and the cursors have to go with it.
-      dropKeysetCursorsIfSortChanged({ previous: s.sort, next: sort });
+      dropKeysetCursorsIfSortChanged({ get, previous: s.sort, next: sort });
       set({
         grouping: mode,
         columnOrder: columns,
@@ -631,7 +606,7 @@ function viewShapeActions(
 function lensLibraryActions(
   set: ViewSet,
   get: ViewGet,
-): Pick<ViewState, "isDraft" | "createLens" | "revertLens" | "renameLens"> {
+): Pick<ViewSlice, "isDraft" | "createLens" | "revertLens" | "renameLens"> {
   return {
     isDraft: (lensId) => get().draftState.has(lensId),
 
@@ -651,7 +626,7 @@ function lensLibraryActions(
         set({ allLenses, activeLensId: newLens.id });
         return newLens.id;
       }
-      applyFilterTextFromLens(newLens.filterText);
+      get().setFilterFromLens(newLens.filterText);
       set({ allLenses, ...adoptedLensState(newLens) });
       return newLens.id;
     },
@@ -665,7 +640,7 @@ function lensLibraryActions(
         set({ draftState });
         return;
       }
-      applyFilterTextFromLens(lens.filterText);
+      get().setFilterFromLens(lens.filterText);
       set({ draftState, sort: lens.sort, grouping: lens.grouping, columnOrder: lens.columns });
     },
 
@@ -684,7 +659,7 @@ function lensLibraryActions(
 function lensLifecycleActions(
   set: ViewSet,
   get: ViewGet,
-): Pick<ViewState, "duplicateLens" | "deleteLens" | "setUserLenses"> {
+): Pick<ViewSlice, "duplicateLens" | "deleteLens" | "setUserLenses"> {
   return {
     duplicateLens: (lensId) => {
       const state = get();
@@ -699,7 +674,7 @@ function lensLifecycleActions(
         isBuiltIn: false,
       };
       lensSyncBridge?.create(newLens);
-      applyFilterTextFromLens(newLens.filterText);
+      get().setFilterFromLens(newLens.filterText);
       set({ allLenses: [...state.allLenses, newLens], ...adoptedLensState(newLens) });
       return newLens.id;
     },
@@ -717,7 +692,7 @@ function lensLifecycleActions(
       }
       const firstLens = allLenses[0];
       if (!firstLens) return;
-      applyFilterTextFromLens(firstLens.filterText);
+      get().setFilterFromLens(firstLens.filterText);
       set({ allLenses, draftState, ...adoptedLensState(firstLens) });
     },
 
@@ -728,7 +703,7 @@ function lensLifecycleActions(
 }
 
 /** The view a lens (and any draft over it) puts on screen. */
-function selectedLensState(s: ViewState, id: string, persist: boolean): Partial<ViewState> {
+function selectedLensState(s: ExplorerStore, id: string, persist: boolean): Partial<ViewSlice> {
   const lens = s.allLenses.find((l) => l.id === id);
   if (!lens) return s;
   // Remember the choice as the last-used lens, across navigation and across
@@ -737,10 +712,10 @@ function selectedLensState(s: ViewState, id: string, persist: boolean): Partial<
   // none — so that path never clobbers the stored preference.
   if (persist) persistActiveLensId(id);
   const draft = s.draftState.get(id);
-  // The lens's filter, or its draft override, goes to filterStore through the
-  // silent setter: `applyQueryText` would loop back through `setFilterDraft`
-  // and mark the lens dirty on the spot.
-  applyFilterTextFromLens(draft?.filter ?? lens.filterText);
+  // The lens's filter, or its draft override, goes to the query slice through
+  // the silent setter: `applyQueryText` would loop back through
+  // `setFilterDraft` and mark the lens dirty on the spot.
+  s.setFilterFromLens(draft?.filter ?? lens.filterText);
   return {
     activeLensId: id,
     sort: draft?.sort ?? lens.sort,
@@ -750,7 +725,7 @@ function selectedLensState(s: ViewState, id: string, persist: boolean): Partial<
 }
 
 /** A new column order, recorded as a draft against the active lens. */
-function withColumnOrder(s: ViewState, order: string[]): Partial<ViewState> {
+function withColumnOrder(s: ViewSlice, order: string[]): Partial<ViewSlice> {
   return {
     columnOrder: order,
     draftState: setDraft(s.draftState, s.activeLensId, { columns: order }),
@@ -758,7 +733,7 @@ function withColumnOrder(s: ViewState, order: string[]): Partial<ViewState> {
 }
 
 /** The column order with one column added or removed. */
-function toggledColumnOrder(s: ViewState, columnId: string): string[] {
+function toggledColumnOrder(s: ViewSlice, columnId: string): string[] {
   if (s.columnOrder.includes(columnId)) return s.columnOrder.filter((id) => id !== columnId);
   return [...s.columnOrder, columnId];
 }
@@ -793,7 +768,7 @@ function draftWithoutFilter(existing: DraftLensState): DraftLensState {
  * carrying a no-op marker around. Any other draft fields on the lens survive:
  * the entry only goes when what is left of it would be empty.
  */
-function filterDraftState(s: ViewState, text: string): Partial<ViewState> {
+function filterDraftState(s: ViewSlice, text: string): Partial<ViewSlice> {
   const lens = s.allLenses.find((l) => l.id === s.activeLensId);
   const existing = s.draftState.get(s.activeLensId);
   const next = new Map(s.draftState);
@@ -813,7 +788,7 @@ function filterDraftState(s: ViewState, text: string): Partial<ViewState> {
 }
 
 /** The state that adopting a lens puts on screen. */
-function adoptedLensState(lens: LensConfig): Partial<ViewState> {
+function adoptedLensState(lens: LensConfig): Partial<ViewSlice> {
   return {
     activeLensId: lens.id,
     sort: { ...lens.sort },
@@ -834,7 +809,7 @@ function lensFromSnapshot({
 }: {
   name: string;
   overrides: Partial<LensDraftInput> | undefined;
-  state: ViewState;
+  state: ExplorerStore;
 }): LensConfig {
   return {
     id: generateId(),
@@ -844,7 +819,7 @@ function lensFromSnapshot({
     addons: overrides?.addons ? [...overrides.addons] : [],
     grouping: overrides?.grouping ?? state.grouping,
     sort: overrides?.sort ? { ...overrides.sort } : { ...state.sort },
-    filterText: overrides?.filterText ?? getCurrentFilterText(),
+    filterText: overrides?.filterText ?? state.queryText,
   };
 }
 
@@ -853,7 +828,7 @@ function lensFromSnapshot({
  * deleted or dismissed, but the strip must always offer a way back to the
  * unfiltered table.
  */
-function isDeletableLens(s: ViewState, lensId: string): boolean {
+function isDeletableLens(s: ViewSlice, lensId: string): boolean {
   if (s.allLenses.length <= 1) return false;
   return lensId !== "all-traces";
 }
@@ -875,15 +850,15 @@ function forgetLens(lens: LensConfig, lensId: string): void {
  * so it is adopted here the moment it appears.
  */
 function lateAdoptedPersistedLens(
-  s: ViewState,
+  s: ExplorerStore,
   allLenses: LensConfig[],
-): Partial<ViewState> | null {
+): Partial<ViewSlice> | null {
   const persisted = getPersistedActiveLensId();
   if (s.activeLensId !== "all-traces" || !persisted || persisted === s.activeLensId) return null;
   const target = allLenses.find((l) => l.id === persisted);
   if (!target) return null;
   const draft = s.draftState.get(persisted);
-  applyFilterTextFromLens(draft?.filter ?? target.filterText);
+  s.setFilterFromLens(draft?.filter ?? target.filterText);
   return {
     allLenses,
     activeLensId: persisted,
@@ -898,7 +873,7 @@ function lateAdoptedPersistedLens(
  * disappeared — deleted in another tab, or by a teammate — the first available
  * one takes over.
  */
-function mergedUserLenses(s: ViewState, lenses: LensConfig[]): Partial<ViewState> {
+function mergedUserLenses(s: ExplorerStore, lenses: LensConfig[]): Partial<ViewSlice> {
   const builtIns = s.allLenses.filter((l) => l.isBuiltIn);
   const allLenses = [...builtIns, ...lenses.map((l) => ({ ...l, isBuiltIn: false }))];
 
@@ -908,7 +883,7 @@ function mergedUserLenses(s: ViewState, lenses: LensConfig[]): Partial<ViewState
   if (allLenses.some((l) => l.id === s.activeLensId)) return { allLenses };
   const next = allLenses[0];
   if (!next) return { allLenses };
-  applyFilterTextFromLens(next.filterText);
+  s.setFilterFromLens(next.filterText);
   return {
     allLenses,
     activeLensId: next.id,

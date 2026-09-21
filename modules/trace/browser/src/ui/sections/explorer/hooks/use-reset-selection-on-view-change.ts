@@ -12,7 +12,7 @@ export function useResetSelectionOnViewChange(): void {
   const timeLabel = useFilterStore((s) => s.debouncedTimeRange.label);
   const activeLensId = useViewStore((s) => s.activeLensId);
 
-  const clear = useSelectionStore((s) => s.clear);
+  const clear = useSelectionStore((s) => s.clearSelection);
   const firstRunRef = useRef(true);
 
   // While a relative-time label is active, from/to tick every minute

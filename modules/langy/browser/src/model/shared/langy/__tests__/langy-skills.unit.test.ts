@@ -7,7 +7,7 @@ import { deriveSkills, skillSourceDirs } from "../../../../../scripts/generate-l
 import { findSkill, LANGY_SKILLS } from "../langy-skills.ts";
 import GENERATED from "../langySkills.generated.json";
 
-const REPO_ROOT = path.resolve(__dirname, "../../../../../../../../..");
+const REPO_ROOT = path.resolve(__dirname, "../../../../../../../..");
 
 /**
  * The catalogue must match the IMAGE, not our memory of it.

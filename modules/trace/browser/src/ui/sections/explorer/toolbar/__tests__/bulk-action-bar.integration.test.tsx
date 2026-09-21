@@ -68,7 +68,7 @@ beforeEach(() => {
   langyMock.showLangy = true;
   langyMock.attach.mockClear();
   langyMock.open.mockClear();
-  useSelectionStore.getState().clear();
+  useSelectionStore.getState().clearSelection();
 });
 afterEach(cleanup);
 
@@ -77,7 +77,7 @@ describe("BulkActionBar Add to context", () => {
     describe("when Add to context is clicked", () => {
       /** @scenario "The trace list adds context through the selection bar, not a hover" */
       it("attaches every selected trace by human name and opens Langy", () => {
-        useSelectionStore.getState().setMany(["t1", "t2"], true);
+        useSelectionStore.getState().setSelectedMany(["t1", "t2"], true);
         renderBar({ t1: "Checkout agent", t2: undefined });
 
         fireEvent.click(screen.getByRole("button", { name: /Add to context/ }));
@@ -100,7 +100,7 @@ describe("BulkActionBar Add to context", () => {
   describe("given Langy is not available", () => {
     it("does not offer the Add to context action", () => {
       langyMock.showLangy = false;
-      useSelectionStore.getState().setMany(["t1"], true);
+      useSelectionStore.getState().setSelectedMany(["t1"], true);
       renderBar();
 
       expect(screen.queryByRole("button", { name: /Add to context/ })).not.toBeInTheDocument();
@@ -111,8 +111,8 @@ describe("BulkActionBar Add to context", () => {
 
   describe("given all-matching selection mode", () => {
     it("disables Add to context (too many to attach as chips)", () => {
-      useSelectionStore.getState().setMany(["t1", "t2"], true);
-      useSelectionStore.getState().enableAllMatching();
+      useSelectionStore.getState().setSelectedMany(["t1", "t2"], true);
+      useSelectionStore.getState().selectAllMatching();
       renderBar();
 
       expect(screen.getByRole("button", { name: /Add to context/ })).toBeDisabled();

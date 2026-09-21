@@ -3,7 +3,7 @@
 // @vitest-environment jsdom
 // @see specs/traces-v2/sessions-lens.feature
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { LensConfig } from "@langwatch/trace-browser-kit";
+import { type LensConfig, useExplorerStore } from "@langwatch/trace-browser-kit";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
@@ -87,6 +87,8 @@ const expandToggle = () => screen.getByRole("button", { name: /Expand turns|Coll
 beforeEach(() => {
   openDrawerMock.mockClear();
   useDrawerStore.getState().closeDrawer();
+  // The open row outlives a remount now that it lives in the Explorer store.
+  useExplorerStore.getState().setExpandedRows([]);
   // The virtualizer windows rows to the scroll element's height, and jsdom
   // measures every element as zero, which windows the table down to no rows
   // at all and leaves every assertion below passing vacuously. Publishing a

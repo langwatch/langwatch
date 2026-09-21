@@ -1,9 +1,20 @@
-import { judgeSpanDigestFormatter } from "@langwatch/scenario";
-import type { Span, SpanTypes } from "@langwatch/trace-contract";
+import {
+  DEFAULT_TOKEN_THRESHOLD,
+  estimateTokens,
+  expandTrace,
+  judgeSpanDigestFormatter,
+} from "@langwatch/scenario";
+import {
+  cutToEstimatedTokensAtLineBreak,
+  type Span,
+  type SpanTypes,
+} from "@langwatch/trace-contract";
 import type { Attributes, HrTime, SpanContext, SpanStatus } from "@opentelemetry/api";
 import { SpanKind, SpanStatusCode, TraceFlags } from "@opentelemetry/api";
 import { emptyResource } from "@opentelemetry/resources";
 import type { ReadableSpan } from "@opentelemetry/sdk-trace-base";
+
+import { rankSpansForExpansion } from "../rules/bounded-spans-digest.rules.ts";
 
 function msToHrTime(ms: number): HrTime {
   const seconds = Math.trunc(ms / 1000);
@@ -205,6 +216,42 @@ export class TraceReadableSpanService {
     return Promise.resolve(judgeSpanDigestFormatter.format(readableSpans));
   }
 
+  /**
+   * The same digest under a token budget: the whole thing when it fits, else
+   * the structure-only skeleton plus as many expanded spans as fit in the
+   * order a reader wants them, else the skeleton cut to the budget.
+   * @see specs/traces/trace-extraction-modules.feature
+   */
+  static formatSpansDigestBounded({
+    spans,
+    maxTokens,
+  }: {
+    spans: Span[];
+    /** Defaults to the scenario judge's own threshold. */
+    maxTokens?: number;
+  }): BoundedSpansDigest {
+    const budget = maxTokens ?? DEFAULT_TOKEN_THRESHOLD;
+    const readableSpans = spans.map((span) =>
+      TraceReadableSpanService.langwatchSpanToReadableSpan(span),
+    );
+
+    const full = judgeSpanDigestFormatter.format(readableSpans);
+    const fullTokens = estimateTokens(full);
+    if (fullTokens <= budget) {
+      return { text: full, isTruncated: false, estimatedTokens: fullTokens };
+    }
+
+    const structure = judgeSpanDigestFormatter.formatStructureOnly(readableSpans);
+    if (estimateTokens(structure) > budget) {
+      // One span per line, so the cut lands on a line break: half a tree line
+      // names a span that does not exist.
+      const text = cutToEstimatedTokensAtLineBreak({ text: structure, maxTokens: budget });
+      return { text, isTruncated: true, estimatedTokens: estimateTokens(text) };
+    }
+
+    return expandedWithinBudget({ spans, readableSpans, structure, budget });
+  }
+
   static langwatchSpanToReadableSpan(span: Span): ReadableSpan {
     const startTime = msToHrTime(span.timestamps.started_at);
     const endTime = msToHrTime(span.timestamps.finished_at);
@@ -246,4 +293,39 @@ export class TraceReadableSpanService {
       droppedLinksCount: 0,
     };
   }
+}
+
+/** A trace digest rendered for a model, with what it cost and what it lost. */
+export interface BoundedSpansDigest {
+  text: string;
+  /** Whether anything was left out to fit the budget. */
+  isTruncated: boolean;
+  estimatedTokens: number;
+}
+
+/**
+ * The skeleton with as many fully expanded spans as the budget takes. A span
+ * that does not fit is skipped rather than ending the walk: a cheaper one
+ * further down the ranking still earns its place.
+ */
+function expandedWithinBudget({
+  spans,
+  readableSpans,
+  structure,
+  budget,
+}: {
+  spans: Span[];
+  readableSpans: ReadableSpan[];
+  structure: string;
+  budget: number;
+}): BoundedSpansDigest {
+  let text = structure;
+  const expanded: string[] = [];
+  for (const span of rankSpansForExpansion(spans)) {
+    const candidate = `${structure}\n\n${expandTrace(readableSpans, [...expanded, span.span_id])}`;
+    if (estimateTokens(candidate) > budget) continue;
+    expanded.push(span.span_id);
+    text = candidate;
+  }
+  return { text, isTruncated: true, estimatedTokens: estimateTokens(text) };
 }

@@ -1,5 +1,5 @@
 import { isEvalColumnId } from "./lens-eval-column-id.ts";
-import type { GroupingMode, SortConfig } from "./view.store.ts";
+import type { GroupingMode, SortConfig } from "./view.slice.ts";
 
 /**
  * Single source of truth for "what can a lens look like under grouping X".

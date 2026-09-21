@@ -67,7 +67,7 @@ const buttonNames = () => screen.getAllByRole("button").map((b) => b.textContent
 
 beforeEach(() => {
   mocks.permissions = new Set<string>(["annotations:create"]);
-  useSelectionStore.getState().clear();
+  useSelectionStore.getState().clearSelection();
 });
 afterEach(cleanup);
 
@@ -75,7 +75,7 @@ describe("BulkActionBar add to annotation queue", () => {
   describe("given rows are selected", () => {
     /** @scenario "Add to annotation queue sits between Add to context and Add to dataset" */
     it("offers the action between Add to context and Add to dataset", () => {
-      useSelectionStore.getState().setMany(["t1", "t2", "t3"], true);
+      useSelectionStore.getState().setSelectedMany(["t1", "t2", "t3"], true);
       renderBar();
 
       const names = buttonNames();
@@ -90,7 +90,7 @@ describe("BulkActionBar add to annotation queue", () => {
     describe("when the user clicks Add to annotation queue", () => {
       /** @scenario "Opening the dialog carries the selected trace ids" */
       it("opens the dialog for exactly the selected traces", async () => {
-        useSelectionStore.getState().setMany(["t1", "t2", "t3"], true);
+        useSelectionStore.getState().setSelectedMany(["t1", "t2", "t3"], true);
         renderBar();
 
         expect(screen.queryByTestId("annotation-queue-dialog")).not.toBeInTheDocument();
@@ -105,8 +105,8 @@ describe("BulkActionBar add to annotation queue", () => {
   describe("given select-all-matching is active", () => {
     /** @scenario "Add to annotation queue is disabled in select-all-matching mode" */
     it("disables the action because the queue needs explicit rows", () => {
-      useSelectionStore.getState().setMany(["t1", "t2", "t3"], true);
-      useSelectionStore.getState().enableAllMatching();
+      useSelectionStore.getState().setSelectedMany(["t1", "t2", "t3"], true);
+      useSelectionStore.getState().selectAllMatching();
       renderBar();
 
       expect(screen.getByRole("button", { name: /Add to annotation queue/ })).toBeDisabled();
@@ -117,7 +117,7 @@ describe("BulkActionBar add to annotation queue", () => {
     /** @scenario "The action is hidden without permission to create annotations" */
     it("does not offer the action at all", () => {
       mocks.permissions = new Set<string>();
-      useSelectionStore.getState().setMany(["t1"], true);
+      useSelectionStore.getState().setSelectedMany(["t1"], true);
       renderBar();
 
       expect(

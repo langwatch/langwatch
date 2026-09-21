@@ -14,9 +14,9 @@ interface SelectHeaderCheckboxProps {
 }
 
 export const SelectHeaderCheckbox: React.FC<SelectHeaderCheckboxProps> = ({ traceIds }) => {
-  const traceIdSet = useSelectionStore((s) => s.traceIds);
-  const mode = useSelectionStore((s) => s.mode);
-  const setMany = useSelectionStore((s) => s.setMany);
+  const traceIdSet = useSelectionStore((s) => s.selection.traceIds);
+  const mode = useSelectionStore((s) => s.selection.mode);
+  const setMany = useSelectionStore((s) => s.setSelectedMany);
 
   if (traceIds.length === 0) return null;
 

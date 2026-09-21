@@ -25,6 +25,11 @@ export type LangyResourceKind = (typeof LANGY_RESOURCE_KINDS)[number];
  */
 export const LANGY_UI_ACTION_CHIP_KINDS = [
   "experiment",
+  // The Trace Explorer's view chip and its applied-search chip are both
+  // `filter`; its bulk selection is `selection`. All three are minted on the
+  // traces page alone, so any of them means the Explorer is on screen.
+  "filter",
+  "selection",
 ] as const satisfies readonly LangyResourceKind[];
 
 /**

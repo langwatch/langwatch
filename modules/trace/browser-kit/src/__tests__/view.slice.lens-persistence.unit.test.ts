@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ACTIVE_LENS_KEY } from "../view.store.ts";
+import { ACTIVE_LENS_KEY } from "../view.slice.ts";
 
 /**
  * The viewStore computes its initial active lens at module-load time from localStorage,
@@ -13,7 +13,7 @@ async function freshStore() {
   // else, so the fresh module graph gets one before the store reads from it.
   const { BrowserUiStorage, setUiStorage } = await import("@langwatch/browser-host/storage");
   setUiStorage(new BrowserUiStorage());
-  return import("../view.store.ts");
+  return import("../explorer.store.ts");
 }
 
 describe("viewStore last-used lens persistence", () => {

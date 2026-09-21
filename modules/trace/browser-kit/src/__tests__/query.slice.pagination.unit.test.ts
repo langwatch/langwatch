@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { INITIAL_TIME_RANGE, useFilterStore } from "../filter.store.ts";
+import { useFilterStore } from "../explorer.store.ts";
+import { INITIAL_TIME_RANGE } from "../query.slice.ts";
 
 /**
  * The trace list is keyset-paged: `pageCursors[n].sortValue` is the sort value of the

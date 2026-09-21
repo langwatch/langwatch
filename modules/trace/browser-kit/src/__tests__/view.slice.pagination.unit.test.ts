@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { useFilterStore } from "../filter.store.ts";
-import { useViewStore } from "../view.store.ts";
+import { useFilterStore, useViewStore } from "../explorer.store.ts";
 
 /**
  * Sort lives in viewStore, the keyset cursors live in filterStore, and the server joins

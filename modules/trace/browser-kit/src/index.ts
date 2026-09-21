@@ -1,13 +1,15 @@
 export * from "./expand-context.ts";
+export * from "./explorer.store.ts";
 export * from "./export-types.ts";
-export * from "./filter.store.ts";
 export * from "./get-suggestion-state.ts";
 export * from "./lens-capabilities.ts";
 export * from "./lens-eval-column-id.ts";
 export * from "./origin-display.ts";
 export * from "./page-visibility.ts";
+export * from "./query.slice.ts";
+export * from "./rows.slice.ts";
 export * from "./scenario-role.tsx";
-export * from "./selection.store.ts";
+export * from "./selection.slice.ts";
 export * from "./sse-subscription.ts";
 export * from "./suggestion-items.ts";
 export * from "./suggestion-ui.ts";
@@ -25,4 +27,4 @@ export {
   isOverridesEmpty,
   parseFragment,
 } from "@langwatch/trace-contract";
-export * from "./view.store.ts";
+export * from "./view.slice.ts";

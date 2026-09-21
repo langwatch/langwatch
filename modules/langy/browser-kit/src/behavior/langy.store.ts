@@ -5,6 +5,7 @@ import {
   isLangyTurnProjectionTerminal,
   type LangyConversationTurnWireEvent,
   type LangyEventCursor,
+  type LangyKickoffBrief,
   type LangyTurnProjectionState,
   abandonSend as reduceAbandonSend,
   abandonStop as reduceAbandonStop,
@@ -138,6 +139,20 @@ interface LangyState extends TurnPhaseState {
   askLangy: (prompt: string) => void;
   /** The panel has taken the queued prompt — clear it so it fires once. */
   consumePendingPrompt: () => void;
+
+  /**
+   * The guided onboarding handing over to Langy: the tour ended and the panel
+   * sends the kickoff on the next idle render. Ephemeral like `pendingPrompt`;
+   * the message itself is what lasts.
+   */
+  pendingKickoff: LangyKickoffBrief | null;
+  /**
+   * Open Langy and queue the kickoff. With `conversationId` the panel
+   * continues that conversation; without one it starts fresh.
+   */
+  queueGuidedKickoff: (kickoff: LangyKickoffBrief) => void;
+  /** The panel has taken the queued kickoff: clear it so it sends once. */
+  consumePendingKickoff: () => void;
 
   /**
    * The panel's composer is asked to take focus.
@@ -455,6 +470,7 @@ const emptyConversationState = () => ({
   turnPlan: null as { content: string; status: string }[] | null,
   // A fresh conversation drops any question still queued for the previous one.
   pendingPrompt: null as string | null,
+  pendingKickoff: null as LangyKickoffBrief | null,
   // A conversation change also drops the id a panel-open warm minted: the
   // pending id belongs to the fresh chat the warm was fired for, and the warm
   // hook re-warms (and re-mints) for whatever the panel points at next.
@@ -526,6 +542,24 @@ export const useLangyStore = create<LangyState>()(
           composerFocusRequested: true,
         })),
       consumePendingPrompt: () => set({ pendingPrompt: null }),
+
+      pendingKickoff: null,
+      queueGuidedKickoff: (kickoff) =>
+        set(() => ({
+          isOpen: true,
+          // The kickoff lands where the caller's conversation is: the attached
+          // one when there is one, a fresh one otherwise.
+          activeConversationId: kickoff.conversationId ?? null,
+          historyLoadConversationId: kickoff.conversationId ?? null,
+          draft: "",
+          modelOverride: "",
+          isModelPickedByUser: false,
+          modelSeededForConversationId: null,
+          ...emptyConversationState(),
+          // AFTER the spread, like `pendingPrompt`: the spread nulls it.
+          pendingKickoff: kickoff,
+        })),
+      consumePendingKickoff: () => set({ pendingKickoff: null }),
 
       composerFocusRequested: false,
       requestComposerFocus: () => set({ composerFocusRequested: true }),

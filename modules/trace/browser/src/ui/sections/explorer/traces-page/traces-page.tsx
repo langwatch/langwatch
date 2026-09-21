@@ -423,9 +423,9 @@ const ResultsPane: React.FC = React.memo(() => {
       >,
     [data],
   );
-  const selectionMode = useSelectionStore((s) => s.mode);
-  const explicitCount = useSelectionStore((s) => s.traceIds.size);
-  const clearSelection = useSelectionStore((s) => s.clear);
+  const selectionMode = useSelectionStore((s) => s.selection.mode);
+  const explicitCount = useSelectionStore((s) => s.selection.traceIds.size);
+  const clearSelection = useSelectionStore((s) => s.clearSelection);
   const {
     isDialogOpen,
     openExportDialog,

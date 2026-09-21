@@ -3,7 +3,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { useEffectiveLens, useViewStore } from "../view.store.ts";
+import { useEffectiveLens, useViewStore } from "../explorer.store.ts";
 
 describe("useEffectiveLens", () => {
   describe("when the view store has not changed between renders", () => {

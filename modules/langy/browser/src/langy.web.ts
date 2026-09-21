@@ -7,9 +7,14 @@
 import { defineWebModule } from "@langwatch/ui-kernel";
 
 import { langyApi } from "./behavior/langy-api.ts";
+import { langyGuidedOnboarding } from "./behavior/langy-guided-onboarding.capability.ts";
 
 export const langyWeb = defineWebModule("langy")
   .withApi(langyApi)
+  // The one thing another module may do to the panel: dock it, hand it a
+  // kickoff, and hear when it has entered a scope. The shell wires this into
+  // the consumer's own `*HostApi`; nothing else reaches Langy's store.
+  .withCapabilities({ guidedOnboarding: langyGuidedOnboarding })
   .withHosts({
     requires: ["LangyHostApi"],
     mounts: { LangyHostApi: { load: () => import("./behavior/langy-host-mount.tsx") } },

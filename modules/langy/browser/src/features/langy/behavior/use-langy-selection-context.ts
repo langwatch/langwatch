@@ -14,8 +14,8 @@ import { ALL_MATCHING_PREFIX } from "../../../behavior/langy-chip-context.ts";
  * checked instead of guessing.
  */
 export function useLangySelectionContext(): LangyContextChip | null {
-  const mode = useSelectionStore((s) => s.mode);
-  const traceIds = useSelectionStore((s) => s.traceIds);
+  const mode = useSelectionStore((s) => s.selection.mode);
+  const traceIds = useSelectionStore((s) => s.selection.traceIds);
   // "Select all matching" is defined BY the search it matched, so the chip has
   // to carry that search or it carries nothing usable (see below).
   const queryText = useFilterStore((s) => s.queryText);

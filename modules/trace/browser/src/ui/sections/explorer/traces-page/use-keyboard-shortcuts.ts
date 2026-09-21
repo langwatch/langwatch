@@ -103,12 +103,12 @@ export const useClearSelectionShortcut = (): void => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (isTextInput(e.target)) return;
-      const { mode, traceIds, clear } = useSelectionStore.getState();
-      const hasSelection = mode === "all-matching" || traceIds.size > 0;
+      const { selection, clearSelection } = useSelectionStore.getState();
+      const hasSelection = selection.mode === "all-matching" || selection.traceIds.size > 0;
       if (!hasSelection) return;
       e.stopPropagation();
       e.preventDefault();
-      clear();
+      clearSelection();
     };
     // Capture phase so we win against bubble-phase Escape handlers (e.g.
     // the drawer's window-level keydown listener).

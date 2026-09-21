@@ -16,7 +16,9 @@ Langy needs to drive the page and to read it. The evaluations workbench already 
 
 ## Decision
 
-The Explorer is one store. `useExplorerStore` (`stores/explorerStore.ts`) composes four slices created with zustand's `StateCreator`: `querySlice`, `viewSlice`, `selectionSlice` and `rowsSlice`. Slices reach each other through `get()`, not imports. `filterStore.ts`, `viewStore.ts` and `selectionStore.ts` are gone, and consumers import `useExplorerStore` and the slice's own types directly.
+The Explorer is one store. `useExplorerStore` (`modules/trace/browser-kit/src/explorer.store.ts`) composes four slices created with zustand's `StateCreator`: `query.slice.ts`, `view.slice.ts`, `selection.slice.ts` and `rows.slice.ts`. Slices reach each other through `get()`, not imports. The store lives in the browser-kit because Explorer state is shared state: `modules/langy/browser` reads it too, and a store is state, not a fetch.
+
+`useFilterStore`, `useViewStore` and `useSelectionStore` remain as names for the one store, so a selector written against any slice still resolves and the Explorer's existing readers did not have to move in the same change. New code says `useExplorerStore`.
 
 `rowsSlice` holds what was outside any store: `expandedRows`, and `results` (`totalHits`, `itemNoun`, `pageTraceIds`, `isSettled`), which the counts hook writes after each read.
 
@@ -42,7 +44,7 @@ What is compromised: `commitExplorerState` writes field by field, so a transform
 
 ## Consequences
 
-Tests that mocked `filterStore` and `viewStore` separately now mock one module, and a second `vi.mock` of the same path replaces the first, so their factories were merged. Open rows now survive a remount of the lens body, and tests reset them in `beforeEach`.
+Tests that mocked `filterStore` and `viewStore` separately now mock one module, and a second `vi.mock` of the same path replaces the first, so their factories were merged. Here they already mocked `@langwatch/trace-browser-kit` as one module, so only the selection's readers moved: `mode`/`traceIds` became `selection.mode`/`selection.traceIds`, and `setMany`/`enableAllMatching`/`clear` became `setSelectedMany`/`selectAllMatching`/`clearSelection`. Open rows now survive a remount of the lens body, and tests reset them in `beforeEach`.
 
 A new page action is a transform, a schema, a manifest entry and nothing in the page beyond the generic handler. A new piece of page state that Langy should see goes in a slice and in `ExplorerState`, not in component state.
 

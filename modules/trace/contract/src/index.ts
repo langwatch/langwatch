@@ -12,6 +12,7 @@ export * from "./trace-content-part.ts";
 export * from "./trace-content-part.visitor.ts";
 export * from "./trace-attributes.ts";
 export * from "./trace-time-range-presets.ts";
+export * from "./trace-token-budget.ts";
 export * from "./trace-explorer-url-state.ts";
 export * from "./explorer/actions/index.ts";
 export * from "./trace-query-analysis.ts";

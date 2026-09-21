@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { useViewStore } from "../view.store.ts";
+import { useViewStore } from "../explorer.store.ts";
 
 /**
  * `reorderColumns(from, to)` is the move primitive that powers both the

@@ -1,5 +1,5 @@
 import { Flex, Text } from "@chakra-ui/react";
-import { useFilterStore, type LensConfig } from "@langwatch/trace-browser-kit";
+import { useExplorerStore, type LensConfig } from "@langwatch/trace-browser-kit";
 import {
   getCoreRowModel,
   getSortedRowModel,
@@ -49,8 +49,11 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
   lens,
   isLoading = false,
 }) => {
-  const pageSize = useFilterStore((s) => s.pageSize);
-  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const pageSize = useExplorerStore((s) => s.pageSize);
+  // The open conversation lives in the store, so a remount keeps it open and
+  // Langy's `explorer.getState` reads the same row the reader sees.
+  const expandedKey = useExplorerStore((s) => s.expandedRows.values().next().value ?? null);
+  const toggleExpandedRow = useExplorerStore((s) => s.toggleExpandedRow);
   const openLatestTrace = useOpenLatestTrace();
 
   // Turn rows for the one expanded conversation, fetched on demand: the
@@ -107,7 +110,7 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
 
   if (!isLoading && groups.length === 0) return <NoConversationsMessage />;
 
-  const toggleExpanded = (id: string) => setExpandedKey((prev) => (prev === id ? null : id));
+  const toggleExpanded = (id: string) => toggleExpandedRow({ key: id, exclusive: true });
 
   return (
     <TraceTableShell table={table} minWidth={CONVERSATION_MIN_WIDTH} stickyFirstColumn>

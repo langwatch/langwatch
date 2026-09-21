@@ -41,10 +41,10 @@ const renderHeader = (props: { data: TraceListItem[]; isLoading: boolean }) =>
 
 const selectAllButton = () => screen.queryByRole("button", { name: "Select all on this page" });
 
-const selection = () => Array.from(useSelectionStore.getState().traceIds);
+const selection = () => Array.from(useSelectionStore.getState().selection.traceIds);
 
 beforeEach(() => {
-  useSelectionStore.getState().clear();
+  useSelectionStore.getState().clearSelection();
 });
 
 afterEach(() => {

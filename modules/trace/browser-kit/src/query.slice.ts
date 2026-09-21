@@ -1,9 +1,7 @@
 import { nowInstant } from "@langwatch/time";
 import type { AiActionError } from "@langwatch/trace-contract";
 import {
-  addSameFieldOrValue,
-  addToOrGroupAtLocation,
-  getFacetValueState,
+  excludedFacetQuery,
   isEmptyAST,
   ParseError,
   parse,
@@ -17,11 +15,13 @@ import {
   setRangeInQuery,
   swapOperatorAtLocation,
   toggleEvaluatorSubFilterInQuery,
-  toggleFacetInQuery,
+  toggledFacetQuery,
   validateAst,
 } from "@langwatch/trace-contract";
 import type { LiqeQuery } from "liqe";
-import { create } from "zustand";
+import type { StateCreator } from "zustand";
+
+import type { ExplorerStore } from "./explorer.store.ts";
 
 export interface TimeRange {
   from: number;
@@ -43,7 +43,7 @@ export interface TraceListCursor {
  */
 export type PageCursor = TraceListCursor | string;
 
-interface FilterState {
+export interface QuerySlice {
   /** The parsed query AST (liqe) — single source of truth */
   ast: LiqeQuery;
   /** Serialized query string — always in sync with ast */
@@ -61,6 +61,17 @@ interface FilterState {
   debouncedQueryText: string;
   /** Debounced version of timeRange to drive network requests */
   debouncedTimeRange: TimeRange;
+
+  /**
+   * The Instant Eval runs behind the query's `eval` chips: the run key (the
+   * question, the unit judged, the other chips and the window) to the run id.
+   * A key with no entry is pending. In the URL as `run=<key>:<runId>`.
+   */
+  evalRuns: Record<string, string>;
+  /** Register the run started for a chip's key. */
+  registerEvalRun: (args: { key: string; runId: string }) => void;
+  /** Replace the whole registry, which is what a URL apply does. */
+  setEvalRuns: (runs: Record<string, string>) => void;
 
   /**
    * Structured error from the most recent Ask AI attempt. Persists until the user
@@ -212,7 +223,37 @@ function safeParseAndSerialize(text: string): ParseResult {
   }
 }
 
-function applyMutation(state: FilterState, mutate: (text: string) => string) {
+/**
+ * The state after the search bar's text is applied. An unchanged canonical
+ * text keeps the previous state reference, so `ast` subscribers do not churn
+ * on a round-trip-equivalent edit.
+ */
+function appliedQueryText({ state, text }: { state: QuerySlice; text: string }) {
+  const result = safeParseAndSerialize(text);
+  if (result.parseError) {
+    if (text === state.queryText && result.parseError === state.parseError) {
+      return state;
+    }
+    return {
+      queryText: text,
+      parseError: result.parseError,
+      aiError: null,
+      lastAiTranslation: null,
+    };
+  }
+  if (result.queryText === state.queryText && state.parseError === null && state.aiError === null) {
+    return state;
+  }
+  return {
+    ...result,
+    aiError: null,
+    page: 1,
+    pageCursors: { 1: null },
+    lastAiTranslation: null,
+  };
+}
+
+function applyMutation(state: QuerySlice, mutate: (text: string) => string) {
   const next = safeParseAndSerialize(mutate(state.queryText));
   return {
     ...next,
@@ -223,11 +264,11 @@ function applyMutation(state: FilterState, mutate: (text: string) => string) {
 }
 
 /**
- * Pure store. The lens dirty-tracking is handled by `useLensFilterDirtySync`
- * (mounted in TracesPage), which subscribes to `queryText` and updates the
- * active lens's draft. filterStore never reaches into viewStore.
+ * The query, window and pagination slice of the Explorer store. Lens
+ * dirty-tracking belongs to `useLensFilterDirtySync`; this slice never reaches
+ * into the view slice.
  */
-export const useFilterStore = create<FilterState>((set, get) => ({
+export const createQuerySlice: StateCreator<ExplorerStore, [], [], QuerySlice> = (set, get) => ({
   ast: EMPTY_AST,
   queryText: "",
   parseError: null,
@@ -239,44 +280,18 @@ export const useFilterStore = create<FilterState>((set, get) => ({
   debouncedQueryText: "",
   debouncedTimeRange: INITIAL_TIME_RANGE,
   lastAiTranslation: null,
+  evalRuns: {},
+
+  registerEvalRun: ({ key, runId }) =>
+    set((state) => ({ evalRuns: { ...state.evalRuns, [key]: runId } })),
+  setEvalRuns: (runs) => set({ evalRuns: runs }),
 
   setAiError: (err) => set({ aiError: err }),
   dismissParseError: () => set({ parseError: null }),
 
   recordAiTranslation: (translation) => set({ lastAiTranslation: translation }),
 
-  applyQueryText: (text) =>
-    set((state) => {
-      const result = safeParseAndSerialize(text);
-      if (result.parseError) {
-        if (text === state.queryText && result.parseError === state.parseError) {
-          return state;
-        }
-        return {
-          queryText: text,
-          parseError: result.parseError,
-          aiError: null,
-          lastAiTranslation: null,
-        };
-      }
-      // Canonical text matches and we're already error-free → the AST is
-      // structurally the same. Keep the previous reference so `s.ast`
-      // subscribers don't churn on a round-trip-equivalent edit.
-      if (
-        result.queryText === state.queryText &&
-        state.parseError === null &&
-        state.aiError === null
-      ) {
-        return state;
-      }
-      return {
-        ...result,
-        aiError: null,
-        page: 1,
-        pageCursors: { 1: null },
-        lastAiTranslation: null,
-      };
-    }),
+  applyQueryText: (text) => set((state) => appliedQueryText({ state, text })),
 
   setQuery: (text, ast) =>
     set({
@@ -312,68 +327,12 @@ export const useFilterStore = create<FilterState>((set, get) => ({
     }),
 
   toggleFacet: (field, value, options) =>
-    set((s) => {
-      const state = getFacetValueState(s.ast, field, value);
-      // OR-group splice path: when the field is already part of an OR
-      // group (2+ values) AND we're adding a new value, splice it into
-      // the same group via `addToOrGroupAtLocation` instead of
-      // AND-combining at the top. Removal still goes through
-      // removeFacetValueFromQuery which walks the whole AST.
-      if (state === "neutral" && options?.orGroupLocation) {
-        return applyMutation(s, (q) =>
-          addToOrGroupAtLocation({
-            currentQuery: q,
-            groupStart: options.orGroupLocation!.start,
-            groupEnd: options.orGroupLocation!.end,
-            fieldName: field,
-            value,
-          }),
-        );
-      }
-      // Same-field OR creation path: a plain click adding the SECOND value of a field
-      // has no group to splice into yet (a group needs 2+ members to exist).
-      if (state === "neutral" && options?.combinator !== "OR") {
-        return applyMutation(s, (q) =>
-          addSameFieldOrValue({ currentQuery: q, fieldName: field, value }),
-        );
-      }
-      return applyMutation(s, (q) =>
-        toggleFacetInQuery({
-          currentQuery: q,
-          fieldName: field,
-          value,
-          currentState: state,
-          combinator: options?.combinator ?? "AND",
-        }),
-      );
-    }),
+    set((s) =>
+      applyMutation(s, (queryText) => toggledFacetQuery({ queryText, field, value, ...options })),
+    ),
 
   excludeFacet: (field, value) =>
-    set((s) => {
-      const state = getFacetValueState(s.ast, field, value);
-      // Already excluded → second press on the `−` toggles it back off.
-      if (state === "exclude") {
-        return applyMutation(s, (q) =>
-          removeFacetValueFromQuery({
-            currentQuery: q,
-            fieldName: field,
-            value,
-          }),
-        );
-      }
-      // Force exclude from neutral OR include. `toggleFacetInQuery`'s
-      // `currentState: "include"` branch first strips any existing clause
-      // for this value, then appends `NOT field:value` — exactly the
-      // "make it excluded" result we want regardless of where it started.
-      return applyMutation(s, (q) =>
-        toggleFacetInQuery({
-          currentQuery: q,
-          fieldName: field,
-          value,
-          currentState: "include",
-        }),
-      );
-    }),
+    set((s) => applyMutation(s, (queryText) => excludedFacetQuery({ queryText, field, value }))),
 
   toggleEvaluatorSubFilter: ({ evaluatorId, field, value }) =>
     set((s) =>
@@ -455,6 +414,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
       page: 1,
       pageCursors: { 1: null },
       lastAiTranslation: null,
+      evalRuns: {},
     }),
 
   commitDebounced: () => {
@@ -466,14 +426,4 @@ export const useFilterStore = create<FilterState>((set, get) => ({
       debouncedTimeRange: s.timeRange,
     });
   },
-}));
-
-// Allow other modules to read the canonical filter text without importing
-// the React hook (used by `useLensStore` actions like create/save).
-export function getCurrentFilterText(): string {
-  try {
-    return useFilterStore.getState().queryText;
-  } catch {
-    return "";
-  }
-}
+});

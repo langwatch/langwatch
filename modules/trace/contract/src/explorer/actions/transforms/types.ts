@@ -14,7 +14,7 @@ export interface ExplorerState {
   pageSize: number;
   selection: { mode: "explicit" | "all-matching"; traceIds: Set<string> };
   expandedRows: Set<string>;
-  evalRuns: Record<string, unknown>;
+  evalRuns: Record<string, string>;
 }
 
 /** How the table groups its rows. Mirrors the lens store's own grouping ids. */

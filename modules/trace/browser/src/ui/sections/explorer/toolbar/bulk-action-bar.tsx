@@ -31,10 +31,10 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
   traceNamesById,
   onExportSelected,
 }) => {
-  const mode = useSelectionStore((s) => s.mode);
-  const traceIds = useSelectionStore((s) => s.traceIds);
-  const enableAllMatching = useSelectionStore((s) => s.enableAllMatching);
-  const clear = useSelectionStore((s) => s.clear);
+  const mode = useSelectionStore((s) => s.selection.mode);
+  const traceIds = useSelectionStore((s) => s.selection.traceIds);
+  const enableAllMatching = useSelectionStore((s) => s.selectAllMatching);
+  const clear = useSelectionStore((s) => s.clearSelection);
   const { openDrawer } = useDrawer();
   const { hasPermission } = useOrganizationTeamProject();
   const datasetGate = usePersonalFeatureGate("datasets");
