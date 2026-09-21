@@ -9,17 +9,9 @@ import {
   PopoverRoot,
 } from "~/components/ui/popover";
 import NextLink from "~/utils/compat/next-link";
-import { formatUsd } from "./InstantEvalConfirmDialog";
 
 /** Why an Instant Eval did not start, and what the popover says about it. */
-export type InstantEvalRefusal =
-  | {
-      kind: "budget";
-      question: string;
-      spentUsd: number;
-      budgetUsd: number;
-    }
-  | { kind: "model"; question: string };
+export type InstantEvalRefusal = { kind: "budget" } | { kind: "model" };
 
 /** Where a paid plan is picked, which is what lifts the free budget. */
 export const UPGRADE_HREF = "/settings/subscription";
@@ -40,18 +32,17 @@ export function instantEvalRefusalCopy(refusal: InstantEvalRefusal): {
   body: string;
   action: { label: string; href: string };
 } {
-  const found = `An Instant Eval reads every result and keeps the ones that answer yes to: "${refusal.question}".`;
-  const meanwhile = "For now the words are searched as a phrase.";
+  const meanwhile = "Searching the words for now.";
   if (refusal.kind === "budget") {
     return {
-      title: "Your free Instant Evals budget is used up",
-      body: `${found} This organization has used ${formatUsd(refusal.spentUsd)} of its ${formatUsd(refusal.budgetUsd)} free budget. Upgrade to run it. ${meanwhile}`,
+      title: "Free Instant Evals used up",
+      body: `Upgrade to find what filters can't, like frustrated users. ${meanwhile}`,
       action: { label: "Upgrade", href: UPGRADE_HREF },
     };
   }
   return {
     title: "Configure a model to judge results",
-    body: `${found} No model is configured to judge results yet. Configure one to run it. ${meanwhile}`,
+    body: `Instant Evals need a model to find what filters can't. ${meanwhile}`,
     action: { label: "Configure a model", href: MODEL_PROVIDERS_HREF },
   };
 }

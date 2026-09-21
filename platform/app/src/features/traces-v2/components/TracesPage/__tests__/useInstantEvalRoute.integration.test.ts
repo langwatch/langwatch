@@ -289,12 +289,7 @@ describe("given the organization has spent its free budget", () => {
           }),
         ),
       );
-      expect(result.current.refusal).toEqual({
-        kind: "budget",
-        question: "the user is annoyed",
-        spentUsd: 1.04,
-        budgetUsd: 1,
-      });
+      expect(result.current.refusal).toEqual({ kind: "budget" });
       expect(useExplorerStore.getState().queryText).toBe("");
       act(() => result.current.dismissRefusal());
       expect(result.current.refusal).toBeNull();
@@ -318,10 +313,7 @@ describe("given the deployment has no classifier", () => {
         act(() =>
           lastCall(mutations.estimate).options.onError?.(handledError(code)),
         );
-        expect(result.current.refusal).toEqual({
-          kind: "model",
-          question: "the user is annoyed",
-        });
+        expect(result.current.refusal).toEqual({ kind: "model" });
         act(() => result.current.dismissRefusal());
         expect(useExplorerStore.getState().queryText).toBe(
           'service:api AND "annoyed users"',

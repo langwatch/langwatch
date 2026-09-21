@@ -24,16 +24,11 @@ const wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 describe("given the organization has spent its free Instant Evals budget", () => {
   describe("when the popover opens", () => {
     /** @scenario "A spent free budget opens the budget popover and the phrase search runs" */
-    it("says what the eval would have found, the spend against the budget, and offers Upgrade and Skip", () => {
+    it("says in one line what Instant Evals find, and offers Upgrade and Skip", () => {
       const onClose = vi.fn();
       render(
         <InstantEvalRefusalPopover
-          refusal={{
-            kind: "budget",
-            question: "the user is annoyed",
-            spentUsd: 1.04,
-            budgetUsd: 1,
-          }}
+          refusal={{ kind: "budget" }}
           onClose={onClose}
         >
           <span>anchor</span>
@@ -41,15 +36,12 @@ describe("given the organization has spent its free Instant Evals budget", () =>
         { wrapper },
       );
       expect(
-        screen.getByText("Your free Instant Evals budget is used up"),
+        screen.getByText("Free Instant Evals used up"),
       ).toBeInTheDocument();
       expect(
         screen.getByText(
-          /keeps the ones that answer yes to: "the user is annoyed"/,
+          "Upgrade to find what filters can't, like frustrated users. Searching the words for now.",
         ),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText(/used 1.04 USD of its 1.00 USD free budget/),
       ).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "Upgrade" })).toHaveAttribute(
         "href",
@@ -65,13 +57,10 @@ describe("given the deployment has no classifier", () => {
   describe("when the popover opens", () => {
     /** @scenario "A missing classifier opens the model popover and the phrase search runs" */
     it("says to configure a model and links to the providers page", () => {
-      const copy = instantEvalRefusalCopy({
-        kind: "model",
-        question: "the user is annoyed",
-      });
+      const copy = instantEvalRefusalCopy({ kind: "model" });
       expect(copy.title).toBe("Configure a model to judge results");
-      expect(copy.body).toContain(
-        "For now the words are searched as a phrase.",
+      expect(copy.body).toBe(
+        "Instant Evals need a model to find what filters can't. Searching the words for now.",
       );
       expect(copy.action).toEqual({
         label: "Configure a model",

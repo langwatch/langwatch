@@ -44,30 +44,17 @@ export interface InstantEvalRoutePayload {
 export const INSTANT_EVAL_AUTO_RUN_USD = 0.5;
 
 /** The refusal codes that get a popover of their own, rather than the registry's copy. */
-function refusalOf({
-  error,
-  question,
-}: {
-  error: unknown;
-  question: string;
-}): InstantEvalRefusal | null {
+function refusalOf({ error }: { error: unknown }): InstantEvalRefusal | null {
   const handled = readHandledError(error);
   if (!handled) return null;
   if (handled.code === "instant_eval_free_budget_exhausted") {
-    const spent = handled.meta.spentUsd;
-    const budget = handled.meta.budgetUsd;
-    return {
-      kind: "budget",
-      question,
-      spentUsd: typeof spent === "number" ? spent : 0,
-      budgetUsd: typeof budget === "number" ? budget : 1,
-    };
+    return { kind: "budget" };
   }
   if (
     handled.code === "instant_eval_not_enabled" ||
     handled.code === "instant_eval_classifier_unavailable"
   ) {
-    return { kind: "model", question };
+    return { kind: "model" };
   }
   return null;
 }
@@ -180,10 +167,7 @@ function useInstantEvalOutcome(): {
       payload: InstantEvalRoutePayload;
     }) => {
       setConfirmation(null);
-      const popover = refusalOf({
-        error,
-        question: payload.question.instructions,
-      });
+      const popover = refusalOf({ error });
       if (popover) {
         setRefusal(popover);
         return;
