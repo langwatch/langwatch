@@ -284,6 +284,62 @@ describe.skipIf(!hasTestcontainers)(
       expect(await redis.zcard(`${name}:gq:group:wedged:jobs`)).toBe(1);
     });
 
+    /** @scenario "Work that never drains leaves its tenants held rather than refusing startup" */
+    describe("when the preflight's own work has not drained by the deadline", () => {
+      it("starts anyway rather than refusing, leaving the work queued", async () => {
+        const name = `{test/gqmain/${crypto.randomUUID().slice(0, 8)}}`;
+        const definition = createQueueDefinition({
+          name,
+          process: async () => {},
+        });
+        // No consumer will ever take this: the claim's owner is gone, exactly
+        // as it is on a fleet whose every replica is still in this barrier.
+        const preflight = new GroupQueueProcessor(definition, redis, {
+          consumerEnabled: false,
+          dispatchGroupAllowListKey: `${name}:gq:test-allow-list`,
+          preflightDrainTimeoutMs: 250,
+        });
+        queues.push(preflight);
+
+        await preflight.send({ id: "stuck", groupId: "stuck", value: "x" });
+
+        await expect(
+          preflight.waitUntilPreflightIdle(),
+        ).resolves.toBeUndefined();
+        // Starting past it is not draining it: the work is still there for the
+        // later pass that re-proves its tenant.
+        expect(await redis.zcard(`${name}:gq:group:stuck:jobs`)).toBe(1);
+      });
+
+      it("still refuses when some of that work has failed", async () => {
+        const name = `{test/gqmain/${crypto.randomUUID().slice(0, 8)}}`;
+        const definition = createQueueDefinition({
+          name,
+          process: async () => {},
+        });
+        const preflight = new GroupQueueProcessor(definition, redis, {
+          consumerEnabled: false,
+          dispatchGroupAllowListKey: `${name}:gq:test-allow-list`,
+          preflightDrainTimeoutMs: 250,
+        });
+        queues.push(preflight);
+
+        await preflight.send({ id: "stuck", groupId: "stuck", value: "x" });
+        await preflight.registerPreflightGroups(() => ["doomed"]);
+        await redis.hset(
+          `${name}:gq:group:doomed:error`,
+          "message",
+          "boom",
+          "timestamp",
+          "99",
+        );
+
+        await expect(preflight.waitUntilPreflightIdle()).rejects.toThrow(
+          "failed: doomed",
+        );
+      });
+    });
+
     it("refuses when a group the preflight adopted clean fails under it", async () => {
       const name = `{test/gqmain/${crypto.randomUUID().slice(0, 8)}}`;
       const definition = createQueueDefinition({
