@@ -1,6 +1,10 @@
 import type { TagToken } from "liqe";
 import { FilterParseError } from "../errors";
 import {
+  CONVERSATION_ID_CLICKHOUSE_EXPRESSION,
+  resolveConversationId,
+} from "../resolve-conversation-id";
+import {
   type FieldDef,
   type InMemoryTrace,
   UNSUPPORTED,
@@ -158,7 +162,7 @@ function translateExistence(
       return wrap("length(AnnotationIds) > 0", negated);
 
     case "conversation":
-      return wrap("Attributes['gen_ai.conversation.id'] != ''", negated);
+      return wrap(`${CONVERSATION_ID_CLICKHOUSE_EXPRESSION} != ''`, negated);
 
     case "user":
       return wrap("Attributes['langwatch.user_id'] != ''", negated);
@@ -240,7 +244,7 @@ function evaluateExistence(
     case "annotation":
       return polarise(trace.summary.annotationIds.length > 0);
     case "conversation":
-      return polarise((attrs["gen_ai.conversation.id"] ?? "") !== "");
+      return polarise(resolveConversationId(attrs) !== "");
     case "user":
       return polarise((attrs["langwatch.user_id"] ?? "") !== "");
     case "customer":
