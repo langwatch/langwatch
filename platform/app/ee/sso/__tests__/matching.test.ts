@@ -237,7 +237,6 @@ describe("matchesConfiguredSsoProvider", () => {
   });
 
   describe("given the same organization and accounts, asked by two different callers", () => {
-    /** @scenario the extracted decision function: the hook and the status read agree on the same inputs */
     it("the sign-in hook and the status read reach the same answer", async () => {
       const organizations = orgWith("waad|acme-conn");
       const account = { providerId: "auth0", accountId: "waad|acme-conn|u-1" };
