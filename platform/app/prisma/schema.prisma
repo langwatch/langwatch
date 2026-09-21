@@ -1350,6 +1350,58 @@ model IssuedLicense {
   @@index([expiresAt])
 }
 
+/// A short code a fresh install pastes instead of a license blob (ADR-139,
+/// section 5). Redeeming it mints the license the code describes and returns
+/// it signed, which is what identifies a new customer without anybody emailing
+/// a license key around.
+///
+/// The row holds a hash of the code, never the code. Every lookup hashes what
+/// the caller presented first, so the stored value is a step away from anything
+/// that could be presented: read access to this table is not credential access.
+model ActivationCode {
+  id String @id @default(nanoid())
+  /// SHA-256 of the normalised code. Looked up on every redemption.
+  codeHash String @unique
+  /// The last four characters, so an operator tells two codes apart in a list
+  /// without the list holding either one.
+  codeHint String
+
+  /// The customer this code belongs to, and the terms it mints.
+  organizationId   String
+  organizationName String
+  email            String
+  planType         String
+  maxMembers       Int
+  maxMembersLite   Int    @default(0)
+  /// How long the license this code mints runs for.
+  licenseTermDays  Int
+  /// Hosted services the minted license may call.
+  services         String[] @default([])
+
+  /// When the code stops working, which is not the term of what it mints.
+  expiresAt DateTime
+  /// A code a customer may redeem on more than one install, for a rollout.
+  reusable  Boolean  @default(false)
+
+  /// Set by the redemption that won, which is what makes a single-use code
+  /// single use: the write itself carries the condition.
+  redeemedAt           DateTime?
+  redeemedByInstanceId String?
+  /// The license the winning redemption minted.
+  issuedLicenseId      String?
+  /// How many installs have redeemed it, which only moves on a reusable code.
+  redemptionCount      Int       @default(0)
+
+  revokedAt   DateTime?
+  revokedById String?
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([organizationId])
+  @@index([expiresAt])
+}
+
 /// The seats one license reported in one quarter of its term, kept at the
 /// highest figure reported. The quarterly seat true-up invoices from this, so
 /// a customer that adds seats for a week pays for them even if the install

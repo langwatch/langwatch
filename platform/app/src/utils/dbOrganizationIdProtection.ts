@@ -677,6 +677,13 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   // backoffice. A guard demanding organizationId would refuse both. It holds
   // no customer content: ids, a token hash, seat counts, terms and amounts.
   "IssuedLicense",
+  // Activation codes (ADR-139, section 5). Org-bearing, and deliberately not
+  // org-CONSTRAINED for the same reason `IssuedLicense` is not: a presented
+  // code is resolved by `codeHash` before any organization is known, which is
+  // what identifies the customer, and LangWatch operators list codes across
+  // customers in the backoffice. It holds no customer content: a hash, the
+  // last four characters of a code, seat counts and dates.
+  "ActivationCode",
   // The registry of self-hosted installs (ADR-139, section 10). Org-bearing,
   // and deliberately not org-CONSTRAINED: a report is addressed by the
   // instance id the install minted, before any organization is known, and the

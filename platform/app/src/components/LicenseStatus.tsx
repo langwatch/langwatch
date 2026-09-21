@@ -18,6 +18,7 @@ interface LicenseStatusProps {
 
 export function LicenseStatus({ organizationId }: LicenseStatusProps) {
   const [licenseKey, setLicenseKey] = useState("");
+  const [activationCode, setActivationCode] = useState("");
 
   const {
     data: status,
@@ -33,16 +34,23 @@ export function LicenseStatus({ organizationId }: LicenseStatusProps) {
     },
   );
 
-  const { upload, remove, isUploading, isRemoving } = useLicenseActions({
-    organizationId,
-    onUploadSuccess: () => {
-      setLicenseKey("");
-      void refetch();
-    },
-    onRemoveSuccess: () => {
-      void refetch();
-    },
-  });
+  const { upload, activate, remove, isUploading, isRemoving } =
+    useLicenseActions({
+      organizationId,
+      onUploadSuccess: () => {
+        setLicenseKey("");
+        setActivationCode("");
+        void refetch();
+      },
+      onRemoveSuccess: () => {
+        void refetch();
+      },
+    });
+
+  const handleCodeActivate = () => {
+    const code = activationCode.trim();
+    if (code) activate(code);
+  };
 
   const handleActivate = () => {
     const normalizedKey = normalizeKeyForActivation(licenseKey);
@@ -74,6 +82,9 @@ export function LicenseStatus({ organizationId }: LicenseStatusProps) {
           onLicenseKeyChange={setLicenseKey}
           onActivate={handleActivate}
           onFileActivate={handleFileActivate}
+          activationCode={activationCode}
+          onActivationCodeChange={setActivationCode}
+          onCodeActivate={handleCodeActivate}
           isActivating={isUploading}
         />
       </VStack>

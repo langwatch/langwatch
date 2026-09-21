@@ -177,9 +177,11 @@ export async function storedCounts({
 export async function onboardingLadder({
   prisma,
   projectIds,
+  organizationIds,
 }: {
   prisma: PrismaClient;
   projectIds: string[];
+  organizationIds: string[];
 }): Promise<Record<string, string | null>> {
   const [
     firstProject,
@@ -206,7 +208,14 @@ export async function onboardingLadder({
     firstAt({ model: prisma.monitor, projectIds }),
     firstAt({ model: prisma.llmPromptConfig, projectIds }),
     firstAt({ model: prisma.workflow, projectIds }),
-    firstAt({ model: prisma.modelProvider, projectIds }),
+    // Scoped to the organization, because that is where a provider lives.
+    prisma.modelProvider
+      .findFirst({
+        where: { organizationId: { in: organizationIds } },
+        orderBy: { createdAt: "asc" },
+        select: { createdAt: true },
+      })
+      .then((row) => row?.createdAt.toISOString() ?? null),
     firstAt({ model: prisma.annotation, projectIds }),
     firstAt({ model: prisma.trigger, projectIds }),
     firstAt({ model: prisma.experiment, projectIds }),

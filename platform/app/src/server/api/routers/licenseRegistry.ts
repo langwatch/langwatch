@@ -4,7 +4,10 @@ import { prisma } from "~/server/db";
 import { adminSurfaceHidden } from "../../../../ee/admin/adminSurfaceHidden";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
 import { CONNECT_SERVICES } from "../../../../ee/licensing/connect/services";
-import { createLicenseRegistryService } from "../../../../ee/licensing/registry/composition";
+import {
+  createActivationCodeService,
+  createLicenseRegistryService,
+} from "../../../../ee/licensing/registry/composition";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
@@ -79,6 +82,7 @@ async function audited<T>({
 }
 
 const service = () => createLicenseRegistryService(prisma);
+const activationCodes = () => createActivationCodeService(prisma);
 
 const licenseTarget = z.object({ id: z.string().min(1) });
 
@@ -327,6 +331,114 @@ export const licenseRegistryRouter = createTRPCRouter({
         targetId: id,
       });
       return license;
+    }),
+
+  /**
+   * Activation codes, issued from the same screen as licenses because they are
+   * the same commercial act: a code is a license the customer has not fetched
+   * yet. The code itself is returned exactly once, at issue.
+   */
+  activationCodes: protectedProcedure
+    .input(
+      z.object({
+        page: z.number().int().min(0).default(0),
+        pageSize: z.number().int().min(1).max(100).default(25),
+        organizationId: z.string().min(1).optional(),
+      }),
+    )
+    .noPermission(NO_PERMISSION_FOR_ORGANIZATION)
+    .query(async ({ ctx, input }) => {
+      const operator = requireOperator(
+        ctx.session.user.impersonator ?? ctx.session.user,
+      );
+      await auditLog({
+        userId: operator.userId,
+        action: "licenseRegistry.activationCodes",
+        args: { page: input.page, pageSize: input.pageSize },
+        targetKind: "activationCode",
+      });
+      return activationCodes().getAll(input);
+    }),
+
+  issueActivationCode: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string().min(1),
+        organizationName: z.string().trim().min(1).max(200),
+        email: z.string().email(),
+        planType: z.enum(["GROWTH", "PRO", "ENTERPRISE", "CUSTOM"]),
+        maxMembers: seatLimits.maxMembers,
+        maxMembersLite: seatLimits.maxMembersLite,
+        /** The term of the license the code mints, not the life of the code. */
+        licenseTermDays: z.number().int().min(1).max(3650),
+        services: z.array(z.enum(CONNECT_SERVICES)).optional(),
+        expiresAt: z.date(),
+        reusable: z.boolean().optional(),
+      }),
+    )
+    .noPermission(NO_PERMISSION_FOR_ORGANIZATION)
+    .mutation(async ({ ctx, input }) => {
+      const operator = requireOperator(
+        ctx.session.user.impersonator ?? ctx.session.user,
+      );
+      const result = await audited({
+        operatorId: operator.userId,
+        action: "licenseRegistry.issueActivationCode",
+        args: {
+          organizationId: input.organizationId,
+          planType: input.planType,
+          reusable: input.reusable ?? false,
+        },
+        run: () =>
+          activationCodes().issue({
+            ...input,
+            ...(input.services ? { services: [...input.services] } : {}),
+            operatorId: operator.userId,
+          }),
+      });
+      // The code itself is never recorded: the audit trail says one was issued,
+      // to whom and by whom, which is what an operator needs back. The code is
+      // credential material and is shown once, here, and never read again.
+      await auditLog({
+        userId: operator.userId,
+        action: "licenseRegistry.issueActivationCode",
+        args: {
+          organizationId: input.organizationId,
+          planType: input.planType,
+          expiresAt: input.expiresAt.toISOString(),
+        },
+        targetKind: "activationCode",
+        targetId: result.row.id,
+      });
+      return result;
+    }),
+
+  revokeActivationCode: protectedProcedure
+    .input(z.object({ id: z.string().min(1) }))
+    .noPermission(NO_PERMISSION)
+    .mutation(async ({ ctx, input }) => {
+      const operator = requireOperator(
+        ctx.session.user.impersonator ?? ctx.session.user,
+      );
+      const row = await audited({
+        operatorId: operator.userId,
+        action: "licenseRegistry.revokeActivationCode",
+        args: { id: input.id },
+        targetId: input.id,
+        run: () =>
+          activationCodes().revoke({
+            id: input.id,
+            operatorId: operator.userId,
+          }),
+      });
+      await auditLog({
+        userId: operator.userId,
+        action: "licenseRegistry.revokeActivationCode",
+        args: { id: input.id },
+        targetKind: "activationCode",
+        targetId: input.id,
+      });
+      return row;
     }),
 
   linkToOrganization: protectedProcedure

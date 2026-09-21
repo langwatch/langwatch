@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useDebounce } from "use-debounce";
 import { api } from "~/utils/api";
 import { BackofficeTable } from "../BackofficeTable";
+import { ActivationCodesSection } from "./licenses/ActivationCodesSection";
 import { IssueDrawer } from "./licenses/IssueDrawer";
 import { LicenseDrawer } from "./licenses/LicenseDrawer";
 import { LicensesTable } from "./licenses/LicensesTable";
@@ -62,6 +63,8 @@ export default function LicensesView() {
           onRevoke={setRevoking}
         />
       </BackofficeTable>
+
+      <ActivationCodesSection />
 
       <LicenseDrawer
         licenseId={openId}

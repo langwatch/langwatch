@@ -40,6 +40,35 @@ import { createInnerTRPCContext } from "../../trpc";
 
 wireDefaultTestApp();
 
+/**
+ * The connect host, stood in for: activation is tested against a real host in
+ * `connect.license-activate.integration.test.ts`, and what matters here is that
+ * whatever comes back goes through the same validation and storage as a license
+ * a customer pasted.
+ */
+const activation = vi.hoisted(() => ({ license: "", calls: 0 }));
+vi.mock("@ee/licensing/connect/install/connectLicenseClient", () => ({
+  getConnectLicenseClient: () => ({
+    activate: async () => {
+      activation.calls += 1;
+      return {
+        license: activation.license,
+        planType: "ENTERPRISE",
+        maxMembers: 25,
+        expiresAt: new Date().toISOString(),
+        services: [],
+      };
+    },
+  }),
+  resetConnectLicenseClient: async () => undefined,
+}));
+vi.mock("@ee/licensing/connect/install/instanceIdentity", async (original) => ({
+  ...(await original<
+    typeof import("@ee/licensing/connect/install/instanceIdentity")
+  >()),
+  installInstanceId: async () => "instance-license-router-test",
+}));
+
 // Mock getLicenseHandler to use test public key
 vi.mock("../../../subscriptionHandler", async (importOriginal) => {
   const original =
@@ -265,6 +294,55 @@ describe("License Router Integration", () => {
       await expect(
         adminCaller.license.getStatus({ organizationId: "" }),
       ).rejects.toThrow();
+    });
+  });
+
+  // ==========================================================================
+  // activate Tests
+  // ==========================================================================
+
+  describe("activate", () => {
+    /** @scenario "The install stores what the code minted exactly as a pasted license" */
+    it("stores the license the code minted the way it stores a pasted one", async () => {
+      activation.license = ENTERPRISE_LICENSE_KEY;
+      activation.calls = 0;
+
+      const result = await adminCaller.license.activate({
+        organizationId,
+        code: "LW-A1B2-C3D4-E5F6-G7H8",
+      });
+
+      expect(result.success).toBe(true);
+      expect(activation.calls).toBe(1);
+
+      const status = await adminCaller.license.getStatus({ organizationId });
+      expect(status.hasLicense).toBe(true);
+      expect(status.valid).toBe(true);
+    });
+
+    it("refuses a license the connect host answered with that does not verify", async () => {
+      activation.license = GARBAGE_DATA;
+
+      await expect(
+        adminCaller.license.activate({
+          organizationId,
+          code: "LW-A1B2-C3D4-E5F6-G7H8",
+        }),
+      ).rejects.toThrow();
+
+      const status = await adminCaller.license.getStatus({ organizationId });
+      expect(status.hasLicense).toBe(false);
+    });
+
+    it("refuses a member, because activating a license is an organization change", async () => {
+      activation.license = ENTERPRISE_LICENSE_KEY;
+
+      await expect(
+        memberCaller.license.activate({
+          organizationId,
+          code: "LW-A1B2-C3D4-E5F6-G7H8",
+        }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
   });
 

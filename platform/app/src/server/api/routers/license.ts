@@ -1,7 +1,12 @@
+import { readConnectConfig } from "@ee/licensing/connect/install/connectConfig";
+import { ConnectDisabledError } from "@ee/licensing/connect/install/connectErrors";
+import { getConnectLicenseClient } from "@ee/licensing/connect/install/connectLicenseClient";
+import { installInstanceId } from "@ee/licensing/connect/install/instanceIdentity";
 import { authProviderIsMounted, platformSSOAllowed } from "@ee/sso/sso-gate";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { prisma } from "~/server/db";
 import { getLicenseHandler } from "~/server/subscriptionHandler";
 import type { LicenseStatus } from "../../../../ee/licensing";
 import { licenseValidationError } from "../../../../ee/licensing/errors";
@@ -103,6 +108,40 @@ export const licenseRouter = createTRPCRouter({
         success: true,
         planInfo: result.planInfo,
       };
+    }),
+
+  /**
+   * Redeems an activation code and stores the license it minted.
+   *
+   * The code is the credential for one call to the connect host and is never
+   * stored on the install: what comes back is an ordinary signed license, which
+   * goes through exactly the same validation and storage as one a customer
+   * pasted. An air-gapped install pastes its license instead and calls nothing.
+   */
+  activate: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string().min(1),
+        code: z.string().min(1, "Activation code is required").max(200),
+      }),
+    )
+    .permission("organization:manage")
+    .mutation(async ({ input }) => {
+      const config = readConnectConfig();
+      if (!config.permitted) throw new ConnectDisabledError();
+
+      const instanceId = await installInstanceId(prisma);
+      const answer = await getConnectLicenseClient(
+        config.licenseEndpoint,
+      ).activate({ code: input.code, instanceId });
+
+      const result = await getLicenseHandler().validateAndStoreLicense(
+        input.organizationId,
+        answer.license,
+      );
+      if (!result.success) throw licenseValidationError(result.error);
+
+      return { success: true, planInfo: result.planInfo };
     }),
 
   /**

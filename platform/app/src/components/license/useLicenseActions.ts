@@ -50,6 +50,29 @@ export function useLicenseActions({
       showErrorToast({ error, fallbackTitle: "Couldn't activate license" }),
   });
 
+  // Redeeming an activation code lands in the same place as a pasted license:
+  // LangWatch signs one and this install stores it. So it reuses the upload
+  // handler's copy, including the restart line, because the consequence for the
+  // operator is identical.
+  const activateMutation = api.license.activate.useMutation({
+    onSuccess: () => {
+      toaster.create({
+        title: "License activated",
+        description: isSaas
+          ? "Your license has been successfully activated."
+          : "Your license has been successfully activated. If your deployment uses SSO, restart the server to enable it.",
+        type: "success",
+      });
+      onUploadSuccess();
+      refreshPlanDerivedState();
+    },
+    onError: (error) =>
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't redeem activation code",
+      }),
+  });
+
   const removeMutation = api.license.remove.useMutation({
     onSuccess: () => {
       toaster.create({
@@ -69,14 +92,19 @@ export function useLicenseActions({
     uploadMutation.mutate({ organizationId, licenseKey });
   };
 
+  const activate = (code: string) => {
+    activateMutation.mutate({ organizationId, code });
+  };
+
   const remove = () => {
     removeMutation.mutate({ organizationId });
   };
 
   return {
     upload,
+    activate,
     remove,
-    isUploading: uploadMutation.isPending,
+    isUploading: uploadMutation.isPending || activateMutation.isPending,
     isRemoving: removeMutation.isPending,
   };
 }

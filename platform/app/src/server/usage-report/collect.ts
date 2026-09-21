@@ -148,12 +148,14 @@ async function optionalBlock({
   const [stored, ladder, domains, activity, ingested, providers] =
     await Promise.all([
       storedCounts({ prisma, projectIds, now }),
-      onboardingLadder({ prisma, projectIds }),
+      onboardingLadder({ prisma, projectIds, organizationIds }),
       userEmailDomains(prisma),
       activityCounts({ prisma, projectIds, now }),
       ingestedCounts({ organizationIds, projectIds, repository }),
+      // Model providers are scoped to the organization, not the project: one
+      // row is shared by every project a scope names.
       prisma.modelProvider.findMany({
-        where: { projectId: { in: projectIds } },
+        where: { organizationId: { in: organizationIds } },
         select: { provider: true },
         distinct: ["provider"],
       }),

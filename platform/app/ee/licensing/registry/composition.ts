@@ -9,6 +9,8 @@ import { env } from "~/env.mjs";
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import { rateLimit } from "~/server/rateLimit";
 import { decrypt, encrypt } from "~/utils/encryption";
+import { PrismaActivationCodes } from "../activation/activationCode.prisma";
+import { ActivationCodeService } from "../activation/activationCode.service";
 import { createContractBudgetService } from "../connect/connect.prisma";
 import { PUBLIC_KEY } from "../constants";
 import { ConnectCredentialService } from "./connectCredential.service";
@@ -78,6 +80,35 @@ export function createLicenseRecorderService(
     signingKey: licenseSigningKey,
     publicKey: PUBLIC_KEY,
     encrypt,
+  });
+}
+
+/**
+ * Guessing bound: an activation code is eighty bits, so the limit is not what
+ * stops a search, but it is what stops one costing us anything. Generous for a
+ * customer typing a code in wrong twice.
+ */
+const ACTIVATION_ATTEMPTS_PER_HOUR = 10;
+const ONE_HOUR_SECONDS = 60 * 60;
+
+/** What `POST /api/connect/v1/license/activate` calls. */
+export function createActivationCodeService(
+  prisma: PrismaClient,
+): ActivationCodeService {
+  return new ActivationCodeService({
+    repository: new PrismaActivationCodes(prisma),
+    licenses: createLicenseRegistryService(prisma),
+    rateLimit: {
+      allow: async ({ codeHash }) =>
+        (
+          await rateLimit({
+            key: `activation_code:${codeHash}`,
+            windowSeconds: ONE_HOUR_SECONDS,
+            max: ACTIVATION_ATTEMPTS_PER_HOUR,
+          })
+        ).allowed,
+    },
+    systemActorId: SYSTEM_ACTORS.connectLicense,
   });
 }
 

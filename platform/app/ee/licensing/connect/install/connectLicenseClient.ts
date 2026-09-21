@@ -36,6 +36,23 @@ export interface LicenseSyncAnswer {
   readonly license?: string;
 }
 
+const activateAnswerSchema = z.object({
+  license: z.string().min(1),
+  planType: z.string(),
+  maxMembers: z.number(),
+  expiresAt: z.string(),
+  services: z.array(z.string()),
+});
+
+/** The license an activation code minted, as it comes back. */
+export interface ActivationAnswer {
+  readonly license: string;
+  readonly planType: string;
+  readonly maxMembers: number;
+  readonly expiresAt: string;
+  readonly services: string[];
+}
+
 export interface ConnectLicenseClientOptions {
   /** Origin of the connect host; the path is this client's own. */
   readonly endpoint: string;
@@ -52,6 +69,31 @@ export class ConnectLicenseClient {
 
   async close(): Promise<void> {
     await this.http.close();
+  }
+
+  /**
+   * Redeems an activation code for the license it describes.
+   *
+   * The code goes in the credential's token slot because it is the whole
+   * credential for this one call, exactly as the license token is for a sync.
+   */
+  async activate({
+    code,
+    instanceId,
+    signal,
+  }: {
+    code: string;
+    instanceId: string;
+    signal?: AbortSignal;
+  }): Promise<ActivationAnswer> {
+    return this.http.call({
+      path: "/v1/license/activate",
+      method: "POST",
+      credential: { token: code, instanceId },
+      body: {},
+      schema: activateAnswerSchema,
+      ...(signal ? { signal } : {}),
+    });
   }
 
   async syncLicense({
