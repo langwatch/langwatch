@@ -115,6 +115,25 @@ export type OnboardingApiMap = {
     };
   };
 
+  modelProvider: {
+    /**
+     * Borrowed from model-provider's contract (`setRoleAssignmentForScope`):
+     * points a model role at a scope. The guided takeover uses it to point
+     * Langy's own role at the model the reader just connected.
+     */
+    setRoleAssignmentForScope: {
+      mutation: {
+        input: {
+          scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+          scopeId: string;
+          role: "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS";
+          model: string | null;
+        };
+        output: { ok: true };
+      };
+    };
+  };
+
   team: {
     /** The team the `/onboarding/:team/project` address names. */
     getBySlug: {

@@ -119,7 +119,8 @@
     "react-icons": "catalog:",
     "react-router": "catalog:",
     "shiki": "catalog:",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "zustand": "catalog:"
   },
   "devDependencies": {
     "@chakra-ui/react": "catalog:",
