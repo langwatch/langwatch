@@ -29,7 +29,7 @@ vi.mock("~/utils/posthogErrorCapture", () => ({
 
 function makeJobs(overrides: Record<string, unknown> = {}) {
   return {
-    runSeatTrueUp: vi.fn(async () => undefined),
+    completePendingSeatChanges: vi.fn(async () => undefined),
     runMonthlyStatements: vi.fn(async () => undefined),
     listPendingRenewalOrganizationIds: vi.fn(async () => ["org-acme"]),
     completeRenewalIfDue: vi.fn(async () => "completed"),
@@ -43,12 +43,12 @@ describe("runConnectedBillingTick", () => {
   });
 
   describe("given every job succeeds", () => {
-    it("runs the seat true-up, the statements and each pending renewal", async () => {
+    it("retries the seat invoices, runs the statements and each pending renewal", async () => {
       const jobs = makeJobs();
 
       await runConnectedBillingTick(jobs);
 
-      expect(jobs.runSeatTrueUp).toHaveBeenCalledTimes(1);
+      expect(jobs.completePendingSeatChanges).toHaveBeenCalledTimes(1);
       expect(jobs.runMonthlyStatements).toHaveBeenCalledTimes(1);
       expect(jobs.completeRenewalIfDue).toHaveBeenCalledWith({
         organizationId: "org-acme",
@@ -59,7 +59,7 @@ describe("runConnectedBillingTick", () => {
   describe("given one job throws", () => {
     it("still runs the ones after it", async () => {
       const jobs = makeJobs({
-        runSeatTrueUp: vi.fn(async () => {
+        completePendingSeatChanges: vi.fn(async () => {
           throw new Error("the payment provider is down");
         }),
       });
@@ -103,7 +103,7 @@ describe("startConnectedBillingWorker", () => {
       expect(startConnectedBillingWorker({ jobs })).toBeUndefined();
 
       vi.advanceTimersByTime(24 * 60 * 60 * 1000);
-      expect(jobs.runSeatTrueUp).not.toHaveBeenCalled();
+      expect(jobs.completePendingSeatChanges).not.toHaveBeenCalled();
     });
   });
 
@@ -113,13 +113,13 @@ describe("startConnectedBillingWorker", () => {
       const handle = startConnectedBillingWorker({ jobs });
 
       await vi.advanceTimersByTimeAsync(4 * 60 * 1000);
-      expect(jobs.runSeatTrueUp).not.toHaveBeenCalled();
+      expect(jobs.completePendingSeatChanges).not.toHaveBeenCalled();
 
       await vi.advanceTimersByTimeAsync(60 * 1000);
-      expect(jobs.runSeatTrueUp).toHaveBeenCalledTimes(1);
+      expect(jobs.completePendingSeatChanges).toHaveBeenCalledTimes(1);
 
       await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000);
-      expect(jobs.runSeatTrueUp).toHaveBeenCalledTimes(2);
+      expect(jobs.completePendingSeatChanges).toHaveBeenCalledTimes(2);
 
       handle?.stop();
     });
@@ -132,7 +132,7 @@ describe("startConnectedBillingWorker", () => {
       handle?.stop();
       await vi.advanceTimersByTimeAsync(3 * 24 * 60 * 60 * 1000);
 
-      expect(jobs.runSeatTrueUp).toHaveBeenCalledTimes(1);
+      expect(jobs.completePendingSeatChanges).toHaveBeenCalledTimes(1);
     });
   });
 });

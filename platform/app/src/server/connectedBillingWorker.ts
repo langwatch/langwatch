@@ -2,11 +2,11 @@
  * The daily billing tick of a connected self-hosted customer (ADR-141,
  * section 7).
  *
- * Three things run on it, in order and independently: the quarterly seat
- * true-up, which invoices the seats a customer added in a quarter that has
- * closed; the monthly statement, which mails the billing contact what the
- * month cost; and the pending renewals, whose credit waits for the last usage
- * invoice of the old term to be finalized.
+ * Three things run on it, in order and independently: the seat change
+ * invoices whose payment provider call failed when the seats were changed;
+ * the monthly statement, which mails the billing contact what the month cost;
+ * and the pending renewals, whose credit waits for the last usage invoice of
+ * the old term to be finalized.
  *
  * It runs on LangWatch Cloud only, because every row it reads and every
  * invoice it creates belongs there. A self-hosted install starts nothing.
@@ -14,7 +14,7 @@
 
 import { createConnectedBillingService } from "@ee/billing/connected/connectedBilling.prisma";
 import { createConnectedMonthlyStatementService } from "@ee/billing/connected/monthlyStatement.prisma";
-import { createConnectedSeatTrueUpService } from "@ee/billing/connected/seatTrueUp.prisma";
+import { createSeatChangeBilling } from "@ee/billing/connected/seatChange.prisma";
 import { createLogger } from "@langwatch/observability";
 import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
@@ -31,8 +31,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * The first tick waits for the process to finish coming up. Nothing here is
- * urgent to the minute: a quarter that closed overnight is invoiced within the
- * day either way.
+ * urgent to the minute: a seat invoice that failed overnight is raised within
+ * the day either way.
  */
 const FIRST_TICK_DELAY_MS = 5 * 60 * 1000;
 
@@ -42,7 +42,7 @@ export interface ConnectedBillingWorkerHandle {
 
 /** One run of each of the three jobs, as the tick drives them. */
 export interface ConnectedBillingJobs {
-  runSeatTrueUp(): Promise<unknown>;
+  completePendingSeatChanges(): Promise<unknown>;
   runMonthlyStatements(): Promise<unknown>;
   /** The organizations holding a renewal whose credit has not been created. */
   listPendingRenewalOrganizationIds(): Promise<string[]>;
@@ -61,7 +61,8 @@ export function createConnectedBillingJobs(
 ): ConnectedBillingJobs {
   const billing = createConnectedBillingService(prisma);
   return {
-    runSeatTrueUp: () => createConnectedSeatTrueUpService(prisma).run(),
+    completePendingSeatChanges: () =>
+      createSeatChangeBilling(prisma).completePendingSeatChanges(),
     runMonthlyStatements: () =>
       createConnectedMonthlyStatementService(prisma).run(),
     listPendingRenewalOrganizationIds: () =>
@@ -100,7 +101,7 @@ async function listPendingRenewalOrganizationIds(
 export async function runConnectedBillingTick(
   jobs: ConnectedBillingJobs,
 ): Promise<void> {
-  await runJob("seatTrueUp", () => jobs.runSeatTrueUp());
+  await runJob("seatChanges", () => jobs.completePendingSeatChanges());
   await runJob("monthlyStatements", () => jobs.runMonthlyStatements());
   await runJob("renewals", async () => {
     for (const organizationId of await jobs.listPendingRenewalOrganizationIds()) {

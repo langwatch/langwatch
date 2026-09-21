@@ -21,14 +21,13 @@ import {
   statusOfIssuedLicense,
 } from "../../licensing/registry/issuedLicense";
 import { PrismaIssuedLicenseRepository } from "../../licensing/registry/issuedLicense.prisma";
-import { seatQuarterKeyFor } from "../../licensing/registry/seatReports";
-import { PrismaConnectedBillingStore } from "./connectedBilling.prisma";
 import type {
   ConnectedBillingAccountRecord,
   ConnectedCurrency,
   CreditGrantRecord,
   InvoiceRecord,
 } from "./connectedBilling.service";
+import { PrismaConnectedBillingStore } from "./connectedBillingStore.prisma";
 
 const CENTS = 100;
 
@@ -44,12 +43,12 @@ export interface ConnectedSeatState {
   licensed: number;
   reported: number | null;
   lastSyncAt: Date | null;
-  currentQuarterPeak: number | null;
 }
 
-export interface ConnectedTrueUpRow {
+/** One mid-term seat change and what it was invoiced. */
+export interface ConnectedSeatChangeRow {
   licenseId: string;
-  quarterStartsAt: Date;
+  changedAt: Date;
   addedSeats: number;
   amountCents: number;
   currency: ConnectedCurrency;
@@ -68,7 +67,7 @@ export interface ConnectedBillingOverview {
     overageEnabled: boolean;
   };
   seats: ConnectedSeatState;
-  trueUps: ConnectedTrueUpRow[];
+  seatChanges: ConnectedSeatChangeRow[];
 }
 
 const toCents = (usd: number): number => Math.round(usd * CENTS);
@@ -116,36 +115,17 @@ async function readContractSpend({
   };
 }
 
-async function readSeatState({
-  prisma,
+function readSeatState({
   licenses,
   now,
 }: {
-  prisma: PrismaClient;
   licenses: IssuedLicenseRecord[];
   now: Date;
-}): Promise<ConnectedSeatState> {
+}): ConnectedSeatState {
   const active = licenses.filter(
     (license) => statusOfIssuedLicense(license, now) === "active",
   );
   const synced = active.filter((license) => license.lastSyncAt);
-  const reports = await prisma.licenseSeatReport.findMany({
-    where: {
-      licenseId: { in: active.length > 0 ? active.map((row) => row.id) : [""] },
-    },
-  });
-  const currentQuarters = new Set(
-    active.map((license) =>
-      seatQuarterKeyFor({
-        licenseId: license.id,
-        issuedAt: license.issuedAt,
-        now,
-      }).quarterStartsAt.getTime(),
-    ),
-  );
-  const peaks = reports
-    .filter((report) => currentQuarters.has(report.quarterStartsAt.getTime()))
-    .map((report) => report.peakMembers);
 
   return {
     licensed: sum(active.map((license) => license.maxMembers)),
@@ -154,7 +134,6 @@ async function readSeatState({
         ? sum(synced.map((license) => license.reportedMembers ?? 0))
         : null,
     lastSyncAt: latest(synced.map((license) => license.lastSyncAt)),
-    currentQuarterPeak: peaks.length > 0 ? Math.max(...peaks) : null,
   };
 }
 
@@ -174,7 +153,7 @@ export async function readConnectedBillingOverview({
   ).findAllByOrganization(organizationId);
   const account = await store.findAccount(organizationId);
 
-  const [terms, spend, seats, trueUpRows] = await Promise.all([
+  const [terms, spend, seatChangeRows] = await Promise.all([
     createContractBudgetService(prisma).termsOf(organizationId),
     readContractSpend({
       prisma,
@@ -182,16 +161,16 @@ export async function readConnectedBillingOverview({
       virtualKeyId:
         licenses.find((license) => license.virtualKeyId)?.virtualKeyId ?? null,
     }),
-    readSeatState({ prisma, licenses, now }),
-    prisma.connectedSeatTrueUp.findMany({
+    prisma.connectedSeatChange.findMany({
       where: {
         licenseId: {
           in: licenses.length > 0 ? licenses.map((row) => row.id) : [""],
         },
       },
-      orderBy: { quarterStartsAt: "desc" },
+      orderBy: { changedAt: "desc" },
     }),
   ]);
+  const seats = readSeatState({ licenses, now });
 
   return {
     account,
@@ -204,9 +183,9 @@ export async function readConnectedBillingOverview({
       overageEnabled: terms.overageEnabled,
     },
     seats,
-    trueUps: trueUpRows.map((row) => ({
+    seatChanges: seatChangeRows.map((row) => ({
       licenseId: row.licenseId,
-      quarterStartsAt: row.quarterStartsAt,
+      changedAt: row.changedAt,
       addedSeats: row.addedSeats,
       amountCents: row.amountCents,
       currency: row.currency as ConnectedCurrency,

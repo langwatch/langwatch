@@ -25,12 +25,10 @@ import {
 function connectedBilling(
   account: { organizationId: string } | null,
 ): ConnectedBillingInvoiceEvents & {
-  rollForwardSmallInvoice: ReturnType<typeof vi.fn>;
   completeRenewalIfDue: ReturnType<typeof vi.fn>;
 } {
   return {
     accountFor: vi.fn().mockResolvedValue(account),
-    rollForwardSmallInvoice: vi.fn().mockResolvedValue("rolled"),
     completeRenewalIfDue: vi.fn().mockResolvedValue("completed"),
   };
 }
@@ -57,7 +55,7 @@ const finalized = (customer: string) =>
 
 describe("a finalized invoice", () => {
   describe("given it belongs to a connected self-hosted customer", () => {
-    it("rolls a small one forward and finishes a renewal that was waiting", async () => {
+    it("finishes a renewal that was waiting", async () => {
       const events = connectedBilling({ organizationId: "org_acme" });
 
       const result = await buildService(events).handleEvent(
@@ -65,9 +63,6 @@ describe("a finalized invoice", () => {
       );
 
       expect(result).toEqual({ status: "ok" });
-      expect(events.rollForwardSmallInvoice).toHaveBeenCalledWith({
-        stripeInvoiceId: "in_1",
-      });
       expect(events.completeRenewalIfDue).toHaveBeenCalledWith({
         organizationId: "org_acme",
       });
@@ -83,7 +78,6 @@ describe("a finalized invoice", () => {
       );
 
       expect(result).toEqual({ status: "ok" });
-      expect(events.rollForwardSmallInvoice).not.toHaveBeenCalled();
       expect(events.completeRenewalIfDue).not.toHaveBeenCalled();
     });
   });

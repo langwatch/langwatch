@@ -25,8 +25,6 @@ export type BankTransferType = "us_bank_transfer" | "eu_bank_transfer";
 
 /** Days after the term ends in which the last usage invoice can still draw the credit. */
 export const CREDIT_GRANT_GRACE_DAYS = 14;
-/** A usage invoice under this amount is rolled into the next one. */
-export const ROLL_FORWARD_THRESHOLD_USD_CENTS = 5_000;
 /** How long an invoice may stay unpaid. */
 export const INVOICE_DAYS_UNTIL_DUE = 30;
 
@@ -63,7 +61,7 @@ export interface PendingRenewal {
 }
 
 export type CreditGrantKind = "commit" | "added" | "renewal";
-export type InvoiceKind = "annual" | "seat_trueup" | "usage";
+export type InvoiceKind = "annual" | "seat_change" | "usage";
 
 export interface CreditGrantRecord {
   stripeCreditGrantId: string;
@@ -79,7 +77,6 @@ export interface InvoiceRecord {
   currency: ConnectedCurrency;
   amountCents: number;
   status: string;
-  rolledForwardTo: string | null;
   paidOutOfBandAt: Date | null;
   termStartsAt: Date | null;
 }
@@ -110,15 +107,17 @@ export interface ConnectedBillingStore {
   addInvoice(accountId: string, invoice: InvoiceRecord): Promise<void>;
   updateInvoice(
     stripeInvoiceId: string,
-    patch: Partial<
-      Pick<InvoiceRecord, "status" | "rolledForwardTo" | "paidOutOfBandAt">
-    >,
+    patch: Partial<Pick<InvoiceRecord, "status" | "paidOutOfBandAt">>,
   ): Promise<void>;
 }
 
 export interface InvoiceLine {
   description: string;
+  /** The whole line. With a quantity, `unitAmountCents` times `quantity`. */
   amountCents: number;
+  /** Set when the customer should read a unit and a count rather than one total. */
+  quantity?: number;
+  unitAmountCents?: number;
 }
 
 export interface ProviderInvoice {
@@ -165,18 +164,6 @@ export interface ConnectedBillingProvider {
     subscriptionId: string;
     periodEnd: Date;
   }): Promise<boolean>;
-  creditInvoiceInFull(input: {
-    invoiceId: string;
-    reason: string;
-  }): Promise<void>;
-  addPendingSubscriptionItem(input: {
-    customerId: string;
-    subscriptionId: string;
-    amountCents: number;
-    currency: ConnectedCurrency;
-    description: string;
-    metadata: Record<string, string>;
-  }): Promise<{ id: string }>;
   payOutOfBand(invoiceId: string): Promise<void>;
 }
 
@@ -407,57 +394,6 @@ export class ConnectedBillingService {
     return "completed";
   }
 
-  /**
-   * A usage invoice under the threshold is credited in full and its amount is
-   * added to the next one. Idempotent per invoice.
-   */
-  async rollForwardSmallInvoice(input: {
-    stripeInvoiceId: string;
-  }): Promise<"rolled" | "left" | "already_rolled" | "not_usage"> {
-    const invoice = await this.deps.provider.retrieveInvoice(
-      input.stripeInvoiceId,
-    );
-    const stored = await this.deps.store.findInvoice(invoice.id);
-    if (stored?.rolledForwardTo) return "already_rolled";
-
-    const account = invoice.subscriptionId
-      ? await this.deps.store.findAccountBySubscription(invoice.subscriptionId)
-      : null;
-    if (!account) return "not_usage";
-    if (invoice.amountDueCents >= ROLL_FORWARD_THRESHOLD_USD_CENTS)
-      return "left";
-    if (invoice.amountDueCents <= 0) return "left";
-
-    if (!stored) {
-      await this.deps.store.addInvoice(account.id, {
-        stripeInvoiceId: invoice.id,
-        kind: "usage",
-        currency: "USD",
-        amountCents: invoice.amountDueCents,
-        status: invoice.status,
-        rolledForwardTo: null,
-        paidOutOfBandAt: null,
-        termStartsAt: null,
-      });
-    }
-    await this.deps.provider.creditInvoiceInFull({
-      invoiceId: invoice.id,
-      reason: "Rolled forward to the next quarterly invoice",
-    });
-    const item = await this.deps.provider.addPendingSubscriptionItem({
-      customerId: account.stripeCustomerId,
-      subscriptionId: account.usageSubscriptionId as string,
-      amountCents: invoice.amountDueCents,
-      currency: "USD",
-      description: `Hosted usage carried over from invoice ${invoice.id}`,
-      metadata: { rolled_forward_from: invoice.id },
-    });
-    await this.deps.store.updateInvoice(invoice.id, {
-      rolledForwardTo: item.id,
-    });
-    return "rolled";
-  }
-
   /** Finance received the money outside the provider. */
   async markPaidOutOfBand(input: { stripeInvoiceId: string }): Promise<void> {
     this.requireCloud();
@@ -633,7 +569,6 @@ export class ConnectedBillingService {
       currency: input.seatCurrency,
       amountCents: lines.reduce((sum, line) => sum + line.amountCents, 0),
       status: invoice.status,
-      rolledForwardTo: null,
       paidOutOfBandAt: null,
       termStartsAt: input.termStartsAt,
     });

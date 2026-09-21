@@ -110,10 +110,8 @@ import { createRunModelsResolver } from "~/server/scenarios/run-models.resolver"
 import { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { getSaaSPlanProvider } from "../../../ee/billing";
-import {
-  createConnectedBillingService,
-  PrismaConnectedBillingStore,
-} from "../../../ee/billing/connected/connectedBilling.prisma";
+import { createConnectedBillingService } from "../../../ee/billing/connected/connectedBilling.prisma";
+import { PrismaConnectedBillingStore } from "../../../ee/billing/connected/connectedBillingStore.prisma";
 import { NotificationService } from "../../../ee/billing/notifications/notification.service";
 import { NotificationRepository } from "../../../ee/billing/notifications/repositories/notification.repository";
 import { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
@@ -810,14 +808,12 @@ export function initializeDefaultApp(options?: {
       licensePrivateKey: env.LANGWATCH_LICENSE_PRIVATE_KEY,
       getPostHog: () => getPostHogInstance(),
       // A finalized invoice of a connected self-hosted customer (ADR-141):
-      // small usage invoices roll forward and a waiting renewal completes.
+      // a waiting renewal completes.
       connectedBilling: {
         accountFor: (stripeCustomerId) =>
           new PrismaConnectedBillingStore(prisma).findAccountByCustomer(
             stripeCustomerId,
           ),
-        rollForwardSmallInvoice: (input) =>
-          createConnectedBillingService(prisma).rollForwardSmallInvoice(input),
         completeRenewalIfDue: (input) =>
           createConnectedBillingService(prisma).completeRenewalIfDue(input),
       },

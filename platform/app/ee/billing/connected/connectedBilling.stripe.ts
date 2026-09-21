@@ -195,8 +195,13 @@ export class StripeConnectedBillingProvider
           customer: input.customerId,
           invoice: draft.id,
           currency,
-          amount: line.amountCents,
           description: line.description,
+          // A line with a quantity carries the unit and the count, so the
+          // customer reads "8 seats at 300.82" and the two multiply back to
+          // the total.
+          ...(line.quantity !== undefined && line.unitAmountCents !== undefined
+            ? { quantity: line.quantity, unit_amount: line.unitAmountCents }
+            : { amount: line.amountCents }),
         },
         { idempotencyKey: `${key}:line:${index}` },
       );
@@ -227,37 +232,6 @@ export class StripeConnectedBillingProvider
         invoice.period_end * MILLISECONDS_PER_SECOND >=
           input.periodEnd.getTime(),
     );
-  }
-
-  async creditInvoiceInFull(input: {
-    invoiceId: string;
-    reason: string;
-  }): Promise<void> {
-    const invoice = await this.deps.stripe.invoices.retrieve(input.invoiceId);
-    await this.deps.stripe.creditNotes.create({
-      invoice: input.invoiceId,
-      amount: invoice.amount_due,
-      memo: input.reason,
-    });
-  }
-
-  async addPendingSubscriptionItem(input: {
-    customerId: string;
-    subscriptionId: string;
-    amountCents: number;
-    currency: ConnectedCurrency;
-    description: string;
-    metadata: Record<string, string>;
-  }): Promise<{ id: string }> {
-    const item = await this.deps.stripe.invoiceItems.create({
-      customer: input.customerId,
-      subscription: input.subscriptionId,
-      currency: input.currency.toLowerCase(),
-      amount: input.amountCents,
-      description: input.description,
-      metadata: input.metadata,
-    });
-    return { id: item.id };
   }
 
   async payOutOfBand(invoiceId: string): Promise<void> {

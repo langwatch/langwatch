@@ -117,8 +117,6 @@ function fakeProvider({
       return invoice;
     }),
     hasFinalizedUsageInvoice: vi.fn(async () => usageInvoiceFinalized),
-    creditInvoiceInFull: vi.fn(async () => undefined),
-    addPendingSubscriptionItem: vi.fn(async () => ({ id: `ii_${++sequence}` })),
     payOutOfBand: vi.fn(async () => undefined),
   };
   return provider;
@@ -480,63 +478,6 @@ describe("ConnectedBillingService", () => {
       return context;
     }
 
-    /** @scenario A usage invoice under 50 USD is rolled forward */
-    it("credits an invoice under 50 USD in full and carries the amount to the next one", async () => {
-      const context = await onboarded(1_200);
-
-      expect(
-        await context.service.rollForwardSmallInvoice({
-          stripeInvoiceId: "in_usage",
-        }),
-      ).toBe("rolled");
-
-      expect(context.provider.creditInvoiceInFull).toHaveBeenCalledWith(
-        expect.objectContaining({ invoiceId: "in_usage" }),
-      );
-      expect(context.provider.addPendingSubscriptionItem).toHaveBeenCalledWith(
-        expect.objectContaining({
-          subscriptionId: "sub_1",
-          amountCents: 1_200,
-          currency: "USD",
-          metadata: { rolled_forward_from: "in_usage" },
-        }),
-      );
-      expect(
-        (await context.store.findInvoice("in_usage"))?.rolledForwardTo,
-      ).toMatch(/^ii_/);
-    });
-
-    /** @scenario A usage invoice of 50 USD or more is left alone */
-    it("leaves an invoice of 50 USD or more alone", async () => {
-      const context = await onboarded(5_000);
-
-      expect(
-        await context.service.rollForwardSmallInvoice({
-          stripeInvoiceId: "in_usage",
-        }),
-      ).toBe("left");
-      expect(context.provider.creditInvoiceInFull).not.toHaveBeenCalled();
-    });
-
-    /** @scenario Rolling the same invoice forward twice moves the amount once */
-    it("moves the amount once when run twice", async () => {
-      const context = await onboarded(1_200);
-
-      await context.service.rollForwardSmallInvoice({
-        stripeInvoiceId: "in_usage",
-      });
-      expect(
-        await context.service.rollForwardSmallInvoice({
-          stripeInvoiceId: "in_usage",
-        }),
-      ).toBe("already_rolled");
-
-      expect(context.provider.creditInvoiceInFull).toHaveBeenCalledTimes(1);
-      expect(context.provider.addPendingSubscriptionItem).toHaveBeenCalledTimes(
-        1,
-      );
-    });
-
     it("marks an invoice paid out of band and records when", async () => {
       const context = await onboarded(80_000);
       const account = await context.store.findAccount(ACME);
@@ -546,7 +487,6 @@ describe("ConnectedBillingService", () => {
         currency: "USD",
         amountCents: 80_000,
         status: "open",
-        rolledForwardTo: null,
         paidOutOfBandAt: null,
         termStartsAt: null,
       });
