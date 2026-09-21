@@ -12,6 +12,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import { promotePendingMethod } from "~/features/auth/logic/lastUsedMethod";
 import { readHandledError } from "~/features/errors/logic/readHandledError";
 import { auth0BridgeConnectionOf } from "~/utils/auth0-bridge";
 
@@ -135,6 +136,18 @@ async function _fetchSessionShared(): Promise<CompatSession | null> {
       const json = await res.json();
       const session = adaptSession(json);
       _cachedSession = session;
+      // A session is the only proof a federated hand-off actually worked, and
+      // this is the one place every landing passes through.
+      //
+      // It cannot live on the sign-in screen. A federated dial hands better-auth
+      // `callbackURL ?? "/"`, so the provider's callback returns the browser to
+      // the app root — that screen is never mounted again, its effect never
+      // runs, and the parked method never became the badge. Password and
+      // passkey were unaffected because they record themselves directly, which
+      // is why this only ever looked broken for the social providers.
+      //
+      // A no-op when nothing is parked, so it costs a landing nothing.
+      if (session) promotePendingMethod();
       return session;
     } catch {
       return _cachedSession;
