@@ -4,7 +4,8 @@
  * The two claim methods are the point of this file. Both push the state the
  * caller resolved against into the WHERE clause of the write, so the database
  * decides who won rather than the process, and a code that was revoked or
- * redeemed between the read and the write refuses the claim.
+ * redeemed between the read and the write refuses the claim. Both are written
+ * as SQL for a reason the comment on `claimSingleUse` gives.
  *
  * @see ./activationCode.service.ts
  */
@@ -87,8 +88,20 @@ export class PrismaActivationCodes implements ActivationCodeRepository {
 
   /**
    * One conditional write, so two installs posting the same code at the same
-   * moment cannot both be told yes: `redeemedAt: null` is part of the WHERE, so
-   * exactly one statement finds a row to update and the other updates none.
+   * moment cannot both be told yes: exactly one statement finds a row to update
+   * and the other updates none.
+   *
+   * Written as SQL rather than through `updateMany`, which does not hold under
+   * concurrency here. Prisma compiles `updateMany` to
+   * `UPDATE ... WHERE id IN (SELECT id FROM ... WHERE <conditions>)`. When two
+   * statements meet on the same row, the second waits for the first to commit
+   * and then re-checks its WHERE clause against the row as it now stands, which
+   * for that shape is only the subquery, and the subquery still runs on the
+   * statement's own older snapshot. Both are told yes. With the conditions
+   * stated directly against the table the re-check sees `redeemedAt` already
+   * set and the second statement updates nothing, which is the answer we need.
+   * A CI run with five installs posting at once had three of them win before
+   * this was written as SQL.
    */
   async claimSingleUse({
     id,
@@ -99,27 +112,28 @@ export class PrismaActivationCodes implements ActivationCodeRepository {
     instanceId: string;
     at: Date;
   }): Promise<boolean> {
-    const { count } = await this.prisma.activationCode.updateMany({
-      where: {
-        id,
-        reusable: false,
-        redeemedAt: null,
-        revokedAt: null,
-        expiresAt: { gt: at },
-      },
-      data: {
-        redeemedAt: at,
-        redeemedByInstanceId: instanceId,
-        redemptionCount: { increment: 1 },
-      },
-    });
-    return count === 1;
+    const updated = await this.prisma.$executeRaw`
+      -- @tenancy: an activation code is addressed by its own primary key, which
+      -- the caller resolved from the hash presented to it. The code names the
+      -- organization a redemption will bind rather than belonging to one.
+      UPDATE "ActivationCode"
+         SET "redeemedAt" = ${at},
+             "redeemedByInstanceId" = ${instanceId},
+             "redemptionCount" = "redemptionCount" + 1
+       WHERE "id" = ${id}
+         AND "reusable" = false
+         AND "redeemedAt" IS NULL
+         AND "revokedAt" IS NULL
+         AND "expiresAt" > ${at}
+    `;
+    return updated === 1;
   }
 
   /**
    * A reusable code is claimed by every install that presents it, so the write
    * carries only the conditions that can still refuse it: revoked, or past its
-   * expiry.
+   * expiry. Nothing here has to be exclusive, but it is the same SQL as the
+   * single-use claim so the count reflects the row as it stood at the write.
    */
   async recordReusableRedemption({
     id,
@@ -130,15 +144,18 @@ export class PrismaActivationCodes implements ActivationCodeRepository {
     instanceId: string;
     at: Date;
   }): Promise<boolean> {
-    const { count } = await this.prisma.activationCode.updateMany({
-      where: { id, reusable: true, revokedAt: null, expiresAt: { gt: at } },
-      data: {
-        redeemedAt: at,
-        redeemedByInstanceId: instanceId,
-        redemptionCount: { increment: 1 },
-      },
-    });
-    return count === 1;
+    const updated = await this.prisma.$executeRaw`
+      -- @tenancy: addressed by primary key, as in claimSingleUse above.
+      UPDATE "ActivationCode"
+         SET "redeemedAt" = ${at},
+             "redeemedByInstanceId" = ${instanceId},
+             "redemptionCount" = "redemptionCount" + 1
+       WHERE "id" = ${id}
+         AND "reusable" = true
+         AND "revokedAt" IS NULL
+         AND "expiresAt" > ${at}
+    `;
+    return updated === 1;
   }
 
   async attachIssuedLicense({

@@ -68,7 +68,7 @@ Feature: The license is the credential for hosted services
     When the install presents the license token with instance id "instance-a"
     Then the license is bound to "instance-a"
 
-  @unit
+  @unit @integration
   Scenario: Two instances racing to bind leave exactly one bound
     Given the license has no instance bound
     When "instance-a" and "instance-b" present the license token at the same moment

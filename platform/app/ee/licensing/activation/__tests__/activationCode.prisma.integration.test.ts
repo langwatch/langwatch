@@ -4,15 +4,19 @@
  * Single-use redemption against a real Postgres.
  *
  * The unit test proves the service asks the store to decide. This proves the
- * store actually does: five redemptions of the same code are sent at once, and
- * Postgres has to admit exactly one. No timing, no sleeps, and no retries: the
- * conditional UPDATE is either exclusive or it is not.
+ * store actually does, twice over. The first test holds one claim open in its
+ * own transaction until the second is blocked on its row lock, which is the
+ * interleaving that decides the question and does not depend on how fast the
+ * machine is. The second sends five claims at once, which is the shape a real
+ * burst takes.
  *
  * @see ../activationCode.prisma.ts
  * @see specs/self-hosting/connected-services/activation-codes.feature
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { Prisma } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
+import { raceOnOneRow } from "~/test-utils/rowLockInterleaving";
 import {
   activationCodeHash,
   activationCodeHint,
@@ -23,6 +27,7 @@ import { PrismaActivationCodes } from "../activationCode.prisma";
 
 const RUN = `act-${Date.now()}`;
 const NEXT_YEAR = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+
 
 function codeOf(): { code: string; hash: string; hint: string } {
   const code = mintActivationCode();
@@ -68,6 +73,34 @@ describe("activation codes on Postgres", () => {
   });
 
   describe("given a single-use code in the registry", () => {
+    describe("when a second install claims it while the first still holds the row", () => {
+      /** @scenario "The database decides which install wins, not the process" */
+      it("refuses the second, because the write re-reads the row it waited for", async () => {
+        const row = await issue(false);
+        const at = new Date();
+        const claimFor = (instance: string) => (tx: Prisma.TransactionClient) =>
+          new PrismaActivationCodes(tx).claimSingleUse({
+            id: row.id,
+            instanceId: `${RUN}-${instance}`,
+            at,
+          });
+
+        const claims = await raceOnOneRow({
+          prisma,
+          table: "ActivationCode",
+          first: claimFor("first"),
+          second: claimFor("second"),
+        });
+
+        expect(claims.first).toBe(true);
+        expect(claims.second).toBe(false);
+
+        const stored = await repository.findById(row.id);
+        expect(stored?.redemptionCount).toBe(1);
+        expect(stored?.redeemedByInstanceId).toBe(`${RUN}-first`);
+      });
+    });
+
     describe("when five installs redeem it at once", () => {
       /** @scenario "The database decides which install wins, not the process" */
       it("admits one claim and refuses the other four", async () => {

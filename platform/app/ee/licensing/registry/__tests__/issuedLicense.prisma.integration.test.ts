@@ -6,7 +6,9 @@
  */
 import { generateKeyPairSync } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { Prisma } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
+import { raceOnOneRow } from "~/test-utils/rowLockInterleaving";
 import { PrismaConnectManagedKeys } from "../connectManagedKey.prisma";
 import {
   PrismaCustomerOrganizations,
@@ -161,6 +163,76 @@ describe("the license registry on Postgres", () => {
       });
 
       expect(attached).toBe(false);
+      expect(
+        (await prisma.issuedLicense.findUnique({ where: { id: license.id } }))
+          ?.virtualKeyId,
+      ).toBeNull();
+    });
+  });
+
+  describe("when two installs present the same license at the same moment", () => {
+    /** @scenario Two instances racing to bind leave exactly one bound */
+    it("binds the first and refuses the second, which is still waiting on its row", async () => {
+      const { license } = await issue("ACME Bind Race");
+      const at = new Date();
+      const bindFor = (instance: string) => (tx: Prisma.TransactionClient) =>
+        new PrismaIssuedLicenseRepository(tx).bindInstance({
+          id: license.id,
+          instanceId: instance,
+          at,
+        });
+
+      const binds = await raceOnOneRow({
+        prisma,
+        table: "IssuedLicense",
+        first: bindFor("instance-first"),
+        second: bindFor("instance-second"),
+      });
+
+      expect(binds.first).toBe(true);
+      expect(binds.second).toBe(false);
+      expect(
+        (await prisma.issuedLicense.findUnique({ where: { id: license.id } }))
+          ?.instanceId,
+      ).toBe("instance-first");
+    });
+  });
+
+  describe("when a managed key is attached while a revocation is landing", () => {
+    /** @scenario The managed key is recorded only while the license still admits the call */
+    it("refuses the attach, because the write re-reads the row it waited for", async () => {
+      const { license } = await issue("ACME Attach Interleaving");
+      const organizationId = license.organizationId as string;
+      await prisma.issuedLicense.update({
+        where: { id: license.id },
+        data: { instanceId: "instance-a" },
+      });
+
+      // The revocation commits first, holding the row. The attach was resolved
+      // against a license that was still active, and has to lose.
+      const answers = await raceOnOneRow<boolean>({
+        prisma,
+        table: "IssuedLicense",
+        first: async (tx) => {
+          await tx.issuedLicense.update({
+            where: { id: license.id },
+            data: { revokedAt: new Date(), revokedReason: "leaked" },
+          });
+          return true;
+        },
+        second: (tx) =>
+          new PrismaIssuedLicenseRepository(tx).attachVirtualKey({
+            id: license.id,
+            virtualKeyId: `vk_${RUN}_should_not_attach`,
+            requires: {
+              organizationId,
+              instanceId: "instance-a",
+              activeAt: new Date(),
+            },
+          }),
+      });
+
+      expect(answers.second).toBe(false);
       expect(
         (await prisma.issuedLicense.findUnique({ where: { id: license.id } }))
           ?.virtualKeyId,

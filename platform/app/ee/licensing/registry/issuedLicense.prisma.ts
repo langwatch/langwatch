@@ -107,12 +107,19 @@ export class PrismaIssuedLicenseRepository implements IssuedLicenseRepository {
     instanceId: string;
     at: Date;
   }): Promise<boolean> {
-    // One conditional write, so the database decides which install wins.
-    const { count } = await this.prisma.issuedLicense.updateMany({
-      where: { id, instanceId: null },
-      data: { instanceId, instanceBoundAt: at },
-    });
-    return count === 1;
+    // One conditional write, so the database decides which install wins. As
+    // SQL, for the reason given above `attachVirtualKey`.
+    const updated = await this.prisma.$executeRaw`
+      -- @tenancy: a license is addressed by its own primary key. The row names
+      -- the organization it was issued to rather than belonging to one.
+      UPDATE "IssuedLicense"
+         SET "instanceId" = ${instanceId},
+             "instanceBoundAt" = ${at},
+             "updatedAt" = now()
+       WHERE "id" = ${id}
+         AND "instanceId" IS NULL
+    `;
+    return updated === 1;
   }
 
   async attachVirtualKey({
@@ -127,19 +134,30 @@ export class PrismaIssuedLicenseRepository implements IssuedLicenseRepository {
     // The state the caller resolved against is part of the write, so a
     // revocation, a supersede, the term running out or a move to another
     // customer between the read and this statement loses the key its grant.
-    const { count } = await this.prisma.issuedLicense.updateMany({
-      where: {
-        id,
-        virtualKeyId: null,
-        organizationId: requires.organizationId,
-        instanceId: requires.instanceId,
-        revokedAt: null,
-        supersededAt: null,
-        expiresAt: { gt: requires.activeAt },
-      },
-      data: { virtualKeyId },
-    });
-    return count === 1;
+    //
+    // Stated as SQL rather than through `updateMany`, which does not hold under
+    // concurrency. Prisma compiles `updateMany` to
+    // `UPDATE ... WHERE id IN (SELECT id FROM ... WHERE <conditions>)`. When two
+    // statements meet on the same row the second waits for the first to commit
+    // and then re-checks its WHERE clause against the row as it now stands,
+    // which for that shape is only the subquery, and the subquery still runs on
+    // the statement's own older snapshot: both are told yes. With the conditions
+    // against the table the re-check sees the new values and the second updates
+    // nothing. Proved on the twin of this write in
+    // ee/licensing/activation/__tests__/activationCode.prisma.integration.test.ts.
+    const updated = await this.prisma.$executeRaw`
+      UPDATE "IssuedLicense"
+         SET "virtualKeyId" = ${virtualKeyId},
+             "updatedAt" = now()
+       WHERE "id" = ${id}
+         AND "virtualKeyId" IS NULL
+         AND "organizationId" = ${requires.organizationId}
+         AND "instanceId" = ${requires.instanceId}
+         AND "revokedAt" IS NULL
+         AND "supersededAt" IS NULL
+         AND "expiresAt" > ${requires.activeAt}
+    `;
+    return updated === 1;
   }
 }
 
