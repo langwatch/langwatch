@@ -31,9 +31,9 @@ export const backofficeSsoConnectionSchema = z
     providerId: z.string(),
     issuer: z.string().nullable(),
     allowsJit: z.boolean(),
-    /** Optional only until identity's backoffice row carries it: a strict
-     *  schema that required it would refuse every row identity sends today. */
-    arrivalPolicy: z.enum(["admit", "request", "refuse"]).optional(),
+    /** Who the connection admits. `allowsJit` above is the derived boolean
+     *  identity keeps beside it for readers written before the policy. */
+    arrivalPolicy: z.enum(["admit", "request", "refuse"]),
     source: z.string(),
     testLoginAccountId: z.string().nullable(),
     rejection: z.object({ domain: z.string(), note: z.string() }).strict().nullable(),

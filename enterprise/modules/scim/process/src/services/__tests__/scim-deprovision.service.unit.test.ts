@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { OffboardIncompleteError } from "@langwatch/authz-contract";
+import { CannotRemoveLastAdminError } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
+import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
 import type { ScimSyncLifecycle } from "../../app/scim.members.ts";
 import { ScimDeprovisionService } from "../scim-deprovision.service.ts";
 
@@ -27,7 +29,11 @@ describe("ScimDeprovisionService", () => {
   it("uses authz's transactional proof for directory removals", async () => {
     const grants = new GrantsFake();
     const lifecycle = new LifecycleFake();
-    const service = ScimDeprovisionService.create({ grants, lifecycle });
+    const service = ScimDeprovisionService.create({
+      grants,
+      lifecycle,
+      organization: new OrganizationAdministrationFake(),
+    });
 
     await service.removeAccess({
       userId: USER_ID,
@@ -52,7 +58,11 @@ describe("ScimDeprovisionService", () => {
       it("removes access through the same proof a deletion carries", async () => {
         const grants = new GrantsFake();
         const lifecycle = new LifecycleFake();
-        const service = ScimDeprovisionService.create({ grants, lifecycle });
+        const service = ScimDeprovisionService.create({
+          grants,
+          lifecycle,
+          organization: new OrganizationAdministrationFake(),
+        });
 
         await service.removeAccess({
           userId: USER_ID,
@@ -78,7 +88,11 @@ describe("ScimDeprovisionService", () => {
     const grants = new GrantsFake();
     const lifecycle = new LifecycleFake();
     grants.offboard.mockRejectedValueOnce(new OffboardIncompleteError({ remainingBindings: 1 }));
-    const service = ScimDeprovisionService.create({ grants, lifecycle });
+    const service = ScimDeprovisionService.create({
+      grants,
+      lifecycle,
+      organization: new OrganizationAdministrationFake(),
+    });
 
     await expect(
       service.removeAccess({
@@ -115,7 +129,11 @@ describe("ScimDeprovisionService", () => {
         personalTeams: [{ id: "team_1", name: "Sam's team" }],
       },
     });
-    const service = ScimDeprovisionService.create({ grants, lifecycle });
+    const service = ScimDeprovisionService.create({
+      grants,
+      lifecycle,
+      organization: new OrganizationAdministrationFake(),
+    });
 
     const manifest = await service.removeAccess({
       userId: USER_ID,
@@ -135,7 +153,11 @@ describe("ScimDeprovisionService", () => {
     const grants = new GrantsFake();
     const lifecycle = new LifecycleFake();
     grants.offboard.mockRejectedValueOnce(new Error("database unavailable"));
-    const service = ScimDeprovisionService.create({ grants, lifecycle });
+    const service = ScimDeprovisionService.create({
+      grants,
+      lifecycle,
+      organization: new OrganizationAdministrationFake(),
+    });
 
     await service
       .removeAccess({
@@ -147,5 +169,66 @@ describe("ScimDeprovisionService", () => {
       .catch(() => undefined);
 
     expect(lifecycle.applyFailed).not.toHaveBeenCalled();
+  });
+  describe("given the organization's only administrator who can still sign in", () => {
+    describe("when the directory pushes them as inactive", () => {
+      /** @scenario "A directory cannot deactivate the last administrator who can still sign in" */
+      it("asks the organization first, and takes no authority away when it refuses", async () => {
+        const grants = new GrantsFake();
+        const lifecycle = new LifecycleFake();
+        const organization = new OrganizationAdministrationFake();
+        organization.assertRemovalKeepsAnAdministrator.mockRejectedValueOnce(
+          new CannotRemoveLastAdminError(),
+        );
+        const service = ScimDeprovisionService.create({ grants, lifecycle, organization });
+
+        await expect(
+          service.removeAccess({
+            userId: USER_ID,
+            organizationId: ORGANIZATION_ID,
+            connectionId: CONNECTION_ID,
+            op: "deactivate_user",
+          }),
+        ).rejects.toMatchObject({ code: "cannot_remove_last_admin" });
+
+        expect(organization.assertRemovalKeepsAnAdministrator).toHaveBeenCalledWith({
+          organizationId: ORGANIZATION_ID,
+          userId: USER_ID,
+        });
+        expect(grants.offboard).not.toHaveBeenCalled();
+        expect(lifecycle.applyFailed).toHaveBeenCalledWith({
+          organizationId: ORGANIZATION_ID,
+          connectionId: CONNECTION_ID,
+          op: "deactivate_user",
+          errorCode: "cannot_remove_last_admin",
+          retryable: false,
+          userId: USER_ID,
+        });
+      });
+    });
+  });
+
+  describe("given a second administrator who can still get in", () => {
+    describe("when the directory pushes the first one as inactive", () => {
+      /** @scenario "A directory may deactivate an administrator while another can still get in" */
+      it("asks before it removes, and removes once the answer is nothing", async () => {
+        const grants = new GrantsFake();
+        const lifecycle = new LifecycleFake();
+        const organization = new OrganizationAdministrationFake();
+        const service = ScimDeprovisionService.create({ grants, lifecycle, organization });
+
+        await service.removeAccess({
+          userId: USER_ID,
+          organizationId: ORGANIZATION_ID,
+          connectionId: CONNECTION_ID,
+          op: "deactivate_user",
+        });
+
+        expect(
+          organization.assertRemovalKeepsAnAdministrator.mock.invocationCallOrder[0],
+        ).toBeLessThan(grants.offboard.mock.invocationCallOrder[0] ?? 0);
+        expect(lifecycle.applyFailed).not.toHaveBeenCalled();
+      });
+    });
   });
 });

@@ -19,7 +19,10 @@ import {
   ScimCostCenterService,
   type ScimDepartmentAssignment,
 } from "./scim-cost-center.service.ts";
-import { ScimDeprovisionService } from "./scim-deprovision.service.ts";
+import {
+  ScimDeprovisionService,
+  type ScimOrganizationAdministration,
+} from "./scim-deprovision.service.ts";
 import { ScimGrantsService } from "./scim-grants.service.ts";
 import { ScimUserPatchService, type ScimUserActivation } from "./scim-user-patch.service.ts";
 import {
@@ -48,6 +51,7 @@ export class ScimProvisioningService {
   private readonly userService: ScimUserProvisioning;
   private readonly grants: ScimGrantsService;
   private readonly deprovision: ScimDeprovisionService;
+  private readonly organization: ScimOrganizationAdministration;
   private readonly provenOffboarding: boolean;
   private readonly costCenters: ScimCostCenterService;
   private readonly patches: ScimUserPatchService;
@@ -60,6 +64,7 @@ export class ScimProvisioningService {
     users,
     auth,
     governance,
+    organization,
     lifecycle,
     provenOffboarding,
   }: {
@@ -69,6 +74,7 @@ export class ScimProvisioningService {
     users: ScimUserProvisioning;
     auth: ScimSessionRevocation;
     governance: ScimDepartmentAssignment;
+    organization: ScimOrganizationAdministration;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
   }) {
@@ -80,14 +86,17 @@ export class ScimProvisioningService {
     this.deprovision = ScimDeprovisionService.create({
       grants: writer,
       lifecycle,
+      organization,
     });
     this.provenOffboarding = provenOffboarding;
     this.costCenters = ScimCostCenterService.create(governance);
+    this.organization = organization;
     this.patches = ScimUserPatchService.create(
       this.userService,
       this.profiles,
       this.costCenters,
       this.deprovision,
+      organization,
       provenOffboarding,
     );
   }
@@ -99,6 +108,7 @@ export class ScimProvisioningService {
     users: ScimUserProvisioning;
     auth: ScimSessionRevocation;
     governance: ScimDepartmentAssignment;
+    organization: ScimOrganizationAdministration;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
   }): ScimProvisioningService {
@@ -388,6 +398,11 @@ export class ScimProvisioningService {
           connectionId,
           op: "deactivate_user",
         });
+      } else {
+        await this.organization.assertRemovalKeepsAnAdministrator({
+          organizationId,
+          userId: id,
+        });
       }
 
       await this.userService.deactivate({ id });
@@ -465,6 +480,12 @@ export class ScimProvisioningService {
         op: "delete_user",
       });
     } else {
+      // The previous write path removes the membership row itself, so it asks
+      // the same refusal the proven path asks through `removeAccess`.
+      await this.organization.assertRemovalKeepsAnAdministrator({
+        organizationId,
+        userId: id,
+      });
       const visibleGrants = await this.prisma.listRoleBindings({
         kind: "member-offboarding",
         organizationId,

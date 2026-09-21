@@ -10,7 +10,10 @@ import {
   type MergedScimName,
 } from "../rules/scim-name.rules.ts";
 import { ScimCostCenterService } from "./scim-cost-center.service.ts";
-import { ScimDeprovisionService } from "./scim-deprovision.service.ts";
+import {
+  ScimDeprovisionService,
+  type ScimOrganizationAdministration,
+} from "./scim-deprovision.service.ts";
 import { ScimUserProfileService } from "./scim-user-profile.service.ts";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -30,6 +33,7 @@ export class ScimUserPatchService {
     private readonly profiles: ScimUserProfileService,
     private readonly costCenters: ScimCostCenterService,
     private readonly deprovision: ScimDeprovisionService,
+    private readonly organization: ScimOrganizationAdministration,
     private readonly provenOffboarding: boolean,
   ) {}
 
@@ -38,9 +42,17 @@ export class ScimUserPatchService {
     profiles: ScimUserProfileService,
     costCenters: ScimCostCenterService,
     deprovision: ScimDeprovisionService,
+    organization: ScimOrganizationAdministration,
     provenOffboarding: boolean,
   ): ScimUserPatchService {
-    return new ScimUserPatchService(users, profiles, costCenters, deprovision, provenOffboarding);
+    return new ScimUserPatchService(
+      users,
+      profiles,
+      costCenters,
+      deprovision,
+      organization,
+      provenOffboarding,
+    );
   }
 
   async apply(input: {
@@ -117,6 +129,13 @@ export class ScimUserPatchService {
           organizationId: input.organizationId,
           connectionId: input.connectionId,
           op: "deactivate_user",
+        });
+      } else {
+        // The flag chooses HOW access is removed; whether the organization may
+        // be left with nobody to administer it is not the flag's to answer.
+        await this.organization.assertRemovalKeepsAnAdministrator({
+          organizationId: input.organizationId,
+          userId: input.id,
         });
       }
 

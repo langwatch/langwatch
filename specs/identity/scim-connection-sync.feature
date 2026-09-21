@@ -359,3 +359,15 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     When "okta-primary" pushes people into "acme"
     Then membership lands the way it did before the flip
     And the tokens keep working throughout
+
+  # The flag chooses HOW access is removed. Whether an organization may be
+  # left with nobody able to administer it is not the flag's to answer, and
+  # the previous write path deletes the membership row itself.
+
+  @unit
+  Scenario: The refusal does not depend on the directory grants flag
+    Given the directory grants flag is off
+    And "acme" whose only administrator was invited by hand
+    When the directory pushes that administrator as inactive, or deletes them
+    Then the push is refused before the membership row or their grants go
+    And the refusal is the organization's own, not a second copy of the rule

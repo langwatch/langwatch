@@ -10,6 +10,7 @@ import type { UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
+import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
 import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
 import type { ScimMembershipRecord } from "../../repositories/scim.repository.ts";
 import type { ScimDepartmentAssignment } from "../scim-cost-center.service.ts";
@@ -144,6 +145,7 @@ function serviceOver(repository: ReturnType<typeof directory>) {
     users: userService(),
     auth: { revokeAllBrowserSessions: vi.fn(async () => undefined) },
     governance: departments(),
+    organization: new OrganizationAdministrationFake(),
     entitlements: new EnterpriseEntitlements(),
     lifecycle: new QuietScimSyncLifecycle(),
     provenOffboarding: false,

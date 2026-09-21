@@ -9,6 +9,7 @@ import type { UpdateUserProfileInput, UserProfile } from "@langwatch/user-contra
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../../__tests__/support/grants-fake.ts";
+import { OrganizationAdministrationFake } from "../../../__tests__/support/organization-administration-fake.ts";
 import { scimRepositoryFixture as repository } from "../../../__tests__/support/scim-repository-fixture.ts";
 import { QuietScimSyncLifecycle } from "../../../services/__tests__/support/quiet-scim-sync-lifecycle.ts";
 import type { ScimUserProvisioning } from "../../../services/scim-provisioning.service.ts";
@@ -97,6 +98,7 @@ function harness(
     users,
     auth,
     governance,
+    organization: new OrganizationAdministrationFake(),
     entitlements: new EnterpriseEntitlements(),
     lifecycle: new QuietScimSyncLifecycle(),
     provenOffboarding: options.provenOffboarding ?? false,

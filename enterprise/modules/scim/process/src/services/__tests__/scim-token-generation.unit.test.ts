@@ -12,6 +12,7 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
+import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
 import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
 import type { ScimRepository } from "../../repositories/scim.repository.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
@@ -51,6 +52,7 @@ function service(repo: ScimRepository): ScimService {
       departmentResolveByNameOrCreate: vi.fn(),
       departmentAssignUser: vi.fn(async () => undefined),
     },
+    organization: new OrganizationAdministrationFake(),
     entitlements: new FixedEntitlementService(),
     lifecycle: new QuietScimSyncLifecycle(),
     provenOffboarding: false,

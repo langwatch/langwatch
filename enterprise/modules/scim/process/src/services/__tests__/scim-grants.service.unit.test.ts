@@ -71,6 +71,14 @@ describe("SCIM grant reconciliation", () => {
     expect(grants.revokeBindings).not.toHaveBeenCalled();
   });
 
+  it("stays silent when nothing is stored and nothing is asserted", async () => {
+    // An empty push is not a command with no bindings in it: a sync that
+    // asserts nothing about a person writes nothing about them at all.
+    expect(await reconcile([])).toEqual({ attached: 0, revoked: 0 });
+    expect(grants.attachBindings).not.toHaveBeenCalled();
+    expect(grants.revokeBindings).not.toHaveBeenCalled();
+  });
+
   it("emits nothing when the projection already matches", async () => {
     repository.listRoleBindings.mockResolvedValue([storedMember]);
 

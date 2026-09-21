@@ -372,6 +372,27 @@ Feature: Proving a domain by publishing a record
     And the mail carries no token value, because we keep only its fingerprint
     And a second mail at the deadline says what stopped and says existing members are unaffected
 
+  # The two halves of that notice, each on its own: what decides how many
+  # mails one absence earns, and who receives the one it earns. A sweep that
+  # re-reads a domain every eight hours would otherwise mail an
+  # administrator every eight hours about the same missing record.
+
+  @unit
+  Scenario: The same absence is one notice however many times it arrives
+    Given the record for "acme.com" went missing at a known moment
+    When that same absence reaches the notifier again
+    Then one notice is asked for, keyed on the absence rather than on the delivery
+    And the record going missing again later asks for another
+    And the deadline notice is keyed apart from the first, so it is never collapsed into it
+
+  @unit
+  Scenario: Every administrator who can still sign in is told, and one bad address stops nobody
+    Given "acme" has three administrators and one of their addresses bounces
+    When the notice is sent
+    Then the other administrators are still told what to publish, where it goes, and by when
+    And an organization with no administrator left to tell is sent nothing at all
+    And an organization whose row no longer names it is still named something a reader recognises
+
   @integration
   Scenario: A domain the file proved is re-read at its file, not at DNS
     Given "acme.com" was proved by serving the verification file

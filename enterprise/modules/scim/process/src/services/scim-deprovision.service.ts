@@ -3,6 +3,7 @@
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 
 import type { ScimRemovalOperation, ScimSyncLifecycle } from "../app/scim.members.ts";
 
@@ -14,18 +15,29 @@ export type ScimRemovalManifest = {
   personalTeams: { id: string; name: string }[];
 };
 
+/**
+ * The one refusal a directory removal has to ask for: the organization's
+ * own, stated where memberships are counted rather than restated here.
+ */
+export type ScimOrganizationAdministration = Pick<
+  OrganizationApi,
+  "assertRemovalKeepsAnAdministrator"
+>;
+
 /** Removes all authority through authz's transactional offboarding proof. */
 export class ScimDeprovisionService {
   private constructor(
     private readonly grants: AuthzGrantsService,
     private readonly lifecycle: ScimSyncLifecycle,
+    private readonly organization: ScimOrganizationAdministration,
   ) {}
 
   static create(options: {
     grants: AuthzGrantsService;
     lifecycle: ScimSyncLifecycle;
+    organization: ScimOrganizationAdministration;
   }): ScimDeprovisionService {
-    return new ScimDeprovisionService(options.grants, options.lifecycle);
+    return new ScimDeprovisionService(options.grants, options.lifecycle, options.organization);
   }
 
   async removeAccess(input: {
@@ -35,6 +47,13 @@ export class ScimDeprovisionService {
     op: ScimRemovalOperation;
   }): Promise<ScimRemovalManifest> {
     try {
+      // The organization's own way in is not the directory's to close: a push
+      // that would leave nobody able to administer it is refused before any
+      // authority is taken away. specs/identity/scim-connection-sync.feature.
+      await this.organization.assertRemovalKeepsAnAdministrator({
+        organizationId: input.organizationId,
+        userId: input.userId,
+      });
       const result = await this.grants.offboard({
         actor: SCIM_ACTOR,
         userId: input.userId,

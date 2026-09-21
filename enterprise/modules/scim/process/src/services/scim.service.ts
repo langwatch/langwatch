@@ -24,6 +24,7 @@ import type { UserProfile } from "@langwatch/user-contract";
 import type { ScimSyncLifecycle, ScimUserPushOperation } from "../app/scim.members.ts";
 import type { ScimRepository } from "../repositories/scim.repository.ts";
 import type { ScimDepartmentAssignment } from "./scim-cost-center.service.ts";
+import type { ScimOrganizationAdministration } from "./scim-deprovision.service.ts";
 import { ScimDirectoryIdentityService } from "./scim-directory-identity.service.ts";
 import { ScimDirectoryService } from "./scim-directory.service.ts";
 import { ScimGrantsService } from "./scim-grants.service.ts";
@@ -60,6 +61,7 @@ export class ScimService extends ScimServiceContract {
     users,
     auth,
     governance,
+    organization,
     entitlements,
     lifecycle,
     provenOffboarding,
@@ -69,6 +71,7 @@ export class ScimService extends ScimServiceContract {
     users: ScimUserProvisioning;
     auth: ScimSessionRevocation;
     governance: ScimDepartmentAssignment;
+    organization: ScimOrganizationAdministration;
     entitlements: Pick<EntitlementApi, "getActivePlan">;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
@@ -85,6 +88,7 @@ export class ScimService extends ScimServiceContract {
       users,
       auth,
       governance,
+      organization,
       lifecycle,
       provenOffboarding,
     });
@@ -98,6 +102,7 @@ export class ScimService extends ScimServiceContract {
     users: ScimUserProvisioning;
     auth: ScimSessionRevocation;
     governance: ScimDepartmentAssignment;
+    organization: ScimOrganizationAdministration;
     entitlements: Pick<EntitlementApi, "getActivePlan">;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;

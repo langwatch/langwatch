@@ -9,6 +9,7 @@ import type { UserApi } from "@langwatch/user-contract";
 
 import type { ScimSyncLifecycle } from "../app/scim.members.ts";
 import type { ScimRepository } from "../repositories/scim.repository.ts";
+import type { ScimOrganizationAdministration } from "./scim-deprovision.service.ts";
 import { ScimService } from "./scim.service.ts";
 
 export interface PostgresScimAdapterOptions {
@@ -17,6 +18,7 @@ export interface PostgresScimAdapterOptions {
   users: UserApi;
   auth: BrowserSessionApi;
   governance: GovernanceRestApi;
+  organization: ScimOrganizationAdministration;
   entitlements: Pick<EntitlementApi, "getActivePlan">;
   lifecycle: ScimSyncLifecycle;
   provenOffboarding: boolean;
@@ -32,6 +34,7 @@ export class PostgresScimService {
     users: UserApi;
     auth: BrowserSessionApi;
     governance: GovernanceRestApi;
+    organization: ScimOrganizationAdministration;
     entitlements: Pick<EntitlementApi, "getActivePlan">;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
@@ -42,6 +45,7 @@ export class PostgresScimService {
       users: options.users,
       auth: options.auth,
       governance: options.governance,
+      organization: options.organization,
       entitlements: options.entitlements,
       lifecycle: options.lifecycle,
       provenOffboarding: options.provenOffboarding,

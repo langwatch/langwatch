@@ -52,6 +52,7 @@ import {
 } from "@langwatch/entitlement-contract";
 import { IdentityApi } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
+import { OrganizationApi } from "@langwatch/organization-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { UserApi } from "@langwatch/user-contract";
 
@@ -111,6 +112,7 @@ export class ScimApp implements ScimApiContract {
     entitlements: EntitlementApi,
     auditLog: AuditLogApi,
     identity: IdentityApi,
+    organization: OrganizationApi,
   };
   static readonly config = scimConfig;
   static readonly secrets = scimSecrets;
@@ -148,6 +150,7 @@ export class ScimApp implements ScimApiContract {
       users: dependencies.users,
       auth: dependencies.auth,
       governance: dependencies.governance,
+      organization: dependencies.organization,
       entitlements: dependencies.entitlements,
       lifecycle: members.lifecycle,
       provenOffboarding: config.provenOffboarding,

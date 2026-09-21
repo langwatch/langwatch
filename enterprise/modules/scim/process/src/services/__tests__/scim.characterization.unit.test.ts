@@ -6,6 +6,7 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
+import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
 import type { ScimSyncLifecycle } from "../../app/scim.members.ts";
 import type { ScimRepository } from "../../repositories/scim.repository.ts";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
@@ -97,6 +98,7 @@ function service(
       })),
       departmentAssignUser: vi.fn(async () => undefined),
     },
+    organization: new OrganizationAdministrationFake(),
     entitlements: new FixedEntitlementService(enterprise),
     lifecycle,
     provenOffboarding: false,
@@ -293,6 +295,7 @@ describe("SCIM characterization: provisioning invariants", () => {
         })),
         departmentAssignUser: vi.fn(async () => undefined),
       },
+      organization: new OrganizationAdministrationFake(),
       entitlements: new FixedEntitlementService(true),
       lifecycle: new QuietScimSyncLifecycle(),
       provenOffboarding: false,
@@ -365,6 +368,7 @@ describe("SCIM characterization: provisioning invariants", () => {
             })),
             departmentAssignUser: vi.fn(async () => undefined),
           },
+          organization: new OrganizationAdministrationFake(),
           entitlements: new FixedEntitlementService(true),
           lifecycle,
           provenOffboarding: false,
