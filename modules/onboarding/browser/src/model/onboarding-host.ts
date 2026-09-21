@@ -41,7 +41,11 @@ export type OnboardingScope = {
 };
 
 /** Who is reading, or `null` while nobody is. */
-export type OnboardingActor = { readonly id: string; readonly email?: string } | null;
+export type OnboardingActor = {
+  readonly id: string;
+  readonly email?: string;
+  readonly name?: string | null;
+} | null;
 
 export type OnboardingSessionStatus = "loading" | "authenticated" | "unauthenticated";
 

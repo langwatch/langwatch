@@ -206,7 +206,9 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
     () =>
       new CapabilityOnboardingHost({
         scope,
-        actor: sessionActor ? { id: sessionActor.id, email: sessionActor.email ?? void 0 } : null,
+        actor: sessionActor
+          ? { id: sessionActor.id, email: sessionActor.email ?? void 0, name: sessionActor.name }
+          : null,
         isSettled: session.isSettled(),
         route: { pathname: location.pathname, asPath, params, query: reading.query },
         navigate: (to) => navigation.navigate(to),
