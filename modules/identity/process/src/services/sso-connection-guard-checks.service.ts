@@ -47,7 +47,12 @@ const ALLOWED_FROM: Record<SsoConnectionCommandType, readonly SsoConnectionLifec
   [APPROVE_DOMAIN_CLAIM_COMMAND_TYPE]: ["CLAIMED"],
   [REJECT_DOMAIN_CLAIM_COMMAND_TYPE]: ["CLAIMED"],
   [DISCARD_CONNECTION_COMMAND_TYPE]: ["DRAFT"],
-  [REQUEST_VERIFICATION_COMMAND_TYPE]: ["APPROVED"],
+  // From CLAIMED, because the published record is what DECIDES a claim: the
+  // customer is given a record the moment they claim, and the proof landing
+  // states the approval and the verification together. From APPROVED for the
+  // tiers an operator or a licence already decided, and from
+  // VERIFICATION_PENDING so an expired record can be asked for again.
+  [REQUEST_VERIFICATION_COMMAND_TYPE]: ["CLAIMED", "APPROVED", "VERIFICATION_PENDING"],
   // Attestation replaces the PROOF, never the approval: it is commandable
   // from APPROVED and from nowhere else, which is what makes an attestation
   // against an unapproved claim a refusal rather than a shortcut.

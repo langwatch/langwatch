@@ -4,7 +4,9 @@ import {
   ssoArrivalPolicySchema,
   ssoConnectionSourceSchema,
   ssoConnectionTypeSchema,
+  ssoDomainClaimAuthoritySchema,
   ssoIdpMetadataSchema,
+  ssoPublishedProofChannelSchema,
   ssoVerificationCeremonyMethodSchema,
 } from "./connection.ts";
 import { identityActorSchema } from "./vocabulary.ts";
@@ -119,7 +121,13 @@ const domainShape = { domain: z.string().min(1) };
 export const claimDomainCommandDataSchema = commandDataSchema(domainShape);
 export type ClaimDomainCommandData = z.infer<typeof claimDomainCommandDataSchema>;
 
-export const approveDomainClaimCommandDataSchema = commandDataSchema(domainShape);
+export const approveDomainClaimCommandDataSchema = commandDataSchema({
+  ...domainShape,
+  /** What authorizes the approval. Absent means an operator's hand: a caller
+   *  written before the record could decide a claim cannot accidentally
+   *  claim an authority it never had. */
+  authority: ssoDomainClaimAuthoritySchema.optional(),
+});
 export type ApproveDomainClaimCommandData = z.infer<typeof approveDomainClaimCommandDataSchema>;
 
 export const rejectDomainClaimCommandDataSchema = commandDataSchema({
@@ -137,6 +145,9 @@ export const requestVerificationCommandDataSchema = commandDataSchema({
   /** `sha256:…`. The caller hashes the token it showed the operator; this
    *  boundary never sees the token, so it cannot leak one. */
   tokenHash: z.string().min(1),
+  /** When the record stops proving anything; absent for a ceremony that does
+   *  not expire. */
+  expiresAtMs: z.number().int().nonnegative().nullable().optional(),
 });
 export type RequestVerificationCommandData = z.infer<typeof requestVerificationCommandDataSchema>;
 
@@ -146,7 +157,13 @@ export type RequestVerificationCommandData = z.infer<typeof requestVerificationC
 export const attestDomainCommandDataSchema = commandDataSchema(domainShape);
 export type AttestDomainCommandData = z.infer<typeof attestDomainCommandDataSchema>;
 
-export const verifyDomainCommandDataSchema = commandDataSchema(domainShape);
+export const verifyDomainCommandDataSchema = commandDataSchema({
+  ...domainShape,
+  /** Which channel the caller read the token from. One minted token is
+   *  satisfiable as a record or as the well-known file, and what proved it is
+   *  what the verified fact records. */
+  channel: ssoPublishedProofChannelSchema.optional(),
+});
 export type VerifyDomainCommandData = z.infer<typeof verifyDomainCommandDataSchema>;
 
 export const recordDomainProofPresentCommandDataSchema = commandDataSchema(domainShape);

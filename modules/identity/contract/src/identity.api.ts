@@ -97,9 +97,10 @@ export interface IdentityBackofficeSsoConnection {
   >[];
   providerId: string;
   issuer: string | null;
-  /** DERIVED from the connection's arrival policy: `admit` and nothing else.
-   *  The policy itself joins this row when the enterprise output schema that
-   *  parses it is widened (the handoff §10). */
+  /** Who the connection admits, as the aggregate holds it. */
+  arrivalPolicy: SsoArrivalPolicy;
+  /** DERIVED from the arrival policy: `admit` and nothing else. Kept beside
+   *  it for one release, for readers written before the policy existed. */
   allowsJit: boolean;
   source: string;
   testLoginAccountId: string | null;

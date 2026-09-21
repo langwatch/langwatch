@@ -258,6 +258,7 @@ describe("sso connection guards", () => {
         domain: "acme.com",
         method: "dns-txt",
         tokenHash: "sha256:9f86d0",
+        expiresAtMs: null,
       });
 
       const verified = await run(() => guards.verifyDomain({ ...identity, domain: "acme.com" }));

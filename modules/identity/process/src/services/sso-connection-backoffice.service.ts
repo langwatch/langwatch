@@ -298,6 +298,7 @@ export class SsoConnectionBackofficeService {
       ),
       providerId: state.idpMetadata.providerId,
       issuer: state.idpMetadata.issuer,
+      arrivalPolicy: state.arrivalPolicy,
       allowsJit: state.arrivalPolicy === "admit",
       source: state.source,
       testLoginAccountId: state.testLoginAccountId,

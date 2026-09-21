@@ -108,6 +108,37 @@ export interface JoinRequestMail {
   sendExpired(input: { requesterEmail: string; organizationName: string }): Promise<void>;
 }
 
+/** What to publish again, named exactly, in both domain-proof mails. */
+export type SsoDomainProofRecord = {
+  recordType: string;
+  recordName: string;
+  recordLabel: string;
+};
+
+/**
+ * The two mails a verified domain's evidence going missing sends (ADR-123).
+ * Same split as {@link JoinRequestMail}: resolved names and addresses in,
+ * the link and the envelope the composition root's.
+ */
+export interface SsoDomainProofMail {
+  /** The record is gone and the grace has started. Sent to one admin. */
+  sendProofWavering(input: {
+    adminEmail: string;
+    organizationName: string;
+    domain: string;
+    record: SsoDomainProofRecord;
+    graceEndsAtMs: number;
+  }): Promise<unknown>;
+
+  /** The grace ran out. Sent to one admin. */
+  sendProofLapsed(input: {
+    adminEmail: string;
+    organizationName: string;
+    domain: string;
+    record: SsoDomainProofRecord;
+  }): Promise<unknown>;
+}
+
 /**
  * The notifier decides WHO is told; this port decides WHAT they read. That
  * split keeps react-email rendering and the mail gateway out of every process

@@ -229,6 +229,76 @@ export class SsoConnectionStringEditRetiredError extends SsoConnectionCommandRef
 }
 
 /**
+ * Missing and foreign connections share one refusal, so no caller can use
+ * the difference as an oracle for which connections exist.
+ */
+export class SsoConnectionNotFoundError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_connection_not_found", "sso_connection_not_found", {
+      httpStatus: 404,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoConnectionNotFoundError";
+  }
+}
+
+/** Somebody else's claim on this domain is still waiting on a decision, so
+ *  issuing a proof against it would decide it by the back door. */
+export class SsoDomainClaimPendingError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_domain_claim_pending", "sso_domain_claim_pending", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoDomainClaimPendingError";
+  }
+}
+
+/** The record we asked for is not published yet (D05 tier 3). A refusal
+ *  rather than a retry loop: the record stays on screen, unchanged. */
+export class SsoDomainProofNotFoundError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_domain_proof_not_found", "sso_domain_proof_not_found", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoDomainProofNotFoundError";
+  }
+}
+
+/** The record was found and has passed its expiry, so it proves nothing.
+ *  Asking again issues a fresh one against the same approved claim. */
+export class SsoDomainProofExpiredError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_domain_proof_expired", "sso_domain_proof_expired", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoDomainProofExpiredError";
+  }
+}
+
+/**
+ * We could not READ the domain at all — a resolver that timed out or a fetch
+ * that never happened. Distinct from `sso_domain_proof_not_found`: "it is
+ * not there" is a customer's next step, "we could not look" is not.
+ */
+export class SsoDomainLookupFailedError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_domain_lookup_failed", "sso_domain_lookup_failed", {
+      httpStatus: 503,
+      fault: "provider",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoDomainLookupFailedError";
+  }
+}
+
+/**
  * A join-request refusal (D12). `join_not_available` is deliberately
  * INDISTINGUISHABLE across causes — naming which would be an oracle for
  * which organizations exist.

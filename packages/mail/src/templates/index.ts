@@ -14,6 +14,10 @@ import { licenseEmailTemplate } from "./license-email.tsx";
 import type { MailTemplate } from "./registry.ts";
 import { resetPasswordEmailTemplate } from "./reset-password-email.tsx";
 import { signUpVerificationEmailTemplate } from "./sign-up-verification-email.tsx";
+import {
+  ssoDomainProofLapsedTemplate,
+  ssoDomainProofWaveringTemplate,
+} from "./sso-domain-proof-emails.tsx";
 import { triggerDigestEmailTemplate } from "./trigger-digest-email.tsx";
 import { usageLimitEmailTemplate } from "./usage-limit-email.tsx";
 
@@ -32,6 +36,8 @@ export const mailTemplates: readonly MailTemplate[] = [
   joinRequestRejectedTemplate,
   joinRequestExpiredTemplate,
   domainAutoJoinedTemplate,
+  ssoDomainProofWaveringTemplate,
+  ssoDomainProofLapsedTemplate,
   licenseEmailTemplate,
   budgetIncreaseRequestEmailTemplate,
   usageLimitEmailTemplate,

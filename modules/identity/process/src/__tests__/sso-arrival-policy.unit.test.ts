@@ -53,6 +53,7 @@ beforeEach(() => {
 
 describe("who a connection admits", () => {
   describe("when one is registered", () => {
+    /** @scenario "A registered connection carries the arrival answer registration stated" */
     it("carries the answer registration stated, and nobody has decided yet", async () => {
       const facts = await guards.registerConnection({
         ...command(T0),
@@ -72,6 +73,7 @@ describe("who a connection admits", () => {
       expect(state.arrivalPolicyDecidedAtMs).toBeNull();
     });
 
+    /** @scenario "A connection nobody has answered for turns arrivals away" */
     it("defaults to turning arrivals away, which is the answer that surprises nobody", () => {
       expect(emptySsoConnection({ connectionId: CONNECTION }).arrivalPolicy).toBe(
         DEFAULT_SSO_ARRIVAL_POLICY,
@@ -90,6 +92,7 @@ describe("who a connection admits", () => {
       });
     });
 
+    /** @scenario "The middle answer is recorded as itself, not as a boolean either side of it" */
     it("records the middle answer as itself, not as a boolean either side of it", async () => {
       const facts = await guards.setArrivalPolicy({ ...command(T0), policy: "request" });
 
@@ -109,6 +112,7 @@ describe("who a connection admits", () => {
       expect(state.arrivalPolicyDecidedAtMs).toBe(T0);
     });
 
+    /** @scenario "Confirming the same arrival answer twice records nothing, and changing it records a decision" */
     it("says nothing when the same answer is confirmed twice, and moves on a change", async () => {
       apply(await guards.setArrivalPolicy({ ...command(T0), policy: "admit" }), T0);
 
@@ -122,6 +126,7 @@ describe("who a connection admits", () => {
       expect(state.arrivalPolicyDecidedAtMs).toBe(T0 + 2_000);
     });
 
+    /** @scenario "Saying it out loud is a fact even where the behaviour is the same" */
     it("counts confirming the registration default as a decision", async () => {
       const facts = await guards.setArrivalPolicy({ ...command(T0), policy: "refuse" });
 
@@ -131,6 +136,7 @@ describe("who a connection admits", () => {
   });
 
   describe("given a connection that has been torn down", () => {
+    /** @scenario "A torn-down connection refuses an arrival decision by name" */
     it("refuses the decision by name rather than changing a dead connection", async () => {
       connections.seed({
         ...emptySsoConnection({ connectionId: CONNECTION }),

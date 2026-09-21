@@ -1,8 +1,9 @@
 import type { EventSourcing } from "@langwatch/eventing";
 import { SSO_CONNECTION_PIPELINE_NAME } from "@langwatch/identity-contract";
 
-import type { PlatformOperator } from "../../app/identity.members.ts";
+import type { PlatformOperator, SsoDomainProofMail } from "../../app/identity.members.ts";
 import type { SsoConnectionEvent } from "../../eventing/sso-connection-state.projection.ts";
+import type { SsoDomainProofNotifications } from "../../eventing/sso-domain-proof-notification.process.ts";
 import {
   SsoConnectionLedgerWriterAdapter,
   type SsoConnectionStagedSender,
@@ -16,6 +17,14 @@ import { LocalDoorBreakGlassBindingAdapter } from "../../services/local-door-bre
 import { SsoConnectionGuardsService } from "../../services/sso-connection-guards.service.ts";
 import { SsoConnectionPipelineDefinitionAdapter } from "../../services/sso-connection-pipeline-definition.service.ts";
 import { SsoConnectionService } from "../../services/sso-connection.service.ts";
+import {
+  SsoDomainProofNotificationService,
+  UnaddressedSsoDomainProofNotifications,
+} from "../../services/sso-domain-proof-notification.service.ts";
+import {
+  PrismaJoinRequestAudienceRepository,
+  type PrismaJoinRequestAudienceDatabase,
+} from "./prisma.join-request-audience.repository.ts";
 import {
   PrismaSsoConnectionProjectionRepository,
   type PrismaSsoConnectionProjectionDatabase,
@@ -31,11 +40,16 @@ import {
   type PrismaSsoPlatformOperatorDatabase,
 } from "./prisma.sso-platform-operators.repository.ts";
 
-/** Every model the connection ledger reads or writes, and no other. */
+/**
+ * Every model the connection ledger reads or writes, and no other — plus the
+ * members a domain-proof notice is addressed to, which is the audience the
+ * join-request notices already read.
+ */
 export type SsoConnectionPipelineDatabase = PrismaSsoConnectionProjectionDatabase &
   PrismaSsoConnectionReadDatabase &
   PrismaSsoConnectionStrandingDatabase &
-  PrismaSsoPlatformOperatorDatabase;
+  PrismaSsoPlatformOperatorDatabase &
+  PrismaJoinRequestAudienceDatabase;
 
 export type PostgresSsoConnectionPipelineOptions = {
   /** The composition root's own typed client, handed down with no cast. */
@@ -52,6 +66,12 @@ export type PostgresSsoConnectionPipelineOptions = {
   operators: PlatformOperator;
   /** How a torn-down connection's directory tokens are retired, if at all. */
   directory?: SsoConnectionDirectoryRevocation;
+  /**
+   * How a missing domain proof reaches the organization's administrators.
+   * Absent where the process composed no gateway — the state still moves,
+   * and the unsent notice is logged rather than retried forever.
+   */
+  mail?: SsoDomainProofMail;
 };
 
 /** The one graph the definition and the back office both command through. */
@@ -96,6 +116,16 @@ export class PostgresSsoConnectionPipelineAdapter {
         connections: () => connections,
         directory: this.options.directory ?? UnrevokedSsoConnectionDirectory.create(),
       }),
+      proofNotifications: this.proofNotifications(),
+    });
+  }
+
+  private proofNotifications(): SsoDomainProofNotifications {
+    const mail = this.options.mail;
+    if (!mail) return UnaddressedSsoDomainProofNotifications.create();
+    return SsoDomainProofNotificationService.create({
+      audience: PrismaJoinRequestAudienceRepository.create(this.options.database),
+      mail,
     });
   }
 

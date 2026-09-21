@@ -21,7 +21,11 @@ export {
   type SesAwsClientConfiguration,
 } from "./providers/ses.ts";
 export { SendgridEmailProvider } from "./providers/sendgrid.ts";
-export { buildSmtpTransportOptions, isSmtpConfigured, SmtpEmailProvider } from "./providers/smtp.ts";
+export {
+  buildSmtpTransportOptions,
+  isSmtpConfigured,
+  SmtpEmailProvider,
+} from "./providers/smtp.ts";
 export { ResendEmailProvider } from "./providers/resend.ts";
 export { computeDefaultFrom, sendEmail } from "./email-sender.ts";
 export { MailRender } from "./ports/mail-render.port.ts";
@@ -60,4 +64,8 @@ export {
 export { sendLicenseEmail } from "./templates/license-email.tsx";
 export { sendResetPasswordEmail } from "./templates/reset-password-email.tsx";
 export { sendSignUpVerificationEmail } from "./templates/sign-up-verification-email.tsx";
+export {
+  sendSsoDomainProofLapsedEmail,
+  sendSsoDomainProofWaveringEmail,
+} from "./templates/sso-domain-proof-emails.tsx";
 export { sendUsageLimitEmail } from "./templates/usage-limit-email.tsx";

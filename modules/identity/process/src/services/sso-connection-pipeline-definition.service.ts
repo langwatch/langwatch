@@ -12,6 +12,8 @@ import {
 } from "@langwatch/eventing";
 import {
   CONNECTION_TORN_DOWN_EVENT_TYPE,
+  DOMAIN_PROOF_LAPSED_EVENT_TYPE,
+  DOMAIN_PROOF_WAVERED_EVENT_TYPE,
   SSO_CONNECTION_EVENT_TYPES,
   TEARDOWN_REQUESTED_EVENT_TYPE,
   SSO_CONNECTION_AGGREGATE_TYPE,
@@ -50,6 +52,20 @@ import {
   SuspendConnectionCommand,
   VerifyDomainCommand,
 } from "../eventing/sso-connection.intent.ts";
+import {
+  runNotifyProofLapsed,
+  runNotifyProofWavering,
+} from "../eventing/sso-domain-proof-notification.intent.ts";
+import {
+  notifyProofLapsedIntentSchema,
+  notifyProofWaveringIntentSchema,
+  onDomainProofLapsed,
+  onDomainProofWavered,
+  SSO_DOMAIN_PROOF_NOTIFICATION_INITIAL_STATE,
+  SSO_DOMAIN_PROOF_NOTIFICATION_PROCESS_NAME,
+  type SsoDomainProofNotifications,
+  type SsoDomainProofNotificationState,
+} from "../eventing/sso-domain-proof-notification.process.ts";
 import type { SsoConnectionGuardsService } from "./sso-connection-guards.service.ts";
 
 /**
@@ -81,6 +97,8 @@ export interface SsoConnectionPipelineDeps {
   connectionGuards: SsoConnectionGuardsService;
   /** How the teardown wake dispatches its completion command. */
   teardown: ConnectionTeardown;
+  /** Who is told when a verified domain's evidence goes missing (ADR-123). */
+  proofNotifications: SsoDomainProofNotifications;
 }
 
 /**
@@ -121,6 +139,9 @@ export class SsoConnectionPipelineDefinitionAdapter {
       .withProcessManager(CONNECTION_TEARDOWN_PROCESS_NAME, (pm) =>
         mountTeardownGrace(pm, deps.teardown),
       )
+      .withProcessManager(SSO_DOMAIN_PROOF_NOTIFICATION_PROCESS_NAME, (pm) =>
+        mountDomainProofNotification(pm, deps.proofNotifications),
+      )
       .build();
   }
 }
@@ -148,4 +169,30 @@ function mountTeardownGrace(
     .on(TEARDOWN_REQUESTED_EVENT_TYPE, onTeardownRequested)
     .on(CONNECTION_TORN_DOWN_EVENT_TYPE, onTornDown)
     .onWake(connectionTeardownWake);
+}
+
+/**
+ * The two notices a missing proof sends (ADR-123). Transient: each fact
+ * carries everything its mail needs, so nothing is remembered and no wake is
+ * armed — one mail per ceremony, keyed so a redelivery is the same mail.
+ */
+function mountDomainProofNotification(
+  pm: ProcessManagerInitialStage<SsoConnectionEvent>,
+  notifications: SsoDomainProofNotifications,
+): ProcessManagerHandledStage<
+  SsoConnectionEvent,
+  SsoDomainProofNotificationState,
+  Record<string, IntentSpec<any>>
+> {
+  return pm
+    .state<SsoDomainProofNotificationState>(SSO_DOMAIN_PROOF_NOTIFICATION_INITIAL_STATE)
+    .intent(
+      "notifyWavering",
+      notifyProofWaveringIntentSchema,
+      runNotifyProofWavering({ notifications }),
+    )
+    .intent("notifyLapsed", notifyProofLapsedIntentSchema, runNotifyProofLapsed({ notifications }))
+    .on(DOMAIN_PROOF_WAVERED_EVENT_TYPE, onDomainProofWavered)
+    .on(DOMAIN_PROOF_LAPSED_EVENT_TYPE, onDomainProofLapsed)
+    .transient();
 }

@@ -39,7 +39,9 @@ export function grandfatheredConnectionFacts(
       },
       {
         type: DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
-        data: { connectionId, domain, actor, source },
+        // The migration stands in for the operator who would have decided it;
+        // no record was read, so nothing here may say one was.
+        data: { connectionId, domain, actor, authority: "platform-operator", source },
       },
       {
         type: DOMAIN_VERIFIED_EVENT_TYPE,

@@ -49,6 +49,8 @@ import {
   type SsoDomainVerification,
   SsoConnectionActivationBlockedError,
   SsoConnectionInvalidTransitionError,
+  SsoDomainProofExpiredError,
+  verificationHasExpired,
   SsoConnectionTeardownStrandsUsersError,
   type SuspendConnectionCommandData,
   TEARDOWN_REQUESTED_EVENT_TYPE,
@@ -154,6 +156,16 @@ export class SsoConnectionGuardsService {
       return [];
     }
 
+    // An operator's hand is what a command that says nothing means: the
+    // published record is the newer authority, so it is the one that has to
+    // name itself — and naming it here, without having read a record, is
+    // exactly the move this refuses. Only `verifyDomain` states it.
+    const authority = data.authority ?? "platform-operator";
+    if (authority === "dns-proof") {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${data.connectionId}: nothing may approve the claim on ${domain} on a published record's authority except the check that read the record`,
+      );
+    }
     await this.checks.assertPlatformOperator({
       actor: data.actor,
       act: `approve the claim on ${domain}`,
@@ -166,6 +178,7 @@ export class SsoConnectionGuardsService {
         data: {
           connectionId: data.connectionId,
           domain,
+          authority,
           actor: data.actor,
           source: data.source,
         },
@@ -221,12 +234,16 @@ export class SsoConnectionGuardsService {
   ): Promise<SsoConnectionFactInput[]> {
     const state = await this.checks.require(data, REQUEST_VERIFICATION_COMMAND_TYPE);
     const domain = normalizeDomain(data.domain);
-    if (!state.approvedDomains.includes(domain)) {
+    // A record may be asked for against an approved claim, or against one
+    // still waiting — the record is what will decide the waiting one. Only
+    // the published-record ceremony may stand in for a decision.
+    const decided = state.approvedDomains.includes(domain);
+    const waiting = state.claimedDomains.includes(domain);
+    if (!decided && !(waiting && data.method === "dns-txt")) {
       throw new SsoConnectionInvalidTransitionError(
-        `connection ${data.connectionId}: domain ${domain} has no approved claim to verify`,
+        `connection ${data.connectionId}: domain ${domain} has no claim a ${data.method} ceremony may prove`,
       );
     }
-
     await this.checks.refuseIfDomainOwnedElsewhere({
       domain,
       connectionId: data.connectionId,
@@ -240,6 +257,7 @@ export class SsoConnectionGuardsService {
           domain,
           method: data.method,
           tokenHash: data.tokenHash,
+          expiresAtMs: data.expiresAtMs ?? null,
           actor: data.actor,
           source: data.source,
         },
@@ -305,19 +323,58 @@ export class SsoConnectionGuardsService {
         `connection ${data.connectionId}: no verification is in flight for ${domain}`,
       );
     }
+    // A record found after its expiry proves nothing. Refused rather than
+    // swept away, so asking again costs one click and no progress.
+    if (verificationHasExpired({ pending, nowMs: data.occurredAtMs })) {
+      throw new SsoDomainProofExpiredError(
+        `connection ${data.connectionId}: the ceremony for ${domain} passed its expiry`,
+      );
+    }
 
     await this.checks.refuseIfDomainOwnedElsewhere({
       domain,
       connectionId: data.connectionId,
     });
 
+    // Which channel the caller read the token from. Only a published-proof
+    // ceremony has channels, so naming one against any other ceremony is a
+    // caller confused about what it checked.
+    if (data.channel !== undefined && pending.method !== "dns-txt") {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${data.connectionId}: a ${pending.method} ceremony has no published channel to have read ${domain}'s proof from`,
+      );
+    }
+    const method = data.channel ?? pending.method;
+    // The record decides the claim: an undecided domain is approved by the
+    // same act that proved it, and the approval says what authorized it.
+    const undecided = state.claimedDomains.includes(domain);
+    if (undecided && pending.method !== "dns-txt") {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${data.connectionId}: a ${pending.method} ceremony cannot decide the claim on ${domain}`,
+      );
+    }
+
     return [
+      ...(undecided
+        ? [
+            {
+              type: DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
+              data: {
+                connectionId: data.connectionId,
+                domain,
+                actor: data.actor,
+                authority: "dns-proof" as const,
+                source: data.source,
+              },
+            },
+          ]
+        : []),
       {
         type: DOMAIN_VERIFIED_EVENT_TYPE,
         data: {
           connectionId: data.connectionId,
           domain,
-          method: pending.method,
+          method,
           actor: data.actor,
           source: data.source,
         },

@@ -79,6 +79,15 @@ export const SSO_PUBLISHED_PROOF_CHANNELS = ["dns-txt", "https-file"] as const;
 export const ssoPublishedProofChannelSchema = z.enum(SSO_PUBLISHED_PROOF_CHANNELS);
 export type SsoPublishedProofChannel = z.infer<typeof ssoPublishedProofChannelSchema>;
 
+/**
+ * What authorized a claim's approval (D05 tier 2). Recorded on the fact
+ * rather than inferred from the deployment, because a deployment changes and
+ * a fact does not: a dispute about a domain is answered from history alone.
+ */
+export const SSO_DOMAIN_CLAIM_AUTHORITIES = ["platform-operator", "dns-proof"] as const;
+export const ssoDomainClaimAuthoritySchema = z.enum(SSO_DOMAIN_CLAIM_AUTHORITIES);
+export type SsoDomainClaimAuthority = z.infer<typeof ssoDomainClaimAuthoritySchema>;
+
 /** Whether a method published something a re-read can go and look for. */
 export function isSsoPublishedProofChannel(method: string): method is SsoPublishedProofChannel {
   return SSO_PUBLISHED_PROOF_CHANNELS.some((channel) => channel === method);
@@ -190,6 +199,9 @@ export const domainClaimApprovedPayloadSchema = z.object({
   /** The ops user who approved. Recorded because first-verifier-owns makes
    *  this step the abuse boundary (D04 Security Concerns). */
   actor: identityActorSchema,
+  /** Defaults to the operator, so every fact written before the published
+   *  record could decide a claim decodes as exactly what it was. */
+  authority: ssoDomainClaimAuthoritySchema.default("platform-operator"),
   ...sourced,
 });
 
@@ -216,6 +228,12 @@ export const verificationRequestedPayloadSchema = z.object({
    *  shown once and never recorded — a log that carried it would let anyone
    *  with read access to history satisfy someone else's ceremony. */
   tokenHash: z.string().min(1),
+  /**
+   * When the published record stops proving anything; null for a ceremony
+   * that does not expire. A deadline rather than a sweep: nothing deletes an
+   * expired ceremony, the guard refuses to read it as a proof.
+   */
+  expiresAtMs: z.number().int().nonnegative().nullable().default(null),
   actor: identityActorSchema,
   ...sourced,
 });
@@ -463,6 +481,9 @@ export interface SsoConnectionState {
     domain: string;
     method: SsoVerificationMethod;
     tokenHash: string;
+    /** When the published record stops proving anything; null when the
+     *  ceremony does not expire. */
+    expiresAtMs: number | null;
   } | null;
   idpMetadata: SsoIdpMetadata;
   /** Who this connection admits (ADR-117 §3). Stated at registration and
@@ -492,6 +513,21 @@ const EMPTY_IDP: SsoIdpMetadata = {
   secretRef: null,
   certRefs: [],
 };
+
+/**
+ * Whether a pending ceremony's record has stopped proving anything. A
+ * ceremony with no deadline never expires, which is what the attested and
+ * licence-bound ones are.
+ */
+export function verificationHasExpired({
+  pending,
+  nowMs,
+}: {
+  pending: { expiresAtMs: number | null };
+  nowMs: number;
+}): boolean {
+  return pending.expiresAtMs !== null && nowMs > pending.expiresAtMs;
+}
 
 export function emptySsoConnection({ connectionId }: { connectionId: string }): SsoConnectionState {
   return {
@@ -625,6 +661,7 @@ export function reduceSsoConnection({
           domain: fact.data.domain,
           method: fact.data.method,
           tokenHash: fact.data.tokenHash,
+          expiresAtMs: fact.data.expiresAtMs,
         },
       };
     // Attestation is one step, not two: there is nothing to wait for between

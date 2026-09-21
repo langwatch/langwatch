@@ -7,6 +7,7 @@ import type { JoinRequestFoldState } from "../eventing/join-request-state.projec
 import type { MfaFoldState } from "../eventing/mfa-enrollment-state.projection.ts";
 import type { ScimSyncFoldState } from "../eventing/scim-sync-state.projection.ts";
 import type { SsoConnectionFoldState } from "../eventing/sso-connection-state.projection.ts";
+import type { SsoDomainProofNotifications } from "../eventing/sso-domain-proof-notification.process.ts";
 import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository.ts";
 import type { IdentityReservationRepository } from "../repositories/identity-reservations.repository.ts";
 import type { IdentityUsersRepository } from "../repositories/identity-users.repository.ts";
@@ -118,6 +119,25 @@ class ProducerOnlyJoinRequestLifecycle implements JoinRequestLifecycle {
         pipeline: "join-requests",
         capability: "expire a join request",
       }),
+    );
+  }
+}
+
+/** The domain-proof notices, refused: this process sends no mail here. */
+class ProducerOnlySsoDomainProofNotifications implements SsoDomainProofNotifications {
+  constructor(private readonly processName: string) {}
+
+  proofWavering(): Promise<void> {
+    return this.refuse("tell administrators a domain's proof went missing");
+  }
+
+  proofLapsed(): Promise<void> {
+    return this.refuse("tell administrators a domain's proof lapsed");
+  }
+
+  private refuse(capability: string): Promise<void> {
+    return Promise.reject(
+      producerOnly({ processName: this.processName, pipeline: "sso-connections", capability }),
     );
   }
 }
@@ -242,6 +262,7 @@ export class IdentityProducerPipelinesAdapter {
         }),
       }),
       teardown: new ProducerOnlyConnectionTeardown(this.processName),
+      proofNotifications: new ProducerOnlySsoDomainProofNotifications(this.processName),
     });
   }
 

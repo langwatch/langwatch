@@ -55,6 +55,17 @@ export type { ScimSyncPipeline } from "./services/scim-sync-pipeline-definition.
 /** The day-7-reminder/day-14-expiry process manager's registered name, named
  *  by a caller that asserts on which process a wake dispatched through. */
 export { JOIN_REQUEST_LIFECYCLE_PROCESS_NAME } from "./eventing/join-request-lifecycle.process.ts";
+/** The domain-proof notification process manager's registered name, and the
+ *  seam a composition answers it with (ADR-123). */
+export {
+  SSO_DOMAIN_PROOF_NOTIFICATION_PROCESS_NAME,
+  type SsoDomainProofNotifications,
+} from "./eventing/sso-domain-proof-notification.process.ts";
+export {
+  SsoDomainProofNotificationService,
+  UnaddressedSsoDomainProofNotifications,
+  type SsoDomainProofAudience,
+} from "./services/sso-domain-proof-notification.service.ts";
 export {
   type IdentityGuardsComposition,
   type IdentityGuardsDatabase,
@@ -135,7 +146,7 @@ export {
 } from "./repositories/prisma/prisma.join-request-notification.repository.ts";
 export type { JoinRequestGuardsDeps } from "./services/join-request-guards.service.ts";
 export type { JoinRequestAudience } from "./repositories/join-request-audience.repository.ts";
-export { type JoinRequestMail } from "./app/identity.members.ts";
+export { type JoinRequestMail, type SsoDomainProofMail } from "./app/identity.members.ts";
 export type { JoinRequestLedger } from "./rules/join-request-ledger.rules.ts";
 export type { ScimSyncLedger } from "./rules/scim-sync-ledger.rules.ts";
 export type { ScimSyncReadRepository } from "./repositories/scim-sync.repository.ts";

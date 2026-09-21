@@ -139,11 +139,14 @@ export class PrismaSsoConnectionProjectionRepository implements StateProjectionS
         ? (row.domainVerifications as unknown as SsoDomainVerification[]).map(provedCondition)
         : [],
       pendingVerification: row.pendingVerification
-        ? (row.pendingVerification as unknown as {
-            domain: string;
-            method: SsoVerificationMethod;
-            tokenHash: string;
-          })
+        ? pendingVerificationOf(
+            row.pendingVerification as unknown as {
+              domain: string;
+              method: SsoVerificationMethod;
+              tokenHash: string;
+              expiresAtMs?: number | null;
+            },
+          )
         : null,
       idpMetadata: row.idpMetadata as unknown as SsoIdpMetadata,
       arrivalPolicy: isSsoArrivalPolicy(row.arrivalPolicy)
@@ -161,4 +164,20 @@ export class PrismaSsoConnectionProjectionRepository implements StateProjectionS
       tearDownAfterMs: row.tearDownAfter?.getTime() ?? null,
     };
   }
+}
+
+/** A ceremony written before ceremonies could expire has no deadline, and a
+ *  missing key is exactly that rather than an unknown one. */
+function pendingVerificationOf(pending: {
+  domain: string;
+  method: SsoVerificationMethod;
+  tokenHash: string;
+  expiresAtMs?: number | null;
+}): NonNullable<SsoConnectionState["pendingVerification"]> {
+  return {
+    domain: pending.domain,
+    method: pending.method,
+    tokenHash: pending.tokenHash,
+    expiresAtMs: pending.expiresAtMs ?? null,
+  };
 }
