@@ -15,14 +15,32 @@ import (
 //
 //	id, *_id, *Id                        — resource identifiers
 //	*_at, *At, timestamp, date, time     — timestamps
+//	created, lastModified, modified      — SCIM's spelling of the same (RFC 7643 §3.1)
 //	token, secret, password, api_key, hash — credentials and digests
 //	url, uri, path, slug, platformUrl    — per-instance URLs and random slugs
 var volatileKeyPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`^id$|_id$|Id$`),
 	regexp.MustCompile(`_at$|At$`),
 	regexp.MustCompile(`(?i)^(timestamp|date|time|token|secret|password|hash|api_?key|apikey)$`),
+	regexp.MustCompile(`(?i)^(created|modified|last_?modified|updated)$`),
 	regexp.MustCompile(`(?i)(token|secret|password)`),
 	regexp.MustCompile(`(?i)^(url|uri|path|slug|platform_?url)$`),
+}
+
+// mintedIdentifier matches an id this deployment minted — a lowercase resource
+// prefix, then a nanoid/ksuid body: "prompt_SXOhgbwO562oHxriy267L",
+// "ptag_zVtGjTm5f2O9PhW2DoKfe", "suite_0007SaVaq9cXCAiGgqSjx2shhCgSW". Such a
+// value is per-instance whatever KEY it sits under, and the two instances can
+// never mint the same one, so comparing it only ever manufactures a finding.
+// The body's 16-character floor keeps stable compound names ("system_anthropic")
+// out, and a value only masks when it matches — where one side mints and the
+// other does not, the two still differ and the finding still stands.
+var mintedIdentifier = regexp.MustCompile(`^[a-z][a-z0-9]*(?:_[a-z0-9]+)*_[A-Za-z0-9_-]{16,}$`)
+
+// IsMintedIdentifier reports whether a VALUE is one this deployment generated.
+func IsMintedIdentifier(value any) bool {
+	text, ok := value.(string)
+	return ok && mintedIdentifier.MatchString(text)
 }
 
 // IsVolatileKey reports whether values under key must be masked before
@@ -187,7 +205,7 @@ func MaskValue(value any) any {
 	case map[string]any:
 		masked := make(map[string]any, len(typed))
 		for key, child := range typed {
-			if IsVolatileKey(key) {
+			if IsVolatileKey(key) || IsMintedIdentifier(child) {
 				masked[key] = "<masked:" + ShapeOf(child).Kind + ">"
 				continue
 			}
@@ -197,6 +215,10 @@ func MaskValue(value any) any {
 	case []any:
 		masked := make([]any, len(typed))
 		for index, element := range typed {
+			if IsMintedIdentifier(element) {
+				masked[index] = "<masked:string>"
+				continue
+			}
 			masked[index] = MaskValue(element)
 		}
 		return masked

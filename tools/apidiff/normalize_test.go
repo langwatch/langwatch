@@ -85,3 +85,63 @@ func TestMaskedKindMismatch(t *testing.T) {
 		t.Fatalf("masked kinds = %v, want <masked:string> vs <masked:number>", got)
 	}
 }
+
+/** @scenario "A value this deployment minted is masked whatever key it sits under" */
+func TestMaskValueMasksMintedIdentifiers(t *testing.T) {
+	t.Parallel()
+	// The handle the server generated for a create that named none. Two
+	// instances can never mint the same one.
+	masked := MaskValue(map[string]any{
+		"handle": "prompt_SXOhgbwO562oHxriy267L",
+		"name":   "prompt_JMnnWqXvNsxJeLjStt4nj",
+		"model":  "openai/gpt-5",
+	})
+	got := masked.(map[string]any)
+	if got["handle"] != "<masked:string>" || got["name"] != "<masked:string>" {
+		t.Errorf("minted ids not masked: %v", got)
+	}
+	if got["model"] != "openai/gpt-5" {
+		t.Errorf("model = %v, want untouched", got["model"])
+	}
+}
+
+func TestIsMintedIdentifierKeepsStableNames(t *testing.T) {
+	t.Parallel()
+	for _, minted := range []string{
+		"prompt_SXOhgbwO562oHxriy267L",
+		"ptag_zVtGjTm5f2O9PhW2DoKfe",
+		"prompt_version_ZSM0u4FpxjhJwMNQm4Bgs",
+		"suite_0007SaVaq9cXCAiGgqSjx2shhCgSW",
+	} {
+		if !IsMintedIdentifier(minted) {
+			t.Errorf("%s: want minted", minted)
+		}
+	}
+	// Stable values that must keep comparing, or real drift goes unseen.
+	for _, stable := range []string{
+		"system_anthropic", "local-dev-project", "local-dev-model-default-config",
+		"openai/gpt-5", "production", "admin@haven.localhost",
+		"urn:ietf:params:scim:schemas:core:2.0:User", "", "TEAM",
+	} {
+		if IsMintedIdentifier(stable) {
+			t.Errorf("%s: want stable, got minted", stable)
+		}
+	}
+}
+
+/** @scenario "SCIM's own spelling of a timestamp is masked like every other" */
+func TestMaskValueMasksScimTimestamps(t *testing.T) {
+	t.Parallel()
+	masked := MaskValue(map[string]any{"meta": map[string]any{
+		"resourceType": "User",
+		"created":      "2026-09-21T08:57:13.433Z",
+		"lastModified": "2026-09-21T08:57:13.525Z",
+	}})
+	meta := masked.(map[string]any)["meta"].(map[string]any)
+	if meta["created"] != "<masked:string>" || meta["lastModified"] != "<masked:string>" {
+		t.Errorf("SCIM timestamps not masked: %v", meta)
+	}
+	if meta["resourceType"] != "User" {
+		t.Errorf("resourceType = %v, want untouched", meta["resourceType"])
+	}
+}

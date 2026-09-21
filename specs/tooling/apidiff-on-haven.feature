@@ -221,3 +221,21 @@ Feature: apidiff boots its instances through haven
     When the operation union is built
     Then the two are paired as one operation
     And each side is probed at the spelling its own document declares
+
+  # The harness reported its own nondeterminism as drift. Measured on run 25 of
+  # 2026-09-21: 12 body_value_diff findings, of which 3 were a handle the server
+  # minted for a create that named none, and 2 more carried SCIM's own spelling
+  # of a timestamp — `created` and `lastModified`, which the *At pattern misses.
+  @unit
+  Scenario: A value this deployment minted is masked whatever key it sits under
+    Given a response carrying an identifier the server generated
+    When the two sides are compared
+    Then that value is masked on both sides
+    And a value the deployment did not mint still compares
+
+  @unit
+  Scenario: SCIM's own spelling of a timestamp is masked like every other
+    Given a SCIM resource carrying created and lastModified
+    When the two sides are compared
+    Then both are masked
+    And the resource's own type still compares
