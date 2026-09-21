@@ -26,6 +26,7 @@ import { readConnectConfig } from "@ee/licensing/connect/install/connectConfig";
 import { installIsEntitled } from "@ee/licensing/connect/install/connectEntitlement";
 import {
   installInstanceId,
+  readInstanceIdentityRow,
   recordInstanceReport,
 } from "@ee/licensing/connect/install/instanceIdentity";
 import { createLogger } from "@langwatch/observability";
@@ -82,25 +83,27 @@ export async function sendUsageStats(
   }
 
   // Default to self-hosted if not specified, as the old worker did.
-  const installMethod = process.env.INSTALL_METHOD ?? "self-hosted";
   const endpoint = await usageStatsEndpoint(prismaClient);
   const instanceId = await installInstanceId(prismaClient);
+  const identity = await readInstanceIdentityRow(prismaClient);
 
   try {
+    // Every field, including the identity and the deployment shape, comes from
+    // the dictionary. The event name is the only thing added here, because it
+    // names the route rather than the install.
     const stats = await collectUsageStats({
       organizationIds: organizations.map((organization) => organization.id),
+      instanceId,
+      firstSeenAt: identity?.createdAt ?? null,
+      switches: {
+        optional: !identity?.optionalMetricsOptOut,
+        hostname: !identity?.hostnameOptOut,
+      },
     });
     const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        event: "daily_usage_stats",
-        install_method: installMethod,
-        hostname: process.env.BASE_HOST,
-        environment: process.env.NODE_ENV,
-        instance_id: instanceId,
-        ...stats,
-      }),
+      body: JSON.stringify({ event: "daily_usage_stats", ...stats }),
     });
 
     if (!response.ok) {

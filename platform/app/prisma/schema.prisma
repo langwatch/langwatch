@@ -6356,4 +6356,12 @@ model InstanceIdentity {
   /// as `fetch` resolved and never looked at the response.
   lastReportAt    DateTime?
   lastReportError String?
+  /// The optional category of the usage report, switched off from the checkup
+  /// page. With it off the report still says which release runs and how many
+  /// projects the install carries, and says nothing about what anyone does
+  /// with it (ADR-139, section 10).
+  optionalMetricsOptOut Boolean @default(false)
+  /// Hostname, which names the customer's own network and so has a switch of
+  /// its own rather than travelling with its category.
+  hostnameOptOut        Boolean @default(false)
 }

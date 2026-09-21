@@ -100,6 +100,58 @@ export async function readInstanceId(
   return minted;
 }
 
+/** The whole row, for a caller that needs more than the id. */
+export interface InstanceIdentityRow {
+  readonly instanceId: string;
+  readonly createdAt: Date;
+  readonly lastReportAt: Date | null;
+  readonly lastReportError: string | null;
+  readonly optionalMetricsOptOut: boolean;
+  readonly hostnameOptOut: boolean;
+}
+
+/** The row as it stands, or null where this install has never minted one. */
+export async function readInstanceIdentityRow(
+  prisma: PrismaClient,
+): Promise<InstanceIdentityRow | null> {
+  return await prisma.instanceIdentity.findUnique({
+    where: { id: ROW_ID },
+    select: {
+      instanceId: true,
+      createdAt: true,
+      lastReportAt: true,
+      lastReportError: true,
+      optionalMetricsOptOut: true,
+      hostnameOptOut: true,
+    },
+  });
+}
+
+/**
+ * Records what a customer switched off.
+ *
+ * `updateMany` rather than `update`: an install that has not minted an
+ * identity yet has nothing to write to, and the switches it would be writing
+ * are the defaults anyway.
+ */
+export async function setUsageReportSwitches({
+  prisma,
+  optionalMetricsOptOut,
+  hostnameOptOut,
+}: {
+  prisma: PrismaClient;
+  optionalMetricsOptOut?: boolean;
+  hostnameOptOut?: boolean;
+}): Promise<void> {
+  await prisma.instanceIdentity.updateMany({
+    where: { id: ROW_ID },
+    data: {
+      ...(optionalMetricsOptOut === undefined ? {} : { optionalMetricsOptOut }),
+      ...(hostnameOptOut === undefined ? {} : { hostnameOptOut }),
+    },
+  });
+}
+
 /** When the usage report last reached LangWatch, and why the last one did not. */
 export interface InstanceReportState {
   readonly lastReportAt: Date | null;

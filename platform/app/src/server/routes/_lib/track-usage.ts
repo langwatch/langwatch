@@ -33,6 +33,12 @@ import { captureException, toError } from "~/utils/posthogErrorCapture";
 
 const TRACK_USAGE_EVENT = "daily_usage_stats";
 
+/**
+ * A rung of the onboarding ladder: the day it was first reached, or null on
+ * one this install never reached. Null is a value here, not a missing field.
+ */
+const ladderDate = z.string().max(40).nullable().optional();
+
 /** The report is small; anything larger is not one. */
 export const TRACK_USAGE_MAX_BODY_BYTES = 10 * 1024;
 
@@ -56,23 +62,89 @@ const trackUsageBodySchema = z.object({
   // attribute the report to, and recording it against nothing is worse than
   // refusing it.
   instance_id: z.string().min(1).max(200),
+  // The standard block, which every report carries.
+  report_schema_version: z.number().optional(),
+  version: z.string().max(100).optional(),
   install_method: z.string().max(100).optional(),
-  hostname: z.string().max(255).optional(),
+  chart_version: z.string().max(100).nullable().optional(),
+  hostname: z.string().max(255).nullable().optional(),
   environment: z.string().max(50).optional(),
+  first_seen_at: z.string().max(40).nullable().optional(),
+  timestamp: z.string().max(40).optional(),
+
+  // The operational block: what it takes to run the service for a customer.
+  organizations: z.number().optional(),
+  teams: z.number().optional(),
+  projects: z.number().optional(),
+  users: z.number().optional(),
+  auth_method: z.string().max(50).optional(),
+  sso_provider: z.string().max(50).nullable().optional(),
+  connected: z.boolean().optional(),
+
+  // Who runs it. Domains with counts, never an address.
+  user_email_domains: z.record(z.string().max(255), z.number()).optional(),
+
+  // The onboarding ladder. Null on a rung this install never reached, which
+  // is the half of the answer worth having.
+  first_project_at: ladderDate,
+  first_member_at: ladderDate,
+  first_dataset_at: ladderDate,
+  first_evaluation_at: ladderDate,
+  first_monitor_at: ladderDate,
+  first_prompt_at: ladderDate,
+  first_workflow_at: ladderDate,
+  first_model_provider_at: ladderDate,
+  first_annotation_at: ladderDate,
+  first_trigger_at: ladderDate,
+  first_experiment_at: ladderDate,
+
+  // What they do. Lifetime, and over the two windows that make a lifetime
+  // total mean something.
   totalTraces: z.number().optional(),
+  traces_7d: z.number().optional(),
+  traces_28d: z.number().optional(),
   totalScenarioEvents: z.number().optional(),
+  scenario_runs_7d: z.number().optional(),
+  scenario_runs_28d: z.number().optional(),
   annotations: z.number().optional(),
+  annotations_7d: z.number().optional(),
+  annotations_28d: z.number().optional(),
   annotationQueues: z.number().optional(),
   annotationQueueItems: z.number().optional(),
   annotationScores: z.number().optional(),
   batchEvaluations: z.number().optional(),
+  batch_evaluations_7d: z.number().optional(),
+  batch_evaluations_28d: z.number().optional(),
   customGraphs: z.number().optional(),
   datasets: z.number().optional(),
+  datasets_7d: z.number().optional(),
+  datasets_28d: z.number().optional(),
   datasetRecords: z.number().optional(),
+  dataset_records_7d: z.number().optional(),
+  dataset_records_28d: z.number().optional(),
   experiments: z.number().optional(),
+  experiments_7d: z.number().optional(),
+  experiments_28d: z.number().optional(),
+  prompts: z.number().optional(),
+  prompts_7d: z.number().optional(),
+  prompts_28d: z.number().optional(),
+  monitors: z.number().optional(),
+  monitors_7d: z.number().optional(),
+  monitors_28d: z.number().optional(),
   triggers: z.number().optional(),
+  triggers_7d: z.number().optional(),
+  triggers_28d: z.number().optional(),
   workflows: z.number().optional(),
-  timestamp: z.string().optional(),
+  workflows_7d: z.number().optional(),
+  workflows_28d: z.number().optional(),
+  active_users_28d: z.number().optional(),
+  active_projects_28d: z.number().optional(),
+
+  // How they run it. Names only, never a key and never an endpoint.
+  model_providers: z.array(z.string().max(50)).max(50).optional(),
+  storage_backend: z.string().max(50).optional(),
+  email_configured: z.boolean().optional(),
+  gateway_configured: z.boolean().optional(),
 });
 
 /**
