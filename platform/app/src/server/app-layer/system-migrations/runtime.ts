@@ -513,12 +513,22 @@ export async function runSystemMigrationPass(args?: {
 }): Promise<MigrationPassSummary> {
   warnWhenRetiredCohortVariablesAreSet();
   const redis = args?.redis ?? tryGetApp()?.redis ?? null;
+  // Only the organizations with something left to do. One that has latched
+  // every migration in this list will never move again, and enumerating it
+  // costs a claim, a state read per migration and a release - per pass, per
+  // replica, forever. At fleet scale that is what ran the boot preflight past
+  // the startup probe's budget. The runner's terminal short-circuit still
+  // stands behind it: this decides who is worth visiting, never what the
+  // visit concludes.
+  const organizationMigrations = organizationMigrationsForThisInstallation();
   const runner = new SystemMigrationRunnerService({
     state: systemMigrationState,
     lease: new RedisMigrationLeaseRepository(redis),
-    tenants: new PrismaOrganizationTenantSource(prisma),
+    tenants: new PrismaOrganizationTenantSource(prisma).pendingFor({
+      migrationNames: organizationMigrations.map((migration) => migration.name),
+    }),
     cohort: await migrationPassCohort(),
-    migrations: organizationMigrationsForThisInstallation(),
+    migrations: organizationMigrations,
   });
   // The USER-rooted leg (ADR-101 §6): the same lease, state table and
   // enrollment rows, driven over users. Both legs' cohorts resolve BEFORE
@@ -539,15 +549,28 @@ export async function runSystemMigrationPass(args?: {
   // narrowed set would silently become the others' cohort too, and a backfill
   // that must reach every user would stop reaching most of them.
   let summary = organizationSummary;
+  const everyUser = new PrismaUserTenantSource(prisma);
   const userBuckets = groupByTenantSource({
     migrations: userMigrations,
-    everyTenant: new PrismaUserTenantSource(prisma),
+    everyTenant: everyUser,
   });
   for (const { tenants, migrations } of userBuckets) {
     const userRunner = new SystemMigrationRunnerService({
       state: systemMigrationState,
       lease: new RedisMigrationLeaseRepository(redis),
-      tenants,
+      // Narrowed AFTER grouping, never before: the buckets are formed by
+      // comparing sources by identity, so handing `groupByTenantSource` a
+      // fresh narrowed object per migration would split one bucket into
+      // several. A bucket driven over every user is cut to the users with
+      // work left for exactly that bucket's migrations; a migration that
+      // declared its own candidates (the heal, which never finalizes anyone)
+      // keeps the set it declared, untouched.
+      tenants:
+        tenants === everyUser
+          ? everyUser.pendingFor({
+              migrationNames: migrations.map((migration) => migration.name),
+            })
+          : tenants,
       cohort: userCohort,
       migrations,
     });
