@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { describe, expect, it } from "vitest";
-import { extractEmailDomain, isSsoProviderMatch } from "../matching";
+import { describe, expect, it, vi } from "vitest";
+import {
+  extractEmailDomain,
+  isSsoProviderMatch,
+  matchesConfiguredSsoProvider,
+} from "../matching";
 
 describe("isSsoProviderMatch", () => {
   describe("when the org has no ssoProvider", () => {
@@ -121,6 +125,138 @@ describe("extractEmailDomain", () => {
       // and route SSO based on the wrong domain.
       expect(extractEmailDomain("a@b@c.com")).toBeNull();
       expect(extractEmailDomain("user@@acme.com")).toBeNull();
+    });
+  });
+});
+
+describe("matchesConfiguredSsoProvider", () => {
+  const orgWith = (ssoProvider: string | null) => ({
+    findByDomain: vi
+      .fn()
+      .mockResolvedValue(
+        ssoProvider === null
+          ? null
+          : { id: "org_1", name: "Acme", ssoProvider },
+      ),
+  });
+
+  describe("when there are no accounts to check", () => {
+    it("returns false without asking for the organization", async () => {
+      const organizations = orgWith("auth0");
+
+      const result = await matchesConfiguredSsoProvider({
+        organizations,
+        domain: "acme.com",
+        accounts: [],
+      });
+
+      expect(result).toBe(false);
+      expect(organizations.findByDomain).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when no organization claims the domain", () => {
+    it("returns false without asking isSsoProviderMatch anything", async () => {
+      const organizations = orgWith(null);
+
+      const result = await matchesConfiguredSsoProvider({
+        organizations,
+        domain: "acme.com",
+        accounts: [{ providerId: "google", accountId: "sub-1" }],
+      });
+
+      expect(result).toBe(false);
+      expect(organizations.findByDomain).toHaveBeenCalledWith({
+        domain: "acme.com",
+      });
+    });
+  });
+
+  describe("when the organization's pin is a provider name and the account matches it", () => {
+    it("returns true", async () => {
+      const organizations = orgWith("auth0");
+
+      const result = await matchesConfiguredSsoProvider({
+        organizations,
+        domain: "acme.com",
+        accounts: [{ providerId: "auth0", accountId: "sub-1" }],
+      });
+
+      expect(result).toBe(true);
+    });
+  });
+
+  describe("when the organization's pin is a providerAccountId prefix the account's id starts with", () => {
+    // The trap: comparing `ssoProvider` to the account by equality would
+    // reject this, since the pin is only a PREFIX of the account id.
+    it("returns true", async () => {
+      const organizations = orgWith("waad|acme-conn");
+
+      const result = await matchesConfiguredSsoProvider({
+        organizations,
+        domain: "acme.com",
+        accounts: [
+          { providerId: "auth0", accountId: "waad|acme-conn|user-123" },
+        ],
+      });
+
+      expect(result).toBe(true);
+    });
+  });
+
+  describe("when the account matches neither the provider name nor the prefix", () => {
+    it("returns false", async () => {
+      const organizations = orgWith("okta");
+
+      const result = await matchesConfiguredSsoProvider({
+        organizations,
+        domain: "acme.com",
+        accounts: [{ providerId: "google", accountId: "sub-1" }],
+      });
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe("when the user holds several accounts and only the second matches", () => {
+    it("reports satisfied with exactly one organization lookup", async () => {
+      const organizations = orgWith("auth0");
+
+      const result = await matchesConfiguredSsoProvider({
+        organizations,
+        domain: "acme.com",
+        accounts: [
+          { providerId: "credential", accountId: "user-1" },
+          { providerId: "auth0", accountId: "sub-1" },
+        ],
+      });
+
+      expect(result).toBe(true);
+      expect(organizations.findByDomain).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("given the same organization and accounts, asked by two different callers", () => {
+    /** @scenario the extracted decision function: the hook and the status read agree on the same inputs */
+    it("the sign-in hook and the status read reach the same answer", async () => {
+      const organizations = orgWith("waad|acme-conn");
+      const account = { providerId: "auth0", accountId: "waad|acme-conn|u-1" };
+
+      // The hook asks about the single account it just saw.
+      const hookAnswer = await matchesConfiguredSsoProvider({
+        organizations,
+        domain: "acme.com",
+        accounts: [account],
+      });
+      // The status read asks about every account the user holds.
+      const statusReadAnswer = await matchesConfiguredSsoProvider({
+        organizations,
+        domain: "acme.com",
+        accounts: [account],
+      });
+
+      expect(hookAnswer).toBe(statusReadAnswer);
+      expect(hookAnswer).toBe(true);
     });
   });
 });

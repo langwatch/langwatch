@@ -8,11 +8,11 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { KeyRound } from "lucide-react";
 import numeral from "numeral";
 import { useEffect } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { OrganizationUserRole } from "~/generated/prisma/client";
+import { signOut } from "~/utils/auth-client";
 import { useRouter } from "~/utils/compat/next-router";
 import { TeamAccessWaiting } from "../features/auth/components/team-access-waiting";
 import { OrganizationMfaGate } from "../features/mfa/components/OrganizationMfaGate";
@@ -324,12 +324,11 @@ export const DashboardPageBody = ({
               <HStack width="full" gap={4}>
                 <VStack align="start" gap={0} flex={1}>
                   <Alert.Title fontWeight="bold">
-                    Action Required: Link your SSO account
+                    Sign in with your organization's single sign-on
                   </Alert.Title>
                   <Text fontSize="sm">
-                    Your organization requires SSO login. Please link your
-                    account by logging in via the email input box on the sign-in
-                    page.
+                    Your organization requires single sign-on. Sign out, then
+                    sign in again by entering your work email address.
                   </Text>
                 </VStack>
                 <Button
@@ -337,12 +336,9 @@ export const DashboardPageBody = ({
                   colorPalette="red"
                   flexShrink={0}
                   color="white"
-                  asChild
+                  onClick={() => void signOut()}
                 >
-                  <Link href="/settings/security">
-                    <KeyRound size={14} />
-                    Link SSO Account
-                  </Link>
+                  Sign out
                 </Button>
               </HStack>
             </Alert.Content>

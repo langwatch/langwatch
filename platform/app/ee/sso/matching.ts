@@ -28,6 +28,43 @@ export const isSsoProviderMatch = (
   );
 };
 
+/** The organization that claims a domain through the legacy `ssoDomain`
+ *  column, with the provider it names — the shape both
+ *  {@link matchesConfiguredSsoProvider} callers already look this up as. */
+export interface OrganizationSsoProviderLookup {
+  findByDomain(args: {
+    domain: string;
+  }): Promise<{ id: string; name: string; ssoProvider: string | null } | null>;
+}
+
+/**
+ * Whether ANY of the given accounts already satisfies the SSO provider an
+ * organization pins, for the given email domain, through the legacy
+ * `ssoDomain` / `ssoProvider` columns.
+ *
+ * The one decision behind "this sign-in clears `pendingSsoSetup`" and "this
+ * user no longer needs to be told to link SSO" — extracted so the sign-in
+ * hook that clears the flag and the status read that reports it never drift
+ * on what "already signed in with the right provider" means. Looks the
+ * organization up itself, and only ONCE per call, so both callers ask the
+ * same question the same way: the hook passes the single account it just saw
+ * (`[account]`), the status read passes every account the user holds.
+ */
+export const matchesConfiguredSsoProvider = async ({
+  organizations,
+  domain,
+  accounts,
+}: {
+  organizations: OrganizationSsoProviderLookup;
+  domain: string;
+  accounts: readonly OAuthAccountLike[];
+}): Promise<boolean> => {
+  if (accounts.length === 0) return false;
+  const org = await organizations.findByDomain({ domain });
+  if (!org) return false;
+  return accounts.some((account) => isSsoProviderMatch(org, account));
+};
+
 /**
  * Extract the lowercase domain from an email address.
  *
