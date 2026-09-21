@@ -20,6 +20,7 @@ import {
 } from "../crm/selfHostedSignals";
 import {
   type IncomingReport,
+  type InstanceOwner,
   type InstanceOwnerLookup,
   instanceActivity,
   type OrganizationNameLookup,
@@ -132,21 +133,14 @@ export class SelfHostedInstanceService {
     const leadingDomain = largestDomain(reportedDomains);
     const alreadyRaised = previous?.raisedSignals ?? [];
 
-    // With nothing listening there is nothing to raise, and a signal recorded
-    // as raised without being announced would be lost rather than delayed.
-    const signals = this.deps.crm
-      ? signalsRaisedBy({
-          properties,
-          firstSeenAt: previous?.firstSeenAt ?? null,
-          alreadyRaised,
-          license: owner ? { expiresAt: owner.expiresAt } : null,
-          domainHasCloudAccount: await this.cloudAccountOnDomain({
-            leadingDomain,
-            alreadyRaised,
-          }),
-          now: receivedAt,
-        })
-      : [];
+    const signals = await this.signalsFor({
+      properties,
+      previous,
+      owner,
+      alreadyRaised,
+      leadingDomain,
+      receivedAt,
+    });
 
     await this.deps.repository.upsert({
       instanceId,
@@ -177,19 +171,72 @@ export class SelfHostedInstanceService {
       payload: properties,
     });
 
-    if (signals.length > 0 && this.deps.crm) {
-      const stored = await this.deps.repository.findByInstanceId(instanceId);
-      if (stored) {
-        await this.deps.crm.announce({
-          signals,
-          instance: stored,
-          leadingDomain,
-          organizationId: owner?.organizationId ?? null,
-        });
-      }
-    }
+    await this.announce({
+      signals,
+      instanceId,
+      leadingDomain,
+      organizationId: owner?.organizationId ?? null,
+    });
 
     return signals;
+  }
+
+  /**
+   * What this report says that somebody should hear about.
+   *
+   * Empty where nothing is listening: a signal recorded as raised without being
+   * announced would be lost rather than delayed.
+   */
+  private async signalsFor({
+    properties,
+    previous,
+    owner,
+    alreadyRaised,
+    leadingDomain,
+    receivedAt,
+  }: {
+    properties: ReportProperties;
+    previous: SelfHostedInstanceRecord | null;
+    owner: InstanceOwner | null;
+    alreadyRaised: readonly string[];
+    leadingDomain: string | null;
+    receivedAt: Date;
+  }): Promise<SelfHostedSignal[]> {
+    if (!this.deps.crm) return [];
+    return signalsRaisedBy({
+      properties,
+      firstSeenAt: previous?.firstSeenAt ?? null,
+      alreadyRaised,
+      license: owner ? { expiresAt: owner.expiresAt } : null,
+      domainHasCloudAccount: await this.cloudAccountOnDomain({
+        leadingDomain,
+        alreadyRaised,
+      }),
+      now: receivedAt,
+    });
+  }
+
+  /** Tells the CRM about the signals, reading the row back as it was stored. */
+  private async announce({
+    signals,
+    instanceId,
+    leadingDomain,
+    organizationId,
+  }: {
+    signals: SelfHostedSignal[];
+    instanceId: string;
+    leadingDomain: string | null;
+    organizationId: string | null;
+  }): Promise<void> {
+    if (signals.length === 0 || !this.deps.crm) return;
+    const stored = await this.deps.repository.findByInstanceId(instanceId);
+    if (!stored) return;
+    await this.deps.crm.announce({
+      signals,
+      instance: stored,
+      leadingDomain,
+      organizationId,
+    });
   }
 
   /**

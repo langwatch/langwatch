@@ -62,6 +62,7 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   sessionCallbackEvidence: () => ({}),
   sessionClaims: () => ({}),
   sessionRevocation: () => ({ revokeAll: async () => undefined }),
+  ssoAssertion: () => ({}),
   signUpConfirmationEndpoint: () => ({
     confirmSignUpAddress: async () => undefined,
   }),

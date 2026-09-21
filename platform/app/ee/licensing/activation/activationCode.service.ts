@@ -215,18 +215,7 @@ export class ActivationCodeService {
       return refuse("activation_code_expired");
     }
 
-    const claim = row.reusable
-      ? await this.deps.repository.recordReusableRedemption({
-          id: row.id,
-          instanceId,
-          at: now,
-        })
-      : await this.deps.repository.claimSingleUse({
-          id: row.id,
-          instanceId,
-          at: now,
-        });
-
+    const claim = await this.claim({ row, instanceId, at: now });
     if (!claim) return this.whyTheClaimLost({ row, at: now });
 
     try {
@@ -239,6 +228,28 @@ export class ActivationCodeService {
       await this.deps.repository.releaseClaim({ id: row.id, instanceId });
       throw error;
     }
+  }
+
+  /**
+   * Claims the code for this install, which is the one write that decides.
+   *
+   * Both calls put the state they read into the WHERE clause, so the database
+   * settles concurrent posts rather than a check here that a second post can
+   * slip past. A single-use code answers true exactly once.
+   */
+  private async claim({
+    row,
+    instanceId,
+    at,
+  }: {
+    row: ActivationCodeRecord;
+    instanceId: string;
+    at: Date;
+  }): Promise<boolean> {
+    const claim = { id: row.id, instanceId, at };
+    return row.reusable
+      ? this.deps.repository.recordReusableRedemption(claim)
+      : this.deps.repository.claimSingleUse(claim);
   }
 
   /**

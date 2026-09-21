@@ -13,6 +13,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { SignalAnnouncement } from "../../crm/selfHostedCrm";
 import { SelfHostedInstanceService } from "../selfHostedInstance.service";
 import type {
   InstanceReportInsert,
@@ -98,8 +99,8 @@ function storeOver(rows: SelfHostedInstanceRecord[] = []) {
 /** A stand-in for the CRM that records what it was asked and what it was told. */
 function crmSpy(hasAccount = false) {
   return {
-    hasAccountOnDomain: vi.fn(async () => hasAccount),
-    announce: vi.fn(async () => undefined),
+    hasAccountOnDomain: vi.fn(async (_domain: string) => hasAccount),
+    announce: vi.fn(async (_announcement: SignalAnnouncement) => undefined),
   };
 }
 

@@ -16,6 +16,8 @@ import {
   leaseFor,
   mintLicense,
   NOW,
+  INSTANCE_ID,
+  instanceIdentityTable,
   ORGANIZATION_ID,
   STRANGER_KEYS,
   tamperedLease,
@@ -102,6 +104,10 @@ function fakePrisma({ license = LICENSE.licenseKey as string | null } = {}) {
           return {};
         }),
       },
+      // The credential now carries the install's own identity rather than an
+      // organization id, so a sync reaches for this table. Held at the fixture
+      // id, because the leases these tests verify were signed for it.
+      instanceIdentity: instanceIdentityTable(),
     } as never,
   };
 }
@@ -181,7 +187,7 @@ describe("given a connected install with a registered license", () => {
       expect(host.sent[0]).toMatchObject({
         credential: {
           token: credentialOf(LICENSE.licenseKey).token,
-          instanceId: ORGANIZATION_ID,
+          instanceId: INSTANCE_ID,
         },
         version: "3.17.0",
         seats: { members: 53, liteMembers: 4 },

@@ -4,7 +4,9 @@
  * @see ./selfHostedInstance.service.ts
  */
 
-import type { Prisma, PrismaClient } from "~/generated/prisma/client";
+// `Prisma` is a value here as well as a namespace: `Prisma.DbNull` is what a
+// nullable Json column takes for SQL NULL.
+import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import type {
   InstanceOwner,
   InstanceOwnerLookup,
@@ -68,15 +70,16 @@ export class PrismaSelfHostedInstances implements SelfHostedInstanceRepository {
       reportSchemaVersion: row.reportSchemaVersion,
       organizationId: row.organizationId,
       issuedLicenseId: row.issuedLicenseId,
+      // `DbNull` rather than `null`: a nullable Json column takes SQL NULL
+      // that way, and plain `null` is not a value Prisma accepts here.
       userEmailDomains: (row.userEmailDomains ??
-        null) as Prisma.InputJsonValue | null,
+        Prisma.DbNull) as Prisma.InputJsonValue,
       userDomains: Object.keys(row.userEmailDomains ?? {}),
       raisedSignals: row.raisedSignals,
       latestReport: row.latestReport as Prisma.InputJsonValue,
       optionalMetricsReported: row.optionalMetricsReported,
       hostnameReported: row.hostnameReported,
       lastUnknownFields: row.lastUnknownFields,
-      raisedSignals: row.raisedSignals,
     };
 
     await this.prisma.selfHostedInstance.upsert({
