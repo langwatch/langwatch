@@ -347,6 +347,34 @@ Feature: The identifier model - identity as an event-sourced pipeline
     And an Auth0 subject naming no known upstream derives nothing
     And deleting the Auth0 Account row detaches the derived identifier with it
 
+  # The derivation is a prediction: it states the native identity the broker's
+  # subject implies, so the native callback resolves before any native sign-in
+  # has happened. When one does happen, better-auth writes the real Account
+  # row and the prediction has been overtaken — but it does not stand down on
+  # its own. Its source broker row is still live, so the orphan compensation
+  # never reaches it, and it holds the provider subject against the identifier
+  # the real row implies, which carries that row's own business time and so is
+  # a different identifier entirely.
+  #
+  # Unretired, that is permanent: the attach loses the subject on every pass,
+  # the parity diff never clears, the user never finalizes, and their secrets
+  # are never carried across, so they sit on the legacy path indefinitely.
+  # This was 64 users on cloud, all of them Google or GitHub — exactly the
+  # upstreams the broker's subjects can be unfolded into.
+  @unit
+  Scenario: A real native account retires the derived identifier that predicted it
+    Given "sam" holds an Auth0 row naming a Google identity, adopted in an earlier pass
+    And "sam" has since signed in with Google directly, so a real Google Account row exists
+    When the identity backfill migrates "sam"
+    Then the derived identifier is detached and the real row's identifier holds the subject
+    And "sam" finalizes rather than being held on a collision that never clears
+
+  @unit
+  Scenario: A derived identifier with no real row behind it is left alone
+    Given "sam" holds only the Auth0 row and the identifier derived from it
+    When the identity backfill migrates "sam"
+    Then nothing is detached, because that identifier is still the only thing asserting the subject
+
   # The READ fork (ADR-101 §5). `User.email` is a legacy column answering a
   # question identity now owns, so a finalized user's email comes from their
   # identifiers and the column is a stale copy. One switch forks both
