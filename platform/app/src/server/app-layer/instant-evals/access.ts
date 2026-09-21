@@ -27,6 +27,32 @@ import { isInstantEvalClassifierConfigured } from "./classifier";
 
 export const INSTANT_EVALS_FLAG = "release_instant_evals";
 
+/**
+ * The product decision alone: whether the flag is on for the project, whatever
+ * the deployment has configured. The search router reads this one, because a
+ * released project with no classifier still gets the "configure a model"
+ * primer, while an unreleased one is never offered a judgement at all.
+ */
+export async function instantEvalsReleased({
+  prisma,
+  projectId,
+}: {
+  prisma: PrismaClient;
+  projectId: string;
+}): Promise<boolean> {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { team: { select: { organizationId: true } } },
+  });
+  const organizationId = project?.team?.organizationId;
+
+  return featureFlagService.isEnabled(INSTANT_EVALS_FLAG, {
+    distinctId: projectId,
+    projectId,
+    organizationId: organizationId ?? NOT_TARGETED,
+  });
+}
+
 export async function instantEvalsEnabled({
   prisma,
   projectId,
@@ -42,16 +68,5 @@ export async function instantEvalsEnabled({
   isClassifierConfigured?: () => boolean;
 }): Promise<boolean> {
   if (!isClassifierConfigured()) return false;
-
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { team: { select: { organizationId: true } } },
-  });
-  const organizationId = project?.team?.organizationId;
-
-  return featureFlagService.isEnabled(INSTANT_EVALS_FLAG, {
-    distinctId: projectId,
-    projectId,
-    organizationId: organizationId ?? NOT_TARGETED,
-  });
+  return instantEvalsReleased({ prisma, projectId });
 }

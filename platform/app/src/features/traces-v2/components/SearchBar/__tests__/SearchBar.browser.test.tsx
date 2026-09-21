@@ -17,6 +17,27 @@ vi.mock("../../../hooks/useTraceFacets", () => ({
   useTraceFacets: () => ({ data: [], isLoading: false }),
 }));
 
+// Enter on a sentence calls `tracesV2.routeSearch`; these tests only type
+// `field:value` queries, which are applied without a call, so the mutation
+// hook is stubbed out rather than mounting a tRPC provider.
+vi.mock("~/utils/api", () => ({
+  api: {
+    tracesV2: {
+      routeSearch: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+      instantEval: {
+        estimate: {
+          useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+        },
+        start: {
+          useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+        },
+      },
+    },
+  },
+}));
+
 // SearchBar mounts TokenValuePicker, which now calls useFacetSearch (a tRPC
 // query) at the top level. This suite renders SearchBar without a tRPC
 // provider, so stub the hook out — server search has its own dedicated suite.
@@ -46,7 +67,7 @@ vi.mock("~/features/langy/stores/langyStore", () => {
   return { useLangyStore };
 });
 
-import { useFilterStore } from "../../../stores/filterStore";
+import { useExplorerStore } from "../../../stores/explorerStore";
 import { SearchBar } from "../SearchBar";
 
 function renderSearchBar() {
@@ -64,16 +85,17 @@ function getEditor(): HTMLElement {
 }
 
 beforeEach(() => {
-  useFilterStore.getState().clearAll();
+  useExplorerStore.getState().clearAll();
 });
 
 afterEach(() => {
   cleanup();
-  useFilterStore.getState().clearAll();
+  useExplorerStore.getState().clearAll();
 });
 
 describe("SearchBar wiring in real Chromium", () => {
-  describe("when the user types into the search bar", () => {
+  describe("when the user types into the search bar and presses Enter", () => {
+    /** @scenario "Pressing Enter applies the query" */
     it("commits the parsed query to the filterStore", async () => {
       renderSearchBar();
       // Cold mount → placeholder. Click activates the real editor.
@@ -84,11 +106,15 @@ describe("SearchBar wiring in real Chromium", () => {
       const editor = getEditor();
       await userEvent.click(editor);
       await userEvent.keyboard("status:error");
+      // Typing alone commits nothing.
+      expect(useExplorerStore.getState().queryText).toBe("");
+      // The first Enter accepts the highlighted value, the second submits.
+      await userEvent.keyboard("[Enter][Enter]");
 
       await waitFor(() => {
-        expect(useFilterStore.getState().queryText).toBe("status:error");
+        expect(useExplorerStore.getState().queryText).toBe("status:error");
       });
-      expect(useFilterStore.getState().parseError).toBeNull();
+      expect(useExplorerStore.getState().parseError).toBeNull();
     });
   });
 
@@ -100,10 +126,10 @@ describe("SearchBar wiring in real Chromium", () => {
       );
       const editor = getEditor();
       await userEvent.click(editor);
-      await userEvent.keyboard('status:"unclosed');
+      await userEvent.keyboard('status:"unclosed[Enter]');
 
       await waitFor(() => {
-        expect(useFilterStore.getState().parseError).toBeTruthy();
+        expect(useExplorerStore.getState().parseError).toBeTruthy();
       });
       // The parse-error pill exposes itself as a popover trigger.
       const indicator = document.querySelector(
@@ -121,9 +147,9 @@ describe("SearchBar wiring in real Chromium", () => {
       );
       const editor = getEditor();
       await userEvent.click(editor);
-      await userEvent.keyboard("status:error");
+      await userEvent.keyboard("status:error[Enter][Enter]");
       await waitFor(() => {
-        expect(useFilterStore.getState().queryText).toBe("status:error");
+        expect(useExplorerStore.getState().queryText).toBe("status:error");
       });
 
       // The clear button is a "ghost" Chakra Button labelled "Clear".
@@ -138,7 +164,7 @@ describe("SearchBar wiring in real Chromium", () => {
       );
 
       await waitFor(() => {
-        expect(useFilterStore.getState().queryText).toBe("");
+        expect(useExplorerStore.getState().queryText).toBe("");
       });
     });
   });
@@ -153,17 +179,17 @@ describe("SearchBar wiring in real Chromium", () => {
       );
       const editor = getEditor();
       await userEvent.click(editor);
-      await userEvent.keyboard("status:error");
+      await userEvent.keyboard("status:error[Enter][Enter]");
 
       await waitFor(() => {
-        expect(useFilterStore.getState().queryText).toBe("status:error");
+        expect(useExplorerStore.getState().queryText).toBe("status:error");
       });
 
       // Re-typing the same text doesn't reset page or churn AST identity.
-      const astBefore = useFilterStore.getState().ast;
+      const astBefore = useExplorerStore.getState().ast;
       // Trigger a redundant applyQueryText with the same canonical text.
-      useFilterStore.getState().applyQueryText("status:error");
-      const astAfter = useFilterStore.getState().ast;
+      useExplorerStore.getState().applyQueryText("status:error");
+      const astAfter = useExplorerStore.getState().ast;
       expect(astAfter).toBe(astBefore);
     });
   });

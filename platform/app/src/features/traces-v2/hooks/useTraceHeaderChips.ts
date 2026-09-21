@@ -5,7 +5,7 @@ import {
   useScenarioChipData,
 } from "../components/TraceDrawer/ScenarioChip";
 import { useDrawerStore } from "../stores/drawerStore";
-import { useFilterStore } from "../stores/filterStore";
+import { useExplorerStore } from "../stores/explorerStore";
 import { useFocusSectionStore } from "../stores/focusSectionStore";
 import { parseSdkInfo, type SdkInfo } from "../utils/sdkInfo";
 import { usePromptByHandle } from "./usePromptByHandle";
@@ -86,7 +86,7 @@ export function useTraceHeaderChips(
   onSelectSpan: (spanId: string) => void;
   onOpenPromptsTab: () => void;
 } {
-  const toggleFacet = useFilterStore((s) => s.toggleFacet);
+  const toggleFacet = useExplorerStore((s) => s.toggleFacet);
   const { closeDrawer } = useDrawer();
 
   const addToFilter = (field: string, value: string) => () => {

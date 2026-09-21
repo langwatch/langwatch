@@ -34,7 +34,37 @@ vi.mock("~/utils/compat/next-link", () => ({
 
 vi.mock("../QueryBreakdownChips", () => ({ QueryBreakdownChips: () => null }));
 
-import { useFilterStore } from "../../../stores/filterStore";
+// The query under test is the only explorer state this notice reads; the rest
+// of the empty state's levers are stubbed so a change to them cannot fail a
+// test about redaction. Same shape as the sibling empty-state test.
+const explorerState = vi.hoisted(() => ({
+  queryText: "",
+  clearAll: vi.fn(),
+  timeRange: { startDate: 0, endDate: 0, label: "test" },
+  setTimeRange: vi.fn(),
+  activeLensId: "traces",
+  selectLens: vi.fn(),
+}));
+
+vi.mock("../../../stores/explorerStore", () => ({
+  useExplorerStore: (selector: (s: unknown) => unknown) =>
+    selector(explorerState),
+}));
+
+vi.mock("../../../hooks/useInstantEvalRuns", () => ({
+  useInstantEvalRuns: () => ({ chips: [] }),
+}));
+
+vi.mock("../../../stores/instantEvalRunStore", () => ({
+  useInstantEvalRunStore: (selector: (s: unknown) => unknown) =>
+    selector({ runs: {} }),
+}));
+
+vi.mock("../../../stores/searchSubmitRequestStore", () => ({
+  useSearchSubmitRequestStore: (selector: (s: unknown) => unknown) =>
+    selector({ requestSubmit: vi.fn() }),
+}));
+
 import { EmptyFilterState } from "../EmptyFilterState";
 
 function piiLevel(level: string) {
@@ -47,7 +77,7 @@ function piiLevel(level: string) {
 }
 
 function renderEmptyState({ query }: { query: string }) {
-  useFilterStore.setState({ queryText: query });
+  explorerState.queryText = query;
   render(
     <ChakraProvider value={defaultSystem}>
       <EmptyFilterState />
@@ -64,7 +94,7 @@ describe("EmptyFilterState after a search for an email address", () => {
 
   afterEach(() => {
     cleanup();
-    useFilterStore.setState({ queryText: "" });
+    explorerState.queryText = "";
   });
 
   describe("given the project redacts PII", () => {

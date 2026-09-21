@@ -72,7 +72,7 @@ import { platformSSOAllowed, resolveAuthProvider } from "@ee/sso/sso-gate";
 import { HttpSsoIssuerDiscovery } from "@ee/sso/sso-issuer-discovery";
 import { SsoLicenseRepository } from "@ee/sso/sso-license.repository";
 import { PrismaSsoMembershipRepository } from "@ee/sso/sso-membership.prisma.repository";
-import { ssoMethodIsConfiguredWith } from "@ee/sso/sso-method-configured";
+import { ssoMethodDialWith } from "@ee/sso/sso-method-configured";
 import { PrismaSsoMigrationCallbackPolicy } from "@ee/sso/sso-migration-callback-policy.prisma.repository";
 import { PrismaSsoMigrationEvidenceRepository } from "@ee/sso/sso-migration-evidence.prisma.repository";
 import { SsoMigrationFinalizationService } from "@ee/sso/sso-migration-finalization.service";
@@ -223,6 +223,7 @@ import { PrismaMfaEnrollmentRepository } from "./repositories/mfa-enrollment.pri
 import { PrismaMfaEnrollmentProjectionRepository } from "./repositories/mfa-enrollment-projection.prisma.repository";
 import { PrismaPasskeyRemovalRepository } from "./repositories/passkey-removal.prisma.repository";
 import { PrismaPriorSessionRepository } from "./repositories/prior-session.prisma.repository";
+import { PrismaSecretHealTenantSource } from "./repositories/secret-heal-tenant-source.prisma.repository";
 import { PrismaSignUpHealthRepository } from "./repositories/sign-up-health.prisma.repository";
 import {
   PrismaSignUpAccountDirectory,
@@ -453,7 +454,10 @@ export function identifierBackfillMigration(): IdentityIdentifierBackfillMigrati
 /** The reverse mirror's heal leg, as its own never-terminal pass — see the
  *  migration's own docblock for why it cannot be a step in the backfill. */
 export function identitySecretHealMigration(): IdentitySecretHealMigration {
-  return new IdentitySecretHealMigration(identitySecretCarryService);
+  return new IdentitySecretHealMigration({
+    secrets: identitySecretCarryService,
+    candidateTenants: new PrismaSecretHealTenantSource(prisma),
+  });
 }
 
 /**
@@ -503,14 +507,14 @@ const legacySsoDomainRouting = new LegacySsoDomainRoutingRepository(
 );
 
 /**
- * Whether a connection can actually be dialed (D09) — the seam where the two
- * engines coexist, composed from its two ports. The decision itself is
+ * Which method a connection is actually dialed through (D09) — the seam where
+ * the two engines coexist, composed from its two ports. The decision itself is
  * `sso-method-configured.ts`; what lives here is where each answer comes
  * from.
  */
 const ssoConnectionIssuers = new PrismaSsoConnectionIssuers(prisma);
 
-const ssoMethodIsConfigured = ssoMethodIsConfiguredWith({
+const ssoMethodDial = ssoMethodDialWith({
   mountedMethodId: async () => (await resolveFederatedMethod())?.id ?? null,
   engineHoldsProvider: async ({ connectionId }) =>
     (await ssoConnectionIssuers.findRegisteredProvider({ connectionId })) !==
@@ -522,13 +526,12 @@ const ssoMethodIsConfigured = ssoMethodIsConfiguredWith({
  * has always meant — whether a sign-in sent here would ARRIVE anywhere — and
  * since D09 there are two ways for that to be true: the provider this
  * deployment mounts from its environment, and a provider this organization
- * registered for itself. `ssoMethodIsConfigured` is the seam where both
- * answer, and it is what makes the two engines coexist rather than take
- * turns.
+ * registered for itself. `ssoMethodDial` is the seam where both answer, and it
+ * is what makes the two engines coexist rather than take turns.
  */
 const ssoConnectionDomainRouting = new SsoConnectionDomainRoutingRepository(
   prisma,
-  ssoMethodIsConfigured,
+  ssoMethodDial,
 );
 
 /** One router owns connection/legacy precedence, method policy and the shared

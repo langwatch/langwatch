@@ -134,6 +134,8 @@ export function useTraceFreshness() {
             discoverInvalidateTimer.current = null;
             void trpcUtils.tracesV2.discover.cancel();
             void trpcUtils.tracesV2.discover.invalidate();
+            void trpcUtils.tracesV2.facets.cancel();
+            void trpcUtils.tracesV2.facets.invalidate();
           }, DISCOVER_INVALIDATE_DEBOUNCE_MS);
         }
       }

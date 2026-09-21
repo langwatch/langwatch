@@ -6,8 +6,14 @@ import {
   type TagToken,
   type UnaryOperatorToken,
 } from "liqe";
-import { FilterFieldUnknownError, FilterParseError } from "../errors";
+import {
+  FilterFieldUnknownError,
+  FilterParseError,
+  FilterTooComplexError,
+} from "../errors";
+import { MAX_FILTER_NODE_COUNT } from "../query-language/queries";
 import { FIELD_DEF_BY_NAME, KNOWN_FIELDS } from "./build-handlers";
+import type { ResolvedInstantEvalRun } from "./instant-eval-field";
 import { boundedSubquery } from "./subqueries";
 import {
   EVENT_ATTRIBUTE_PREFIX,
@@ -24,7 +30,6 @@ import {
   wrap,
 } from "./value-helpers";
 
-export const MAX_NODE_COUNT = 20;
 const MAX_PARAM_COUNT = 50;
 
 /**
@@ -67,6 +72,25 @@ export function translateFilterToClickHouse(
   tenantId: string,
   timeRange: { from: number; to: number },
 ): { sql: string; params: Record<string, unknown> } | null {
+  return translateFilterWithEvalRuns({ queryText, tenantId, timeRange });
+}
+
+/**
+ * {@link translateFilterToClickHouse} for a query that may carry `eval` chips:
+ * each chip compiles against the Instant Eval run registered for it.
+ */
+export function translateFilterWithEvalRuns({
+  queryText,
+  tenantId,
+  timeRange,
+  evalRuns,
+}: {
+  queryText: string;
+  tenantId: string;
+  timeRange: { from: number; to: number };
+  /** The Instant Eval runs registered for the query's `eval` chips. */
+  evalRuns?: readonly ResolvedInstantEvalRun[];
+}): { sql: string; params: Record<string, unknown> } | null {
   const ctx: TranslationContext = {
     paramCounter: 0,
     nodeCount: 0,
@@ -77,6 +101,7 @@ export function translateFilterToClickHouse(
     },
     tenantId,
     timeRange,
+    ...(evalRuns ? { evalRuns } : {}),
   };
 
   const sql = translateFilterAst({ queryText, ctx, translateTag });
@@ -314,8 +339,8 @@ function translateNode({
   translateTag: FilterTagTranslator;
 }): string {
   ctx.nodeCount++;
-  if (ctx.nodeCount > MAX_NODE_COUNT) {
-    throw new FilterParseError("Query too complex");
+  if (ctx.nodeCount > MAX_FILTER_NODE_COUNT) {
+    throw new FilterTooComplexError({ maxNodes: MAX_FILTER_NODE_COUNT });
   }
 
   switch (node.type) {

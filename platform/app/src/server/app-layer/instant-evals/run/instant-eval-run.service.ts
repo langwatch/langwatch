@@ -26,6 +26,7 @@
 import { createLogger } from "@langwatch/observability";
 
 import type { LangWatchQLService } from "~/server/analytics/lwql";
+import type { InstantEvalRunReference } from "~/server/app-layer/traces/query-language/instantEvalChips";
 import type { InstantEvalFreeBudget } from "~/server/app-layer/usage/instant-eval-free-budget.service";
 import type { Protections } from "~/server/traces/protections";
 import type { InstantEvalClassifier } from "../classifier/classifier";
@@ -37,7 +38,10 @@ import {
   InstantEvalNotEnabledError,
   InstantEvalRunNotFoundError,
 } from "./errors";
-import { instantEvalStatementFor } from "./input";
+import {
+  type InstantEvalSelectionResolver,
+  resolveInstantEvalStatement,
+} from "./input";
 import {
   createInstantEvalRun,
   newInstantEvalRunId,
@@ -46,6 +50,7 @@ import {
   estimateInstantEvalRun,
   type InstantEvalEstimate,
 } from "./instant-eval-estimate";
+import { resolveInstantEvalRunsForExplorer } from "./instant-eval-explorer";
 import type {
   InstantEvalJudgmentPage,
   InstantEvalJudgmentsRepository,
@@ -127,6 +132,17 @@ export interface InstantEvalRunServiceDependencies {
   }>;
   /** The free budget an organization without a paid plan is bounded by. */
   readonly budget: InstantEvalFreeBudget;
+  /**
+   * Resolves a shorthand filter the dialect refuses by field into the trace
+   * ids it selects, through the explorer's own compiler, capped at the run's
+   * row limit. Absent where no such compiler is wired, and the refusal stands.
+   */
+  readonly selectTraceIds?: (args: {
+    projectId: string;
+    filter: string;
+    window: { from: number; to: number };
+    limit: number;
+  }) => Promise<readonly string[]>;
   readonly now?: () => number;
   /** The seed a sample's pseudo-random order uses. Injected so a test can pin it. */
   readonly sampleSeed?: () => number;
@@ -167,18 +183,38 @@ export class InstantEvalRunService {
     });
   }
 
+  /** The selection resolver for this project and cap, when one is wired. */
+  private selectionResolver({
+    projectId,
+    rowLimit,
+  }: {
+    projectId: string;
+    rowLimit: number;
+  }): InstantEvalSelectionResolver | undefined {
+    const select = this.deps.selectTraceIds;
+    if (!select) return undefined;
+    return ({ filter, window }) =>
+      select({ projectId, filter, window, limit: rowLimit });
+  }
+
   private async accept({
+    projectId,
+    rowLimit,
     caller,
     protections,
     input,
   }: {
+    projectId: string;
+    rowLimit: number;
     caller: InstantEvalRunCaller;
     protections: Protections;
     input: InstantEvalRunInput;
   }): Promise<AcceptedInstantEvalStatement> {
-    const statement = instantEvalStatementFor({
+    const resolveSelection = this.selectionResolver({ projectId, rowLimit });
+    const statement = await resolveInstantEvalStatement({
       input,
       database: this.deps.query.database,
+      ...(resolveSelection ? { resolveSelection } : {}),
     });
     return await acceptInstantEvalStatement({
       query: this.deps.query,
@@ -208,7 +244,13 @@ export class InstantEvalRunService {
     // Before the statement is accepted, so a free organization past its
     // budget is told so without the probe reading anything on its behalf.
     await this.deps.budget.assertWithinBudget({ projectId });
-    const accepted = await this.accept({ caller, protections, input });
+    const accepted = await this.accept({
+      projectId,
+      rowLimit,
+      caller,
+      protections,
+      input,
+    });
     const runId = newInstantEvalRunId();
     await this.reserveForRun({
       projectId,
@@ -303,7 +345,13 @@ export class InstantEvalRunService {
       projectId,
       protections,
       caller,
-      accepted: await this.accept({ caller, protections, input }),
+      accepted: await this.accept({
+        projectId,
+        rowLimit,
+        caller,
+        protections,
+        input,
+      }),
       rowLimit,
       rowSource: this.deps.rowSource,
       classifier: this.deps.classifier(),
@@ -341,6 +389,29 @@ export class InstantEvalRunService {
     const row = await this.deps.runs.findById({ projectId, runId });
     if (!row) throw new InstantEvalRunNotFoundError({ runId });
     return row;
+  }
+
+  /**
+   * The runs the Explorer registered for its `eval` chips, checked against
+   * the project and dated, as the filter compiler reads them.
+   *
+   * Not behind the feature gate: a list carrying a chip on a project whose
+   * flag was turned off since still has to render, and a run the project
+   * does not own is simply not in the answer.
+   */
+  async resolveForExplorer({
+    projectId,
+    evalRuns,
+  }: {
+    projectId: string;
+    evalRuns: Readonly<Record<string, InstantEvalRunReference>>;
+  }) {
+    return await resolveInstantEvalRunsForExplorer({
+      runs: this.deps.runs,
+      projectId,
+      evalRuns,
+      now: this.now(),
+    });
   }
 
   /**

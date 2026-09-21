@@ -11,8 +11,7 @@ import { writeSpotlightFragment } from "../../onboarding/spotlights/SpotlightOve
 import { TRACE_EXPLORER_SPOTLIGHTS } from "../../onboarding/spotlights/spotlights";
 import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
 import { useDrawerStore } from "../../stores/drawerStore";
-import { useFilterStore } from "../../stores/filterStore";
-import { useViewStore } from "../../stores/viewStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 import { AutomateButton } from "./AutomateButton";
 import { ColumnsDropdown } from "./ColumnsDropdown";
 import { DensityToggle } from "./DensityToggle";
@@ -148,18 +147,18 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   // `LensNamePopover` — same Chakra UI the + new lens button uses.
   // Reverting is one keystroke away via the lens tab's right-click
   // menu and via the draft-dot popover.
-  const activeLensId = useViewStore((s) => s.activeLensId);
-  const activeLensIsDraft = useViewStore((s) => s.isDraft(activeLensId));
-  const activeLensName = useViewStore(
+  const activeLensId = useExplorerStore((s) => s.activeLensId);
+  const activeLensIsDraft = useExplorerStore((s) => s.isDraft(activeLensId));
+  const activeLensName = useExplorerStore(
     (s) =>
       s.allLenses.find((l) => l.id === activeLensId)?.name ?? "Current view",
   );
-  const createLens = useViewStore((s) => s.createLens);
+  const createLens = useExplorerStore((s) => s.createLens);
   // Hide "Save the result as a lens" when the current query has a parse
   // error — saving a broken query as a lens would just create a lens
   // that silently fails to filter on load. The button comes back the
   // moment the error is resolved.
-  const hasParseError = useFilterStore((s) => Boolean(s.parseError));
+  const hasParseError = useExplorerStore((s) => Boolean(s.parseError));
 
   // Measure the toolbar's own width so controls can collapse when space runs
   // out (narrow window OR a wide filters sidebar — viewport breakpoints miss

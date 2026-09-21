@@ -642,6 +642,48 @@ describe("LangyDeclarativeCard", () => {
       expect(screen.queryByText("i5KRzS-5c2UVUD99UzyWw")).toBeNull();
     });
   });
+
+  describe("given a page action that answered a link because no page was open", () => {
+    const outcome = (result: Record<string, unknown>) =>
+      JSON.stringify({
+        kind: "explorer.setFilter",
+        status: "done",
+        executedVia: "backend",
+        actionId: "action-1",
+        result,
+      });
+
+    /** @scenario "The card for an answered link opens the Trace Explorer" */
+    it("links to the answered page under the answered label", () => {
+      renderCard({
+        name: "langwatch.ui.call",
+        output: outcome({
+          query: "status:error",
+          href: "/acme/traces#all-traces?q=status%3Aerror",
+          label: "View in Trace Explorer",
+        }),
+      });
+
+      const link = screen.getByText("View in Trace Explorer").closest("a");
+      expect(link?.getAttribute("href")).toBe(
+        "/acme/traces#all-traces?q=status%3Aerror",
+      );
+    });
+
+    describe("when the answered link leaves the app", () => {
+      it("keeps the card's own link and copy", () => {
+        renderCard({
+          name: "langwatch.ui.call",
+          output: outcome({
+            href: "//elsewhere.example/acme/traces",
+            label: "View in Trace Explorer",
+          }),
+        });
+
+        expect(screen.queryByText("View in Trace Explorer")).toBeNull();
+      });
+    });
+  });
 });
 
 /**

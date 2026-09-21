@@ -6,8 +6,7 @@ import type {
   AiActionErrorDetails,
 } from "~/server/app-layer/traces/ai-query";
 import { api } from "~/utils/api";
-import { useFilterStore } from "../../stores/filterStore";
-import { useViewStore } from "../../stores/viewStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 
 /**
  * Lifts the composer's detail rows out of a handled error's `meta`.
@@ -88,10 +87,10 @@ export function useAiTraceAction({
   onDone,
 }: UseAiTraceActionOptions = {}): UseAiTraceActionResult {
   const { project } = useOrganizationTeamProject();
-  const timeRange = useFilterStore((s) => s.debouncedTimeRange);
-  const applyQueryText = useFilterStore((s) => s.applyQueryText);
-  const recordAiTranslation = useFilterStore((s) => s.recordAiTranslation);
-  const createLens = useViewStore((s) => s.createLens);
+  const timeRange = useExplorerStore((s) => s.debouncedTimeRange);
+  const applyQueryText = useExplorerStore((s) => s.applyQueryText);
+  const recordAiTranslation = useExplorerStore((s) => s.recordAiTranslation);
+  const createLens = useExplorerStore((s) => s.createLens);
   const [error, setError] = useState<AiActionError | null>(null);
   // Track the prompt across the async boundary so onSuccess can save it
   // alongside the model's response — no plumbing through the mutation

@@ -9213,6 +9213,30 @@
         "knownValues": []
       },
       {
+        "name": "eval.trace",
+        "label": "Eval each trace",
+        "valueType": "text",
+        "group": "eval",
+        "facetable": false,
+        "knownValues": []
+      },
+      {
+        "name": "eval.conversation",
+        "label": "Eval each conversation",
+        "valueType": "text",
+        "group": "eval",
+        "facetable": false,
+        "knownValues": []
+      },
+      {
+        "name": "eval.llm",
+        "label": "Eval each model call",
+        "valueType": "text",
+        "group": "eval",
+        "facetable": false,
+        "knownValues": []
+      },
+      {
         "name": "evaluator",
         "label": "Evaluator",
         "valueType": "categorical",

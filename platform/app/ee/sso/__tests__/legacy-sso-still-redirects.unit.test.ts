@@ -45,12 +45,22 @@ const noConnectionRegistered: SignInDomainRoutingPort = {
   listActiveConnections: async () => [],
 };
 
+/** A deployment mounting an identity provider of its own, brokering for
+ *  nobody. */
+const OWN_PROVIDER: SignInMethod = {
+  id: "okta",
+  kind: "federated",
+  connectionId: null,
+};
+
 function routerFor({
   ssoDomain,
   ssoProvider,
+  mounted = MOUNTED,
 }: {
   ssoDomain: string;
   ssoProvider: string | null;
+  mounted?: SignInMethod;
 }) {
   const findUnique = vi.fn(
     async ({ where }: { where: { ssoDomain: string } }) =>
@@ -73,7 +83,7 @@ function routerFor({
       domains: {
         legacy: new LegacySsoDomainRoutingRepository(
           prisma,
-          async () => MOUNTED,
+          async () => mounted,
         ),
         connections: noConnectionRegistered,
       },
@@ -140,13 +150,50 @@ describe("given an organization that signs in through this deployment's provider
   });
 });
 
-describe("given an organization naming a provider this deployment never mounted", () => {
+describe("given an organization pinned to a provider behind the broker this deployment mounts", () => {
+  describe("when one of its people submits their work email", () => {
+    /** @scenario An organization pinned to a provider behind the broker is sent to the broker */
+    it("sends them to the broker, which is the only way to that provider", async () => {
+      // The pin names the upstream — a `providerAccountId` prefix, never a
+      // provider this deployment mounted — and dialing it as written would
+      // dial nothing. The address rides along as a login hint, so the broker
+      // opens the same door it opened before the identifier-first screen.
+      const { service } = routerFor({
+        ssoDomain: "acme.com",
+        ssoProvider: "waad|acme-connection",
+      });
+
+      const decision = await service.route({ identifier: "sam@acme.com" });
+
+      expect(decision.outcome).toBe("redirect_to_connection");
+      expect(decision.methodSet.map((one) => one.id)).toEqual(["auth0"]);
+      expect(decision.reasonCode).toBe("domain_routed");
+    });
+
+    /** @scenario An organization pinned to a provider behind the broker is sent to the broker */
+    it("never offers a password on the way", async () => {
+      const { service } = routerFor({
+        ssoDomain: "acme.com",
+        ssoProvider: "waad|acme-connection",
+      });
+
+      const decision = await service.route({ identifier: "sam@acme.com" });
+
+      expect(decision.methodSet.some((one) => one.kind === "password")).toBe(
+        false,
+      );
+    });
+  });
+});
+
+describe("given an organization naming a provider nothing here can carry", () => {
   describe("when one of its people submits their work email", () => {
     /** @scenario An organization naming a provider this deployment does not mount is not sent nowhere */
     it("offers the local methods rather than a door that cannot open", async () => {
       const { service } = routerFor({
         ssoDomain: "acme.com",
-        ssoProvider: "okta",
+        ssoProvider: "azure-ad",
+        mounted: OWN_PROVIDER,
       });
 
       const decision = await service.route({ identifier: "sam@acme.com" });

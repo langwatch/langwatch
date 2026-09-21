@@ -2,6 +2,7 @@ import type { IdentitySecretCarryService } from "@langwatch/identity-server";
 import type {
   SystemMigration,
   TenantMigrationOutcome,
+  TenantSource,
 } from "@langwatch/system-migrations";
 
 /** Its own state-table key, separate from the backfill's on purpose — see
@@ -45,9 +46,27 @@ export class IdentitySecretHealMigration implements SystemMigration {
   readonly runsAutomaticallyOnSelfHosted = true;
   readonly enrolledAutomatically = true;
 
-  constructor(
-    private readonly secrets: Pick<IdentitySecretCarryService, "carryForUser">,
-  ) {}
+  /**
+   * The users whose two branches could actually have drifted apart, rather
+   * than every user. This migration never finalizes a tenant, so without the
+   * narrowing every user it is handed is re-claimed, re-read and re-recorded
+   * on every pass — twice over in the boot preflight, before any process may
+   * serve. See the source's own docblock.
+   */
+  readonly candidateTenants: TenantSource;
+
+  private readonly secrets: Pick<IdentitySecretCarryService, "carryForUser">;
+
+  constructor({
+    secrets,
+    candidateTenants,
+  }: {
+    secrets: Pick<IdentitySecretCarryService, "carryForUser">;
+    candidateTenants: TenantSource;
+  }) {
+    this.secrets = secrets;
+    this.candidateTenants = candidateTenants;
+  }
 
   async migrateTenant({
     tenantId,

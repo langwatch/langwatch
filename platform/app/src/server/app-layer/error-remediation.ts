@@ -82,6 +82,12 @@ const registry = {
       "Check the filter syntax near the indicated position; filters are field:value pairs combined with AND/OR",
     ],
   },
+  filter_too_complex: {
+    tips: [
+      "Wrap a sentence in double quotes so it counts as one phrase instead of one term per word",
+      "Keep the filter under meta.maxNodes nodes in total; every term, operator, negation and pair of parentheses counts as one",
+    ],
+  },
   filter_field_unknown: {
     tips: [
       "Use one of the fields listed in meta.knownFields",
@@ -803,6 +809,11 @@ const registry = {
   langy_ui_save_failed: {
     tips: [
       "The page applied the change but could not write it to the server, so the saved evaluation does not have it. Do not build the next step on it: pass --experiment <slug> to apply the change to the saved evaluation instead",
+    ],
+  },
+  langy_ui_page_not_ready: {
+    tips: [
+      "The page was open but still loading and never became ready; run the same action once more, and if it fails again tell the user the page did not load",
     ],
   },
   langy_ui_timeout: {

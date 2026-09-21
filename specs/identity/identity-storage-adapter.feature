@@ -229,6 +229,35 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     Then the newer Account secret columns are copied onto "olga"'s AccountCredential row
     And her next sign-in verifies the new password
 
+  # The heal never finalizes a user — for as long as both branches can write a
+  # secret there is no state in which a user can no longer need repairing — so
+  # every pass re-proves everyone it enumerates. That is affordable only if it
+  # enumerates the users whose secrets could actually have drifted. Asking the
+  # whole user table instead costs a claim, a state read and a state write per
+  # user per pass, twice over before a process may serve, which is what held
+  # the fleet's startup open past its probe budget.
+  @integration
+  Scenario: The heal pass enumerates only users whose legacy secrets could have drifted
+    Given a user who holds no Account row at all
+    And a user whose AccountCredential row is already level with their Account row
+    And a user whose Account row was written more recently than their AccountCredential row
+    When the heal pass asks which users to visit
+    Then only the third user is named
+
+  @integration
+  Scenario: A user whose secrets have not been carried across yet is still enumerated
+    Given a user holding an Account row with no AccountCredential row yet
+    When the heal pass asks which users to visit
+    Then that user is named
+
+  @unit
+  Scenario: A migration's own candidate tenants do not narrow the others in the pass
+    Given the heal declares the drifted users as its candidates
+    And the identifier backfill declares no candidates of its own
+    When a user pass runs
+    Then the heal is driven over the drifted users alone
+    And the backfill is still driven over every user
+
   @unit
   Scenario: An unreadable gate cache degrades writes to the legacy branch, never to an error
     Given the gate cache cannot be read

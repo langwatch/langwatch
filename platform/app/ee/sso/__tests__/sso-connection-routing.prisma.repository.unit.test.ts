@@ -1,10 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type {
+  PrismaClient,
   SsoConnection,
   SsoConnectionMigrationPhase,
 } from "~/generated/prisma/client";
 import { verifiedDomainCanBeShared } from "../sso-connection-projection.prisma.repository";
-import { selectMigrationRoute } from "../sso-connection-routing.prisma.repository";
+import {
+  SsoConnectionDomainRoutingRepository,
+  selectMigrationRoute,
+} from "../sso-connection-routing.prisma.repository";
+import { ssoMethodDialWith } from "../sso-method-configured";
 
 function connection({
   id,
@@ -116,6 +121,67 @@ describe("persisted SSO migration routing", () => {
     expect(() =>
       selectMigrationRoute([legacy, unrelated], "normal"),
     ).toThrowError("sso_domain_holders_are_not_a_replacement_pair");
+  });
+});
+
+/**
+ * A grandfathered row carries the organization's PIN in `idpMetadata`, and a
+ * pin is not always something the sign-in surface can dial. What comes out of
+ * the lookup has to be.
+ *
+ * Spec: specs/identity/sso-idp-termination.feature
+ */
+describe("given a grandfathered row pinned to a provider behind the broker", () => {
+  const pinned = (providerId: string): PrismaClient =>
+    ({
+      ssoVerifiedDomain: { findUnique: vi.fn().mockResolvedValue(null) },
+      ssoConnection: {
+        findFirst: vi
+          .fn()
+          .mockResolvedValue({ ...legacy, idpMetadata: { providerId } }),
+      },
+    }) as unknown as PrismaClient;
+
+  const routingOver = ({
+    providerId,
+    mountedMethodId,
+  }: {
+    providerId: string;
+    mountedMethodId: string | null;
+  }) =>
+    new SsoConnectionDomainRoutingRepository(
+      pinned(providerId),
+      ssoMethodDialWith({
+        mountedMethodId: async () => mountedMethodId,
+        engineHoldsProvider: async () => false,
+      }),
+    );
+
+  describe("when the router looks its domain up", () => {
+    /** @scenario "An organization pinned to a provider behind the broker is sent to the broker" */
+    it("hands out the broker as what the sign-in surface dials", async () => {
+      const found = await routingOver({
+        providerId: "waad|acme-connection",
+        mountedMethodId: "auth0",
+      }).findConnectionForDomain({ domain: "acme.com" });
+
+      expect(found?.configured).toBe(true);
+      expect(found?.method.id).toBe("auth0");
+      expect(found?.method.connectionId).toBe(legacy.id);
+      expect(found?.connectionId).toBe(legacy.id);
+    });
+  });
+
+  describe("when nothing mounted here can carry the pin", () => {
+    /** @scenario "An organization naming a provider this deployment does not mount is not sent nowhere" */
+    it("reports it undialable rather than handing out the pin", async () => {
+      const found = await routingOver({
+        providerId: "azure-ad",
+        mountedMethodId: "okta",
+      }).findConnectionForDomain({ domain: "acme.com" });
+
+      expect(found?.configured).toBe(false);
+    });
   });
 });
 

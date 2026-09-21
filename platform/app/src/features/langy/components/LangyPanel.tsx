@@ -188,6 +188,7 @@ import {
   useLangyStore,
 } from "../stores/langyStore";
 import { executeUiAction } from "../uiActions/executeUiAction";
+import { isOnPageOwningAction } from "../uiActions/manifestRoutes";
 import type { LangyUiActionHandlers } from "../uiActions/types";
 import { AnimatedConversationTitle } from "./AnimatedConversationTitle";
 import { Composer } from "./Composer";
@@ -364,12 +365,12 @@ function dispatchUiActionToPage({
   entry,
   projectId,
   seen,
-  handlers,
+  getHandlers,
 }: {
   entry: { actionId: string; kind: string; payload: unknown };
   projectId: string | undefined;
   seen: Set<string>;
-  handlers: LangyUiActionHandlers;
+  getHandlers: () => LangyUiActionHandlers;
 }): void {
   const store = useLangyStore.getState();
   const conversationId = store.activeConversationId;
@@ -383,7 +384,9 @@ function dispatchUiActionToPage({
     entry,
     turnId,
     seen,
-    handlers,
+    getHandlers,
+    isPageArriving: (kind) =>
+      isOnPageOwningAction({ kind, pathname: window.location.pathname }),
     claim: ({ actionId }) =>
       trpcClient.langy.claimUiAction.mutate({
         projectId,
@@ -1052,7 +1055,7 @@ function LangyPanel({
             entry,
             projectId: turnContextRef.current?.projectId,
             seen: uiActionSeenRef.current,
-            handlers: actionHandlersRef?.current ?? {},
+            getHandlers: () => actionHandlersRef?.current ?? {},
           });
         },
         onLocalWait: recordLocalWait,

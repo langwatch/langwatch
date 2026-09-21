@@ -132,6 +132,13 @@ export class JevInstantEvalClassifier implements InstantEvalClassifier {
       new Pool(new URL(baseUrl).origin, {
         connections: POOL_CONNECTIONS,
         keepAliveTimeout: 30_000,
+        // HTTP/1.1 on purpose. undici negotiates HTTP/2 by default, and a
+        // cancelled page aborts every classification in flight at once: that
+        // many stream resets on one session left Node's HTTP/2 writer
+        // spinning on the main thread, and the whole process stopped
+        // answering until it was killed. One request per connection has no
+        // shared session to wedge, and the pool is already sized for it.
+        allowH2: false,
       });
     this.sleep = options.sleep ?? abortableSleep;
   }
