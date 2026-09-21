@@ -36,6 +36,10 @@ const stubs = vi.hoisted(() => {
         findUnique: vi.fn().mockResolvedValue(null),
         upsert: vi.fn().mockResolvedValue(undefined),
       },
+      // Both legs page their tenants with a raw walk that leaves out the
+      // ones already terminal for every migration the pass drives. Nobody
+      // here has work, which ends each pass without touching Redis.
+      $queryRaw: vi.fn().mockResolvedValue([]),
     },
   };
 });
