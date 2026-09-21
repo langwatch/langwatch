@@ -13,6 +13,16 @@ import {
   WebhookApi,
   type SqsDestinationInput,
   type WebhookEndpointView,
+  deliveryDtoSchema,
+  deliveryListResponseSchema,
+  endpointDtoSchema,
+  endpointListResponseSchema,
+  endpointStatusSchema,
+  endpointWithSecretDtoSchema,
+  eventTypeDtoSchema,
+  eventTypeListResponseSchema,
+  webhookEventEnvelopeSchema,
+  webhookEventListResponseSchema,
 } from "@langwatch/webhook-contract";
 import { z } from "zod";
 
@@ -21,8 +31,6 @@ import { z } from "zod";
 // AND output, with no dual-casing tolerance: the stored SCREAMING_SNAKE is
 // Prisma's convention, not a contract, and `toWireEnum` / `toStoredEnum`
 // translate at this seam in both directions.
-
-const endpointStatusSchema = z.enum(["active", "disabled"]);
 
 const deliveryControlsSchema = {
   max_batch_size: z.number().int().optional(),
@@ -189,69 +197,6 @@ function endpointResponse(endpoint: WebhookEndpointView) {
 // {@link endpointResponse} is the one builder behind create, list, get,
 // patch and roll-secret, so one schema describes all five.
 
-const sqsDestinationDtoSchema = z.object({
-  queue_url: z.string(),
-  region: z.string(),
-  account_id: z.string(),
-  queue_name: z.string(),
-  credential_mode: z.enum(["assume_role", "static", "ambient"]),
-  role_arn: z.string().nullable(),
-  external_id: z.string().nullable(),
-  access_key_id: z.string().nullable(),
-});
-
-const endpointCommonDtoFields = {
-  id: z.string(),
-  enabled_events: z.array(z.string()),
-  status: endpointStatusSchema,
-  disabled_reason: z.string().nullable(),
-  disabled_at: z.string().nullable(),
-  failing_since: z.string().nullable(),
-  last_success_at: z.string().nullable(),
-  last_failure_at: z.string().nullable(),
-  max_batch_size: z.number().int(),
-  max_batch_delay_ms: z.number().int(),
-  max_in_flight: z.number().int(),
-  created_at: z.string(),
-  updated_at: z.string(),
-};
-
-const httpEndpointDtoSchema = z.object({
-  destination_kind: z.literal("http"),
-  url: z.string(),
-  sqs: z.null(),
-  ...endpointCommonDtoFields,
-});
-
-const sqsEndpointDtoSchema = z.object({
-  destination_kind: z.literal("sqs"),
-  url: z.null(),
-  sqs: sqsDestinationDtoSchema,
-  ...endpointCommonDtoFields,
-});
-
-const endpointDtoSchema = z.discriminatedUnion("destination_kind", [
-  httpEndpointDtoSchema,
-  sqsEndpointDtoSchema,
-]);
-
-const endpointWithSecretDtoSchema = z.discriminatedUnion("destination_kind", [
-  httpEndpointDtoSchema.extend({ secret: z.string() }),
-  sqsEndpointDtoSchema.extend({ secret: z.string() }),
-]);
-
-const deliveryDtoSchema = z.object({
-  id: z.string(),
-  dispatch_id: z.string(),
-  attempt: z.number().int(),
-  event_count: z.number().int(),
-  outcome: z.enum(["success", "retryable", "terminal", "pending"]),
-  response_status: z.number().int().nullable(),
-  latency_ms: z.number().int().nullable(),
-  error: z.string().nullable(),
-  fired_at: z.string(),
-});
-
 const healthDtoSchema = z.object({
   status: endpointStatusSchema,
   disabled_reason: z.string().nullable(),
@@ -265,35 +210,12 @@ const healthDtoSchema = z.object({
   p95_latency_ms: z.number().int().nullable(),
 });
 
-const eventTypeDtoSchema = z.object({
-  type: z.string(),
-  family: z.string(),
-  schema_version: z.string(),
-  is_emitting: z.boolean(),
-  description: z.string(),
-});
-
-const webhookEventEnvelopeSchema = z.object({
-  id: z.string(),
-  type: z.string(),
-  created: z.string(),
-  schema_version: z.string(),
-  data: z.record(z.string(), z.unknown()),
-});
-
 const testFireResultSchema = z.object({
   delivered: z.boolean(),
   response_status: z.number().int().nullable(),
   response_body: z.string().optional(),
   error: z.string().optional(),
 });
-
-const nextCursorSchema = z
-  .string()
-  .nullable()
-  .describe(
-    "Pass back as `cursor` for the next page. Null means the walk is exhausted; a full page does NOT mean there is more.",
-  );
 
 /** The queue fields, wire spelling to service spelling. */
 function sqsFromBody(sqs: {
@@ -397,7 +319,7 @@ export const webhookRest: Readonly<{
 
   .get("/endpoints", "getApiWebhooksV1Endpoints")
   .withPermission("webhookEndpoints:view")
-  .withOutput(z.array(endpointDtoSchema))
+  .withOutput(endpointListResponseSchema)
   .withDocs({
     tags: ["Webhooks"],
     summary: "List webhook endpoints",
@@ -407,7 +329,7 @@ export const webhookRest: Readonly<{
     await app.assertEndpointsEntitled(scope.id);
 
     const list = await app.getAll({ organizationId: scope.id });
-    return list.map(endpointResponse);
+    return { data: list.map(endpointResponse) };
   })
 
   .get("/endpoints/:id", "getApiWebhooksV1EndpointsById")
@@ -538,7 +460,7 @@ export const webhookRest: Readonly<{
   .withParams(endpointIdParams)
   .withQuery(deliveriesQuerySchema)
   .withPermission("webhookEndpoints:view")
-  .withOutput(z.object({ data: z.array(deliveryDtoSchema), next_cursor: nextCursorSchema }))
+  .withOutput(deliveryListResponseSchema)
   .withDocs({
     tags: ["Webhooks"],
     summary: "List an endpoint's delivery attempts",
@@ -603,7 +525,7 @@ export const webhookRest: Readonly<{
 
   .get("/event-types", "getApiWebhooksV1EventTypes")
   .withPermission("webhookEndpoints:view")
-  .withOutput(z.array(eventTypeDtoSchema))
+  .withOutput(eventTypeListResponseSchema)
   .withDocs({
     tags: ["Webhooks"],
     summary: "List subscribable event types",
@@ -613,21 +535,21 @@ export const webhookRest: Readonly<{
   .handle(async ({ app, scope }) => {
     await app.assertEndpointsEntitled(scope.id);
 
-    return WEBHOOK_EVENT_TYPES.map((t) => ({
-      type: t.type,
-      family: t.family,
-      schema_version: t.schemaVersion,
-      is_emitting: t.isEmitting,
-      description: t.description,
-    }));
+    return {
+      data: WEBHOOK_EVENT_TYPES.map((t) => ({
+        type: t.type,
+        family: t.family,
+        schema_version: t.schemaVersion,
+        is_emitting: t.isEmitting,
+        description: t.description,
+      })),
+    };
   })
 
   .get("/events", "getApiWebhooksV1Events")
   .withQuery(eventsQuerySchema)
   .withPermission("webhookEndpoints:view")
-  .withOutput(
-    z.object({ data: z.array(webhookEventEnvelopeSchema), next_cursor: nextCursorSchema }),
-  )
+  .withOutput(webhookEventListResponseSchema)
   .withDocs({
     tags: ["Webhooks"],
     summary: "List emitted events",

@@ -32,3 +32,15 @@ Feature: Enterprise webhook endpoints
     Given an organization has a set of project tenants
     When it lists or reads emitted webhook events
     Then only rows from those tenants are mapped to envelopes
+
+  # Measured against main on 2026-09-21: GET /endpoints and /event-types
+  # returned a bare array here where main answers {"data": [...]}. The envelope
+  # cannot simply be dropped — /endpoints/{id}/deliveries pages, and
+  # next_cursor has nowhere to live beside a bare array — so restoring it on
+  # the other two is the only shape that is both prod-compatible and
+  # internally consistent.
+  @integration
+  Scenario: A webhook list answers under its own data envelope
+    Given the webhook endpoints and event-type lists
+    When each is read
+    Then each answers under "data"

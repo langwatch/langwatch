@@ -322,3 +322,24 @@ describe("the /api/webhooks/v1 door", () => {
     });
   });
 });
+
+describe("every list on the /api/webhooks/v1 surface", () => {
+  /** @scenario "A webhook list answers under its own data envelope" */
+  it("answers under `data`, because next_cursor has nowhere to live beside a bare array", async () => {
+    const { request } = mountWebhookRest({
+      endpoints: createApiFixture<WebhookAppDependencies["endpoints"]>({
+        getAll: async () => [],
+      }),
+    });
+
+    const endpoints = await request("/api/webhooks/v1/endpoints");
+    expect(endpoints.status).toBe(200);
+    await expect(endpoints.json()).resolves.toEqual({ data: [] });
+
+    const eventTypes = await request("/api/webhooks/v1/event-types");
+    expect(eventTypes.status).toBe(200);
+    const catalogue = (await eventTypes.json()) as { data?: unknown[] };
+    expect(Array.isArray(catalogue.data)).toBe(true);
+    expect(catalogue.data?.length).toBeGreaterThan(0);
+  });
+});
