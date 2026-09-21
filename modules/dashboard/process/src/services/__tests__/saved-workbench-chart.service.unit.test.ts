@@ -10,6 +10,7 @@ import type {
   LangWatchQLValidationInput,
 } from "@langwatch/analytics-contract";
 import { VEGA_LITE_SCHEMA_URL } from "@langwatch/analytics-contract/visualization/validation";
+import { createApiFixture } from "@langwatch/api-fixture";
 import {
   SavedWorkbenchChartDashboardNotFoundError,
   SavedWorkbenchChartDefinitionInvalidError,
@@ -18,7 +19,6 @@ import {
   WORKBENCH_CHART_DEFINITION_VERSION,
   type SavedWorkbenchChartDefinition,
 } from "@langwatch/dashboard-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type {
@@ -147,7 +147,7 @@ function recordingAnalytics(refusal?: Error) {
     validateLangWatchQL: (input: LangWatchQLValidationInput) => {
       validated.push(input);
       if (refusal) throw refusal;
-      return undefined;
+      return { parameters: [], appFunctions: [] };
     },
     executeLangWatchQL: async (input: unknown) => {
       executed.push(input);

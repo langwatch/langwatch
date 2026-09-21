@@ -56,3 +56,56 @@ export interface LangWatchQLJudgement {
   readonly kind: LangWatchQLJudgementKind;
   readonly reads: LangWatchQLJudgementReading;
 }
+
+/** What one eval call asks, as the judge behind it is asked it. */
+export type LangWatchQLJudgementAsked =
+  | Readonly<{
+      kind: "boolean";
+      instructions: string;
+      /** What counts as yes, then what counts as no. A boundary has two sides. */
+      criteria?: readonly [string, string];
+    }>
+  | Readonly<{
+      kind: "score";
+      instructions: string;
+      /** Inclusive bounds. Every whole number between them is a level. */
+      range: Readonly<{ min: number; max: number }>;
+    }>
+  | Readonly<{
+      kind: "category";
+      instructions: string;
+      options: readonly Readonly<{ name: string; description: string }>[];
+    }>;
+
+/**
+ * One judged column of a statement: the question its call asks, plus how the
+ * column reads the answer. Derived from the catalogue, so a caller never has
+ * to know which option of an eval function is its threshold, range or list.
+ */
+export type LangWatchQLJudgementCall = Readonly<{
+  /** The output column the call was aliased to, which names the question. */
+  column: string;
+  /** The eval function that asked it. */
+  function: string;
+  reads: LangWatchQLJudgementReading;
+  /** Where a boolean call's probability becomes a pass. */
+  threshold?: number;
+}> &
+  LangWatchQLJudgementAsked;
+
+/** A bound parameter an admitted statement declares, e.g. `{since:DateTime}`. */
+export interface LangWatchQLDeclaredParameter {
+  readonly name: string;
+  /** The declared ClickHouse type, as the caller wrote it. */
+  readonly type: string;
+}
+
+/**
+ * What the validator answers about a statement it admitted. A refusal is
+ * thrown, so this is the accepted shape and there is no other.
+ */
+export interface LangWatchQLAcceptedStatement {
+  readonly parameters: readonly LangWatchQLDeclaredParameter[];
+  /** The app-function calls the projection made, in projection order. */
+  readonly appFunctions: readonly LangWatchQLAppFunctionCall[];
+}

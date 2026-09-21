@@ -4,7 +4,10 @@
  * @see specs/instant-evals/instant-eval-api.feature
  */
 
-import type { LangWatchQLJudgementReading } from "@langwatch/analytics-contract";
+import type {
+  LangWatchQLJudgementCall,
+  LangWatchQLJudgementReading,
+} from "@langwatch/analytics-contract";
 import type {
   InstantEvalQuestion,
   InstantEvalQuestionKind,
@@ -99,4 +102,43 @@ function optionsOf(value: unknown): readonly { name: string; description: string
 function findCriteria(value: unknown): (readonly [string, string])[] {
   const parsed = z.tuple([z.string(), z.string()]).safeParse(value);
   return parsed.success ? [parsed.data] : [];
+}
+
+/** One judged column of the statement, as the run stores what it asked. */
+function runQuestionOf(call: LangWatchQLJudgementCall): InstantEvalRunQuestion {
+  return {
+    id: call.column,
+    function: call.function,
+    kind: call.kind,
+    reads: call.reads,
+    question: askedQuestionOf(call),
+    ...(call.threshold === undefined ? {} : { threshold: call.threshold }),
+  };
+}
+
+/** The same question, addressed to the judge by the column it comes back in. */
+function askedQuestionOf(call: LangWatchQLJudgementCall): InstantEvalQuestion {
+  const { column: id, instructions } = call;
+  if (call.kind === "score") return { id, kind: "score", instructions, range: call.range };
+  if (call.kind === "category") {
+    return { id, kind: "category", instructions, options: call.options };
+  }
+
+  return {
+    id,
+    kind: "boolean",
+    instructions,
+    ...(call.criteria ? { criteria: call.criteria } : {}),
+  };
+}
+
+/**
+ * The questions a validated statement asks, in projection order. Empty for a
+ * statement that projects no eval function, which is what the create path
+ * refuses on: a run with no question would judge nothing and cost nothing.
+ */
+export function instantEvalRunQuestions(
+  judgements: readonly LangWatchQLJudgementCall[],
+): readonly InstantEvalRunQuestion[] {
+  return judgements.map(runQuestionOf);
 }

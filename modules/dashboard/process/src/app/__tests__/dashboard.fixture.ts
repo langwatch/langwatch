@@ -5,10 +5,10 @@ import type {
   LangWatchQLQueryResult,
   LangWatchQLValidationInput,
 } from "@langwatch/analytics-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AutomationApi, Trigger } from "@langwatch/automation-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { vi } from "vitest";
 
 import type { DashboardRepositories } from "../../repositories/dashboard.repositories.ts";
@@ -25,8 +25,15 @@ export const FULLY_PERMITTED: LangWatchQLProtections = {
 export function createDashboardTestAnalytics(overrides: Partial<AnalyticsApi> = {}): AnalyticsApi {
   return createApiFixture<AnalyticsApi>({
     isLangWatchQLAvailable: () => true,
-    describeLangWatchQLSchema: () => ({ database: "analytics", datasets: [], appFunctions: [] }),
-    validateLangWatchQL: (_input: LangWatchQLValidationInput) => undefined,
+    describeLangWatchQLSchema: async () => ({
+      database: "analytics",
+      datasets: [],
+      appFunctions: [],
+    }),
+    validateLangWatchQL: (_input: LangWatchQLValidationInput) => ({
+      parameters: [],
+      appFunctions: [],
+    }),
     executeLangWatchQL: async (_input: LangWatchQLExecuteInput) =>
       ({
         columns: [],

@@ -2,7 +2,30 @@ import { moduleApi } from "@langwatch/kernel/module-api";
 import type { Instant } from "@langwatch/time";
 
 import type { InstantEvalJudgmentStatus } from "./instant-eval-limits.ts";
-import type { InstantEvalResultsWire, InstantEvalRunWire } from "./instant-eval.schemas.ts";
+import type {
+  InstantEvalResultsWire,
+  InstantEvalRunWire,
+  InstantEvalShorthandInput,
+} from "./instant-eval.schemas.ts";
+
+/**
+ * What a caller sends to start or price a run: a statement or a target, never
+ * both and never neither. A target is expanded into a statement first, so
+ * every field below it describes that statement too.
+ */
+export interface InstantEvalRunInput {
+  readonly sql?: string;
+  readonly parameters?: Readonly<Record<string, unknown>>;
+  /** A target, a trace filter and the questions, in place of a statement. */
+  readonly shorthand?: InstantEvalShorthandInput;
+  readonly name?: string;
+  /**
+   * Rows the run may judge. Ten thousand on every plan rather than the plan's
+   * own cap: a run is charged for what it judges, so an absent field must not
+   * silently bill a paid plan for ten times what the caller meant to ask for.
+   */
+  readonly limit?: number;
+}
 
 /** One run's counters, which is all a chip and a progress bar read. */
 export interface InstantEvalRunProgress {

@@ -71,7 +71,7 @@ Reusable framework decisions live with their packages:
 | [112](./112-singular-feature-ownership.md)                             | Product domains use singular feature ownership                                                                            | Accepted                  |
 | [113](./113-explicit-runtime-boot.md)                                  | Explicit runtime boot owns configuration and application construction                                                     | Accepted                  |
 | [128](./128-public-rest-and-internal-trpc.md)                          | Public REST and internal tRPC are separate transport surfaces                                                             | Accepted                  |
-| [131](./131-better-auth-is-a-boundary-over-identity-services.md)       | better-auth is a boundary tier of classes over identity services, not a place that queries Prisma                        | Accepted                  |
+| [131](./131-better-auth-is-a-boundary-over-identity-services.md)       | better-auth is a boundary tier of classes over identity services, not a place that queries Prisma                         | Accepted                  |
 | [135](./135-lint-and-format-toolchain.md)                              | One linter, one formatter, and four places a rule may live                                                                | Proposed                  |
 | [136](./136-package-and-layer-boundaries.md)                           | Which package may name which, and in which direction                                                                      | Proposed                  |
 | [137](./137-module-source-grammar.md)                                  | A module's source layout is a grammar, not a convention                                                                   | Proposed                  |
@@ -81,6 +81,8 @@ Reusable framework decisions live with their packages:
 | [141](./141-platform-invariants.md)                                    | The invariants a single file can be checked against                                                                       | Proposed                  |
 | [142](./142-test-quality-rules.md)                                     | A test that cannot fail is worse than no test                                                                             | Proposed                  |
 | [143](./143-formatting.md)                                             | oxfmt is the only formatter, and it reads one configuration                                                               | Proposed                  |
+| [136](./136-lwql-app-functions-identity-udfs.md)                       | LangWatchQL app functions are projection UDFs plus a post-execution hydration stage                                       | Accepted                  |
+| [153](./153-instant-eval-run-is-a-judgment-job.md)                     | An Instant Eval run is a judgment job over the same statement, not a monitor run                                          | Accepted                  |
 | [150](./150-nx-task-runner.md)                                         | Nx is the workspace task runner, over inferred pnpm targets                                                               | Accepted                  |
 
 Package-local decisions are indexed beside their owners. The framework

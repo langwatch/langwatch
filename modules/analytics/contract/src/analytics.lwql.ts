@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { LangWatchQLTimeWindow } from "./analytics.lwql-time-window.ts";
+import type { LangWatchQLAcceptedStatement } from "./langwatch-ql-app-functions.ts";
 
 /** One column in a LangWatchQL result. */
 export const langWatchQLColumnSchema = z
@@ -189,20 +190,31 @@ export type LangWatchQLExecuteInput = LangWatchQLRunContext &
   Readonly<{
     sql: string;
     parameters?: Readonly<Record<string, unknown>>;
-    /** Whether this caller may call an eval function. Absent means no. */
-    isInstantEvalsEnabled?: boolean;
   }>;
 
-/** Input used to admit a statement before it is stored as a reusable artifact. */
+/**
+ * The eval-function gate, which Analytics resolves from the project's rollout
+ * rather than taking from a caller — it travels only from Analytics to the
+ * engine below it.
+ */
+export type LangWatchQLEvalGate = Readonly<{
+  /** Whether an eval function may be called. Absent means no. */
+  isInstantEvalsEnabled?: boolean;
+}>;
+
+/**
+ * Input used to admit a statement before it is stored as a reusable artifact.
+ * The gate defaults to closed: a chart stores SQL somebody else runs later, so
+ * a gate resolved at save time would be the wrong caller's answer.
+ */
 export type LangWatchQLValidationInput = Readonly<{
   projectId: string;
   protections: LangWatchQLProtections;
   sql: string;
   parameters?: Readonly<Record<string, unknown>>;
   timeWindow?: LangWatchQLTimeWindow;
-  /** Whether this caller may call an eval function. Absent means no. */
-  isInstantEvalsEnabled?: boolean;
-}>;
+}> &
+  LangWatchQLEvalGate;
 
 /**
  * Analytics' separate restricted-query lifecycle and trust boundary. Ordinary Analytics reads
@@ -212,9 +224,13 @@ export type LangWatchQLValidationInput = Readonly<{
 export abstract class LangWatchQLService {
   abstract get available(): boolean;
   abstract close(): Promise<void>;
-  abstract describeSchema(input: { protections: LangWatchQLProtections }): LangWatchQLSchema;
-  abstract validate(input: LangWatchQLValidationInput): unknown;
-  abstract execute(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
+  abstract describeSchema(
+    input: { protections: LangWatchQLProtections } & LangWatchQLEvalGate,
+  ): LangWatchQLSchema;
+  abstract validate(input: LangWatchQLValidationInput): LangWatchQLAcceptedStatement;
+  abstract execute(
+    input: LangWatchQLExecuteInput & LangWatchQLEvalGate,
+  ): Promise<LangWatchQLQueryResult>;
 }
 
 /**

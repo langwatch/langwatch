@@ -22,8 +22,12 @@ import {
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
   type LangWatchQLRunCaller,
+  type LangWatchQLAcceptedStatement,
+  type LangWatchQLAppFunctionCall,
+  type LangWatchQLJudgementCall,
   type LangWatchQLSchema,
   type LangWatchQLService,
+  type LangWatchQLValidationInput,
   type AnalyticsApi as AnalyticsApiContract,
 } from "@langwatch/analytics-contract";
 import type { RestCredentialPrincipal } from "@langwatch/api/rest";
@@ -44,7 +48,9 @@ import { createLangWatchQLService } from "../app/langwatch-ql-composition.build.
 import type { EvaluationAnalyticsClickHouseClient } from "../repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
 import type { LangWatchQLConnection } from "../repositories/langwatch-ql-executor.repository.ts";
 import { savedWorkbenchChartPlatformUrl as savedWorkbenchChartPlatformUrl_ } from "../rules/analytics-platform-url.rules.ts";
-import { lwqlEnabled } from "../rules/lwql-access.rules.ts";
+import { statementMightCallEvalFunction } from "../rules/langwatch-ql-eval-function-catalog.rules.ts";
+import { langWatchQLJudgementCalls } from "../rules/langwatch-ql-judgement-questions.rules.ts";
+import { instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
 import {
   resolveApiKeyProtections as resolveApiKeyProtectionsRule,
   resolveWorkbenchProtections,
@@ -310,10 +316,13 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
   }
 
   /** The datasets and columns one member's protections unlock. */
-  describeLangWatchQLSchema(
-    input: Readonly<{ protections: LangWatchQLProtections; isInstantEvalsEnabled?: boolean }>,
-  ): LangWatchQLSchema {
-    return this.#dependencies.langWatchQL.describeSchema(input);
+  async describeLangWatchQLSchema(
+    input: Readonly<{ projectId: string; protections: LangWatchQLProtections }>,
+  ): Promise<LangWatchQLSchema> {
+    return this.#dependencies.langWatchQL.describeSchema({
+      protections: input.protections,
+      isInstantEvalsEnabled: await this.#isInstantEvalsEnabled(input.projectId),
+    });
   }
 
   /**
@@ -323,7 +332,23 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
   async executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
     await this.#dependencies.lwqlBounds.assertQueryWithinBounds({ projectId: input.project.id });
 
-    return this.#dependencies.langWatchQL.execute(input);
+    // Resolved before the engine validates, because whether an eval function
+    // may be called is part of that verdict — and only for a statement that
+    // names one, since the answer costs a project read and a flag evaluation.
+    const isInstantEvalsEnabled =
+      statementMightCallEvalFunction(input.sql) &&
+      (await this.#isInstantEvalsEnabled(input.project.id));
+
+    return this.#dependencies.langWatchQL.execute({ ...input, isInstantEvalsEnabled });
+  }
+
+  /** This project's eval-function rollout, the one answer both paths above read. */
+  #isInstantEvalsEnabled(projectId: string): Promise<boolean> {
+    return instantEvalsEnabled({
+      featureFlags: this.#dependencies.featureFlags,
+      projectId,
+      projects: this.#dependencies.projects,
+    });
   }
 
   upsertEvaluationAnalytics(
@@ -356,8 +381,15 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
     return this.#dependencies.analytics.appendEvaluationAnalyticsRollupBatch(input);
   }
 
-  validateLangWatchQL(input: Parameters<LangWatchQLService["validate"]>[0]): unknown {
+  validateLangWatchQL(input: LangWatchQLValidationInput): LangWatchQLAcceptedStatement {
     return this.#dependencies.langWatchQL.validate(input);
+  }
+
+  /** The judged columns a hydration plan asks for, read off this catalogue. */
+  describeLangWatchQLJudgements(input: {
+    appFunctions: readonly LangWatchQLAppFunctionCall[];
+  }): readonly LangWatchQLJudgementCall[] {
+    return langWatchQLJudgementCalls(input.appFunctions);
   }
 
   /** Whether this project's rollout admits it to the Workbench at all. */

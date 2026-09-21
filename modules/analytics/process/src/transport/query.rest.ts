@@ -135,5 +135,7 @@ export const queryRest: Readonly<{
       },
     },
   })
-  .handle(({ app }, protections) => app.describeLangWatchQLSchema({ protections }))
+  .handle(({ app, scope }, protections) =>
+    app.describeLangWatchQLSchema({ projectId: scope.id, protections }),
+  )
   .build();

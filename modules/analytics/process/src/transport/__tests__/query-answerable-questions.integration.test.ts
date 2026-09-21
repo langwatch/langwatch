@@ -1370,7 +1370,7 @@ function mountQueryDoor({
 
   const queryApi: AnalyticsQueryApi = {
     resolveApiKeyRunCaller: async () => tenant(),
-    describeLangWatchQLSchema: (input) => service().describeSchema(input),
+    describeLangWatchQLSchema: async ({ protections }) => service().describeSchema({ protections }),
     executeLangWatchQL: (input) => service().execute(input),
   };
 

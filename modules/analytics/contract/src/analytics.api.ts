@@ -29,6 +29,11 @@ import type {
   DashboardWidgetDefinition,
   DashboardWidgetQuery,
 } from "./dashboard-widget-definition.ts";
+import type {
+  LangWatchQLAcceptedStatement,
+  LangWatchQLAppFunctionCall,
+  LangWatchQLJudgementCall,
+} from "./langwatch-ql-app-functions.ts";
 
 /** A persisted custom-chart-playground widget, parsed from its CustomGraph row. */
 export interface DashboardWidget {
@@ -83,14 +88,27 @@ export interface AnalyticsApi {
   ): Promise<void>;
   isLangWatchQLAvailable(): boolean;
   /**
-   * `isInstantEvalsEnabled` decides whether the eval functions are published
-   * as available. The caller answers it; absent means no.
+   * Whether the eval functions are published as available is Analytics' own
+   * answer, read from this project's rollout — which is why the project is
+   * named and the caller never states the gate.
    */
   describeLangWatchQLSchema(input: {
+    projectId: string;
     protections: LangWatchQLProtections;
-    isInstantEvalsEnabled?: boolean;
-  }): LangWatchQLSchema;
-  validateLangWatchQL(input: LangWatchQLValidationInput): unknown;
+  }): Promise<LangWatchQLSchema>;
+  /**
+   * Admits a statement, or throws the refusal. The verdict is what a caller
+   * storing or paging the statement needs from it, and nothing more.
+   */
+  validateLangWatchQL(input: LangWatchQLValidationInput): LangWatchQLAcceptedStatement;
+  /**
+   * The judged columns a hydration plan asks for, in the catalogue's own
+   * vocabulary. Derived here because the catalogue is LangWatchQL's: which
+   * option of an eval function is its threshold, range or list is its answer.
+   */
+  describeLangWatchQLJudgements(input: {
+    appFunctions: readonly LangWatchQLAppFunctionCall[];
+  }): readonly LangWatchQLJudgementCall[];
   executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
   /** Whether this project's rollout admits it to the Workbench at all. */
   isWorkbenchEnabled(input: { projectId: string }): Promise<boolean>;

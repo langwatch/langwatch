@@ -4,10 +4,12 @@
  * @see specs/instant-evals/instant-eval-api.feature
  */
 
+import type { LangWatchQLJudgementCall } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
 import {
   INSTANT_EVAL_DEFAULT_THRESHOLD,
+  instantEvalRunQuestions,
   readInstantEvalRunQuestions,
 } from "../instant-eval-run-questions.rules.ts";
 
@@ -112,6 +114,98 @@ describe("given the questions stored on a run", () => {
       expect(readInstantEvalRunQuestions({ not: "a list" })).toEqual([]);
       expect(readInstantEvalRunQuestions(null)).toEqual([]);
       expect(readInstantEvalRunQuestions([{ id: "x", kind: "mood" }])).toEqual([]);
+    });
+  });
+});
+
+describe("instantEvalRunQuestions, given what the statement's judged columns ask", () => {
+  const judgement = (call: LangWatchQLJudgementCall) => call;
+
+  describe("when a boolean column carries its own threshold", () => {
+    it("stores the question addressed by the column it comes back in", () => {
+      expect(
+        instantEvalRunQuestions([
+          judgement({
+            column: "annoyed",
+            function: "eval_passed",
+            reads: "passed",
+            threshold: 0.8,
+            kind: "boolean",
+            instructions: "The customer sounds annoyed",
+            criteria: ["annoyed", "calm"],
+          }),
+        ]),
+      ).toEqual([
+        {
+          id: "annoyed",
+          function: "eval_passed",
+          kind: "boolean",
+          reads: "passed",
+          threshold: 0.8,
+          question: {
+            id: "annoyed",
+            kind: "boolean",
+            instructions: "The customer sounds annoyed",
+            criteria: ["annoyed", "calm"],
+          },
+        },
+      ]);
+    });
+  });
+
+  describe("when a score and a category column are asked", () => {
+    it("stores each one's own bounds, and no threshold", () => {
+      expect(
+        instantEvalRunQuestions([
+          judgement({
+            column: "helpful",
+            function: "eval_score",
+            reads: "score",
+            kind: "score",
+            instructions: "How helpful",
+            range: { min: 1, max: 5 },
+          }),
+          judgement({
+            column: "topic",
+            function: "eval_category",
+            reads: "label",
+            kind: "category",
+            instructions: "What is it about",
+            options: [{ name: "refund", description: "wants money back" }],
+          }),
+        ]),
+      ).toEqual([
+        {
+          id: "helpful",
+          function: "eval_score",
+          kind: "score",
+          reads: "score",
+          question: {
+            id: "helpful",
+            kind: "score",
+            instructions: "How helpful",
+            range: { min: 1, max: 5 },
+          },
+        },
+        {
+          id: "topic",
+          function: "eval_category",
+          kind: "category",
+          reads: "label",
+          question: {
+            id: "topic",
+            kind: "category",
+            instructions: "What is it about",
+            options: [{ name: "refund", description: "wants money back" }],
+          },
+        },
+      ]);
+    });
+  });
+
+  describe("when the statement judges nothing", () => {
+    it("asks nothing, which is what the create path refuses on", () => {
+      expect(instantEvalRunQuestions([])).toEqual([]);
     });
   });
 });

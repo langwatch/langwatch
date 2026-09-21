@@ -27,14 +27,17 @@ export interface AnalyticsLwqlApi {
   /** The project's own rollout switch, read rather than enforced. */
   isWorkbenchEnabled(input: { projectId: string }): Promise<boolean>;
   /** What this member may see of the project's content. */
-  protectionsFor(input: { projectId: string; userId: string }): Promise<LangWatchQLProtections>;
+  resolveProtections(input: { projectId: string; userId: string }): Promise<LangWatchQLProtections>;
   /** The project identity a member's execution runs under, and its protections. */
-  runCallerFor(input: {
+  resolveRunCaller(input: {
     projectId: string;
     userId: string;
   }): Promise<Readonly<{ project: LangWatchQLCaller; protections: LangWatchQLProtections }>>;
-  describeSchema(input: { protections: LangWatchQLProtections }): LangWatchQLSchema;
-  execute(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
+  describeLangWatchQLSchema(input: {
+    projectId: string;
+    protections: LangWatchQLProtections;
+  }): Promise<LangWatchQLSchema>;
+  executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
 }
 
 export const AnalyticsLwqlApi = moduleApi<AnalyticsLwqlApi>()("analytics");
@@ -66,8 +69,12 @@ export const analyticsLwqlTrpcTransport = defineTrpcRouter(AnalyticsLwqlApi, ana
   .handle(async ({ app, input, actor }) => {
     await assertWorkbenchEnabled(app, input.projectId);
 
-    return app.describeSchema({
-      protections: await app.protectionsFor({ projectId: input.projectId, userId: actor.id }),
+    return app.describeLangWatchQLSchema({
+      projectId: input.projectId,
+      protections: await app.resolveProtections({
+        projectId: input.projectId,
+        userId: actor.id,
+      }),
     });
   })
 
@@ -76,12 +83,12 @@ export const analyticsLwqlTrpcTransport = defineTrpcRouter(AnalyticsLwqlApi, ana
   .handle(async ({ app, input, actor }) => {
     await assertWorkbenchEnabled(app, input.projectId);
 
-    const { project, protections } = await app.runCallerFor({
+    const { project, protections } = await app.resolveRunCaller({
       projectId: input.projectId,
       userId: actor.id,
     });
 
-    return app.execute({
+    return app.executeLangWatchQL({
       project,
       protections,
       sql: input.sql,
