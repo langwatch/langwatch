@@ -17,7 +17,7 @@ const prisma = new PrismaClient({
 });
 const connections = new SsoConnectionDomainRoutingRepository(
   prisma,
-  async () => true,
+  async ({ methodId }) => methodId,
 );
 const domains = {
   connections,

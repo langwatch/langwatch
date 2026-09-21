@@ -35,6 +35,49 @@ import {
 
 export const INSTANT_EVALS_FLAG = "release_instant_evals";
 
+/**
+ * The product decision alone: whether the flag is on for the project, whatever
+ * the deployment has configured. The search router reads this one, because a
+ * released project with no classifier still gets the "configure a model"
+ * primer, while an unreleased one is never offered a judgement at all.
+ */
+export async function instantEvalsReleased({
+  prisma,
+  projectId,
+  organizationId,
+}: {
+  prisma: PrismaClient;
+  projectId: string;
+  /**
+   * The project's organization, where the caller already has it. Resolved here
+   * otherwise, so the common call stays a single argument pair.
+   */
+  organizationId?: string;
+}): Promise<boolean> {
+  const resolved =
+    organizationId ?? (await organizationOf({ prisma, projectId }));
+
+  return featureFlagService.isEnabled(INSTANT_EVALS_FLAG, {
+    distinctId: projectId,
+    projectId,
+    organizationId: resolved ?? NOT_TARGETED,
+  });
+}
+
+async function organizationOf({
+  prisma,
+  projectId,
+}: {
+  prisma: PrismaClient;
+  projectId: string;
+}): Promise<string | undefined> {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { team: { select: { organizationId: true } } },
+  });
+  return project?.team?.organizationId;
+}
+
 export async function instantEvalsEnabled({
   prisma,
   projectId,
@@ -56,11 +99,7 @@ export async function instantEvalsEnabled({
 }): Promise<boolean> {
   if (!isClassifierConfigured()) return false;
 
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { team: { select: { organizationId: true } } },
-  });
-  const organizationId = project?.team?.organizationId;
+  const organizationId = await organizationOf({ prisma, projectId });
 
   if (
     organizationId &&
@@ -69,9 +108,5 @@ export async function instantEvalsEnabled({
     return false;
   }
 
-  return featureFlagService.isEnabled(INSTANT_EVALS_FLAG, {
-    distinctId: projectId,
-    projectId,
-    organizationId: organizationId ?? NOT_TARGETED,
-  });
+  return instantEvalsReleased({ prisma, projectId, organizationId });
 }

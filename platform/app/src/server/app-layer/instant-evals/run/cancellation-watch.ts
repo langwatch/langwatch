@@ -22,11 +22,11 @@ const logger = createLogger("langwatch:instant-evals:cancel-watch");
 /**
  * How often a page in flight re-reads the cancellation.
  *
- * Five seconds: a page is tens of seconds of judging, so this stops one within
- * a fraction of it, and it is one Redis read per interval rather than one per
- * classification.
+ * One second: a Stop pressed in the Explorer is answered by the run within
+ * about a second plus the classifications already in flight, and it is one
+ * Redis read per interval rather than one per classification.
  */
-export const INSTANT_EVAL_CANCEL_POLL_MS = 5_000;
+export const INSTANT_EVAL_CANCEL_POLL_MS = 1_000;
 
 /** An abort signal that fires when the run is cancelled, or null when it cannot be. */
 export function watchForCancellation({

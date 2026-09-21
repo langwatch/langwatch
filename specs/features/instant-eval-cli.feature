@@ -350,3 +350,10 @@ Feature: langwatch instant-eval, asking one question of a whole production histo
     When the user runs instant-eval run "annoyed" --limit 50000
     Then the exit code is non-zero
     And the refusal is reported with the words the platform sent
+
+  @unit
+  Scenario: A failed response with no body is reported as a failed request
+    Given a proxy answers 502 with an empty body because the platform is restarting
+    When the user runs instant-eval status, list or cancel
+    Then the failure names the operation and the 502 status
+    And no command reads a field of a response that never arrived

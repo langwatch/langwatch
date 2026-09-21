@@ -49050,6 +49050,8 @@ Do NOT consider the work complete without verifying. In order:
 4. Say what the wait ended on. Traces found: say what the run produced. Nothing after the third try: say the instrumentation is in place and the trace had not arrived yet, name the project to look in, and do not report the change as verified.
 5. If verification isn't possible (no shell access, can't run the code, missing external services), tell the user exactly what to check in their LangWatch dashboard and what you couldn't verify and why.
 
+This step only proves traces arrive. To find specific traces afterwards (a user, an error, a thumbs down), use the `find-traces` skill.
+
 ## Common Mistakes
 
 - Do NOT invent instrumentation patterns. Read the framework-specific doc
@@ -52496,6 +52498,8 @@ Do NOT consider the work complete without verifying. In order:
 4. Say what the wait ended on. Traces found: say what the run produced. Nothing after the third try: say the instrumentation is in place and the trace had not arrived yet, name the project to look in, and do not report the change as verified.
 5. If verification isn't possible (no shell access, can't run the code, missing external services), tell the user exactly what to check in their LangWatch dashboard and what you couldn't verify and why.
 
+This step only proves traces arrive. To find specific traces afterwards (a user, an error, a thumbs down), use the `find-traces` skill.
+
 ## Common Mistakes
 
 - Do NOT invent instrumentation patterns. Read the framework-specific doc
@@ -54387,7 +54391,9 @@ langwatch trace export --format jsonl --limit 1000 --origin application -o trace
 langwatch trace export --format jsonl --limit 1000 --origin application --start-date <30d-ago> --end-date <14d-ago> -o traces-before.jsonl
 ```
 
-`--origin application` scopes the sample to real production traffic (it includes traces with no recorded origin). Evaluation, simulation, playground, gateway, and langy traces would pollute the picture of what the agent does for users; include those origins (comma-separated) only when they are the subject of the question.
+`--origin application` scopes the export to real production traffic (it includes traces with no recorded origin). Evaluation, simulation, playground, gateway, and langy traces would pollute the picture of what the agent does for users; include those origins (comma-separated) only when they are the subject of the question.
+
+That narrowing belongs to the export and to nothing else. An export is a local sample you analyse offline, so choosing its origins is part of the analysis, and a count taken from it is a count of production traffic rather than of what the Trace Explorer shows. `trace search` is the other case: it answers with cards and a "View in Trace Explorer" link, and the link carries whatever the search named. Name an origin there and the Explorer opens narrower than the page the user was on, with a smaller number than the one beside it. So on `trace search`, name no origin unless the user does.
 
 Write small local scripts (python3 or jq) over the JSONL to compute, at minimum:
 
@@ -54399,11 +54405,13 @@ Write small local scripts (python3 or jq) over the JSONL to compute, at minimum:
 6. **Outliers**: the single weirdest traces by duration, cost, span count, and output size. Read them individually.
 
 ```bash
-langwatch trace search --errors-only --origin application --limit 25 --format json  # Every failure, without guessing at text
-langwatch trace search -q "<one phrase from a pattern>" --origin application --limit 10 --format json   # Chase a specific pattern
+langwatch trace search --errors-only --limit 25 --format json  # Every failure, without guessing at text
+langwatch trace search -q "<one phrase from a pattern>" --limit 10 --format json   # Chase a specific pattern
 langwatch trace get <traceId>                                                   # Read a representative trace in full
 langwatch trace get <traceId> -f json                                           # Every span, token count, and timing
 ```
+
+A search that names no origin counts what the Trace Explorer counts (every trace except Langy's own), so the numbers you report match the link on the card. When the ask is to find specific traces rather than to diagnose the agent ("show me the thumbs down ones", "filter to alice"), use the `find-traces` skill: it drives the Explorer and searches every form a concept can take.
 
 For every pattern you claim, keep 2-3 example trace IDs as evidence. Never report a pattern without example traces behind it.
 
@@ -54432,7 +54440,8 @@ If the `agent-improve` skill is installed, offer it as the next step: it turns e
 - Do NOT analyze only the happy window; without a before/after comparison you cannot see behavior change
 - Do NOT dump raw JSON at the user; the deliverable is the diagnosis and the report, written in plain language with numbers
 - Do NOT stop at an empty evaluation metric; when evaluations have no data, the answer comes from the traces (and simulation runs), with a closing invitation to dig deeper
-- Do NOT mix origins blindly; questions about production behavior are answered from `--origin application` traffic
+- Do NOT mix origins blindly in an export; a question about production behavior is analysed from `--origin application` traffic
+- Do NOT pass `--origin` to `trace search` unless the user named an origin; the card's link carries it and opens the Explorer on a narrower set than the count beside it
 - If the CLI returns an error, report the user-facing consequence (what couldn't be determined and why in plain terms), not the raw error text. An activity card already shows the underlying failure
 ````
 
@@ -56282,6 +56291,173 @@ langwatch dashboard-widget create \
   </div>
 </div>
 
+<div className="lw-accordion">
+  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
+    <span className="lw-accordion-title">Find the traces where users gave a thumbs down</span>
+    <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
+  </div>
+  <div className="lw-accordion-body">
+    <div className="lw-accordion-commands">
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Install via CLI</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"npx skills add langwatch/skills/recipes/find-traces"} data-track="docs_copy_skill_install" data-track-title={"Find the traces where users gave a thumbs down"} data-track-skill={"langwatch/skills/recipes/find-traces"}>
+          <code>npx skills add langwatch/skills/recipes/find-traces</code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Skill Usage</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"/find-traces"} data-track="docs_copy_slash_command" data-track-title={"Find the traces where users gave a thumbs down"} data-track-command={"/find-traces"}>
+          <code><span className="lw-slash-command">/find-traces</span></code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+    </div>
+    <div className="lw-accordion-actions">
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title={"Find the traces where users gave a thumbs down"} data-track-skill={"langwatch/skills/recipes/find-traces"}>
+        <span className="lw-accordion-action-icon lw-copy-line-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+        <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Copy Full Prompt</span>
+          <span className="lw-accordion-action-subtitle">Run skill without installing</span>
+        </span>
+        <div className="lw-prompt-source">
+
+````text
+Find the traces where users gave a thumbs down
+
+You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check whether LANGWATCH_API_KEY is already set: in the process environment, which is where CI injects it, and otherwise in the project's .env file. Use that key instead of asking for a new one. Read LANGWATCH_ENDPOINT from the same places, and nothing else out of .env: if the endpoint is set, the project is on a self-hosted instance, and the CLI works against that endpoint instead of app.langwatch.ai.
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
+
+# Find Traces
+
+A request to find traces names a concept ("thumbs down", "the angry ones", "alice's failures"), not a filter. This skill turns the concept into a filter in the trace filter language, runs it over the right window, and answers with the count and the traces.
+
+## Prerequisites
+
+Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
+
+```bash
+langwatch docs                                    # Docs index
+langwatch docs integration/python/guide           # Python integration
+langwatch docs integration/typescript/guide       # TypeScript integration
+langwatch docs prompt-management/cli              # Prompts CLI
+langwatch scenario-docs                           # Scenario docs index
+```
+
+Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Every list command takes `--limit <n>` to cap the rows and `--jq <expr>` to read part of the answer. A paginated list answers with an envelope, so count its rows through the row array (`--jq '.traces | length'`), and read how many there are in all at `.pagination.total`. Bare `--jq length` counts the fields of the envelope, not the rows. Read the docs first instead of guessing SDK APIs or CLI flags.
+
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx --yes langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`. With `--session`, always run `--dry-run` first and let the user read the payload, because a transcript carries content they never reviewed. `npx --yes langwatch report --help` explains the options.
+
+## Primary and secondary way of working
+
+Decide which one applies before you run anything.
+
+**Primary: finding traces is the ask.** "Show me the thumbs down traces", "which traces failed yesterday", "filter to alice". The user wants to look at traces, so put them in front of the user: open the Trace Explorer and drive it with `explorer.setTimeRange` and `explorer.setFilter`. The Explorer is the answer; your reply is the count and what stands out.
+
+**Secondary: traces are a means to another task.** "Build a dataset from the failed traces", "write a scenario from a bad conversation", "why is cost up" asked from another page. Stay on the page the user is on. Search with `langwatch trace search`, answer with its cards and the "View in Trace Explorer" link they carry, and continue the task. Do not navigate away from the user's work.
+
+When the turn context says the current page is the Trace Explorer, the primary way applies to any trace-finding ask, even a small one, because the user is already looking at the list.
+
+## Step 1: Take the window and the filter from the page
+
+The turn context of the Trace Explorer carries `from`, `to` and `search and attribute filters`. Those are the defaults:
+
+- Use that window. Pass it as `--start-date <from> --end-date <to>` on every `trace search` and `trace facets` call. With no page context, use the last 30 days, which is what the Explorer opens on.
+- Keep the filter the user already applied unless the ask replaces it. To narrow it, call `explorer.setFilter` with `"mode": "add"`.
+- Name no origin. A search that names no origin counts what the Explorer counts: every trace except Langy's own. Do not pass `--origin application`; it drops evaluation, simulation and playground traces the Explorer shows, and the two counts stop agreeing. Pass `--origin` or an `origin:` term only when the user names an origin.
+
+## Step 2: Learn the fields before writing a filter
+
+```bash
+langwatch query reference --section trace-filter     # the language: fields, operators, examples
+langwatch trace fields --format json                 # every field a filter can name
+langwatch trace facets <field> --start-date <from> --end-date <to> --format json   # the values a field holds in this project
+```
+
+Read the reference once per session. Use `trace facets` every time the concept maps to a field whose values you have not seen, because values differ per project: an event named `thumbs_up_down` in one project is `feedback` in another.
+
+If any of these three is refused as an unknown command or an unknown option, the CLI on this worker is older than this skill. Say that, name the command that was refused and the version `langwatch --version` reports, and stop: an older CLI cannot list the fields or filter the search, so a search that runs without them would answer "none found" for a project that has results.
+
+## Step 3: Search every form the concept can take
+
+A concept can be recorded in several places. One empty search says one form is empty, not that the traces do not exist. Before reporting that nothing was found, try each form that applies:
+
+1. **Events.** `langwatch trace facets event` lists the event names in the window. Thumbs down is the predefined event `thumbs_up_down` with a vote of `-1`: `event:thumbs_up_down AND event.attribute.event.metrics.vote:-1`. A custom event may carry the same meaning under another name or attribute, so read the facet values rather than assuming the predefined one.
+2. **Annotations.** Reviewers and end users also leave thumbs and comments as annotations: `langwatch trace facets annotation`, then `annotation:<value>`.
+3. **Evaluator results.** A sentiment, satisfaction or quality evaluator may already label the concept: `langwatch trace facets evaluatorLabel`, `evaluatorVerdict:fail`, `evaluator:<name>`.
+4. **Trace attributes and labels.** Applications often stamp their own field: `langwatch trace facets label`, and `langwatch trace facets` with no field, which lists every facet with its top values and the attribute keys in use. Filter on one with `trace.attribute.<key>:<value>`.
+5. **The text itself.** A phrase search with `-q "<phrase>"` when the concept shows up in what the user or the agent wrote.
+6. **A wider window.** When every form is empty in the page's window, run the best form again over 90 days. If it matches there, say so and offer the wider window; do not change the page's window without saying it.
+
+Then check the result is what it claims to be: read three of the matched traces with `langwatch trace get <traceId>` and confirm they show the concept. A filter that matches the wrong thing is worse than an empty one.
+
+Ask the user only when two forms both match and mean different things (an end user's thumbs down event versus a reviewer's negative annotation). Say what each one counts and ask which they mean. When one form matches, use it and say which form it was.
+
+## Step 4a: Primary, drive the Explorer
+
+```bash
+langwatch navigate open traces                  # only when the user is on another page; run it alone
+langwatch ui actions                            # confirm the explorer.* kinds and read their payload schemas
+langwatch ui call explorer.setTimeRange --payload '{"preset":"30d"}'      # only when the window has to change
+langwatch ui call explorer.setFilter --payload-file filter.json
+langwatch ui call explorer.getState --payload '{}'
+```
+
+`filter.json` holds `{"query": "<the filter>"}`. Write it to a file: a filter has quotes and colons the shell would split.
+
+`explorer.getState` answers what the page shows: `query`, `timeRange`, `totalHits`, `pageTraceIds` and `source`. Report `totalHits`, because it is the number on the user's screen. When `isCountSettled` is `false` the list has not answered yet; read the state once more before you report a count.
+
+Read `executedVia` on every call. `"browser"` means the Explorer on screen changed. `"backend"` means no Explorer was open: the answer carries `href` and the card shows "View in Trace Explorer" on that filter, and the page did not change. In that case take the count from `langwatch trace search` with the same filter and window, and tell the user the link opens the Explorer on it.
+
+A state with `source: "saved"` carries a `note` and the Explorer's defaults, not the user's screen: do not quote its query, window or count as theirs. Say "this is not the page you are on" and give the link, rather than a number you did not read from a page. A call that fails with `langy_ui_page_not_ready` reached a page that was still loading. In both cases run the same call once more before you answer, and take the count from `langwatch trace search` with the same filter and window when the second call answers `saved` too.
+
+`explorer.setFilter` refuses a filter the language does not parse with `filter_invalid` and a position. Fix the filter and call once more.
+
+Other kinds, for follow-up asks: `explorer.setLens`, `explorer.setSort`, `explorer.setPage`, `explorer.select`, and `explorer.runInstantEval` for a judgement no field holds ("which of these sound annoyed"). `explorer.runInstantEval` spends the user's budget and needs an open Explorer, so use it when the fields and events above cannot express the concept.
+
+## Step 4b: Secondary, answer with cards
+
+```bash
+langwatch trace search --filter '<the filter>' --start-date <from> --end-date <to> --limit 25 --format json
+```
+
+The card lists the traces and links to the Explorer on the same filter and window, so the count the user sees after the click is the count you reported. Report `.pagination.totalHits`, not the number of rows on the page. Then continue the task the traces were for.
+
+## What to report
+
+- The count, the window it covers, and which form matched ("1,204 traces in the last 30 days carry a thumbs down event").
+- Two or three things the matched traces have in common, from the ones you read.
+- When nothing matched: every form you tried and the window, in one sentence, so the user knows the search was complete.
+
+## Common mistakes
+
+- Reporting "no traces found" after one empty search. Run the forms in Step 3 first.
+- Passing `--origin application` by habit. The count then disagrees with the Explorer.
+- Using the 24 hour CLI default while the user looks at 30 days. Pass the page's window.
+- Driving the Explorer away from a task the user is in the middle of. That is the secondary way: cards and a link.
+- Saying the page shows something when `executedVia` was `"backend"`.
+````
+
+        </div>
+      </div>
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/recipes/find-traces/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"Find the traces where users gave a thumbs down"} data-track-skill={"langwatch/skills/recipes/find-traces"}>
+        <span className="lw-accordion-action-icon"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.25 3.75H2.75C1.64543 3.75 0.75 4.64543 0.75 5.75V12.25C0.75 13.3546 1.64543 14.25 2.75 14.25H15.25C16.3546 14.25 17.25 13.3546 17.25 12.25V5.75C17.25 4.64543 16.3546 3.75 15.25 3.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M8.75 11.25V6.75H8.356L6.25 9.5L4.144 6.75H3.75V11.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M11.5 9.5L13.25 11.25L15 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.25 11.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Download SKILL.md</span>
+          <span className="lw-accordion-action-subtitle">Manual installation</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
 {/* lw-generated:recipes:end */}
 
 <div className="lw-info-box">
@@ -56420,7 +56596,9 @@ langwatch trace export --format jsonl --limit 1000 --origin application -o trace
 langwatch trace export --format jsonl --limit 1000 --origin application --start-date <30d-ago> --end-date <14d-ago> -o traces-before.jsonl
 ```
 
-`--origin application` scopes the sample to real production traffic (it includes traces with no recorded origin). Evaluation, simulation, playground, gateway, and langy traces would pollute the picture of what the agent does for users; include those origins (comma-separated) only when they are the subject of the question.
+`--origin application` scopes the export to real production traffic (it includes traces with no recorded origin). Evaluation, simulation, playground, gateway, and langy traces would pollute the picture of what the agent does for users; include those origins (comma-separated) only when they are the subject of the question.
+
+That narrowing belongs to the export and to nothing else. An export is a local sample you analyse offline, so choosing its origins is part of the analysis, and a count taken from it is a count of production traffic rather than of what the Trace Explorer shows. `trace search` is the other case: it answers with cards and a "View in Trace Explorer" link, and the link carries whatever the search named. Name an origin there and the Explorer opens narrower than the page the user was on, with a smaller number than the one beside it. So on `trace search`, name no origin unless the user does.
 
 Write small local scripts (python3 or jq) over the JSONL to compute, at minimum:
 
@@ -56432,11 +56610,13 @@ Write small local scripts (python3 or jq) over the JSONL to compute, at minimum:
 6. **Outliers**: the single weirdest traces by duration, cost, span count, and output size. Read them individually.
 
 ```bash
-langwatch trace search --errors-only --origin application --limit 25 --format json  # Every failure, without guessing at text
-langwatch trace search -q "<one phrase from a pattern>" --origin application --limit 10 --format json   # Chase a specific pattern
+langwatch trace search --errors-only --limit 25 --format json  # Every failure, without guessing at text
+langwatch trace search -q "<one phrase from a pattern>" --limit 10 --format json   # Chase a specific pattern
 langwatch trace get <traceId>                                                   # Read a representative trace in full
 langwatch trace get <traceId> -f json                                           # Every span, token count, and timing
 ```
+
+A search that names no origin counts what the Trace Explorer counts (every trace except Langy's own), so the numbers you report match the link on the card. When the ask is to find specific traces rather than to diagnose the agent ("show me the thumbs down ones", "filter to alice"), use the `find-traces` skill: it drives the Explorer and searches every form a concept can take.
 
 For every pattern you claim, keep 2-3 example trace IDs as evidence. Never report a pattern without example traces behind it.
 
@@ -56465,7 +56645,8 @@ If the `agent-improve` skill is installed, offer it as the next step: it turns e
 - Do NOT analyze only the happy window; without a before/after comparison you cannot see behavior change
 - Do NOT dump raw JSON at the user; the deliverable is the diagnosis and the report, written in plain language with numbers
 - Do NOT stop at an empty evaluation metric; when evaluations have no data, the answer comes from the traces (and simulation runs), with a closing invitation to dig deeper
-- Do NOT mix origins blindly; questions about production behavior are answered from `--origin application` traffic
+- Do NOT mix origins blindly in an export; a question about production behavior is analysed from `--origin application` traffic
+- Do NOT pass `--origin` to `trace search` unless the user named an origin; the card's link carries it and opens the Explorer on a narrower set than the count beside it
 - If the CLI returns an error, report the user-facing consequence (what couldn't be determined and why in plain terms), not the raw error text. An activity card already shows the underlying failure
 ````
 

@@ -2,6 +2,7 @@
 import type { RoutableConnection, SignInMethod } from "@langwatch/identity";
 import type { SignInDomainRoutingPort } from "@langwatch/identity-server";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { legacySsoDialOf } from "./legacy-sso-dial";
 
 /**
  * The router's domain-lookup port, over the data that exists TODAY:
@@ -46,20 +47,27 @@ export class LegacySsoDomainRoutingRepository
     });
     if (!organization?.ssoProvider) return null;
 
-    // Pre-D04 an org names a provider but the deployment mounts one IdP, so a
-    // connection is only dialable when the two agree. Where they disagree the
-    // router falls back to the local set with `method_not_configured` rather
-    // than redirecting somewhere that cannot answer.
+    // Pre-D04 an org PINS a provider and the deployment mounts one IdP, so a
+    // connection is dialable when some mounted method carries the pin —
+    // `legacySsoDialOf` is that reading, and it is the id handed out, because
+    // the pin itself is not always something the sign-in surface can dial.
+    // Where nothing here carries it the router falls back to the local set
+    // with `method_not_configured` rather than redirecting somewhere that
+    // cannot answer.
     const mounted = await this.instanceMethod();
+    const dial = legacySsoDialOf({
+      pin: organization.ssoProvider,
+      mountedMethodId: mounted?.id ?? null,
+    });
     return {
       connectionId: `org:${organization.id}`,
       method: {
-        id: organization.ssoProvider,
+        id: dial ?? organization.ssoProvider,
         kind: "federated",
         connectionId: `org:${organization.id}`,
       },
       state: "ACTIVE",
-      configured: mounted?.id === organization.ssoProvider,
+      configured: dial !== null,
       allowsJit: true,
     };
   }

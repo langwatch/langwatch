@@ -739,27 +739,34 @@ describe("TraceListClickHouseRepository filtering across row versions", () => {
       expect(page.totalHits).toBe(0);
     });
 
+    const annotationCounts = (filterWhere?: FilterWhere) =>
+      repo
+        .findBatchedFacets({
+          tenantId: versionTenant,
+          timeRange,
+          table: "trace_summaries",
+          timeColumn: "OccurredAt",
+          categoricalSpecs: [
+            { key: "annotation", expression: annotationFacetExpression },
+          ],
+          rangeSpecs: [],
+          topN: 10,
+          filterWhere,
+        })
+        .then((batch) => batch.categoricals.annotation?.values ?? []);
+
     /** @scenario "A filter reads only the latest version of each trace" */
     it("counts the trace exactly once, in the bucket its newest version is in", async () => {
-      const counts = await repo.findFacetCounts({
-        tenantId: versionTenant,
-        timeRange,
-        facetExpression: annotationFacetExpression,
-      });
-
-      expect(counts.values).toEqual({ annotated: 1 });
+      expect(await annotationCounts()).toEqual([
+        { value: "annotated", count: 1 },
+      ]);
     });
 
     /** @scenario "A filter reads only the latest version of each trace" */
     it("counts nothing for the bucket only its older version is in", async () => {
-      const counts = await repo.findFacetCounts({
-        tenantId: versionTenant,
-        timeRange,
-        facetExpression: annotationFacetExpression,
-        filterWhere: filterFor("annotation:unannotated"),
-      });
-
-      expect(counts.values).toEqual({});
+      expect(
+        await annotationCounts(filterFor("annotation:unannotated")),
+      ).toEqual([]);
     });
   });
 });
@@ -874,13 +881,26 @@ describe("TraceListClickHouseRepository with the explorer's hidden origins", () 
 
     /** @scenario "The origin facet still offers Langy" */
     it("counts both origins in the origin facet when read without the exclusion", async () => {
-      const counts = await repo.findFacetCounts({
+      const batch = await repo.findBatchedFacets({
         tenantId: langyTenant,
         timeRange,
-        facetExpression: originFacetExpression,
+        table: "trace_summaries",
+        timeColumn: "OccurredAt",
+        categoricalSpecs: [
+          { key: "origin", expression: originFacetExpression },
+        ],
+        rangeSpecs: [],
+        topN: 10,
       });
 
-      expect(counts.values).toEqual({ application: 1, langy: 1 });
+      expect(
+        [...(batch.categoricals.origin?.values ?? [])].sort((a, b) =>
+          a.value.localeCompare(b.value),
+        ),
+      ).toEqual([
+        { value: "application", count: 1 },
+        { value: "langy", count: 1 },
+      ]);
     });
   });
 });

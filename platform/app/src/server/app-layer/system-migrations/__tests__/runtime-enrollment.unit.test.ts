@@ -10,7 +10,9 @@ const stubs = vi.hoisted(() => {
   const userFindUnique = vi.fn().mockResolvedValue(null);
   const userFindMany = vi.fn().mockResolvedValue([]);
   const organizationFindMany = vi.fn().mockResolvedValue([]);
+  const secretHealQueryRaw = vi.fn().mockResolvedValue([]);
   return {
+    secretHealQueryRaw,
     enrollmentFindMany,
     enrollmentFindUnique,
     organizationUserFindMany,
@@ -39,6 +41,12 @@ const stubs = vi.hoisted(() => {
         findMany: organizationUserFindMany,
         findFirst: organizationUserFindFirst,
       },
+      // The secret heal declares its own candidate tenants — the users whose
+      // legacy secrets could have drifted — and asks for them in raw SQL,
+      // because the predicate compares a column against a column on a
+      // related row. None drifted here; this suite is about which cohort a
+      // tenant lands in, not about what the heal then finds.
+      $queryRaw: secretHealQueryRaw,
     },
   };
 });
@@ -98,6 +106,7 @@ import {
   IDENTITY_CONNECTION_GRANDFATHER_MIGRATION_NAME,
   IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
 } from "../../identity/migration-name";
+import { IDENTITY_SECRET_HEAL_MIGRATION_NAME } from "../../identity/secret-heal.migration";
 import { RedisMigrationLeaseRepository } from "../repositories/migration-lease.redis.repository";
 import {
   migrationPassCohort,
@@ -114,6 +123,9 @@ import {
 // OrganizationUser by userId alone — a shape the guard rejects — and this
 // suite could not see that while the stubs bypassed the guard.
 for (const [delegateName, delegate] of Object.entries(stubs.prisma)) {
+  // `$queryRaw` and friends are client methods, not model delegates — the
+  // guard keys off a model name and there is none to give it.
+  if (delegateName.startsWith("$")) continue;
   const model = delegateName.charAt(0).toUpperCase() + delegateName.slice(1);
   for (const [action, fn] of Object.entries(delegate)) {
     (delegate as Record<string, unknown>)[action] = (args: unknown) =>
@@ -269,6 +281,56 @@ describe("migrationPassCohort on cloud", () => {
       // "all" did not widen anything and "none" did not narrow anything:
       // the cohort still came from the enrollment table.
       expect(stubs.enrollmentFindMany).toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given a full pass over both legs", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe("when one user migration declares its own candidate tenants", () => {
+    /** @scenario "A migration that declares its own tenants keeps them" */
+    it("visits the declared tenants for it and only the tenants with work left for the rest", async () => {
+      stubs.enrollmentFindMany.mockResolvedValue([]);
+
+      await runSystemMigrationPass();
+
+      const queries = stubs.secretHealQueryRaw.mock.calls.map((call) => {
+        const [strings, ...values] = call as [
+          TemplateStringsArray,
+          ...unknown[],
+        ];
+        return { sql: strings.join(" "), values };
+      });
+      // The heal's own source asks about drifted credentials and nothing
+      // else: narrowing it by migration state would empty it, because the
+      // heal never finalizes anyone.
+      const declared = queries.filter((query) =>
+        query.sql.includes("AccountCredential"),
+      );
+      const narrowed = queries.filter((query) =>
+        query.sql.includes("SystemMigrationTenantState"),
+      );
+      expect(declared).toHaveLength(1);
+      // One narrowed walk per leg: organizations, then the users the
+      // backfill bucket is driven over.
+      expect(narrowed).toHaveLength(2);
+
+      const askedAbout = narrowed.flatMap((query) =>
+        query.values.filter(Array.isArray).flat(),
+      );
+      expect(askedAbout).toContain(AUTHZ_ENGINE_MIGRATION_NAME);
+      expect(askedAbout).toContain(
+        IDENTITY_CONNECTION_GRANDFATHER_MIGRATION_NAME,
+      );
+      expect(askedAbout).toContain(IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME);
+      expect(askedAbout).not.toContain(IDENTITY_SECRET_HEAL_MIGRATION_NAME);
+
+      // The unnarrowed table walks are what the pass used to do.
+      expect(stubs.organizationFindMany).not.toHaveBeenCalled();
+      expect(stubs.userFindMany).not.toHaveBeenCalled();
     });
   });
 });

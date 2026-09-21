@@ -93,6 +93,27 @@ vi.mock("../../../hooks/useFacetSearch", () => ({
   useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
 }));
 
+// Enter on a sentence calls `tracesV2.routeSearch`; the hook's own routing
+// is covered by useSubmitSearch.integration, so the mutation is stubbed
+// here rather than mounting a tRPC provider.
+vi.mock("~/utils/api", () => ({
+  api: {
+    tracesV2: {
+      routeSearch: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+      instantEval: {
+        estimate: {
+          useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+        },
+        start: {
+          useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+        },
+      },
+    },
+  },
+}));
+
 // @paper-design/shaders-react requires WebGL, which jsdom does not provide.
 // The shader backdrop is decorative; rendering nothing keeps the SearchBar
 // mountable without crashing on an unhandled WebGL constructor rejection.
@@ -100,17 +121,41 @@ vi.mock("@paper-design/shaders-react", () => ({
   MeshGradient: () => null,
 }));
 
-import { useFilterStore } from "../../../stores/filterStore";
+import { traceViewContextChip } from "~/features/langy/hooks/useLangyTraceViewContext";
+import { useExplorerStore } from "../../../stores/explorerStore";
+import { SEARCH_BAR_PLACEHOLDER } from "../PlaceholderEditor";
 import { SearchBar } from "../SearchBar";
 import { SEARCH_HANDOFF_DRAFT } from "../searchLangyHandoff";
 
+/** The view chip the handoff attaches, built the way the page builds it. */
+function expectedViewChip(): { type: "filter"; id: string; label: string } {
+  const view = useExplorerStore.getState();
+  const filter = view;
+  const lens = view.allLenses.find((l) => l.id === view.activeLensId);
+  const chip = traceViewContextChip({
+    queryText: filter.queryText,
+    timeRange: filter.timeRange,
+    lens: lens
+      ? {
+          id: view.activeLensId,
+          name: lens.name,
+          isSavedView: !lens.isBuiltIn,
+          hasLocalChanges: view.draftState.has(view.activeLensId),
+        }
+      : undefined,
+    grouping: view.grouping,
+    sort: view.sort,
+  });
+  return { type: "filter", id: chip.ref ?? chip.id, label: chip.label };
+}
+
 afterEach(() => {
   cleanup();
-  useFilterStore.getState().clearAll();
+  useExplorerStore.getState().clearAll();
 });
 
 beforeEach(() => {
-  useFilterStore.getState().clearAll();
+  useExplorerStore.getState().clearAll();
   langyMock.enabled = false;
   langyMock.panelOpen = false;
   langyMock.draft = "";
@@ -130,11 +175,18 @@ function renderSearchBar() {
 
 describe("<SearchBar /> wiring smoke", () => {
   describe("when the component mounts with no active query", () => {
-    it("renders the placeholder", () => {
+    /** @scenario "Search bar renders with placeholder text" */
+    it("renders the placeholder, which invites a filter or a sentence", () => {
       renderSearchBar();
 
-      const placeholder = document.querySelector("[data-placeholder]");
+      const placeholder = document.querySelector(
+        "[data-placeholder]",
+      ) as HTMLElement;
       expect(placeholder).toBeInTheDocument();
+      expect(placeholder.dataset.placeholder).toBe(SEARCH_BAR_PLACEHOLDER);
+      expect(placeholder.dataset.placeholder).toBe(
+        "Search filters or type what you are looking for",
+      );
     });
 
     it("defers TipTap mount until interaction", () => {
@@ -157,7 +209,7 @@ describe("<SearchBar /> wiring smoke", () => {
 
   describe("when the store has an active query", () => {
     it("renders the query text inside the placeholder", () => {
-      useFilterStore.getState().applyQueryText("@status:error");
+      useExplorerStore.getState().applyQueryText("@status:error");
       renderSearchBar();
 
       const placeholder = document.querySelector(
@@ -167,7 +219,7 @@ describe("<SearchBar /> wiring smoke", () => {
     });
 
     it("shows the clear button", () => {
-      useFilterStore.getState().applyQueryText("@status:error");
+      useExplorerStore.getState().applyQueryText("@status:error");
       renderSearchBar();
 
       expect(screen.getByText(/clear/i)).toBeInTheDocument();
@@ -176,10 +228,10 @@ describe("<SearchBar /> wiring smoke", () => {
 
   describe("when the store has a parse error", () => {
     it("records the parse error in the store", () => {
-      useFilterStore.getState().applyQueryText('@status:"unclosed');
+      useExplorerStore.getState().applyQueryText('@status:"unclosed');
       renderSearchBar();
 
-      expect(useFilterStore.getState().parseError).not.toBeNull();
+      expect(useExplorerStore.getState().parseError).not.toBeNull();
     });
   });
 });
@@ -193,13 +245,13 @@ describe("<SearchBar /> ask affordance", () => {
       expect(screen.queryByText("Ask Langy")).not.toBeInTheDocument();
     });
 
-    it("keeps the Ask AI placeholder wording", () => {
+    it("keeps the ask out of the placeholder: the button is the way to ask", () => {
       renderSearchBar();
 
       const placeholder = document.querySelector(
         "[data-placeholder]",
       ) as HTMLElement;
-      expect(placeholder.dataset.placeholder).toContain("Ask AI");
+      expect(placeholder.dataset.placeholder).not.toContain("Ask");
     });
   });
 
@@ -208,20 +260,16 @@ describe("<SearchBar /> ask affordance", () => {
       langyMock.enabled = true;
     });
 
-    it("labels the affordance Ask Langy", () => {
+    /** @scenario "The ask button reads Ask Langy" */
+    it("labels the affordance Ask Langy and keeps the placeholder the same", () => {
       renderSearchBar();
 
       expect(screen.getByText("Ask Langy")).toBeInTheDocument();
       expect(screen.queryByText("Ask AI")).not.toBeInTheDocument();
-    });
-
-    it("swaps the placeholder wording to Ask Langy", () => {
-      renderSearchBar();
-
       const placeholder = document.querySelector(
         "[data-placeholder]",
       ) as HTMLElement;
-      expect(placeholder.dataset.placeholder).toContain("Ask Langy");
+      expect(placeholder.dataset.placeholder).toBe(SEARCH_BAR_PLACEHOLDER);
     });
 
     describe("when Ask Langy is clicked with the panel closed", () => {
@@ -240,7 +288,7 @@ describe("<SearchBar /> ask affordance", () => {
       });
 
       it("shows that the applied search will go with the question", () => {
-        useFilterStore.getState().applyQueryText("@status:error");
+        useExplorerStore.getState().applyQueryText("@status:error");
         renderSearchBar();
 
         fireEvent.click(screen.getByRole("button", { name: "Ask Langy" }));
@@ -250,9 +298,11 @@ describe("<SearchBar /> ask affordance", () => {
     });
 
     describe("when a question is typed into the floating bar and sent", () => {
-      it("asks Langy the question with the applied search attached, and the bar dissolves", () => {
-        useFilterStore.getState().applyQueryText("@status:error");
-        const applied = useFilterStore.getState().queryText;
+      /** @scenario "Ask Langy sends the whole view with the question" */
+      it("asks Langy the question with the view and the applied search attached, and the bar dissolves", () => {
+        useExplorerStore.getState().applyQueryText("@status:error");
+        const applied = useExplorerStore.getState().queryText;
+        const viewChip = expectedViewChip();
         renderSearchBar();
         fireEvent.click(screen.getByRole("button", { name: "Ask Langy" }));
 
@@ -263,7 +313,13 @@ describe("<SearchBar /> ask affordance", () => {
         fireEvent.keyDown(input, { key: "Enter" });
 
         expect(langyMock.ask).toHaveBeenCalledWith("why are these failing?");
-        expect(langyMock.attach).toHaveBeenCalledWith({
+        // The view first (time range, lens, sort, the search), then the
+        // filter chip the agent applies: at least what the passive page
+        // context sends.
+        expect(langyMock.attach).toHaveBeenNthCalledWith(1, viewChip);
+        expect(viewChip.id).toContain("search and attribute filters:");
+        expect(viewChip.id).toContain(applied);
+        expect(langyMock.attach).toHaveBeenNthCalledWith(2, {
           type: "filter",
           id: applied,
           label: `filtered: ${applied}`,
@@ -288,8 +344,8 @@ describe("<SearchBar /> ask affordance", () => {
       });
 
       it("uses the open panel — the search attaches, no second composer floats", () => {
-        useFilterStore.getState().applyQueryText("@status:error");
-        const applied = useFilterStore.getState().queryText;
+        useExplorerStore.getState().applyQueryText("@status:error");
+        const applied = useExplorerStore.getState().queryText;
         renderSearchBar();
 
         fireEvent.click(screen.getByRole("button", { name: "Ask Langy" }));

@@ -33,7 +33,7 @@ import { baseParams, buildTimeWhere, KEY_DISCOVERY_SETTINGS } from "./helpers";
 export function buildSpanAttributeKeysFacetQuery(
   ctx: FacetQueryContext,
 ): FacetQuery {
-  const where = buildTimeWhere("StartTime");
+  const where = buildTimeWhere("StartTime", ctx);
   const prefixFilter = ctx.prefix
     ? "AND lower(key) ILIKE concat({prefix:String}, '%')"
     : "";

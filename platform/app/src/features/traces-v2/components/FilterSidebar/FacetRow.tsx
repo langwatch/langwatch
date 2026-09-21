@@ -33,7 +33,7 @@ export const FacetRow = memo(function FacetRow({
   // don't look like "0 matches" while we're still waiting on the real
   // descriptors. Once real data lands the row gets a count + bar.
   const fillPct =
-    !item.synthetic && maxCount > 0
+    !item.synthetic && item.countState !== "pending" && maxCount > 0
       ? Math.max(
           (item.count / maxCount) * 100,
           item.count > 0 ? MIN_VISIBLE_FILL_PCT : 0,
@@ -162,7 +162,7 @@ export const FacetRow = memo(function FacetRow({
             >
               {item.label}
             </Text>
-            {!item.synthetic && (
+            {!item.synthetic && item.countState !== "pending" && (
               <Text
                 data-facet-count
                 textStyle="xs"
@@ -170,6 +170,8 @@ export const FacetRow = memo(function FacetRow({
                 fontWeight={isActive ? "600" : "400"}
                 flexShrink={0}
                 fontVariantNumeric="tabular-nums"
+                opacity={item.countState === "stale" ? 0.4 : 1}
+                transition="opacity 120ms ease"
               >
                 {formatCount(item.count)}
               </Text>

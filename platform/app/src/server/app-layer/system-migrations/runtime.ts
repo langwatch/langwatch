@@ -9,6 +9,7 @@
 import { auditLog } from "@ee/audit-log/auditLog";
 import { createLogger } from "@langwatch/observability";
 import {
+  groupByTenantSource,
   type MigrationPassSummary,
   type SystemMigration,
   SystemMigrationRunnerService,
@@ -512,12 +513,22 @@ export async function runSystemMigrationPass(args?: {
 }): Promise<MigrationPassSummary> {
   warnWhenRetiredCohortVariablesAreSet();
   const redis = args?.redis ?? tryGetApp()?.redis ?? null;
+  // Only the organizations with something left to do. One that has latched
+  // every migration in this list will never move again, and enumerating it
+  // costs a claim, a state read per migration and a release - per pass, per
+  // replica, forever. At fleet scale that is what ran the boot preflight past
+  // the startup probe's budget. The runner's terminal short-circuit still
+  // stands behind it: this decides who is worth visiting, never what the
+  // visit concludes.
+  const organizationMigrations = organizationMigrationsForThisInstallation();
   const runner = new SystemMigrationRunnerService({
     state: systemMigrationState,
     lease: new RedisMigrationLeaseRepository(redis),
-    tenants: new PrismaOrganizationTenantSource(prisma),
+    tenants: new PrismaOrganizationTenantSource(prisma).pendingFor({
+      migrationNames: organizationMigrations.map((migration) => migration.name),
+    }),
     cohort: await migrationPassCohort(),
-    migrations: organizationMigrationsForThisInstallation(),
+    migrations: organizationMigrations,
   });
   // The USER-rooted leg (ADR-101 §6): the same lease, state table and
   // enrollment rows, driven over users. Both legs' cohorts resolve BEFORE
@@ -532,17 +543,42 @@ export async function runSystemMigrationPass(args?: {
     await reapOrphanedAddressLocks();
     return organizationSummary;
   }
-  const userRunner = new SystemMigrationRunnerService({
-    state: systemMigrationState,
-    lease: new RedisMigrationLeaseRepository(redis),
-    tenants: new PrismaUserTenantSource(prisma),
-    cohort: userCohort,
+  // One runner per distinct tenant source. A migration that declares its own
+  // candidates is driven over those alone; every other user migration shares
+  // the walk over the whole `User` table. They cannot share one source: the
+  // narrowed set would silently become the others' cohort too, and a backfill
+  // that must reach every user would stop reaching most of them.
+  let summary = organizationSummary;
+  const everyUser = new PrismaUserTenantSource(prisma);
+  const userBuckets = groupByTenantSource({
     migrations: userMigrations,
+    everyTenant: everyUser,
   });
-  const summary = mergeSummaries(
-    organizationSummary,
-    await userRunner.runPass({ signal: args?.signal }),
-  );
+  for (const { tenants, migrations } of userBuckets) {
+    const userRunner = new SystemMigrationRunnerService({
+      state: systemMigrationState,
+      lease: new RedisMigrationLeaseRepository(redis),
+      // Narrowed AFTER grouping, never before: the buckets are formed by
+      // comparing sources by identity, so handing `groupByTenantSource` a
+      // fresh narrowed object per migration would split one bucket into
+      // several. A bucket driven over every user is cut to the users with
+      // work left for exactly that bucket's migrations; a migration that
+      // declared its own candidates (the heal, which never finalizes anyone)
+      // keeps the set it declared, untouched.
+      tenants:
+        tenants === everyUser
+          ? everyUser.pendingFor({
+              migrationNames: migrations.map((migration) => migration.name),
+            })
+          : tenants,
+      cohort: userCohort,
+      migrations,
+    });
+    summary = mergeSummaries(
+      summary,
+      await userRunner.runPass({ signal: args?.signal }),
+    );
+  }
   await reapOrphanedAddressLocks();
   return summary;
 }
