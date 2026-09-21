@@ -101,8 +101,11 @@ describe("given tenants at every stage of a two-migration pass", () => {
   });
 
   afterAll(async () => {
+    // Scoped by tenant as well as migration: the multitenancy guard refuses a
+    // bulk write that names no tenant, because one would rewrite every
+    // tenant's migration state rather than the rows this file seeded.
     await prisma.systemMigrationTenantState.deleteMany({
-      where: { migrationName: { in: BOTH } },
+      where: { migrationName: { in: BOTH }, tenantId: { in: EVERY_TENANT } },
     });
     await prisma.organization.deleteMany({
       where: { id: { in: EVERY_TENANT } },
